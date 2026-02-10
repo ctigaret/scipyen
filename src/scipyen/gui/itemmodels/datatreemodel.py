@@ -673,8 +673,10 @@ a tuple: (``parsedData``, ``infoDict``), where:
         n = len(pData)
         info = f"{n} {strutils.pluralize('element', n)}"
 
-        return pData, {"indirect": True, "objDataAsChild": False,
-                       "objInfo": info, "objType": type(obj).__name__,
+        return pData, {"indirect": True,
+                       "objDataAsChild": False,
+                       "objInfo": info,
+                       "objType": type(obj).__name__,
                        "objTip": tip,
                        "memberAccess": ("[","]"),
                        "choices": dict()}
@@ -741,7 +743,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             )
 
         n = len(pData)
-        info = f"{n} {strutils.pluralize('element', n)}"
+        info = f"{n} {strutils.pluralize('member', n)}"
         tip = type(obj).__name__
         return pData, {"indirect": True, "objDataAsChild": False,
                        "objInfo": info, "objType": type(obj).__name__,
@@ -1223,7 +1225,8 @@ a tuple: (``parsedData``, ``infoDict``), where:
             path = self._getPathForItemOrIndex_(leaf)
             print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> path = {path}")
             if len(path):
-                path[-1] = "self._modelData_"
+                if path[-1] == self._topObjectItem_.data(QtCore.Qt.DisplayRole):
+                    path[-1] = "self._modelData_"
 
             accessExpr = "".join(list(reversed(path)))
             print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> accessExpr = {accessExpr}")
@@ -1242,23 +1245,20 @@ a tuple: (``parsedData``, ``infoDict``), where:
             return "".join(list(reversed(path)))
         return ""
 
-    @singledispatchmethod
-    def _getPathForItemOrIndex_(self: typing.Self, index: object) -> typing.Sequence:
-        raise NotImplementedError
-
-    @_getPathForItemOrIndex_.register(QtCore.QModelIndex)
-    def _(self: typing.Self, index: QtCore.QModelIndex) -> typing.Sequence:
-        item = self.itemFromIndex(index)
-        if item:
-            return self._getPathForItemOrIndex_(item)
+    def _getPathForItemOrIndex_(
+        self: typing.Self,
+        indexOrItem: typing.Union[QtCore.QModelIndex,
+                            QtGui.QStandardItem]
+        ) -> typing.Sequence:
+        if isinstance(indexOrItem, QtCore.QModelIndex):
+            item = self.itemFromIndex(indexOrItem)
         else:
-            return list()
-
-    @_getPathForItemOrIndex_.register(QtGui.QStandardItem)
-    def _(self: typing.Self, item: QtGui.QStandardItem) -> typing.Sequence:
-        # print(f"{self.__class__.__name__}._getPathForItemOrIndex_(item: {item.data(QtCore.Qt.DisplayRole)})")
+            item = indexOrItem
 
         path = list()
+
+        if not item:
+            return path
 
         if item.data(StandaloneEditorWidgetRole):
             # NOTE: 2026-02-10 12:46:07
@@ -1289,19 +1289,20 @@ a tuple: (``parsedData``, ``infoDict``), where:
             # parentBinding = parentItem.data(QtCore.Qt.DisplayRole)
             bindingType = targetItem.data(ObjectKeyTypeRole)
             itemBinding = targetItem.data(ObjectKeyRole)
+            print(f"{self.__class__.__name__}._getPathForItemOrIndex_: bindingType -> {bindingType}")
             # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: itemBinding -> {itemBinding}")
             # else:
             #     itemBinding = itemBinding # BUG 2026-02-09 12:20:22 FIXME/TODO
 
             if itemBinding:
                 if len(parentAccess) == 1:
-                    print(f"{self.__class__.__name__}._getPathForItemOrIndex_ -> add access {parentAccess[0]}{itemBinding}")
+                    # print(f"{self.__class__.__name__}._getPathForItemOrIndex_ -> add access {parentAccess[0]}{itemBinding}")
                     path.append(f"{parentAccess[0]}{itemBinding}")
                 elif len(parentAccess) == 2:
                     if bindingType is str:
                         itemBinding = f"'{itemBinding}'"
-                    # elif bindingType is int:
-                    #     itemBinding = bindingType(itemBinding)
+                    else:
+                        itemBinding = bindingType(itemBinding) # hedging my bets...
                     path.append(f"{parentAccess[0]}{itemBinding}{parentAccess[1]}")
 
             path += self._getPathForItemOrIndex_(parentItem)
@@ -1309,17 +1310,88 @@ a tuple: (``parsedData``, ``infoDict``), where:
         elif item == self._topObjectItem_:
             # NOTE: 2026-02-10 12:26:33
             # this one is in column 0 by design
-            path = [self._topObjectItem_.data(QtCore.Qt.DisplayRole)]
+            path += [self._topObjectItem_.data(QtCore.Qt.DisplayRole)]
 
         return path
+
+    # @singledispatchmethod
+    # def _getPathForItemOrIndex_(self: typing.Self, index: object) -> typing.Sequence:
+    #     raise NotImplementedError
+    #
+    # @_getPathForItemOrIndex_.register(QtCore.QModelIndex)
+    # def _(self: typing.Self, index: QtCore.QModelIndex) -> typing.Sequence:
+    #     item = self.itemFromIndex(index)
+    #     if item:
+    #         return self._getPathForItemOrIndex_(item)
+    #     else:
+    #         return list()
+    #
+    # @_getPathForItemOrIndex_.register(QtGui.QStandardItem)
+    # def _(self: typing.Self, item: QtGui.QStandardItem) -> typing.Sequence:
+    #     # print(f"{self.__class__.__name__}._getPathForItemOrIndex_(item: {item.data(QtCore.Qt.DisplayRole)})")
+    #
+    #     path = list()
+    #
+    #     if item.data(StandaloneEditorWidgetRole):
+    #         # NOTE: 2026-02-10 12:46:07
+    #         # skip child items with standalone editor widget
+    #         # use their parent instead
+    #         # NOTE: 2026-02-10 12:24:40
+    #         # by design, only items in column 0 have data associated with this
+    #         # role
+    #         item = item.parent()
+    #         if item is None:
+    #             return path
+    #
+    #     # NOTE: 2026-02-10 12:22:40
+    #     # Code below only makes sense for items in column 0; however, when an`
+    #     # item on a higher column is passed, I need access to its sibling in
+    #     # column 0
+    #
+    #     parentItem = item.parent()
+    #
+    #     if parentItem:
+    #         if item.column() == 0:
+    #             targetItem = item
+    #         else:
+    #             # get the item's sibling in column 0
+    #             targetItem = parentItem.child(item.row(), 0)
+    #
+    #         parentAccess = parentItem.data(ObjectDataAccessRole)
+    #         # parentBinding = parentItem.data(QtCore.Qt.DisplayRole)
+    #         bindingType = targetItem.data(ObjectKeyTypeRole)
+    #         itemBinding = targetItem.data(ObjectKeyRole)
+    #         print(f"{self.__class__.__name__}._getPathForItemOrIndex_: itemBinding -> {itemBinding}")
+    #         # else:
+    #         #     itemBinding = itemBinding # BUG 2026-02-09 12:20:22 FIXME/TODO
+    #
+    #         if itemBinding:
+    #             if len(parentAccess) == 1:
+    #                 print(f"{self.__class__.__name__}._getPathForItemOrIndex_ -> add access {parentAccess[0]}{itemBinding}")
+    #                 path.append(f"{parentAccess[0]}{itemBinding}")
+    #             elif len(parentAccess) == 2:
+    #                 if bindingType is str:
+    #                     itemBinding = f"'{itemBinding}'"
+    #                 # elif bindingType is int:
+    #                 #     itemBinding = bindingType(itemBinding)
+    #                 path.append(f"{parentAccess[0]}{itemBinding}{parentAccess[1]}")
+    #
+    #         path += self._getPathForItemOrIndex_(parentItem)
+    #
+    #     elif item == self._topObjectItem_:
+    #         # NOTE: 2026-02-10 12:26:33
+    #         # this one is in column 0 by design
+    #         path += [self._topObjectItem_.data(QtCore.Qt.DisplayRole)]
+    #
+    #     return path
 
     def setData(self: typing.Self, modelIndex: QtCore.QModelIndex,
                 value: object, role = QtCore.Qt.EditRole) -> bool:
         if self._modelData_ is None:
             return False
 
-        row = modelIndex.row()
-        col = modelIndex.column()
+        # row = modelIndex.row()
+        # col = modelIndex.column()
 
         item = self.itemFromIndex(modelIndex)
 
@@ -1340,18 +1412,38 @@ a tuple: (``parsedData``, ``infoDict``), where:
         # if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole,
         #                 ObjectDataRole):
 
-        if col == 2 and role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole,
-                                 ObjectDataRole):
-            # NOTE: 2026-02-10 09:38:47
-            # mmm... overrule this !?
-            print(f"{self.__class__.__name__}.setData {value} for item in column 2 , row {item.row()}")
-            item.setData(QtCore.QVariant(value), QtCore.Qt.EditRole)
-            item.setData(QtCore.QVariant(value), ObjectDataRole)
-            self.dataChanged.emit(modelIndex, modelIndex)
-            self.sig_modelDataChanged.emit()
-            return True
+        objItem = item
+        if item.column() == 2 and role == ObjectDataRole:
+            parentItem = item.parent()
+            if not parentItem:
+                return False
+            objItem = parentItem.child(item.row(), 0)
 
-        return False
+        print(f"{self.__class__.__name__}.setData {value} for objItem {objItem.data(QtCore.Qt.DisplayRole)} , row {item.row()}")
+        # item.setData(QtCore.QVariant(value), QtCore.Qt.EditRole)
+        # item.setData(QtCore.QVariant(value), ObjectDataRole)
+        objItem.setData(QtCore.QVariant(value), ObjectDataRole)
+        path = self._getPathForItemOrIndex_(objItem)
+        print(f"\taccess to objItem: {path}")
+
+        if path[-1] == self._topObjectItem_.data(QtCore.Qt.DisplayRole):
+            path[-1] = "self._modelData_"
+
+        accexpr = "".join(reversed(path))
+        setexpr = accexpr + " = value"
+        exec(setexpr)
+
+        newVal = eval(accexpr)
+        objItem.setData(newVal, ObjectDataRole)
+        if item != objItem:
+            item.setData(QtCore.QVariant(newVal), QtCore.Qt.DisplayRole)
+            item.setData(newVal, ObjectDataRole)
+
+        self.dataChanged.emit(modelIndex, modelIndex)
+        self.sig_modelDataChanged.emit()
+        return True
+
+        # return False
 
 
 

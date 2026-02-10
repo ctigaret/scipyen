@@ -136,6 +136,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     """
         super().__init__(parent=parent)
         self._model_ = None
+        self._useObjectDataRole_: bool = False
 
         self._enforceFloat_:bool = enforceFloat
 
@@ -186,8 +187,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         return self._enforceFloat_
 
     @enforceFloat.setter
-    def enforceFloat(self, val:bool):
-        self._enforceFloat_ = val == True
+    def enforceFloat(self, val: bool):
+        self._enforceFloat_ = val is True
 
     @property
     def columnChoices(self) -> dict:
@@ -195,20 +196,29 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     One may edit the contents directly
     """
 
-    def setColumnChoices(self, choicesDict:typing.Optional[dict[int, dict[typing.Sequence, bool]]]=None):
+    def setColumnChoices(
+        self,
+        choicesDict: typing.Optional[dict[int, dict[typing.Sequence,
+                                                    bool]]] = None
+        ):
         if choicesDict is None:
             self._columnChoices_ = dict() # wipes out current column choices
 
         elif self._checkColumnChoiceDict_(choicesDict): # may wipe out the choices if parameter is empty
             self._columnChoices_ = choicesDict
         else:
-            scipywarn(f"{self.__class__.__name__}.setColumnChoices: inappropriate value")
+            scipywarn(
+                f"{self.__class__.__name__}.setColumnChoices: inappropriate value"
+                )
 
-    def setChoicesForColumn(self, /,
-                            col:typing.Optional[int] = None,
-                            choiceData:typing.Optional[typing.Union[dict, typing.Sequence, bool]]=None,
-                            editable:typing.Optional[bool] = None
-                            ):
+    def setChoicesForColumn(
+        self: typing.Self, /,
+        col: typing.Optional[int] = None,
+        choiceData: typing.Optional[typing.Union[dict,
+                                                    typing.Sequence,
+                                                    bool]] = None,
+        editable: typing.Optional[bool] = None
+                    ):
         r"""Alter the choices for a specific column.
         Keyword-only parameters:
         col: int or None; column index; can be None when choiceData is a dict with
@@ -292,7 +302,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         if isinstance(data, (bool, np.bool)):# or "bool" in type(data).__name__:
             widget = QtWidgets.QCheckBox(parent)
             if not inModel:
-                widget.setChecked(data == True)
+                widget.setChecked(data is True)
             widget.toggled.connect(self.slot_dataChanged)
 
         elif isinstance(data, (int, float, np.floating, np.integer)):# or any(v in type(data).__name__ for v in ("int", "float")):
@@ -464,8 +474,15 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         # one should restrict everything to string, in the custom item model, as
         # as this cannot cover every possibility
 
-        data = index.data(ObjectDataRole) or index.data(QtCore.Qt.EditRole)
-        disp = index.data(QtCore.Qt.DisplayRole)
+        data = index.data(ObjectDataRole)
+        if data is not None:
+            self._useObjectDataRole_ = True
+
+        else:
+            data = index.data(QtCore.Qt.EditRole)
+            self._useObjectDataRole_ = False
+
+        # disp = index.data(QtCore.Qt.DisplayRole)
         # CAUTION: Standard item model and standard items treat DisplayRole and
         # DisplayRole as being the same; in such case I need a custom role
         dataChoices = index.data(DataChoicesRole)
@@ -506,14 +523,15 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         return self.createWidget(data, choices, True, parent)
 
-        if hasattr(widget, "setFrame"):
-            widget.setFrame(False)
-        widget.setAutoFillBackground(True)
-        return widget
-
     def setEditorData(self, editor:QtWidgets.QWidget, index:QtCore.QModelIndex):
         r"""Sets the value of the editor widget based on the EditRole data in the QModelIndex"""
-        data = index.data(ObjectDataRole) or index.data(QtCore.Qt.EditRole)
+        data = index.data(ObjectDataRole)
+        if data is not None:
+            self._useObjectDataRole_ = True
+        else:
+            data = index.data(QtCore.Qt.EditRole)
+            self._useObjectDataRole_ = False
+
         # NOTE: 2026-02-10 09:48:29
         # because for QStandardItems EditRole and DisplayRole do the same thing
         disp = f"{index.data(QtCore.Qt.DisplayRole)}"
@@ -521,6 +539,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         if index.column() in self._columnChoices_:
             choices = self._columnChoices_[index.column()]["choices"]
+
         elif dataChoices:
             choices = dataChoices
         else:
@@ -542,7 +561,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         else:
             if isinstance(data, bool) or "bool" in type(data).__name__:
                 assert isinstance(editor, QtWidgets.QCheckBox), f"Incompatible editor widget type ({type(editor).__name__}) for boolean data"
-                editor.setChecked(bool(data)==True) # because data may be of numpy.bool type
+                editor.setChecked(bool(data) is True) # because data may be of numpy.bool type
 
             elif isinstance(data, int) or "int" in type(data).__name__:
                 assert isinstance(editor, QtWidgets.QSpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for integer data"
@@ -556,6 +575,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     decimals = len(disp[disp.index("."):])
                 else:
                     decimals = 0
+                if isinstance(editor, smw.QuantitySpinBox):
+                    editor.keepDimensionless = True
+                    editor.forceDimensionless = True
                 editor.setDecimals(decimals)
                 editor.setValue(data)
 
@@ -591,16 +613,24 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 editor.setText(data)
 
 
-    def setModelData(self, editor:QtWidgets.QWidget, model:QtCore.QAbstractItemModel, index:QtCore.QModelIndex):
+    def setModelData(self, editor:QtWidgets.QWidget,
+                     model:QtCore.QAbstractItemModel,
+                     index:QtCore.QModelIndex):
         r"""Sets data back into the QModelIndex"""
-        if isinstance(editor, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox, smw.QuantitySpinBox)):
+        if isinstance(editor, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox,
+                               smw.QuantitySpinBox)):
             data = editor.value()
+
         elif isinstance(editor, QtWidgets.QLineEdit):
             data = editor.text()
+
         elif isinstance(editor, QtWidgets.QComboBox):
             data = editor.currentText()
+
         elif isinstance(editor, QtWidgets.QCheckBox):
             data = editor.isChecked()
 
-        # print(f"{self.__class__.__name__}.setModelData -> data = {data}")
-        model.setData(index, data, QtCore.Qt.EditRole)
+
+        role = ObjectDataRole if self._useObjectDataRole_ else QtCore.Qt.EditRole
+        # print(f"{self.__class__.__name__}.setModelData -> editor: {type(editor).__name__}, row = {index.row()}, column = {index.column()}, data = {data} for role = {role}")
+        model.setData(index, data, role)

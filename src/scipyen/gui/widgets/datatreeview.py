@@ -184,7 +184,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         parent = kwargs.pop("parent", None)
         super().__init__(parent=parent)
         super().setModel(DataTreeModel())
-        self.model().dataChanged.connect(self._slot_dataChanged_)
+        # self.model().dataChanged.connect(self._slot_dataChanged_)
         self._delegate_ = PythonItemDelegate()
         self._defaultDelegate_ = self.itemDelegate()
 
@@ -203,10 +203,27 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
         if index0 == index1:
             item = self.model().itemFromIndex(index0)
-            if item.column() == 2:
-                data = item.data()
-                originalData = self.model().getDataObjectForLeaf(item)
-                print(f"\torginal data {originalData}, new data {data}")
+            if item.column() == 0:
+                # I need item in column 0 which is the reposutory of the actual
+                # data object
+
+                objItem = item
+            else:
+                parentItem = item.parent()
+                if parentItem:
+                    objItem = parentItem.child(item.row(), 0)
+                else:
+                    return
+
+            originalData = self.model().getDataObjectForLeaf(item)
+            data = objItem.data(ObjectDataRole)
+            print(f"\torginal data {originalData}, new data {data}")
+
+
+            # if item.column() == 2:
+            #     data = item.data()
+            #     originalData = self.model().getDataObjectForLeaf(item)
+            #     print(f"\torginal data {originalData}, new data {data}")
 
 
     def _setupChildDataItem_(self: typing.Self, item: QtGui.QStandardItem,
@@ -290,9 +307,10 @@ For a given item:
 
     def setData(self: typing.Self, obj: object,
                 name: typing.Optional[str] = None):
-        model = self.model()
-        model.setModelData(obj, name)
-        root = model.invisibleRootItem()
+        signalBlocker = QtCore.QSignalBlocker(self.model())
+        # model = self.model()
+        self.model().setModelData(obj, name)
+        root = self.model().invisibleRootItem()
         if root.hasChildren():
             # NOTE: 2026-02-08 15:23:06
             # there is exactly one of these and it is the visible "root" of the
