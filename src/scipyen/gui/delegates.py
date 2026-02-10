@@ -285,10 +285,6 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
     Bypasses the QModelIndex paradigm because a QTreeWidgetItem does not expose QModelIndex API
 
-    .. warning::
-
-        Do **NOT** use within the Model/View paradigm!
-
     """
         from gui.widgets.tableeditorwidget import TableEditorWidget # import here to avoid circular imports (delegates is imported by tableeditorwidget as well)
         widget = None
@@ -510,74 +506,6 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         return self.createWidget(data, choices, True, parent)
 
-#         if index.column() in self._columnChoices_:
-#             if not isinstance(data, str):
-#                 scipywarn(f"{self.__class__.__name__}.createEditor: data type ({type(data).__name__}) is not supported for combo box")
-#                 return
-#
-#             choices = self._columnChoices_[index.column()]["choices"]
-#
-#             if data not in choices:
-#                 scipywarn(f"{self.__class__.__name__}.createEditor: data {data} does not belong to choices ({choices})")
-#                 return
-#
-#             ndx = choices.index(data)
-#
-#             widget = QtWidgets.QComboBox(parent)
-#             widget.insertItems(0, choices)
-#             widget.setEditable(False) # prevent editing for now; must revisit this FIXME/TODO
-#             # widget.setEditable(self._columnChoices_[index.column()]["editable"])
-#             widget.setCurrentIndex(ndx)
-#
-#         else:
-#
-#             # TODO: 2025-09-25 23:42:02
-#             # for datetime.datetime use QDateTimeEdit (with QDate and QTime)
-#             # for datetime.date use QDateEdit (with QDate)
-#             # for datetime.time use QTimeEdit (with QTime)
-#
-#             if isinstance(data, bool) or "bool" in type(data).__name__:
-#                 widget = QtWidgets.QCheckBox(parent)
-#
-#             elif isinstance(data, (int, float)) or any(v in type(data).__name__ for v in ("int", "float")):
-#                 if self._enforceFloat_:
-#                     # widget = QtWidgets.QDoubleSpinBox(parent)
-#                     widget = smw.QuantitySpinBox(parent)
-#                     widget.setMinimum(-math.inf)
-#                     widget.setMaximum(math.inf)
-#                     widget.setSingleStep(1)
-#
-#                 else:
-#                     if isinstance(data, int) or "int" in type(data).__name__: # to include numpy array int dtypes
-#                         widget = QtWidgets.QSpinBox(parent)
-#                         widget.setMinimum(-9999)
-#                         widget.setMaximum(9999)
-#
-#                     elif isinstance(data, float) or "float" in type(data).__name__: # to include numpy array float dtypes
-#                         # widget = QtWidgets.QDoubleSpinBox(parent)
-#                         widget = smw.QuantitySpinBox(parent)
-#                         widget.setMinimum(-math.inf)
-#                         widget.setMaximum(math.inf)
-#                         widget.setSingleStep(1)
-#
-#             elif isinstance(data, pq.Quantity):
-#                 if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
-#                     widget = smw.QuantityChooserWidget(parent)
-#                 else:
-#                     if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
-#                         return
-#                     widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
-#                     widget.setMinimum(-math.inf * data.units)
-#                     widget.setMaximum(math.inf * data.units)
-#                     widget.setSingleStep(1.0  * data.units)
-#                     widget.disableUnitChange = True
-#
-#             elif isinstance(data, str) or "str" in type(a).__name__: # for numpy.str_ type
-#                 widget = QtWidgets.QLineEdit(parent)
-#
-#             else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
-#                 return
-
         if hasattr(widget, "setFrame"):
             widget.setFrame(False)
         widget.setAutoFillBackground(True)
@@ -586,7 +514,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     def setEditorData(self, editor:QtWidgets.QWidget, index:QtCore.QModelIndex):
         r"""Sets the value of the editor widget based on the EditRole data in the QModelIndex"""
         data = index.data(ObjectDataRole) or index.data(QtCore.Qt.EditRole)
-        disp = index.data(QtCore.Qt.DisplayRole)
+        # NOTE: 2026-02-10 09:48:29
+        # because for QStandardItems EditRole and DisplayRole do the same thing
+        disp = f"{index.data(QtCore.Qt.DisplayRole)}"
         dataChoices = index.data(DataChoicesRole)
 
         if index.column() in self._columnChoices_:

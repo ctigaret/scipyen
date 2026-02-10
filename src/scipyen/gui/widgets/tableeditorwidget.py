@@ -96,6 +96,14 @@ __ui_path__ = adapt_ui_path(__module_path__, "tableeditorwidget.ui")
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
+TabularType = typing.Union[pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
+                           neo.AnalogSignal, neo.IrregularlySampledSignal,
+                           neo.Epoch, neo.Event, neo.SpikeTrain,
+                           DataSignal, IrregularlySampledDataSignal,
+                           TriggerEvent, TriggerProtocol,
+                           np.ndarray, vigra.VigraArray,
+                           vigra.filters.Kernel1D, vigra.filters.Kernel2D]
+
 Ui_TableEditorWidget, QWidget = loadUiType(__ui_path__)
 
 class TableEditorWidget(QWidget, Ui_TableEditorWidget):
@@ -112,6 +120,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 
     sig_selectionChanged = Signal(name="sig_selectionChanged")
     sig_dataChanged = Signal(name="sig_dataChanged")
+    sig_valueChanged = sig_dataChanged
 
     def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None,
                  readOnly:bool=True, enforceFloat:bool=False,
@@ -169,12 +178,10 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 
         # self.setData(None)
 
-    def setData(self, data:(pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
-                       neo.AnalogSignal, neo.IrregularlySampledSignal,
-                       neo.Epoch, neo.Event, neo.SpikeTrain,
-                       DataSignal, IrregularlySampledDataSignal,
-                       TriggerEvent, TriggerProtocol,
-                       np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D), *args, **kwargs):
+    def setValue(self: typing.Self, value: TabularType, *args, **kwargs):
+        self.setData(value, *args, **kwargs)
+
+    def setData(self, data: TabularType, *args, **kwargs):
         r"""Called when this widget is part of TableEditor
     """
         from imaging import vigrautils

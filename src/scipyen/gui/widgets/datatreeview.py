@@ -184,12 +184,30 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         parent = kwargs.pop("parent", None)
         super().__init__(parent=parent)
         super().setModel(DataTreeModel())
+        self.model().dataChanged.connect(self._slot_dataChanged_)
         self._delegate_ = PythonItemDelegate()
         self._defaultDelegate_ = self.itemDelegate()
 
     def setModel(self: typing.Self, model: QtCore.QAbstractItemModel):
         # disallow changing the model
         pass
+
+    @Slot(QtCore.QModelIndex, QtCore.QModelIndex)
+    def _slot_dataChanged_(self, index0: QtCore.QModelIndex,
+                           index1: QtCore.QModelIndex):
+        print(f"{self.__class__.__name__}._slot_dataChanged_:")
+        # print(f"\tindex 0 row {index0.row()}, col {index0.column()}")
+        # print(f"\tindex 0 data {index0.data()}")
+        # print(f"\tindex 1 row {index1.row()}, col {index1.column()}")
+        # print(f"\tindex 1 data {index1.data()}")
+
+        if index0 == index1:
+            item = self.model().itemFromIndex(index0)
+            if item.column() == 2:
+                data = item.data()
+                originalData = self.model().getDataObjectForLeaf(item)
+                print(f"\torginal data {originalData}, new data {data}")
+
 
     def _setupChildDataItem_(self: typing.Self, item: QtGui.QStandardItem,
                              objData: typing.Optional[typing.Any] = None):
@@ -219,8 +237,10 @@ For a given item:
 
         model = self.model()
         index = item.index()
+
         if objData is None:
             objData = item.data(ObjectDataRole)
+
         if index.column() == 0 and item.hasChildren():
             for row in range(item.rowCount()):
                 childItem = item.child(row, 0)
@@ -247,11 +267,15 @@ For a given item:
                     self._setupChildDataItem_(infoItem, objData)
 
         elif index.column() == 2:
-            print(f"{self.__class__.__name__}._setupChildDataItem_: index row {index.row()}, column {index.column}, data {index.data(ObjectDataRole)}")
+            # print(f"{self.__class__.__name__}._setupChildDataItem_ for column 2")
+            # print(f"\tindex display: {index.data(QtCore.Qt.DisplayRole)}")
+            # print(f"\tindex object data {index.data(ObjectDataRole)}")
+            # print(f"\tindex row {index.row()}")
+            signalBlocker = QtCore.QSignalBlocker(self.model())
             # index = infoItem.index()
-            row = index.row()
+            # row = index.row()
             infoItem = model.itemFromIndex(index)
-            choices = infoItem.data(DataChoicesRole)
+            # choices = infoItem.data(DataChoicesRole) # picked up by the delegate, from the index
             # editorWidget = self._delegate_.createWidget(objData,
             #                                             choices,
             #                                             False,
@@ -260,10 +284,9 @@ For a given item:
             #
             #
             self.setItemDelegateForColumn(index.column(), self._delegate_)
-            self.setItemDelegateForRow(row, self._delegate_)
+            self.setItemDelegateForRow(index.row(), self._delegate_)
             flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
             infoItem.setFlags(flags)
-
 
     def setData(self: typing.Self, obj: object,
                 name: typing.Optional[str] = None):

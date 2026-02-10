@@ -261,25 +261,17 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         #return QtCore.Qt.ItemIsEditable | QtCore.Qt.ItemIsSelectable
 
-    def setData(self, modelIndex, value, role=QtCore.Qt.EditRole):
+    def setData(self: typing.Self, modelIndex: QtCore.QModelIndex,
+                value: object, role=QtCore.Qt.EditRole) -> bool:
         r"""Set a new data with the specified role, at the specified model index in this model"""
         if self._modelData_ is None:
             return False
 
         row = modelIndex.row()
         col = modelIndex.column()
-        # print(f"{self.__class__.__name__}.setData({modelIndex}, {value}, {role})")
-        # print(f"\trow: {row}, col: {col} for model data with shape {self._modelData_.shape}")
 
         if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole):
             return False
-
-        # if isinstance(self._modelData_, neo.core.dataobject.DataObject):
-        #
-        # elif self._modelData_.ndim < 2: or col  >= self._modelData_.shape[1]:
-        #     return False
-
-        # print(f"{self.__class__.__name__}.setData: role = {role}")
 
         if self._setDataValue_(value, row, col):
             # NOTE: This signal (inherited from Qt?) notifies the itemview (here,

@@ -4,30 +4,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-r"""
-.. note::
-
-    NOTE: 2026-02-02 08:56:30
-
-    Hitting a wall of bricks here...
-
-    The only QModelIndex constructor API exposed in PyQt6 QModelIndex
-    seems to be:
-
-.. ::
-
-    QModelIndex()
-    QModelIndex(a0: QModelIndex)
-    QModelIndex(a0: QPersistentModelIndex)
-
-
-I.e., there seems to be no way I can generate a QModelIndex via, say,
-
-.. ::
-
-    QtCore.QModelIndex(row:int, column:int, data:typing.Any)
-
-"""
 from __future__ import print_function
 
 import os
@@ -211,7 +187,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                  parent: typing.Optional[QtCore.QObject] = None,
                  **kwargs):
         super(DataTreeModel, self).__init__(0, 3, parent=parent)
-        self._data_: typing.Optional[object] = None
+        self._modelData_: typing.Optional[object] = None
         self._dataTypeStr_: str = ""
         self._visited_: dict = dict()
         self._rootTitle_ = "/"
@@ -254,7 +230,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         self._rootTitle_ = rootTitle if len(rootTitle.strip()) else "/"
 
-        self._data_ = obj
+        self._modelData_ = obj
 
         pData, objDict = self._parseObject_(obj, self._showPrivate_)
 
@@ -333,9 +309,12 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # b) offer a delegate editor widget so that user can modify the value
         #
         # "choices" goes as item data with objectDataRole for THIS item
-        item2 = QtGui.QStandardItem(info)
-        item2.setData(info, QtCore.Qt.DisplayRole)
-        item2.setData(QtCore.QVariant(obj), ObjectDataRole)
+        item2 = QtGui.QStandardItem(f"{info}")
+        item2.setData(info, QtCore.Qt.EditRole)
+        # NOTE: 2026-02-10 09:33:22
+        # execute the code line below NOT here, but conditionally in
+        # self._buildBranch_:
+        # item2.setData(QtCore.QVariant(obj), ObjectDataRole)
         item2.setData(objDict.get("choices", list()), DataChoicesRole)
 
         #
@@ -389,6 +368,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             objItem.insertRow(0, [dataItem])
         else:
             dataItem = rowItems[-1]
+            dataItem.setData(QtCore.QVariant(obj), ObjectDataRole)
             # NOTE: 2026-02-08 14:41:20 TODO
             # use data item roles to
             # 1) flag that this needs an item-deletage that occupies a single row
@@ -575,9 +555,6 @@ a tuple: (``parsedData``, ``infoDict``), where:
             raise NotImplementedError(
             f"Objects of type {type(obj).__name__} are not supported"
             )
-            # pData = obj
-            # indirect = False
-            # info = ""
 
         return pData, {"indirect": indirect, "objDataAsChild": objDataAsChild,
                        "objInfo": info, "objType": type(obj).__name__,
@@ -742,7 +719,9 @@ a tuple: (``parsedData``, ``infoDict``), where:
           _: bool=True) -> tuple:
         tip = type(obj).__name__
         return obj, {"indirect": False, "objDataAsChild": False,
-                     "objInfo": f"{obj}", "objType": type(obj).__name__,
+                     # "objInfo": f"{obj}",
+                     "objInfo": obj,
+                     "objType": type(obj).__name__,
                      "objTip": tip,
                      "memberAccess": tuple(),
                      "choices": dict()}
@@ -902,7 +881,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
         #
         # ### END   NOTE: 2026-02-08 21:20:00 TODO/FIXME
 
-        tip = type(obk).__name__
+        tip = type(obj).__name__
         if isinstance(obj, vigra.filters.Kernel1D):
             n = int(obj.size())
             info = f"with {n} {strutils.pluralize('sample', n)}"
@@ -1039,7 +1018,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             objDataAsChild = False
         else:
             if obj.size <= 1:
-                info = f"{obj}"
+                info = obj
                 objDataAsChild = False
             else:
                 n = obj.size
@@ -1063,17 +1042,21 @@ a tuple: (``parsedData``, ``infoDict``), where:
         c = obj.channels
         axtags = ", ".join(list(map(lambda i: f"'{i.key}'", obj.axistags)))
         samples = strutils.pluralize('samples', n)
+        objDataAsChild = False
         if obj.size <= 1:
-            info = f"{obj}"
+            info = obj
         else:
+            objDataAsChild = True
             info = f"Vigra Array with {n} {samples}; shape {s}; axistags: {axtags}; {c} channels; dtype {obj.dtype}."
 
         pData = dict(enumerate(obj.axistags))
 
         tip = type(obj).__name__
 
-        return pData, {"indirect": True, "objDataAsChild": True,
-                       "objInfo": info, "objType": type(obj).__name__,
+        return pData, {"indirect": True,
+                       "objDataAsChild": objDataAsChild,
+                       "objInfo": info,
+                       "objType": type(obj).__name__,
                        "objTip": tip,
                        "memberAccess": (".", ),
                        "choices": dict()}
@@ -1090,13 +1073,18 @@ a tuple: (``parsedData``, ``infoDict``), where:
         # s = " × ".join(list(map(lambda x: f"{x}", obj.shape)))
         s = f"{obj.shape}"
         samples = strutils.pluralize('sample', n)
+        objDataAsChild = False
         if obj.size <= 1:
-            info = f"{obj}"
+            info = obj
         else:
+            objDataAsChild = True
             info = f"Array with {n} {samples}; shape {s}; dtype {obj.dtype}."
 
-        return obj, {"indirect": False, "objDataAsChild": True, "objInfo": info,
-                     "objType": type(obj).__name__, "objTip": tip,
+        return obj, {"indirect": False,
+                     "objDataAsChild": objDataAsChild,
+                     "objInfo": info,
+                     "objType": type(obj).__name__,
+                     "objTip": tip,
                      "memberAccess": tuple(),
                      "choices": dict()}
 
@@ -1233,10 +1221,12 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         if byPath:
             path = self._getPathForItemOrIndex_(leaf)
+            print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> path = {path}")
             if len(path):
-                path[-1] = "self._data_"
+                path[-1] = "self._modelData_"
 
             accessExpr = "".join(list(reversed(path)))
+            print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> accessExpr = {accessExpr}")
             return eval(accessExpr)
 
         else:
@@ -1267,35 +1257,102 @@ a tuple: (``parsedData``, ``infoDict``), where:
     @_getPathForItemOrIndex_.register(QtGui.QStandardItem)
     def _(self: typing.Self, item: QtGui.QStandardItem) -> typing.Sequence:
         # print(f"{self.__class__.__name__}._getPathForItemOrIndex_(item: {item.data(QtCore.Qt.DisplayRole)})")
+
         path = list()
+
         if item.data(StandaloneEditorWidgetRole):
+            # NOTE: 2026-02-10 12:46:07
+            # skip child items with standalone editor widget
+            # use their parent instead
+            # NOTE: 2026-02-10 12:24:40
+            # by design, only items in column 0 have data associated with this
+            # role
             item = item.parent()
             if item is None:
                 return path
 
+        # NOTE: 2026-02-10 12:22:40
+        # Code below only makes sense for items in column 0; however, when an`
+        # item on a higher column is passed, I need access to its sibling in
+        # column 0
+
         parentItem = item.parent()
+
         if parentItem:
+            if item.column() == 0:
+                targetItem = item
+            else:
+                # get the item's sibling in column 0
+                targetItem = parentItem.child(item.row(), 0)
+
             parentAccess = parentItem.data(ObjectDataAccessRole)
-            parentBinding = parentItem.data(QtCore.Qt.DisplayRole)
-            bindingType = item.data(ObjectKeyTypeRole)
-            itemBinding = item.data(ObjectKeyRole)
+            # parentBinding = parentItem.data(QtCore.Qt.DisplayRole)
+            bindingType = targetItem.data(ObjectKeyTypeRole)
+            itemBinding = targetItem.data(ObjectKeyRole)
+            # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: itemBinding -> {itemBinding}")
             # else:
             #     itemBinding = itemBinding # BUG 2026-02-09 12:20:22 FIXME/TODO
 
-            if len(parentAccess) == 1:
-                path.append(f"{parentAccess[0]}{itemBinding}")
-            elif len(parentAccess) == 2:
-                if bindingType is str:
-                    itemBinding = f"'{itemBinding}'"
-                # elif bindingType is int:
-                #     itemBinding = bindingType(itemBinding)
-                path.append(f"{parentAccess[0]}{itemBinding}{parentAccess[1]}")
+            if itemBinding:
+                if len(parentAccess) == 1:
+                    print(f"{self.__class__.__name__}._getPathForItemOrIndex_ -> add access {parentAccess[0]}{itemBinding}")
+                    path.append(f"{parentAccess[0]}{itemBinding}")
+                elif len(parentAccess) == 2:
+                    if bindingType is str:
+                        itemBinding = f"'{itemBinding}'"
+                    # elif bindingType is int:
+                    #     itemBinding = bindingType(itemBinding)
+                    path.append(f"{parentAccess[0]}{itemBinding}{parentAccess[1]}")
 
             path += self._getPathForItemOrIndex_(parentItem)
 
         elif item == self._topObjectItem_:
+            # NOTE: 2026-02-10 12:26:33
+            # this one is in column 0 by design
             path = [self._topObjectItem_.data(QtCore.Qt.DisplayRole)]
 
         return path
+
+    def setData(self: typing.Self, modelIndex: QtCore.QModelIndex,
+                value: object, role = QtCore.Qt.EditRole) -> bool:
+        if self._modelData_ is None:
+            return False
+
+        row = modelIndex.row()
+        col = modelIndex.column()
+
+        item = self.itemFromIndex(modelIndex)
+
+        # NOTE: 2026-02-10 09:18:53
+        # don't change data for this kind of item; this is done directly by the
+        # table editor delegate
+        #
+        # Also NOTE: I use avoid editing any item in column 0 as this refers to
+        # the symbol, in the parent object, to which the child object is bound;
+        # changing this symbol would effectively mean changing the structure of
+        # the parent object (its "class") for regular objects, whereas for
+        # collections, this would mean chaning the "keys" in a mapping or the
+        # "indexes" in a sequence, etc. For collections, there IS a way to alter
+        # the "keys" in a dictionary or the **order** of elements in a sequence,
+        # but that is too convoluted to implement in this model and is beyond
+        # its scope, anyway.
+        #
+        # if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole,
+        #                 ObjectDataRole):
+
+        if col == 2 and role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole,
+                                 ObjectDataRole):
+            # NOTE: 2026-02-10 09:38:47
+            # mmm... overrule this !?
+            print(f"{self.__class__.__name__}.setData {value} for item in column 2 , row {item.row()}")
+            item.setData(QtCore.QVariant(value), QtCore.Qt.EditRole)
+            item.setData(QtCore.QVariant(value), ObjectDataRole)
+            self.dataChanged.emit(modelIndex, modelIndex)
+            self.sig_modelDataChanged.emit()
+            return True
+
+        return False
+
+
 
 
