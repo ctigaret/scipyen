@@ -6,7 +6,7 @@
 
 r"""
 """
-import os, sys, typing, math
+import os, sys, typing, math, pathlib
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -387,7 +387,6 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     widget.setData(data)
                     widget.sig_dataChanged.connect(self.slot_dataChanged)
 
-
         elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
             if inModel:
                 return
@@ -426,6 +425,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     else:
                         return
 
+        # elif isinstance(data, pathlib.Path):
+        #     widget = smw.LazyLineEdit()
+        #     widget.setText(data)
+        #     widget.sig_enterPressed.connect(self.slot_dataChanged)
         else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
             return
 
@@ -611,6 +614,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             elif isinstance(data, str) or "str" in type(a).__name__:
                 assert isinstance(editor, QtWidgets.QLineEdit), f"Incompatible editor editor type ({type(editor).__name__}) for string data"
                 editor.setText(data)
+
+            # elif isinstance(data, pathlib.Path):
+            #     assert isinstance(editor, QtWidgets.QLineEdit), f"Incompatible editor editor type ({type(editor).__name__}) for string data"
+            #     editor.setText(data)
 
 
     def setModelData(self, editor:QtWidgets.QWidget,

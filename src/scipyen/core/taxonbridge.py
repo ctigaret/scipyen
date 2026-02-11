@@ -10,8 +10,6 @@ class Taxon:
     r"""Shim class that will be overwritten below if taxoniq package is installed.
     For HDF5 storage, all we need is a scientific_name
     """
-    # def __new__(obj, *args, **kwargs):
-    #     return MISSING
     def __init__(self, **kwargs):
         self.tax_id = None
         self.scientific_name = kwargs.pop("scientific_name", None)

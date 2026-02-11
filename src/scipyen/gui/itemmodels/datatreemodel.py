@@ -22,7 +22,7 @@ import pkgutil
 import typing
 import enum
 from functools import (singledispatch, singledispatchmethod)
-from collections import deque
+from collections import deque, UserDict
 from dataclasses import MISSING
 import math
 import qtpy
@@ -72,6 +72,10 @@ import vigra
 
 import core.datatypes as datatypes
 from core.datatypes import (is_namedtuple, TypeEnum)
+from core.prog import scipywarn
+from core import taxonbridge
+from core import bgbridge
+# print(f"has brain globe: {bgbridge.hasBrainGlobe}")
 
 # NOTE: 2026-02-07 09:14:19 FIXME/TODO
 # to break cycling dependencies in systems.PrairieView, which needs this for the
@@ -164,6 +168,14 @@ PODS = (
 class DataTreeModel(QtGui.QStandardItemModel):
     r"""
 """
+    # TODO 2026-02-08 22:49:01
+    # Support for:
+    # struct array, recarray
+    # neo.BaseSignal
+    # types in the datetime module - needs additions to PythonItemDelegate
+    #
+    #
+    # FIXME handling of Enum / TypeEnum values -> trigger the use of a ComboBox!
 
 
     mappingTypes = (dict, types.MappingProxyType)
@@ -240,12 +252,13 @@ class DataTreeModel(QtGui.QStandardItemModel):
         self._buildTree_(self._privateData_, objDict, self._rootTitle_)
 
     def _makeObjectRow_(self: typing.Self, obj: object, /,
-                       objDict: dict, objKey: object) -> tuple:
+                       objDict: dict, objKey: object,
+                       objKeyType: type) -> tuple:
 
         typeName = objDict["objType"]
         info = objDict["objInfo"]
 
-        keyType = type(objKey)
+        # keyType = type(objKey)
 
         if isinstance(objKey, str):
             objName = objKey
@@ -263,6 +276,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         item0 = QtGui.QStandardItem(objName)
         item0.setData(objName, QtCore.Qt.DisplayRole)
+        item0.setData(type(obj), ObjectTypeRole)
 
         # NOTE: 2026-02-09 21:47:10
         # used to construct the acess path to the object for this item
@@ -287,7 +301,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # "lazy" evaluation of the colleciton's contents - in itself for a good
         # reason) ; therefore, I apply the same philosophy here
         #
-        item0.setData(QtCore.QVariant(keyType), ObjectKeyTypeRole)
+        item0.setData(QtCore.QVariant(objKeyType), ObjectKeyTypeRole)
 
         # for user's benefit — good to know the type of the object represented
         # in this row.
@@ -335,19 +349,22 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         # print(f"{self.__class__.__name__}._buildTree_(obj: {type(obj).__name__})")
         if isinstance(self._privateData_, dict):
-            self._topObjectItem_ = self._buildBranch_(self._privateData_, objDict, name,
-                               self.invisibleRootItem(), 0)
+            self._topObjectItem_ = self._buildBranch_(self._privateData_,
+                                                      objDict, name, str,
+                                                      self.invisibleRootItem(),
+                                                      0
+                                                     )
 
         else: # TODO 2026-02-08 00:37:05 URGENT
             pass
 
     @singledispatchmethod
     def _buildBranch_(self: typing.Self, obj: object, objDict: dict,
-                      objKey: object,
+                      objKey: object, objKeyType: type,
                       parentItem: QtGui.QStandardItem,
                       row: int) -> QtGui.QStandardItem:
         # print(f"{self.__class__.__name__}._buildBranch_(obj: {type(obj).__name__})")
-        rowItems = self._makeObjectRow_(obj, objDict, objKey)
+        rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType)
         objItem = rowItems[0]
         # rowItems[0].setData(QtCore.QVariant())
         parentItem.insertRow(row, rowItems)
@@ -369,18 +386,17 @@ class DataTreeModel(QtGui.QStandardItemModel):
         else:
             dataItem = rowItems[-1]
             dataItem.setData(QtCore.QVariant(obj), ObjectDataRole)
-            # NOTE: 2026-02-08 14:41:20 TODO
-            # use data item roles to
-            # 1) flag that this needs an item-deletage that occupies a single row
-            # 2) disable editing when we're read-only
 
         return objItem
 
     @_buildBranch_.register(dict)
-    def _(self: typing.Self, obj: dict, objDict: dict, objKey: object,
+    @_buildBranch_.register(UserDict)
+    @_buildBranch_.register(types.MappingProxyType)
+    def _(self: typing.Self, obj: (dict, types.MappingProxyType, UserDict),
+          objDict: dict, objKey: object, objKeyType: type,
           parentItem: QtGui.QStandardItem, row: int) -> QtGui.QStandardItem:
 
-        rowItems = self._makeObjectRow_(obj, objDict, objKey)
+        rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType)
         parentItem.insertRow(row, rowItems)
         pItem = rowItems[0]
 
@@ -395,11 +411,12 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         for key, value in obj.items():
             if isinstance(key, str):
-                vName = key
+                keyName = key
             else:
-                vName = f"{key}"
+                keyName = f"{key}"
+
             pValue, valDict = self._parseObject_(value, self._showPrivate_)
-            self._buildBranch_(pValue, valDict, vName, pItem, k)
+            self._buildBranch_(pValue, valDict, keyName, type(key), pItem, k)
             k += 1
 
         return pItem
@@ -475,15 +492,16 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         # print(f"{self.__class__.__name__}._parseObject_(obj: {tip})")
 
-        if obj in (None, MISSING, pd.NA):
-            pData = obj
-            indirect = False
-            info = f"{obj}"
-            tip = f"{obj}"
-            objDataAsChild = False
-            memberAccess = tuple()
+        # if obj in (None, MISSING, pd.NA):
+        #    pData = obj
+        #    indirect = False
+        #    info = f"{obj}"
+        #    tip = f"{obj}"
+        #    objDataAsChild = False
+        #    memberAccess = tuple()
+        #    # objKeyType = None # no access -> no objKeyType
 
-        elif isDataclass(obj):
+        if isDataclass(obj):
             datafields = dataclasses.fields(obj)
             try:
                 fieldnames = list(map(lambda f: f.name, datafields))
@@ -515,16 +533,9 @@ a tuple: (``parsedData``, ``infoDict``), where:
             objDataAsChild = False
             memberAccess = (".",)
 
-        elif self.HAVE_METAARRAY and (
+        elif HAVE_METAARRAY and (
                 hasattr(obj, "implements") and obj.implements("MetaArray")
             ):
-            # NOTE: 2026-02-07 09:16:25 FIXME/TODO
-            # either break the cycling import dependency at
-            # NOTE: 2026-02-07 09:14:19 FIXME/TODO, or make sure to refer to
-            # HAVE_METAARRAY int he self's namespace, where it is defined
-            #
-            # WARNING: 2026-02-07 09:18:42 Do the same with PrairieView object
-            #
             pData = dict(
                     [("data", obj.view(np.ndarray)), ("meta", obj.infoCopy())]
                 )
@@ -552,12 +563,60 @@ a tuple: (``parsedData``, ``infoDict``), where:
         #     info = f"{n} {strutils.pluralize('member', n)}"
 
         else:
-            raise NotImplementedError(
-            f"Objects of type {type(obj).__name__} are not supported"
-            )
+            pData = obj
+            indirect = False
+            info = f"{obj}"
+            tip = f"{obj}"
+            objDataAsChild = False
+            memberAccess = tuple()
+            scipywarn(f"TODO: Support for objects of type {type(obj).__name__} awaits implementation. FIXME")
+            # raise NotImplementedError(
+            # f"Objects of type {type(obj).__name__} are not supported"
+            # )
 
         return pData, {"indirect": indirect, "objDataAsChild": objDataAsChild,
-                       "objInfo": info, "objType": type(obj).__name__,
+                       "objInfo": info,
+                       "objType": type(obj).__name__,
+                       "memberAccess": memberAccess,
+                       "objTip": tip}
+
+    @_parseObject_.register(type(None))
+    @_parseObject_.register(type(MISSING))
+    @_parseObject_.register(type(pd.NA))
+    def _(self: typing.Self, obj: (type(None), type(MISSING), type(pd.NA)),
+          _:bool = False) -> tuple:
+        pData = obj
+        indirect = False
+        info = f"{obj}"
+        tip = f"{obj}"
+        objDataAsChild = False
+        memberAccess = tuple()
+
+        return pData, {"indirect": indirect, "objDataAsChild": objDataAsChild,
+                       "objInfo": info,
+                       "objType": type(obj).__name__,
+                       "memberAccess": memberAccess,
+                       "objTip": tip}
+
+    @_parseObject_.register(datetime.datetime)
+    @_parseObject_.register(datetime.date)
+    @_parseObject_.register(datetime.time)
+    @_parseObject_.register(datetime.timedelta)
+    @_parseObject_.register(datetime.timezone)
+    def _(self: typing.Self, obj: (datetime.datetime, datetime.date,
+                                   datetime.time,
+                                   datetime.timedelta, datetime.timezone),
+          _:bool = False) -> tuple:
+        pData = obj
+        indirect = False
+        info = f"{obj}"
+        tip = f"{obj}"
+        objDataAsChild = False
+        memberAccess = tuple()
+
+        return pData, {"indirect": indirect, "objDataAsChild": objDataAsChild,
+                       "objInfo": info,
+                       "objType": type(obj).__name__,
                        "memberAccess": memberAccess,
                        "objTip": tip}
 
@@ -578,14 +637,23 @@ a tuple: (``parsedData``, ``infoDict``), where:
     @_parseObject_.register(enum.EnumType)
     @_parseObject_.register(TypeEnum)
     def _(self: typing.Self, obj: typing.Union[type, enum.EnumType, TypeEnum],
-                   includePrivateMembers: bool = True) -> tuple:
-        info = f"Type object: {obj.__name__}"
+                   includePrivateMembers: bool = False) -> tuple:
+        # info = f"Type object: {type(obj).__name__}"
+        info = obj
         tip = str(obj)
         pData = obj
-        choices = dict()
+        choices = list()
         memberAccess = (".", )
+
         if isinstance(obj, (enum.EnumType, TypeEnum)):
-            choices = obj.__members__
+            if hasattr(obj, "__members__"):
+                choices = list(obj.__members__.keys())
+            else:
+                try:
+                    choices = list(obj.names())
+                except:
+                    scipywarn(f"Cannot access enumeration values for {type(obj).__name__}")
+                    choices = list()
 
         elif isinstance(obj, pkgutil.ModuleInfo):
             info += " ".join(
@@ -604,13 +672,40 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return pData, {"indirect": False, "objDataAsChild": False,
                        "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip, "memberAccess": memberAccess,
+                       "objTip": tip,
+                       "memberAccess": memberAccess,
                        "choices": choices}
+
+    @_parseObject_.register(taxonbridge.Taxon)
+    def _(self: typing.Self, obj: taxonbridge.Taxon,
+                includePrivateMembers: bool = False) -> tuple:
+        pData = obj.__dict__
+        indirect = True
+        info = f"{obj}"
+        if not includePrivateMembers:
+            pData = dict(
+                list(
+                    filter(
+                        self._check_private_member_,
+                        pData.items()
+                    )
+                    )
+                )
+
+        tip = type(obj).__name__
+        return pData, {"indirect": indirect,
+                       "objDataAsChild": False,
+                       "objInfo": info,
+                       "objType": type(obj).__name__,
+                       "objTip": tip,
+                       "memberAccess": (".",),
+                       "choices": dict()}
 
     @_parseObject_.register(dict)
     @_parseObject_.register(types.MappingProxyType)
-    def _(self: typing.Self, obj: (dict, types.MappingProxyType),
-                   includePrivateMembers: bool = True) -> tuple:
+    @_parseObject_.register(UserDict)
+    def _(self: typing.Self, obj: (dict, types.MappingProxyType, UserDict),
+                   includePrivateMembers: bool = False) -> tuple:
         # NOTE: 2021-07-20 09:52:34
         # dict objects with mixed key types cannot be sorted
         # therefore we resort to an indexing vector
@@ -622,8 +717,14 @@ a tuple: (``parsedData``, ``infoDict``), where:
             )
         ]
 
-        items = [i for i in obj.items()]
-        pData = dict([items[k] for k in ndx])
+        if isinstance(obj, UserDict):
+            # print(f"{self.__class__.__name__}._parseObject_({type(obj)})")
+            pData = obj
+            indirect = False
+        else:
+            items = [i for i in obj.items()]
+            pData = dict([items[k] for k in ndx])
+            indirect = False
 
         if not includePrivateMembers:
             pData = dict(
@@ -638,9 +739,12 @@ a tuple: (``parsedData``, ``infoDict``), where:
         n = len(pData) # CAUTION: this might include private members !!!
         info = f"{len(obj)} key / value {strutils.pluralize('pair', n)}"
         tip = type(obj).__name__
-        return obj, {"indirect":False, "objDataAsChild":False, "objInfo":info,
+        return obj, {"indirect":indirect,
+                     "objDataAsChild":False,
+                     "objInfo":info,
                      "objType": type(obj).__name__,
-                     "objTip":tip, "memberAccess": ("[", "]"),
+                     "objTip":tip,
+                     "memberAccess": ("[", "]"),
                      "choices": dict()}
 
     @_parseObject_.register(list)
@@ -650,7 +754,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
     @_parseObject_.register(set)
     def _(self: typing.Self,
           obj: typing.Union[list, tuple, deque, set, NeoObjectList],
-                   includePrivateMembers: bool = True) -> tuple:
+                   includePrivateMembers: bool = False) -> tuple:
 
         tip = type(obj).__name__
 
@@ -702,6 +806,23 @@ a tuple: (``parsedData``, ``infoDict``), where:
                       "memberAccess": tuple(),
                       "choices": dict()}
 
+    @_parseObject_.register(pathlib.Path)
+    def _(self: typing.Self, obj: pathlib.Path,
+          _: bool = True) -> tuple:
+        info = f"{obj}"
+        tip = type(obj).__name__
+        pData = obj.as_posix()
+        indirect = True
+        return  pData, {"indirect": indirect,
+                        "objDataAsChild": False,
+                        "objInfo": info,
+                        "objType": type(obj).__name__,
+                        "objTip": tip,
+                        "memberAccess": tuple(),
+                        "choices": dict()}
+
+
+
     @_parseObject_.register(bool)
     @_parseObject_.register(int)
     @_parseObject_.register(float)
@@ -730,7 +851,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
     @_parseObject_.register(types.SimpleNamespace)
     def _(self: typing.Self, obj: types.SimpleNamespace,
-                   includePrivateMembers: bool = True) -> tuple:
+                   includePrivateMembers: bool = False) -> tuple:
         pData = obj.__dict__
         if not includePrivateMembers:
             pData = dict(
@@ -753,7 +874,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
     @_parseObject_.register(types.ModuleType)
     def _(self: typing.Self, obj: types.ModuleType,
-          includePrivateMembers: bool = True) -> tuple:
+          includePrivateMembers: bool = False) -> tuple:
         tip = type(obj).__name__
 
         if hasattr(obj, "__name__"):
@@ -1009,13 +1130,10 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "memberAccess": (".", ),
                        "choices": dict()}
 
-    # TODO 2026-02-08 22:49:01 URGENTLY
-    # neo.BaseSignal
-
     @_parseObject_.register(pq.Quantity)
     def _(self: typing.Self, obj: pq.Quantity, _: bool=True) -> tuple:
         tip = f"{scq.unitFamilyName(obj.units)} quantity"
-        if isinstance(pq.UnitQuantity):
+        if isinstance(obj, pq.UnitQuantity):
             info = f"{obj} {scq.unitFamilyName(obj)}"
             objDataAsChild = False
         else:
@@ -1039,7 +1157,6 @@ a tuple: (``parsedData``, ``infoDict``), where:
         # member access relates to metadata (axistags)
         # the array data has read-write access through TableEditorWidget
         n = obj.size
-        # s = " × ".join(list(map(lambda x: f"{x}", obj.shape)))
         s = f"{obj.shape}"
         c = obj.channels
         axtags = ", ".join(list(map(lambda i: f"'{i.key}'", obj.axistags)))
@@ -1063,8 +1180,6 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "memberAccess": (".", ),
                        "choices": dict()}
 
-    # TODO: 2026-02-07 23:00:31 URGENTLY
-    # struct array, recarray
 
     @_parseObject_.register(np.ndarray)
     def _(self: typing.Self, obj: np.ndarray, _: bool = False) -> tuple:
@@ -1072,7 +1187,6 @@ a tuple: (``parsedData``, ``infoDict``), where:
         tip = type(obj).__name__
         n = obj.size
         shape = obj.shape
-        # s = " × ".join(list(map(lambda x: f"{x}", obj.shape)))
         s = f"{obj.shape}"
         samples = strutils.pluralize('sample', n)
         objDataAsChild = False
@@ -1223,13 +1337,13 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         if byPath:
             path = self._getPathForItemOrIndex_(leaf)
-            print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> path = {path}")
+            # print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> path = {path}")
             if len(path):
                 if path[-1] == self._topObjectItem_.data(QtCore.Qt.DisplayRole):
                     path[-1] = "self._modelData_"
 
             accessExpr = "".join(list(reversed(path)))
-            print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> accessExpr = {accessExpr}")
+            # print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> accessExpr = {accessExpr}")
             return eval(accessExpr)
 
         else:
@@ -1286,13 +1400,10 @@ a tuple: (``parsedData``, ``infoDict``), where:
                 targetItem = parentItem.child(item.row(), 0)
 
             parentAccess = parentItem.data(ObjectDataAccessRole)
-            # parentBinding = parentItem.data(QtCore.Qt.DisplayRole)
             bindingType = targetItem.data(ObjectKeyTypeRole)
             itemBinding = targetItem.data(ObjectKeyRole)
-            print(f"{self.__class__.__name__}._getPathForItemOrIndex_: bindingType -> {bindingType}")
+            # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: bindingType for {targetItem.data(QtCore.Qt.DisplayRole)} -> {bindingType}")
             # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: itemBinding -> {itemBinding}")
-            # else:
-            #     itemBinding = itemBinding # BUG 2026-02-09 12:20:22 FIXME/TODO
 
             if itemBinding:
                 if len(parentAccess) == 1:
@@ -1314,84 +1425,10 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return path
 
-    # @singledispatchmethod
-    # def _getPathForItemOrIndex_(self: typing.Self, index: object) -> typing.Sequence:
-    #     raise NotImplementedError
-    #
-    # @_getPathForItemOrIndex_.register(QtCore.QModelIndex)
-    # def _(self: typing.Self, index: QtCore.QModelIndex) -> typing.Sequence:
-    #     item = self.itemFromIndex(index)
-    #     if item:
-    #         return self._getPathForItemOrIndex_(item)
-    #     else:
-    #         return list()
-    #
-    # @_getPathForItemOrIndex_.register(QtGui.QStandardItem)
-    # def _(self: typing.Self, item: QtGui.QStandardItem) -> typing.Sequence:
-    #     # print(f"{self.__class__.__name__}._getPathForItemOrIndex_(item: {item.data(QtCore.Qt.DisplayRole)})")
-    #
-    #     path = list()
-    #
-    #     if item.data(StandaloneEditorWidgetRole):
-    #         # NOTE: 2026-02-10 12:46:07
-    #         # skip child items with standalone editor widget
-    #         # use their parent instead
-    #         # NOTE: 2026-02-10 12:24:40
-    #         # by design, only items in column 0 have data associated with this
-    #         # role
-    #         item = item.parent()
-    #         if item is None:
-    #             return path
-    #
-    #     # NOTE: 2026-02-10 12:22:40
-    #     # Code below only makes sense for items in column 0; however, when an`
-    #     # item on a higher column is passed, I need access to its sibling in
-    #     # column 0
-    #
-    #     parentItem = item.parent()
-    #
-    #     if parentItem:
-    #         if item.column() == 0:
-    #             targetItem = item
-    #         else:
-    #             # get the item's sibling in column 0
-    #             targetItem = parentItem.child(item.row(), 0)
-    #
-    #         parentAccess = parentItem.data(ObjectDataAccessRole)
-    #         # parentBinding = parentItem.data(QtCore.Qt.DisplayRole)
-    #         bindingType = targetItem.data(ObjectKeyTypeRole)
-    #         itemBinding = targetItem.data(ObjectKeyRole)
-    #         print(f"{self.__class__.__name__}._getPathForItemOrIndex_: itemBinding -> {itemBinding}")
-    #         # else:
-    #         #     itemBinding = itemBinding # BUG 2026-02-09 12:20:22 FIXME/TODO
-    #
-    #         if itemBinding:
-    #             if len(parentAccess) == 1:
-    #                 print(f"{self.__class__.__name__}._getPathForItemOrIndex_ -> add access {parentAccess[0]}{itemBinding}")
-    #                 path.append(f"{parentAccess[0]}{itemBinding}")
-    #             elif len(parentAccess) == 2:
-    #                 if bindingType is str:
-    #                     itemBinding = f"'{itemBinding}'"
-    #                 # elif bindingType is int:
-    #                 #     itemBinding = bindingType(itemBinding)
-    #                 path.append(f"{parentAccess[0]}{itemBinding}{parentAccess[1]}")
-    #
-    #         path += self._getPathForItemOrIndex_(parentItem)
-    #
-    #     elif item == self._topObjectItem_:
-    #         # NOTE: 2026-02-10 12:26:33
-    #         # this one is in column 0 by design
-    #         path += [self._topObjectItem_.data(QtCore.Qt.DisplayRole)]
-    #
-    #     return path
-
     def setData(self: typing.Self, modelIndex: QtCore.QModelIndex,
                 value: object, role = QtCore.Qt.EditRole) -> bool:
         if self._modelData_ is None:
             return False
-
-        # row = modelIndex.row()
-        # col = modelIndex.column()
 
         item = self.itemFromIndex(modelIndex)
 
@@ -1409,22 +1446,19 @@ a tuple: (``parsedData``, ``infoDict``), where:
         # but that is too convoluted to implement in this model and is beyond
         # its scope, anyway.
         #
-        # if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole,
-        #                 ObjectDataRole):
 
         objItem = item
+
         if item.column() == 2 and role == ObjectDataRole:
             parentItem = item.parent()
             if not parentItem:
                 return False
             objItem = parentItem.child(item.row(), 0)
 
-        print(f"{self.__class__.__name__}.setData {value} for objItem {objItem.data(QtCore.Qt.DisplayRole)} , row {item.row()}")
-        # item.setData(QtCore.QVariant(value), QtCore.Qt.EditRole)
-        # item.setData(QtCore.QVariant(value), ObjectDataRole)
+        # print(f"{self.__class__.__name__}.setData {value} for objItem {objItem.data(QtCore.Qt.DisplayRole)} , row {item.row()}")
         objItem.setData(QtCore.QVariant(value), ObjectDataRole)
         path = self._getPathForItemOrIndex_(objItem)
-        print(f"\taccess to objItem: {path}")
+        # print(f"\taccess to objItem: {path}")
 
         if path[-1] == self._topObjectItem_.data(QtCore.Qt.DisplayRole):
             path[-1] = "self._modelData_"
@@ -1434,7 +1468,14 @@ a tuple: (``parsedData``, ``infoDict``), where:
         exec(setexpr)
 
         newVal = eval(accexpr)
+
+        objType = objectItem.data(ObjectTypeRole)
+
+        if objType is pathlib.Path:
+            newVal = pathlib.Path(newVal)
+
         objItem.setData(newVal, ObjectDataRole)
+
         if item != objItem:
             item.setData(QtCore.QVariant(newVal), QtCore.Qt.DisplayRole)
             item.setData(newVal, ObjectDataRole)
@@ -1442,8 +1483,6 @@ a tuple: (``parsedData``, ``infoDict``), where:
         self.dataChanged.emit(modelIndex, modelIndex)
         self.sig_modelDataChanged.emit()
         return True
-
-        # return False
 
 
 
