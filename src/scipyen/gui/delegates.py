@@ -425,28 +425,13 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     else:
                         return
 
-        # elif isinstance(data, pathlib.Path):
-        #     widget = smw.LazyLineEdit()
-        #     widget.setText(data)
-        #     widget.sig_enterPressed.connect(self.slot_dataChanged)
         else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
             return
 
         if hasattr(widget, "setFrame"):
             widget.setFrame(False)
         widget.setAutoFillBackground(True)
-        # if not inModel:
-        #     widget.setVisible(not editable)
-        #     if not editable:
-        #     widget
-        # if not editable:
-        #     if inModel:
-        #         widget.setEnabled(False)
-        #     else:
-        #         widget.setVisible(False)
-        #         widget.setVisible(False)
-        #         widget.setVisible(False)
-        #         else
+
         return widget
 
     @Slot()
@@ -521,8 +506,11 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
             choices = self._columnChoices_[index.column()]["choices"]
 
-        elif dataChoices:
+        elif isinstance(dataChoices, typing.Sequence) and all(isinstance(v, str) for v in dataChoices):
             choices = dataChoices
+
+        elif isinstance(dataChoices, dict) and all(isinstance(key, str) for key in dataChoices.keys()):
+            choices = list(dataChoices.keys())
 
         return self.createWidget(data, choices, True, parent)
 

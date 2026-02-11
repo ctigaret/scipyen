@@ -34,15 +34,18 @@ else:
 
 StandaloneEditorWidgetRole = QtCore.Qt.UserRole + 2
 ObjectDataAccessRole = QtCore.Qt.UserRole + 20
-ObjectTypeRole = QtCore.Qt.UserRole + 30
-ObjectDataRole = QtCore.Qt.UserRole + 40
-ObjectKeyRole = QtCore.Qt.UserRole + 50
-ObjectKeyTypeRole = QtCore.Qt.UserRole + 60
-DataChoicesRole = QtCore.Qt.UserRole + 70
+ObjectDataAccessTypeRole = QtCore.Qt.UserRole + 30
+ObjectTypeRole = QtCore.Qt.UserRole + 40
+ObjectDataRole = QtCore.Qt.UserRole + 50
+ObjectKeyRole = QtCore.Qt.UserRole + 60
+ObjectKeyTypeRole = QtCore.Qt.UserRole + 70
+DataChoicesRole = QtCore.Qt.UserRole + 80
 
 
-__all__ = ("StandaloneEditorWidgetRole", "ObjectDataAccessRole","ObjectTypeRole",
-           "ObjectDataRole", "ObjectKeyRole", "ObjectKeyTypeRole",
+__all__ = ("StandaloneEditorWidgetRole",
+           "ObjectTypeRole", "ObjectDataRole",
+           "ObjectKeyRole", "ObjectKeyTypeRole",
+           "ObjectDataAccessRole", "ObjectDataAccessTypeRole",
            "DataChoicesRole")
 
 

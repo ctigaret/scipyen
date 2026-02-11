@@ -68,6 +68,7 @@ import numpy as np
 import scipy
 import pandas as pd
 import vigra
+import meshio
 # ### END 3rd party modules
 
 import core.datatypes as datatypes
@@ -257,6 +258,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         typeName = objDict["objType"]
         info = objDict["objInfo"]
+        memberAccess = objDict["memberAccess"]
 
         # keyType = type(objKey)
 
@@ -280,8 +282,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         # NOTE: 2026-02-09 21:47:10
         # used to construct the acess path to the object for this item
-        item0.setData(QtCore.QVariant(objDict["memberAccess"]),
-                      ObjectDataAccessRole)
+        item0.setData(QtCore.QVariant(memberAccess), ObjectDataAccessRole)
+
+
 
         # NOTE: 2026-02-09 21:47:38
         # reference to the actual Python object
@@ -303,11 +306,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
         #
         item0.setData(QtCore.QVariant(objKeyType), ObjectKeyTypeRole)
 
-        # for user's benefit — good to know the type of the object represented
+        # for user's benefit — good to know the type of the object is represented
         # in this row.
         item1 = QtGui.QStandardItem(typeName)
         item1.setData(typeName, QtCore.Qt.DisplayRole)
-
         # either:
         #
         # a) display some object info for the user's benefit; this can be:
@@ -329,7 +331,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # execute the code line below NOT here, but conditionally in
         # self._buildBranch_:
         # item2.setData(QtCore.QVariant(obj), ObjectDataRole)
-        item2.setData(objDict.get("choices", list()), DataChoicesRole)
+        item2.setData(objDict.get("choices", dict()), DataChoicesRole)
 
         #
         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
@@ -365,9 +367,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
                       row: int) -> QtGui.QStandardItem:
         # print(f"{self.__class__.__name__}._buildBranch_(obj: {type(obj).__name__})")
         rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType)
-        objItem = rowItems[0]
-        # rowItems[0].setData(QtCore.QVariant())
         parentItem.insertRow(row, rowItems)
+        objItem = rowItems[0]
         if objDict["objDataAsChild"]:
             # NOTE: 2026-02-08 09:52:28 TODO
             # use data item roles to:
@@ -386,6 +387,21 @@ class DataTreeModel(QtGui.QStandardItemModel):
         else:
             dataItem = rowItems[-1]
             dataItem.setData(QtCore.QVariant(obj), ObjectDataRole)
+
+        accessType = objDict.get("accessType", None)
+
+        objItem.setData(QtCore.QVariant(accessType), ObjectDataAccessTypeRole)
+
+        if isinstance(accessType, str) and len(accessType.strip()):
+            tooltip = f"{accessType}"
+            if accessType == "attribute":
+                tooltip += f" of {parentItem.data(QtCore.Qt.DisplayRole)}"
+            else:
+                tooltip += f" into {parentItem.data(QtCore.Qt.DisplayRole)}"
+
+            objItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.ToolTipRole)
+            objItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.StatusTipRole)
+            objItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.WhatsThisRole)
 
         return objItem
 
@@ -409,6 +425,22 @@ class DataTreeModel(QtGui.QStandardItemModel):
             pItem.insertRow(0, [dataItem])
             k += 1
 
+        else:
+            accessType = objDict.get("accessType", None)
+
+            pItem.setData(QtCore.QVariant(accessType), ObjectDataAccessTypeRole)
+
+            if isinstance(accessType, str) and len(accessType.strip()):
+                tooltip = f"{accessType}"
+                if accessType == "attribute":
+                    tooltip += f" of {parentItem.data(QtCore.Qt.DisplayRole)}"
+                else:
+                    tooltip += f" into {parentItem.data(QtCore.Qt.DisplayRole)}"
+
+                pItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.ToolTipRole)
+                pItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.StatusTipRole)
+                pItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.WhatsThisRole)
+
         for key, value in obj.items():
             if isinstance(key, str):
                 keyName = key
@@ -418,6 +450,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             pValue, valDict = self._parseObject_(value, self._showPrivate_)
             self._buildBranch_(pValue, valDict, keyName, type(key), pItem, k)
             k += 1
+
 
         return pItem
 
@@ -532,6 +565,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             indirect = True
             objDataAsChild = False
             memberAccess = (".",)
+            accessType = "attribute"
 
         elif HAVE_METAARRAY and (
                 hasattr(obj, "implements") and obj.implements("MetaArray")
@@ -543,6 +577,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             objDataAsChild = False
             info = ""
             memberAccess = ("[", "]")
+            accessType = "index"
 
         # elif self._introspect_ and self._introspectable_(obj) :
         #     pData = datatypes.inspect_members(obj, self._predicate_)
@@ -569,6 +604,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             tip = f"{obj}"
             objDataAsChild = False
             memberAccess = tuple()
+            accessType = None
             scipywarn(f"TODO: Support for objects of type {type(obj).__name__} awaits implementation. FIXME")
             # raise NotImplementedError(
             # f"Objects of type {type(obj).__name__} are not supported"
@@ -578,6 +614,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objInfo": info,
                        "objType": type(obj).__name__,
                        "memberAccess": memberAccess,
+                       "accessType": accessType,
                        "objTip": tip}
 
     @_parseObject_.register(type(None))
@@ -591,11 +628,14 @@ a tuple: (``parsedData``, ``infoDict``), where:
         tip = f"{obj}"
         objDataAsChild = False
         memberAccess = tuple()
+        accessType = None
 
-        return pData, {"indirect": indirect, "objDataAsChild": objDataAsChild,
+        return pData, {"indirect": indirect,
+                       "objDataAsChild": objDataAsChild,
                        "objInfo": info,
                        "objType": type(obj).__name__,
                        "memberAccess": memberAccess,
+                       "accessType": None,
                        "objTip": tip}
 
     @_parseObject_.register(datetime.datetime)
@@ -613,12 +653,15 @@ a tuple: (``parsedData``, ``infoDict``), where:
         tip = f"{obj}"
         objDataAsChild = False
         memberAccess = tuple()
+        accessType = None
 
-        return pData, {"indirect": indirect, "objDataAsChild": objDataAsChild,
+        return pData, {"indirect": indirect,
+                       "objDataAsChild": objDataAsChild,
                        "objInfo": info,
                        "objType": type(obj).__name__,
                        "memberAccess": memberAccess,
-                       "objTip": tip}
+                       "accessType": accessType,
+                       "objTip": tip, "choices": dict()}
 
     @_parseObject_.register(types.FunctionType)
     @_parseObject_.register(types.MethodType)
@@ -631,6 +674,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
         return obj, {"indirect": False, "objDataAsChild": False, "objInfo": info,
                      "objType": type(obj).__name__, "objTip": tip,
                      "memberAccess": tuple(),
+                     "accessType": None,
                      "choices": dict()}
 
     @_parseObject_.register(type)
@@ -642,18 +686,20 @@ a tuple: (``parsedData``, ``infoDict``), where:
         info = obj
         tip = str(obj)
         pData = obj
-        choices = list()
+        choices = dict()
         memberAccess = (".", )
+        accessType = "attribute"
 
         if isinstance(obj, (enum.EnumType, TypeEnum)):
             if hasattr(obj, "__members__"):
-                choices = list(obj.__members__.keys())
+                choices = dict(obj.__members__)
             else:
                 try:
-                    choices = list(obj.names())
+                    choices = dict(zip(obj.names(), obj.values()))
+                    # choices = list(obj.names())
                 except:
                     scipywarn(f"Cannot access enumeration values for {type(obj).__name__}")
-                    choices = list()
+                    choices = dict()
 
         elif isinstance(obj, pkgutil.ModuleInfo):
             info += " ".join(
@@ -674,6 +720,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objInfo": info, "objType": type(obj).__name__,
                        "objTip": tip,
                        "memberAccess": memberAccess,
+                       "accessType": accessType,
                        "choices": choices}
 
     @_parseObject_.register(taxonbridge.Taxon)
@@ -699,6 +746,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objType": type(obj).__name__,
                        "objTip": tip,
                        "memberAccess": (".",),
+                       "accessType": "attribute",
                        "choices": dict()}
 
     @_parseObject_.register(dict)
@@ -745,6 +793,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                      "objType": type(obj).__name__,
                      "objTip":tip,
                      "memberAccess": ("[", "]"),
+                     "accessType": "key",
                      "choices": dict()}
 
     @_parseObject_.register(list)
@@ -761,8 +810,12 @@ a tuple: (``parsedData``, ``infoDict``), where:
         if is_namedtuple(obj):
             pData = obj._asDict()
             tip += "(namedtuple)"
+            memberAccess = (".",)
+            accessType = "attribute"
         else:
             pData = dict(enumerate(obj))
+            memberAccess = ("[","]")
+            accessType = "index"
 
         if not includePrivateMembers:
             pData = dict(
@@ -782,7 +835,8 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objInfo": info,
                        "objType": type(obj).__name__,
                        "objTip": tip,
-                       "memberAccess": ("[","]"),
+                       "memberAccess": memberAccess,
+                       "accessType": accessType,
                        "choices": dict()}
 
     @_parseObject_.register(str)
@@ -804,6 +858,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                       "objInfo": info, "objType": type(obj).__name__,
                       "objTip": tip,
                       "memberAccess": tuple(),
+                      "accessType": None,
                       "choices": dict()}
 
     @_parseObject_.register(pathlib.Path)
@@ -819,6 +874,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                         "objType": type(obj).__name__,
                         "objTip": tip,
                         "memberAccess": tuple(),
+                        "accessType": None,
                         "choices": dict()}
 
 
@@ -847,6 +903,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                      "objType": type(obj).__name__,
                      "objTip": tip,
                      "memberAccess": tuple(),
+                     "accessType": None,
                      "choices": dict()}
 
     @_parseObject_.register(types.SimpleNamespace)
@@ -870,6 +927,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objInfo": info, "objType": type(obj).__name__,
                        "objTip": tip,
                        "memberAccess": (".", ),
+                       "accessType": "attribute",
                        "choices": dict()}
 
     @_parseObject_.register(types.ModuleType)
@@ -902,10 +960,13 @@ a tuple: (``parsedData``, ``infoDict``), where:
                             )
                         )
 
-        return pData, {"indirect": True, "objDataAsChild": False,
-                       "objInfo": info, "objType": type(obj).__name__,
+        return pData, {"indirect": True,
+                       "objDataAsChild": False,
+                       "objInfo": info,
+                       "objType": type(obj).__name__,
                        "objTip": tip,
                        "memberAccess": (".", ),
+                       "accessType": "attribute",
                        "choices": dict()}
 
     @_parseObject_.register(vigra.filters.Kernel1D)
@@ -1009,16 +1070,19 @@ a tuple: (``parsedData``, ``infoDict``), where:
             n = int(obj.size())
             info = f"with {n} {strutils.pluralize('sample', n)}"
             memberAccess = ("[","]")
+            accessType = "index"
         else:
             h = int(obj.height())
             w = int(obj.width())
             info = f"with {h} × {w} {strutils.pluralize('sample', h*w)}"
             memberAccess = ("[", ",", "]")
+            accessType = "indexes"
 
         return obj, {"indirect": False, "objDataAsChild": False,
                      "objInfo": info, "objType": type(obj).__name__,
                      "objTip": tip,
                      "memberAccess": memberAccess,
+                     "accessType": accessType,
                      "choices": dict()}
 
     @_parseObject_.register(pd.DataFrame)
@@ -1028,12 +1092,15 @@ a tuple: (``parsedData``, ``infoDict``), where:
           obj: typing.Union[pd.DataFrame, pd.Series, pd.Index],
           _: bool = True) -> tuple:
 
-        # TableEditorWidget gives direct read-write access
+        # NOTE: 2026-02-11 21:09:34
+        # TableEditorWidget gives direct read-write access, so no direct access
+        # required in this model
         memberAccess = tuple()
 
         # Don;t be fooled by the nomenclature; for a column index, this is the
         # number of columns
         nrows = len(obj)
+
         if isinstance(obj, pd.DataFrame):
             ncols = len(obj.columns)
             rows = strutils.pluralize('row', nrows)
@@ -1057,6 +1124,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                      "objInfo": info, "objType": type(obj).__name__,
                      "objTip": tip,
                      "memberAccess": memberAccess,
+                     "accessType": None,
                      "choices": dict()}
 
 
@@ -1081,6 +1149,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objType": type(obj).__name__,
                        "objTip": tip,
                        "memberAccess": (".", ),
+                       "accessType": "attribute",
                        "choices": dict()}
 
     @_parseObject_.register(neo.Epoch)
@@ -1104,6 +1173,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objInfo": info, "objType": type(obj).__name__,
                        "objTip": tip,
                        "memberAccess": (".", ),
+                       "accessType": "attribute",
                        "choices": dict()}
 
     @_parseObject_.register(neo.Event)
@@ -1128,6 +1198,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objInfo": info, "objType": type(obj).__name__,
                        "objTip": tip,
                        "memberAccess": (".", ),
+                       "accessType": "attribute",
                        "choices": dict()}
 
     @_parseObject_.register(pq.Quantity)
@@ -1150,12 +1221,15 @@ a tuple: (``parsedData``, ``infoDict``), where:
                      "objInfo": info, "objType": type(obj).__name__,
                      "objTip": tip,
                      "memberAccess": (".", ),
+                     "accessType": "attribute",
                      "choices": dict()}
 
     @_parseObject_.register(vigra.VigraArray)
     def _(self: typing.Self, obj:vigra.VigraArray, _: bool = True) -> tuple:
-        # member access relates to metadata (axistags)
-        # the array data has read-write access through TableEditorWidget
+        # NOTE: 2026-02-11 21:11:11
+        # member access relates to metadata attributes (i.e., axistags);
+        # the array data has read-write access to the underlying array via the
+        # TableEditorWidget in the child item
         n = obj.size
         s = f"{obj.shape}"
         c = obj.channels
@@ -1178,6 +1252,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objType": type(obj).__name__,
                        "objTip": tip,
                        "memberAccess": (".", ),
+                       "accessType": "attribute",
                        "choices": dict()}
 
 
@@ -1202,6 +1277,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                      "objType": type(obj).__name__,
                      "objTip": tip,
                      "memberAccess": tuple(),
+                     "accessType": None,
                      "choices": dict()}
 
     @_parseObject_.register(vigra.AxisInfo)
@@ -1215,6 +1291,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objInfo": info, "objType": type(obj).__name__,
                        "objTip": tip,
                        "memberAccess": (".", ),
+                       "accessType": "attribute",
                        "choices": dict()}
 
     @_parseObject_.register(vigra.AxisType)
@@ -1227,6 +1304,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
         return obj, {"indirect": False, "objDataAsChild": False, "objInfo": info,
                      "objType": type(obj).__name__, "objTip": tip,
                      "memberAccess": tuple(),
+                     "accessType": None,
                      "choices":  {vigra.AxisType.names}}
 
     @_parseObject_.register(AxesCalibration)
@@ -1240,6 +1318,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objInfo": info, "objType": type(obj).__name__,
                        "objTip": tip,
                        "memberAccess": (".", ),
+                       "accessType": "attribute",
                        "choices": dict()}
 
     @_parseObject_.register(AxisCalibrationData)
@@ -1262,6 +1341,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objInfo": info, "objType": type(obj).__name__,
                        "objTip": tip,
                        "memberAccess": (".", ),
+                       "accessType": "attribute",
                        "choices": dict()}
 
     @_parseObject_.register(ChannelCalibrationData)
@@ -1276,6 +1356,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objInfo": info, "objType": type(obj).__name__,
                        "objTip": tip,
                        "memberAccess": (".", ),
+                       "accessType": "attribute",
                        "choices": dict()}
 
     @_parseObject_.register(PVObject)
@@ -1304,6 +1385,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                                "objInfo": info, "objType": type(obj).__name__,
                                "objtip": tip,
                                "memberAccess": (".", ),
+                               "accessType": "attribute",
                                "choices": dict()}
 
     @_parseObject_.register(scipy.optimize.Bounds)
@@ -1320,6 +1402,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                        "objInfo": info, "objType": type(obj).__name__,
                        "objTip": tip ,
                        "memberAccess": (".", ),
+                       "accessType": "attribute",
                        "choices": dict()}
 
     def itemChildren(self: typing.Self,
@@ -1337,7 +1420,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         if byPath:
             path = self._getPathForItemOrIndex_(leaf)
-            # print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> path = {path}")
+            print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> path = {path}")
             if len(path):
                 if path[-1] == self._topObjectItem_.data(QtCore.Qt.DisplayRole):
                     path[-1] = "self._modelData_"
@@ -1348,7 +1431,6 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         else:
             return leaf.data(ObjectDataRole)
-            # return self._getPyObj_(leaf)
 
     def getPathForLeaf(self: typing.Self,
                        leaf: typing.Union[QtCore.QModelIndex,
