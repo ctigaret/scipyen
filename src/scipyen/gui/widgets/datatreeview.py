@@ -280,6 +280,7 @@ For a given item:
                         item.child(0).setFlags(flags)
 
                 self._setupChildDataItem_(childItem)
+
                 if infoItem:
                     self._setupChildDataItem_(infoItem, objData)
 
@@ -292,6 +293,17 @@ For a given item:
             # index = infoItem.index()
             # row = index.row()
             infoItem = model.itemFromIndex(index)
+            parentItem = infoItem.parent()
+            if parentItem:
+                objItem = parentItem.child(infoItem.row(), 0)
+                objType = objItem.data(ObjectTypeRole)
+
+                if issubclass(objType, enum.Enum):
+                    # FIXME: 2026-02-11 22:58:27
+                    # how to pass specific choices dict to the SAME delegate ?!?
+                    # TODO: create another delegate SPECIFICALLY for choices, using combobox
+                    pass
+
             # choices = infoItem.data(DataChoicesRole) # picked up by the delegate, from the index
             # editorWidget = self._delegate_.createWidget(objData,
             #                                             choices,

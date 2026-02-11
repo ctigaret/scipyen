@@ -32,14 +32,14 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-StandaloneEditorWidgetRole = QtCore.Qt.UserRole + 2
-ObjectDataAccessRole = QtCore.Qt.UserRole + 20
-ObjectDataAccessTypeRole = QtCore.Qt.UserRole + 30
-ObjectTypeRole = QtCore.Qt.UserRole + 40
-ObjectDataRole = QtCore.Qt.UserRole + 50
-ObjectKeyRole = QtCore.Qt.UserRole + 60
-ObjectKeyTypeRole = QtCore.Qt.UserRole + 70
-DataChoicesRole = QtCore.Qt.UserRole + 80
+StandaloneEditorWidgetRole = QtCore.Qt.UserRole + 300
+ObjectDataAccessRole = QtCore.Qt.UserRole + 320
+ObjectDataAccessTypeRole = QtCore.Qt.UserRole + 330
+ObjectTypeRole = QtCore.Qt.UserRole + 340
+ObjectDataRole = QtCore.Qt.UserRole + 350
+ObjectKeyRole = QtCore.Qt.UserRole + 360
+ObjectKeyTypeRole = QtCore.Qt.UserRole + 370
+DataChoicesRole = QtCore.Qt.UserRole + 380
 
 
 __all__ = ("StandaloneEditorWidgetRole",

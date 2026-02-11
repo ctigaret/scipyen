@@ -671,7 +671,9 @@ a tuple: (``parsedData``, ``infoDict``), where:
         word = "Fuction" if isinstance(obj, types.FunctionType) else "Method"
         info = f"{word} {obj.__qualname__}{inspect.signature(obj)} from module {obj.__module__}"
 
-        return obj, {"indirect": False, "objDataAsChild": False, "objInfo": info,
+        return obj, {"indirect": False,
+                     "objDataAsChild": False,
+                     "objInfo": info,
                      "objType": type(obj).__name__, "objTip": tip,
                      "memberAccess": tuple(),
                      "accessType": None,
@@ -687,10 +689,12 @@ a tuple: (``parsedData``, ``infoDict``), where:
         tip = str(obj)
         pData = obj
         choices = dict()
-        memberAccess = (".", )
-        accessType = "attribute"
+        memberAccess = tuple()
+        accessType = None
 
         if isinstance(obj, (enum.EnumType, TypeEnum)):
+            memberAccess = (".", )
+            accessType = "attribute"
             if hasattr(obj, "__members__"):
                 choices = dict(obj.__members__)
             else:
@@ -701,27 +705,28 @@ a tuple: (``parsedData``, ``infoDict``), where:
                     scipywarn(f"Cannot access enumeration values for {type(obj).__name__}")
                     choices = dict()
 
-        elif isinstance(obj, pkgutil.ModuleInfo):
-            info += " ".join(
-                    [
-                        "Fields:",
-                        "; ".join(
-                            list(
-                                map(
-                                    lambda f: f" {f} = {getattr(obj, f, None)}",
-                                    obj._fields,
-                                )
-                            )
-                        ),
-                    ]
-                )
+        return obj, {"indirect": False,
+                     "objDataAsChild": False,
+                     "objInfo": info, "objType": type(obj).__name__,
+                     "objTip": tip,
+                     "memberAccess": memberAccess,
+                     "accessType": accessType,
+                     "choices": choices}
 
-        return pData, {"indirect": False, "objDataAsChild": False,
-                       "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip,
-                       "memberAccess": memberAccess,
-                       "accessType": accessType,
-                       "choices": choices}
+    @_parseObject_.register(pkgutil.ModuleInfo)
+    def _(self: typing.Self, obj: pkgutil.ModuleInfo,
+                includePrivateMembers: bool = False) -> tuple:
+        pData = dict(map(lambda f: (f, getattr(obj, f, None)), obj._fields))
+        info = f"{len(pData)} fields"
+
+        return obj, {"indirect": True,
+                     "objDataAsChild": False,
+                     "objInfo": info,
+                     "objType": type(obj).__name__,
+                     "objTip": tip,
+                     "memberAccess": (".",),
+                     "accessType": "attribute",
+                     "choices": dict()}
 
     @_parseObject_.register(taxonbridge.Taxon)
     def _(self: typing.Self, obj: taxonbridge.Taxon,
@@ -1454,9 +1459,12 @@ a tuple: (``parsedData``, ``infoDict``), where:
         path = list()
 
         if not item:
+            # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: invalid item {item}")
             return path
 
+        # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: {item.data(QtCore.Qt.DisplayRole)}")
         if item.data(StandaloneEditorWidgetRole):
+            # print(f"\thas standalone widget: {item.data(StandaloneEditorWidgetRole)}")
             # NOTE: 2026-02-10 12:46:07
             # skip child items with standalone editor widget
             # use their parent instead
@@ -1475,6 +1483,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
         parentItem = item.parent()
 
         if parentItem:
+            # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: parent of {item.data(QtCore.Qt.DisplayRole)} -> {parentItem.data(QtCore.Qt.DisplayRole)}")
             if item.column() == 0:
                 targetItem = item
             else:
@@ -1491,11 +1500,13 @@ a tuple: (``parsedData``, ``infoDict``), where:
                 if len(parentAccess) == 1:
                     # print(f"{self.__class__.__name__}._getPathForItemOrIndex_ -> add access {parentAccess[0]}{itemBinding}")
                     path.append(f"{parentAccess[0]}{itemBinding}")
+
                 elif len(parentAccess) == 2:
                     if bindingType is str:
                         itemBinding = f"'{itemBinding}'"
                     else:
                         itemBinding = bindingType(itemBinding) # hedging my bets...
+
                     path.append(f"{parentAccess[0]}{itemBinding}{parentAccess[1]}")
 
             path += self._getPathForItemOrIndex_(parentItem)
@@ -1504,6 +1515,10 @@ a tuple: (``parsedData``, ``infoDict``), where:
             # NOTE: 2026-02-10 12:26:33
             # this one is in column 0 by design
             path += [self._topObjectItem_.data(QtCore.Qt.DisplayRole)]
+        #
+        # else:
+        #     print(f"{self.__class__.__name__}._getPathForItemOrIndex_: no more parent for {item.data(QtCore.Qt.DisplayRole)}")
+
 
         return path
 
