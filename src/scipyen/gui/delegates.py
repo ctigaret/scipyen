@@ -333,6 +333,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 and all(isinstance(v, (enum.Enum, str)) for v in choices)
                 ) or (
                     isinstance(choices, dict)
+                    and len(choices) > 0
                     and all(isinstance(k, str) for k in choices.keys())
                     ):
                 if isinstance(choices, dict):

@@ -261,11 +261,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
                        objDict: dict, objKey: object,
                        objKeyType: type) -> tuple:
 
-        typeName = objDict["objType"]
+        typeName = objDict["objType"].__name__
+
         info = objDict["objInfo"]
         memberAccess = objDict["memberAccess"]
-
-        # keyType = type(objKey)
 
         if isinstance(objKey, str):
             objName = objKey
@@ -283,7 +282,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         item0 = QtGui.QStandardItem(objName)
         item0.setData(objName, QtCore.Qt.DisplayRole)
-        item0.setData(type(obj), ObjectTypeRole)
+        item0.setData(objDict["objType"], ObjectTypeRole)
 
         # NOTE: 2026-02-09 21:47:10
         # used to construct the acess path to the object for this item
@@ -527,17 +526,10 @@ a tuple: (``parsedData``, ``infoDict``), where:
         indirect: bool = False
         tip: str = type(obj).__name__
         objDataAsChild: bool = False
+        objType = type(obj)
+        choices = dict()
 
         # print(f"{self.__class__.__name__}._parseObject_(obj: {tip})")
-
-        # if obj in (None, MISSING, pd.NA):
-        #    pData = obj
-        #    indirect = False
-        #    info = f"{obj}"
-        #    tip = f"{obj}"
-        #    objDataAsChild = False
-        #    memberAccess = tuple()
-        #    # objKeyType = None # no access -> no objKeyType
 
         if isDataclass(obj):
             datafields = dataclasses.fields(obj)
@@ -625,18 +617,23 @@ a tuple: (``parsedData``, ``infoDict``), where:
             # f"Objects of type {type(obj).__name__} are not supported"
             # )
 
-        return pData, {"indirect": indirect, "objDataAsChild": objDataAsChild,
-                       "objInfo": info,
-                       "objType": type(obj).__name__,
-                       "memberAccess": memberAccess,
-                       "accessType": accessType,
-                       "objTip": tip}
+        return pData, {
+            "indirect": indirect, "objDataAsChild": objDataAsChild,
+            "objInfo": info,
+            "objType": type(obj).__name__,
+            "memberAccess": memberAccess,
+            "accessType": accessType,
+            "objTip": tip,
+            "objType": objType,
+            "choices": choices,
+            }
 
     @_parseObject_.register(type(None))
     @_parseObject_.register(type(MISSING))
     @_parseObject_.register(type(pd.NA))
     def _(self: typing.Self, obj: (type(None), type(MISSING), type(pd.NA)),
           _:bool = False) -> tuple:
+        objType = type(obj)
         pData = obj
         indirect = False
         info = f"{obj}"
@@ -645,13 +642,17 @@ a tuple: (``parsedData``, ``infoDict``), where:
         memberAccess = tuple()
         accessType = None
 
-        return pData, {"indirect": indirect,
-                       "objDataAsChild": objDataAsChild,
-                       "objInfo": info,
-                       "objType": type(obj).__name__,
-                       "memberAccess": memberAccess,
-                       "accessType": None,
-                       "objTip": tip}
+        return pData, {
+            "indirect": indirect,
+            "objDataAsChild": objDataAsChild,
+            "objInfo": info,
+            "objType": type(obj).__name__,
+            "memberAccess": memberAccess,
+            "accessType": None,
+            "objTip": tip,
+            "objType": objType,
+            "choices": dict(),
+            }
 
     @_parseObject_.register(datetime.datetime)
     @_parseObject_.register(datetime.date)
@@ -662,6 +663,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                                    datetime.time,
                                    datetime.timedelta, datetime.timezone),
           _:bool = False) -> tuple:
+        objType = type(obj)
         pData = obj
         indirect = False
         info = f"{obj}"
@@ -670,29 +672,37 @@ a tuple: (``parsedData``, ``infoDict``), where:
         memberAccess = tuple()
         accessType = None
 
-        return pData, {"indirect": indirect,
-                       "objDataAsChild": objDataAsChild,
-                       "objInfo": info,
-                       "objType": type(obj).__name__,
-                       "memberAccess": memberAccess,
-                       "accessType": accessType,
-                       "objTip": tip, "choices": dict()}
+        return pData, {
+            "indirect": indirect,
+            "objDataAsChild": objDataAsChild,
+            "objInfo": info,
+            "objType": type(obj).__name__,
+            "memberAccess": memberAccess,
+            "accessType": accessType,
+            "objTip": tip,
+            "objType": objType,
+            "choices": dict(),
+            }
 
     @_parseObject_.register(types.FunctionType)
     @_parseObject_.register(types.MethodType)
     def _(self: typing.Self, obj: (types.FunctionType, types.MethodType),
           _:bool = False) -> tuple:
+        objType = type(obj)
         tip = f"{obj}"
         word = "Fuction" if isinstance(obj, types.FunctionType) else "Method"
         info = f"{word} {obj.__qualname__}{inspect.signature(obj)} from module {obj.__module__}"
 
-        return obj, {"indirect": False,
-                     "objDataAsChild": False,
-                     "objInfo": info,
-                     "objType": type(obj).__name__, "objTip": tip,
-                     "memberAccess": tuple(),
-                     "accessType": None,
-                     "choices": dict()}
+        return obj, {
+            "indirect": False,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": tuple(),
+            "accessType": None,
+            "choices": dict(),
+            }
 
     @_parseObject_.register(type)
     @_parseObject_.register(enum.EnumType)
@@ -701,7 +711,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
     def _(self: typing.Self,
           obj: typing.Union[type, enum.EnumType, enum.Enum, TypeEnum],
           includePrivateMembers: bool = False) -> tuple:
-        # info = f"Type object: {type(obj).__name__}"
+        objType = type(obj)
         info = obj
         tip = str(obj)
         pData = obj
@@ -724,33 +734,39 @@ a tuple: (``parsedData``, ``infoDict``), where:
                     scipywarn(f"Cannot access enumeration values for {type(obj).__name__}")
                     choices = dict()
 
-        return obj, {"indirect": False,
-                     "objDataAsChild": False,
-                     "objInfo": info,
-                     "objType": type(obj).__name__,
-                     "objTip": tip,
-                     "memberAccess": memberAccess,
-                     "accessType": accessType,
-                     "choices": choices}
+        return obj, {
+            "indirect": False,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": memberAccess,
+            "accessType": accessType,
+            "choices": choices,
+            }
 
     @_parseObject_.register(pkgutil.ModuleInfo)
     def _(self: typing.Self, obj: pkgutil.ModuleInfo,
                 includePrivateMembers: bool = False) -> tuple:
+        objType = type(obj)
         pData = dict(map(lambda f: (f, getattr(obj, f, None)), obj._fields))
         info = f"{len(pData)} fields"
 
-        return obj, {"indirect": True,
-                     "objDataAsChild": False,
-                     "objInfo": info,
-                     "objType": type(obj).__name__,
-                     "objTip": tip,
-                     "memberAccess": (".",),
-                     "accessType": "attribute",
-                     "choices": dict()}
+        return obj, {
+            "indirect": True,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": (".",),
+            "accessType": "attribute",
+            "choices": dict(),
+            }
 
     @_parseObject_.register(taxonbridge.Taxon)
     def _(self: typing.Self, obj: taxonbridge.Taxon,
                 includePrivateMembers: bool = False) -> tuple:
+        objType = type(obj)
         pData = obj.__dict__
         indirect = True
         info = f"{obj}"
@@ -765,20 +781,23 @@ a tuple: (``parsedData``, ``infoDict``), where:
                 )
 
         tip = type(obj).__name__
-        return pData, {"indirect": indirect,
-                       "objDataAsChild": False,
-                       "objInfo": info,
-                       "objType": type(obj).__name__,
-                       "objTip": tip,
-                       "memberAccess": (".",),
-                       "accessType": "attribute",
-                       "choices": dict()}
+        return pData, {
+            "indirect": indirect,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": (".",),
+            "accessType": "attribute",
+            "choices": dict(),
+            }
 
     @_parseObject_.register(dict)
     @_parseObject_.register(types.MappingProxyType)
     @_parseObject_.register(UserDict)
     def _(self: typing.Self, obj: (dict, types.MappingProxyType, UserDict),
                    includePrivateMembers: bool = False) -> tuple:
+        objType = type(obj)
         # NOTE: 2021-07-20 09:52:34
         # dict objects with mixed key types cannot be sorted
         # therefore we resort to an indexing vector
@@ -812,14 +831,17 @@ a tuple: (``parsedData``, ``infoDict``), where:
         n = len(pData) # CAUTION: this might include private members !!!
         info = f"{len(obj)} key / value {strutils.pluralize('pair', n)}"
         tip = type(obj).__name__
-        return obj, {"indirect":indirect,
-                     "objDataAsChild":False,
-                     "objInfo":info,
-                     "objType": type(obj).__name__,
-                     "objTip":tip,
-                     "memberAccess": ("[", "]"),
-                     "accessType": "key",
-                     "choices": dict()}
+
+        return obj, {
+            "indirect": indirect,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip":tip,
+            "memberAccess": ("[", "]"),
+            "accessType": "key",
+            "choices": dict(),
+            }
 
     @_parseObject_.register(list)
     @_parseObject_.register(tuple)
@@ -829,8 +851,8 @@ a tuple: (``parsedData``, ``infoDict``), where:
     def _(self: typing.Self,
           obj: typing.Union[list, tuple, deque, set, NeoObjectList],
                    includePrivateMembers: bool = False) -> tuple:
-
-        tip = type(obj).__name__
+        objType = type(obj)
+        tip = objType.__name__
 
         if is_namedtuple(obj):
             pData = obj._asDict()
@@ -855,21 +877,24 @@ a tuple: (``parsedData``, ``infoDict``), where:
         n = len(pData)
         info = f"{n} {strutils.pluralize('element', n)}"
 
-        return pData, {"indirect": True,
-                       "objDataAsChild": False,
-                       "objInfo": info,
-                       "objType": type(obj).__name__,
-                       "objTip": tip,
-                       "memberAccess": memberAccess,
-                       "accessType": accessType,
-                       "choices": dict()}
+        return pData, {
+            "indirect": True,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": memberAccess,
+            "accessType": accessType,
+            "choices": dict(),
+            }
 
     @_parseObject_.register(str)
     @_parseObject_.register(bytes)
     @_parseObject_.register(bytearray)
     def _(self: typing.Self, obj: typing.Union[str, bytes, bytearray],
           _: bool = True) -> tuple:
-        tip = type(obj).__name__
+        objType = type(obj)
+        tip = objType.__name__
         n = len(obj)
         if n > 100:
             info = (
@@ -879,30 +904,35 @@ a tuple: (``parsedData``, ``infoDict``), where:
         else:
             info = obj if isinstance(obj, str) else obj.decode()
 
-        return  obj, {"indirect": False, "objDataAsChild": False,
-                      "objInfo": info, "objType": type(obj).__name__,
-                      "objTip": tip,
-                      "memberAccess": tuple(),
-                      "accessType": None,
-                      "choices": dict()}
+        return  obj, {
+            "indirect": False,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": tuple(),
+            "accessType": None,
+            "choices": dict(),
+            }
 
     @_parseObject_.register(pathlib.Path)
     def _(self: typing.Self, obj: pathlib.Path,
           _: bool = True) -> tuple:
+        objType = type(obj)
         info = f"{obj}"
-        tip = type(obj).__name__
+        tip = objType.__name__
         pData = obj.as_posix()
         indirect = True
-        return  pData, {"indirect": indirect,
-                        "objDataAsChild": False,
-                        "objInfo": info,
-                        "objType": type(obj).__name__,
-                        "objTip": tip,
-                        "memberAccess": tuple(),
-                        "accessType": None,
-                        "choices": dict()}
-
-
+        return  pData, {
+            "indirect": indirect,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": tuple(),
+            "accessType": None,
+            "choices": dict()
+            }
 
     @_parseObject_.register(bool)
     @_parseObject_.register(int)
@@ -921,19 +951,22 @@ a tuple: (``parsedData``, ``infoDict``), where:
                             numbers.Number,
                             np.integer, np.floating, np.complexfloating],
           _: bool=True) -> tuple:
-        tip = type(obj).__name__
-        return obj, {"indirect": False, "objDataAsChild": False,
-                     # "objInfo": f"{obj}",
-                     "objInfo": obj,
-                     "objType": type(obj).__name__,
-                     "objTip": tip,
-                     "memberAccess": tuple(),
-                     "accessType": None,
-                     "choices": dict()}
+        objType = type(obj)
+        tip = objType.__name__
+        return obj, {
+            "indirect": False, "objDataAsChild": False,
+            "objInfo": obj,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": tuple(),
+            "accessType": None,
+            "choices": dict(),
+            }
 
     @_parseObject_.register(types.SimpleNamespace)
     def _(self: typing.Self, obj: types.SimpleNamespace,
                    includePrivateMembers: bool = False) -> tuple:
+        objType = type(obj)
         pData = obj.__dict__
         if not includePrivateMembers:
             pData = dict(
@@ -948,16 +981,21 @@ a tuple: (``parsedData``, ``infoDict``), where:
         n = len(pData)
         info = f"{n} {strutils.pluralize('member', n)}"
         tip = type(obj).__name__
-        return pData, {"indirect": True, "objDataAsChild": False,
-                       "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip,
-                       "memberAccess": (".", ),
-                       "accessType": "attribute",
-                       "choices": dict()}
+        return pData, {
+            "indirect": True,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": (".", ),
+            "accessType": "attribute",
+            "choices": dict(),
+            }
 
     @_parseObject_.register(types.ModuleType)
     def _(self: typing.Self, obj: types.ModuleType,
           includePrivateMembers: bool = False) -> tuple:
+        objType = type(obj)
         tip = type(obj).__name__
 
         if hasattr(obj, "__name__"):
@@ -985,21 +1023,22 @@ a tuple: (``parsedData``, ``infoDict``), where:
                             )
                         )
 
-        return pData, {"indirect": True,
-                       "objDataAsChild": False,
-                       "objInfo": info,
-                       "objType": type(obj).__name__,
-                       "objTip": tip,
-                       "memberAccess": (".", ),
-                       "accessType": "attribute",
-                       "choices": dict()}
+        return pData, {
+            "indirect": True,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": (".", ),
+            "accessType": "attribute",
+            "choices": dict(),
+            }
 
     @_parseObject_.register(vigra.filters.Kernel1D)
     @_parseObject_.register(vigra.filters.Kernel2D)
     def _(self: typing.Self,
            obj: typing.Union[vigra.filters.Kernel1D, vigra.filters.Kernel2D],
            _: bool = True) -> tuple:
-
         # ### BEGIN NOTE: 2026-02-08 21:20:00 TODO/FIXME
         #
         # enable representation of the kernel as: (think hard & choose one)
@@ -1090,6 +1129,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
         #
         # ### END   NOTE: 2026-02-08 21:20:00 TODO/FIXME
 
+        objType = type(obj)
         tip = type(obj).__name__
         if isinstance(obj, vigra.filters.Kernel1D):
             n = int(obj.size())
@@ -1103,12 +1143,16 @@ a tuple: (``parsedData``, ``infoDict``), where:
             memberAccess = ("[", ",", "]")
             accessType = "indexes"
 
-        return obj, {"indirect": False, "objDataAsChild": False,
-                     "objInfo": info, "objType": type(obj).__name__,
-                     "objTip": tip,
-                     "memberAccess": memberAccess,
-                     "accessType": accessType,
-                     "choices": dict()}
+        return obj, {
+            "indirect": False,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": memberAccess,
+            "accessType": accessType,
+            "choices": dict(),
+            }
 
     @_parseObject_.register(pd.DataFrame)
     @_parseObject_.register(pd.Series)
@@ -1117,6 +1161,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
           obj: typing.Union[pd.DataFrame, pd.Series, pd.Index],
           _: bool = True) -> tuple:
 
+        objType = type(obj)
         # NOTE: 2026-02-11 21:09:34
         # TableEditorWidget gives direct read-write access, so no direct access
         # required in this model
@@ -1145,12 +1190,16 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         tip = type(obj).__name__
 
-        return obj, {"indirect": False, "objDataAsChild": True,
-                     "objInfo": info, "objType": type(obj).__name__,
-                     "objTip": tip,
-                     "memberAccess": memberAccess,
-                     "accessType": None,
-                     "choices": dict()}
+        return obj, {
+            "indirect": False,
+            "objDataAsChild": True,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": memberAccess,
+            "accessType": None,
+            "choices": dict(),
+            }
 
 
     @_parseObject_.register(Interval)
@@ -1164,22 +1213,27 @@ a tuple: (``parsedData``, ``infoDict``), where:
                     "annotations": obj.annotations,
                     "description": obj.description,
                 }
+        objType = type(obj)
         tip = type(obj).__name__
         n = len(obj)
         desc = strutils.pluralize('subinterval', n)
         info = f"Interval '{obj.name}' with {len(obj)} {desc}"
 
-        return pData, {"indirect": True, "objDataAsChild": False,
-                       "objInfo": info,
-                       "objType": type(obj).__name__,
-                       "objTip": tip,
-                       "memberAccess": (".", ),
-                       "accessType": "attribute",
-                       "choices": dict()}
+        return pData, {
+            "indirect": True,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": (".", ),
+            "accessType": "attribute",
+            "choices": dict(),
+            }
 
     @_parseObject_.register(neo.Epoch)
     @_parseObject_.register(DataZone)
     def _(self: typing.Self, obj: typing.Union[neo.Epoch, DataZone]) -> tuple:
+        objType = type(obj)
         pData = {
                     "times": obj.times,
                     "durations": obj.durations,
@@ -1194,18 +1248,23 @@ a tuple: (``parsedData``, ``infoDict``), where:
         desc = strutils.pluralize('subinterval', n)
         info = f"{klass} '{obj.name}' with {len(obj)} {desc}"
 
-        return pData, {"indirect": True, "objDataAsChild": False,
-                       "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip,
-                       "memberAccess": (".", ),
-                       "accessType": "attribute",
-                       "choices": dict()}
+        return pData, {
+            "indirect": True,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": (".", ),
+            "accessType": "attribute",
+            "choices": dict(),
+            }
 
     @_parseObject_.register(neo.Event)
     @_parseObject_.register(DataMark)
     @_parseObject_.register(TriggerEvent)
     def _(self: typing.Self,
           obj: typing.Union[neo.Event, DataMark, TriggerEvent]) -> tuple:
+        objType = type(obj)
         pData = {"times": obj.times, "labels": obj.labels}
 
         if isinstance(obj, (DataMark, TriggerEvent)):
@@ -1219,15 +1278,20 @@ a tuple: (``parsedData``, ``infoDict``), where:
         desc = strutils.pluralize('subinterval', n)
         info = f"{klass} '{obj.name}' with {len(obj)} {desc}"
 
-        return pData, {"indirect": True, "objDataAsChild": False,
-                       "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip,
-                       "memberAccess": (".", ),
-                       "accessType": "attribute",
-                       "choices": dict()}
+        return pData, {
+            "indirect": True,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": (".", ),
+            "accessType": "attribute",
+            "choices": dict(),
+            }
 
     @_parseObject_.register(pq.Quantity)
     def _(self: typing.Self, obj: pq.Quantity, _: bool=True) -> tuple:
+        objType = type(obj)
         tip = f"{scq.unitFamilyName(obj.units)} quantity"
         if isinstance(obj, pq.UnitQuantity):
             info = f"{obj} {scq.unitFamilyName(obj)}"
@@ -1242,15 +1306,20 @@ a tuple: (``parsedData``, ``infoDict``), where:
                 info = f"Quantity array ({obj.units.dimensionality}) with {n} {strutils.pluralize('samples', n)}; shape {s}; dtype {obj.dtype}."
                 objDataAsChild = True
 
-        return obj, {"indirect": False, "objDataAsChild": objDataAsChild,
-                     "objInfo": info, "objType": type(obj).__name__,
-                     "objTip": tip,
-                     "memberAccess": (".", ),
-                     "accessType": "attribute",
-                     "choices": dict()}
+        return obj, {
+            "indirect": False,
+            "objDataAsChild": objDataAsChild,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": (".", ),
+            "accessType": "attribute",
+            "choices": dict(),
+            }
 
     @_parseObject_.register(vigra.VigraArray)
     def _(self: typing.Self, obj:vigra.VigraArray, _: bool = True) -> tuple:
+        objType = type(obj)
         # NOTE: 2026-02-11 21:11:11
         # member access relates to metadata attributes (i.e., axistags);
         # the array data has read-write access to the underlying array via the
@@ -1271,18 +1340,21 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         tip = type(obj).__name__
 
-        return pData, {"indirect": True,
-                       "objDataAsChild": objDataAsChild,
-                       "objInfo": info,
-                       "objType": type(obj).__name__,
-                       "objTip": tip,
-                       "memberAccess": (".", ),
-                       "accessType": "attribute",
-                       "choices": dict()}
+        return pData, {
+            "indirect": True,
+            "objDataAsChild": objDataAsChild,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": (".", ),
+            "accessType": "attribute",
+            "choices": dict(),
+            }
 
 
     @_parseObject_.register(np.ndarray)
     def _(self: typing.Self, obj: np.ndarray, _: bool = False) -> tuple:
+        objType = type(obj)
         # TableEditorWidget gives read-write access to array data
         tip = type(obj).__name__
         n = obj.size
@@ -1296,58 +1368,77 @@ a tuple: (``parsedData``, ``infoDict``), where:
             objDataAsChild = True
             info = f"Array with {n} {samples}; shape {s}; dtype {obj.dtype}."
 
-        return obj, {"indirect": False,
-                     "objDataAsChild": objDataAsChild,
-                     "objInfo": info,
-                     "objType": type(obj).__name__,
-                     "objTip": tip,
-                     "memberAccess": tuple(),
-                     "accessType": None,
-                     "choices": dict()}
+        return obj, {
+            "indirect": False,
+            "objDataAsChild": objDataAsChild,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": tuple(),
+            "accessType": None,
+            "choices": dict(),
+            }
 
     @_parseObject_.register(vigra.AxisInfo)
     def _(self: typing.Self, obj: vigra.AxisInfo, _: bool = False) -> tuple:
+        objType = type(obj)
         info = f"{type(obj).__name__} ({getNameForAxisType(obj.typeFlags)}) key {obj.key}"
         tip = type(obj).__name__
         pData = {"resolution": obj.resolution, "description": obj.description,
                  "typeFlags": obj.typeFlags}
 
-        return pData, {"indirect": True, "objDataAsChild": False,
-                       "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip,
-                       "memberAccess": (".", ),
-                       "accessType": "attribute",
-                       "choices": dict()}
+        return pData, {
+            "indirect": True,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": (".", ),
+            "accessType": "attribute",
+            "choices": dict()
+            }
 
     @_parseObject_.register(vigra.AxisType)
     def _(self: typing.Self, obj: vigra.AxisType, _: bool = False) -> tuple:
         # NOTE: 2026-02-08 22:54:09 TODO
         # Don't really want to edit this via GUI, so no member access for now
+        objType = type(obj)
         tip = type(obj).__name__
         info = f"{tip}: {getNameForAxisType(obj)} ({getValueForAxisType(obj)})"
 
-        return obj, {"indirect": False, "objDataAsChild": False, "objInfo": info,
-                     "objType": type(obj).__name__, "objTip": tip,
-                     "memberAccess": tuple(),
-                     "accessType": None,
-                     "choices":  {vigra.AxisType.names}}
+        return obj, {
+            "indirect": False,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": tuple(),
+            "accessType": None,
+            "choices":  {vigra.AxisType.names},
+            }
 
     @_parseObject_.register(AxesCalibration)
     def _(self: typing.Self, obj: AxesCalibration, _:bool=True) -> tuple:
+        objType = type(obj)
         pData = dict(enumerate(obj.calibrations))
         n = len(pData)
         info = f"{n} {strutils.pluralize('calibration', n)}"
         tip = type(obj).__name__
 
-        return pData, {"indirect": True, "objDataAsChild": False,
-                       "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip,
-                       "memberAccess": (".", ),
-                       "accessType": "attribute",
-                       "choices": dict()}
+        return pData, {
+            "indirect": True,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": (".", ),
+            "accessType": "attribute",
+            "choices": dict(),
+            }
 
     @_parseObject_.register(AxisCalibrationData)
     def _(self: typing.Self, obj: AxisCalibrationData) -> tuple:
+        objType = type(obj)
         tip = type(obj).__name__
         indirect = True
         objDataAsChild = False
@@ -1362,30 +1453,40 @@ a tuple: (``parsedData``, ``infoDict``), where:
             c = len(obj.channels)
             info = f"Channel axis calibration with {c} {strutils.pluralize('channel', c)}"
 
-        return pData, {"indirect": indirect, "objDataAsChild": objDataAsChild,
-                       "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip,
-                       "memberAccess": (".", ),
-                       "accessType": "attribute",
-                       "choices": dict()}
+        return pData, {
+            "indirect": indirect,
+            "objDataAsChild": objDataAsChild,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": (".", ),
+            "accessType": "attribute",
+            "choices": dict(),
+            }
 
     @_parseObject_.register(ChannelCalibrationData)
     def _(self: typing.Self,
           obj: ChannelCalibrationData, _: bool = True) -> tuple:
+        objType = type(obj)
         tip = f"{type(obj).__name__}"
         fields = dataclasses.fields(obj)
         fieldnames = list(map(lambda f: f.name, datafields))
         pData = dict(map(lambda c: (c, getattr(data, c)), fieldnames))
 
-        return pData, {"indirect": True, "objDataAsChild": False,
-                       "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip,
-                       "memberAccess": (".", ),
-                       "accessType": "attribute",
-                       "choices": dict()}
+        return pData, {
+            "indirect": True,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": (".", ),
+            "accessType": "attribute",
+            "choices": dict(),
+            }
 
     @_parseObject_.register(PVObject)
     def _(self: typing.Self, obj: PVObject) -> tuple:
+        objType = type(obj)
         tip = type(obj).__name__
         info = tip
         if isinstance(obj, PVScan):
@@ -1406,16 +1507,21 @@ a tuple: (``parsedData``, ``infoDict``), where:
                 ):
                 info = data.description
 
-        return obj.as_dict(), {"indirect": True, "objDataAsChild": False,
-                               "objInfo": info, "objType": type(obj).__name__,
-                               "objtip": tip,
-                               "memberAccess": (".", ),
-                               "accessType": "attribute",
-                               "choices": dict()}
+        return obj.as_dict(), {
+            "indirect": True,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objtip": tip,
+            "memberAccess": (".", ),
+            "accessType": "attribute",
+            "choices": dict(),
+            }
 
     @_parseObject_.register(scipy.optimize.Bounds)
     def _(self: typing.Self,
           obj: scipy.optimize.Bounds, _:bool = True) -> tuple:
+        objType = type(obj)
         tip = type(obj).__name__
         pData = {
                     "lb": obj.lb,
@@ -1423,12 +1529,16 @@ a tuple: (``parsedData``, ``infoDict``), where:
                     "keep_feasible": obj.keep_feasible,
                 }
         info = ""
-        return pData, {"indirect": True, "objDataAsChild": False,
-                       "objInfo": info, "objType": type(obj).__name__,
-                       "objTip": tip ,
-                       "memberAccess": (".", ),
-                       "accessType": "attribute",
-                       "choices": dict()}
+        return pData, {
+            "indirect": True,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip ,
+            "memberAccess": (".", ),
+            "accessType": "attribute",
+            "choices": dict(),
+            }
 
     def itemChildren(self: typing.Self,
                      item: QtGui.QStandardItem) -> typing.List:

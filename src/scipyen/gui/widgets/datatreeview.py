@@ -277,9 +277,17 @@ For a given item:
             # self.setIndexWidget(index, editorWidget)
             #
             #
-            self.setItemDelegateForColumn(index.column(), self._delegate_)
-            self.setItemDelegateForRow(index.row(), self._delegate_)
-            flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
+
+            # NOTE: 2026-02-12 14:58:10
+            # inhibit editing for immutable collections - e.g. tuple, for now
+            parentType = parentItem.data(ObjectTypeRole)
+            # TODO 2026-02-12 14:59:32 to expand in parentheses as needed
+            if parentType not in (tuple, ):
+                self.setItemDelegateForColumn(index.column(), self._delegate_)
+                self.setItemDelegateForRow(index.row(), self._delegate_)
+                flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
+            else:
+                flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
             infoItem.setFlags(flags)
 
     def setData(self: typing.Self, obj: object,
