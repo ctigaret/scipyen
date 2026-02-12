@@ -106,15 +106,6 @@ else:
     altKeyDescr = "<ALT>"
     ctrlKeyDescr = "<CTRL>"
 
-
-
-# NOTE: 2022-12-25 23:08:51
-# needed for the new plugins framework
-# This plugins does not install a custom menu, but DOES provide a viewer type
-# hence we flag it using __scipyen_plugin__ (we could have defined
-# init_scipyen_plugin instead, to return an empty dict)
-__scipyen_plugin__ = None
-
 class DataViewer(ScipyenViewer):
     r"""Viewer for hierarchical (nesting) collection types.
     These can be: (nested) dictionaries, lists, tuples.
