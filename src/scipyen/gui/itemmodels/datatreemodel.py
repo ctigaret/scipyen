@@ -56,7 +56,12 @@ try:
 except Exception:
     HAVE_METAARRAY = None
 
-
+HAS_MESHIO = False
+try:
+    import meshio
+    HAS_MESHIO = True
+except:
+    pass
 
 # from pyqtgraph import (DataTreeWidget, TableWidget, )
 
@@ -597,6 +602,16 @@ a tuple: (``parsedData``, ``infoDict``), where:
         #     n = len(pData)
         #     info = f"{n} {strutils.pluralize('member', n)}"
 
+        elif HAS_MESHIO and isinstance(obj, meshio.Mesh):
+            pData = obj
+            indirect=False,
+            s = " × ".join(list(map(lambda x: f"{x}", obj.points.shape)))
+            info = f"{obj.points.size} points ({s})"
+            tip = type(obj).__name__
+            objDataAsChild = False
+            memberAccess = tuple()
+            accessType = None
+
         else:
             pData = obj
             indirect = False
@@ -681,9 +696,11 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
     @_parseObject_.register(type)
     @_parseObject_.register(enum.EnumType)
+    @_parseObject_.register(enum.Enum)
     @_parseObject_.register(TypeEnum)
-    def _(self: typing.Self, obj: typing.Union[type, enum.EnumType, TypeEnum],
-                   includePrivateMembers: bool = False) -> tuple:
+    def _(self: typing.Self,
+          obj: typing.Union[type, enum.EnumType, enum.Enum, TypeEnum],
+          includePrivateMembers: bool = False) -> tuple:
         # info = f"Type object: {type(obj).__name__}"
         info = obj
         tip = str(obj)
@@ -692,9 +709,11 @@ a tuple: (``parsedData``, ``infoDict``), where:
         memberAccess = tuple()
         accessType = None
 
-        if isinstance(obj, (enum.EnumType, TypeEnum)):
+        if isinstance(obj, (enum.EnumType, TypeEnum, enum.Enum)):
             memberAccess = (".", )
             accessType = "attribute"
+            if isinstance(obj, (enum.Enum, TypeEnum)):
+                info = obj.name
             if hasattr(obj, "__members__"):
                 choices = dict(obj.__members__)
             else:
@@ -707,7 +726,8 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         return obj, {"indirect": False,
                      "objDataAsChild": False,
-                     "objInfo": info, "objType": type(obj).__name__,
+                     "objInfo": info,
+                     "objType": type(obj).__name__,
                      "objTip": tip,
                      "memberAccess": memberAccess,
                      "accessType": accessType,
@@ -1425,7 +1445,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         if byPath:
             path = self._getPathForItemOrIndex_(leaf)
-            print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> path = {path}")
+            # print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> path = {path}")
             if len(path):
                 if path[-1] == self._topObjectItem_.data(QtCore.Qt.DisplayRole):
                     path[-1] = "self._modelData_"
@@ -1439,10 +1459,13 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
     def getPathForLeaf(self: typing.Self,
                        leaf: typing.Union[QtCore.QModelIndex,
-                                          QtGui.QStandardItem]
+                                          QtGui.QStandardItem],
+                       pathOnly: bool = False,
                        ) -> str:
         path = self._getPathForItemOrIndex_(leaf)
         if len(path):
+            if pathOnly:
+                return "".join(list(reversed(path[1:])))
             return "".join(list(reversed(path)))
         return ""
 
@@ -1566,7 +1589,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         newVal = eval(accexpr)
 
-        objType = objectItem.data(ObjectTypeRole)
+        objType = objItem.data(ObjectTypeRole)
 
         if objType is pathlib.Path:
             newVal = pathlib.Path(newVal)

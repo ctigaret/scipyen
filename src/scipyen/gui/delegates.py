@@ -6,7 +6,7 @@
 
 r"""
 """
-import os, sys, typing, math, pathlib
+import os, sys, typing, math, pathlib, enum, datetime
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -98,11 +98,13 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     # decide how to handle the case where the combo box is editable (and its
     # currentText() is not among the combo box items)
 
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
-                 columnChoices: typing.Optional[dict[int, dict[typing.Sequence, bool]]] = None,
+    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
+                 columnChoices: typing.Optional[dict[int,
+                                                     dict[typing.Sequence,
+                                                          bool]]] = None,
                  immutableColumns: typing.Optional[typing.Sequence[int]] = None,
                  immutableRows: typing.Optional[typing.Sequence[int]] = None,
-                 enforceFloat:bool=False):
+                 enforceFloat: bool = False):
         r"""Instantiates a PythonItemDelegate.
 
     Parameters:
@@ -135,7 +137,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
     """
         super().__init__(parent=parent)
-        self._model_ = None
+        # self._model_ = None
         self._useObjectDataRole_: bool = False
 
         self._enforceFloat_:bool = enforceFloat
@@ -288,7 +290,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             else:
                 scipywarn(f"{self.__class__.__name__}.setChoicesForColumn: invalid choiceData: {choiceData}")
 
-    def createWidget(self, data:typing.Any, choices:typing.Optional[typing.Sequence[str]] = None,
+    def createWidget(self, data:typing.Any,
+                     choices: typing.Optional[typing.Union[typing.Sequence[typing.Union[enum.Enum, str]],
+                                                           typing.Dict]] = None,
                      inModel:bool=True,
                      parent:typing.Optional[QtWidgets.QWidget] = None) -> QtWidgets.QWidget:
         r"""Work around for use with InteractiveTreeWidget and possibly others.
@@ -305,7 +309,57 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 widget.setChecked(data is True)
             widget.toggled.connect(self.slot_dataChanged)
 
+        elif isinstance(data, (datetime.datetime, datetime.date, datetime.time)):
+            if isinstance(data, datetime.datetime):
+                # qDate = QtCore.QDate(data.year, data.month, data.day)
+                # qTime = QtCore.QTime(data.hour, data.minute, data.second,
+                #                      int(np.round(data.microsecond/1000, 3)))
+                # qDateTime = QtCore.QDateTime(qDate, qTime)
+                widget = QtWidgets.QDateTimeEdit(parent)
+
+            elif isinstance(data, datetime.date):
+                # qDate = QtCore.QDate(data.year, data.month, data.day)
+                widget = QtWidgets.QDateEdit(parent)
+
+            else:
+                # qTime = QtCore.QTime(data.hour, data.minute, data.second,
+                #                      int(np.round(data.microsecond/1000, 3)))
+                widget = QtWidgets.QTimeEdit(parent)
+
         elif isinstance(data, (int, float, np.floating, np.integer)):# or any(v in type(data).__name__ for v in ("int", "float")):
+            if (
+                isinstance(choices, typing.Sequence)
+                and len(choices) > 0
+                and all(isinstance(v, (enum.Enum, str)) for v in choices)
+                ) or (
+                    isinstance(choices, dict)
+                    and all(isinstance(k, str) for k in choices.keys())
+                    ):
+                if isinstance(choices, dict):
+                    entries = list(choices.keys())
+                    values = list(choices.values())
+                else:
+                    entries = list(map(lambda x: x.name if isinstance(x, enum.Enum) else x, choices))
+                    values = list(map(lambda x: x.value if isinstance(x, enum.Enum) else choices.index(x), choices))
+
+                if data in values:
+                    ndx = values.index(data)
+                    widget = QtWidgets.QComboBox(parent)
+                    widget.insertItems(0, entries)
+                    widget.setEditable(False)
+                    widget.setCurrentIndex(ndx)
+
+                    if hasattr(widget, "setFrame"):
+                        widget.setFrame(False)
+
+                    widget.setAutoFillBackground(True)
+
+                    return widget
+
+                else:
+                    scipywarn(f"Data ({data}) is not in the supplied choices ({choices})")
+                    return
+
             if self._enforceFloat_:
                 # widget = QtWidgets.QDoubleSpinBox(parent)
                 widget = smw.QuantitySpinBox(parent)
@@ -395,35 +449,55 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 widget.setData(data)
                 widget.sig_dataChanged.connect(self.slot_dataChanged)
 
-        elif isinstance(data, (str, np.character, bytes, bytearray)): # or "str" in type(a).__name__: # for numpy.str_ type
-            if isinstance(data, str) and isinstance(choices, typing.Sequence) and len(choices) > 0 and all(isinstance(c, str) for c in choices):
-                if data not in choices:
-                    scipywarn(f"Data ({data}) is not in the supplied choices ({choices})")
-                    return
+        elif isinstance(data, (str, np.character, bytes, bytearray)):
+            if isinstance(data, str):
+                if (
+                    (
+                    isinstance(choices, typing.Sequence)
+                    and all(isinstance(v, (enum.Enum, str)) for v in choices)
+                    ) or isinstance(choices, dict)
+                    ) and len(choices) > 0:
+                    if isinstance(choices, dict):
+                        entries = list(choices.keys())
+                        values = list(choices.values())
+                    else:
+                        entries = list(map(lambda x: x.name if isinstance(x, enum.Enum) else x, choices))
+                        values = list(map(lambda x: x.value if isinstance(x, enum.Enum) else entries.index(x), choices))
 
-                ndx = choices.index(data)
-                widget = QtWidgets.QComboBox(parent)
-                widget.insertItems(0, choices)
-                widget.setEditable(False)
-                widget.setCurrentIndex(ndx)
-            else:
-                if len(data) > 100:
-                    txt = data if isinstance(data, str) else data.decode()
-                    widget = QtWidgets.QPlainTextEdit(txt)
-                    widget.setMaximumHeight(200)
-                    if isinstance(data, str):
-                        widget.setReadOnly(False)
-                        widget.textChanged().connect(self.slot_dataChanged)
+                    if data in entries:
+                        ndx = entries.index(data)
+                        widget = QtWidgets.QComboBox(parent)
+                        widget.insertItems(0, entries)
+                        widget.setEditable(False)
+                        widget.setCurrentIndex(ndx)
+
+                        if hasattr(widget, "setFrame"):
+                            widget.setFrame(False)
+                        widget.setAutoFillBackground(True)
+
+                        return widget
+
                     else:
-                        widget.setReadOnly(True)
-                else:
-                    if isinstance(data, str):
-                        # widget = QtWidgets.QLineEdit(parent)
-                        widget = smw.LazyLineEdit(parent)
-                        widget.setText(data)
-                        widget.sig_enterPressed.connect(self.slot_dataChanged)
-                    else:
+                        scipywarn(f"Data ({data}) is not in the supplied choices ({choices})")
                         return
+
+            if len(data) > 100:
+                txt = data if isinstance(data, str) else data.decode()
+                widget = QtWidgets.QPlainTextEdit(txt)
+                widget.setMaximumHeight(200)
+                if isinstance(data, str):
+                    widget.setReadOnly(False)
+                    widget.textChanged().connect(self.slot_dataChanged)
+                else:
+                    widget.setReadOnly(True)
+            else:
+                if isinstance(data, str):
+                    # widget = QtWidgets.QLineEdit(parent)
+                    widget = smw.LazyLineEdit(parent)
+                    widget.setText(data)
+                    widget.sig_enterPressed.connect(self.slot_dataChanged)
+                else:
+                    return
 
         else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
             return
@@ -499,22 +573,29 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         choices = list()
 
-        if index.column() in self._columnChoices_:
+        if (
+            isinstance(dataChoices, typing.Sequence)
+            and all(isinstance(v, (enum.Enum, str)) for v in dataChoices)
+            ):
+            choices = dataChoices
+
+        elif (
+            isinstance(dataChoices, dict)
+            and all(isinstance(key, str) for key in dataChoices.keys())
+            ):
+            choices = dataChoices
+
+        elif index.column() in self._columnChoices_:
             if not isinstance(data, str):
                 scipywarn(f"{self.__class__.__name__}.createEditor: data type ({type(data).__name__}) is not supported for combo box")
                 return
 
             choices = self._columnChoices_[index.column()]["choices"]
 
-        elif isinstance(dataChoices, typing.Sequence) and all(isinstance(v, str) for v in dataChoices):
-            choices = dataChoices
-
-        elif isinstance(dataChoices, dict) and all(isinstance(key, str) for key in dataChoices.keys()):
-            choices = list(dataChoices.keys())
-
         return self.createWidget(data, choices, True, parent)
 
-    def setEditorData(self, editor:QtWidgets.QWidget, index:QtCore.QModelIndex):
+    def setEditorData(self, editor: QtWidgets.QWidget,
+                      index: QtCore.QModelIndex):
         r"""Sets the value of the editor widget based on the EditRole data in the QModelIndex"""
         data = index.data(ObjectDataRole)
         if data is not None:
@@ -528,26 +609,63 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         disp = f"{index.data(QtCore.Qt.DisplayRole)}"
         dataChoices = index.data(DataChoicesRole)
 
-        if index.column() in self._columnChoices_:
-            choices = self._columnChoices_[index.column()]["choices"]
-
-        elif dataChoices:
+        if dataChoices:
             choices = dataChoices
+
+        elif index.column() in self._columnChoices_:
+            choices = self._columnChoices_[index.column()]["choices"]
         else:
             choices = list()
 
         if isinstance(editor, QtWidgets.QComboBox):
             # case where we use a QComboBox
-            if not isinstance(data, str):
+            if not isinstance(data, (enum.Enum, int, str)):
                 scipywarn(f"{self.__class__.__name__}.createEditor: data type ({type(data).__name__}) is not supported for combo box")
                 return
 
-            if data not in choices:
-                scipywarn(f"{self.__class__.__name__}.createEditor: data {data} does not belong to choices ({choices})")
-                return
+            if (
+                isinstance(choices, typing.Sequence)
+                and len(choices) > 0
+                and all(isinstance(v, (enum.Enum, str)) for v in choices)
+                ) or (
+                    isinstance(choices, dict)
+                    and all(isinstance(k, str) for k in choices.keys())
+                    ):
+                if isinstance(choices, dict):
+                    entries = list(choices.keys())
+                    values = list(choices.values())
 
-            ndx = choices.index(data)
-            editor.setCurrentIndex(ndx)
+                else:
+                    entries = list(map(lambda x: x.name if isinstance(x, enum.Enum) else x, choices))
+                    values = list(map(lambda x: x.value if isinstance(x, enum.Enum) else choices.index(x), choices))
+
+                if (
+                        (
+                            isinstance(data, enum.Enum) and data.name in entries
+                        )
+                        or
+                        (
+                            isinstance(data, str) and data in entries
+                        )
+                    ):
+                    ndx = entries.index(data.name) if isinstance(data, enum.Enum) else entries.index(data)
+
+                elif (
+                        (
+                            isinstance(data, enum.Enum) and data.value in values
+                        )
+                        or
+                        (
+                            isinstance(data, int) and data in values
+                        )
+                    ):
+                    ndx = values.index(data.value) if isinstance(data, enum.Enum) else values.index(data)
+
+                else:
+                    scipywarn(f"{self.__class__.__name__}.createEditor: data {data} does not belong to choices ({choices})")
+                    return
+
+                editor.setCurrentIndex(ndx)
 
         else:
             if isinstance(data, bool) or "bool" in type(data).__name__:
@@ -599,19 +717,39 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     # editor.setSingleStep(1.0  * data.units)
                 editor.setValue(data)
 
-            elif isinstance(data, str) or "str" in type(a).__name__:
+            elif isinstance(data, str) or "str" in type(data).__name__:
                 assert isinstance(editor, QtWidgets.QLineEdit), f"Incompatible editor editor type ({type(editor).__name__}) for string data"
                 editor.setText(data)
+
+            elif isinstance(data, (datetime.datetime, datetime.date, datetime.time)):
+                if isinstance(editor, QtWidgets.QDateTimeEdit):
+                    if isinstance(data, datetime.datetime):
+                        qDate = QtCore.QDate(data.year, data.month, data.day)
+                        qTime = QtCore.QTime(data.hour, data.minute, data.second,
+                                            int(np.round(data.microsecond/1000, 3)))
+                        qDateTime = QtCore.QDateTime(qDate, qTime)
+                        editor.setDateTime(qDateTime)
+
+                    elif isinstance(data, datetime.date):
+                        qDate = QtCore.QDate(data.year, data.month, data.day)
+                        editor.setDate(qDate)
+
+                    else:
+                        qTime = QtCore.QTime(data.hour, data.minute, data.second,
+                                            int(np.round(data.microsecond/1000, 3)))
+                        editor.setTime(qTime)
 
             # elif isinstance(data, pathlib.Path):
             #     assert isinstance(editor, QtWidgets.QLineEdit), f"Incompatible editor editor type ({type(editor).__name__}) for string data"
             #     editor.setText(data)
 
 
-    def setModelData(self, editor:QtWidgets.QWidget,
-                     model:QtCore.QAbstractItemModel,
-                     index:QtCore.QModelIndex):
+    def setModelData(self, editor: QtWidgets.QWidget,
+                     model: QtCore.QAbstractItemModel,
+                     index: QtCore.QModelIndex):
         r"""Sets data back into the QModelIndex"""
+        originalData = index.data(ObjectDataRole)
+
         if isinstance(editor, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox,
                                smw.QuantitySpinBox)):
             data = editor.value()
@@ -620,11 +758,53 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             data = editor.text()
 
         elif isinstance(editor, QtWidgets.QComboBox):
-            data = editor.currentText()
+            textValue = editor.currentText()
+            ndxValue = editor.currentIndex()
+            # originalData = index.data(ObjectDataRole)
+
+            if isinstance(originalData, enum.Enum):
+                data = type(originalData)[textValue]
+
+            elif isinstance(originalData, str):
+                data = textValue
+
+            elif isinstance(originalData, int):
+                data = ndxValue
+
+            else:
+                scipywarn(f"Index data ({type(originalData).__name__}) is not supported by a combo box")
+                return
+
+        elif isinstance(editor, QtWidgets.QDateTimeEdit):
+            qDateTime = editor.dateTime()
+            if not qDateTime.isNull() and qDateTime.isValid():
+                qDate = qDateTime.date()
+                qTime = qDateTime.time()
+                if isinstance(originalData, datetime.datetime):
+                    if qDate.isValid() and qTime.isValid():
+                        data = datetime.datetime(
+                            qDate.year(), qDate.month(), qDate.day(),
+                            qTime.hour(), qTime.minute(), qTime.second(),
+                            qTime.msec() * 1000)
+
+                elif isinstance(originalData, datetime.date):
+                    if qDate.isValid():
+                        data = datetime.date(qDate.year(), qDate.month(),
+                                              qDate.day())
+
+                elif isinstance(originalData, datetime.time):
+                    if qTime.isValid():
+                        data = datetime.time(qTime.hour(), qTime.minute(),
+                                             qTime.second(), qTime.msec()*1000)
+
+                elif isinstance(originalData, str):
+                    data = qDateTime.toString()
+
+                else:
+                    return
 
         elif isinstance(editor, QtWidgets.QCheckBox):
             data = editor.isChecked()
-
 
         role = ObjectDataRole if self._useObjectDataRole_ else QtCore.Qt.EditRole
         # print(f"{self.__class__.__name__}.setModelData -> editor: {type(editor).__name__}, row = {index.row()}, column = {index.column()}, data = {data} for role = {role}")

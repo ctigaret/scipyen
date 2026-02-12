@@ -83,7 +83,7 @@ from core.workspacefunctions import validate_varname
 
 from core.utilities import NestedFinder
 
-from core.prog import (safewrapper, safeguiwrapper, )
+from core.prog import (safewrapper, safeguiwrapper, scipywarn)
 
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 from core.scipyendataclasses import ScipyenDataclass
@@ -100,8 +100,9 @@ from core.scipyen_config import markConfigurable
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
 from gui.pictgui import WorkerThread
-from gui.widgets import datatreeview
-from gui.widgets.datatreeview import (DataTreeModel, DataTreeView)
+from gui.widgets.datatreeview import DataTreeView
+# from gui.itemmodels import DataTreeModel
+
 
 # from . import resources_rc
 # from . import icons_rc
@@ -131,7 +132,7 @@ A lot of things copied from there, EXCEPT that it now uses
     sig_activated = Signal(int)
     closeMe  = Signal(int)
     signal_window_will_close = Signal()
-    _sig_setTreeWidgetData_ = Signal(dict, name="_sig_setTreeWidgetData_")
+    _sig_setTreeViewData_ = Signal(dict, name="_sig_setTreeViewData_")
 
     # NOTE: 2022-11-20 22:09:07
     # reserved for future developmet of editing capabilities TODO
@@ -231,12 +232,14 @@ A lot of things copied from there, EXCEPT that it now uses
 
         self._obj_to_view_ = (dataclasses.MISSING, "")
 
-        super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs)
+        super().__init__(data=data, parent=parent, win_title=win_title,
+                         doc_title = doc_title, ID=ID, *args, **kwargs)
 
     def _configureUI_(self):
         self.treeView = DataTreeView(parent = self,
-                                     supported_data_types = tuple(self.viewer_for_types),
-                                     readOnly = self._readOnly_)
+                                     supported_data_types = tuple(self.viewer_for_types))
+                                     # ,
+                                     # readOnly = self._readOnly_)
 
         self.treeView.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
@@ -244,14 +247,19 @@ A lot of things copied from there, EXCEPT that it now uses
         self.treeView.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
         self.treeView.setDragEnabled(True)
 
-        self.treeView.customContextMenuRequested[QtCore.QPoint].connect(self.slot_customContextMenuRequested)
+        self.treeView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.treeView.customContextMenuRequested[QtCore.QPoint].connect(
+            self.slot_customContextMenuRequested
+            )
+
+        self.treeView.setAlternatingRowColors(True)
 
         # NOTE: 2025-03-12 13:25:01 treeView ultimately inherits from QTreeWidget
         # and itemDoubleClicked is a Signal emitted by QTreeWidget
-        self.treeView.itemDoubleClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_itemDoubleClicked)
+        # self.treeView.itemDoubleClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_itemDoubleClicked)
 
         self.setCentralWidget(self.treeView)
-        self._sig_setTreeWidgetData_.connect(self.treeView.slot_setData)
+        self._sig_setTreeViewData_.connect(self.treeView.slot_setData)
         # self.treeView.update() # force drawing placeholder text ?!?
 
         self.toolBar = QtWidgets.QToolBar("Main", self)
@@ -266,8 +274,6 @@ A lot of things copied from there, EXCEPT that it now uses
         expandAllAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("expand-all"), "Expand All")
         expandAllAction.triggered.connect(self.slot_expandAll)
 
-        # increaseWidgetHeight
-
         self.goFirst = self.toolBar.addAction(QtGui.QIcon.fromTheme("go-first-symbolic"), "First view")
         self.goFirst.triggered.connect(self.slot_goFirst)
         self.goFirst.setEnabled(False)
@@ -281,3 +287,407 @@ A lot of things copied from there, EXCEPT that it now uses
         self.goNext.setEnabled(False)
 
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
+
+    @Slot(QtCore.QPoint)
+    @safewrapper
+    def slot_customContextMenuRequested(self, point):
+        from gui.mainwindow import VTH
+
+        # FIXME/TODO copy to system clipboard? - what mime type? JSON data?
+        if self._scipyenWindow_ is None:
+            return
+
+        # indexList = self.treeView.selectedIndexes()
+        # if len(indexList) == 0:
+        #     return
+
+        items = self.treeView.selectedItems()
+        if len(items) == 0:
+            return
+
+        cm = QtWidgets.QMenu("Data operations", self)
+        cm.setToolTipsVisible(True)
+
+        copyItemData = cm.addAction("Copy value(s) to workspace")
+        copyItemData.setToolTip("Copy value(s) to workspace (SHIFT to assign full path as name)")
+        copyItemData.setStatusTip("Copy value(s) to workspace (SHIFT to assign full path as name)")
+        copyItemData.setWhatsThis("Copy value(s) to workspace (SHIFT to assign full path as name)")
+        copyItemData.triggered.connect(self.slot_exportToWorkspace)
+
+        copyItemPath = cm.addAction("Copy path(s)")
+        copyItemPath.triggered.connect(self.slot_copyPaths)
+
+        sendToConsole = cm.addAction("Send path(s) to console")
+        sendToConsole.triggered.connect(self.slot_exportToConsole)
+
+        # NOTE: 2025-05-28 13:28:36
+        # to keep it simple, restrict the option viewing the selected item, to
+        # the case where a single item is selected
+        if len(items) == 1:
+            names, objects =  self.treeView.exportDataForItems(items)
+            obj = objects[0]
+            name = names[0]
+            self._obj_to_view_ = (obj, name)
+
+            viewItemData = cm.addAction("View")
+            # viewItemData.setToolTip("View item in a separate window (SHIFT for a new window)")
+            # viewItemData.setStatusTip("View item in a separate window (SHIFT for a new window)")
+            # viewItemData.setWhatsThis("View item in a separate window (SHIFT for a new window)")
+            viewItemData.setToolTip(f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.setStatusTip(f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.setWhatsThis(f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.triggered.connect(self.slot_viewItem)
+
+            if not issubclass(type(obj), QtWidgets.QWidget):
+                handler_specs = VTH.get_handler_spec(type(obj))
+                if len(handler_specs):
+                    specialViewMenu = cm.addMenu("View with")
+                    for handler_spec in handler_specs:
+                        action = specialViewMenu.addAction(handler_spec[1])
+                        action.setToolTip(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        action.setStatusTip(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        action.setWhatsThis(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        action.triggered.connect(self.slot_autoSelectViewer)
+
+            cm.addSeparator()
+            viewInConsoleAction = cm.addAction("Display in console")
+            viewInConsoleAction.setToolTip("Display in console")
+            viewInConsoleAction.setStatusTip("Display in console")
+            viewInConsoleAction.setWhatsThis("Display in console")
+
+            viewInConsoleAction.triggered.connect(
+                self.slot_showInConsole)
+
+        # TODO: 2022-10-11 13:45:44
+        # use itemAt (point) to get the index of the item, then if index is in
+        # the leaf column, check if the value is editable (and constraints)
+        # • editable values are, POD types (numeric scalars, strings, bool)
+        # if editable then enable this menu action
+        # • contemplate editing of other data (elements in expanded lists,
+        # expanded dicts, elements of numpy arrays and their subclasses)
+        # editItemData = cm.addAction("Edit")
+        # editItemData.setToolTip("Edit value")
+        # editItemData.setStatusTip("Edit value")
+        # editItemData.setWhatsThis("Edit value")
+        # editItemData.tiggered.connect(self.slot_editItemData)
+
+        cm.popup(self.treeView.mapToGlobal(point), copyItemData)
+
+    @Slot()
+    @safewrapper
+    def slot_exportToWorkspace(self: typing.Self):
+        fullPathAsName = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+
+        if self._scipyenWindow_ is None:
+            return
+
+        items = self.treeView.selectedItems()
+
+        if len(items) == 0:
+            return
+
+        names, objects  = self.treeView.exportDataForItems(items, fullPathAsName=fullPathAsName)
+
+        if len(objects) == 1:
+            dlg = quickdialog.QuickDialog(self, "Copy to workspace")
+            labelString = "Warning: The current variable name starts with an underscore ('_'), and therefore it will be hidden in the workspace viewer."
+            namePrompt = quickdialog.StringInput(dlg, "Data name:")
+            namePrompt.valueChanged[str].connect(dlg._slot_valueChanged)
+            namePrompt.variable.setClearButtonEnabled(True)
+            namePrompt.variable.redoAvailable=True
+            namePrompt.variable.undoAvailable=True
+            hiddenWarningLabel = QtWidgets.QLabel(labelString, self)
+            hiddenWarningLabel.setVisible(False)
+            dlg.addCallback(lambda s: hiddenWarningLabel.setVisible(s.startswith("_")))
+            dlg.addWidget(hiddenWarningLabel, 0, QtCore.Qt.AlignLeft)
+
+            namePrompt.setText(names[0])
+            dlg.adjustSize()
+
+            if dlg.exec() == QtWidgets.QDialog.Accepted:
+                newVarName = namePrompt.text()
+
+                self._scipyenWindow_.assignToWorkspace(newVarName, objects[0], check_name=False)
+
+        else:
+            for name, obj in zip(names, objects):
+                self._scipyenWindow_.assignToWorkspace(name, obj, check_name=False)
+
+    @Slot()
+    @safewrapper
+    def slot_copyPaths(self: typing.Self):
+        if self._scipyenWindow_ is None:
+            return
+
+        item_paths = self.treeView.getSelectedPaths()
+        self.exportPathsToClipboard(item_paths)
+
+    @Slot()
+    def slot_exportToConsole(self: typing.Self):
+        if self._scipyenWindow_ is None:
+            return
+
+        item_paths = self.treeView.getSelectedPaths()
+        self.exportPathsToClipboard(item_paths)
+        self._scipyenWindow_.console.paste()
+
+    @Slot()
+    @safewrapper
+    def slot_collapseAll(self):
+        self.treeView.collapseAll()
+
+    @Slot()
+    @safewrapper
+    def slot_expandAll(self):
+        self.treeView.expandAll()
+        self.treeView.resizeColumnToContents(0)
+    @Slot()
+    @safewrapper
+    def slot_viewItem(self: typing.Self):
+        # from core.utilities import get_nested_value
+        if self.scipyenWindow is None or "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+            return
+
+        if self._obj_to_view_[0] is dataclasses.MISSING or len(self._obj_to_view_[1].strip()) == 0:
+            return
+
+        newWindow = bool(
+            QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
+
+        askForParams = bool(
+            QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+
+        variable, varname = self._obj_to_view_
+
+        if newWindow:
+            if not self.scipyenWindow.viewObject(variable, varname, winType=self.__class__,
+                                    newWindow=True,
+                                    askForParams=askForParams):
+                self._showInConsole_(variable)
+        else:
+            if isinstance(variable, tuple(self.viewer_for_types.keys())):
+                self.view(variable, doc_title = varname)
+            else:
+                self._showInConsole_(variable)
+
+        self._obj_to_view_ = (dataclasses.MISSING, "")
+
+    @Slot(QtWidgets.QTreeWidgetItem, int)
+    @safewrapper
+    def slot_itemDoubleClicked(self, item, column):
+        names, objects = self.treeView.exportDataForItems([item])
+        obj = objects[0]
+        name = names[0]
+        self._obj_to_view_ = (obj, name)
+        self.slot_viewItem()
+
+    @Slot()
+    @safewrapper
+    def slot_autoSelectViewer(self):
+        from gui.mainwindow import VTH
+
+        if "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+            return
+
+        if self._obj_to_view_[0] is dataclasses.MISSING or len(self._obj_to_view_[1].strip()) == 0:
+            return
+
+        newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
+        askForParams = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+
+        variable, varname = self._obj_to_view_
+
+        action = self.sender()
+        actionName = action.text().replace("&", "")
+        handler_specs = VTH.get_handler_spec(type(variable))
+        # print(f"{self.__class__.__name__}.slot_autoSelectViewer: hanler_specs -> {handler_specs}")
+        if len(handler_specs):
+            viewers = [spec[0] for spec in handler_specs if spec[1] == actionName]
+
+            if len(viewers):
+                viewer = viewers[0]
+
+                if not self.scipyenWindow.viewObject(variable, varname, winType=viewer,
+                                       newWindow=newWindow,
+                                       askForParams=askForParams):
+                    self._showInConsole_(variable)
+        else:
+            self._showInConsole_(variable)
+
+        self._obj_to_view_ = (dataclasses.MISSING, "")
+
+    @safewrapper
+    def exportPathsToClipboard(self, item_paths):
+        if self._scipyenWindow_ is None:
+            return
+
+        if len(item_paths) > 1:
+            if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier):
+                self._scipyenWindow_.app.clipboard().setText(",\n".join(["""%s""" % i for i in item_paths]))
+            else:
+                self._scipyenWindow_.app.clipboard().setText(", ".join(["""%s""" % i for i in item_paths]))
+
+        elif len(item_paths) == 1:
+            self._scipyenWindow_.app.clipboard().setText(item_paths[0])
+
+    def _showInConsole_(self, obj):
+        if "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+            return
+        try:
+            # NOTE 2025-05-28 14:22:51
+            # as the object may not exist in the workspace, it gets assigned
+            # there first, under a special (hidden) name, executed, and finally
+            # deleted (i.e. the special (hidden) symbol is removed from the
+            # workspace)
+            self.scipyenWindow.assignToWorkspace("____", obj)
+            self.scipyenWindow.console.execute("____", interactive=False)
+            self.scipyenWindow.console.execute("del ____", hidden=True, interactive=False)
+        except:
+            traceback.print_exc()
+
+    @Slot()
+    def slot_goBack(self):
+        self._cache_index_ = self._cache_index_ - 1
+
+        if self._cache_index_ < 0:
+            self._cache_index_ = 0
+
+        elif self._cache_index_ >= len(self._obj_cache_):
+            self._cache_index_ = len(self._obj_cache_) - 1
+
+        self.goNext.setEnabled(self._cache_index_ < len(self._obj_cache_)-1)
+        self.goBack.setEnabled(self._cache_index_ > 0)
+
+        worker = WorkerThread(self, self._populateTreeView_)
+        worker.signals.signal_Finished.connect(self._slot_treeViewPopulated)
+        worker.run()
+
+    @Slot()
+    def slot_goFirst(self):
+        self._cache_index_ = 0
+        self.goNext.setEnabled(self._cache_index_ < len(self._obj_cache_)-1)
+        self.goBack.setEnabled(self._cache_index_ > 0)
+        worker = WorkerThread(self, self._populateTreeView_)
+        worker.signals.signal_Finished.connect(self._slot_treeViewPopulated)
+        worker.run()
+
+    @Slot()
+    def slot_goNext(self):
+        self._cache_index_ = self._cache_index_ + 1
+        if self._cache_index_ >= len(self._obj_cache_):
+            self._cache_index_ = len(self._obj_cache_) - 1
+
+        self.goNext.setEnabled(self._cache_index_ < len(self._obj_cache_)-1)
+        self.goBack.setEnabled(self._cache_index_ >0)
+        worker = WorkerThread(self, self._populateTreeView_)
+        worker.signals.signal_Finished.connect(self._slot_treeViewPopulated)
+        worker.run()
+
+    def _check_cache_(self, obj:typing.Any, name:str) -> bool:
+        if isinstance(obj, np.ndarray):
+            for (o,n) in self._obj_cache_:
+                if isinstance(o, np.ndarray) and np.all(obj.flatten() == o.flatten()) and name == n:
+                    return True
+            return False
+
+        elif isinstance(obj, (pd.Index, pd.DataFrame, pd.Series)):
+            for (o,n) in self._obj_cache_:
+                if isinstance(o, type(obj)) and np.all(obj == o) and name == n:
+                    return True
+            return False
+        else:
+            # print(f"{self.__class__.__name__}._check_cache_: obj is a {type(obj).__name__}, name: {name} ({type(name).__name__}))")
+            for (o,n) in self._obj_cache_:
+                if all(isinstance(o_, np.ndarray) for o_ in (o, obj)) and np.all(obj == o) and name ==n:
+                    return True
+                return False
+
+    def _get_cache_index_(self, obj:typing.Any, name:str) -> int | None:
+        if isinstance(obj, np.ndarray):
+            for k, (o,n) in enumerate(self._obj_cache_):
+                if isinstance(o, np.ndarray) and np.all(obj.flatten() == o.flatten()) and name == n:
+                    return k
+            return
+        elif isinstance(obj, (pd.DataFrame, pd.Index, pd.Series)):
+            for k, (o,n) in enumerate(self._obj_cache_):
+                if isinstance(o, type(obj)) and np.all(obj == o) and name == n:
+                    return k
+            return
+        else:
+            if (obj, name) in self._obj_cache_:
+                return self._obj_cache_.index((obj, name))
+
+    def _set_data_(self, data:object, predicate=None, *args, **kwargs):
+        r"""
+        Displays new data
+        """
+        self.update()
+        if inspect.isfunction(predicate):
+            self.predicate=predicate
+
+        if data is not self._data_:
+            self._data_ = data
+            self._dataTypeStr_ = type(self._data_).__name__
+            self._top_title_ = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
+
+            if self._check_cache_(self._data_, self._top_title_):
+                self._cache_index_ = self._get_cache_index_(self._data_, self._top_title_)
+
+                if self._cache_index_ is None:
+                    self._cache_index_ = 0
+            else:
+                self._obj_cache_.append((self._data_, self._top_title_))
+                self._cache_index_ = len(self._obj_cache_)-1 if len(self._obj_cache_) > 0 else 0
+
+            for w in (self.goFirst, self.goBack):
+                w.setEnabled(len(self._obj_cache_) > 1)
+
+            self.goNext.setEnabled(len(self._obj_cache_) > 1 and self._cache_index_ < len(self._obj_cache_)-1)
+
+            worker = WorkerThread(self, self._populateTreeView_)
+            worker.signals.signal_Finished.connect(self._slot_treeViewPopulated)
+            worker.run()
+
+        if kwargs.get("show", True):
+            self.activateWindow()
+
+    def _populateTreeView_(self):
+        self.treeView.clear()
+        if len(self._obj_cache_):
+            if self._cache_index_ >= len(self._obj_cache_):
+                self._cache_index_ = len(self._obj_cache_) - 1
+            obj, name = self._obj_cache_[self._cache_index_]
+            self.update_title(doc_title = name, win_title=self._winTitle_)
+            what = {"data": obj, "predicate": self.predicate, "root_title": name,
+                    "showPrivate": self._showPrivateMembers_,
+                    "dataTypeStr": type(obj).__name__}
+            self._sig_setTreeViewData_.emit(what)
+
+    @Slot()
+    def _slot_treeViewPopulated(self):
+        self._slot_update_title()
+        # self.treeView.collapseAll()
+        self.treeView.expandToDepth(1)
+        self.treeView.resizeColumnToContents(0)
+
+    @Slot()
+    @safewrapper
+    def slot_refreshDataDisplay(self):
+        worker = WorkerThread(self, self._populateTreeView_)
+        worker.signals.signal_Finished.connect(self._slot_treeViewPopulated)
+        worker.run()
+
+
+    @Slot()
+    @safewrapper
+    def slot_showInConsole(self):
+        if self.scipyenWindow is None or "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+            return
+
+        if self._obj_to_view_[0] is dataclasses.MISSING or len(self._obj_to_view_[1].strip()) == 0:
+            return
+
+        variable, varname = self._obj_to_view_
+        self._showInConsole_(variable)
+        self._obj_to_view_ = (dataclasses.MISSING, "")
+

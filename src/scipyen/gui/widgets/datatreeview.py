@@ -184,47 +184,12 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         parent = kwargs.pop("parent", None)
         super().__init__(parent=parent)
         super().setModel(DataTreeModel())
-        # self.model().dataChanged.connect(self._slot_dataChanged_)
         self._delegate_ = PythonItemDelegate()
         self._defaultDelegate_ = self.itemDelegate()
 
     def setModel(self: typing.Self, model: QtCore.QAbstractItemModel):
         # disallow changing the model
         pass
-
-    @Slot(QtCore.QModelIndex, QtCore.QModelIndex)
-    def _slot_dataChanged_(self, index0: QtCore.QModelIndex,
-                           index1: QtCore.QModelIndex):
-        print(f"{self.__class__.__name__}._slot_dataChanged_:")
-        # print(f"\tindex 0 row {index0.row()}, col {index0.column()}")
-        # print(f"\tindex 0 data {index0.data()}")
-        # print(f"\tindex 1 row {index1.row()}, col {index1.column()}")
-        # print(f"\tindex 1 data {index1.data()}")
-
-        if index0 == index1:
-            item = self.model().itemFromIndex(index0)
-            if item.column() == 0:
-                # I need item in column 0 which is the reposutory of the actual
-                # data object
-
-                objItem = item
-            else:
-                parentItem = item.parent()
-                if parentItem:
-                    objItem = parentItem.child(item.row(), 0)
-                else:
-                    return
-
-            originalData = self.model().getDataObjectForLeaf(item)
-            data = objItem.data(ObjectDataRole)
-            print(f"\torginal data {originalData}, new data {data}")
-
-
-            # if item.column() == 2:
-            #     data = item.data()
-            #     originalData = self.model().getDataObjectForLeaf(item)
-            #     print(f"\torginal data {originalData}, new data {data}")
-
 
     def _setupChildDataItem_(self: typing.Self, item: QtGui.QStandardItem,
                              objData: typing.Optional[typing.Any] = None):
@@ -298,11 +263,11 @@ For a given item:
                 objItem = parentItem.child(infoItem.row(), 0)
                 objType = objItem.data(ObjectTypeRole)
 
-                if issubclass(objType, enum.Enum):
-                    # FIXME: 2026-02-11 22:58:27
-                    # how to pass specific choices dict to the SAME delegate ?!?
-                    # TODO: create another delegate SPECIFICALLY for choices, using combobox
-                    pass
+                # if issubclass(objType, enum.Enum):
+                #     # FIXME: 2026-02-11 22:58:27
+                #     # how to pass specific choices dict to the SAME delegate ?!?
+                #     # TODO: create another delegate SPECIFICALLY for choices, using combobox
+                #     pass
 
             # choices = infoItem.data(DataChoicesRole) # picked up by the delegate, from the index
             # editorWidget = self._delegate_.createWidget(objData,
@@ -321,6 +286,7 @@ For a given item:
                 name: typing.Optional[str] = None):
         signalBlocker = QtCore.QSignalBlocker(self.model())
         # model = self.model()
+        self.model().clear()
         self.model().setModelData(obj, name)
         root = self.model().invisibleRootItem()
         if root.hasChildren():
@@ -342,5 +308,62 @@ For a given item:
         # set all delegates in column 2 to readOnly
         # WARNING: delegates are handled by the viewer owner of this model!
 
+    def selectedItems(self: typing.Self) -> typing.Sequence:
+        return list(
+                        filter(lambda i: i.column() == 0,
+                               map(
+                                   lambda i: self.model().itemFromIndex(i),
+                                   self.selectedIndexes()
+                                   )
+                               )
+                    )
 
+    def exportDataForItems(self: typing.Self,
+                           items: typing.Sequence[QtGui.QStandardItem] = list(),
+                           fullPathAsName: bool = False,
+                           pathOnly: bool = False) -> tuple:
+
+        if pathOnly:
+            fullPathAsName = True
+
+        # l_pathToStr = lambda s: s.replace(".", "_").replace("[", "_").replace("]", "_") is isinstance(s, str) else ""
+
+        l_getName = lambda i: self.model().getPathForLeaf(i) if fullPathAsName else i.data(QtCore.Qt.DisplayRole)
+
+        names, objects = zip(
+            *list(
+                    map(
+                        lambda i: (
+                                    l_getName(i),
+                                    self.model().getDataObjectForLeaf(i)
+                                    ),
+                        items
+                        )
+                    )
+            )
+
+        if pathOnly:
+            return names
+
+        return names, objects
+
+    def getSelectedPaths(self: typing.Self) -> typing.Sequence:
+        items = self.selectedItems()
+        if len(items) == 0:
+            return list()
+
+        return self.exportDataForItems(items, pathOnly = True)
+
+    @Slot(object)
+    def slot_setData(self: typing.Self, what: dict):
+        data = what.get("data", None)
+        root_title = what.get("root_title", "")
+        # predicate = what.get("predicate", None)
+        # showPrivate = what.get("showPrivate", None)
+        # dataTypeStr = what.get("dataTypeStr", None)
+        # hideRoot = what.get("hideRoot", False)
+        self.setData(data, root_title)
+
+    def clear(self: typing.Self):
+        self.model().clear()
 
