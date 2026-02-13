@@ -44,13 +44,21 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 import math, datetime
 import numpy as np
 import quantities as pq
+import pandas as pd
+
+import core.bgbridge
+
 from core import scipyen_quantities as scq
 from core import strutils
 from core.datatypes import UnitTypes, GENOTYPES
-import pandas as pd
+
+from core import workspacefunctions as wsf
+from dataclasses import (dataclass, asdict)
+from core.scipyendataclasses import *
 
 from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
 from gui.textviewer import TextViewer
+from gui.widgets.datatreeview import DataTreeView
 
 Ui_MetaDataWidget, QWidget = loadUiType(os.path.join(__module_path__, "metadatawidget.ui"))
 
@@ -64,7 +72,11 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     def __init__(self, parent=None, **kwargs):
         scipywarn(print_styled(f"The class {self.__class__.__name__} is deprecated", "yellow"))
         QWidget.__init__(self, parent=parent)
-        
+
+        self._atlas_manager_ = bgbridge.BrainAtlasManager()
+
+        self._available_atlas_names_ = list(self._atlas_manager_.atlases.keys())
+
         self._dataVarName = kwargs.pop("varname", "")
         self._dataName = kwargs.pop("name", "")
         self._dateTime = datetime.datetime.now()
@@ -142,11 +154,11 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         self.cellIDLineEdit.redoAvailable = True
         self.cellIDLineEdit.editingFinished.connect(self._slot_setCell)
         
-        self.fieldIDLineEdit.setText(f"{self._field}")
-        self.fieldIDLineEdit.setClearButtonEnabled(True)
-        self.fieldIDLineEdit.undoAvailable = True
-        self.fieldIDLineEdit.redoAvailable = True
-        self.fieldIDLineEdit.editingFinished.connect(self._slot_setField)
+        # self.fieldIDLineEdit.setText(f"{self._field}")
+        # self.fieldIDLineEdit.setClearButtonEnabled(True)
+        # self.fieldIDLineEdit.undoAvailable = True
+        # self.fieldIDLineEdit.redoAvailable = True
+        # self.fieldIDLineEdit.editingFinished.connect(self._slot_setField)
         
         self.ageSpinBox.unitsFamily = "Time"
         self.ageSpinBox.units = self._age.units if isinstance(self._age, pq.Quantity) else pq.dimensionless

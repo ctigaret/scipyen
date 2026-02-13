@@ -929,32 +929,38 @@ class BrainAtlasManager(QtCore.QObject):
             
         return conf_object
 
-    def getAtlasesConfiguration(self, atlases_conf_path:typing.Optional[pathlib.Path]=None,
-                         conf_path:typing.Optional[pathlib.Path] = None) -> dict | None:
+    def getAtlasesConfiguration(self: typing.Self,
+                atlases_conf_path: typing.Optional[pathlib.Path]=None,
+                conf_path: typing.Optional[pathlib.Path] = None,
+                ) -> dict | None:
         r"""Returns atlas names and versions as a dictionary.
         
         This information is taken from the local atlas configuration file
         $HOME/.brainglobe/last_versions.conf if it exists, and assumed to be up 
         to date.
         
-        Failing that, an atlas configuration file is downloaded from the BrainGlobe
-        GIN repository https://gin.g-node.org/brainglobe/atlases/raw/master/last_versions.conf
-        and saved as the local configuration file specified above.
-        
+
         A diferent local configuration file can be specified using 'atlases_conf_path'
-        parameter, but the default one (see above) will be used in all other operations 
+        parameter, but the default one (see above) will be used in all other operations
         by the manager.
-        
+
         By default the method uses the default local BrainGlobe configuration file¹
         ($HOME/.config/brainglobe/bg_config.conf), but an alternative configuration
         file can be specified using the 'conf_path' parameter. WARNING: nevertheless,
         the manager will use the default BrainGlobe configuration file for all other
         operations.
-        
+
         NOTE:
         ¹ do NOT confuse with the atlas configuration file
-        
+
         """
+        # FIXME: 2026-02-13 13:00:38
+        # there are issues with downloading atlases programmatically,
+        # probably on the remote site.
+        # Until I figure out what the problem is, just return an empty dict()
+        # Failing that, an atlas configuration file is downloaded from the BrainGlobe
+        # GIN repository https://gin.g-node.org/brainglobe/atlases/raw/master/last_versions.conf
+        # and saved as the local configuration file specified above.
         # atlases_conf_path = None
         if not self.hasBrainGlobeAtlasAPI():
             return dict()
@@ -965,8 +971,10 @@ class BrainAtlasManager(QtCore.QObject):
                 atlases_conf_path = pathlib.Path(os.path.join(conf["default_dirs"]["brainglobe_dir"], "last_versions.conf"))
         
         if not isinstance(atlases_conf_path, pathlib.Path) or not atlases_conf_path.exists():
-            scipywarn(f"File {atlases_conf_path} does not exist; a copy from the remote GIN site will now be downloaded. You will need to call getAtlasesConfiguration method again")
-            self.getRemoteAtlasesConfiguration()
+            scipywarn(f"File {atlases_conf_path} does not exist; please install atlases locally, first")
+            # scipywarn(f"File {atlases_conf_path} does not exist; a copy from the remote GIN site will now be downloaded. You will need to call getAtlasesConfiguration method again")
+            return dict()
+            # self.getRemoteAtlasesConfiguration()
         else:
             self._current_atlases_versions_ = self._parseLocalAtlasesConf(atlases_conf_path)
             return self._current_atlases_versions_
@@ -997,29 +1005,33 @@ class BrainAtlasManager(QtCore.QObject):
         Optionally, a different destination can be specified using the 'file_path'
         parameter, but the manager will use the default one (specified above)
         for all other operations.
-        
+
+        CAUTION: this relies on a good connection to the remote gin node.
+
         """
         if not self.hasBrainGlobeAtlasAPI():
             return
-        
+
         if file_path is None:
             conf = self.getBrainGlobeConfiguration()
             if conf:
                 file_path = os.path.join(conf["default_dirs"]["brainglobe_dir"], "last_versions.conf")
-            
+
         url = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("last_versions.conf")
         self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar, timeout_ms=120000)
         self.netMan.sig_resultReady[object].connect(self._slot_lastVersionsConfDownloaded)
         self.netMan.getUrl(url, destination=file_path, replyHandler = None)
-        
+
     def checkAtlasesConfiguration(self):
         r"""Compares the local atlas configuration file to the remote one.
         The local configuration file is $HOME/.brainglobe/last_versions.conf and
         the remote one is downloaded from the BrainGlobe GIN repository
         https://gin.g-node.org/brainglobe/atlases/raw/master/last_versions.conf
-        saved to a temporary file, for comparing. 
-        
+        saved to a temporary file, for comparing.
+
         The temporary file is removed after the comparison.
+
+        CAUTION: this relies on a good connection to the remote gin node.
         
         """
         if not self.hasBrainGlobeAtlasAPI():
@@ -1240,7 +1252,7 @@ def get_atlas_structure(name:str, atlas:BrainGlobeAtlas,
                         cutoff = 0.5,
                         maxfound = 10,
                         ) -> dict | None:
-    r"""Best-guess for the atlas a structure corresponding to a named brain region.
+    r"""Best-guess for n atlas structure corresponding to a named brain region.
 
     The function tries to match the brain region name given in 'name' parameter
     to the 'name' or 'acronym' attribute of the structures in the atlas — depending

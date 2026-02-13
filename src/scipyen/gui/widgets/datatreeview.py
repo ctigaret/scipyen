@@ -275,16 +275,18 @@ For a given item:
             # TODO 2026-02-12 14:59:32 to expand in parentheses as needed
             if (
                 (
-                    parentType not in (tuple, )
-                    and not parentItem.data(ReadOnlyRole) is True
+                    parentType in (tuple, )
+                    or parentItem.data(ReadOnlyRole) is True
+                    or objItem.data(ReadOnlyRole) is True
                     )
                 or self.model().readOnly
                 ):
+                flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
+
+            else:
                 self.setItemDelegateForColumn(index.column(), self._delegate_)
                 self.setItemDelegateForRow(index.row(), self._delegate_)
                 flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
-            else:
-                flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
             infoItem.setFlags(flags)
 
     def setData(self: typing.Self, obj: object,
@@ -300,6 +302,9 @@ For a given item:
             # tree; all of objects "internals" are child rows of it.
             objItem = root.child(0,0)
             self._setupChildDataItem_(objItem)
+            self.expandToDepth(1)
+            self.resizeColumnToContents(0)
+
 
     @property
     def readOnly(self: typing.Self) -> bool:
@@ -397,6 +402,17 @@ For a given item:
 
     @Slot(object)
     def slot_setData(self: typing.Self, what: dict):
+        r"""Preferred way to set the data in this viewer asynchronously.
+    Parameters:
+    ===========
+    :what: a mapping
+        "data"          ↦ the object to be represented in the hierarchical tree model
+        "root-title"    ↦ the name (symbol) to appear as the "trunk" of the tree, to which the "data" is bound
+                            When not a string, or when it is an empty string,
+                            this symbol will be "/"
+        "readOnly"      ↦ disable changing the values associated with the ``data``'s members
+
+    """
         data = what.get("data", None)
         root_title = what.get("root_title", "")
         self.readOnly = what.get("readOnly", False)

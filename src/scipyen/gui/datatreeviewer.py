@@ -657,8 +657,8 @@ A lot of things copied from there, EXCEPT that it now uses
     def _slot_treeViewPopulated(self):
         self._slot_update_title()
         # self.treeView.collapseAll()
-        self.treeView.expandToDepth(1)
-        self.treeView.resizeColumnToContents(0)
+        # self.treeView.expandToDepth(1)
+        # self.treeView.resizeColumnToContents(0)
 
     @Slot()
     @safewrapper

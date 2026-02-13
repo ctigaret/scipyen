@@ -1221,7 +1221,8 @@ NOTE:
     # #                            weakref_slot=False, 
     # #                            module=None)
     
-__all__ = ("AdministrationRoute", "BiologicalSource", "Biometrics", "BioSourceType",
-           "CellCompartment","CellCompartmentType", "Episode", "Organ", "Organism", 
-           "OrganismStage", "Procedure", "ProcedureType", "Schedule", 
-           "SubstanceDosage", "Tissue", "Treatment")
+__all__ = ("AdministrationRoute", "BiologicalSource", "Biometrics",
+           "BioSourceType","CellCompartment","CellCompartmentType", "Episode",
+           "Organ", "Organism", "OrganismStage", "Procedure", "ProcedureType",
+           "Schedule", "SubstanceDosage", "Tissue", "Treatment",
+           "isDataclass", "mergeDataclasses")

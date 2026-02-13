@@ -53,7 +53,8 @@ def get_nearest_parent_common_name(t:Taxon):
     return ""
 
 # supported_species=["Homo", "Danio", "Caenorhabditis", "Rattus", "Mus", "Gallus"]
-supported_species=["Rattus", "Mus"]
+supported_species = ["Rattus", "Mus"]
+supported_speciees_common_names = ["mouse", "rat", "fish", "fly", "frog"]
     
 def get_taxon(s:str) -> Taxon | str:
     if hasTaxoniq:
@@ -63,6 +64,15 @@ def get_taxon(s:str) -> Taxon | str:
                 
             elif s.lower() in ["rat", "rats"] or s.lower().startswith("rat"):
                 s = "Rattus"
+
+            elif s.lower() in ["fly", ] or "fly" in s.lower():
+                s = "Drosophila"
+
+            elif s.lower() in ["fish", ] or "fish" in s.lower():
+                s = "Danio"
+
+            elif s.lower() in ["frog", ] or "frog" in s.lower():
+                s = "Xenopus"
                 
             taxon = taxoniq.Taxon(scientific_name=s)
             return taxon

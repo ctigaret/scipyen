@@ -328,10 +328,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
         #
         item0.setData(QtCore.QVariant(objKeyType), ObjectKeyTypeRole)
 
-        readOnly = objDict.get("readOnly", False)
 
-        if readOnly:
-            item0.setData(readOnly, ReadOnlyRole)
+
 
         # for user's benefit — good to know the type of the object is represented
         # in this row.
@@ -362,7 +360,25 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         #
         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
+        # for item in (item0, item1, item2):
+
+        readOnly = objDict.get("readOnly", False)
+
+        palette = QtWidgets.QApplication.palette()
+        font = QtWidgets.QApplication.font()
+        if readOnly:
+            brush = palette.brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
+            font_ = QtGui.QFont(font)
+            font_.setItalic(True)
+
+        else:
+            brush = palette.brush(QtGui.QPalette.Active, QtGui.QPalette.Text)
+            font_ = QtGui.QFont(font)
+
         for item in (item0, item1, item2):
+            item.setData(readOnly, ReadOnlyRole)
+            item.setData(brush, QtCore.Qt.ForegroundRole)
+            item.setData(font_, QtCore.Qt.FontRole)
             item.setFlags(flags)
 
         return (item0, item1, item2)
@@ -462,6 +478,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 keyName = f"{key}"
 
             pValue, valDict = self._parseObject_(value, self._showPrivate_)
+
+            if objDict.get("readOnly", False) is True:
+                valDict["readOnly"] = True
+
             self._buildBranch_(pValue, valDict, keyName, type(key), pItem, k)
             k += 1
 
@@ -744,8 +764,13 @@ a tuple: (``parsedData``, ``infoDict``), where:
                 info = obj.name
             if hasattr(obj, "__members__"):
                 choices = dict(obj.__members__)
+            elif hasattr(type(obj), "__members__"):
+                choices = dict(type(obj).__members__)
             else:
                 try:
+                    # NOTE: 2026-02-13 17:45:45
+                    # this only works for TypeEnum
+                    #
                     choices = dict(zip(obj.names(), obj.values()))
                     # choices = list(obj.names())
                 except:
@@ -798,6 +823,13 @@ a tuple: (``parsedData``, ``infoDict``), where:
                     )
                 )
 
+        pData["common_name"] = obj.common_name
+        pData["rank"] = obj.rank
+        pData["scientific_name"] = obj.scientific_name
+        pData["url"] = obj.url
+        pData["wikidata_id"] = obj.wikidata_id
+        pData["wikidata_url"] = obj.wikidata_url
+
         tip = type(obj).__name__
         return pData, {
             "indirect": indirect,
@@ -808,6 +840,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             "memberAccess": (".",),
             "accessType": "attribute",
             "choices": dict(),
+            "readOnly": True
             }
 
     @_parseObject_.register(dict)
