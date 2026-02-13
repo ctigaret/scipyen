@@ -398,7 +398,10 @@ A lot of things copied from there, EXCEPT that it now uses
             dlg.addCallback(lambda s: hiddenWarningLabel.setVisible(s.startswith("_")))
             dlg.addWidget(hiddenWarningLabel, 0, QtCore.Qt.AlignLeft)
 
-            namePrompt.setText(names[0])
+            if strutils.isnumber(names[0][0]):
+                namePrompt.setText(f"data_{names[0]}")
+            else:
+                namePrompt.setText(names[0])
             dlg.adjustSize()
 
             if dlg.exec() == QtWidgets.QDialog.Accepted:

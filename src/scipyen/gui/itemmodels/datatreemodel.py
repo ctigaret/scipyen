@@ -275,6 +275,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # self._dataTypeStr_ = objDict["objType"].__name__
         self.setHorizontalHeaderLabels(["Object", "Type", "Value / Information"])
         self._buildTree_(self._privateData_, objDict, self._rootTitle_)
+        # tooltip = f"{type(obj).__name__}"
+        # if self.readOnly or self._topObjectItem_.data(ReadOnlyRole) is True:
+        #     tooltip += " (Read-only)"
+
+        # self._topObjectItem_.setData(tooltip, QtCore.Qt.ToolTipRole)
 
     def _makeObjectRow_(self: typing.Self, obj: object, /,
                        objDict: dict, objKey: object,
@@ -302,6 +307,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
         item0 = QtGui.QStandardItem(objName)
         item0.setData(objName, QtCore.Qt.DisplayRole)
         item0.setData(objDict["objType"], ObjectTypeRole)
+        # item0.setData(type(objKey).__name__, QtCore.Qt.ToolTipRole)
+        item0.setData(objDict["objType"].__name__, QtCore.Qt.ToolTipRole)
 
         # NOTE: 2026-02-09 21:47:10
         # used to construct the acess path to the object for this item
@@ -324,7 +331,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         #
         # iterators are NOT supported (they're used to yield elements of a
         # collection dynamically, anyway, and a reason for using them is a
-        # "lazy" evaluation of the colleciton's contents - in itself for a good
+        # "lazy" evaluation of the collection's contents - in itself for a good
         # reason) ; therefore, I apply the same philosophy here
         #
         item0.setData(QtCore.QVariant(objKeyType), ObjectKeyTypeRole)
@@ -409,7 +416,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
                       row: int) -> QtGui.QStandardItem:
         # print(f"{self.__class__.__name__}._buildBranch_(obj: {type(obj).__name__})")
         rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType)
-        parentItem.insertRow(row, rowItems)
         objItem = rowItems[0]
         if objDict["objDataAsChild"]:
             dataItem = QtGui.QStandardItem("")
@@ -423,16 +429,29 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         objItem.setData(QtCore.QVariant(accessType), ObjectDataAccessTypeRole)
 
-        if isinstance(accessType, str) and len(accessType.strip()):
-            tooltip = f"{accessType}"
-            if accessType == "attribute":
-                tooltip += f" of {parentItem.data(QtCore.Qt.DisplayRole)}"
-            else:
-                tooltip += f" into {parentItem.data(QtCore.Qt.DisplayRole)}"
+        # tooltip = objItem.data(QtCore.Qt.ToolTipRole)
+        #
+        # if not isinstance(tooltip, str) or len(tooltip.strip()) == 0:
+        #     tooltip = objDict["objType"].__name__
+        #
+        if parentItem:
+        #     parentItemName = parentItem.data(QtCore.Qt.DisplayRole)
+        #     parentAccessType = parentItem.data(ObjectDataAccessTypeRole)
+        #     if isinstance(parentAccessType, str) and len(parentAccessType.strip()):
+        #         tt = ""
+        #         if isinstance(parentItemName, str) and len(parentItemName.strip()):
+        #             if parentAccessType in ("attribute", "member"):
+        #                 tt = f" of {parentItemName})"
+        #             elif parentAccessType == "index":
+        #                 tt = f" into {parentItemName})"
+        #
+        #         tooltip += f" ({parentAccessType}{tt}"
+        #
+        #         objItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.ToolTipRole)
+        #         objItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.StatusTipRole)
+        #         objItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.WhatsThisRole)
 
-            objItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.ToolTipRole)
-            objItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.StatusTipRole)
-            objItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.WhatsThisRole)
+            parentItem.insertRow(row, rowItems)
 
         return objItem
 
@@ -444,7 +463,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
           parentItem: QtGui.QStandardItem, row: int) -> QtGui.QStandardItem:
 
         rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType)
-        parentItem.insertRow(row, rowItems)
+        # if parentItem:
         pItem = rowItems[0]
 
         k = 0
@@ -461,16 +480,30 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
             pItem.setData(QtCore.QVariant(accessType), ObjectDataAccessTypeRole)
 
-            if isinstance(accessType, str) and len(accessType.strip()):
-                tooltip = f"{accessType}"
-                if accessType == "attribute":
-                    tooltip += f" of {parentItem.data(QtCore.Qt.DisplayRole)}"
-                else:
-                    tooltip += f" into {parentItem.data(QtCore.Qt.DisplayRole)}"
+            # tooltip = pItem.data(QtCore.Qt.ToolTipRole)
+            #
+            # if not isinstance(tooltip, str) or len(tooltip.strip()) == 0:
+            #     tooltip = objDict["objType"].__name__
+            #
 
-                pItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.ToolTipRole)
-                pItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.StatusTipRole)
-                pItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.WhatsThisRole)
+            if parentItem:
+            #     parentItemName = parentItem.data(QtCore.Qt.DisplayRole)
+            #     parentAccessType = parentItem.data(ObjectDataAccessTypeRole)
+            #     if isinstance(parentAccessType, str) and len(parentAccessType.strip()):
+            #         tt = ""
+            #         if isinstance(parentItemName, str) and len(parentItemName.strip()):
+            #             if parentAccessType in ("attribute", "member", "key"):
+            #                 tt = f" of {parentItemName})"
+            #             elif parentAccessType == "index":
+            #                 tt = f" into {parentItemName})"
+            #
+            #         tooltip += f" ({parentAccessType}{tt}"
+            #
+            #         pItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.ToolTipRole)
+            #         pItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.StatusTipRole)
+            #         pItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.WhatsThisRole)
+
+                parentItem.insertRow(row, rowItems)
 
         for key, value in obj.items():
             if isinstance(key, str):
@@ -888,7 +921,14 @@ a tuple: (``parsedData``, ``infoDict``), where:
     @_parseObject_.register(UserDict)
     def _(self: typing.Self, obj: (dict, types.MappingProxyType, UserDict),
                    includePrivateMembers: bool = False) -> tuple:
-        objType = type(obj)
+        # CAUTION: 2026-02-13 21:54:18
+        # this might be the private data, NOT the original model data!
+
+        if obj is self._privateData_:
+            objType = type(self._modelData_)
+        else:
+            objType = type(obj)
+
         # NOTE: 2021-07-20 09:52:34
         # dict objects with mixed key types cannot be sorted
         # therefore we resort to an indexing vector
