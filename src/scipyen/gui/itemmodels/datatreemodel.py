@@ -80,7 +80,8 @@ import core.datatypes as datatypes
 from core.datatypes import (is_namedtuple, TypeEnum)
 from core.prog import scipywarn
 from core import taxonbridge
-from core import bgbridge
+from core import bgbridge as bgbridge
+
 # print(f"has brain globe: {bgbridge.hasBrainGlobe}")
 
 # NOTE: 2026-02-07 09:14:19 FIXME/TODO
@@ -804,6 +805,45 @@ a tuple: (``parsedData``, ``infoDict``), where:
             "memberAccess": (".",),
             "accessType": "attribute",
             "choices": dict(),
+            }
+
+    @_parseObject_.register(bgbridge.Structure)
+    def _(self: typing.Self, obj: bgbridge.Structure,
+                includePrivateMembers: bool = False) -> tuple:
+        objType = type(obj)
+        ndx = [
+            i[1]
+            for i in sorted(
+                (str(k[0]), k[1])
+                for k in zip(obj.keys(), range(len(obj)))
+            )
+        ]
+
+        items = [i for i in obj.items()]
+        pData = dict([items[k] for k in ndx])
+        indirect = True
+        info = f"{obj}"
+        if not includePrivateMembers:
+            pData = dict(
+                list(
+                    filter(
+                        self._check_private_member_,
+                        pData.items()
+                    )
+                    )
+                )
+
+        tip = type(obj).__name__
+        return pData, {
+            "indirect": indirect,
+            "objDataAsChild": False,
+            "objInfo": info,
+            "objType": objType,
+            "objTip": tip,
+            "memberAccess": (".",),
+            "accessType": "attribute",
+            "choices": dict(),
+            "readOnly": True
             }
 
     @_parseObject_.register(taxonbridge.Taxon)
