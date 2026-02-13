@@ -1218,7 +1218,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.annotationsViewer.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.annotationsViewer.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
         self.annotationsViewer.setDragEnabled(True)
-        self.annotationsViewer.setSupportedDataTypes(tuple(DataTreeViewer.viewer_for_types))
+        # self.annotationsViewer.setSupportedDataTypes(tuple(DataTreeViewer.viewer_for_types))
         #### END set up annotations dock widget
 
         #### BEGIN set up coordinates dock widget - defined in the UI file
@@ -2433,10 +2433,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             self.dataAnnotations.update(data)
 
         if self.annotationsViewer.isVisible():
-            self.annotationsViewer.setData(self.dataAnnotations)
+            self.annotationsViewer.setData(self.dataAnnotations, "Annotations")
 
-            if self.annotationsViewer.topLevelItemCount() == 1:
-                self.annotationsViewer.topLevelItem(0).setText(0, "Data")
+            # if self.annotationsViewer.topLevelItemCount() == 1:
+            #     self.annotationsViewer.topLevelItem(0).setText(0, "Data")
 
     def _gen_signal_ndx_name_map_(self, signals:typing.Union[tuple, list]):
         r"""Generates a mapping of entry_name ↦ (index , signal_name)
@@ -4524,8 +4524,9 @@ anything else       anything else       ❌
         if self._scipyenWindow_ is None:
             return
 
-        # NOTE: 2022-03-04 10:05:14
+        # NOTE: 2022-03-04 10:05:14 -> NOTE: 2026-02-13 00:49:34
         # annotations viewer is dataviewer.InteractiveTreeWidget
+        # as of 2026-02-13 00:49:39, this is a DataTreeView
         indexList = self.annotationsViewer.selectedIndexes()
 
         if len(indexList) == 0:

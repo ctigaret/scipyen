@@ -220,6 +220,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         self._hideRoot_: bool = False
         self._introspect_: bool = True
         self._topObjectItem_: typing.Optional[QtGui.QStandardItem] = None
+        self._readOnly: bool = False
 
         self._supportedDataTypes_ = kwargs.pop("supportedTypes", tuple())
         if not isinstance(self._supportedDataTypes_, tuple) or not all(
@@ -235,6 +236,14 @@ class DataTreeModel(QtGui.QStandardItemModel):
     def topObjectItem(self: typing.Self) -> QtGui.QStandardItem | None:
         return self._topObjectItem_
 
+    @property
+    def readOnly(self: typing.Self) -> bool:
+        return self._readOnly_
+
+    @readOnly.setter
+    def readOnly(self: typing.Self, val: bool):
+        self._readOnly_ = val is True
+
     def setModelData(
         self,
         obj: object,
@@ -243,14 +252,19 @@ class DataTreeModel(QtGui.QStandardItemModel):
         showPrivate: bool = False,
         dataTypeStr: typing.Optional[str] = None,
         hideRoot: bool = False,
+        readOnly: bool = False,
     ):
         # print(f"{self.__class__.__name__}.setModelData(obj: {type(obj).__name__})")
         self._visited_.clear()
         self._predicate_ = predicate
-        self._showPrivate_ = showPrivate
-        self._hideRoot_ = hideRoot
+        self._showPrivate_ = showPrivate is True
+        self._hideRoot_ = hideRoot is True
+        self._readOnly_ = readOnly is True
 
-        self._rootTitle_ = rootTitle if len(rootTitle.strip()) else "/"
+        self._rootTitle_ = rootTitle if (
+            isinstance(rootTitle, str)
+            and len(rootTitle.strip())
+            ) else "/"
 
         self._modelData_ = obj
 
@@ -314,6 +328,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
         #
         item0.setData(QtCore.QVariant(objKeyType), ObjectKeyTypeRole)
 
+        readOnly = objDict.get("readOnly", False)
+
+        if readOnly:
+            item0.setData(readOnly, ReadOnlyRole)
+
         # for user's benefit — good to know the type of the object is represented
         # in this row.
         item1 = QtGui.QStandardItem(typeName)
@@ -363,6 +382,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
                                                     self.invisibleRootItem(),
                                                     0
                                                     )
+        if self.readOnly:
+            self._topObjectItem_.setData(self.readOnly, ReadOnlyRole)
 
     @singledispatchmethod
     def _buildBranch_(self: typing.Self, obj: object, objDict: dict,
@@ -447,7 +468,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         return pItem
 
-    def _introspectable_(self: typing.Self, obj: object) -> bool:
+    def introspectable(self: typing.Self, obj: object) -> bool:
+        mro = inspect.getmro(type(obj))
         return (all(t not in self._supportedDataTypes_ for t in mro)
                          and not inspect.isroutine(obj)
                          and not isinstance(obj, (types.ModuleType,
@@ -516,6 +538,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
         objDataAsChild: bool = False
         objType = type(obj)
         choices = dict()
+        readOnly = False
 
         if isDataclass(obj):
             datafields = dataclasses.fields(obj)
@@ -572,7 +595,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             memberAccess = tuple()
             accessType = None
 
-        elif self._introspect_ and self._introspectable_(obj) :
+        elif self._introspect_ and self.introspectable(obj) :
             pData = datatypes.inspect_members(obj, self._predicate_)
             indirect = True
             if not includePrivateMembers:
@@ -593,6 +616,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             choices = dict()
             memberAccess = (".", )
             accessType = "attribute"
+            readOnly = True
 
         else:
             pData = obj
@@ -616,6 +640,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             "objTip": tip,
             "objType": objType,
             "choices": choices,
+            "readOnly": readOnly,
             }
 
     @_parseObject_.register(type(None))
@@ -674,12 +699,16 @@ a tuple: (``parsedData``, ``infoDict``), where:
             }
 
     @_parseObject_.register(types.FunctionType)
+    @_parseObject_.register(types.BuiltinFunctionType)
     @_parseObject_.register(types.MethodType)
-    def _(self: typing.Self, obj: (types.FunctionType, types.MethodType),
+    @_parseObject_.register(types.BuiltinMethodType)
+    def _(self: typing.Self, obj: (types.FunctionType, types.BuiltinFunctionType,
+                                   types.MethodType,types.BuiltinMethodType,
+                                   ),
           _:bool = False) -> tuple:
         objType = type(obj)
         tip = f"{obj}"
-        word = "Fuction" if isinstance(obj, types.FunctionType) else "Method"
+        word = "Fuction" if isinstance(obj, (types.FunctionType, types.BuiltinFunctionType)) else "Method"
         info = f"{word} {obj.__qualname__}{inspect.signature(obj)} from module {obj.__module__}"
 
         return obj, {
@@ -844,7 +873,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
         tip = objType.__name__
 
         if is_namedtuple(obj):
-            pData = obj._asDict()
+            pData = obj._asDict() if hasattr(obj, "_asDict") else obj._asdict()
             tip += "(namedtuple)"
             memberAccess = (".",)
             accessType = "attribute"
@@ -1642,10 +1671,6 @@ a tuple: (``parsedData``, ``infoDict``), where:
             # NOTE: 2026-02-10 12:26:33
             # this one is in column 0 by design
             path += [self._topObjectItem_.data(QtCore.Qt.DisplayRole)]
-        #
-        # else:
-        #     print(f"{self.__class__.__name__}._getPathForItemOrIndex_: no more parent for {item.data(QtCore.Qt.DisplayRole)}")
-
 
         return path
 
@@ -1655,6 +1680,9 @@ a tuple: (``parsedData``, ``infoDict``), where:
             return False
 
         item = self.itemFromIndex(modelIndex)
+
+        if item.data(ReadOnlyRole) is True:
+            return
 
         # NOTE: 2026-02-10 09:18:53
         # don't change data for this kind of item; this is done directly by the
@@ -1689,24 +1717,30 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
         accexpr = "".join(reversed(path))
         setexpr = accexpr + " = value"
-        exec(setexpr)
+        OK = False
+        try:
+            exec(setexpr)
+            newVal = eval(accexpr)
+            OK = True
+        except:
+            pass
 
-        newVal = eval(accexpr)
+        if OK:
+            objType = objItem.data(ObjectTypeRole)
 
-        objType = objItem.data(ObjectTypeRole)
+            if objType is pathlib.Path:
+                newVal = pathlib.Path(newVal)
 
-        if objType is pathlib.Path:
-            newVal = pathlib.Path(newVal)
+            objItem.setData(newVal, ObjectDataRole)
 
-        objItem.setData(newVal, ObjectDataRole)
+            if item != objItem:
+                item.setData(QtCore.QVariant(newVal), QtCore.Qt.DisplayRole)
+                item.setData(newVal, ObjectDataRole)
 
-        if item != objItem:
-            item.setData(QtCore.QVariant(newVal), QtCore.Qt.DisplayRole)
-            item.setData(newVal, ObjectDataRole)
+            self.dataChanged.emit(modelIndex, modelIndex)
+            self.sig_modelDataChanged.emit()
 
-        self.dataChanged.emit(modelIndex, modelIndex)
-        self.sig_modelDataChanged.emit()
-        return True
+        return OK
 
 
 

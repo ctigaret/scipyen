@@ -240,6 +240,12 @@ For a given item:
                                                                     choices = list(),
                                                                     inModel = False,
                                                                     parent = self)
+                        if (
+                            item.data(ReadOnlyRole) is True
+                            or self.model().readOnly
+                            ):
+                            if hasattr(editorWidget,  "readOnly"):
+                                editorWidget.readOnly = True
                         self.setIndexWidget(childIndex, editorWidget)
                         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
                         item.child(0).setFlags(flags)
@@ -267,7 +273,13 @@ For a given item:
             # inhibit editing for immutable collections - e.g. tuple, for now
             parentType = parentItem.data(ObjectTypeRole)
             # TODO 2026-02-12 14:59:32 to expand in parentheses as needed
-            if parentType not in (tuple, ):
+            if (
+                (
+                    parentType not in (tuple, )
+                    and not parentItem.data(ReadOnlyRole) is True
+                    )
+                or self.model().readOnly
+                ):
                 self.setItemDelegateForColumn(index.column(), self._delegate_)
                 self.setItemDelegateForRow(index.row(), self._delegate_)
                 flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
@@ -296,6 +308,7 @@ For a given item:
     @readOnly.setter
     def readOnly(self: typing.Self, val: bool):
         self._readOnly_ = val is True
+        self.model().readonly = self._readOnly_
         # TODO: 2026-02-09 12:50:43
         # set all editors in column 1 to readOnly
         # set all delegates in column 2 to readOnly
@@ -386,10 +399,7 @@ For a given item:
     def slot_setData(self: typing.Self, what: dict):
         data = what.get("data", None)
         root_title = what.get("root_title", "")
-        # predicate = what.get("predicate", None)
-        # showPrivate = what.get("showPrivate", None)
-        # dataTypeStr = what.get("dataTypeStr", None)
-        # hideRoot = what.get("hideRoot", False)
+        self.readOnly = what.get("readOnly", False)
         self.setData(data, root_title)
 
     def clear(self: typing.Self):

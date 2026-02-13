@@ -124,7 +124,7 @@ __scipyen_plugin__ = None
 class DataTreeViewer(ScipyenViewer):
     r"""Replacement for DataViewer.
 A lot of things copied from there, EXCEPT that it now uses
-``DataTreeview`` and ``DataTreeModel`` from ``gui.widgets.datareeview`` module.
+``DataTreeview`` and ``DataTreeModel`` from ``gui.widgets.datatreeview`` module.
 """
     sig_activated = Signal(int)
     closeMe  = Signal(int)
@@ -469,15 +469,6 @@ A lot of things copied from there, EXCEPT that it now uses
 
         self._obj_to_view_ = (dataclasses.MISSING, "")
 
-    @Slot(QtWidgets.QTreeWidgetItem, int)
-    @safewrapper
-    def slot_itemDoubleClicked(self, item, column):
-        names, objects = self.treeView.exportDataForItems([item])
-        obj = objects[0]
-        name = names[0]
-        self._obj_to_view_ = (obj, name)
-        self.slot_viewItem()
-
     @Slot()
     @safewrapper
     def slot_autoSelectViewer(self):
@@ -618,6 +609,7 @@ A lot of things copied from there, EXCEPT that it now uses
         r"""
         Displays new data
         """
+        self._readOnly_ = kwargs.get("readOnly", False)
         self.update()
         if inspect.isfunction(predicate):
             self.predicate=predicate
@@ -657,7 +649,8 @@ A lot of things copied from there, EXCEPT that it now uses
             self.update_title(doc_title = name, win_title=self._winTitle_)
             what = {"data": obj, "predicate": self.predicate, "root_title": name,
                     "showPrivate": self._showPrivateMembers_,
-                    "dataTypeStr": type(obj).__name__}
+                    "dataTypeStr": type(obj).__name__,
+                    "readOnly": self.readOnly}
             self._sig_setTreeViewData_.emit(what)
 
     @Slot()
@@ -692,17 +685,16 @@ A lot of things copied from there, EXCEPT that it now uses
     def slot_itemDoubleClicked(self: typing.Self, item:QtGui.QStandardItem):
         if item.column() == 0:
             obj = item.data(ObjectDataRole)
+            readOnly = item.data(ReadOnlyRole) is True
             name = item.data(QtCore.Qt.DisplayRole)
             if obj is not None:
+                self.treeView.readOnly = readOnly
                 self.view(obj, name)
 
+    @property
+    def readOnly(self: typing.Self) -> bool:
+        return self._readOnly_
 
-    # def mouseDoubleClickEvent(self: typing.Self, evt: QtGui.QMouseEvent):
-    #     pos = evt.position().toPoint()
-    #     index = self.indexAt(pos)
-    #     item = self.treeView.model().itemFromIndex(index)
-    #     if item.column() == 0:
-    #         obj = index.data(ObjectDataRole)
-    #         self.view(obj)
-    #     super().mouseDoubleClickEvent(evt)
-    #     evt.setAccepted(True)
+    @readOnly.setter
+    def readOnly(self: typing.Self, val: bool):
+        self._readOnly_ = val is True
