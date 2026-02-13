@@ -98,7 +98,7 @@ from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
 from gui.pictgui import WorkerThread
 from gui.widgets.datatreeview import DataTreeView
-# from gui.itemmodels import DataTreeModel
+from gui.itemmodels.roles import *
 
 
 # from . import resources_rc
@@ -253,7 +253,7 @@ A lot of things copied from there, EXCEPT that it now uses
 
         # NOTE: 2025-03-12 13:25:01 treeView ultimately inherits from QTreeWidget
         # and itemDoubleClicked is a Signal emitted by QTreeWidget
-        # self.treeView.itemDoubleClicked[QtWidgets.QTreeWidgetItem, int].connect(self.slot_itemDoubleClicked)
+        self.treeView.sig_itemDoubleClicked[QtGui.QStandardItem].connect(self.slot_itemDoubleClicked)
 
         self.setCentralWidget(self.treeView)
         self._sig_setTreeViewData_.connect(self.treeView.slot_setData)
@@ -330,9 +330,9 @@ A lot of things copied from there, EXCEPT that it now uses
             # viewItemData.setToolTip("View item in a separate window (SHIFT for a new window)")
             # viewItemData.setStatusTip("View item in a separate window (SHIFT for a new window)")
             # viewItemData.setWhatsThis("View item in a separate window (SHIFT for a new window)")
-            viewItemData.setToolTip(f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
-            viewItemData.setStatusTip(f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
-            viewItemData.setWhatsThis(f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.setToolTip(f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.setStatusTip(f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.setWhatsThis(f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
             viewItemData.triggered.connect(self.slot_viewItem)
 
             if not issubclass(type(obj), QtWidgets.QWidget):
@@ -688,3 +688,21 @@ A lot of things copied from there, EXCEPT that it now uses
         self._showInConsole_(variable)
         self._obj_to_view_ = (dataclasses.MISSING, "")
 
+    @Slot(QtGui.QStandardItem)
+    def slot_itemDoubleClicked(self: typing.Self, item:QtGui.QStandardItem):
+        if item.column() == 0:
+            obj = item.data(ObjectDataRole)
+            name = item.data(QtCore.Qt.DisplayRole)
+            if obj is not None:
+                self.view(obj, name)
+
+
+    # def mouseDoubleClickEvent(self: typing.Self, evt: QtGui.QMouseEvent):
+    #     pos = evt.position().toPoint()
+    #     index = self.indexAt(pos)
+    #     item = self.treeView.model().itemFromIndex(index)
+    #     if item.column() == 0:
+    #         obj = index.data(ObjectDataRole)
+    #         self.view(obj)
+    #     super().mouseDoubleClickEvent(evt)
+    #     evt.setAccepted(True)

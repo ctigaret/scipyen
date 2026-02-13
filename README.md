@@ -1,11 +1,11 @@
 # Welcome to Scipyen
 
 Scipyen (**Sci**entific **py**thon **e**nvironment for **n**euroscience) is an
-open-source environment for the analysis of electrophysiology and 
-microscopy imaging data using Python programming language. 
+open-source environment for the analysis of electrophysiology and
+microscopy imaging data using Python programming language.
 
-Scipyen provides a framework similar to an Integrated 
-Development Environment (IDE)[^1], where the user creates their own data 
+Scipyen provides a framework similar to an Integrated
+Development Environment (IDE)[^1], where the user creates their own data
 analysis workflows or pipelines according to their need. Instead of offering a preset collection of analysis scenarios[^2], Scipyen integrates
 third party numerical analysis software, a set of GUI tools for the visualization
 of electrophysiology[^3], microscopy[^4], and tabular[^5] data, and provides a mechanism to run your own Python scripts[^6].
@@ -13,7 +13,7 @@ of electrophysiology[^3], microscopy[^4], and tabular[^5] data, and provides a m
 THIS SOFTWARE IS PROVIDED AS IS AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 
 ## Main features
-* [Graphical User Interface](https://en.wikipedia.org/wiki/Graphical_user_interface)[(GUI)](#Scipyen_screenshot) with 
+* [Graphical User Interface](https://en.wikipedia.org/wiki/Graphical_user_interface)[(GUI)](#Scipyen_screenshot) with
     - read-only[^7] access to the file system
     - a dynamic view into the workspace variables[^8]
     - a command history viewer[^9]
@@ -25,7 +25,7 @@ THIS SOFTWARE IS PROVIDED AS IS AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, I
 * A script manager[^13] for user-written Python code[^6].
 
 ## <a name=use_virtual_environment></a>Getting started
-Scipyen should be used inside a [virtual Python environment](https://www.google.com/search?q=virtual+python+environment) which allows the local installation of 3<sup>rd</sup> party Python packages without interfering with the host computer. 
+Scipyen should be used inside a [virtual Python environment](https://www.google.com/search?q=virtual+python+environment) which allows the local installation of 3<sup>rd</sup> party Python packages without interfering with the host computer.
 
 Before using Scipyen, follow these steps:
 
@@ -35,57 +35,57 @@ Before using Scipyen, follow these steps:
     ```
 2. Create a virtual python environment.
 
-        
+
     2.1 In a terminal window navigate to the top directory of the cloned repository
     and launch the environment installation script (NOTE: I assume you cloned
     scipyen in your home directory; make sure you adjust the paths correctly):
-        
+
     * Linux:
-        
+
     ```bash
     cd ~/scipyen
     sh ./env_install.sh
     ```
-    
+
     * MacOS:
-        
+
     ```bash
     cd ~/scipyen
     sh ./mamba_env_install_macos.sh
     ```
-    
+
     * Windows
-    
+
     ```dos
     cd c:\users\<my user name>\scipyen
     mamba_env_install_windows.bat
     ```
 
 3. Launch Scipyen:
-    
+
     3.1. Linux/MacOS:
-        
+
     * The environment installation script creates an executable shell script ~/bin/scipyen.
     Make sure ~/bin is in your PATH environment variable then call this script in a terminal window.
-    
-    * To activate the virtual environment in order to change/upgrade installed python packages, 
+
+    * To activate the virtual environment in order to change/upgrade installed python packages,
     call the command "scipyact" in a terminal window (NOTE: This is sourced from the file "~/.scipyenrc"
     created by the environment installation script).
-    
-    * To launch scipyen manually, in a terminal window activate the environment as above, 
+
+    * To launch scipyen manually, in a terminal window activate the environment as above,
     navigate to the source directory inside the local git repository, e.g.
     ```bash
-    cd ~/scipyen/src/scipyen 
+    cd ~/scipyen/src/scipyen
     ```
-    
+
     then launch Scipyen with:
-    
+
     ```bash
     python scipyen.py
     ```
-    
+
     3.2 Windows:
-        
+
     * Use the desktop shortcut that was created by the environment installation script.
 
 
@@ -101,20 +101,20 @@ Scipyen session with:
 1. The main window, with workspace viewer ("User variables"), file system viewer and command history.
 2. The console
 3. The script manager
-4. Dictionary viewer (DataViewer_0)
-5. Electrophysiology data viewer (SignalViewer_0)
+4. DataTreeViewer
+5. Electrophysiology data viewer (SignalViewer)
 
 
 
-* * * 
+* * *
 
 [^1]: See [Spyder](https://www.spyder-ide.org/) for a comprehensive scientific python environment
 and [Eric](https://www.spyder-ide.org/) for Python programming with a wider purpose.
 Also, see [GNU Octave](https://octave.org/), [Scilab](https://www.scilab.org/),
-[Matlab](https://www.mathworks.com/products/matlab.html) 
+[Matlab](https://www.mathworks.com/products/matlab.html)
 and [Sage](https://www.sagemath.org/) for scientific programming environments 'outside' the Python universe.
 
-[^2]: Scipyen does contain some example analyses workflows e.g. for mEPSC analysis, action potential analysis, LTP, and two-photon line scanning 
+[^2]: Scipyen does contain some example analyses workflows e.g. for mEPSC analysis, action potential analysis, LTP, and two-photon line scanning
 for fluorescence Ca^2+^ imaging. These workflows are specific to the author's lab environment and they are in continuous development.
 
 [^3]: Electrophysiology data is represented using [NeuralEnsemble](https://github.com/NeuralEnsemble)'s python [neo](https://github.com/NeuralEnsemble/python-neo) package.
@@ -131,7 +131,7 @@ for fluorescence Ca^2+^ imaging. These workflows are specific to the author's la
 
 [^9]: Commands are grouped by session, and can be replayed by double clicking, dragging into the console, or copy then pasted in a text editor to create scripts.
 
-[^10]: The Script manager simply provides a convenience to collect python scripts so they are readily available across sessions. 
+[^10]: The Script manager simply provides a convenience to collect python scripts so they are readily available across sessions.
 
 [^11]: Scipyen's console is based on [jupyter qtconsole](https://qtconsole.readthedocs.io/en/stable/index.html), and gives access to the "user workspace"[^7] and various modules (either part of Scipyen, or installed in your Python environment). To keep things "clean", the workspace viewer shows *only* the variables created since the start of the session.
 

@@ -291,10 +291,16 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 scipywarn(f"{self.__class__.__name__}.setChoicesForColumn: invalid choiceData: {choiceData}")
 
     def createWidget(self, data:typing.Any,
-                     choices: typing.Optional[typing.Union[typing.Sequence[typing.Union[enum.Enum, str]],
-                                                           typing.Dict]] = None,
-                     inModel:bool=True,
-                     parent:typing.Optional[QtWidgets.QWidget] = None) -> QtWidgets.QWidget:
+        choices: typing.Optional[
+                                typing.Union[
+                                    typing.Sequence[
+                                        typing.Union[enum.Enum, str]
+                                                    ],
+                                    typing.Dict]
+                                ] = None,
+        inModel: bool=True,
+        parent: typing.Optional[QtWidgets.QWidget] = None
+                     ) -> QtWidgets.QWidget:
         r"""Work around for use with InteractiveTreeWidget and possibly others.
 
     Bypasses the QModelIndex paradigm because a QTreeWidgetItem does not expose QModelIndex API
@@ -311,22 +317,15 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         elif isinstance(data, (datetime.datetime, datetime.date, datetime.time)):
             if isinstance(data, datetime.datetime):
-                # qDate = QtCore.QDate(data.year, data.month, data.day)
-                # qTime = QtCore.QTime(data.hour, data.minute, data.second,
-                #                      int(np.round(data.microsecond/1000, 3)))
-                # qDateTime = QtCore.QDateTime(qDate, qTime)
                 widget = QtWidgets.QDateTimeEdit(parent)
 
             elif isinstance(data, datetime.date):
-                # qDate = QtCore.QDate(data.year, data.month, data.day)
                 widget = QtWidgets.QDateEdit(parent)
 
             else:
-                # qTime = QtCore.QTime(data.hour, data.minute, data.second,
-                #                      int(np.round(data.microsecond/1000, 3)))
                 widget = QtWidgets.QTimeEdit(parent)
 
-        elif isinstance(data, (int, float, np.floating, np.integer)):# or any(v in type(data).__name__ for v in ("int", "float")):
+        elif isinstance(data, (int, float, np.floating, np.integer)):
             if (
                 isinstance(choices, typing.Sequence)
                 and len(choices) > 0
@@ -362,7 +361,6 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     return
 
             if self._enforceFloat_:
-                # widget = QtWidgets.QDoubleSpinBox(parent)
                 widget = smw.QuantitySpinBox(parent)
                 widget.setMinimum(-math.inf)
                 widget.setMaximum(math.inf)
@@ -370,14 +368,13 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 widget.sig_valueChanged.connect(self.slot_dataChanged)
 
             else:
-                if isinstance(data, (int, np.integer)):# or "int" in type(data).__name__: # to include numpy array int dtypes
+                if isinstance(data, (int, np.integer)):
                     widget = QtWidgets.QSpinBox(parent)
                     widget.setMinimum(-9999)
                     widget.setMaximum(9999)
                     widget.valueChanged.connect(self.slot_dataChanged)
 
-                elif isinstance(data, (float, np.floating)):# or "float" in type(data).__name__: # to include numpy array float dtypes
-                    # widget = QtWidgets.QDoubleSpinBox(parent)
+                elif isinstance(data, (float, np.floating)):
                     widget = smw.QuantitySpinBox(parent)
                     widget.setMinimum(-math.inf)
                     widget.setMaximum(math.inf)
@@ -396,6 +393,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             # set up other properties as well...
 
         elif isinstance(data, pq.Quantity):
+            # print(f"{self.__class__.__name__}.createWidget({type(data).__name__})")
             if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
                 widget = smw.QuantityChooserWidget(parent)
                 widget.unitChanged.connect(self.slot_dataChanged)
@@ -414,13 +412,13 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                         widget.setValue(data)
 
                 else:
-                    if inModel:
-                        # print("return none for Quantity")
-                        return
-                    else:
-                        widget = TableEditorWidget(parent, readOnly=False)
+                    widget = TableEditorWidget(parent, readOnly=False)
+                    if not inModel:
                         widget.setData(data)
+                        # widget = TableEditorWidget(parent, readOnly=False)
                         widget.sig_dataChanged.connect(self.slot_dataChanged)
+
+            # print(f"\t-> widget: {type(widget).__name__}")
 
         elif isinstance(data, np.ndarray):
             if data.ndim == 0 or (data.ndim ==1 and data.size == 1):
@@ -435,18 +433,14 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     widget.setValue(data)
 
             else:
-                if inModel:
-                    return
-                else:
-                    widget = TableEditorWidget(parent, readOnly=False)
+                widget = TableEditorWidget(parent, readOnly=False)
+                if not inModel:
                     widget.setData(data)
                     widget.sig_dataChanged.connect(self.slot_dataChanged)
 
         elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
-            if inModel:
-                return
-            else:
-                widget = TableEditorWidget(parent, readOnly=False)
+            widget = TableEditorWidget(parent, readOnly=False)
+            if not inModel:
                 widget.setData(data)
                 widget.sig_dataChanged.connect(self.slot_dataChanged)
 

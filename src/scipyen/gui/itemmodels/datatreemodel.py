@@ -21,7 +21,7 @@ import decimal
 import pkgutil
 import typing
 import enum
-from functools import (singledispatch, singledispatchmethod)
+from functools import singledispatchmethod
 from collections import deque, UserDict
 from dataclasses import MISSING
 import math
@@ -118,11 +118,9 @@ from core import xmlutils, strutils
 
 from core import scipyen_quantities as scq
 
-from core.workspacefunctions import (validate_varname, user_workspace)
+# from core.workspacefunctions import (validate_varname, user_workspace)
 
-from core.utilities import (NestedFinder,
-                            get_nested_value, set_nested_value,
-                            unique)
+from core.utilities import unique
 
 from core.prog import (safewrapper, safeguiwrapper, print_styled, qVariants,
                        is_hashable)
@@ -131,13 +129,13 @@ from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 
 from core.scipyendataclasses import isDataclass
 
-from gui.widgets.tablewidget import SimpleTableWidget
-from gui.widgets.tableeditorwidget import (TableEditorWidget,
-                                           TabularDataModel,)
-from gui.pictgui import WorkerThread
-from gui.widgets.small_widgets import QuantitySpinBox, ComplexSpinBox
-from gui.delegates import PythonItemDelegate
-from gui.workspacegui import GuiMessages, WorkspaceGuiMixin
+# from gui.widgets.tablewidget import SimpleTableWidget
+# from gui.widgets.tableeditorwidget import (TableEditorWidget,
+#                                            TabularDataModel,)
+# from gui.pictgui import WorkerThread
+# from gui.widgets.small_widgets import QuantitySpinBox, ComplexSpinBox
+# from gui.delegates import PythonItemDelegate
+# from gui.workspacegui import GuiMessages, WorkspaceGuiMixin
 from gui.itemmodels.roles import *
 
 NOTMEMOIZED = (
@@ -173,7 +171,13 @@ PODS = (
 
 class DataTreeModel(QtGui.QStandardItemModel):
     r"""
+    Hierarchical item model for Python objects.
+
+    Currently only supports a subset of Python object types.
 """
+    # TODO: 2026-02-12 23:36:43 FIXME
+    # Harmonize with iolib.jsonio and iolib.h5io
+
     # TODO 2026-02-08 22:49:01
     # Support for:
     # struct array, recarray
@@ -214,7 +218,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         self._predicate_: types.FunctionType = None
         self._showPrivate_: bool = False
         self._hideRoot_: bool = False
-        self._introspect_: bool = False
+        self._introspect_: bool = True
         self._topObjectItem_: typing.Optional[QtGui.QStandardItem] = None
 
         self._supportedDataTypes_ = kwargs.pop("supportedTypes", tuple())
@@ -253,8 +257,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
         pData, objDict = self._parseObject_(obj, self._showPrivate_)
 
         self._privateData_ = pData
-        self._dataTypeStr_ = objDict["objType"]
-
+        # self._dataTypeStr_ = objDict["objType"].__name__
+        self.setHorizontalHeaderLabels(["Object", "Type", "Value / Information"])
         self._buildTree_(self._privateData_, objDict, self._rootTitle_)
 
     def _makeObjectRow_(self: typing.Self, obj: object, /,
@@ -354,15 +358,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # go as the first (and only) top-level row in the model
 
         # print(f"{self.__class__.__name__}._buildTree_(obj: {type(obj).__name__})")
-        if isinstance(self._privateData_, dict):
-            self._topObjectItem_ = self._buildBranch_(self._privateData_,
-                                                      objDict, name, str,
-                                                      self.invisibleRootItem(),
-                                                      0
-                                                     )
-
-        else: # TODO 2026-02-08 00:37:05 URGENT
-            pass
+        self._topObjectItem_ = self._buildBranch_(self._privateData_,
+                                                    objDict, name, str,
+                                                    self.invisibleRootItem(),
+                                                    0
+                                                    )
 
     @singledispatchmethod
     def _buildBranch_(self: typing.Self, obj: object, objDict: dict,
@@ -374,17 +374,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
         parentItem.insertRow(row, rowItems)
         objItem = rowItems[0]
         if objDict["objDataAsChild"]:
-            # NOTE: 2026-02-08 09:52:28 TODO
-            # use data item roles to:
-            # 1) flag to the TreeView using this model, that this is a dataItem
-            #   and therefore span the entire row (i.e, ALL columns)
-            #
-            # 2) flag to the TreeView using this model, that this needs an
-            #   item delegate for tabular-like data (DataFrame, Series, Index,
-            #   ndarray)
-            #
-            #   2.1) set this to read-only in usual circumstances
-            #
             dataItem = QtGui.QStandardItem("")
             dataItem.setData(QtCore.QVariant(True), StandaloneEditorWidgetRole)
             objItem.insertRow(0, [dataItem])
@@ -468,7 +457,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @singledispatchmethod
     def _parseObject_(self, obj: object,
                       includePrivateMembers: bool = False,
-                      objBinding: typing.Optional[typing.Union[str, int]] = None,
                    ) -> tuple:
         r"""
 Returns:
@@ -529,8 +517,6 @@ a tuple: (``parsedData``, ``infoDict``), where:
         objType = type(obj)
         choices = dict()
 
-        # print(f"{self.__class__.__name__}._parseObject_(obj: {tip})")
-
         if isDataclass(obj):
             datafields = dataclasses.fields(obj)
             try:
@@ -576,24 +562,6 @@ a tuple: (``parsedData``, ``infoDict``), where:
             memberAccess = ("[", "]")
             accessType = "index"
 
-        # elif self._introspect_ and self._introspectable_(obj) :
-        #     pData = datatypes.inspect_members(obj, self._predicate_)
-        #     if not includePrivateMembers:
-        #         pData = dict(
-        #             list(
-        #                 filter(
-        #                     self._check_private_member_,
-        #                     pData.items()
-        #                 )
-        #             )
-        #         )
-        #
-        #     indirect = True
-        #     objDataAsChild = True
-        #
-        #     n = len(pData)
-        #     info = f"{n} {strutils.pluralize('member', n)}"
-
         elif HAS_MESHIO and isinstance(obj, meshio.Mesh):
             pData = obj
             indirect=False,
@@ -604,6 +572,28 @@ a tuple: (``parsedData``, ``infoDict``), where:
             memberAccess = tuple()
             accessType = None
 
+        elif self._introspect_ and self._introspectable_(obj) :
+            pData = datatypes.inspect_members(obj, self._predicate_)
+            indirect = True
+            if not includePrivateMembers:
+                pData = dict(
+                    list(
+                        filter(
+                            self._check_private_member_,
+                            pData.items()
+                        )
+                    )
+                )
+
+            indirect = True
+            objDataAsChild = False
+
+            n = len(pData)
+            info = f"{n} {strutils.pluralize('member', n)}"
+            choices = dict()
+            memberAccess = (".", )
+            accessType = "attribute"
+
         else:
             pData = obj
             indirect = False
@@ -612,6 +602,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             objDataAsChild = False
             memberAccess = tuple()
             accessType = None
+            choices = dict()
             scipywarn(f"TODO: Support for objects of type {type(obj).__name__} awaits implementation. FIXME")
             # raise NotImplementedError(
             # f"Objects of type {type(obj).__name__} are not supported"
@@ -620,7 +611,6 @@ a tuple: (``parsedData``, ``infoDict``), where:
         return pData, {
             "indirect": indirect, "objDataAsChild": objDataAsChild,
             "objInfo": info,
-            "objType": type(obj).__name__,
             "memberAccess": memberAccess,
             "accessType": accessType,
             "objTip": tip,
@@ -646,7 +636,6 @@ a tuple: (``parsedData``, ``infoDict``), where:
             "indirect": indirect,
             "objDataAsChild": objDataAsChild,
             "objInfo": info,
-            "objType": type(obj).__name__,
             "memberAccess": memberAccess,
             "accessType": None,
             "objTip": tip,
@@ -1291,6 +1280,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
 
     @_parseObject_.register(pq.Quantity)
     def _(self: typing.Self, obj: pq.Quantity, _: bool=True) -> tuple:
+        # print(f"{self.__class__.__name__}._parseObject_({type(obj).__name__})")
         objType = type(obj)
         tip = f"{scq.unitFamilyName(obj.units)} quantity"
         if isinstance(obj, pq.UnitQuantity):
@@ -1298,7 +1288,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             objDataAsChild = False
         else:
             if obj.size <= 1:
-                info = obj
+                info = f"{obj}"
                 objDataAsChild = False
             else:
                 n = obj.size
@@ -1306,7 +1296,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
                 info = f"Quantity array ({obj.units.dimensionality}) with {n} {strutils.pluralize('samples', n)}; shape {s}; dtype {obj.dtype}."
                 objDataAsChild = True
 
-        return obj, {
+        objDict = {
             "indirect": False,
             "objDataAsChild": objDataAsChild,
             "objInfo": info,
@@ -1316,6 +1306,10 @@ a tuple: (``parsedData``, ``infoDict``), where:
             "accessType": "attribute",
             "choices": dict(),
             }
+
+        # print(f"\t-> {objDict}")
+
+        return obj, objDict
 
     @_parseObject_.register(vigra.VigraArray)
     def _(self: typing.Self, obj:vigra.VigraArray, _: bool = True) -> tuple:

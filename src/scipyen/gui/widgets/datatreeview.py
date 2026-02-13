@@ -45,6 +45,7 @@ import decimal
 import pkgutil
 import typing
 import enum
+import pickle
 from functools import (singledispatch, singledispatchmethod)
 from collections import deque
 from dataclasses import MISSING
@@ -180,12 +181,14 @@ PODS = (
 )
 
 class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
+    sig_itemDoubleClicked = Signal(QtGui.QStandardItem, name="sig_itemDoubleClicked")
     def __init__(self: typing.Self, *args, **kwargs):
         parent = kwargs.pop("parent", None)
         super().__init__(parent=parent)
         super().setModel(DataTreeModel())
         self._delegate_ = PythonItemDelegate()
         self._defaultDelegate_ = self.itemDelegate()
+        self._dragStartPosition_: typing.Optional[QtCore.QPoint] = None
 
     def setModel(self: typing.Self, model: QtCore.QAbstractItemModel):
         # disallow changing the model
@@ -219,9 +222,8 @@ For a given item:
 
         model = self.model()
         index = item.index()
-
-        if objData is None:
-            objData = item.data(ObjectDataRole)
+        objData = item.data(ObjectDataRole)
+        objType = item.data(ObjectTypeRole)
 
         if index.column() == 0 and item.hasChildren():
             for row in range(item.rowCount()):
@@ -232,14 +234,12 @@ For a given item:
                     if hasEditorWidgetChild is True:
                         childIndex = item.child(0).index()
                         self.setFirstColumnSpanned(0, index, True)
-                        # self.setFirstColumnSpanned(0, childIndex, True)
+                        # self.setItemDelegateForColumn(childIndex.column(), self._delegate_)
+                        # self.setItemDelegateForRow(childIndex.row(), self._delegate_)
                         editorWidget = self._delegate_.createWidget(objData,
-                                                                    list(),
-                                                                    False,
-                                                                    self)
-                        # if isinstance(editorWidget, TableEditorWidget):
-                        #     editorWidget.model.dataChanged.connect
-                        # editorWidget.setData(objData)
+                                                                    choices = list(),
+                                                                    inModel = False,
+                                                                    parent = self)
                         self.setIndexWidget(childIndex, editorWidget)
                         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
                         item.child(0).setFlags(flags)
@@ -262,21 +262,6 @@ For a given item:
             if parentItem:
                 objItem = parentItem.child(infoItem.row(), 0)
                 objType = objItem.data(ObjectTypeRole)
-
-                # if issubclass(objType, enum.Enum):
-                #     # FIXME: 2026-02-11 22:58:27
-                #     # how to pass specific choices dict to the SAME delegate ?!?
-                #     # TODO: create another delegate SPECIFICALLY for choices, using combobox
-                #     pass
-
-            # choices = infoItem.data(DataChoicesRole) # picked up by the delegate, from the index
-            # editorWidget = self._delegate_.createWidget(objData,
-            #                                             choices,
-            #                                             False,
-            #                                             self)
-            # self.setIndexWidget(index, editorWidget)
-            #
-            #
 
             # NOTE: 2026-02-12 14:58:10
             # inhibit editing for immutable collections - e.g. tuple, for now
@@ -326,6 +311,33 @@ For a given item:
                                )
                     )
 
+    def getDataForItems(
+        self: typing.Self,
+        items: typing.Sequence[QtGui.QStandardItem] = list()
+        ) -> tuple:
+
+        names, objects = zip(
+            *list(
+                    map(
+                        lambda i: (
+                                    i.data(QtCore.Qt.DisplayRole),
+                                    self.model().getDataObjectForLeaf(i)
+                                    ),
+                        list(
+                            filter(
+                                (
+                                    lambda i: i.column() == 0
+                                    and not i.data(StandaloneEditorWidgetRole)
+                                ),
+                                items
+                                )
+                            )
+                        )
+                    )
+            )
+
+        return names, objects
+
     def exportDataForItems(self: typing.Self,
                            items: typing.Sequence[QtGui.QStandardItem] = list(),
                            fullPathAsName: bool = False,
@@ -345,7 +357,15 @@ For a given item:
                                     l_getName(i),
                                     self.model().getDataObjectForLeaf(i)
                                     ),
-                        items
+                        list(
+                            filter(
+                                (
+                                    lambda i: i.column() == 0
+                                    and not i.data(StandaloneEditorWidgetRole)
+                                ),
+                                items
+                                )
+                            )
                         )
                     )
             )
@@ -374,4 +394,33 @@ For a given item:
 
     def clear(self: typing.Self):
         self.model().clear()
+
+    def mouseDoubleClickEvent(self: typing.Self, evt: QtGui.QMouseEvent):
+        pos = evt.position().toPoint()
+        index = self.indexAt(pos)
+        item = self.model().itemFromIndex(index)
+        if item.column() == 0:
+            self.sig_itemDoubleClicked.emit(item)
+        super().mouseDoubleClickEvent(evt)
+        evt.setAccepted(True)
+
+    def mousePressEvent(self: typing.Self, evt: QtGui.QMouseEvent):
+        if evt.button() == QtCore.Qt.LeftButton:
+            self._dragStartPosition_ = evt.pos()
+
+        super().mousePressEvent(evt)
+        evt.setAccepted(True)
+
+    def mouseMoveEvent(self: typing.Self, evt: QtGui.QMouseEvent):
+        # TODO: 2026-02-13 00:34:07 FINALIZE ME
+        if evt.buttons() & QtCore.Qt.LeftButton:
+            if isinstance(self._dragStartPosition_, QtCore.QPoint):
+                items = self.selectedItems()
+                if (
+                    len(items)
+                    and
+                    (evt.pos() - self._dragStartPosition_).manhattanLength() >=  QtWidgets.QApplication.startDragDistance()
+                    ):
+                    drag = QtGui.QDrag(self)
+                    mimeData = QtCore.QMimeData()
 

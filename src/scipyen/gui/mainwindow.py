@@ -3418,7 +3418,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             The only acceptable sip.wrappertype objects are the ones loaded by
             slot_loadPlugins:
 
-            DataViewer, MatrixViewer, ImageViewer, SignalViewer, TableEditor,
+            DataTreeViewer, MatrixViewer, ImageViewer, SignalViewer, TableEditor,
             TextViewer, XMLViewer.
 
             When a str the ony acceptable ones are the string verison of the
@@ -5467,24 +5467,24 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                             f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                         action.triggered.connect(self.slot_autoSelectViewer)
 
-                    if "DataViewer" not in [h[0].__name__ for h in handler_specs]:
-                        act = specialViewMenu.addAction("DataViewer")
+                    if "DataTreeViewer" not in [h[0].__name__ for h in handler_specs]:
+                        act = specialViewMenu.addAction("DataTreeViewer")
                         act.setToolTip(
-                            f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                            f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                         act.setStatusTip(
-                            f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                            f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                         act.setWhatsThis(
-                            f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                            f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                         act.triggered.connect(self.slot_useDataViewer)
 
                 else:
-                    act1 = cm.addAction("Show in DataViewer")
+                    act1 = cm.addAction("Show in DataTreeViewer")
                     act1.setToolTip(
-                        f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                     act1.setStatusTip(
-                        f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                     act1.setWhatsThis(
-                        f"View using generic DataViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                     act1.triggered.connect(self.slot_useDataViewer)
 
         else:
@@ -9971,7 +9971,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         vartype = type(variable)
 
         viewers = [v for v in self.viewers.keys() if v.__name__ ==
-                   "DataViewer"]
+                   "DataTreeViewer"]
 
         if len(viewers):
             viewer = viewers[0]
