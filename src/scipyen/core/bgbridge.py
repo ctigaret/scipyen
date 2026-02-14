@@ -16,13 +16,13 @@ Wrapper around BrainGlobe API, with shims
 # 1) figure out where brainglobe downloads stuff (no need to use our own custom locations,
 # we're OK with their defaults):
 #
-# 1.1) get the brainglobe configuration (a configparser ⌣ ) 
+# 1.1) get the brainglobe configuration (a configparser ⌣ )
 # bgconf = bgbridge.brainglobe_atlasapi.config.read_config()
 # 1.2) get the directory where atlases are saved
 # bgconf["default_dirs"]["brainglobe_dir"] -> by default: $HOME/.brainglobe
 # 1.3) get the directory where atlas tarballs are downloaded
 # bgconf["default_dirs"]["interm_download_dir"] -> by deault, same as above: $HOME/.brainglobe
-# 
+#
 # 2) prepare some ingredients
 # 2.1) get the remote url for an atlas - given atlasName:str
 # 2.1.1) get the remote version - requires being online
@@ -61,14 +61,14 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
+
     from qtpy import sip
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
-    
+
 
 
 if os.environ["QT_API"] == "pyside6":
@@ -77,13 +77,13 @@ if os.environ["QT_API"] == "pyside6":
     qtpy.API = os.environ["QT_API"]
     from PySide6 import (QtCore, QtWidgets, QtGui)
     from PySide6.QtCore import (Signal, Slot, Property)
-    
+
 else:
     import qtpy
     qtpy.API = os.environ["QT_API"]
     from qtpy import (QtCore, QtWidgets, QtGui)
     from qtpy.QtCore import (Signal, Slot, Property)
-    
+
 
 import configparser # from standard library; Scipyen uses confuse from  pypi
                     # so don't "confuse" them(!)
@@ -99,7 +99,7 @@ from core import scipyen_quantities as scq
 from gui.widgets.cancellableqprogressbar import CancellableQProgressBar
 from iolib import network
 
-DEFAULT_RAT_BRAIN_ATLAS = "whs_sd_rat_39um" 
+DEFAULT_RAT_BRAIN_ATLAS = "whs_sd_rat_39um"
 DEFAULT_MOUSE_BRAIN_ATLAS = "allen_mouse_50um"
 
 class Structure(collections.UserDict):
@@ -107,7 +107,7 @@ class Structure(collections.UserDict):
     def __getitem__(self, name:str):
         scipywarn(f"The current {self.__class__.__name__} is a shim. You need to install the brainglobe_atlasapi package for full functionality")
         return self.data.get(name, None)
-    
+
 class StructuresDict(collections.UserDict):
     r"""Shim class that will be overwritten below if brainglobe packages are installed"""
     def __init__(self, data:list):
@@ -120,16 +120,16 @@ class StructuresDict(collections.UserDict):
                 acro = i.get("name", f"Structure Shim {k}")
                 self.data[sid] = i
                 self.acronym_to_id_map[acro] = sid
-        
+
     def __getitem__(self, name:str):
         scipywarn(f"The current {self.__class__.__name__} is a shim. You need to install the brainglobe_atlasapi package for full functionality")
         return self.data.get(name, None)
-    
+
 class BrainGlobeAtlas:
     r"""Shim class that will be overwritten below if brainglobe_atlasapi package is installed"""
     def __init__(self, **kwargs):
         self.atlas_name = kwargs.pop("atlas_name", None)
-    
+
 hasBrainGlobe=False
 hasBrainGlobeAtlasAPI=False
 try:
@@ -142,7 +142,7 @@ try:
                                                   show_atlases)
     from brainglobe_atlasapi.structure_class import Structure, StructuresDict
     # BGStructure = Structure
-    
+
     hasBrainGlobe=True
     hasBrainGlobeAtlasAPI=True
 except:
@@ -156,53 +156,53 @@ except:
 
 class BGStructureDescriptor:
     r"""Generic, string-based brain structure descriptor.
-    Currently, a shim, to evolve into a descriptor for instances of 
+    Currently, a shim, to evolve into a descriptor for instances of
     brainglobe_atlasapi.structure_class.Structure once I've figured out a way to
-    "normalize" the structure IDs for corresponding structures across various 
+    "normalize" the structure IDs for corresponding structures across various
     atlases.
-    
+
     For example, the structure with name "Hippocampal formation" has the acronym
-    "HF" in Waxholm rat brain atlas, but to "HPF" in Allen adult brain atlas (and 
+    "HF" in Waxholm rat brain atlas, but to "HPF" in Allen adult brain atlas (and
     (and the derived ones, like Princeton mouse atlas or Kim mouse atlas).
-    
+
     There are also discrepancies in the "canonical" name of the structure, e.g.
     acronym "CA1" is mapped to "Cornu ammonis 1" in Waxholm, "Field CA1" in Allen
     and Princeton atlases, but to "Field CA1 of the hippocampus" in Kim atlas.
-    
-        
+
+
     """
     def __init__(self, *, default:typing.Optional[typing.Union[Structure, str, type(pd.NA), type(MISSING)]] = None):
         # if hasBrainGlobeAtlasAPI and isinstance(default, Structure):
         if hasBrainGlobeAtlasAPI and isinstance(default, brainglobe_atlasapi.structure_class.Structure):
             self._default = default
-            
+
         elif isinstance(default, str) or default in (None, MISSING, pd.NA):
             self._default = default
-            
+
         elif not isinstance(default, type(pd.NA)):
             raise TypeError(f"Expecting a BGSStructure, a non-empty str, pandas NA, None or MISSING; instead, got {type(default).__name__}")
-        
+
     def __set_name__(self, obj:object, name:str):
         if len(name.strip()) == 0:
             raise ValueError("Cannot accept an empty name")
         self._name = "_"+name
-        
+
     # This one below: instance of                       owner class
-    #                 owner class                       
+    #                 owner class
     #                  ↓                                ↓
     def __get__(self, obj:typing.Optional[object]=None, objtype:typing.Optional[type]=None) -> object:
         if obj is None:
             if isinstance(objtype, type):
                 return getattr(objtype, self._name, self._default)
-            
+
             return self._default
-        
+
         return getattr(obj, self._name, self._default)
 
     def __set__(self, obj:object, value:typing.Optional[typing.Union[Structure, str, type(pd.NA), type(MISSING)]] = None):
         if hasBrainGlobeAtlasAPI and isinstance(value, brainglobe_atlasapi.structure_class.Structure):
             setattr(obj, self._name, value)
-            
+
         elif isinstance(value, str) or value in (None, MISSING, pd.NA):
             setattr(obj, self._name, value)
 
@@ -216,46 +216,50 @@ class BrainAtlasManager(QtCore.QObject):
     # def __new__(cls, parent=None):
     #     if cls._instance is None:
     #         cls._instance = super().__new__(cls)
-    # 
+    #
     #     return cls._instance
-    
+
     default_config_file = brainglobe_atlasapi.config.CONFIG_PATH if hasBrainGlobeAtlasAPI else None
-    
+
     remoteUrlBase = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base if hasBrainGlobeAtlasAPI else None
-    
+
     default_free_space_fraction_allowed = 0.01
-    
+
     assumed_compression_ratio = 2.
-    
+
+    default_atlas_name =  'whs_sd_rat_39um'
+    default_species = "Rattus norvegicus"
+
     def __init__(self, maxFileSystemFraction:typing.Optional[float] = None,
                  parent=None):
         r"""Parameters:
         maxFileSystemFraction: float in the interval [0.1 ⋯ 0.9]
             The maximum file system size available for downloading an extracting
             an atlas data. This will take into account the temporary file space
-            occupied by the archive. 
-    
-            As the final size of the extracted data is not known a priori, this 
+            occupied by the archive.
+
+            As the final size of the extracted data is not known a priori, this
             class will assume a conservative compression ratio of 2/1.
-    
+
             Thus, for an archive of 1 GiB, the resulting data after extraction
-            would occupy 2 GiB. 
-    
+            would occupy 2 GiB.
+
             This means that a safe installation of atlas data would require
             3 × archive size:
-    
+
                 the archive size for the download + twice the archive size for
                 extracted data, even if the archive will be deleted after the
                 extraction.
-    
-    
-    
+
+
+
             By default this is set to 0.1
-    
-    
+
+
         """
         super().__init__(parent=parent)
-        self._atlas = None
+        self._atlas_ = None
+        self._current_atlas_ = None
         self._atlas_name_to_initialize_ = None
         self._atlas_in_progress_ = None
         self.downloadThread = None
@@ -269,99 +273,242 @@ class BrainAtlasManager(QtCore.QObject):
             self._maxFreeSpaceFraction_ = maxFileSystemFraction
         else:
             self._maxFreeSpaceFraction_ = self.default_free_space_fraction_allowed
-            
+
         self.scipyenWindow = wf.getMainScipyenWindow()
-        
+
     @classmethod
     def hasBrainGlobeAtlasAPI(self)->bool:
         from gui.workspacegui import GuiMessages
         if not hasBrainGlobeAtlasAPI:
             scipywarn("The 'brainglobe_atlasapi' package is not installed")
-            GuiMessages.informationMessage_static(self.scipyenWindow, 
+            GuiMessages.informationMessage_static(self.scipyenWindow,
                                                   f"{self.__class__.__name__}",
                                                   f"Please install brainglobe_atlasapi package.")
             return False
-        
+
         return True
-        
-    def initAtlasForSpecies(self, taxon:typing.Union[str, taxonbridge.Taxon], 
-                            atlasName:typing.Optional[str]=None):
+
+    def getAtlasNamesForSpecies(self: typing.Self,
+                            taxon:typing.Union[str, taxonbridge.Taxon],
+                            localOnly: bool = True,
+                            ) -> typing.Sequence[str]:
+
         if not self.hasBrainGlobeAtlasAPI():
-            return
-        
-        if len(self.atlasNames) == 0:
+            scipywarn("brainglobe is not installed")
+            return list()
+
+        atlasNames = self.localAtlasNames if localOnly else self.atlasNames
+
+        if len(atlasNames) == 0:
             scipywarn("No atlases are available. Make sure the REQUIRED package brainglobe (or at least brainglobe_atlasapi) is installed.")
-            return
-        
+            return list()
+
         if taxonbridge.hasTaxoniq and isinstance(taxon, taxonbridge.Taxon):
             species = taxonbridge.get_nearest_parent_common_name(taxon)
-                
+
         elif isinstance(taxon, str):
             if len(taxon.strip()) == 0:
                 raise ValueError("taxon is an empty string!")
-            
-            if taxon not in [s.lower() for s in taxonbridge.supported_species] + ["mouse", "mice", "rat", "rats"]:
-                raise ValueError(f"taxon {taxon} is not supported")
-            
-            # NOTE: 2024-11-23 14:40:50
-            # try and get a Taxon object using this species string, then get the 
-            # actual species from thisTaxon object
-            taxonObj = taxonbridge.get_taxon(taxon)
-            
-            if isinstance(taxonObj, taxonbridge.Taxon):
-                species = taxonbridge.get_nearest_parent_common_name(taxonObj)
+
+            ret = list(
+                map(
+                    lambda a: a.atlas_name,
+                    filter(
+                        lambda a: (isinstance(a, BrainGlobeAtlas)
+                                and taxon in a.metadata["species"]),
+                            map(
+                                lambda s: BrainGlobeAtlas(s, check_latest=False),
+                                atlasNames
+                                )
+                        )
+                    )
+                )
+
+            if len(ret):
+                return ret
+
+            if taxon in [s.lower() for s in taxonbridge.supported_species] + ["mouse", "mice", "rat", "rats"]:
+                if taxonbridge.hasTaxoniq:
+                    taxonObj = taxonbridge.get_taxon(taxon)
+
+                    if isinstance(taxonObj, taxonbridge.Taxon):
+                        species = taxonbridge.get_nearest_parent_common_name(taxonObj)
+
+                    else:
+                        species = taxon
+
+                else:
+                    # could not retrieve a Taxon object => use taxon parameter as species
+                    # and continue with that
+                    species = taxon
+
             else:
-                # could not retrieve a Taxon object => use taxon parameter as species
-                # and continue with that
-                species = taxon
-            
-            if any(species.lower().startswith(a) or species.lower().endswith(a) for a in ("rat", "rats")):
-                species = "rat"
-                
-            elif any(species.lower().startswith(a) or species.lower().endswith(a) for a in ("mus", "mouse", "mice")):
-                species = "mouse"
-            
+                raise ValueError(f"taxon {taxon} is not supported")
+
         else:
-            raise TypeError(f"'taxon' expected to be Taxon or a str; instad got a {type(taxon).__name__}")
-        
-        if "mice" in species.lower():
+            raise TypeError(f"'taxon' expected to be Taxon or a str; instead got a {type(taxon).__name__}")
+
+        if any(species.lower().startswith(a) or species.lower().endswith(a) for a in ("rat", "rats")):
+            species = "rat"
+
+        elif any(species.lower().startswith(a) or species.lower().endswith(a) for a in ("mus", "mouse", "mice")):
             species = "mouse"
-            
-        atlas_names_for_species = list(filter(lambda x: species in x, self.atlasNames))
-        
+
+        ret = list(
+            map(
+                lambda a: a.atlas_name,
+                filter(
+                    lambda x: (
+                        isinstance(x, BrainGlobeAtlas)
+                        and (
+                            species in x.metadata["species"]
+                            or species in x.atlas_name
+                            )
+                        ),
+                    map(
+                        lambda s: BrainGlobeAtlas(s, check_latest=False),
+                        atlasNames
+                        )
+                    )
+                )
+            )
+
+        return ret
+
+    def initAtlasForSpecies(self: typing.Self,
+                            taxon:typing.Union[str, taxonbridge.Taxon],
+                            atlasName:typing.Optional[str]=None,
+                            localOnly: bool = True) -> typing.Optional[
+                                typing.Union[
+                                    BrainGlobeAtlas,
+                                    typing.Sequence[BrainGlobeAtlas]
+                                    ]
+                                ]:
+        if not self.hasBrainGlobeAtlasAPI():
+            scipywarn("brainglobe is not installed")
+            return
+
+        atlasNames = self.localAtlasNames if localOnly else self.atlasNames
+
+        if len(atlasNames) == 0:
+            scipywarn("No atlases are available. Make sure the REQUIRED package brainglobe (or at least brainglobe_atlasapi) is installed.")
+            return
+
+        if taxonbridge.hasTaxoniq and isinstance(taxon, taxonbridge.Taxon):
+            species = taxonbridge.get_nearest_parent_common_name(taxon)
+
+        elif isinstance(taxon, str):
+            if len(taxon.strip()) == 0:
+                raise ValueError("taxon is an empty string!")
+
+            atlases = list(
+                filter(
+                    lambda a: (
+                        isinstance(a, BrainGlobeAtlas)
+                        and (
+                            taxon in a.metadata["species"]
+                            or taxon in a.atlas_name
+                            )
+                        ),
+                        map(
+                            lambda s: BrainGlobeAtlas(s, check_latest=False),
+                            atlasNames
+                            )
+                    )
+                )
+
+            if len(atlases):
+                names = list(map(lambda a: a.atlas_name, atlases))
+                if atlasName in names:
+                    return atlases[names.index(atlasName)]
+                else:
+                    if len(atlases) == 1:
+                        return atlases[0]
+                    else:
+                        chosen_atlas_name = self.selectAtlasName(list(map(lambda a: a.atlas_name, atlases)))
+                        if chosen_atlas_name:
+                            return BrainGlobeAtlas(chosen_atlas_name, check_latest = False)
+
+            if taxon in [s.lower() for s in taxonbridge.supported_species] + ["mouse", "mice", "rat", "rats"]:
+                if taxonbridge.hasTaxoniq:
+                    taxonObj = taxonbridge.get_taxon(taxon)
+
+                    if isinstance(taxonObj, taxonbridge.Taxon):
+                        species = taxonbridge.get_nearest_parent_common_name(taxonObj)
+
+                    else:
+                        species = taxon
+
+                else:
+                    # could not retrieve a Taxon object => use taxon parameter as species
+                    # and continue with that
+                    species = taxon
+
+            else:
+                raise ValueError(f"taxon {taxon} is not supported")
+
+        else:
+            raise TypeError(f"'taxon' expected to be Taxon or a str; instead got a {type(taxon).__name__}")
+
+        if any(species.lower().startswith(a) or species.lower().endswith(a) for a in ("rat", "rats")):
+            species = "rat"
+
+        elif any(species.lower().startswith(a) or species.lower().endswith(a) for a in ("mus", "mouse", "mice")):
+            species = "mouse"
+
+        atlas_names_for_species = list(
+            filter(
+                lambda x: (
+                    isinstance(x, BrainGlobeAtlas)
+                    and (
+                        species in x.metadata["species"]
+                        or species in x.atlas_name
+                        )
+                    ),
+                map(
+                    lambda s: BrainGlobeAtlas(s, check_latest=False),
+                    atlasNames
+                    )
+                )
+            )
+
+        # atlas_names_for_species = list(filter(lambda x: species in x, self.atlasNames))
+
         chosen_atlas = None
-        
+
         if isinstance(atlasName, str) and len(atlasName.strip()):
             if atlasName not in atlas_names_for_species:
                 scipwarn(f"The supplied atlas name {atlasName} is not valid for species {species}")
-                
+
             else:
                 chosen_atlas = atlasName
-                
+
         else:
             if len(atlas_names_for_species) > 1:
                 chosen_atlas = self.selectAtlasName(atlas_names_for_species, retNone=True)
+
             elif len(atlas_names_for_species) == 1:
                 chosen_atlas = atlas_names_for_species[0]
+
             else:
                 chosen_atlas = self.selectAtlasName(species, retNone=True)
-        
+
         ret = ""
-        
+
         if chosen_atlas is None:
             if species == "mouse":
                 default_atlas = DEFAULT_MOUSE_BRAIN_ATLAS
-                
+
             elif species == "rat":
                 default_atlas = DEFAULT_RAT_BRAIN_ATLAS
-                
+
             else:
-                raise ValueError(f"Species {species} is not yet supported ")
-        
+                return
+
             if len(atlas_names_for_species) == 0:
                 scipywarn(f"No brain atlas for species {species} is found")
                 return
-            
+
             elif len(atlas_names_for_species) > 1:
                 if default_atlas in atlas_names_for_species:
                     scipywarn(f"There is more than one brain atlas available. The default one ({default_atlas}) will be used")
@@ -369,12 +516,12 @@ class BrainAtlasManager(QtCore.QObject):
                 else:
                     scipywarn(f"There is more than one brain atlas available, but the default one ({default_atlas}) is not among them. The first available one ({atlas_names_for_species[0]}) will be used")
                     ret = atlas_names_for_species[0]
-            
+
         else:
             ret = chosen_atlas
-            
+
         return self.initAtlas(ret)
-        
+
     def _parse_size(self, s:str) -> int:
         r"""Parses the archive size from the HTML file for a given atlas archive.
         Code taken from brainglobe_atlasapi
@@ -392,33 +539,33 @@ class BrainAtlasManager(QtCore.QObject):
             sz *= 1e6
         elif pfx == "K":
             sz *= 1e3
-        return int(sz)    
-    
+        return int(sz)
+
     def _getArchiveSizeAndDownload(self,info:QtCore.QByteArray,
                                    manager:network.ScipyenNetworkManager,
                                    targetDir:str,
                                    url:typing.Union[str, QtCore.QUrl],
                                    ) -> None:
         from gui.workspacegui import GuiMessages
-        
+
         if not isinstance(info, QtCore.QByteArray):
             raise TypeError(f"In BrainAtlasManager._getArchiveSizeAndDownload: Expecting a QByteArray; instead, got {type(info).__name__}")
-        
+
         info = bytes(info).decode()
-        
+
         if not isinstance(info, str) or len(info.strip()) == 0:
             scipywarn("BrainAtlasManager._getArchiveSizeAndDownload received invalid data")
-            return 
-        
+            return
+
         sz = self._parse_size(info)
-        
+
         if isinstance(sz, int):
             t,u,f = shutil.disk_usage(targetDir)
-            
+
             freeSpace = scq.getInformationQuantity(f)
             archiveSize = scq.getInformationQuantity(sz)
             neededSpace = archiveSize * (self.assumed_compression_ratio + 1)
-            
+
             if float(neededSpace/freeSpace) >= self.default_free_space_fraction_allowed:
                 txt = [f"You are about to download a file with size of {scq.quantity2str(archiveSize,precision=1)}",
                        f"requiring {scq.quantity2str(neededSpace, precision=1)} for a 'safe' installation!",
@@ -431,16 +578,16 @@ class BrainAtlasManager(QtCore.QObject):
                     self.cancelDownload()
                     # manager.slot_abortReply()
                     return
-                
-            
+
+
             manager.setNextDownloadSize(sz)
         else:
             scipywarn("In BrainAtlasManager._getArchiveSizeAndDownload: Could not get the size of the next download")
-        
-        # targetDir = self.getBrainGlobeConfiguration()["default_dirs"]["brainglobe_dir"]   
+
+        # targetDir = self.getBrainGlobeConfiguration()["default_dirs"]["brainglobe_dir"]
         destination = os.path.join(targetDir, "archive.tar.gz")
-        manager.getUrl(url, destination=destination, replyHandler = None) 
-        
+        manager.getUrl(url, destination=destination, replyHandler = None)
+
     def testAtlasDownload(self):
         r"""Tests downloading and extracting an atlas archive.
         See iolib.network.example_sequential_download_handler for explanations
@@ -448,61 +595,61 @@ class BrainAtlasManager(QtCore.QObject):
         """
         if not self.hasBrainGlobeAtlasAPI():
             return
-        
+
         archiveName = "example_mouse_100um_v1.2.tar.gz"
         versions = self.getAtlasesConfiguration()
-        
+
         resolution = list((k,v) for k, v in versions.items() if archiveName.startswith(k))
-        
+
         if len(resolution):
             atlasName, atlasVersion = resolution[0]
-            
+
         localAtlasDir = self.localAtlasRepository / f"{atlasName}_v{atlasVersion}"
-        
+
         if localAtlasDir.exists():
             shutil.rmtree(localAtlasDir)
 
         url = self.remoteUrlBase.format(archiveName)
-        
+
         url1 = url.replace("raw", "src")
-        
+
         self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
         self.netMan.sig_networkError[object].connect(self._slot_networkError)
         self.netMan.sig_resultReady[object].connect(self._slot_extractAtlasArchive)
         self.netMan.sig_finished.connect(self.slot_networkOperationFinished)
-        
-        handle = functools.partial(self._getArchiveSizeAndDownload, 
+
+        handle = functools.partial(self._getArchiveSizeAndDownload,
                                    targetDir = self.localDownloadDirectory,
                                    url = url)
-        
+
         self.netMan.getUrl(url1, destination=None, replyHandler=handle)
-        
+
     @Slot(object)
     def _slot_networkError(self, url_msg:tuple[str]):
         from gui.workspacegui import GuiMessages
         print(f"{self.__class__.__name__}._slot_networkError: url_msg = {url_msg}")
-        GuiMessages.criticalMessage_static(self.scipyenWindow, 
+        GuiMessages.criticalMessage_static(self.scipyenWindow,
                                            f"{self.__class__.__name__}",
                                            f"Error from {url_msg[0]}:\n{url_msg[1]}")
-        
+
     def _extractAtlasArchive(self, target:typing.Union[str, pathlib.Path]) -> bool:
         import tarfile
         print(f"{self.__class__.__name__}._extractAtlasArchive: target = {target}")
         targetDir = self.getBrainGlobeConfiguration()["default_dirs"]["brainglobe_dir"]
         if isinstance(target, str):
             target = pathlib.Path(target)
-            
+
         elif not isinstance(target, pathlib.Path):
             raise TypeError(f"'target' expected a str or a pathlib.Path; instead, got {type(target).__name__}")
-            
+
         if not isinstance(targetDir, str) or not os.path.isdir(targetDir):
             raise ValueError(f"'targetDir ('{targetDir}') is not a directory")
-        
+
         if isinstance(target, pathlib.Path):
             path = target.as_posix()
             if not target.exists():
                 raise RuntimeError(f"In {self.__class__.__name__}._extractAtlasArchive: File object {path} does not exist!")
-            
+
             tar = tarfile.open(path)
             try:
                 tar.extractall(path = targetDir)
@@ -512,45 +659,81 @@ class BrainAtlasManager(QtCore.QObject):
             except:
                 traceback.print_exc()
                 return False
-            
+
         return False
-        
+
     @Slot(object)
     def _slot_extractAtlasArchive(self, target:typing.Union[str, pathlib.Path]) -> None:
         ret = self._extractAtlasArchive(target)
-                
+
     @Slot(object)
     def _slot_extractAtlasArchiveAndInit(self, target:typing.Union[str, pathlib.Path]) -> None:
         # print(f"{self.__class__.__name__}._slot_extractAtlasArchiveAndInit: target = {target}")
         ret = self._extractAtlasArchive(target)
         if ret and self._atlas_name_to_initialize_ is not None:
-            self._atlas = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
+            self._atlas_ = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
             print(f"{print_styled(f'{self._atlas_name_to_initialize_}', 'green')} was initialized")
             self._atlas_name_to_initialize_ = None
-        
-    def initAtlas(self, name:typing.Optional[str]=None, download:bool=False) -> BrainGlobeAtlas | None:
-        if name is None or (isinstance(name, str) and (len(name.strip()) == 0 or name not in self.atlasNames)):
+
+    def initAtlas(self, name: typing.Optional[str] = None,
+                  localOnly: bool = True,
+                  interactive: bool = True
+                  # download: bool = False,
+                  ) -> BrainGlobeAtlas | None:
+        from gui.workspacegui import GuiMessages
+        if not self.hasBrainGlobeAtlasAPI():
+            scipywarn("BraingGlobe is not installed; brain atlases are not available")
+            return
+
+        if localOnly:
+            atlasNames = self.localAtlasNames
+        else:
+            atlasNames = self.atlasNames
+
+        if (
+            name is None
+            or (
+                isinstance(name, str) and (
+                    len(name.strip()) == 0
+                    or name not in atlasNames
+                    )
+                )
+            ):
             name = self.selectAtlasName()
             if name is None:
                 return
-                    
+                # name = self.default_atlas_name
+
         if name not in self.localAtlasNames:
-            if download:
-                scipywarn(f"The atlas {name} will be available as the 'atlas' attribute once donwloaded and initialized")
-                self.downloadAtlas(name, True)
-            else:
-                scipywarn(f"The atlas {name} must be downloaded manually")
-                return
+            if interactive:
+                GuiMessages.informationMessage(
+                    title = f"Atlas {name}:",
+                    text  = "\n".join(
+            [
+                f"Atlas {name} must be installed manually.",
+                "Open a terminal, run 'scipyact' to acivate Scipyen's environment,"
+                f"then run 'brainglobe install -a {name}' to install the atlas"
+            ]
+                        )
+                    )
+            return
+            # if download:
+            #     scipywarn(f"The atlas {name} will be available as the 'atlas' attribute once donwloaded and initialized")
+            #     self.downloadAtlas(name, True)
+            # else:
+            #     scipywarn(f"The atlas {name} must be downloaded manually")
+            #     return
         else:
             # TODO 2024-11-24 21:23:14
             # make 'check_latest' below a Scipyen configurable variable
             # (not Qt configurable)
-            self._atlas = BrainGlobeAtlas(name, check_latest=download) 
+            self._current_atlas_ = BrainGlobeAtlas(name, check_latest=False)
+            # self._atlas_ = BrainGlobeAtlas(name, check_latest=download)
             self._atlas_name_to_initialize_ = None
-            
-            return self._atlas
-                
-    def showAtlases(self, show_local_path:bool=False, toConsole:bool=True, 
+
+            return self._current_atlas_
+
+    def showAtlases(self, show_local_path:bool=False, toConsole:bool=True,
                     table_width:int=80) -> typing.Optional[pd.DataFrame]:
         r"""Shows atlases using brainglobe_atlasapi.
         WARNING: May be blocking the GUI
@@ -562,41 +745,41 @@ class BrainAtlasManager(QtCore.QObject):
             isUpdated = lambda x: self.localAtlases[x]["updated"] if isLocal(x) else False
             localVersion = lambda x: self.localAtlases[x]["version"] if isLocal(x) else ""
             localPath = lambda x: self.localAtlases[x]["local"] if isLocal(x) else ""
-            
+
             ll = sorted(sorted(list((k, isLocal(k), isUpdated(k), localVersion(k), v, localPath(k)) for k,v in self._all_atlases_.items()), key=lambda x: x[0]), key=lambda x: x[1], reverse=True)
             names, downloaded, updated, local_version, latest_version, path = zip(*ll)
-            
+
             if show_local_path:
                 return pd.DataFrame({"Names": names, "Downloaded": downloaded, "Updated": updated, "Local version": local_version, "Latest version": latest_version, "Local path": path},
                                    columns = ["Names", "Downloaded", "Updated", "Local version", "Latest version", "Local path"])
             else:
                 return pd.DataFrame({"Names": names, "Downloaded": downloaded, "Updated": updated, "Local version": local_version, "Latest version": latest_version},
                                    columns = ["Names", "Downloaded", "Updated", "Local version", "Latest version"])
-                
+
     def checkAtlasGINStatus(self):
         url = QtCore.QUrl("https://gin.g-node.org/")
         self.netMan.sig_resultReady[object].connect(self._slot_checkGINReady)
         self.netMan.sig_finished.connect(self.slot_networkOperationFinished)
         self.netMan.checkUrl(url)
-        
+
     def getRemoteAtlasArchiveFileSizes(self): # TODO
         atlasesConf = self.getAtlasesConfiguration()
         names, versions = zip(*list(atlasesConf.items()))
         archiveNames = list(map(lambda x: f"{x[0]}_v{x[1]}.tar.gz", zip(names, versions)))
         # archiveNames = list(map(lambda x: f"{x[0]}_v{x[1]}.tar.gz", zip(*list(atlasesConf.items()))))
-        
+
         urls = list(map(lambda x: self.remoteUrlBase.format(x).replace("raw", "src"), archiveNames))
-        
+
     def _reportRemoteArchiveSizes(self):
         pass
-        
+
     @Slot(object)
     def _slot_checkGINReady(self, result):
         errorMsg = self.netMan.networkErorName
         scipywarn(f"Got {errorMsg} from {result[1]}" )
         if self.netMan.receivers(self.netMan.sig_resultReady) > 0:
             self.netMan.sig_resultReady.disconnect()
-            
+
     @Slot()
     def cancelDownload(self):
         try:
@@ -604,228 +787,316 @@ class BrainAtlasManager(QtCore.QObject):
             self.netMan.networkReply.close()
         except:
             traceback.print_exc()
-            
+
     def downloadAtlas(self, name:typing.Optional[str], initAtlas:bool=False) -> None:
         r"""Downloads an atlas data from the BrainGlobe GIN repository
-        
+
         https://gin.g-node.org/brainglobe/atlases/raw/master/
-        
+
         If the atlas data already exists locally, it will be overwritten.
-        
+
         By default, atlas data is stored in the $HOME/.brainglobe directory
         (on UNIX operating systems).
-        
+
         """
         frame_records = inspect.getouterframes(inspect.currentframe())
-        
+
         if "console" in frame_records[1].frame.f_globals:
             dlgParent = frame_records[1].frame.f_globals["console"]
         else:
             dlgParent = self.scipyenWindow
-        
+
         if not self.hasBrainGlobeAtlasAPI():
             return
-        
+
         slot = self._slot_extractAtlasArchiveAndInit if initAtlas else self._slot_extractAtlasArchive
-        
+
         self._atlas_name_to_initialize_ = name if initAtlas else None
-        
+
         versions = self.getAtlasesConfiguration()
         if not isinstance(name, str) or len(name.strip()) == 0 or name not in self.atlases:
             name = self.selectAtlasName(name, dlgParent = dlgParent)
-            
+
         if name is None:
             return
-        
+
         version = versions[name]
-            
+
         archiveName = f"{name}_v{version}.tar.gz"
-        
+
         localAtlasDir = self.localAtlasRepository / f"{name}_v{version}"
         if localAtlasDir.exists():
             shutil.rmtree(localAtlasDir)
-        
+
         url = self.remoteUrlBase.format(archiveName)
-        
+
         url1 = url.replace("raw", "src")
-        
+
         self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
         self.netMan.sig_resultReady[object].connect(self._slot_extractAtlasArchive)
-        
-        handle = functools.partial(self._getArchiveSizeAndDownload, 
+
+        handle = functools.partial(self._getArchiveSizeAndDownload,
                                    targetDir = self.localDownloadDirectory,
                                    url = url)
-        
+
         self.netMan.getUrl(url1, destination=None, replyHandler=handle)
-        
-        
+
+
     @Slot()
     def slot_networkOperationFinished(self):
         if isinstance(self.netMan, network.ScipyenNetworkManager):
             color = "yellow" if self.netMan.networkError else "green"
             print(print_styled(f"{self.__class__.__name__} network operation finished with {self.netMan.networkErrorName}", color, True))
-            
-    def selectAtlasName(self, choices:typing.Optional[typing.Union[typing.Sequence[str], str]]=None,
-                        retNone:bool=False,
-                        dlgTitle:typing.Optional[str]=None,
-                        dlgParent:typing.Optional[QtWidgets.QWidget] = None) -> str:
+
+    def selectAtlasName(
+        self: typing.Self,
+        choices: typing.Optional[
+            typing.Union[
+                typing.Sequence[str],
+                str
+                ]
+            ] = None,
+        localOnly: bool = True,
+        retNone: bool = False,
+        dlgTitle: typing.Optional[str] = None,
+        dlgParent: typing.Optional[QtWidgets.QWidget] = None
+        ) -> str | None:
         from gui.itemslistdialog import ItemsListDialog
 
         if not self.hasBrainGlobeAtlasAPI():
             return
-        
-        atlasNames = self.atlasNames
-        
+
+        atlasNames = self.localAtlasNames if localOnly else self.atlasNames
+
         if isinstance(choices, (tuple, list)):
             if all(isinstance(v, str) for v in choices):
-                names = list(itertools.chain.from_iterable(map(lambda c: filter(lambda x: c in x, atlasNames), choices)))
+                names = list(
+                    itertools.chain.from_iterable(
+                        map(
+                            lambda c: filter(
+                                lambda x: c in x,
+                                atlasNames
+                                ),
+                            choices
+                            )
+                        )
+                    )
+
                 if len(names) == 0:
                     scipywarn("No valid atlas names were supplied")
                     names = atlasNames
-            
+
         elif isinstance(choices, str) and len(choices.strip()):
-            names = list(filter(lambda x: choices in x, atlasNames))
+            names = list(
+                        filter(
+                            lambda x: choices in x,
+                            atlasNames
+                            )
+                        )
+
             if len(names) == 0:
                 scipywarn("No valid atlas names were supplied")
                 names = atlasNames
-            
+
         else:
             names = atlasNames
-            
+
         if len(names) == 0:
             if retNone:
                 return
-            
+            else:
+                return str()
+
         if not isinstance(dlgTitle, str) or len(dlgTitle.strip()) == 0:
-            dlgTitle = "Choose from available atlas names:"
-            
+            where = f" local " if localOnly else " "
+            dlgTitle = f"Choose from available{where}atlas names:"
+
+        preSelected = (
+        self.default_atlas_name if self.default_atlas_name in names else None
+        )
+
         if dlgParent is None:
             dlgParent = self.scipyenWindow
-        
+
         dlg = ItemsListDialog(parent = dlgParent, itemsList = names,
-                                title = dlgTitle)
+                                title = dlgTitle, preSelected = preSelected)
         dlg.adjustSize()
         a = dlg.exec_()
-        
+
         if a == QtWidgets.QDialog.Accepted:
             names = dlg.selectedItemsText
             if len(names):
                 return names[0]
-        
+
 #     def uninstallAtlas(self, name:str):
 #         """
 #         TODO - Do NOT use yet!
 #         """
 #         from gui.itemslistdialog import ItemsListDialog
-#         
+#
 #         if len(self.localAtlasNames) == 0:
 #             print("No atlas is installed locally")
 #             return
-#         
+#
 #         if name not in self.localAtlasNames:
 #             dlg = ItemsListDialog(parent = self.scipyenWindow, itemsList = self.localAtlasNames,
 #                                   title = f"Choose atlas:")
 #             a = dlg.exec_()
-#             
+#
 #             if a == QtWidgets.QDialog.Accepted:
 #                 names = dlg.selectedItemsText
 #                 if len(names):
 #                     name = names[0]
-#         
+#
 #         # self._downloadAtlas(name, setOwn=False)
-        
+
     def getAtlasStructure(self, name:str,
                         acro:bool=False,
                         cutoff = 0.5,
                         maxfound = 10,
                         ):
         r"""See get_atlas_structure(…) module-level function"""
-        if self._atlas is None:
+        if self._atlas_ is None:
             raise RuntimeError("no atlas has been initialized yet")
-        
-        return get_atlas_structure(name, self._atlas)
-        
+
+        return get_atlas_structure(name, self._atlas_)
+
     @property
     def atlas(self):
-        r"""
+        r"""Last initialized atlas
         """
-        if self._atlas is None:
+        if self._atlas_ is None:
             if self._atlas_name_to_initialize_ is None:
                 return self.initAtlas()
                 # scipywarn("No atlas has been initialized yet; please call one of:\n self.initAtlas(…)\n self.initAtlasForSpecies(…)\n self.installAtlas(…)\n")
             else:
-                self._atlas = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
-                
-        return self._atlas
-    
+                self._atlas_ = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
+
+        return self._atlas_
+
     @property
     def localAtlases(self) -> dict:
         if not self.hasBrainGlobeAtlasAPI():
             return dict()
-        
+
         p = self.localAtlasRepository
-        
-        atlasDirsVers = sorted(map(lambda x: x if len(x)==2 else [x[0], ""], map(lambda x: x.name.split("_v"), filter(lambda x: x.is_dir(), p.glob("*")))))
-        
+
+        atlasesConfig = self.getAtlasesConfiguration()
+        if len(atlasesConfig) == 0:
+            scipywarn("No local atlases configuration was found. Please use brainglobe executable to setup the local repository")
+            return dict()
+
+        atlasDirsVers = sorted(
+            filter(
+                lambda x: x[0] in atlasesConfig,
+                map(
+                    lambda x: x if len(x)==2 else [x[0], ""],
+                    map(
+                        lambda x: x.name.split("_v"),
+                        filter(
+                            lambda x: x.is_dir(), p.glob("*")
+                            )
+                        )
+                    )
+                )
+            )
+
         atlasNames, atlasVers = zip(*atlasDirsVers)
-        
+
         uniqueAtlasNames = utilities.unique(atlasNames)
-        
+
         if len(uniqueAtlasNames) < len(atlasNames):
             # there are atlases with several versions stored locally
-            
+
             check_singleton = lambda x: x[0] if len(x) == 1 else tuple(x)
-            
-            return dict((u, check_singleton(list(map(lambda x: x[1], filter(lambda x: x[0] == u, atlasDirsVers))))) for u in uniqueAtlasNames)
-                    
+
+            return dict(
+                    (
+                        u,
+                        check_singleton(
+                            list(
+                                map(lambda x: x[1],
+                                    filter(
+                                        lambda x: x[0] == u,
+                                        atlasDirsVers
+                                        )
+                                    )
+                                )
+                            )
+                    ) for u in uniqueAtlasNames
+                )
+
         return dict(atlasDirsVers)
         # return dict(sorted(map(lambda x: x.name.split("_v"), filter(lambda x: x.is_dir(), p.glob("*")))))
-    
+
     @property
     def localAtlasNames(self) -> list[str]:
         return list(self.localAtlases.keys())
-    
+
     @property
     def localAtlasVersions(self) -> list:
         return list(self.localAtlases.values())
-    
+
     @property
     def atlases(self) -> dict:
         r"""A mapping with all available atlases, of the form name ↦ version"""
         if not self.hasBrainGlobeAtlasAPI():
             return dict()
-        
+
         return self.getAtlasesConfiguration()
-    
+
     @property
     def atlasNames(self) -> list[str]:
         r"""List of available atlas names.
         Assumes that the local atlas configuration file $HOME/.brainglobe.last_versions.conf
         is up to date
-    
+
         A 'canonical' atlas name is of the form:
-        
+
         name = <identifier>_{<identifier>_}*<resolution>um
-        
+
         identifier = [a-zA-Z0-9]
-        
+
         """
         if not hasBrainGlobeAtlasAPI:
             scipywarn("The 'brainglobe_atlasapi' package is not installed")
             return list()
 
         atlasConf = self.getAtlasesConfiguration()
-        
+
         if atlasConf:
             return list(atlasConf.keys())
         else:
             return list()
 
+    def getAvailableSpecies(self: typing.Self, localOnly: bool = True) -> tuple:
+        atlasNames = self.localAtlasNames if localOnly else self.atlasNames
+
+        atlases = list(
+            filter(
+                lambda a: isinstance(a, BrainGlobeAtlas),
+                    map(
+                        lambda s: self.initAtlas(s, localOnly,
+                                                interactive = False),
+                        atlasNames
+                        )
+                )
+            )
+
+        species = set(
+            map(
+                lambda a: a.metadata["species"],
+                atlases
+                )
+            )
+
+        return species
+
     # @Slot(object)
     # def _slot_setAtlas(self, o:object):
-    #     self._atlas = o
+    #     self._atlas_ = o
     #     self._atlas_in_progress_ = None
-        
+
     # @Slot()
     # def finished(self):
     #     # print(f"Atlas {self._atlas_name_to_initialize_} has been downloaded.")
@@ -842,7 +1113,7 @@ class BrainAtlasManager(QtCore.QObject):
     #     self.downloadThread = None
     #     self._atlas_in_progress_ = None
     #     # self._instance = None
-        
+
     def displayAtlases(self, asDict:bool=False, showNeedsUpdate:bool=True,
                        pretty:bool=True, prettier:bool=False) -> pd.DataFrame | dict:
         if not self.hasBrainGlobeAtlasAPI():
@@ -850,15 +1121,15 @@ class BrainAtlasManager(QtCore.QObject):
                 return dict()
             else:
                 return pd.DataFrame()
-            
+
         all_atlases = self.getAtlasesConfiguration()
         local_atlases = self.localAtlases
-        
+
         # vercomp = lambda x,y: atlas_version_str2tuple(x) == atlas_version_str2tuple(y) if isinstance(y, str) else atlas_version_str2tuple(x) in tuple(map(lambda v: atlas_version_str2tuple(v), y)) if isinstance(y, tuple) else False
-        
-        if prettier: 
+
+        if prettier:
             pretty = True
-        
+
         if pretty:
             if showNeedsUpdate:
                 names, remote_vers, is_local, local_vers, uptodate = zip(*sorted(sorted(map(lambda k: (k, all_atlases[k], "✓" if k in local_atlases else "", local_atlases.get(k, ""), "✓" if atlas_vercomp(all_atlases[k], local_atlases.get(k, None)) else ""), all_atlases.keys()), key=lambda x: x[0]), key=lambda x: x[2], reverse=True))
@@ -869,7 +1140,7 @@ class BrainAtlasManager(QtCore.QObject):
                 names, remote_vers, is_local, local_vers, uptodate = zip(*sorted(sorted(map(lambda k: (k, all_atlases[k], k in local_atlases, local_atlases.get(k, pd.NA)), all_atlases.keys(), atlas_vercomp(all_atlases[k], local_atlases.get(k, None))), key=lambda x: x[0]), key=lambda x: x[2], reverse=True))
             else:
                 names, remote_vers, is_local, local_vers = zip(*sorted(sorted(map(lambda k: (k, all_atlases[k], k in local_atlases, local_atlases.get(k, pd.NA)), all_atlases.keys()), key=lambda x: x[0]), key=lambda x: x[2], reverse=True))
-            
+
         if showNeedsUpdate:
             ret = {"Atlas":names,
                 "Remote version":remote_vers,
@@ -881,64 +1152,64 @@ class BrainAtlasManager(QtCore.QObject):
                 "Remote version":remote_vers,
                 "Local":is_local,
                 "Local version":local_vers}
-        
+
         if asDict:
             return ret
-        
+
         if prettier:
             r1 = ret.copy()
             r1.pop("Atlas")
             return pd.DataFrame(r1, columns=r1.keys(), index = ret["Atlas"])
-        
+
         return pd.DataFrame(ret, columns=ret.keys())
-        
+
     @Slot()
     def _slot_breakLoop(self):
         self.loopControl["break"] = True
-        
+
     @classmethod
     def getBrainGlobeConfiguration(cls, file_path:typing.Optional[pathlib.Path]=None,
                                    asDict:bool = False) -> configparser.ConfigParser | None:
         r"""Reads the brainglobe configuration from a local file.
-        
+
         WARNING: This is NOT the atlas configuration file (last_versions.conf) !!!
-        
+
         On UN*X platforms, by default, this is file is '~/.config/brainglobe/bg_config.conf'
-        
+
         """
         if not cls.hasBrainGlobeAtlasAPI():
             return
-        
+
         if file_path is None:
             file_path = cls.default_config_file
-            
+
         if not isinstance(file_path, pathlib.Path) or not file_path.exists():
             brainglobe_atlasapi.config.write_default_config()
 
             # return
-            
+
         conf_object = configparser.ConfigParser()
         with open(file_path) as file_object:
             conf_object.read_file(file_object)
-            
+
         if not conf_object.has_section("default_dirs"):
             raise RuntimeError(f"The {file_path} is an invalid brainglobe configuration file; please provide a valid file or reinstall brainglobe package")
-            
+
         if asDict:
             return dict((s, dict(conf_object[s])) for s in conf_object.sections())
-            
+
         return conf_object
 
     def getAtlasesConfiguration(self: typing.Self,
                 atlases_conf_path: typing.Optional[pathlib.Path]=None,
                 conf_path: typing.Optional[pathlib.Path] = None,
-                ) -> dict | None:
+                ) -> dict:
         r"""Returns atlas names and versions as a dictionary.
-        
+
         This information is taken from the local atlas configuration file
-        $HOME/.brainglobe/last_versions.conf if it exists, and assumed to be up 
+        $HOME/.brainglobe/last_versions.conf if it exists, and assumed to be up
         to date.
-        
+
 
         A diferent local configuration file can be specified using 'atlases_conf_path'
         parameter, but the default one (see above) will be used in all other operations
@@ -964,12 +1235,12 @@ class BrainAtlasManager(QtCore.QObject):
         # atlases_conf_path = None
         if not self.hasBrainGlobeAtlasAPI():
             return dict()
-        
+
         if not isinstance(atlases_conf_path, pathlib.Path) or not atlases_conf_path.exists():
             conf = self.getBrainGlobeConfiguration(conf_path)
             if conf:
                 atlases_conf_path = pathlib.Path(os.path.join(conf["default_dirs"]["brainglobe_dir"], "last_versions.conf"))
-        
+
         if not isinstance(atlases_conf_path, pathlib.Path) or not atlases_conf_path.exists():
             scipywarn(f"File {atlases_conf_path} does not exist; please install atlases locally, first")
             # scipywarn(f"File {atlases_conf_path} does not exist; a copy from the remote GIN site will now be downloaded. You will need to call getAtlasesConfiguration method again")
@@ -978,12 +1249,12 @@ class BrainAtlasManager(QtCore.QObject):
         else:
             self._current_atlases_versions_ = self._parseLocalAtlasesConf(atlases_conf_path)
             return self._current_atlases_versions_
-        
+
     def _parseLocalAtlasesConf(self, atlases_conf_path) -> dict:
         atlases_conf = configparser.ConfigParser()
         with open(atlases_conf_path) as atlases_conf_file:
             atlases_conf.read_file(atlases_conf_file)
-            
+
         if atlases_conf.has_section("atlases"):
             # self._current_atlases_versions_ = dict(sorted(((k,v) for k,v in atlases_conf["atlases"].items()), key=lambda x: x[0]))
             return dict(sorted(((k,v) for k,v in atlases_conf["atlases"].items()), key=lambda x: x[0]))
@@ -992,16 +1263,16 @@ class BrainAtlasManager(QtCore.QObject):
             scipywarn(f"Invalid atlases configuration file {atlases_conf_path}")
             return dict()
             # return False
-            
+
     def getRemoteAtlasesConfiguration(self, file_path:typing.Optional[pathlib.Path]=None):
         r"""Updates the atlas configuration file containing atlas names and versions.
-        
+
         This information is downloaded from the BrainGlobe GIN repository
-        
+
         https://gin.g-node.org/brainglobe/atlases/raw/master/last_versions.conf
-        
+
         and saved to the local "conf" file (by default this is $HOME/.brainglobe/last_versions.conf)
-        
+
         Optionally, a different destination can be specified using the 'file_path'
         parameter, but the manager will use the default one (specified above)
         for all other operations.
@@ -1032,7 +1303,7 @@ class BrainAtlasManager(QtCore.QObject):
         The temporary file is removed after the comparison.
 
         CAUTION: this relies on a good connection to the remote gin node.
-        
+
         """
         if not self.hasBrainGlobeAtlasAPI():
             return
@@ -1040,98 +1311,98 @@ class BrainAtlasManager(QtCore.QObject):
         self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
         self.netMan.sig_resultReady[object].connect(self._slot_lastVersionsConfTempDownloaded)
         self.netMan.getUrl(url, destination="temp", replyHandler = None)
-    
+
     @Slot(object)
     def _slot_lastVersionsConfTempDownloaded(self, o:typing.Union[str, pathlib.Path, QtCore.QFile]):
         if isinstance(o, str):
             target = pathlib.Path(o)
-            
+
         elif isinstance(o, pathlib.Path):
             target = o
-            
+
         elif isinstance(o, QtCore.QFile):
             target = pathlib.Path(o.fileName())
-            
+
         else:
             raise TypeError(f"In {self.__class__.__name__}._slot_lastVersionsConfDownloaded: expecting a str, a pathlib.Path, or a QtCore.QFile; instead, got {type(o).__name__}")
 
         atlasConf = self.getAtlasesConfiguration()
         # print(f"atlasConf = {atlasConf}")
-        
+
         tempRemoteConf = self._parseLocalAtlasesConf(target)
         # print(f"tempRemoteConf = {tempRemoteConf}")
-        
+
         self._current_atlases_versions_updated_ = atlasConf == tempRemoteConf
-        
+
         if isinstance(o, QtCore.QFile):
             o.remove()
-        
+
         self._slot_reportLocalDBUpdated()
-            
+
     @Slot()
     def _slot_reportLocalDBUpdated(self):
         from gui.workspacegui import GuiMessages
         if not self._current_atlases_versions_updated_:
             scipywarn("Atlas versions database needs updating. To update, call 'getRemoteAtlasesConfiguration()'")
             ret = GuiMessages.questionMessage_static(self.scipyenWindow,
-                                                  f"{self.__class__.__name__}", 
+                                                  f"{self.__class__.__name__}",
                                                   f"Local database needs updating.\nDo you wish to download it?")
-            
+
             if ret == QtWidgets.QMessageBox.Yes:
                 self.getRemoteAtlasesConfiguration()
         else:
-            GuiMessages.informationMessage_static(self.scipyenWindow, 
-                                                  f"{self.__class__.__name__}", 
+            GuiMessages.informationMessage_static(self.scipyenWindow,
+                                                  f"{self.__class__.__name__}",
                                                   "Local atlases database is up to date")
-            
+
     @Slot(object)
     def _slot_lastVersionsConfDownloaded(self, o:typing.Union[str, pathlib.Path]):
         from gui.workspacegui import GuiMessages
         if isinstance(o, str):
             target = pathlib.Path(o)
-            
+
         elif isinstance(o, pathlib.Path):
             target = o
         else:
             raise TypeError(f"In {self.__class__.__name__}._slot_lastVersionsConfDownloaded: expecting a str or a pathlib.Path; indteag, got {type(o).__name__}")
-    
+
         print(print_styled(f"Latest atlas versions information was downloaded to {target.as_posix()}.", "green", True))
-        GuiMessages.informationMessage_static(self.scipyenWindow, 
-                                                f"{self.__class__.__name__}", 
+        GuiMessages.informationMessage_static(self.scipyenWindow,
+                                                f"{self.__class__.__name__}",
                                                 f"Latest atlas versions information was downloaded to {target.as_posix()}.")
-        
+
         self._current_atlases_versions_updated_ = True
-        
+
     def getArchiveNameForAtlas(self, entryName:typing.Optional[str]=None) -> str | None:
         atlasPath = self.atlasDir(entryName)
         if isinstance(atlasPath, pathlib.Path):
             return atlasPath.name + ".tar.gz"
-        
+
     @property
     def localAtlasRepository(self) -> pathlib.Path:
         r"""The local directory where atlases are stored.
         WARNING: The path may not exist in your file system!
         """
         return pathlib.Path(self.getBrainGlobeConfiguration()["default_dirs"]["brainglobe_dir"])
-    
+
     @property
     def localDownloadDirectory(self) -> pathlib.Path:
         r"""The local directory where temporary atlas archives are downloaded.
         WARNING: The path may not exist in your file system!
         """
         return self.getBrainGlobeConfiguration()["default_dirs"]["interm_download_dir"]
-        
+
     def atlasDir(self, entryName:typing.Optional[str]=None) -> pathlib.Path | None:
         r"""Get the local atlas directory for a given atlas name.
-        WARNING: The returned pathlib Path may NOT exist; this needs to be 
+        WARNING: The returned pathlib Path may NOT exist; this needs to be
         verified by the caller of this method!
         """
-        from gui.itemslistdialog import ItemsListDialog
+        # from gui.itemslistdialog import ItemsListDialog
         if not self.hasBrainGlobeAtlasAPI():
             return
 
         atlasConf = self.getAtlasesConfiguration()
-        
+
         if entryName not in atlasConf:
             if isinstance(entryName, str):
                 keys = list(map(lambda x: entryName in x, atlasConf.keys()))
@@ -1141,113 +1412,113 @@ class BrainAtlasManager(QtCore.QObject):
                     entryName = self.selectAtlasName(keys)
                 else:
                     entryName = keys[0]
-                    
+
             if entryName is None:
                 entryName = self.selectAtlasName()
                 if entryName is None:
                     return
-        
+
         name = f"{entryName}_v{atlasConf[entryName]}"
 
         return self.localAtlasRepository / name
-        
-    
+
+
     def atlasIsUpdated(self, atlasName:typing.Optional[str] = None) -> bool:
         r"""
         Returns False if:
         • a local copy of the named atlas does NOT have the latest version available.
         • there is no local copy of the named atlas
-        
+
         Raised an error if there is no atlas with that name available anywhere
-        
+
         NOTE: The latest version available is the one cached in the local brainglobe
         database. You may want to update it first, by calling getRemoteAtlasesConfiguration().
-        
+
         """
         if not self.hasBrainGlobeAtlasAPI():
             return False
-        
+
         a = atlasName if isinstance(atlasName, str) else None
-        
+
         allAtlases = self.getAtlasesConfiguration()
         localAtlases = self.localAtlases
         if atlasName not in self.atlasNames:
             atlasName = self.selectAtlasName(list(allAtlases.keys()))
-            
+
         if atlasName is None:
             if isinstance(a, str):
                 raise ValueError(f"No atlas named '{a}' was found")
             else:
                 raise ValueError(f"No atlas is available")
-        
+
         if atlasName not in localAtlases:
             return False
-            
+
         remoteVersion = atlas_version_str2tuple(allAtlases[localName])
         localVersion = localAtlases[atlasName]
-        
+
         return atlas_vercomp(remoteVersion, localVersion)
-        
-    def getLocalAtlasVersion(self, n:typing.Optional[str]=None, 
+
+    def getLocalAtlasVersion(self, n:typing.Optional[str]=None,
                               asString:bool=True) -> str | list | None:
         r"""Returs the versions of the locally installed atlas data.
         This information is derived from the directory name(s) for the
         downloaded atlas data, in the local atlas repository.
-        
+
         ATTENTION: This version, derived as above, may be different from the version
         advertised in the local atlases configuration file (assuming it is uptodate),
         indicating that an update of atlas data may be necessary.
-    
+
         The local atlas repository is located in $HOME/.brainglobe.
-    
+
         """
         from gui.workspacegui import GuiMessages
         if not self.hasBrainGlobeAtlasAPI():
             return
-        
+
         p = self.localAtlasRepository
-        
+
         if not isinstance(n, str) or len(n.strip()) == 0:
             n = self.selectAtlasName()
-            
+
         elif n not in self.atlasNames:
             n = self.selectAtlasName(n)
 
         dirs = sorted(p.glob(f"*{n}*"))
-        
+
         if len(dirs) > 0:
             vStrings = list(map(lambda x: x.name[len(n):].strip("_v"), dirs))
             if len(vStrings) == 1:
                 return vStrings[0] if asString else atlas_version_str2tuple(vString[0])
             return vStrings if asString else list(map(atlas_version_str2tuple, vStrings))
-        
+
         else:
             scipywarn(f"No local atlas named, or with name containing '{n}' was found")
-            GuiMessages.informationMessage_static(self.scipyenWindow, 
+            GuiMessages.informationMessage_static(self.scipyenWindow,
                                                   f"{self.__class__.__name__}",
                                                   f"No local atlas named, or with name containing '{n}' was found")
-            
-    def getRemoteAtlasVersion(self, n:typing.Optional[str]=None, 
+
+    def getRemoteAtlasVersion(self, n:typing.Optional[str]=None,
                               asString:bool=True) -> str |None:
         r"""Returns the version of the atlas data using the atlases configuration file.
-        
+
         Uses the local atlases configuration file, assumed to to be uptodate.
-        
+
         """
         if not self.hasBrainGlobeAtlasAPI():
             return
-            
+
         if not isinstance(n, str) or len(n.strip()) == 0:
             n = self.selectAtlasName()
-            
+
         elif n not in self.atlasNames:
             n = self.selectAtlasName(n)
-            
+
         return self.atlases[n] if asString else atlas_version_str2tuple(self.atlases[n])
-        
+
 # ### BEGIN ---- module-level functions
-        
-def get_atlas_structure(name:str, atlas:BrainGlobeAtlas, 
+
+def get_atlas_structure(name:str, atlas:BrainGlobeAtlas,
                         acro:bool=False,
                         cutoff = 0.5,
                         maxfound = 10,
@@ -1256,41 +1527,41 @@ def get_atlas_structure(name:str, atlas:BrainGlobeAtlas,
 
     The function tries to match the brain region name given in 'name' parameter
     to the 'name' or 'acronym' attribute of the structures in the atlas — depending
-    in the value of the 'acro' parameters. 
+    in the value of the 'acro' parameters.
 
-    Matching is performed by difflib.get_close_matches. When matches are found, 
+    Matching is performed by difflib.get_close_matches. When matches are found,
     the "best" matching structure is returned.
-    
+
 
     Parameters:
     ===========
-    name:   common name of the brain region. Case sensitive (sometimes)¹ 
-    
+    name:   common name of the brain region. Case sensitive (sometimes)¹
+
     atlas:  a brainglobe_atlasapi.BrainGlobeAtlas instance
-    
+
     acro:   flag indicating is the search for matches will take place primarily
             on stucture acronyms (True) or names (False)
             Default: False, meaning that the function will first try to match
             'name' against the structure names, then (and only if no matches are
             found) against the structure acronyms in the atlas.
-    
+
     cutoff: the 'cutoff' parameter for the 'difflib.get_close_matches' function.
             default (here) is 0.5
-    
-    maxfound:the maximum number of matches to be returned (passed directly to 
+
+    maxfound:the maximum number of matches to be returned (passed directly to
             difflib.get_close_matches function).
             Default is 10
-    
+
     See also: difflib.get_close_matches in Python standard library
-    
-    WARNING: This may yield surprising results, so it is best avoid ambiguities 
-        in the 'name' parameter. 
-    
+
+    WARNING: This may yield surprising results, so it is best avoid ambiguities
+        in the 'name' parameter.
+
     ¹Case sensitivity does not always work as you may think, see examples below.
 
-    Some examples using the Waxholm Space Atlas of the Sprague Dawley Rat Brain 
+    Some examples using the Waxholm Space Atlas of the Sprague Dawley Rat Brain
     (https://www.nitrc.org/projects/whs-sd-atlas):
-    
+
     'name'                          best guess structure:
                                     name                        acronym
     --------------------------------------------------------------------
@@ -1301,7 +1572,7 @@ def get_atlas_structure(name:str, atlas:BrainGlobeAtlas,
     Hippocampal                     Hippocampal region          HR
     hippocampal                     Hippocampal region          HR
     CA1                             Cornu ammonis 1             CA1
-    ca1                             anterior commissure, 
+    ca1                             anterior commissure,
                                     anterior limb               aca     !
     accum                           Tectum                      Tc      !
     accumb                          Nucleus accumbens           NAc
@@ -1311,7 +1582,7 @@ def get_atlas_structure(name:str, atlas:BrainGlobeAtlas,
     shell                           Lateral lemniscus           ll      !
     accumbens shell                 Nucleus accumbens, shell    NAc-sh
     accumbens, shell                Nucleus accumbens, shell    NAc-sh
-    
+
 
     """
     # import editdistance
@@ -1319,60 +1590,60 @@ def get_atlas_structure(name:str, atlas:BrainGlobeAtlas,
     if not hasBrainGlobeAtlasAPI:
         scipywarn("The 'brainglobe_atlasapi' package is not installed")
         return
-    
+
     if not isinstance(name, str):
         raise TypeError(f"Expecting a str; got {type(name).__name__} instead")
-    
+
     if len(name.strip()) == 0:
         raise ValueError("Expecting a non-empty string")
-    
+
     # structures, snames, sacronyms, sids = zip(*[(s, s["name"], s["acronym"], s["id"]) for s in atlas.structures_list])
     structures, snames, sacronyms = zip(*[(s, s["name"], s["acronym"]) for s in atlas.structures_list])
-    
+
     # first, check against the primary (the "primary" being sacronyms if acro,
-    # else snames) 
+    # else snames)
     sss = sacronyms if acro else snames
     matches = list(map(lambda x: structures[x], map(lambda x: sss.index(x), difflib.get_close_matches(name, sss, 10, 0.5))))
-    
+
     if len(matches) == 0:
         # nothing found => check against the secondary (the "secondary" being
         # the one left out above, i.e., snames if acro else sacronyms)
         sss = snames if acro else sacronyms
         matches = list(map(lambda x: structures[x], map(lambda x: sss.index(x), difflib.get_close_matches(name, sss, 10, 0.5))))
-    
+
     # finally, get the best match (if any found) and augment with atlas name
     # return None when nothing was found
     if len(matches):
         ret = atlas.structures[matches[0]["id"]]
         ret["atlasName"] = atlas.atlas_name
         return ret
-    
+
 def atlas_vercomp(x:str, y:typing.Union[str, typing.Tuple[str]]) -> bool:
     r"""Compares remote atlas versions tring (x) to local atlas version (str, or tuple[str]).
     NOTE: Unlike the equivalent code in brainglobe_atlasapi, this allows to existence,
     locally, of more than one version of the atlas...
     """
     return atlas_version_str2tuple(x) == atlas_version_str2tuple(y) if isinstance(y, str) else atlas_version_str2tuple(x) in tuple(map(lambda v: atlas_version_str2tuple(v), y)) if isinstance(y, tuple) else False
-    
+
 def atlas_dirname2name_version(n:str) -> tuple:
     r"""Breaks up atlas directory name into atlas name and version.
-    
+
        A 'canonical' atlas name is of the form:
-        
+
         name = <identifier>_{<identifier>_}*<resolution>um
-        
+
         identifier = [a-zA-Z0-9]
-        
+
         In addition, an atlas directory name has the version apended:
-    
+
         dirname = <name>_v<maj.min>
         maj = [0-9]+
         min = [0-9]+
-    
+
     Returns:
     --------
     A tuple[str]: (name, version)
-    
+
     """
     return n.split("_v")
 
@@ -1394,38 +1665,38 @@ def atlas_version_tuple2str(t:tuple[int])-> str | None:
 
 def atlas_name2components(n:str) -> str | tuple:
     r"""Breaks up an atlas name (`n`) into its identifier and resolution.
-    
+
        A 'canonical' atlas name is of the form:
-        
+
         name = <identifier>_{<identifier>_}*<resolution>um
-        
+
         identifier = [a-zA-Z0-9]
-        
+
     NOTE: atlas version is NOT contained in the atlas name
     """
     # 1. break apart
     parts = n.split("_")
     if len(parts) == 1:
         parts = n.split(" ")
-        
+
         if len(parts) == 1:
             return parts[0]
-        
+
     # 2. locate the resolution
     resolution = list(filter(lambda x: x[1].endswith("um"), enumerate(parts)))
     if len(resolution) == 0:
         return n # no resolution found, return the full name
-    
+
     ndx = resolution[0][0]
     parts.pop(ndx)
     resolutionString = resolution[0][1]
     resolution = float(resolutionString.strip("um"))
-    
+
     # version = list(filter(lambda x: x[1].startswith("v"), enumerate(parts)))
     # if len
-    
+
     return "_".join(parts), resolutionString, resolution
-        
+
 # ### END ---- module-level functions
 
-    
+
