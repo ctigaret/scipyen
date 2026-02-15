@@ -1087,7 +1087,7 @@ class AboutDialog(QtWidgets.QDialog, __UI_AboutLicense__):
 class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
-    _instance = None
+    _instance = None # NOTE: Singleton design pattern
     workspaceChanged = Signal()
     startPluginLoad = Signal()
     sig_refreshRecentFilesMenu = Signal()
@@ -1124,7 +1124,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     _defaultUseNativeMenuBar:bool = True
 
-    _instance = None # NOTE: Singleton design pattern
+    # _instance = None # NOTE: Singleton design pattern
 
     @classmethod
     def _walk_mro(cls) -> typing.Generator[typing.Self, None, None]:

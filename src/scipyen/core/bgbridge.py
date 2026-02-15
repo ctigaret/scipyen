@@ -69,8 +69,6 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-
-
 if os.environ["QT_API"] == "pyside6":
     import PySide6
     import qtpy
@@ -101,6 +99,7 @@ from iolib import network
 
 DEFAULT_RAT_BRAIN_ATLAS = "whs_sd_rat_39um"
 DEFAULT_MOUSE_BRAIN_ATLAS = "allen_mouse_50um"
+DEFAULT_SPECIES = "Rattus norvegicus"
 
 class Structure(collections.UserDict):
     r"""Shim class that will be overwritten below if brainglobe packages are installed"""
@@ -212,7 +211,7 @@ class BGStructureDescriptor:
 class BrainAtlasManager(QtCore.QObject):
     r"""Access for brainglobe atlasapi, with non UI blocking network operations.
     """
-    # _instance = None
+    _instance = None
     # def __new__(cls, parent=None):
     #     if cls._instance is None:
     #         cls._instance = super().__new__(cls)
@@ -230,8 +229,7 @@ class BrainAtlasManager(QtCore.QObject):
     default_atlas_name =  'whs_sd_rat_39um'
     default_species = "Rattus norvegicus"
 
-    def __init__(self, maxFileSystemFraction:typing.Optional[float] = None,
-                 parent=None):
+    def __init__(self, parent=None):
         r"""Parameters:
         maxFileSystemFraction: float in the interval [0.1 ⋯ 0.9]
             The maximum file system size available for downloading an extracting
@@ -266,24 +264,62 @@ class BrainAtlasManager(QtCore.QObject):
         self.progressDlg = None
         # self.scipyenWindow = None
         self.loopControl = {"break":False}
-        self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
+        self._netMan_ = None
         self._current_atlases_versions_ = None # cache this
         self._current_atlases_versions_updated_ = True
-        if isinstance(maxFileSystemFraction, float) and maxFileSystemFraction >= 0.1 and maxFileSystemFraction <= 0.9:
-            self._maxFreeSpaceFraction_ = maxFileSystemFraction
-        else:
-            self._maxFreeSpaceFraction_ = self.default_free_space_fraction_allowed
+        self._maxFreeSpaceFraction_ = self.default_free_space_fraction_allowed
 
-        self.scipyenWindow = wf.getMainScipyenWindow()
+        # self.scipyenWindow = wf.getMainScipyenWindow()
+
+        # NOTE: singleton design pattern
+        # see traitlets.config.SingletonConfigurable
+        self.__class__._instance = self
+
+    @classmethod
+    def _walk_mro(cls) -> typing.Generator[typing.Self, None, None]:
+        r"""Walk the cls.mro() for parent classes that are also singletons
+
+        For use in instance()
+        """
+        # NOTE: Singleton design pattern
+        # NOTE: 2025-01-07 12:42:39
+        # see traitlets.config.SingletonConfigurable
+        for subclass in cls.mro():
+            if (
+                issubclass(cls, subclass)
+                and issubclass(subclass, typing.Self)
+                # and issubclass(subclass, SMW)
+                # and subclass != SMW
+                and subclass != typing.Self
+            ):
+                yield subclass
+
+    @classmethod
+    def initialized(cls:typing.Self) -> bool:
+        # NOTE: Singleton design pattern
+        return hasattr(cls, "_instance" and isinstance(cls._instance, cls))
+
+    @classmethod
+    def instance(cls: typing.Self, *args, **kwargs) -> typing.Self:
+        if cls._instance is None:
+            inst = cls(*args, **kwargs)
+            for subclass in cls._walk_mro():
+                subclass._instance = inst
+        if hasattr(cls, "_instance") and isinstance(cls._instance, cls):
+            return cls._instance
+        else:
+            raise RuntimeError(f"Incompatible sibling of '{cls.__name__}' is already instantiated as singleton: {type(cls._instance).__name__}")
+
 
     @classmethod
     def hasBrainGlobeAtlasAPI(self)->bool:
         from gui.workspacegui import GuiMessages
         if not hasBrainGlobeAtlasAPI:
+            scipyenWindow = wf.getMainScipyenWindow()
             scipywarn("The 'brainglobe_atlasapi' package is not installed")
-            GuiMessages.informationMessage_static(self.scipyenWindow,
-                                                  f"{self.__class__.__name__}",
-                                                  f"Please install brainglobe_atlasapi package.")
+            GuiMessages.informationMessage_static(scipyenWindow,
+                                                  title = f"{self.__class__.__name__}",
+                                                  text = f"Please install brainglobe_atlasapi package.")
             return False
 
         return True
@@ -378,12 +414,14 @@ class BrainAtlasManager(QtCore.QObject):
     def initAtlasForSpecies(self: typing.Self,
                             taxon:typing.Union[str, taxonbridge.Taxon],
                             atlasName:typing.Optional[str]=None,
+                            interactive: bool = True,
                             localOnly: bool = True) -> typing.Optional[
                                 typing.Union[
                                     BrainGlobeAtlas,
                                     typing.Sequence[BrainGlobeAtlas]
                                     ]
                                 ]:
+        # print(f"{self.__class__.__name__}.initAtlasForSpecies({taxon})")
         if not self.hasBrainGlobeAtlasAPI():
             scipywarn("brainglobe is not installed")
             return
@@ -425,11 +463,33 @@ class BrainAtlasManager(QtCore.QObject):
                     if len(atlases) == 1:
                         return atlases[0]
                     else:
-                        chosen_atlas_name = self.selectAtlasName(list(map(lambda a: a.atlas_name, atlases)))
-                        if chosen_atlas_name:
-                            return BrainGlobeAtlas(chosen_atlas_name, check_latest = False)
+                        if interactive:
+                            chosen_atlas_name = self.selectAtlasName(
+                                list(
+                                    map(
+                                        lambda a: a.atlas_name,
+                                        atlases
+                                        )
+                                    ),
+                                localOnly = localOnly,
+                                )
+                        else:
+                            atlas_names_for_species = list(
+                                    map(
+                                        lambda a: a.atlas_name,
+                                        atlases
+                                        )
+                                    )
+                            if self.default_atlas_name in atlas_names_for_species:
+                                chosen_atlas_name = self.default_atlas_name
 
-            if taxon in [s.lower() for s in taxonbridge.supported_species] + ["mouse", "mice", "rat", "rats"]:
+                        if chosen_atlas_name:
+                            return BrainGlobeAtlas(chosen_atlas_name,
+                                                   check_latest = False)
+
+            if taxon in [
+                s.lower() for s in taxonbridge.supported_species
+                ] + ["mouse", "mice", "rat", "rats"]:
                 if taxonbridge.hasTaxoniq:
                     taxonObj = taxonbridge.get_taxon(taxon)
 
@@ -450,7 +510,12 @@ class BrainAtlasManager(QtCore.QObject):
         else:
             raise TypeError(f"'taxon' expected to be Taxon or a str; instead got a {type(taxon).__name__}")
 
-        if any(species.lower().startswith(a) or species.lower().endswith(a) for a in ("rat", "rats")):
+        if (
+            any(
+                species.lower().startswith(a)
+                or species.lower().endswith(a) for a in ("rat", "rats")
+                )
+            ):
             species = "rat"
 
         elif any(species.lower().startswith(a) or species.lower().endswith(a) for a in ("mus", "mouse", "mice")):
@@ -485,13 +550,24 @@ class BrainAtlasManager(QtCore.QObject):
 
         else:
             if len(atlas_names_for_species) > 1:
-                chosen_atlas = self.selectAtlasName(atlas_names_for_species, retNone=True)
+                if interactive:
+                    chosen_atlas = self.selectAtlasName(atlas_names_for_species,
+                                                        localOnly=localOnly,
+                                                        retNone=True)
+                else:
+                    if self.default_atlas_name in atlas_names_for_species:
+                        chosen_atlas = self.default_atlas_name
+                    else:
+                        chosen_atlas = atlas_names_for_species[0]
 
             elif len(atlas_names_for_species) == 1:
                 chosen_atlas = atlas_names_for_species[0]
 
             else:
-                chosen_atlas = self.selectAtlasName(species, retNone=True)
+                if interactive:
+                    chosen_atlas = self.selectAtlasName(species,
+                                                        localOnly=localOnly,
+                                                        retNone=True)
 
         ret = ""
 
@@ -520,7 +596,9 @@ class BrainAtlasManager(QtCore.QObject):
         else:
             ret = chosen_atlas
 
-        return self.initAtlas(ret)
+        self._current_atlas_ = BrainGlobeAtlas(ret, check_latest=False)
+
+        return self._current_atlas_
 
     def _parse_size(self, s:str) -> int:
         r"""Parses the archive size from the HTML file for a given atlas archive.
@@ -612,23 +690,24 @@ class BrainAtlasManager(QtCore.QObject):
         url = self.remoteUrlBase.format(archiveName)
 
         url1 = url.replace("raw", "src")
-
-        self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
-        self.netMan.sig_networkError[object].connect(self._slot_networkError)
-        self.netMan.sig_resultReady[object].connect(self._slot_extractAtlasArchive)
-        self.netMan.sig_finished.connect(self.slot_networkOperationFinished)
+        if not self._netMan_:
+            self._netMan_ = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
+        self._netMan_.sig_networkError[object].connect(self._slot_networkError)
+        self._netMan_.sig_resultReady[object].connect(self._slot_extractAtlasArchive)
+        self._netMan_.sig_finished.connect(self.slot_networkOperationFinished)
 
         handle = functools.partial(self._getArchiveSizeAndDownload,
                                    targetDir = self.localDownloadDirectory,
                                    url = url)
 
-        self.netMan.getUrl(url1, destination=None, replyHandler=handle)
+        self._netMan_.getUrl(url1, destination=None, replyHandler=handle)
 
     @Slot(object)
     def _slot_networkError(self, url_msg:tuple[str]):
         from gui.workspacegui import GuiMessages
+        scipyenWindow = wf.getMainScipyenWindow()
         print(f"{self.__class__.__name__}._slot_networkError: url_msg = {url_msg}")
-        GuiMessages.criticalMessage_static(self.scipyenWindow,
+        GuiMessages.criticalMessage_static(scipyenWindow,
                                            f"{self.__class__.__name__}",
                                            f"Error from {url_msg[0]}:\n{url_msg[1]}")
 
@@ -681,6 +760,7 @@ class BrainAtlasManager(QtCore.QObject):
                   # download: bool = False,
                   ) -> BrainGlobeAtlas | None:
         from gui.workspacegui import GuiMessages
+        # print(f"{self.__class__.__name__}.initAtlas({name})")
         if not self.hasBrainGlobeAtlasAPI():
             scipywarn("BraingGlobe is not installed; brain atlases are not available")
             return
@@ -689,6 +769,15 @@ class BrainAtlasManager(QtCore.QObject):
             atlasNames = self.localAtlasNames
         else:
             atlasNames = self.atlasNames
+
+        if isinstance(name, str) and len(name):
+            try:
+                return self.initAtlasForSpecies(name,
+                                                interactive=interactive,
+                                                localOnly=localOnly)
+            except:
+                traceback.print_exc()
+                # pass
 
         if (
             name is None
@@ -699,7 +788,9 @@ class BrainAtlasManager(QtCore.QObject):
                     )
                 )
             ):
-            name = self.selectAtlasName()
+
+            name = self.selectAtlasName(localOnly = localOnly)
+
             if name is None:
                 return
                 # name = self.default_atlas_name
@@ -709,11 +800,11 @@ class BrainAtlasManager(QtCore.QObject):
                 GuiMessages.informationMessage(
                     title = f"Atlas {name}:",
                     text  = "\n".join(
-            [
-                f"Atlas {name} must be installed manually.",
-                "Open a terminal, run 'scipyact' to acivate Scipyen's environment,"
-                f"then run 'brainglobe install -a {name}' to install the atlas"
-            ]
+    [
+        f"Atlas {name} must be installed manually.",
+        "Open a terminal, run 'scipyact' to activate Scipyen's environment,"
+        f"then run 'brainglobe install -a {name}' to install the atlas"
+    ]
                         )
                     )
             return
@@ -758,9 +849,11 @@ class BrainAtlasManager(QtCore.QObject):
 
     def checkAtlasGINStatus(self):
         url = QtCore.QUrl("https://gin.g-node.org/")
-        self.netMan.sig_resultReady[object].connect(self._slot_checkGINReady)
-        self.netMan.sig_finished.connect(self.slot_networkOperationFinished)
-        self.netMan.checkUrl(url)
+        if not self._netMan_:
+            self._netMan_ = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
+        self._netMan_.sig_resultReady[object].connect(self._slot_checkGINReady)
+        self._netMan_.sig_finished.connect(self.slot_networkOperationFinished)
+        self._netMan_.checkUrl(url)
 
     def getRemoteAtlasArchiveFileSizes(self): # TODO
         atlasesConf = self.getAtlasesConfiguration()
@@ -775,16 +868,16 @@ class BrainAtlasManager(QtCore.QObject):
 
     @Slot(object)
     def _slot_checkGINReady(self, result):
-        errorMsg = self.netMan.networkErorName
+        errorMsg = self._netMan_.networkErorName
         scipywarn(f"Got {errorMsg} from {result[1]}" )
-        if self.netMan.receivers(self.netMan.sig_resultReady) > 0:
-            self.netMan.sig_resultReady.disconnect()
+        if self._netMan_.receivers(self._netMan_.sig_resultReady) > 0:
+            self._netMan_.sig_resultReady.disconnect()
 
     @Slot()
     def cancelDownload(self):
         try:
-            self.netMan.networkReply.abort()
-            self.netMan.networkReply.close()
+            self._netMan_.networkReply.abort()
+            self._netMan_.networkReply.close()
         except:
             traceback.print_exc()
 
@@ -804,7 +897,8 @@ class BrainAtlasManager(QtCore.QObject):
         if "console" in frame_records[1].frame.f_globals:
             dlgParent = frame_records[1].frame.f_globals["console"]
         else:
-            dlgParent = self.scipyenWindow
+            scipyenWindow = wf.getMainScipyenWindow()
+            dlgParent = scipyenWindow
 
         if not self.hasBrainGlobeAtlasAPI():
             return
@@ -832,21 +926,22 @@ class BrainAtlasManager(QtCore.QObject):
 
         url1 = url.replace("raw", "src")
 
-        self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
-        self.netMan.sig_resultReady[object].connect(self._slot_extractAtlasArchive)
+        if not self._netMan_:
+            self._netMan_ = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
+        self._netMan_.sig_resultReady[object].connect(self._slot_extractAtlasArchive)
 
         handle = functools.partial(self._getArchiveSizeAndDownload,
                                    targetDir = self.localDownloadDirectory,
                                    url = url)
 
-        self.netMan.getUrl(url1, destination=None, replyHandler=handle)
+        self._netMan_.getUrl(url1, destination=None, replyHandler=handle)
 
 
     @Slot()
     def slot_networkOperationFinished(self):
-        if isinstance(self.netMan, network.ScipyenNetworkManager):
-            color = "yellow" if self.netMan.networkError else "green"
-            print(print_styled(f"{self.__class__.__name__} network operation finished with {self.netMan.networkErrorName}", color, True))
+        if isinstance(self._netMan_, network.ScipyenNetworkManager):
+            color = "yellow" if self._netMan_.networkError else "green"
+            print(print_styled(f"{self.__class__.__name__} network operation finished with {self._netMan_.networkErrorName}", color, True))
 
     def selectAtlasName(
         self: typing.Self,
@@ -915,8 +1010,9 @@ class BrainAtlasManager(QtCore.QObject):
         self.default_atlas_name if self.default_atlas_name in names else None
         )
 
+        scipyenWindow = wf.getMainScipyenWindow()
         if dlgParent is None:
-            dlgParent = self.scipyenWindow
+            dlgParent = scipyenWindow
 
         dlg = ItemsListDialog(parent = dlgParent, itemsList = names,
                                 title = dlgTitle, preSelected = preSelected)
@@ -1036,6 +1132,18 @@ class BrainAtlasManager(QtCore.QObject):
     @property
     def localAtlasVersions(self) -> list:
         return list(self.localAtlases.values())
+
+    @property
+    def maxFileSystemFraction(self: typing.Self) -> float:
+        return self._maxFreeSpaceFraction_
+
+    @maxFileSystemFraction.setter
+    def maxFileSystemFraction(self: typing.Self, val: float):
+        if isinstance(val, float) and maxFileSystemFraction >= 0.1 and val <= 0.9:
+            self._maxFreeSpaceFraction_ = val
+        else:
+            self._maxFreeSpaceFraction_ = self.default_free_space_fraction_allowed
+
 
     @property
     def atlases(self) -> dict:
@@ -1289,9 +1397,10 @@ class BrainAtlasManager(QtCore.QObject):
                 file_path = os.path.join(conf["default_dirs"]["brainglobe_dir"], "last_versions.conf")
 
         url = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("last_versions.conf")
-        self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar, timeout_ms=120000)
-        self.netMan.sig_resultReady[object].connect(self._slot_lastVersionsConfDownloaded)
-        self.netMan.getUrl(url, destination=file_path, replyHandler = None)
+        if not self._netMan_:
+            self._netMan_ = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar, timeout_ms=120000)
+        self._netMan_.sig_resultReady[object].connect(self._slot_lastVersionsConfDownloaded)
+        self._netMan_.getUrl(url, destination=file_path, replyHandler = None)
 
     def checkAtlasesConfiguration(self):
         r"""Compares the local atlas configuration file to the remote one.
@@ -1308,9 +1417,10 @@ class BrainAtlasManager(QtCore.QObject):
         if not self.hasBrainGlobeAtlasAPI():
             return
         url = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base.format("last_versions.conf")
-        self.netMan = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
-        self.netMan.sig_resultReady[object].connect(self._slot_lastVersionsConfTempDownloaded)
-        self.netMan.getUrl(url, destination="temp", replyHandler = None)
+        if not self._netMan_:
+            self._netMan_ = network.ScipyenNetworkManager(progressUIFactory = CancellableQProgressBar)
+        self._netMan_.sig_resultReady[object].connect(self._slot_lastVersionsConfTempDownloaded)
+        self._netMan_.getUrl(url, destination="temp", replyHandler = None)
 
     @Slot(object)
     def _slot_lastVersionsConfTempDownloaded(self, o:typing.Union[str, pathlib.Path, QtCore.QFile]):
@@ -1342,22 +1452,24 @@ class BrainAtlasManager(QtCore.QObject):
     @Slot()
     def _slot_reportLocalDBUpdated(self):
         from gui.workspacegui import GuiMessages
+        scipyenWindow = wf.getMainScipyenWindow()
         if not self._current_atlases_versions_updated_:
             scipywarn("Atlas versions database needs updating. To update, call 'getRemoteAtlasesConfiguration()'")
-            ret = GuiMessages.questionMessage_static(self.scipyenWindow,
+            ret = GuiMessages.questionMessage_static(scipyenWindow,
                                                   f"{self.__class__.__name__}",
                                                   f"Local database needs updating.\nDo you wish to download it?")
 
             if ret == QtWidgets.QMessageBox.Yes:
                 self.getRemoteAtlasesConfiguration()
         else:
-            GuiMessages.informationMessage_static(self.scipyenWindow,
+            GuiMessages.informationMessage_static(scipyenWindow,
                                                   f"{self.__class__.__name__}",
                                                   "Local atlases database is up to date")
 
     @Slot(object)
     def _slot_lastVersionsConfDownloaded(self, o:typing.Union[str, pathlib.Path]):
         from gui.workspacegui import GuiMessages
+        scipyenWindow = wf.getMainScipyenWindow()
         if isinstance(o, str):
             target = pathlib.Path(o)
 
@@ -1367,7 +1479,7 @@ class BrainAtlasManager(QtCore.QObject):
             raise TypeError(f"In {self.__class__.__name__}._slot_lastVersionsConfDownloaded: expecting a str or a pathlib.Path; indteag, got {type(o).__name__}")
 
         print(print_styled(f"Latest atlas versions information was downloaded to {target.as_posix()}.", "green", True))
-        GuiMessages.informationMessage_static(self.scipyenWindow,
+        GuiMessages.informationMessage_static(scipyenWindow,
                                                 f"{self.__class__.__name__}",
                                                 f"Latest atlas versions information was downloaded to {target.as_posix()}.")
 
@@ -1473,6 +1585,7 @@ class BrainAtlasManager(QtCore.QObject):
 
         """
         from gui.workspacegui import GuiMessages
+        scipyenWindow = wf.getMainScipyenWindow()
         if not self.hasBrainGlobeAtlasAPI():
             return
 
@@ -1494,7 +1607,7 @@ class BrainAtlasManager(QtCore.QObject):
 
         else:
             scipywarn(f"No local atlas named, or with name containing '{n}' was found")
-            GuiMessages.informationMessage_static(self.scipyenWindow,
+            GuiMessages.informationMessage_static(scipyenWindow,
                                                   f"{self.__class__.__name__}",
                                                   f"No local atlas named, or with name containing '{n}' was found")
 
@@ -1698,5 +1811,10 @@ def atlas_name2components(n:str) -> str | tuple:
     return "_".join(parts), resolutionString, resolution
 
 # ### END ---- module-level functions
+
+manager = BrainAtlasManager()
+
+available_species = manager.getAvailableSpecies()
+
 
 
