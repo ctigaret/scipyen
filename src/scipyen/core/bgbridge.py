@@ -797,7 +797,7 @@ class BrainAtlasManager(QtCore.QObject):
 
         if name not in self.localAtlasNames:
             if interactive:
-                GuiMessages.informationMessage(
+                GuiMessages.informationMessage_static(
                     title = f"Atlas {name}:",
                     text  = "\n".join(
     [
@@ -1063,7 +1063,7 @@ class BrainAtlasManager(QtCore.QObject):
         """
         if self._atlas_ is None:
             if self._atlas_name_to_initialize_ is None:
-                return self.initAtlas()
+                self._atlas_ = self.initAtlas()
                 # scipywarn("No atlas has been initialized yet; please call one of:\n self.initAtlas(…)\n self.initAtlasForSpecies(…)\n self.installAtlas(…)\n")
             else:
                 self._atlas_ = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
@@ -1636,7 +1636,7 @@ def get_atlas_structure(name:str, atlas:BrainGlobeAtlas,
                         cutoff = 0.5,
                         maxfound = 10,
                         ) -> dict | None:
-    r"""Best-guess for n atlas structure corresponding to a named brain region.
+    r"""Best-guess for an atlas structure corresponding to a named brain region.
 
     The function tries to match the brain region name given in 'name' parameter
     to the 'name' or 'acronym' attribute of the structures in the atlas — depending
@@ -1648,22 +1648,27 @@ def get_atlas_structure(name:str, atlas:BrainGlobeAtlas,
 
     Parameters:
     ===========
-    name:   common name of the brain region. Case sensitive (sometimes)¹
 
-    atlas:  a brainglobe_atlasapi.BrainGlobeAtlas instance
+    :name:   common name of the brain region. Case sensitive (sometimes)¹
 
-    acro:   flag indicating is the search for matches will take place primarily
-            on stucture acronyms (True) or names (False)
-            Default: False, meaning that the function will first try to match
-            'name' against the structure names, then (and only if no matches are
-            found) against the structure acronyms in the atlas.
+    :atlas:  a brainglobe_atlasapi.BrainGlobeAtlas instance
 
-    cutoff: the 'cutoff' parameter for the 'difflib.get_close_matches' function.
-            default (here) is 0.5
+    :acro:   flag indicating is the search for matches will take place primarily
+            on structure acronyms (``True``) or names (``False``)
+            Default is ``False``, meaning that the function will first try to
+            match 'name' against the structure names, then (and only if no
+            matches are found) against the structure acronyms in the atlas.
 
-    maxfound:the maximum number of matches to be returned (passed directly to
-            difflib.get_close_matches function).
-            Default is 10
+    :cutoff: the 'cutoff' parameter for the 'difflib.get_close_matches'
+            function; default (here) is 0.5
+
+    :maxfound: the maximum number of matches to be returned (passed directly to
+            difflib.get_close_matches function). Default is 10
+
+    Returns:
+    ========
+
+    A dict or ``None``
 
     See also: difflib.get_close_matches in Python standard library
 
@@ -1673,6 +1678,7 @@ def get_atlas_structure(name:str, atlas:BrainGlobeAtlas,
     ¹Case sensitivity does not always work as you may think, see examples below.
 
     Some examples using the Waxholm Space Atlas of the Sprague Dawley Rat Brain
+        ('whs-sd-atlas')
     (https://www.nitrc.org/projects/whs-sd-atlas):
 
     'name'                          best guess structure:

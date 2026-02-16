@@ -103,6 +103,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
 
             if isinstance(self._atlas_, bgbridge.BrainGlobeAtlas):
                 self._current_atlas_name_ = self._atlas_.atlas_name
+                self._available_structures_ = self._atlas_.structures_list
 
         self._dataVarName = kwargs.pop("varname", "")
         self._dataName = kwargs.pop("name", "")
@@ -197,7 +198,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         self.speciesComboBox.addItems(sorted(self._available_species_))
         ndx = sorted(self._available_species_).index(self.default_species)
         self.speciesComboBox.setCurrentIndex(ndx)
-        self.speciesComboBox.currentTextChanged.connect(self._slot_setSpecies)
+        self.speciesComboBox.currentTextChanged.connect(self._slot_speciesChanged)
 
         self.sexComboBox.setEditable(False)
         self.sexComboBox.addItems(self._available_sex_)
@@ -258,7 +259,15 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             ndx = self._atlas_names_for_current_species_.index(self._current_atlas_name_)
             self.atlasesComboBox.setCurrentIndex(ndx)
 
-        self.atlasesComboBox.currentTextChanged.connect(self._slot_setAtlas)
+        self.atlasesComboBox.currentTextChanged.connect(self._slot_atlasChanged)
+
+        self.structuresComboBox.addItems(
+            list(
+                sorted(
+                    map(lambda s: s["name"], self._atlas_.structures_list)
+                    )
+                )
+        )
 
     def value(self):
         r"""Returns a dict with field values takes from individual children
@@ -355,7 +364,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         # self._age_units = self._age.units
 
     @Slot(str)
-    def _slot_setSpecies(self: typing.Self, val: str):
+    def _slot_speciesChanged(self: typing.Self, val: str):
         # TODO: 2026-02-15 09:42:03
         # choose atlas for species, use interactive modes
         # then populate atlas comboBox
@@ -363,7 +372,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
             return
 
         if val == self._current_species_:
-            # do nothin if species is the same
+            # do nothing if species is the same
             return
 
         signalBlocker = QtCore.QSignalBlocker(self.atlasesComboBox)
@@ -371,36 +380,42 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         if val in self._available_species_:
             # when another species was chose, the list of atlases available for
             # the (new) species must be built, and the atlases combo box re-populated
-            self._current_species_ = val
-            self._atlas_names_for_current_species_ = self._atlas_manager_.getAtlasNamesForSpecies(self._current_species_)
+            # self._current_species_ = val
+            atlas_names_for_current_species = self._atlas_manager_.getAtlasNamesForSpecies(val)
 
-            if len(self._atlas_names_for_current_species_):
-                if self.default_brain_atlas_name in self._atlas_names_for_current_species_:
+            if len(atlas_names_for_current_species):
+                if self.default_brain_atlas_name in atlas_names_for_current_species:
                     self._atlas_ = self._atlas_manager_.initAtlas(self.default_brain_atlas_name, interactive=False)
                 else:
-                    self._atlas_ = self._atlas_manager_.initAtlas(self._atlas_names_for_current_species_, interactive=True)
+                    self._atlas_ = self._atlas_manager_.initAtlas(atlas_names_for_current_species, interactive=True)
 
                 if isinstance(self._atlas_, bgbridge.BrainGlobeAtlas):
+                    self._atlas_names_for_current_species_ = atlas_names_for_current_species
+                    self._current_species_ = val
                     self._current_atlas_name_ = self._atlas_.atlas_name
 
                     self.atlasesComboBox.clear()
                     self.atlasesComboBox.addItems(self._atlas_names_for_current_species_)
-                    if (
-                        isinstance(self._atlas_, bgbridge.BrainGlobeAtlas)
-                        and isinstance(self._current_atlas_name_, str)
-                        and self._current_atlas_name_ in self._atlas_names_for_current_species_
-                        ):
-                        ndx = self._atlas_names_for_current_species_.index(self._current_atlas_name_)
-                        self.atlasesComboBox.setCurrentIndex(ndx)
+                    ndx = self._atlas_names_for_current_species_.index(self._current_atlas_name_)
+                    self.atlasesComboBox.setCurrentIndex(ndx)
 
             else:
-                self.atlasesComboBox.clear() # also consider making it inactive ?
-                self._atlas_ = None
-                self._current_atlas_name_ = None
+                if (
+                    isinstance(self._atlas_, bgbridge.BrainGlobeAtlas)
+                    and isinstance(self._current_atlas_name_, str)
+                    and self._current_atlas_name_ in self._atlas_names_for_current_species_
+                    ):
+                    ndx = self._atlas_names_for_current_species_.index(self._current_atlas_name_)
+                    self.atlasesComboBox.setCurrentIndex(ndx)
 
+                else:
+                    self.atlasesComboBox.clear() # also consider making it inactive ?
+                    self._atlas_ = None
+                    self._current_atlas_name_ = None
+                    self._atlas_names_for_current_species_ = list()
 
     @Slot(str)
-    def _slot_setAtlas(self: typing.Self, val: str):
+    def _slot_atlasChanged(self: typing.Self, val: str):
         # only select from the locally available atlases for the given species;
         # to avid complex (and possibly recurrent) code execution, at any one
         # time:
@@ -414,7 +429,17 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         if not bgbridge.hasBrainGlobeAtlasAPI:
             return
 
-        self._atlas_ = self._atlas_manager_.initAtlas(val)
+        atlas = self._atlas_manager_.initAtlas(val, interactive=False)
+        if atlas.atlas_name == self._atlas_.atlas_name:
+            return
+        signalBlocker = QtCore.QSignalBlocker(self.structuresComboBox)
+        currently_selected_structure_name = self.structuresComboBox.currentText()
+        structure = bgbridge.get_atlas_structure(currently_selected_structure_name,
+                                                 atlas)
+        self._atlas_ = atlas
+        self._current_atlas_name_ = self._atlas_.atlas_name
+        self.structuresComboBox.clear()
+
 
     @Slot(str)
     def _slot_setSex(self, value:str):
