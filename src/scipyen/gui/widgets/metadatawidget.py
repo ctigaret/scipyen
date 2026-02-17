@@ -76,7 +76,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         # scipywarn(print_styled(f"The class {self.__class__.__name__} is deprecated", "yellow"))
         QWidget.__init__(self, parent=parent)
 
-        self._atlas_manager_ = None
+        # self._atlas_manager_ = None
         self._atlas_ = None
         self._current_atlas_name_ = None
         self._available_species_: set = set()
@@ -84,10 +84,10 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         self._atlas_names_for_current_species_: list[str] = list()
 
         if bgbridge.hasBrainGlobeAtlasAPI:
-            self._atlas_manager_ = bgbridge.manager
-            self._available_species_ = bgbridge.available_species
+            self._atlas_manager_ = bgbridge.BrainAtlasManager(parent=self)
+            self._available_species_ = self._atlas_manager_.getAvailableSpecies(localAtlasesOnly=True)
             self._available_species_.add(self.default_species)
-            # bg_available_species_ = self._atlas_manager_.getAvailableSpecies() # use this to populate speciesComboBox
+            # bg_available_species_ = self._atlas_manager_.getAvailableSpecies(localAtlasesOnly=True) # use this to populate speciesComboBox
             #
             # if len(bg_available_species_):
             #     self._available_species_ |= bg_available_species_

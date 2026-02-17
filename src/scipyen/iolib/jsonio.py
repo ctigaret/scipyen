@@ -158,6 +158,7 @@ Decided to stick with Python's own JSON as this provides (non-standard JSON)
 
 import sys, traceback, typing, collections, inspect, types, dataclasses, math
 import datetime, zoneinfo
+import pathlib
 from inspect import _empty
 from dataclasses import MISSING
 import json
@@ -1113,20 +1114,25 @@ def dumps(obj, *args, **kwargs) -> str:
     kwargs["default"] = object2JSON
     return json.dumps(obj, *args, **kwargs)
 
+@singledispatch
 def load(fp, *args, **kwargs) -> typing.Any:
     ret = json.load(fp, *args, **kwargs)
     return json2python(ret)
 
-def loads(s) -> typing.Any:
-    ret = json.loads(s)
-    return json2python(ret)
-
-def load(filename):
+@load.register(str)
+@load.register(pathlib.Path)
+def load(filename:typing.Union[str, pathlib.Path],
+         *args, **kwargs) -> typing.Any:
     with open(filename, mode="rt") as jsonfile:
         s = jsonfile.read()
         ret = loads(s)
 
     return ret
+
+def loads(s) -> typing.Any:
+    ret = json.loads(s)
+    return json2python(ret)
+
 
 def json2python(jsonobj:typing.Union[list, tuple, dict]) -> typing.Any:
     r"""Restores a Python object from it JSON representation.
