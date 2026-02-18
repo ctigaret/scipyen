@@ -162,6 +162,12 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     def _configureUI_(self):
         self.setupUi(self)
 
+        # hide these for now
+        # NOTE: currently, removed from the ui file, for now
+        # for w in (self.organNameLabel, self.organNameLineEdit,
+        #           self.tissueNameLabel, self.tissueNameLineEdit):
+        #     w.setVisible(False)
+
         self.dataVarNameLabel.setText(self._dataVarName)
 
         self.dataNameLineEdit.setClearButtonEnabled(True)
