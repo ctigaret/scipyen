@@ -310,16 +310,19 @@ class CellCompartmentType(TypeEnum):
     nucleolus = 13
 
 class BioSourceType(TypeEnum):
-    exvivo      = 1
-    invitro     = 2
-    insilico    = 4
-    monolayer   = 8     # e.g. "primary" culture = invitro | monolayer = 10
+    undefined   = 0
+    exvivo      = 1     # tissue or organ sample from organism
+    invitro     = 2     # culture system
+    insilico    = 4     # biological/biophysical/mathematical model
+    monolayer   = 8     # e.g. "primary" culture or cell line = invitro | monolayer = 10
+    culture     = invitro | monolayer
     tissue      = 16    # e.g. acute brain slice = exvivo | tissue = 17
                         # e.g. "organotypic" slice culture = invitro | tissue  = 18
+    acute_slice = exvivo | tissue
     assembloid  = 32    # e.g. "organoid" = invitro | assembloid = 34
-
+    organ       = exvivo | assembloid # i.e., 33
+    organoid    = invitro | assembloid # i.e, 34
     invivo      = 64
-
     organism    = 128
 
 class ProcedureType(TypeEnum):
@@ -451,11 +454,12 @@ class Biometrics(ScipyenDataclass):
 
 @dataclass
 class Organism(ScipyenDataclass):
-    taxon:TaxonDescriptor = TaxonDescriptor()
-    subspecies:str = ""
-    strain:str = ""
-    stage:OrganismStage = dataclasses.field(default=OrganismStage.postnatal)
-    biometrics:Biometrics = dataclasses.field(default_factory=Biometrics)
+    taxon: TaxonDescriptor = TaxonDescriptor()
+    subspecies: str = ""
+    strain: str = ""
+    stage: OrganismStage = dataclasses.field(default=OrganismStage.postnatal)
+    biometrics: Biometrics = dataclasses.field(default_factory=Biometrics)
+    ID: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
     def __post_init__(self):
         if isinstance(self.biometrics, Biometrics):
@@ -475,6 +479,14 @@ Tissue = ScipyenDataclass
 
 class Organ():pass # leave here for it to be detected in Kate symbol viewer
 Organ = ScipyenDataclass
+
+class Cell(ScipyenDataclass):
+    type: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g., "neuron", "glia", etc
+    subtype: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
+    ID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+
+    # Cellular compartment, where relevant e.g. "spine", "dendrite", "axon", "soma"
+    cellCompartment:CellCompartment = dataclasses.field(default_factory=CellCompartment)
 
 @dataclass
 class BiologicalSource(ScipyenDataclass):
@@ -516,8 +528,10 @@ class BiologicalSource(ScipyenDataclass):
     #
     #   e.g. TS2_1234567_01_02_22_VisCx_
     #
+    # Think of it as "Sample ID"
+    #
     #   Default: pandas.NA
-    sourceID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    sourceID: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
     # Specific organ structure, if relevant.
     #
@@ -544,20 +558,20 @@ class BiologicalSource(ScipyenDataclass):
     #   source underlying dictionary)
     structure:BGStructureDescriptor = BGStructureDescriptor()
 
-    # Type of cell: string, e.g. "neuron", or pandas NA.
-    cellType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-
-    # Morphological cell variety: string, e.g. "bitufted" or pandas NA.
-    cellSubType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal"
-
-    # Additional cell descriptors: sequence of strings, or NA
-    cellDescriptors:typing.Union[str, type(pd.NA), typing.Sequence[str]] = dataclasses.field(default=pd.NA)
-
-    # Cell identifier - see sourceID for rules
-    cellID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-
-    # Cellular compartment, where relevant e.g. "spine", "dendrite", "axon", "soma"
-    cellCompartment:CellCompartment = dataclasses.field(default_factory=CellCompartment)
+    # # Type of cell: string, e.g. "neuron", or pandas NA.
+    # cellType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    #
+    # # Morphological cell variety: string, e.g. "bitufted" or pandas NA.
+    # cellSubType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal"
+    #
+    # # Additional cell descriptors: sequence of strings, or NA
+    # cellDescriptors:typing.Union[str, type(pd.NA), typing.Sequence[str]] = dataclasses.field(default=pd.NA)
+    #
+    # # Cell identifier - see sourceID for rules
+    # cellID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    #
+    # # Cellular compartment, where relevant e.g. "spine", "dendrite", "axon", "soma"
+    # cellCompartment:CellCompartment = dataclasses.field(default_factory=CellCompartment)
 
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")
