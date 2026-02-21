@@ -298,25 +298,26 @@ class CellCompartmentType(TypeEnum):
     supplemented.
 
     Refers to "gross" compartments; for a more granular types see AxonalCompartment
-    DendriticCompartment ChemicalSynapseCompartment
+    DendriticCompartment ChemicalSynapseComponent
     """
     undefined = 0
     cell = undefined
     soma = 1
     axon = 2
     dendrite = 3
-    plasmalemma = 4
-    perisynaptic = 5
-    extrasynaptic = 6
-    cilium = 7
-    flagellum = 8
-    microvillus = 9
-    filopodium = 10
-    lamellipodium = 11
-    cytoplasm = 12
-    organelle = 13
-    sarcolemma = 14
-    cytosol = 15
+    synapse = 4
+    plasmalemma = 5
+    perisynaptic = 6
+    extrasynaptic = 7
+    cilium = 8
+    flagellum = 9
+    microvillus = 10
+    filopodium = 11
+    lamellipodium = 12
+    cytoplasm = 13
+    organelle = 14
+    sarcolemma = 15
+    cytosol = 16
 
 class AxonalCompartment(TypeEnum):
     undefined = 0
@@ -372,7 +373,7 @@ class PlasmaMembraneSpecialization(TypeEnum):
     neural_synapse = 1
     chemical_synapse = 1
     gap_junction = 2 # electrical synapse
-    electrical_synapse 2
+    electrical_synapse = 2
     zonula_occludens = 3
     zonula_adherens = 4
     synapse = 5 # generic synapse including immunological synapse
@@ -416,6 +417,11 @@ Excludes synapse components e.g. postsynaptic density, and plasmalemma
     vacuole = 30
     inclusion = 31
     other = 32
+
+class GeneticSex(TypeEnum):
+    undefined = 0
+    female = 1
+    male = 2
 
 class BioSourceType(TypeEnum):
     undefined   = 0
@@ -517,12 +523,27 @@ class AdministrationRoute(TypeEnum):
     custom = other
 
 @dataclass
+class CompartmentSpecification(ScipyenDataclass):
+    compartment: typing.Union[Organelle,
+                        AxonalCompartment,
+                        DendriticCompartment,
+                        PlasmaMembraneSpecialization] = 0
+
+@dataclass
+class NeuralChemicalSynapse(ScipyenDataclass):
+    synapseType: ChemicalSynapseType = ChemicalSynapseType.undefined
+    synapseComponent: ChemicalSynapseComponent = ChemicalSynapseComponent.undefined
+
+@dataclass
 class CellCompartment(ScipyenDataclass):
     # name:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    compartmentType:CellCompartmentType = CellCompartmentType.undefined
+    compartmentType: CellCompartmentType = CellCompartmentType.undefined
     compartmentID:int = 0
-
-    # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("type", "id")))
+    compartmentSpecification: typing.Union[
+        CompartmentSpecification,
+        NeuralChemicalSynapse
+        ] = dataclasses.field(
+            default_factory = CompartmentSpecification)
 
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")
@@ -535,7 +556,7 @@ class CellCompartment(ScipyenDataclass):
 
 @dataclass
 class Biometrics(ScipyenDataclass):
-    genotype:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    genotype: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
     # genotype of the source - keep it simple
     #
     # NOTE: avoid strings like (+/-, TSNeo/-, etc) as they don't play well when
@@ -544,11 +565,11 @@ class Biometrics(ScipyenDataclass):
     # animal model they would have a well-defined meaning
     #
 
-    sex:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    sex: GeneticSex = GeneticSex.undefined
     # ID of source sex (where appropriate); one of "f", "m", "na" (case-insensitive)
     #
 
-    age:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    age: typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
     # animal's age (more generaly the age of the biological source)- almost
     # free-form string, see NOTE for animal ID - keep it
     #   simple, yet meaningful, and indicate units (e.g. 3_mo, or 20_d, or 1_yr)
@@ -557,7 +578,7 @@ class Biometrics(ScipyenDataclass):
     # provide a more standardized way to store this information, hopefully more
     # suitable to some sort of database management
 
-    postnatal:bool=True
+    postnatal: bool = True
 
     weight:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
     height:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
@@ -593,65 +614,8 @@ class Organism(ScipyenDataclass):
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
 
-class Tissue():pass # leave here for it to be detected in Kate symbol viewer
-Tissue = ScipyenDataclass
-
-class Organ():pass # leave here for it to be detected in Kate symbol viewer
-Organ = ScipyenDataclass
-
-class Cell(ScipyenDataclass):
-    cellType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g., "neuron", "glia", etc
-    cellSubType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
-    cellID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-
-    # Cellular compartment, where relevant e.g. "spine", "dendrite", "axon", "soma"
-    cellCompartment:CellCompartment = dataclasses.field(default_factory=CellCompartment)
-
-@dataclass
-class BiologicalSource(ScipyenDataclass):
+class Organ(ScipyenDataclass):
     from core.bgbridge import BGStructureDescriptor
-    r"""Source of measurement data.
-    Encapsulates the biological source for the data measured in an experiment or
-    investigation.
-    This may be an entire organism, an organ, tissue, individual cell, or
-    subcellular compartment.
-    """
-    # TODO: 2024-11-17 21:11:13 : locate and use neuronal taxonomy API
-
-    # The organism of this source.
-    # Contains the data related to the taxon, species, subspecies, strain, and
-    # biometrics.
-    # See Organism class in this module
-    # organism:Organism = dataclasses.field(default=Organism("rat"))
-    organism:Organism = dataclasses.field(default_factory=Organism)
-
-    # The organ where the experiment or investigation was conducted
-    # The Organ class is an alias to ScipyenDataclass, therefore, it only has
-    # two fields: 'name' and 'description' (both strings)
-    organ:Organ = dataclasses.field(default_factory = Organ)
-
-    # The tissue where the experiment or investigation was conducted
-    tissue:Tissue = dataclasses.field(default_factory = Tissue)
-
-    # Type of source: ex vivo, in vitro, culture, whole organism, see BioSourceType
-    # Default: BioSourceType.exvivo
-    sourceType:BioSourceType = dataclasses.field(default=BioSourceType.exvivo)
-
-    # Identifier of this source: this can be any meaningful combination of:
-    #   animal ID, experimental date,  brain region, etc as long as they are
-    #   merged into a single string which is also a valid python identifier i.e.,
-    #   satisfies the following rules:
-    #
-    #   1) contains ONLY alphanumeric characters and underscore ('_')
-    #   2) DOES NOT begin with a digit or underscore ('_')
-    #
-    #   e.g. TS2_1234567_01_02_22_VisCx_
-    #
-    # Think of it as "Sample ID"
-    #
-    #   Default: pandas.NA
-    sourceID: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-
     # Specific organ structure, if relevant.
     #
     # For now, only brain atlas api (brainglobe_atlasapi.structure) is supported;
@@ -675,7 +639,64 @@ class BiologicalSource(ScipyenDataclass):
     #   and by the atlas is belongs to; therefore they can be uniquely compared
     #   for equality using only these two attributes (or rather elements of the
     #   source underlying dictionary)
-    structure:BGStructureDescriptor = BGStructureDescriptor()
+    brainGlobeAtlasName: typing.Union[str, type(pd.NA)] = pd.NA
+    structure: BGStructureDescriptor = BGStructureDescriptor()
+
+class Tissue(ScipyenDataclass):
+    parent: typing.Optional[Organ] = None
+
+class Cell(ScipyenDataclass):
+    cellType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g., "neuron", "glia", etc
+    cellSubType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
+    cellID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+
+    # Cellular compartment, where relevant e.g. "spine", "dendrite", "axon", "soma"
+    cellCompartment:CellCompartment = dataclasses.field(default_factory=CellCompartment)
+
+    parent: typing.Optional[typing.Union[Organ, Tissue]] = None
+
+@dataclass
+class BiologicalSource(ScipyenDataclass):
+    r"""Source of measurement data.
+    Encapsulates the biological source for the data measured in an experiment or
+    investigation.
+    This may be an entire organism, an organ, tissue, individual cell, or
+    subcellular compartment.
+    """
+    # TODO: 2024-11-17 21:11:13 : locate and use neuronal taxonomy API
+
+    # The organism of this source.
+    # Contains the data related to the taxon, species, subspecies, strain, and
+    # biometrics.
+    # See Organism class in this module
+    # organism:Organism = dataclasses.field(default=Organism("rat"))
+    organism:Organism = dataclasses.field(default_factory=Organism)
+
+    # Type of source: ex vivo, in vitro, culture, whole organism, see BioSourceType
+    # Default: BioSourceType.exvivo
+    sourceType:BioSourceType = dataclasses.field(default=BioSourceType.exvivo)
+
+    # Specimen where the experiment or investigation was conducted:
+    # Organ, Tissue, or Cell (if Cell, its 'parent' — Organ or Tissue — might
+    # also be specified)
+    specimen: typing.Union[Organ, Tissue, Cell] = dataclasses.field(
+        default_factory = Cell())
+
+
+    # Identifier of this source: this can be any meaningful combination of:
+    #   animal ID, experimental date,  brain region, etc as long as they are
+    #   merged into a single string which is also a valid python identifier i.e.,
+    #   satisfies the following rules:
+    #
+    #   1) contains ONLY alphanumeric characters and underscore ('_')
+    #   2) DOES NOT begin with a digit or underscore ('_')
+    #
+    #   e.g. TS2_1234567_01_02_22_VisCx_
+    #
+    # Think of it as "Sample ID"
+    #
+    #   Default: pandas.NA
+    sourceID: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
     # # Type of cell: string, e.g. "neuron", or pandas NA.
     # cellType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
