@@ -249,7 +249,7 @@ class ScipyenDataclass:
 
     @classmethod
     def fromHDF5(cls, entity:h5py.Group,
-                attrs:typing.Optional[dict] = None, cache:dict = {}):
+                attrs:typing.Optional[dict] = None, cache:dict = dict()):
         from iolib import h5io
 
         # print(f"\n\n### BEGIN {cls.__name__}.fromHDF5 ")
@@ -292,47 +292,166 @@ class ScipyenDataclass:
         return val in map(lambda f: f.name, dataclasses.fields(cls))
 
 class CellCompartmentType(TypeEnum):
-    r"""Follows SWC/CNIC specification augmented with 'spine', 'nucleus', 'nucleolus'.
-    See http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
+    r"""Follows SWC/CNIC specification at
+    http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
+
+    supplemented.
+
+    Refers to "gross" compartments; for a more granular types see AxonalCompartment
+    DendriticCompartment ChemicalSynapseCompartment
     """
     undefined = 0
     cell = undefined
     soma = 1
     axon = 2
-    dendrite = 3 # basal dendrite
-    apical_dendrite = 4
-    fork_point = 5
-    end_point = 6
-    spine = 7
-    basal_dendrite_spine = dendrite | spine # = 10
-    apical_dendrite_spine = apical_dendrite | spine # = 11
-    nucleus = 12
-    nucleolus = 13
+    dendrite = 3
+    plasmalemma = 4
+    perisynaptic = 5
+    extrasynaptic = 6
+    cilium = 7
+    flagellum = 8
+    microvillus = 9
+    filopodium = 10
+    lamellipodium = 11
+    cytoplasm = 12
+    organelle = 13
+    sarcolemma = 14
+    cytosol = 15
+
+class AxonalCompartment(TypeEnum):
+    undefined = 0
+    axolemma = 1
+    axoplasm = 2
+    initial = 3 # axon initial segment
+    node = 4 # Ranvier's node
+    internode = 5 # axon segment between two consecutive Ranvier nodes
+    myelin = 6 # myelin sheath
+    bouton = 7 # axonal bouton, "en passant"
+    terminal_bouton = 8
+    arborization = 9
+    collateral = 10
+
+class DendriticCompartment(TypeEnum):
+    undefined = 0
+    basal = 1 # basal dendrite, shaft
+    apical = 2 # apical dendrite, shaft
+    fork = 3 # dendritic branch point
+    end = 4 # dendritic end point
+    tuft = 5 # apical tuft
+    spine = 6
+    basal_spine = 7
+    apical_spine = 8
+    spine_head = 9
+    spine_neck = 10
+    spine_apparatus = 11
+
+class ChemicalSynapseComponent(TypeEnum):
+    undefined = 0
+    presynaptic = 1
+    active_zone = 2 # presynaptic active zone
+    postsynaptic = 3
+    psd = 4 # postsynaptic density
+    cleft = 5
+
+class ChemicalSynapseType(TypeEnum):
+    undefined = 0
+    symmetrical = 1
+    asymmetrical = 2
+    excitatory = 3
+    inhibitory = 4
+    glomerulus = 5 # cerebellar glomerulus
+    mossy = 6 # hippocampal mossy fibre synapse
+    calyx = 7 # calyx of Held
+    nmj = 8 # neuromuscular junction
+    axosomatic = 9
+    axonendritic = 10
+    axoaxonic = 11
+
+class PlasmaMembraneSpecialization(TypeEnum):
+    undefined = 0
+    neural_synapse = 1
+    chemical_synapse = 1
+    gap_junction = 2 # electrical synapse
+    electrical_synapse 2
+    zonula_occludens = 3
+    zonula_adherens = 4
+    synapse = 5 # generic synapse including immunological synapse
+
+class Organelle(TypeEnum):
+    r"""including specializations.
+
+Excludes synapse components e.g. postsynaptic density, and plasmalemma
+"""
+    undefined = 0
+    cytoskeleton = 1
+    actin_filament = 2
+    myosin_filament = 3
+    microtubule = 4
+    actomyosin = 5 # includes polyribosomes
+    ribosome = 6 # actin + myosin
+    nuclear_envelope = 7
+    endoplasmic_reticulum = 8
+    er = endoplasmic_reticulum
+    vesicle = 9
+    transport_vesicle = 10
+    golgi_apparatus = 11
+    golgi_cis = 12
+    golgi_trans = 13
+    rough_endoplasmic_reticulum = 14 # ribosome + endoplasmic_reticulum
+    secretory_vesicle = 15
+    lysosome = 16
+    endosome = 17
+    endocytotic = 18 # includes clathrin-coated and dynamin-coated vesicles
+    caveolae = 19
+    exocitotic = 20
+    synaptic_vesicle = 21
+    nuclear_pore = 22
+    nucleus = 23
+    nucleolus = 24
+    heterochromatin = 25
+    euchromatin = 26
+    chromosome = 27
+    centriole = 28
+    mitotic_spindle = 29
+    vacuole = 30
+    inclusion = 31
+    other = 32
 
 class BioSourceType(TypeEnum):
     undefined   = 0
     exvivo      = 1     # tissue or organ sample from organism
     invitro     = 2     # culture system
     insilico    = 4     # biological/biophysical/mathematical model
-    monolayer   = 8     # e.g. "primary" culture or cell line = invitro | monolayer = 10
+    monolayer   = 8     # dissociated cells, cultured, possibly confluent
     culture     = invitro | monolayer
-    tissue      = 16    # e.g. acute brain slice = exvivo | tissue = 17
-                        # e.g. "organotypic" slice culture = invitro | tissue  = 18
-    acute_slice = exvivo | tissue
-    assembloid  = 32    # e.g. "organoid" = invitro | assembloid = 34
-    organ       = exvivo | assembloid # i.e., 33
+    tissue      = 16    # e.g. aortic strip, teania caeci/coli, etc
+    acute_slice = exvivo | tissue # e.g. acute brain slice = exvivo | tissue = 17
+    organtypic = 18 # e.g. "organotypic" slice culture = invitro | tissue  = 18
+    assembloid  = 32
+    organ       = exvivo | assembloid # e.g. isolated hear, aorta, ileum, 33
     organoid    = invitro | assembloid # i.e, 34
-    invivo      = 64
-    organism    = 128
+    invivo      = 64 # e.g. in vivo imaging, electrophysiology, etc
+    organism    = 128 # for behaviour and systemic measurements (temperature, mass, motor function, etc)
+    blood       = 256
+    serum       = 257
+    plasma      = 258
+    marrow      = 384
+    exudate     = 512
+    secretion   = 513
+    excretion   = 1024
+    urine       = 1025
+    faeces      = 1026
+    pus         = 2048
 
 class ProcedureType(TypeEnum):
     null = 0
     mating = 1
     treatment = 2
-    behaviour = 4 # includes navigation in real or virtual environment, rotarod, inclined plane, licking etc # TODO to refine
+    behaviour = 4 # includes motor functions
     surgery = 8
     biopsy = 16
     postop = 32
+    recovery = postop
     tagging = 64
     weaning = 128
     cull = 256
@@ -359,49 +478,49 @@ class OrganismStage(TypeEnum):
 class AdministrationRoute(TypeEnum):
     null = 0
     bath = 1 # relates to ex vivo tissue slices
+    bulk = bath
     puff = 2 # relates to ex vivo tissue slices — e.g. picospritzer, pressurized micropipette, etc
     intraperitoneal = 4
-    intramuscular = 8
-    intravenous = 16
-    intraarterial = 32
-    intracerebral = 64
-    intraventricular = 128 # can be in the heart!
-    intracerebroventricular = intracerebral | intraventricular # 192
-    intracardiac = 256
-    intracardioventricular = intracardiac | intraventricular # 384
-    subcutaneous = 512
-    transcutaneous = 1024
-    peros = 2048 # e.g. gavage
-    inhalation = 4096
-    intranasal = 8192
-    intraorbital = 16384
-    food_water = 32768
-    other = 65536
-
-    # aliases
     ip = intraperitoneal
-    iv = intravenous
-    ia = intraarterial
+    intramuscular = 8
     im = intramuscular
+    intravenous = 16
+    iv = intravenous
+    intraarterial = 32
+    ia = intraarterial
+    intracerebral = 64 # must specify target structure via atlas reference
     ic = intracerebral
+    intracerebroventricular = 128
     icv = intracerebroventricular
+    intracardiac = 192
     icd = intracardiac
+    intracardioventricular = 384
     icdv = intracardioventricular
-    ins = intranasal # 'in' is a reserved Python keyword
-    inh = inhalation
-    io = intraorbital
+    subcutaneous = 512
     sc = subcutaneous
+    intradermal = 513
+    idr = intradermal # id is a python keyword
+    transcutaneous = 1024
     tc = transcutaneous
+    peros = 2048
     gavage = peros
     oral = peros
+    inhalation = 4096
+    inh = inhalation
+    intranasal = 8192
+    ins = intranasal # 'in' is a reserved Python keyword
+    intraorbital = 16384
+    io = intraorbital
+    eye_drops = 24756
+    food_water = 32768
+    other = 65536
     custom = other
-    bulk = bath
 
 @dataclass
 class CellCompartment(ScipyenDataclass):
     # name:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    type:CellCompartmentType = CellCompartmentType.undefined
-    id:int = 0
+    compartmentType:CellCompartmentType = CellCompartmentType.undefined
+    compartmentID:int = 0
 
     # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("type", "id")))
 
@@ -481,9 +600,9 @@ class Organ():pass # leave here for it to be detected in Kate symbol viewer
 Organ = ScipyenDataclass
 
 class Cell(ScipyenDataclass):
-    type: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g., "neuron", "glia", etc
-    subtype: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
-    ID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    cellType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g., "neuron", "glia", etc
+    cellSubType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
+    cellID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
     # Cellular compartment, where relevant e.g. "spine", "dendrite", "axon", "soma"
     cellCompartment:CellCompartment = dataclasses.field(default_factory=CellCompartment)
