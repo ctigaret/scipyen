@@ -291,6 +291,25 @@ class ScipyenDataclass:
     """
         return val in map(lambda f: f.name, dataclasses.fields(cls))
 
+class GenericNeuronType(TypeEnum):
+    r"""Generic classification of neurons according to NeuroMorpho.org:
+pyramidal, non-pyramidal principal, and interneurons.
+"""
+    undefined = 0
+    pyramidal = 1
+    nonpyramidal = 2
+    interneuron = 3
+
+class NonPyramidalPrincipalNeuronType(TypeEnum):
+    undefined = 0
+    stellate = 1
+    granule = 2
+    msn = 3
+    drg = 4
+    other = 5
+
+
+
 class CellCompartmentType(TypeEnum):
     r"""Follows SWC/CNIC specification at
     http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
@@ -670,18 +689,13 @@ class BiologicalSource(ScipyenDataclass):
     # biometrics.
     # See Organism class in this module
     # organism:Organism = dataclasses.field(default=Organism("rat"))
-    organism:Organism = dataclasses.field(default_factory=Organism)
+    organism:Organism = dataclasses.field(default_factory = Organism)
 
     # Type of source: ex vivo, in vitro, culture, whole organism, see BioSourceType
     # Default: BioSourceType.exvivo
-    sourceType:BioSourceType = dataclasses.field(default=BioSourceType.exvivo)
-
-    # Specimen where the experiment or investigation was conducted:
-    # Organ, Tissue, or Cell (if Cell, its 'parent' — Organ or Tissue — might
-    # also be specified)
-    specimen: typing.Union[Organ, Tissue, Cell] = dataclasses.field(
-        default_factory = Cell())
-
+    sourceType:BioSourceType = dataclasses.field(
+        default = BioSourceType.exvivo
+        )
 
     # Identifier of this source: this can be any meaningful combination of:
     #   animal ID, experimental date,  brain region, etc as long as they are
@@ -698,20 +712,14 @@ class BiologicalSource(ScipyenDataclass):
     #   Default: pandas.NA
     sourceID: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
-    # # Type of cell: string, e.g. "neuron", or pandas NA.
-    # cellType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    #
-    # # Morphological cell variety: string, e.g. "bitufted" or pandas NA.
-    # cellSubType:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal"
-    #
-    # # Additional cell descriptors: sequence of strings, or NA
-    # cellDescriptors:typing.Union[str, type(pd.NA), typing.Sequence[str]] = dataclasses.field(default=pd.NA)
-    #
-    # # Cell identifier - see sourceID for rules
-    # cellID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    #
-    # # Cellular compartment, where relevant e.g. "spine", "dendrite", "axon", "soma"
-    # cellCompartment:CellCompartment = dataclasses.field(default_factory=CellCompartment)
+    # Specimen where the experiment or investigation was conducted:
+    # Organ, Tissue, or Cell (if Cell, its 'parent' — Organ or Tissue — should
+    # also be specified)
+    specimen: typing.Union[Organ, Tissue, Cell] = dataclasses.field(
+        default_factory = Cell)
+
+    # def __post_init__(self: typing.Self):
+    #     if isinstance
 
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")
@@ -1297,16 +1305,9 @@ types, in args.
 
 CAUTION: The dataclasses in args MUST have distinct field names. Fields in
 subequent elements of 'args', that have the same name as fields in args[0] will
-be silently ignored. This means that this function should used to augment the
-dataclass in args[0] with non-duplicate fields from the subsequent elements of
-'args'.
-
-NOTE:
-    1. Any dataclsses.InitVar type of fields in args will NOT be propagated to
-    the new type. This means that the function will not be able to merge dataclasses
-    with complex constructors that reply on __post_init__ or InitVar-typed fields.
-
-.. _[#]
+be silently ignored. This means that this function can only be used to augment
+the dataclass in args[0] with non-duplicate fields from the subsequent elements
+of 'args'.
 
 """
     from copy import deepcopy
