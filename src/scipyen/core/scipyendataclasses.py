@@ -735,7 +735,7 @@ class Procedure(ScipyenDataclass):
     """
     # name:str = ""
     _:KW_ONLY
-    type: ProcedureType = ProcedureType.null
+    procedureType: ProcedureType = ProcedureType.null
     # description: str = ""
 
     # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("type", ) )) # "name" and "description" inherited from ScipyenDataclass
@@ -795,7 +795,7 @@ class Treatment(Procedure):
     # allow combination of compounds
     route:AdministrationRoute = AdministrationRoute.null
 
-    type:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
+    procedureType:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
 
     def __post_init__(self):
         super().__init__(name=self.name, description=self.description,

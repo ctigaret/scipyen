@@ -39,13 +39,17 @@ class BaseScipyenData(ScipyenDataclass):
     # see NOTE below)
     # name:str = ""
     # description:str = ""
-    file_origin:typing.Union[str, pathlib.Path] = dataclasses.field(default="")
+    file_origin: typing.Union[
+        str, pathlib.Path
+        ] = dataclasses.field(default="")
     # which file it originates from
-    file_datetime:datetime = dataclasses.field(default_factory = datetime.now)
+    file_datetime: datetime = dataclasses.field(default_factory = datetime.now)
     # when was the file created
-    rec_datetime:datetime = dataclasses.field(default_factory = datetime.now)
+    rec_datetime: datetime = dataclasses.field(default_factory = datetime.now)
     # when was data recorded
-    analysis_datetime:datetime = dataclasses.field(default_factory = datetime.now)
+    analysis_datetime: datetime = dataclasses.field(
+        default_factory = datetime.now
+        )
     # when was data analysed
     
     # NOTE: 2024-11-16 10:10:16 Revisit this:
@@ -55,10 +59,10 @@ class BaseScipyenData(ScipyenDataclass):
     # triggers:typing.Union[TriggerProtocol, list] = dataclasses.field(default_factory=TriggerProtocol)
     
     # biological source including organism, organ, tissue, cell, ID, 
-    source:BiologicalSource = dataclasses.field(default_factory=BiologicalSource)
+    source: BiologicalSource = dataclasses.field(default_factory=BiologicalSource)
     # includes treatment, with dosage route, and schedule; does NOT include triggers
     # as these are specific to ephys/imaging protocols.
-    procedure:Procedure = dataclasses.field(default_factory=Procedure)
+    procedure: Procedure = dataclasses.field(default_factory=Procedure)
     
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")
