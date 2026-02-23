@@ -12,7 +12,7 @@ from collections import deque, namedtuple
 from functools import (singledispatch, singledispatchmethod)
 import itertools
 import datetime
-from enum import (Enum, IntEnum, EnumMeta)
+from enum import (Enum, IntEnum, EnumMeta) #noqa
 import inspect
 import numbers
 import math
@@ -133,7 +133,7 @@ class ScipyenDataclass:
 
         fields = tuple(map(lambda f: (f.name, getattr(self, f.name), getattr(other, f.name)), dataclasses.fields(self.__class__)))
 
-        diff_fields = tuple(filter(lambda f: type(f[1]) != type(f[2]) or not safe_identity_test(f[1], f[2]), fields))
+        diff_fields = tuple(filter(lambda f: type(f[1]) is not type(f[2]) or not safe_identity_test(f[1], f[2]), fields))
 
         if showValues:
             return dict(map(lambda f: (f[0], (f[1], f[2])), diff_fields))
@@ -662,17 +662,18 @@ class Organ(ScipyenDataclass):
     structure: BGStructureDescriptor = BGStructureDescriptor()
 
 class Tissue(ScipyenDataclass):
-    parent: typing.Optional[Organ] = None
+    _: KW_ONLY
+    parent: typing.Optional[Organ] = dataclasses.field(default = None)
 
 class Cell(ScipyenDataclass):
     cellType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g., "neuron", "glia", etc
     cellSubType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
-    cellID:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
+    cellID: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
     # Cellular compartment, where relevant e.g. "spine", "dendrite", "axon", "soma"
-    cellCompartment:CellCompartment = dataclasses.field(default_factory=CellCompartment)
+    cellCompartment: CellCompartment = dataclasses.field(default_factory=CellCompartment)
 
-    parent: typing.Optional[typing.Union[Organ, Tissue]] = None
+    parent: typing.Optional[typing.Union[Organ, Tissue]] = dataclasses.field(default = None)
 
 @dataclass
 class BiologicalSource(ScipyenDataclass):
@@ -829,7 +830,7 @@ class Episode(ScipyenDataclass):
         without affecting the identity of an Episode
     """
     # name:str = ""
-    _:KW_ONLY
+    _: KW_ONLY
     begin:datetime.datetime = datetime.datetime.now()
     end:datetime.datetime = datetime.datetime.now()
     beginFrame:int = 0
@@ -1377,7 +1378,7 @@ of 'args'.
     # #                            module=None)
 
 __all__ = ("AdministrationRoute", "BiologicalSource", "Biometrics",
-           "BioSourceType","CellCompartment","CellCompartmentType", "Episode",
+           "BioSourceType", "Cell", "CellCompartment","CellCompartmentType", "Episode",
            "Organ", "Organism", "OrganismStage", "Procedure", "ProcedureType",
            "Schedule", "SubstanceDosage", "Tissue", "Treatment",
            "isDataclass", "mergeDataclasses")

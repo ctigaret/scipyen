@@ -291,7 +291,7 @@ For a given item:
 
     def setData(self: typing.Self, obj: object,
                 name: typing.Optional[str] = None):
-        signalBlocker = QtCore.QSignalBlocker(self.model())
+        signalBlocker = QtCore.QSignalBlocker(self.model()) #noqa
         # model = self.model()
         self.model().clear()
         self.model().setModelData(obj, name)
