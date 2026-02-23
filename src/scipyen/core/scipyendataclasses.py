@@ -662,7 +662,8 @@ class Organ(ScipyenDataclass):
     structure: BGStructureDescriptor = BGStructureDescriptor()
 
 class Tissue(ScipyenDataclass):
-    _: KW_ONLY
+    name:str = dataclasses.field(default_factory=str)
+    description: str = dataclasses.field(default_factory=str)
     parent: typing.Optional[Organ] = dataclasses.field(default = None)
 
 class Cell(ScipyenDataclass):
@@ -1381,4 +1382,4 @@ __all__ = ("AdministrationRoute", "BiologicalSource", "Biometrics",
            "BioSourceType", "Cell", "CellCompartment","CellCompartmentType", "Episode",
            "Organ", "Organism", "OrganismStage", "Procedure", "ProcedureType",
            "Schedule", "SubstanceDosage", "Tissue", "Treatment",
-           "isDataclass", "mergeDataclasses")
+           "isDataclass", "mergeDataclasses", "ScipyenDataclass")
