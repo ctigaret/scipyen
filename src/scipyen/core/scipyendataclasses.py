@@ -633,6 +633,7 @@ class Organism(ScipyenDataclass):
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
 
+@dataclass
 class Organ(ScipyenDataclass):
     from core.bgbridge import BGStructureDescriptor
     # Specific organ structure, if relevant.
@@ -661,11 +662,14 @@ class Organ(ScipyenDataclass):
     brainGlobeAtlasName: typing.Union[str, type(pd.NA)] = pd.NA
     structure: BGStructureDescriptor = BGStructureDescriptor()
 
+@dataclass
 class Tissue(ScipyenDataclass):
+    r"""Tissue"""
     name:str = dataclasses.field(default_factory=str)
     description: str = dataclasses.field(default_factory=str)
-    parent: typing.Optional[Organ] = dataclasses.field(default = None)
+    parent: Organ = dataclasses.field(default_factory = Organ)
 
+@dataclass
 class Cell(ScipyenDataclass):
     cellType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g., "neuron", "glia", etc
     cellSubType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
@@ -674,7 +678,7 @@ class Cell(ScipyenDataclass):
     # Cellular compartment, where relevant e.g. "spine", "dendrite", "axon", "soma"
     cellCompartment: CellCompartment = dataclasses.field(default_factory=CellCompartment)
 
-    parent: typing.Optional[typing.Union[Organ, Tissue]] = dataclasses.field(default = None)
+    parent: typing.Optional[typing.Union[Organ, Tissue]] = dataclasses.field(default_factory = Tissue)
 
 @dataclass
 class BiologicalSource(ScipyenDataclass):
