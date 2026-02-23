@@ -7127,28 +7127,31 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
                             if item.column() == 0]  # list of QModelIndex
 
-            if len(selectedItems) != 1:
-                return
+            if len(selectedItems) == 1:
+                item = selectedItems[0]
 
-            item = selectedItems[0]
+                if not self.fileSystemModel.isDir(item):
+                    item = self.fileSystemModel.parent(item)
+                    # return
+                # if not isinstance(item, QtCore.QModelIndex) or not item.data(QtGui.QFileSystemModel.FileInfoRole):
+                #     item = self.fileSystemModel.index(self.currentDir)
 
-            if not self.fileSystemModel.isDir(item):
-                return
-            # if not isinstance(item, QtCore.QModelIndex) or not item.data(QtGui.QFileSystemModel.FileInfoRole):
-            #     item = self.fileSystemModel.index(self.currentDir)
+                info = item.data(QtGui.QFileSystemModel.FileInfoRole)
+                if not info.exists() or not info.isDir() or not info.isWritable():
+                    return
 
-            info = item.data(QtGui.QFileSystemModel.FileInfoRole)
-            if not info.exists() or not info.isDir() or not info.isWritable():
-                return
+                parent = item
+                folderName = self._checkItemExistsInDir_(folderName, self.fileSystemModel.filePath(item))
+                # itemdir = QtCore.QDir(self.fileSystemModel.filePath(item))
+                # entries = itemdir.entryList(QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot)
+                #
+                # if folderName in entries:
+                #     folderName = counter_suffix(folderName, entries, bracketed=True, start=1,
+                #                                 returns_counter=False)
 
-            parent = item
-            folderName = self._checkItemExistsInDir_(folderName, self.fileSystemModel.filePath(item))
-            # itemdir = QtCore.QDir(self.fileSystemModel.filePath(item))
-            # entries = itemdir.entryList(QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot)
-            #
-            # if folderName in entries:
-            #     folderName = counter_suffix(folderName, entries, bracketed=True, start=1,
-            #                                 returns_counter=False)
+            elif len(selectedItems) == 0:
+                parent = self.fileSystemModel.rootDirectory()
+                path = pathlib.Path(self.fileSystemModel.rootPath())
 
         else:
             parent = self.fileSystemModel.rootDirectory()
@@ -7467,7 +7470,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         action_0 = None
         create_new = None
         paste_action = None
-        open_link_target_action = None
+        # open_link_target_action = None
 
         clipboard = QtGui.QGuiApplication.clipboard()
         mimeData = clipboard.mimeData()
@@ -7478,7 +7481,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         elif any([mimeData.hasText(), mimeData.hasImage(), mimeData.hasHtml(), mimeData.hasColor()]):
             pasteActionName = "Paste clipboard contents"
 
-        itemAtMouse = self.fileSystemTreeView.indexAt(point)
+        # itemAtMouse = self.fileSystemTreeView.indexAt(point)
         # print(f"{self.__class__.__name__}.slot_fileSystemContextMenuRequest: indexAtMouse: {itemAtMouse.data()}")
         if not self.fileSystemModel.rootDirectory().isEmpty():
             cm = QtWidgets.QMenu("Selected Items", self)
@@ -7501,7 +7504,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 parentInfos = list(map(lambda i: i.data(QtGui.QFileSystemModel.FileInfoRole), parents))
 
                 if len(selectedItems) == 1:
-                    item = selectedItems[0]
+                    # item = selectedItems[0]
                     # info = item.data(QtGui.QFileSystemModel.FileInfoRole)
                     info = infos[0]
                     # print(f"\tpath: {self.fileSystemModel.filePath(item)}")
@@ -9780,10 +9783,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if all([isinstance(self.workspace[v], str) for v in varnames]):
             for v in varnames:
                 o = self.workspace[v]
-                if strutils.is_html(o):
-                    filename = "".join([v, ".html"])
-                else:
-                    filename = "".join([v, ".txt"])
+                filename = "".join([v, ".txt"])
+                # if strutils.is_html(o):
+                #     filename = "".join([v, ".html"])
+                # else:
+                #     filename = "".join([v, ".txt"])
                 pio.saveText(o, filename)
 
     @Slot()
