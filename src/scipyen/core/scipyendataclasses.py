@@ -291,22 +291,28 @@ class ScipyenDataclass:
     """
         return val in map(lambda f: f.name, dataclasses.fields(cls))
 
-class GenericNeuronType(TypeEnum):
-    r"""Generic classification of neurons according to NeuroMorpho.org:
-pyramidal, non-pyramidal principal, and interneurons.
+class NeuronType(TypeEnum):
+    r"""Generic classification of neurons beyond that of NeuroMorpho.org
+(pyramidal, non-pyramidal principal, and interneurons).
 """
     undefined = 0
-    pyramidal = 1
-    nonpyramidal = 2
-    interneuron = 3
+    pyramidal = auto()
+    stellate = auto()
+    granule = auto()
+    msn = auto()
+    drg = auto()
+    nonpyramidal = sum(
+            (
+                stellate,
+                granule,
+                msn,
+                drg
+            )
+        )
+    principal = pyramidal + nonpyramidal
+    interneuron = auto()
+    other = auto()
 
-class NonPyramidalPrincipalNeuronType(TypeEnum):
-    undefined = 0
-    stellate = 1
-    granule = 2
-    msn = 3
-    drg = 4
-    other = 5
 
 class CellCompartmentType(TypeEnum):
     r"""Insipired by SWC/CNIC specification at
@@ -317,51 +323,24 @@ class CellCompartmentType(TypeEnum):
     """
     undefined = 0
     cell = undefined
-    # cytoplasm = auto()
-    # cytosol = auto()
-    # plasmalemma = auto()
-    soma = auto()
-    axon = auto()
-    dendrite = auto()
-    # synapse = auto()
-    # perisynaptic = auto()
-    # extrasynaptic = auto()
+    organelle = auto()
     cilium = auto()
     flagellum = auto()
     microvillus = auto()
     filopodium = auto()
     lamellipodium = auto()
-    organelle = auto()
 
-# class CellCompartmentType(Flag):
-#     r"""Follows SWC/CNIC specification at
-#     http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
-#
-#     supplemented.
-#
-#     Refers to "gross" compartments; for a more granular types see AxonalCompartment
-#     DendriticCompartment ChemicalSynapseCompartment
-#     """
-#     undefined = 0
-#     cell = undefined
-#     cytosol = auto()
-#     soma = auto()
-#     axon = auto()
-#     dendrite = auto()
-#     synapse = auto()
-#     plasmalemma = auto()
-#     cilium = auto()
-#     flagellum = auto()
-#     microvillus = auto()
-#     filopodium = auto()
-#     lamellipodium = auto()
-#     cytoplasm = auto()
-#     organelle = auto()
-#
-class AxonalCompartment(TypeEnum):
+class NeuronCompartmentType(TypeEnum):
     undefined = 0
-    # axolemma =
-    # axoplasm = 2
+    cell = undefined
+    organelle = auto()
+    soma = auto()
+    axon = auto()
+    dendrite = auto()
+    chemical_synapse = auto()
+
+class AxonalCompartmentType(TypeEnum):
+    undefined = 0
     initial = auto() # axon initial segment
     node = auto() # Ranvier's node
     internode = auto() # axon segment between two consecutive Ranvier nodes
@@ -372,7 +351,7 @@ class AxonalCompartment(TypeEnum):
     collateral = auto()
     other = auto()
 
-class DendriticCompartment(TypeEnum):
+class DendriticCompartmentType(TypeEnum):
     undefined = 0
     basal = auto() # basal dendrite, shaft
     apical = auto()# apical dendrite, shaft
@@ -386,7 +365,7 @@ class DendriticCompartment(TypeEnum):
     spine_apparatus = auto()
     other = auto()
 
-class ChemicalSynapseUltrastructureElement(TypeEnum):
+class ChemicalSynapseUltrastructureElementType(TypeEnum):
     undefined = 0
     presynaptic_membrane = auto()
     presynaptic_cytoskeleton = auto()
@@ -426,7 +405,7 @@ class ChemicalSynapseUltrastructureElement(TypeEnum):
     extrasynaptic = auto()
     cleft = auto()
 
-class ChemicalSynapseMorphology(TypeEnum):
+class ChemicalSynapseMorphologicalType(TypeEnum):
     undefined = 0
     symmetrical = auto()
     asymmetrical = auto()
@@ -436,7 +415,7 @@ class ChemicalSynapseMorphology(TypeEnum):
     nmj = auto() # neuromuscular junction
     other = auto()
 
-class PostsynapticEntity(TypeEnum):
+class PostsynapticEntityType(TypeEnum):
     undefined = 0
     soma = auto()
     dendrite = auto()
@@ -448,7 +427,7 @@ class ChemicalSynapseFunctionalType(TypeEnum):
     excitatory = auto()
     inhibitory = auto()
 
-class PlasmaMembraneSpecialization(TypeEnum):
+class PlasmaMembraneSpecializationType(TypeEnum):
     undefined = 0
     chemical_synapse = auto()
     neural_synapse = chemical_synapse
@@ -459,7 +438,14 @@ class PlasmaMembraneSpecialization(TypeEnum):
     synapse = auto() # generic synapse including immunological synapse
     caveolae = auto()
 
-class UltrastructureElement(TypeEnum):
+@dataclass
+class ChemicalSynapse(ScipyenDataclass):
+    morphologicalType : ChemicalSynapseMorphologicalType = ChemicalSynapseMorphologicalType.undefined
+    functionalType: ChemicalSynapseFunctionalType = ChemicalSynapseFunctionalType.undefined
+    postsynapticEntityType: PostsynapticEntityType = PostsynapticEntityType.undefined
+    parent: Neuron = dataclasses.field(default_factory = Neuron)
+
+class UltrastructureElementType(TypeEnum):
     r"""Organelles, etc.
 Excludes chemical synapse components e.g. postsynaptic density
 """
@@ -568,23 +554,10 @@ Excludes chemical synapse components e.g. postsynaptic density
 
     other = auto()
 
-# class ChromosomalSexDeterminism(TypeEnum):
-#     r"""Organism where sex is determined by chromosome identity"""
-#     undefined = 0
-#     XY = auto()
-#     X0 = auto()
-#     Z0 = auto()
-#     ZW = auto()
-#     other = auto() # combinations of X+, Y+
-
 class GeneticSex(TypeEnum):
     undefined = 0
     female = 1
     male = 2
-
-# @dataclass
-# class ChromosomalSex(ScipyenDataclass):
-#     system: ChromosomalSexDeterminism = ChromosomalSexDeterminism.XY
 
 class BioSourceType(TypeEnum):
     undefined   = 0
@@ -706,11 +679,31 @@ class AdministrationRoute(Flag):
 # class CompartmentSpecification(ScipyenDataclass):
 #     compartmentType: CellCompartmentType = CellCompartmentType.undefined
 
+@dataclass
+class UltrastructureElement(ScipyenDataclass):
+    elementType: UltrastructureElementType = UltrastructureElementType.undefined
+    parent: Cell = dataclasses.field(default_factory = Cell)
 
 @dataclass
 class CellCompartment(ScipyenDataclass):
     compartmentType: CellCompartmentType = CellCompartmentType.undefined
     compartmentID:int = 0
+    parent: Cell = dataclasses.field(default_factory = Cell)
+
+    def __repr__(self):
+        indent = lambda x: x.replace("\n", "\n\t") # noqa
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
+        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
+        return "\n".join(ret)
+
+    def __eq__(self, other) -> bool:
+        return super().__eq__(other)
+
+@dataclass
+class NeuronCompartment(ScipyenDataclass):
+    compartmentType: NeuronCompartmentType = NeuronCompartmentType.undefined
+    compartmentID:int = 0
+    parent: Neuron = dataclasses.field(default_factory = Neuron)
 
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t") # noqa
@@ -823,13 +816,17 @@ class Cell(ScipyenDataclass):
     cellSubType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
     cellID: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
-    # Cellular compartment, where relevant e.g. "spine", "dendrite", "axon", "soma"
     cellCompartment: CellCompartment = dataclasses.field(default_factory=CellCompartment)
 
     parent: typing.Optional[typing.Union[Organ, Tissue]] = dataclasses.field(default_factory = Tissue)
 
 @dataclass
 class Neuron(Cell):
+    cellSubType: NeuronType = NeuronType.undefined
+    cellCompartment: NeuronCompartment = dataclasses.field(default_factory=NeuronCompartment)
+    subCompartment: typing.Optional[
+        typing.Union[DendriticCompartment, AxonalCompartment]
+        ]
     def __post_init__(self: typing.Self):
         super().__init__(
             self, name=self.name, description=self.description,
@@ -837,9 +834,16 @@ class Neuron(Cell):
             cellSubType = self.cellSubType,
             cellID = self.cellID,
             )
-        # if self.cellCompartment.compartmentType == CellCompartment.soma:
 
+@dataclass
+class AxonalCompartment(ScipyenDataclass):
+    compartmentType: AxonalCompartmentType = AxonalCompartmentType.undefined
+    parent: Neuron = dataclasses.field(default_factory = Neuron)
 
+@dataclass
+class DendriticCompartment(ScipyenDataclass):
+    compartmentType: DendriticCompartmentType = DendriticCompartmentType.undefined
+    parent: Neuron = dataclasses.field(default_factory = Neuron)
 
 @dataclass
 class BiologicalSource(ScipyenDataclass):
@@ -1543,8 +1547,8 @@ of 'args'.
     # #                            weakref_slot=False,
     # #                            module=None)
 
-__all__ = ("AdministrationRoute", "BiologicalSource", "Biometrics",
-           "BioSourceType", "Cell", "CellCompartment","CellCompartmentType", "Episode",
-           "Organ", "Organism", "OrganismStage", "Procedure", "ProcedureType",
-           "Schedule", "SubstanceDosage", "Tissue", "Treatment",
-           "isDataclass", "mergeDataclasses", "ScipyenDataclass")
+# __all__ = ("AdministrationRoute", "BiologicalSource", "Biometrics",
+#            "BioSourceType", "Cell", "CellCompartment","CellCompartmentType", "Episode",
+#            "Organ", "Organism", "OrganismStage", "Procedure", "ProcedureType",
+#            "Schedule", "SubstanceDosage", "Tissue", "Treatment",
+#            "isDataclass", "mergeDataclasses", "ScipyenDataclass")
