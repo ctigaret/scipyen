@@ -753,7 +753,7 @@ class BrainAtlasManager(QtCore.QObject):
             print(f"{print_styled(f'{self._atlas_name_to_initialize_}', 'green')} was initialized")
             self._atlas_name_to_initialize_ = None
 
-    def initAtlas(self, name: typing.Optional[str] = None,
+    def initAtlas(self, nameOrSpecies: typing.Optional[typing.Union[str, taxonbridge.Taxon]] = None,
                   localAtlasesOnly: bool = True,
                   interactive: bool = True
                   # download: bool = False,
@@ -769,59 +769,77 @@ class BrainAtlasManager(QtCore.QObject):
         else:
             atlasNames = self.atlasNames
 
-        if isinstance(name, str) and len(name):
+        species = None
+
+        if isinstance(nameOrSpecies, taxonbridge.Taxon):
+            species = nameOrSpecies
+
+        elif isinstance(nameOrSpecies, str):
+            availableSpecies = self.getAvailableSpecies()
+            if (
+                nameOrSpecies in availableSpecies
+                or any(nameOrSpecies.lower() in s.lower() for s in availableSpecies)
+                or nameOrSpecies in ("rat", "rats", "mouse", "mice")
+                ):
+                species = nameOrSpecies
+
+        if species:
             try:
-                return self.initAtlasForSpecies(name,
-                                                interactive=interactive,
-                                                localAtlasesOnly=localAtlasesOnly)
+                return self.initAtlasForSpecies(
+                    species,
+                    interactive=interactive,
+                    localAtlasesOnly=localAtlasesOnly
+                    )
             except:
                 traceback.print_exc()
-                # pass
 
-        if (
-            name is None
-            or (
-                isinstance(name, str) and (
-                    len(name.strip()) == 0
-                    or name not in atlasNames
-                    )
-                )
-            ):
+        else:
+            name = nameOrSpecies
 
-            name = self.selectAtlasName(localAtlasesOnly = localAtlasesOnly)
-
-            if name is None:
-                return
-                # name = self.default_atlas_name
-
-        if name not in self.localAtlasNames:
-            if interactive:
-                GuiMessages.informationMessage_static(
-                    title = f"Atlas {name}:",
-                    text  = "\n".join(
-    [
-        f"Atlas {name} must be installed manually.",
-        "Open a terminal, run 'scipyact' to activate Scipyen's environment,"
-        f"then run 'brainglobe install -a {name}' to install the atlas"
-    ]
+            if (
+                name is None
+                or (
+                    isinstance(name, str) and (
+                        len(name.strip()) == 0
+                        or name not in atlasNames
                         )
                     )
-            return
-            # if download:
-            #     scipywarn(f"The atlas {name} will be available as the 'atlas' attribute once donwloaded and initialized")
-            #     self.downloadAtlas(name, True)
-            # else:
-            #     scipywarn(f"The atlas {name} must be downloaded manually")
-            #     return
-        else:
-            # TODO 2024-11-24 21:23:14
-            # make 'check_latest' below a Scipyen configurable variable
-            # (not Qt configurable)
-            self._current_atlas_ = BrainGlobeAtlas(name, check_latest=False)
-            # self._atlas_ = BrainGlobeAtlas(name, check_latest=download)
-            self._atlas_name_to_initialize_ = None
+                ):
 
-            return self._current_atlas_
+                name = self.selectAtlasName(localAtlasesOnly = localAtlasesOnly)
+
+                if name is None:
+                    return
+                    # name = self.default_atlas_name
+
+            if name not in self.localAtlasNames:
+                if interactive:
+                    GuiMessages.informationMessage_static(
+                        title = f"Atlas {name}:",
+                        text  = "\n".join(
+        [
+            f"Atlas {name} must be installed manually.",
+            "Open a terminal, run 'scipyact' to activate Scipyen's environment,"
+            f"then run 'brainglobe install -a {name}' to install the atlas"
+        ]
+                            )
+                        )
+                return
+                # if download:
+                #     scipywarn(f"The atlas {name} will be available as the 'atlas' attribute once donwloaded and initialized")
+                #     self.downloadAtlas(name, True)
+                # else:
+                #     scipywarn(f"The atlas {name} must be downloaded manually")
+                #     return
+            else:
+                # TODO 2024-11-24 21:23:14
+                # make 'check_latest' below a Scipyen configurable variable
+                # (not Qt configurable)
+                self._current_atlas_ = BrainGlobeAtlas(name, check_latest=False)
+                # self._atlas_ = BrainGlobeAtlas(name, check_latest=download)
+                self._atlas_name_to_initialize_ = None
+
+                return self._current_atlas_
 
     def showAtlases(self, show_local_path:bool=False, toConsole:bool=True,
                     table_width:int=80) -> typing.Optional[pd.DataFrame]:
@@ -1051,23 +1069,23 @@ class BrainAtlasManager(QtCore.QObject):
                         maxfound = 10,
                         ):
         r"""See get_atlas_structure(…) module-level function"""
-        if self._atlas_ is None:
+        if self._current_atlas_ is None:
             raise RuntimeError("no atlas has been initialized yet")
 
-        return get_atlas_structure(name, self._atlas_)
+        return get_atlas_structure(name, self._current_atlas_)
 
     @property
     def atlas(self):
         r"""Last initialized atlas
         """
-        if self._atlas_ is None:
+        if self._current_atlas_ is None:
             if self._atlas_name_to_initialize_ is None:
-                self._atlas_ = self.initAtlas()
+                self._current_atlas_ = self.initAtlas()
                 # scipywarn("No atlas has been initialized yet; please call one of:\n self.initAtlas(…)\n self.initAtlasForSpecies(…)\n self.installAtlas(…)\n")
             else:
-                self._atlas_ = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
+                self._current_atlas_ = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
 
-        return self._atlas_
+        return self._current_atlas_
 
     @property
     def localAtlases(self) -> dict:

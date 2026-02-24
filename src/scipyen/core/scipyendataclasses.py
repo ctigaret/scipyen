@@ -12,7 +12,7 @@ from collections import deque, namedtuple
 from functools import (singledispatch, singledispatchmethod)
 import itertools
 import datetime
-from enum import (Enum, IntEnum, EnumMeta) #noqa
+from enum import (Enum, IntEnum, EnumMeta, Flag, auto) #noqa
 import inspect
 import numbers
 import math
@@ -308,94 +308,122 @@ class NonPyramidalPrincipalNeuronType(TypeEnum):
     drg = 4
     other = 5
 
-
-
 class CellCompartmentType(TypeEnum):
-    r"""Follows SWC/CNIC specification at
+    r"""Insipired by SWC/CNIC specification at
     http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
 
-    supplemented.
-
     Refers to "gross" compartments; for a more granular types see AxonalCompartment
-    DendriticCompartment ChemicalSynapseComponent
+    DendriticCompartment ChemicalSynapseCompartment
     """
     undefined = 0
     cell = undefined
-    soma = 1
-    axon = 2
-    dendrite = 3
-    synapse = 4
-    plasmalemma = 5
-    perisynaptic = 6
-    extrasynaptic = 7
-    cilium = 8
-    flagellum = 9
-    microvillus = 10
-    filopodium = 11
-    lamellipodium = 12
-    cytoplasm = 13
-    organelle = 14
-    sarcolemma = 15
-    cytosol = 16
+    # cytoplasm = auto()
+    # cytosol = auto()
+    # plasmalemma = auto()
+    soma = auto()
+    axon = auto()
+    dendrite = auto()
+    # synapse = auto()
+    # perisynaptic = auto()
+    # extrasynaptic = auto()
+    cilium = auto()
+    flagellum = auto()
+    microvillus = auto()
+    filopodium = auto()
+    lamellipodium = auto()
+    organelle = auto()
 
+# class CellCompartmentType(Flag):
+#     r"""Follows SWC/CNIC specification at
+#     http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
+#
+#     supplemented.
+#
+#     Refers to "gross" compartments; for a more granular types see AxonalCompartment
+#     DendriticCompartment ChemicalSynapseCompartment
+#     """
+#     undefined = 0
+#     cell = undefined
+#     cytosol = auto()
+#     soma = auto()
+#     axon = auto()
+#     dendrite = auto()
+#     synapse = auto()
+#     plasmalemma = auto()
+#     cilium = auto()
+#     flagellum = auto()
+#     microvillus = auto()
+#     filopodium = auto()
+#     lamellipodium = auto()
+#     cytoplasm = auto()
+#     organelle = auto()
+#
 class AxonalCompartment(TypeEnum):
     undefined = 0
-    axolemma = 1
-    axoplasm = 2
-    initial = 3 # axon initial segment
-    node = 4 # Ranvier's node
-    internode = 5 # axon segment between two consecutive Ranvier nodes
-    myelin = 6 # myelin sheath
-    bouton = 7 # axonal bouton, "en passant"
-    terminal_bouton = 8
-    arborization = 9
-    collateral = 10
+    # axolemma =
+    # axoplasm = 2
+    initial = auto() # axon initial segment
+    node = auto() # Ranvier's node
+    internode = auto() # axon segment between two consecutive Ranvier nodes
+    myelin = auto() # myelin sheath
+    bouton = auto() # axonal bouton, "en passant"
+    terminal_bouton = auto()
+    arborization = auto()
+    collateral = auto()
 
 class DendriticCompartment(TypeEnum):
     undefined = 0
-    basal = 1 # basal dendrite, shaft
-    apical = 2 # apical dendrite, shaft
-    fork = 3 # dendritic branch point
-    end = 4 # dendritic end point
-    tuft = 5 # apical tuft
-    spine = 6
-    basal_spine = 7
-    apical_spine = 8
-    spine_head = 9
-    spine_neck = 10
-    spine_apparatus = 11
+    basal = auto() # basal dendrite, shaft
+    apical = auto()# apical dendrite, shaft
+    fork = auto()# dendritic branch point
+    end = auto()# dendritic end point
+    tuft = auto()# apical tuft
+    spine = auto()
+    spine_head = auto()
+    spine_neck = auto()
+    spine_apparatus = auto()
 
-class ChemicalSynapseComponent(TypeEnum):
+class ChemicalSynapseCompartment(TypeEnum):
     undefined = 0
-    presynaptic = 1
-    active_zone = 2 # presynaptic active zone
-    postsynaptic = 3
-    psd = 4 # postsynaptic density
-    cleft = 5
+    presynaptic = auto()
+    postsynaptic = auto()
+    perisynaptic = auto()
+    extrasynaptic = auto()
+    active_zone = auto() # presynaptic active zone
+    psd = auto() # postsynaptic density
+    cleft = auto()
 
-class ChemicalSynapseType(TypeEnum):
+class ChemicalSynapseMorphology(TypeEnum):
     undefined = 0
-    symmetrical = 1
-    asymmetrical = 2
-    excitatory = 3
-    inhibitory = 4
-    glomerulus = 5 # cerebellar glomerulus
-    mossy = 6 # hippocampal mossy fibre synapse
-    calyx = 7 # calyx of Held
-    nmj = 8 # neuromuscular junction
-    axosomatic = 9
-    axonendritic = 10
-    axoaxonic = 11
+    symmetrical = auto()
+    asymmetrical = auto()
+    glomerulus = auto() # cerebellar glomerulus
+    mossy = auto() # hippocampal mossy fibre synapse
+    calyx = auto() # calyx of Held
+    nmj = auto() # neuromuscular junction
+
+class PostsynapticEntity(TypeEnum):
+    undefined = 0
+    soma = auto()
+    dendrite = auto()
+    spine = auto()
+    axon = auto()
+
+class ChemicalSynapseFunctionalType(TypeEnum):
+    undefined = 0
+    excitatory = auto()
+    inhibitory = auto()
 
 class PlasmaMembraneSpecialization(TypeEnum):
     undefined = 0
-    neural_synapse = 1
-    chemical_synapse = 1
-    gap_junction = 2 # electrical synapse
-    electrical_synapse = 2
-    zonula_occludens = 3
-    zonula_adherens = 4
-    synapse = 5 # generic synapse including immunological synapse
+    neural_synapse = auto()
+    chemical_synapse = neural_synapse
+    gap_junction = auto() # electrical synapse
+    electrical_synapse = gap_junction
+    zonula_occludens = auto()
+    zonula_adherens = auto()
+    synapse = auto() # generic synapse including immunological synapse
+    caveolae = auto()
 
 class Organelle(TypeEnum):
     r"""including specializations.
@@ -403,44 +431,107 @@ class Organelle(TypeEnum):
 Excludes synapse components e.g. postsynaptic density, and plasmalemma
 """
     undefined = 0
-    cytoskeleton = 1
-    actin_filament = 2
-    myosin_filament = 3
-    microtubule = 4
-    actomyosin = 5 # includes polyribosomes
-    ribosome = 6 # actin + myosin
-    nuclear_envelope = 7
-    endoplasmic_reticulum = 8
+    actin_filament = auto()
+    spine_apparatus = auto()
+    myosin_filament = auto()
+    actomyosin = actin_filament + myosin_filament
+    microtubule = auto()
+    mitotic_spindle = auto()
+    centriole = auto()
+    cytoskeleton = sum(
+            (
+                actomyosin,
+                spine_apparatus,
+                microtubule,
+                mitotic_spindle,
+                centriole,
+            )
+        )
+    ribosome = auto()
+    lysosome = auto()
+    endosome = auto()
+    clathrin_coated = auto()
+    dynamin_associated = auto()
+    endocytotic = clathrin_coated + dynamin_associated
+    secretory_vesicle = auto()
+    synaptic_granule = auto()
+    synaptic_vesicle = auto()
+    transport_vesicle = auto()
+    exocytotic = sum(
+            (
+                secretory_vesicle,
+                synaptic_granule,
+                synaptic_vesicle,
+            )
+        )
+    endoplasmic_reticulum = auto()
+    vacuole = auto()
     er = endoplasmic_reticulum
-    vesicle = 9
-    transport_vesicle = 10
-    golgi_apparatus = 11
-    golgi_cis = 12
-    golgi_trans = 13
-    rough_endoplasmic_reticulum = 14 # ribosome + endoplasmic_reticulum
-    secretory_vesicle = 15
-    lysosome = 16
-    endosome = 17
-    endocytotic = 18 # includes clathrin-coated and dynamin-coated vesicles
-    caveolae = 19
-    exocitotic = 20
-    synaptic_vesicle = 21
-    nuclear_pore = 22
-    nucleus = 23
-    nucleolus = 24
-    heterochromatin = 25
-    euchromatin = 26
-    chromosome = 27
-    centriole = 28
-    mitotic_spindle = 29
-    vacuole = 30
-    inclusion = 31
-    other = 32
+    rough_endoplasmic_reticulum = ribosome + endoplasmic_reticulum
+    vesicle = endocytotic + exocytotic
+    golgi_cisterna = auto()
+    golgi_cis = auto()
+    golgi_trans = auto()
+    golgi_apparatus = sum(
+            (
+                golgi_cisterna,
+                golgi_cis,
+                golgi_trans,
+            )
+        )
+    nuclear_envelope = auto()
+    nuclear_pore = auto()
+    nucleolus = auto()
+    heterochromatin = auto()
+    euchromatin = auto()
+    chromatin = heterochromatin + euchromatin
+    chromosome = auto()
+    nucleus = sum(
+            (
+                nuclear_envelope,
+                nuclear_pore,
+                nucleolus,
+                chromatin,
+            )
+        )
+    inclusion = auto()
+    mitochondrial_matrix = auto()
+    mitochondrial_cristae = auto()
+    inner_mitochondrial_membrane = mitochondrial_cristae
+    outer_mitochondrial_membrane = auto()
+    mitochondria = sum(
+            (
+                inner_mitochondrial_membrane,
+                outer_mitochondrial_membrane,
+                mitochondrial_matrix
+            )
+        )
+    membrane_bound = sum(
+            (
+                lysosome,
+                endosome,
+                vesicle,
+                golgi_apparatus,
+                vacuole,
+                nucleus,
+                mitochondria
+            )
+        )
 
-class GeneticSex(TypeEnum):
+    other = auto()
+
+class ChromosomalSexDeterminism(TypeEnum):
+    r"""Organism where sex is determined by chromosome identity"""
     undefined = 0
-    female = 1
-    male = 2
+    XY = auto()
+    X0 = auto()
+    Z0 = auto
+    ZW = auto()
+    other = auto() # combinations of X+, Y+
+
+@dataclass
+class ChromosomalSex(ScipyenDataclass):
+    system: ChromosomalSexDeterminism = ChromosomalSexDeterminism.XY
 
 class BioSourceType(TypeEnum):
     undefined   = 0
@@ -500,73 +591,72 @@ class OrganismStage(TypeEnum):
     juvenile    = larva | adolescent # = 65
     postnatal   = larva | adolescent | adult # = 99
 
-class AdministrationRoute(TypeEnum):
+class AdministrationRoute(Flag):
     null = 0
-    bath = 1 # relates to ex vivo tissue slices
+    bath = auto() # relates to ex vivo tissue slices
     bulk = bath
-    puff = 2 # relates to ex vivo tissue slices — e.g. picospritzer, pressurized micropipette, etc
-    intraperitoneal = 4
+    puff = auto() # relates to ex vivo tissue slices — e.g. picospritzer, pressurized micropipette, etc
+    intraperitoneal = auto()
     ip = intraperitoneal
-    intramuscular = 8
+    intramuscular = auto()
     im = intramuscular
-    intravenous = 16
+    intravenous = auto()
     iv = intravenous
-    intraarterial = 32
+    intraarterial = auto()
     ia = intraarterial
-    intracerebral = 64 # must specify target structure via atlas reference
+    intracerebral = auto() # must specify target structure via atlas reference
     ic = intracerebral
-    intracerebroventricular = 128
+    intracerebroventricular = auto()
     icv = intracerebroventricular
-    intracardiac = 192
+    intracardiac = auto()
     icd = intracardiac
-    intracardioventricular = 384
+    intracardioventricular = auto()
     icdv = intracardioventricular
-    subcutaneous = 512
+    subcutaneous = auto()
     sc = subcutaneous
-    intradermal = 513
+    intradermal = auto()
     idr = intradermal # id is a python keyword
-    transcutaneous = 1024
+    transcutaneous = auto()
     tc = transcutaneous
-    peros = 2048
+    peros = auto()
     gavage = peros
     oral = peros
-    inhalation = 4096
+    inhalation = auto()
     inh = inhalation
-    intranasal = 8192
+    intranasal = auto()
     ins = intranasal # 'in' is a reserved Python keyword
-    intraorbital = 16384
+    intraorbital = auto()
     io = intraorbital
-    eye_drops = 24756
-    food_water = 32768
-    other = 65536
+    eye_drops = auto()
+    food_water = auto()
+    other = auto()
     custom = other
-
-@dataclass
-class CompartmentSpecification(ScipyenDataclass):
-    compartment: typing.Union[Organelle,
-                        AxonalCompartment,
-                        DendriticCompartment,
-                        PlasmaMembraneSpecialization] = 0
 
 @dataclass
 class NeuralChemicalSynapse(ScipyenDataclass):
     synapseType: ChemicalSynapseType = ChemicalSynapseType.undefined
-    synapseComponent: ChemicalSynapseComponent = ChemicalSynapseComponent.undefined
+    synapseComponent: ChemicalSynapseCompartment = ChemicalSynapseCompartment.undefined
+
+# @dataclass
+# class CompartmentSpecification(ScipyenDataclass):
+#     compartmentType: CellCompartmentType = CellCompartmentType.undefined
+
 
 @dataclass
 class CellCompartment(ScipyenDataclass):
-    # name:typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
     compartmentType: CellCompartmentType = CellCompartmentType.undefined
     compartmentID:int = 0
-    compartmentSpecification: typing.Union[
-        CompartmentSpecification,
-        NeuralChemicalSynapse
-        ] = dataclasses.field(
-            default_factory = CompartmentSpecification)
+    subCompartment: typing.Optional[
+        typing.Union[
+            AxonalCompartment,
+            DendriticCompartment,
+            ChemicalSynapseCompartment
+            ]
+        ] = dataclasses.field(default = None)
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        indent = lambda x: x.replace("\n", "\n\t") # noqa
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -659,7 +749,7 @@ class Organ(ScipyenDataclass):
     #   and by the atlas is belongs to; therefore they can be uniquely compared
     #   for equality using only these two attributes (or rather elements of the
     #   source underlying dictionary)
-    brainGlobeAtlasName: typing.Union[str, type(pd.NA)] = pd.NA
+    atlasName: typing.Union[str, type(pd.NA)] = pd.NA
     structure: BGStructureDescriptor = BGStructureDescriptor()
 
 @dataclass
@@ -679,6 +769,19 @@ class Cell(ScipyenDataclass):
     cellCompartment: CellCompartment = dataclasses.field(default_factory=CellCompartment)
 
     parent: typing.Optional[typing.Union[Organ, Tissue]] = dataclasses.field(default_factory = Tissue)
+
+@dataclass
+class Neuron(Cell):
+    def __post_init__(self: typing.Self):
+        super().__init__(
+            self, name=self.name, description=self.description,
+            cellType = "neuron",
+            cellSubType = self.cellSubType,
+            cellID = self.cellID,
+            )
+        # if self.cellCompartment.compartmentType == CellCompartment.soma:
+
+
 
 @dataclass
 class BiologicalSource(ScipyenDataclass):
@@ -813,7 +916,7 @@ class Treatment(Procedure):
 
     def __post_init__(self):
         super().__init__(name=self.name, description=self.description,
-                         type = ProcedureType.treatment)
+                         procedureType = ProcedureType.treatment)
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
