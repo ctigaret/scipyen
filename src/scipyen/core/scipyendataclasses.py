@@ -438,13 +438,6 @@ class PlasmaMembraneSpecializationType(TypeEnum):
     synapse = auto() # generic synapse including immunological synapse
     caveolae = auto()
 
-@dataclass
-class ChemicalSynapse(ScipyenDataclass):
-    morphologicalType : ChemicalSynapseMorphologicalType = ChemicalSynapseMorphologicalType.undefined
-    functionalType: ChemicalSynapseFunctionalType = ChemicalSynapseFunctionalType.undefined
-    postsynapticEntityType: PostsynapticEntityType = PostsynapticEntityType.undefined
-    parent: Neuron = dataclasses.field(default_factory = Neuron)
-
 class UltrastructureElementType(TypeEnum):
     r"""Organelles, etc.
 Excludes chemical synapse components e.g. postsynaptic density
@@ -680,41 +673,6 @@ class AdministrationRoute(Flag):
 #     compartmentType: CellCompartmentType = CellCompartmentType.undefined
 
 @dataclass
-class UltrastructureElement(ScipyenDataclass):
-    elementType: UltrastructureElementType = UltrastructureElementType.undefined
-    parent: Cell = dataclasses.field(default_factory = Cell)
-
-@dataclass
-class CellCompartment(ScipyenDataclass):
-    compartmentType: CellCompartmentType = CellCompartmentType.undefined
-    compartmentID:int = 0
-    parent: Cell = dataclasses.field(default_factory = Cell)
-
-    def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t") # noqa
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
-        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
-        return "\n".join(ret)
-
-    def __eq__(self, other) -> bool:
-        return super().__eq__(other)
-
-@dataclass
-class NeuronCompartment(ScipyenDataclass):
-    compartmentType: NeuronCompartmentType = NeuronCompartmentType.undefined
-    compartmentID:int = 0
-    parent: Neuron = dataclasses.field(default_factory = Neuron)
-
-    def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t") # noqa
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
-        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
-        return "\n".join(ret)
-
-    def __eq__(self, other) -> bool:
-        return super().__eq__(other)
-
-@dataclass
 class Biometrics(ScipyenDataclass):
     genotype: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
     # genotype of the source - keep it simple
@@ -816,17 +774,26 @@ class Cell(ScipyenDataclass):
     cellSubType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
     cellID: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
-    cellCompartment: CellCompartment = dataclasses.field(default_factory=CellCompartment)
-
     parent: typing.Optional[typing.Union[Organ, Tissue]] = dataclasses.field(default_factory = Tissue)
+
+@dataclass
+class CellCompartment(ScipyenDataclass):
+    compartmentType: CellCompartmentType = CellCompartmentType.undefined
+    compartmentID:int = 0
+    parent: Cell = dataclasses.field(default_factory = Cell)
+
+    def __repr__(self):
+        indent = lambda x: x.replace("\n", "\n\t") # noqa
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
+        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
+        return "\n".join(ret)
+
+    def __eq__(self, other) -> bool:
+        return super().__eq__(other)
 
 @dataclass
 class Neuron(Cell):
     cellSubType: NeuronType = NeuronType.undefined
-    cellCompartment: NeuronCompartment = dataclasses.field(default_factory=NeuronCompartment)
-    subCompartment: typing.Optional[
-        typing.Union[DendriticCompartment, AxonalCompartment]
-        ]
     def __post_init__(self: typing.Self):
         super().__init__(
             self, name=self.name, description=self.description,
@@ -834,6 +801,21 @@ class Neuron(Cell):
             cellSubType = self.cellSubType,
             cellID = self.cellID,
             )
+
+@dataclass
+class NeuronCompartment(ScipyenDataclass):
+    compartmentType: NeuronCompartmentType = NeuronCompartmentType.undefined
+    compartmentID:int = 0
+    parent: Neuron = dataclasses.field(default_factory = Neuron)
+
+    def __repr__(self):
+        indent = lambda x: x.replace("\n", "\n\t") # noqa
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
+        ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
+        return "\n".join(ret)
+
+    def __eq__(self, other) -> bool:
+        return super().__eq__(other)
 
 @dataclass
 class AxonalCompartment(ScipyenDataclass):
@@ -844,6 +826,18 @@ class AxonalCompartment(ScipyenDataclass):
 class DendriticCompartment(ScipyenDataclass):
     compartmentType: DendriticCompartmentType = DendriticCompartmentType.undefined
     parent: Neuron = dataclasses.field(default_factory = Neuron)
+
+@dataclass
+class ChemicalSynapse(ScipyenDataclass):
+    morphologicalType : ChemicalSynapseMorphologicalType = ChemicalSynapseMorphologicalType.undefined
+    functionalType: ChemicalSynapseFunctionalType = ChemicalSynapseFunctionalType.undefined
+    postsynapticEntityType: PostsynapticEntityType = PostsynapticEntityType.undefined
+    parent: Neuron = dataclasses.field(default_factory = Neuron)
+
+@dataclass
+class UltrastructureElement(ScipyenDataclass):
+    elementType: UltrastructureElementType = UltrastructureElementType.undefined
+    parent: Cell = dataclasses.field(default_factory = Cell)
 
 @dataclass
 class BiologicalSource(ScipyenDataclass):
