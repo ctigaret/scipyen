@@ -370,6 +370,7 @@ class AxonalCompartment(TypeEnum):
     terminal_bouton = auto()
     arborization = auto()
     collateral = auto()
+    other = auto()
 
 class DendriticCompartment(TypeEnum):
     undefined = 0
@@ -378,19 +379,51 @@ class DendriticCompartment(TypeEnum):
     fork = auto()# dendritic branch point
     end = auto()# dendritic end point
     tuft = auto()# apical tuft
+    shaft = auto()
     spine = auto()
     spine_head = auto()
     spine_neck = auto()
     spine_apparatus = auto()
+    other = auto()
 
-class ChemicalSynapseCompartment(TypeEnum):
+class ChemicalSynapseUltrastructureElement(TypeEnum):
     undefined = 0
-    presynaptic = auto()
-    postsynaptic = auto()
+    presynaptic_membrane = auto()
+    presynaptic_cytoskeleton = auto()
+    presynaptic_vesicle = auto()
+    presynaptic_docked = auto()
+    rrp = presynaptic_docked
+    presynaptic_recycling_pool = auto()
+    presynaptic_reserve_pool = auto()
+    presynaptic_vesicles = sum(
+            (
+                presynaptic_vesicle,
+                presynaptic_docked,
+                presynaptic_recycling_pool,
+                presynaptic_reserve_pool
+            )
+        )
+    active_zone = auto() # presynaptic active zone
+    presynaptic_compartment = sum(
+            (
+                presynaptic_membrane,
+                presynaptic_cytoskeleton,
+                presynaptic_vesicles,
+                active_zone
+            )
+        )
+    postsynaptic_membrane = auto()
+    postsynaptic_cytoskeleton = auto()
+    psd = auto() # postsynaptic density
+    postsynaptic_compartment = sum(
+            (
+                postsynaptic_membrane,
+                postsynaptic_cytoskeleton,
+                psd
+            )
+        )
     perisynaptic = auto()
     extrasynaptic = auto()
-    active_zone = auto() # presynaptic active zone
-    psd = auto() # postsynaptic density
     cleft = auto()
 
 class ChemicalSynapseMorphology(TypeEnum):
@@ -401,6 +434,7 @@ class ChemicalSynapseMorphology(TypeEnum):
     mossy = auto() # hippocampal mossy fibre synapse
     calyx = auto() # calyx of Held
     nmj = auto() # neuromuscular junction
+    other = auto()
 
 class PostsynapticEntity(TypeEnum):
     undefined = 0
@@ -416,8 +450,8 @@ class ChemicalSynapseFunctionalType(TypeEnum):
 
 class PlasmaMembraneSpecialization(TypeEnum):
     undefined = 0
-    neural_synapse = auto()
-    chemical_synapse = neural_synapse
+    chemical_synapse = auto()
+    neural_synapse = chemical_synapse
     gap_junction = auto() # electrical synapse
     electrical_synapse = gap_junction
     zonula_occludens = auto()
@@ -425,12 +459,13 @@ class PlasmaMembraneSpecialization(TypeEnum):
     synapse = auto() # generic synapse including immunological synapse
     caveolae = auto()
 
-class Organelle(TypeEnum):
-    r"""including specializations.
-
-Excludes synapse components e.g. postsynaptic density, and plasmalemma
+class UltrastructureElement(TypeEnum):
+    r"""Organelles, etc.
+Excludes chemical synapse components e.g. postsynaptic density
 """
     undefined = 0
+    plasmalemma = auto()
+    cytosol = auto()
     actin_filament = auto()
     spine_apparatus = auto()
     myosin_filament = auto()
@@ -447,7 +482,7 @@ Excludes synapse components e.g. postsynaptic density, and plasmalemma
                 centriole,
             )
         )
-    ribosome = auto()
+    ribosome = auto() # includes polyribosomes
     lysosome = auto()
     endosome = auto()
     clathrin_coated = auto()
@@ -518,76 +553,106 @@ Excludes synapse components e.g. postsynaptic density, and plasmalemma
             )
         )
 
+    organelle = sum(
+            (
+                membrane_bound,
+                cytoskeleton,
+                ribosome,
+                inclusion
+            )
+        )
+
+    cytoplasm = cytosol + organelle
+
+    whole_cell = cytoplasm + plasmalemma
+
     other = auto()
 
-class ChromosomalSexDeterminism(TypeEnum):
-    r"""Organism where sex is determined by chromosome identity"""
-    undefined = 0
-    XY = auto()
-    X0 = auto()
-    Z0 = auto
-    ZW = auto()
-    other = auto() # combinations of X+, Y+
+# class ChromosomalSexDeterminism(TypeEnum):
+#     r"""Organism where sex is determined by chromosome identity"""
+#     undefined = 0
+#     XY = auto()
+#     X0 = auto()
+#     Z0 = auto()
+#     ZW = auto()
+#     other = auto() # combinations of X+, Y+
 
-@dataclass
-class ChromosomalSex(ScipyenDataclass):
-    system: ChromosomalSexDeterminism = ChromosomalSexDeterminism.XY
+class GeneticSex(TypeEnum):
+    undefined = 0
+    female = 1
+    male = 2
+
+# @dataclass
+# class ChromosomalSex(ScipyenDataclass):
+#     system: ChromosomalSexDeterminism = ChromosomalSexDeterminism.XY
 
 class BioSourceType(TypeEnum):
     undefined   = 0
-    exvivo      = 1     # tissue or organ sample from organism
-    invitro     = 2     # culture system
-    insilico    = 4     # biological/biophysical/mathematical model
-    monolayer   = 8     # dissociated cells, cultured, possibly confluent
+    exvivo      = auto()     # tissue or organ sample from organism
+    invitro     = auto()     # culture system
+    insilico    = auto()     # biological/biophysical/mathematical model
+    monolayer   = auto()     # dissociated cells, cultured, possibly confluent
     culture     = invitro | monolayer
-    tissue      = 16    # e.g. aortic strip, teania caeci/coli, etc
+    tissue      = auto()    # e.g. aortic strip, teania caeci/coli, etc
     acute_slice = exvivo | tissue # e.g. acute brain slice = exvivo | tissue = 17
-    organtypic = 18 # e.g. "organotypic" slice culture = invitro | tissue  = 18
-    assembloid  = 32
+    organtypic  = invitro | tissue # e.g. "organotypic" slice culture = invitro | tissue  = 18
+    assembloid  = auto()
     organ       = exvivo | assembloid # e.g. isolated hear, aorta, ileum, 33
     organoid    = invitro | assembloid # i.e, 34
-    invivo      = 64 # e.g. in vivo imaging, electrophysiology, etc
-    organism    = 128 # for behaviour and systemic measurements (temperature, mass, motor function, etc)
-    blood       = 256
-    serum       = 257
-    plasma      = 258
-    marrow      = 384
-    exudate     = 512
-    secretion   = 513
-    excretion   = 1024
-    urine       = 1025
-    faeces      = 1026
-    pus         = 2048
+    invivo      = auto() # e.g. in vivo imaging, electrophysiology, etc
+    organism    = auto() # for behaviour and systemic measurements (temperature, mass, motor function, etc)
+    serum       = auto()
+    plasma      = auto()
+    rbc         = auto()
+    wbc         = auto()
+    thrombocyte = auto()
+    platelet    = thrombocyte
+    blood       = sum(
+            (
+                serum,
+                plasma,
+                rbc,
+                wbc,
+                thrombocyte
+            )
+        )
+    marrow      = auto()
+    secretion   = auto()
+    urine       = auto()
+    faeces      = auto()
+    excretion   = (urine + faeces)
+    exudate     = auto()
+    pus         = auto()
 
 class ProcedureType(TypeEnum):
     null = 0
-    mating = 1
-    treatment = 2
-    behaviour = 4 # includes motor functions
-    surgery = 8
-    biopsy = 16
-    postop = 32
+    mating = auto()
+    treatment = auto()
+    behaviour = auto() # includes motor functions
+    surgery = auto()
+    biopsy = auto()
+    postop = auto()
     recovery = postop
-    tagging = 64
-    weaning = 128
-    cull = 256
-    other = 512
+    tagging = auto()
+    weaning = auto()
+    cull = auto()
+    other = auto()
 
 class OrganismStage(TypeEnum):
     undefined   = 0
-    zygote      = 1
-    morula      = 2
-    blastula    = 4
-    gastrula    = 8
+    zygote      = auto()
+    morula      = auto()
+    blastula    = auto()
+    gastrula    = auto()
     embryo      = zygote | morula | blastula | gastrula # = 15
-    foetal      = 16
+    foetal      = auto()
     prenatal = embryo | foetal # = 31
-    larva       = 32
+    larva       = auto()
     pup         = larva
     prepubertal = larva
     preweaning  = prepubertal
-    adolescent  = 33
-    adult       = 34
+    adolescent  = auto()
+    adult       = auto()
     juvenile    = larva | adolescent # = 65
     postnatal   = larva | adolescent | adult # = 99
 
@@ -632,10 +697,10 @@ class AdministrationRoute(Flag):
     other = auto()
     custom = other
 
-@dataclass
-class NeuralChemicalSynapse(ScipyenDataclass):
-    synapseType: ChemicalSynapseType = ChemicalSynapseType.undefined
-    synapseComponent: ChemicalSynapseCompartment = ChemicalSynapseCompartment.undefined
+# @dataclass
+# class NeuralChemicalSynapse(ScipyenDataclass):
+#     synapseType: ChemicalSynapseType = ChemicalSynapseType.undefined
+#     synapseComponent: ChemicalSynapseCompartment = ChemicalSynapseCompartment.undefined
 
 # @dataclass
 # class CompartmentSpecification(ScipyenDataclass):
@@ -646,13 +711,6 @@ class NeuralChemicalSynapse(ScipyenDataclass):
 class CellCompartment(ScipyenDataclass):
     compartmentType: CellCompartmentType = CellCompartmentType.undefined
     compartmentID:int = 0
-    subCompartment: typing.Optional[
-        typing.Union[
-            AxonalCompartment,
-            DendriticCompartment,
-            ChemicalSynapseCompartment
-            ]
-        ] = dataclasses.field(default = None)
 
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t") # noqa
