@@ -311,8 +311,8 @@ class NeuronType(TypeEnum):
         )
     principal = pyramidal + nonpyramidal
     interneuron = auto()
+    inhibitory = auto()
     other = auto()
-
 
 class CellCompartmentType(TypeEnum):
     r"""Insipired by SWC/CNIC specification at
@@ -675,7 +675,6 @@ class AdministrationRoute(Flag):
 
 @dataclass
 class Biometrics(ScipyenDataclass):
-    genotype: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
     # genotype of the source - keep it simple
     #
     # NOTE: avoid strings like (+/-, TSNeo/-, etc) as they don't play well when
@@ -683,10 +682,12 @@ class Biometrics(ScipyenDataclass):
     # These are entirely conventional, and, within the same line of genetic
     # animal model they would have a well-defined meaning
     #
+    genotype: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
-    sex: GeneticSex = GeneticSex.undefined
+    geneticSex: GeneticSex = GeneticSex.undefined
     # ID of source sex (where appropriate); one of "f", "m", "na" (case-insensitive)
     #
+    stage: OrganismStage = OrganismStage.postnatal
 
     age: typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
     # animal's age (more generaly the age of the biological source)- almost
@@ -697,14 +698,12 @@ class Biometrics(ScipyenDataclass):
     # provide a more standardized way to store this information, hopefully more
     # suitable to some sort of database management
 
-    postnatal: bool = True
-
     weight:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
     height:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        indent = lambda x: x.replace("\n", "\n\t") # noqa
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -716,13 +715,9 @@ class Organism(ScipyenDataclass):
     taxon: TaxonDescriptor = TaxonDescriptor()
     subspecies: str = ""
     strain: str = ""
-    stage: OrganismStage = dataclasses.field(default=OrganismStage.postnatal)
+
     biometrics: Biometrics = dataclasses.field(default_factory=Biometrics)
     ID: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-
-    def __post_init__(self):
-        if isinstance(self.biometrics, Biometrics):
-            self.biometrics.postnatal = self.stage > OrganismStage.prenatal
 
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t") # noqa
@@ -736,12 +731,6 @@ class Organism(ScipyenDataclass):
 @dataclass
 class Organ(ScipyenDataclass):
     from core.bgbridge import BGStructureDescriptor
-    sourceType: BioSourceType = (
-        BioSourceType.exvivo |
-        BioSourceType.invitro |
-        BioSourceType.invivo |
-        BioSourceType.organ
-        )
     # Specific organ structure, if relevant.
     #
     # For now, only brain atlas api (brainglobe_atlasapi.structure) is supported;
@@ -772,52 +761,29 @@ class Organ(ScipyenDataclass):
 @dataclass
 class Tissue(ScipyenDataclass):
     r"""Tissue"""
-    sourceType: BioSourceType = (
-        BioSourceType.exvivo |
-        BioSourceType.invitro |
-        BioSourceType.invivo |
-        BioSourceType.tissue
-        )
-    name:str = dataclasses.field(default_factory=str)
-    description: str = dataclasses.field(default_factory=str)
     parent: Organ = dataclasses.field(default_factory = Organ)
 
 @dataclass
 class Cell(ScipyenDataclass):
-    sourceType: BioSourceType = (
-        BioSourceType.exvivo |
-        BioSourceType.invitro |
-        BioSourceType.invivo |
-        BioSourceType.cell |
-        )
     cellType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g., "neuron", "glia", etc
     cellSubType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
-    cellID: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
     parent: typing.Optional[typing.Union[Organ, Tissue]] = dataclasses.field(default_factory = Tissue)
 
 @dataclass
 class Neuron(Cell):
     cellSubType: NeuronType = NeuronType.undefined
+
     def __post_init__(self: typing.Self):
-        assert isinstance()
         super().__init__(
-            self, name=self.name, description=self.description,
+            self, self.name, self.description,
             cellType = "neuron",
             cellSubType = self.cellSubType,
-            cellID = self.cellID,
             )
 
 @dataclass
 class CellCompartment(ScipyenDataclass):
-    sourceType: BioSourceType = (
-        BioSourceType.exvivo |
-        BioSourceType.invitro |
-        BioSourceType.cell |
-        BioSourceType.compartment
-        )
     compartmentType: CellCompartmentType = CellCompartmentType.undefined
-    compartmentID:int = 0
     parent: Cell = dataclasses.field(default_factory = Cell)
 
     def __repr__(self):
@@ -832,14 +798,7 @@ class CellCompartment(ScipyenDataclass):
 
 @dataclass
 class NeuronCompartment(CellCompartment):
-    sourceType: BioSourceType = (
-        BioSourceType.exvivo |
-        BioSourceType.invitro |
-        BioSourceType.cell |
-        BioSourceType.compartment
-        )
     compartmentType: NeuronCompartmentType = NeuronCompartmentType.undefined
-    compartmentID:int = 0
     parent: Neuron = dataclasses.field(default_factory = Neuron)
 
     def __post_init__(self: typing.Self):
@@ -926,24 +885,10 @@ class BiologicalSource(ScipyenDataclass):
         default = BioSourceType.exvivo
         )
 
-    # Identifier of this source: this can be any meaningful combination of:
-    #   animal ID, experimental date,  brain region, etc as long as they are
-    #   merged into a single string which is also a valid python identifier i.e.,
-    #   satisfies the following rules:
-    #
-    #   1) contains ONLY alphanumeric characters and underscore ('_')
-    #   2) DOES NOT begin with a digit or underscore ('_')
-    #
-    #   e.g. TS2_1234567_01_02_22_VisCx_
-    #
-    # Think of it as "Sample ID"
-    #
-    #   Default: pandas.NA
-    sourceID: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
-
     # Specimen where the experiment or investigation was conducted:
     # Organ, Tissue, or Cell (if Cell, its 'parent' — Organ or Tissue — should
     # also be specified)
+    # Equivalent to the unit of analysis
     specimen: typing.Union[
         Organism,
         Organ,
@@ -956,17 +901,6 @@ class BiologicalSource(ScipyenDataclass):
         ] = dataclasses.field(
                 default_factory = Cell
             )
-
-    # cellCompartment: typing.Optional[CellCompartment] = None
-    #
-    # cellSubCompartment: typing.Optional[
-    #     typing.Union[CellCompartment, ChemicalSynapse]
-    #     ] = None
-    #
-    # ultrastructureElement: typing.Optional[UltrastructureElement] = None
-
-    # def __post_init__(self: typing.Self):
-    #     if isinstance
 
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t") # noqa

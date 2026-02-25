@@ -69,7 +69,6 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
             else:
                 setattr(self, f"_{name}", pd.NA)
 
-
         self._available_genotypes_ = kwargs.pop("default_genotypes", GENOTYPES)
         self._available_sex_ = ["NA", "F", "M"]
 
