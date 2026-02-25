@@ -554,35 +554,36 @@ class GeneticSex(TypeEnum):
 
 class BioSourceType(TypeEnum):
     undefined   = 0
-    exvivo      = auto()     # tissue or organ sample from organism
-    invitro     = auto()     # culture system
-    insilico    = auto()     # biological/biophysical/mathematical model
-    monolayer   = auto()     # dissociated cells, cultured, possibly confluent
-    culture     = invitro | monolayer
+    insilico    = auto()    # biological/biophysical/mathematical model
+    exvivo      = auto()    # tissue or organ sample from organism
+    invitro     = auto()    # culture system, homogenate
+    invivo      = auto()    # e.g. in vivo imaging, electrophysiology, etc
+    organism    = auto()    # for behaviour and systemic measurements (temperature, mass, motor function, etc)
+    organ       = auto()    # e.g. isolated hear, aorta, ileum, 33
     tissue      = auto()    # e.g. aortic strip, teania caeci/coli, etc
-    acute_slice = exvivo | tissue # e.g. acute brain slice = exvivo | tissue = 17
-    organtypic  = invitro | tissue # e.g. "organotypic" slice culture = invitro | tissue  = 18
-    assembloid  = auto()
-    organ       = exvivo | assembloid # e.g. isolated hear, aorta, ileum, 33
-    organoid    = invitro | assembloid # i.e, 34
-    invivo      = auto() # e.g. in vivo imaging, electrophysiology, etc
-    organism    = auto() # for behaviour and systemic measurements (temperature, mass, motor function, etc)
-    serum       = auto()
-    plasma      = auto()
-    rbc         = auto()
-    wbc         = auto()
+    # marrow      = auto() # this is an organ!
+    cell        = auto()
     thrombocyte = auto()
     platelet    = thrombocyte
+    compartment = auto()
+    ultrastructure = auto()
+    serum       = auto()
+    plasma      = auto()
+    homogenate  = auto()
+    monolayer   = invitro | cell # dissociated cells, cultured, possibly confluent
+    culture     = monolayer
+    acute_slice = exvivo | tissue # e.g. acute brain slice = exvivo | tissue = 17
+    organtypic  = invitro | tissue # e.g. "organotypic" slice culture = invitro | tissue  = 18
+    organoid    = invitro | organ
+    assembloid  = organoid # i.e, 34
     blood       = sum(
             (
                 serum,
                 plasma,
-                rbc,
-                wbc,
+                cell,
                 thrombocyte
             )
         )
-    marrow      = auto()
     secretion   = auto()
     urine       = auto()
     faeces      = auto()
@@ -724,8 +725,8 @@ class Organism(ScipyenDataclass):
             self.biometrics.postnatal = self.stage > OrganismStage.prenatal
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x.name}" if isinstance(x, Enum) else f": {type(x).__name__} → {x}"
+        indent = lambda x: x.replace("\n", "\n\t") # noqa
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x.name}" if isinstance(x, Enum) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -735,6 +736,12 @@ class Organism(ScipyenDataclass):
 @dataclass
 class Organ(ScipyenDataclass):
     from core.bgbridge import BGStructureDescriptor
+    sourceType: BioSourceType = (
+        BioSourceType.exvivo |
+        BioSourceType.invitro |
+        BioSourceType.invivo |
+        BioSourceType.organ
+        )
     # Specific organ structure, if relevant.
     #
     # For now, only brain atlas api (brainglobe_atlasapi.structure) is supported;
@@ -760,16 +767,29 @@ class Organ(ScipyenDataclass):
     #   source underlying dictionary)
     atlasName: typing.Union[str, type(pd.NA)] = pd.NA
     structure: BGStructureDescriptor = BGStructureDescriptor()
+    parent: Organism = dataclasses.field(default_factory = Organism)
 
 @dataclass
 class Tissue(ScipyenDataclass):
     r"""Tissue"""
+    sourceType: BioSourceType = (
+        BioSourceType.exvivo |
+        BioSourceType.invitro |
+        BioSourceType.invivo |
+        BioSourceType.tissue
+        )
     name:str = dataclasses.field(default_factory=str)
     description: str = dataclasses.field(default_factory=str)
     parent: Organ = dataclasses.field(default_factory = Organ)
 
 @dataclass
 class Cell(ScipyenDataclass):
+    sourceType: BioSourceType = (
+        BioSourceType.exvivo |
+        BioSourceType.invitro |
+        BioSourceType.invivo |
+        BioSourceType.cell |
+        )
     cellType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g., "neuron", "glia", etc
     cellSubType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
     cellID: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
@@ -777,7 +797,25 @@ class Cell(ScipyenDataclass):
     parent: typing.Optional[typing.Union[Organ, Tissue]] = dataclasses.field(default_factory = Tissue)
 
 @dataclass
+class Neuron(Cell):
+    cellSubType: NeuronType = NeuronType.undefined
+    def __post_init__(self: typing.Self):
+        assert isinstance()
+        super().__init__(
+            self, name=self.name, description=self.description,
+            cellType = "neuron",
+            cellSubType = self.cellSubType,
+            cellID = self.cellID,
+            )
+
+@dataclass
 class CellCompartment(ScipyenDataclass):
+    sourceType: BioSourceType = (
+        BioSourceType.exvivo |
+        BioSourceType.invitro |
+        BioSourceType.cell |
+        BioSourceType.compartment
+        )
     compartmentType: CellCompartmentType = CellCompartmentType.undefined
     compartmentID:int = 0
     parent: Cell = dataclasses.field(default_factory = Cell)
@@ -791,22 +829,25 @@ class CellCompartment(ScipyenDataclass):
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
 
-@dataclass
-class Neuron(Cell):
-    cellSubType: NeuronType = NeuronType.undefined
-    def __post_init__(self: typing.Self):
-        super().__init__(
-            self, name=self.name, description=self.description,
-            cellType = "neuron",
-            cellSubType = self.cellSubType,
-            cellID = self.cellID,
-            )
 
 @dataclass
-class NeuronCompartment(ScipyenDataclass):
+class NeuronCompartment(CellCompartment):
+    sourceType: BioSourceType = (
+        BioSourceType.exvivo |
+        BioSourceType.invitro |
+        BioSourceType.cell |
+        BioSourceType.compartment
+        )
     compartmentType: NeuronCompartmentType = NeuronCompartmentType.undefined
     compartmentID:int = 0
     parent: Neuron = dataclasses.field(default_factory = Neuron)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.compartmentType, NeuronCompartmentType), f"Wrong compartment type: {self.compartmentType}"
+        assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
+        super().__init__(self, compartmentType = self.compartmentType,
+                         compartmentID = self.compartmentID,
+                         parent = self.parent)
 
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t") # noqa
@@ -818,26 +859,49 @@ class NeuronCompartment(ScipyenDataclass):
         return super().__eq__(other)
 
 @dataclass
-class AxonalCompartment(ScipyenDataclass):
+class AxonalCompartment(NeuronCompartment):
     compartmentType: AxonalCompartmentType = AxonalCompartmentType.undefined
     parent: Neuron = dataclasses.field(default_factory = Neuron)
 
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.compartmentType, AxonalCompartmentType), f"Wrong compartment type: {self.compartmentType}"
+        assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
+        super().__init__(self, compartmentType = self.compartmentType,
+                         compartmentID = self.compartmentID,
+                         parent = self.parent)
+
 @dataclass
-class DendriticCompartment(ScipyenDataclass):
+class DendriticCompartment(NeuronCompartment):
     compartmentType: DendriticCompartmentType = DendriticCompartmentType.undefined
     parent: Neuron = dataclasses.field(default_factory = Neuron)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.compartmentType, DendriticCompartmentType), f"Wrong compartment type: {self.compartmentType}"
+        assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
+        super().__init__(self, compartmentType = self.compartmentType,
+                         compartmentID = self.compartmentID,
+                         parent = self.parent)
 
 @dataclass
 class ChemicalSynapse(ScipyenDataclass):
     morphologicalType : ChemicalSynapseMorphologicalType = ChemicalSynapseMorphologicalType.undefined
     functionalType: ChemicalSynapseFunctionalType = ChemicalSynapseFunctionalType.undefined
     postsynapticEntityType: PostsynapticEntityType = PostsynapticEntityType.undefined
-    parent: Neuron = dataclasses.field(default_factory = Neuron)
+    preSynapticParent: Neuron = dataclasses.field(default_factory = Neuron)
+    postSynapticParent: Neuron = dataclasses.field(default_factory = Neuron)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
 
 @dataclass
 class UltrastructureElement(ScipyenDataclass):
     elementType: UltrastructureElementType = UltrastructureElementType.undefined
     parent: Cell = dataclasses.field(default_factory = Cell)
+
+@dataclass
+class ChemicalSynapseUltrastructureElement(UltrastructureElement):
+    elementType: ChemicalSynapseUltrastructureElementType = ChemicalSynapseUltrastructureElementType.undefined # noqa
+    parent: ChemicalSynapse = dataclasses.field(default_factory = ChemicalSynapse)
 
 @dataclass
 class BiologicalSource(ScipyenDataclass):
@@ -854,7 +918,7 @@ class BiologicalSource(ScipyenDataclass):
     # biometrics.
     # See Organism class in this module
     # organism:Organism = dataclasses.field(default=Organism("rat"))
-    organism:Organism = dataclasses.field(default_factory = Organism)
+    # organism:Organism = dataclasses.field(default_factory = Organism)
 
     # Type of source: ex vivo, in vitro, culture, whole organism, see BioSourceType
     # Default: BioSourceType.exvivo
@@ -880,15 +944,33 @@ class BiologicalSource(ScipyenDataclass):
     # Specimen where the experiment or investigation was conducted:
     # Organ, Tissue, or Cell (if Cell, its 'parent' — Organ or Tissue — should
     # also be specified)
-    specimen: typing.Union[Organ, Tissue, Cell] = dataclasses.field(
-        default_factory = Cell)
+    specimen: typing.Union[
+        Organism,
+        Organ,
+        Tissue,
+        Cell,
+        CellCompartment,
+        ChemicalSynapse,
+        UltrastructureElement,
+        ChemicalSynapseUltrastructureElement
+        ] = dataclasses.field(
+                default_factory = Cell
+            )
+
+    # cellCompartment: typing.Optional[CellCompartment] = None
+    #
+    # cellSubCompartment: typing.Optional[
+    #     typing.Union[CellCompartment, ChemicalSynapse]
+    #     ] = None
+    #
+    # ultrastructureElement: typing.Optional[UltrastructureElement] = None
 
     # def __post_init__(self: typing.Self):
     #     if isinstance
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        indent = lambda x: x.replace("\n", "\n\t") # noqa
+        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
