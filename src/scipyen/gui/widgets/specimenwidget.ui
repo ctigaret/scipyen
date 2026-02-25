@@ -33,7 +33,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>TextLabel</string>
+    <string>Specimen Type</string>
    </property>
   </widget>
  </widget>
