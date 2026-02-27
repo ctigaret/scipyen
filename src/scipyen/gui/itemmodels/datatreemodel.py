@@ -24,7 +24,7 @@ import enum
 from functools import singledispatchmethod
 from collections import deque, UserDict
 from dataclasses import MISSING
-import math
+import math # noqa
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -461,8 +461,22 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
             pItem.setData(QtCore.QVariant(accessType), ObjectDataAccessTypeRole) # noqa
 
+
             if parentItem:
                 parentItem.insertRow(row, rowItems)
+
+            if not issubclass(
+                type(obj), NOTMEMOIZED + PODS
+            ):
+                if id(obj) in self._visited_:
+                    x = self._visited_.get(id(obj), None)
+                    if x is not None:
+                        oType = x[1]
+                        path = x[2]
+                        desc = f"<reference to {oType.__name__} at {path}>"
+                else:
+                    itemPath = self._getPathForItemOrIndex_(pItem)
+                    self._memoize_(obj, itemPath)
 
         for key, value in obj.items():
             if isinstance(key, str):
