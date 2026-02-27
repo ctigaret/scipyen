@@ -213,6 +213,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         self._modelData_: typing.Optional[object] = None
         self._dataTypeStr_: str = ""
         self._visited_: dict = dict()
+        # self._visited_: set = set()
         self._rootTitle_ = "/"
         self._hasDynamicPrivate_: bool = False
         self._privateData_: dict = None
@@ -269,21 +270,26 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         self._modelData_ = obj
 
+        self.setHorizontalHeaderLabels(["Object", "Type", "Value / Information"])
+
         pData, objDict = self._parseObject_(obj, self._showPrivate_)
 
         self._privateData_ = pData
-        # self._dataTypeStr_ = objDict["objType"].__name__
-        self.setHorizontalHeaderLabels(["Object", "Type", "Value / Information"])
-        self._buildTree_(self._privateData_, objDict, self._rootTitle_)
-        # tooltip = f"{type(obj).__name__}"
-        # if self.readOnly or self._topObjectItem_.data(ReadOnlyRole) is True:
-        #     tooltip += " (Read-only)"
 
-        # self._topObjectItem_.setData(tooltip, QtCore.Qt.ToolTipRole)
+        self._buildTree_(self._privateData_, objDict, self._rootTitle_)
 
     def _makeObjectRow_(self: typing.Self, obj: object, /,
                        objDict: dict, objKey: object,
-                       objKeyType: type) -> tuple:
+                       objKeyType: type, visited:bool=False) -> tuple:
+
+        # if "reference" in objDict:
+        #     item0 = QtGui.QStandardItem(objName)
+        #     item0.setData(objName, QtCore.Qt.DisplayRole)
+        #     item0.setData(objDict["objType"], ObjectTypeRole) # noqa
+        #     # item0.setData(type(objKey).__name__, QtCore.Qt.ToolTipRole)
+        #     item0.setData(objDict["objType"].__name__, QtCore.Qt.ToolTipRole)
+
+
 
         typeName = objDict["objType"].__name__
 
@@ -306,24 +312,22 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         item0 = QtGui.QStandardItem(objName)
         item0.setData(objName, QtCore.Qt.DisplayRole)
-        item0.setData(objDict["objType"], ObjectTypeRole)
+        item0.setData(objDict["objType"], ObjectTypeRole) # noqa
         # item0.setData(type(objKey).__name__, QtCore.Qt.ToolTipRole)
         item0.setData(objDict["objType"].__name__, QtCore.Qt.ToolTipRole)
 
         # NOTE: 2026-02-09 21:47:10
         # used to construct the acess path to the object for this item
-        item0.setData(QtCore.QVariant(memberAccess), ObjectDataAccessRole)
-
-
+        item0.setData(QtCore.QVariant(memberAccess), ObjectDataAccessRole) # noqa
 
         # NOTE: 2026-02-09 21:47:38
         # reference to the actual Python object
-        item0.setData(QtCore.QVariant(obj), ObjectDataRole)
+        item0.setData(QtCore.QVariant(obj), ObjectDataRole) # noqa
 
         # NOTE: 2026-02-09 21:47:57
         # reference to the object's binding in its parent: e.g. symbol of an
         # attribute or field, index (for sequences), key (for mappings)
-        item0.setData(QtCore.QVariant(objKey), ObjectKeyRole)
+        item0.setData(QtCore.QVariant(objKey), ObjectKeyRole) # noqa
 
         # NOTE: 2026-02-09 21:49:05
         # object "bindings" are are int for sequences, any hashable object type
@@ -334,10 +338,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # "lazy" evaluation of the collection's contents - in itself for a good
         # reason) ; therefore, I apply the same philosophy here
         #
-        item0.setData(QtCore.QVariant(objKeyType), ObjectKeyTypeRole)
-
-
-
+        item0.setData(QtCore.QVariant(objKeyType), ObjectKeyTypeRole) # noqa
 
         # for user's benefit — good to know the type of the object is represented
         # in this row.
@@ -364,7 +365,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # execute the code line below NOT here, but conditionally in
         # self._buildBranch_:
         # item2.setData(QtCore.QVariant(obj), ObjectDataRole)
-        item2.setData(objDict.get("choices", dict()), DataChoicesRole)
+        item2.setData(objDict.get("choices", dict()), DataChoicesRole) # noqa
 
         #
         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
@@ -407,50 +408,31 @@ class DataTreeModel(QtGui.QStandardItemModel):
                                                     0
                                                     )
         if self.readOnly:
-            self._topObjectItem_.setData(self.readOnly, ReadOnlyRole)
+            self._topObjectItem_.setData(self.readOnly, ReadOnlyRole) # noqa
 
     @singledispatchmethod
     def _buildBranch_(self: typing.Self, obj: object, objDict: dict,
                       objKey: object, objKeyType: type,
                       parentItem: QtGui.QStandardItem,
                       row: int) -> QtGui.QStandardItem:
-        # print(f"{self.__class__.__name__}._buildBranch_(obj: {type(obj).__name__})")
+
         rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType)
+
         objItem = rowItems[0]
+
         if objDict["objDataAsChild"]:
             dataItem = QtGui.QStandardItem("")
-            dataItem.setData(QtCore.QVariant(True), StandaloneEditorWidgetRole)
+            dataItem.setData(QtCore.QVariant(True), StandaloneEditorWidgetRole) # noqa
             objItem.insertRow(0, [dataItem])
         else:
             dataItem = rowItems[-1]
-            dataItem.setData(QtCore.QVariant(obj), ObjectDataRole)
+            dataItem.setData(QtCore.QVariant(obj), ObjectDataRole) # noqa
 
         accessType = objDict.get("accessType", None)
 
-        objItem.setData(QtCore.QVariant(accessType), ObjectDataAccessTypeRole)
+        objItem.setData(QtCore.QVariant(accessType), ObjectDataAccessTypeRole) # noqa
 
-        # tooltip = objItem.data(QtCore.Qt.ToolTipRole)
-        #
-        # if not isinstance(tooltip, str) or len(tooltip.strip()) == 0:
-        #     tooltip = objDict["objType"].__name__
-        #
         if parentItem:
-        #     parentItemName = parentItem.data(QtCore.Qt.DisplayRole)
-        #     parentAccessType = parentItem.data(ObjectDataAccessTypeRole)
-        #     if isinstance(parentAccessType, str) and len(parentAccessType.strip()):
-        #         tt = ""
-        #         if isinstance(parentItemName, str) and len(parentItemName.strip()):
-        #             if parentAccessType in ("attribute", "member"):
-        #                 tt = f" of {parentItemName})"
-        #             elif parentAccessType == "index":
-        #                 tt = f" into {parentItemName})"
-        #
-        #         tooltip += f" ({parentAccessType}{tt}"
-        #
-        #         objItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.ToolTipRole)
-        #         objItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.StatusTipRole)
-        #         objItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.WhatsThisRole)
-
             parentItem.insertRow(row, rowItems)
 
         return objItem
@@ -463,7 +445,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
           parentItem: QtGui.QStandardItem, row: int) -> QtGui.QStandardItem:
 
         rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType)
-        # if parentItem:
         pItem = rowItems[0]
 
         k = 0
@@ -478,31 +459,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
         else:
             accessType = objDict.get("accessType", None)
 
-            pItem.setData(QtCore.QVariant(accessType), ObjectDataAccessTypeRole)
-
-            # tooltip = pItem.data(QtCore.Qt.ToolTipRole)
-            #
-            # if not isinstance(tooltip, str) or len(tooltip.strip()) == 0:
-            #     tooltip = objDict["objType"].__name__
-            #
+            pItem.setData(QtCore.QVariant(accessType), ObjectDataAccessTypeRole) # noqa
 
             if parentItem:
-            #     parentItemName = parentItem.data(QtCore.Qt.DisplayRole)
-            #     parentAccessType = parentItem.data(ObjectDataAccessTypeRole)
-            #     if isinstance(parentAccessType, str) and len(parentAccessType.strip()):
-            #         tt = ""
-            #         if isinstance(parentItemName, str) and len(parentItemName.strip()):
-            #             if parentAccessType in ("attribute", "member", "key"):
-            #                 tt = f" of {parentItemName})"
-            #             elif parentAccessType == "index":
-            #                 tt = f" into {parentItemName})"
-            #
-            #         tooltip += f" ({parentAccessType}{tt}"
-            #
-            #         pItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.ToolTipRole)
-            #         pItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.StatusTipRole)
-            #         pItem.setData(QtCore.QVariant(tooltip), QtCore.Qt.WhatsThisRole)
-
                 parentItem.insertRow(row, rowItems)
 
         for key, value in obj.items():
@@ -530,62 +489,78 @@ class DataTreeModel(QtGui.QStandardItemModel):
                                              pkgutil.ModuleInfo))
                          and obj is not None)
 
+    def _memoize_(self, obj, path):
+        if id(obj) not in self._visited_:
+            idx = len(self._visited_)
+            self._visited_[id(obj)] = (idx, type(obj), path)
+
+    # def _parse_(self:typing.Self, obj: object,
+    #                   includePrivateMembers: bool = False) -> tuple:
+    #     if not issubclass(
+    #         type(obj), NOTMEMOIZED + PODS
+    #     ) and id(obj) in self._visited_:
+    #         return obj, {"reference": self._visited_[id(obj)],
+    #                      "objType": type(obj)}
+    #
+    #     else:
+    #         pData, objDict = self._parseObject_(obj, includePrivateMembers)
+
     @singledispatchmethod
     def _parseObject_(self, obj: object,
                       includePrivateMembers: bool = False,
                    ) -> tuple:
         r"""
-Returns:
-========
-a tuple: (``parsedData``, ``infoDict``), where:
+        Returns:
+        ========
+        a tuple: (``parsedData``, ``infoDict``), where:
 
-    ``parsedData`` if either ``obj`` itself, or a ``dict`` representation of it
+            ``parsedData`` if either ``obj`` itself, or a ``dict`` representation of it
 
-    ``infoDict`` is the mapping:
+            ``infoDict`` is the mapping:
 
-    "indirect" ↦ bool
-        When ``False``, ``self._privateData_`` attribute is ``obj`` itself, and
-        ``obj`` is represented by a single row (the *object row*). The
-        *object row* ia a child of the parent tree item, which is either the
-        *invisibile root item* of the model or a row / branch representation of
-        the container of ``obj``.
+            "indirect" ↦ bool
+                When ``False``, ``self._privateData_`` attribute is ``obj`` itself, and
+                ``obj`` is represented by a single row (the *object row*). The
+                *object row* ia a child of the parent tree item, which is either the
+                *invisibile root item* of the model or a row / branch representation of
+                the container of ``obj``.
 
-        When ``True`` this flag indicates that ``parsedData`` is in fact a
-        ``dict`` representation of the object's structure. Members of ``obj``
-        are to be represented as tree sub-branches (*member rows*) children of
-        the *object row*. When ``includePrivateMembers`` is ``False`` (the default),
-        private members of ``obj`` are excluded from this representation. All
-        *member rows* follow a possible *data row* (see below).
+                When ``True`` this flag indicates that ``parsedData`` is in fact a
+                ``dict`` representation of the object's structure. Members of ``obj``
+                are to be represented as tree sub-branches (*member rows*) children of
+                the *object row*. When ``includePrivateMembers`` is ``False`` (the default),
+                private members of ``obj`` are excluded from this representation. All
+                *member rows* follow a possible *data row* (see below).
 
-    "objDataAsChild" ↦ bool
-        When ``True``, the contents of ``obj`` should be displayed in a widget
-        on its own, in the first row (*data row*) child (branch) of the *object row*.
-        If, in addition, ``obj`` is represented indirectly by a ``dict``
-        (``parsedData``, see above), all *member rows* **must** follow the
-        *data row*.
+            "objDataAsChild" ↦ bool
+                When ``True``, the contents of ``obj`` should be displayed in a widget
+                on its own, in the first row (*data row*) child (branch) of the *object row*.
+                If, in addition, ``obj`` is represented indirectly by a ``dict``
+                (``parsedData``, see above), all *member rows* **must** follow the
+                *data row*.
 
-    "objInfo" ↦ str
-        When ``obj`` is a scalar number or singleton array, this is a string
-        representaion of ``obj`` *value* and can be made editable, unless the
-        model is configured to introspect all members of ``obj``.
+            "objInfo" ↦ str
+                When ``obj`` is a scalar number or singleton array, this is a string
+                representaion of ``obj`` *value* and can be made editable, unless the
+                model is configured to introspect all members of ``obj``.
 
-        When ``obj`` is representable as a ``dict`` (see above) **or** the model
-        is set up to introspect members of ``obj`` regardless of its type, then
-        **objInfo** contains abrief description of ``obj`` (one line).
+                When ``obj`` is representable as a ``dict`` (see above) **or** the model
+                is set up to introspect members of ``obj`` regardless of its type, then
+                **objInfo** contains abrief description of ``obj`` (one line).
 
-    "objType" ↦ str
-        The type name of ``obj``.
+            "objType" ↦ str
+                The type name of ``obj``.
 
-    "objTip" ↦ str
-        Contents of the UI tooltip to be shown when the *object row* is hovered.
+            "objTip" ↦ str
+                Contents of the UI tooltip to be shown when the *object row* is hovered.
 
-    "memberAccess" ↦ typing.Tuple[str]
+            "memberAccess" ↦ typing.Tuple[str]
 
-    "choices" ↦ dict, mapping name ↦ value - used in enums and enum-like objects
-        where a combo box is appropriate for choosing a value from a predefined
-        set; for all other object types, this will be empty.
+            "choices" ↦ dict, mapping name ↦ value - used in enums and enum-like objects
+                where a combo box is appropriate for choosing a value from a predefined
+                set; for all other object types, this will be empty.
 
-    """
+        """
         # mro = inspect.getmro(type(obj))
         indirect: bool = False
         tip: str = type(obj).__name__
@@ -593,6 +568,15 @@ a tuple: (``parsedData``, ``infoDict``), where:
         objType = type(obj)
         choices = dict()
         readOnly = False
+
+#         if not issubclass(
+#             type(obj), NOTMEMOIZED + PODS
+#         ) and id(obj) in self._visited_:
+#             return obj, {"reference": self._visited_[id(obj)],
+#                          "objType": type(obj)}
+#
+#         else:
+#             pData, objDict = self._parseObject_(obj, includePrivateMembers)
 
         if isDataclass(obj):
             datafields = dataclasses.fields(obj)
@@ -1701,7 +1685,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             return eval(accessExpr)
 
         else:
-            return leaf.data(ObjectDataRole)
+            return leaf.data(ObjectDataRole) # noqa
 
     def getPathForLeaf(self: typing.Self,
                        leaf: typing.Union[QtCore.QModelIndex,
@@ -1732,7 +1716,7 @@ a tuple: (``parsedData``, ``infoDict``), where:
             return path
 
         # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: {item.data(QtCore.Qt.DisplayRole)}")
-        if item.data(StandaloneEditorWidgetRole):
+        if item.data(StandaloneEditorWidgetRole): # noqa
             # print(f"\thas standalone widget: {item.data(StandaloneEditorWidgetRole)}")
             # NOTE: 2026-02-10 12:46:07
             # skip child items with standalone editor widget
@@ -1759,9 +1743,9 @@ a tuple: (``parsedData``, ``infoDict``), where:
                 # get the item's sibling in column 0
                 targetItem = parentItem.child(item.row(), 0)
 
-            parentAccess = parentItem.data(ObjectDataAccessRole)
-            bindingType = targetItem.data(ObjectKeyTypeRole)
-            itemBinding = targetItem.data(ObjectKeyRole)
+            parentAccess = parentItem.data(ObjectDataAccessRole) # noqa
+            bindingType = targetItem.data(ObjectKeyTypeRole) # noqa
+            itemBinding = targetItem.data(ObjectKeyRole) # noqa
             # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: bindingType for {targetItem.data(QtCore.Qt.DisplayRole)} -> {bindingType}")
             # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: itemBinding -> {itemBinding}")
 

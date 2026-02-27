@@ -775,11 +775,12 @@ class Neuron(Cell):
     cellSubType: NeuronType = NeuronType.undefined
 
     def __post_init__(self: typing.Self):
+        assert isinstance (self.cellSubType, NeuronType), f"Wrong subtype {self.cellSubType} for Neuron"
         super().__init__(
             self, self.name, self.description,
-            cellType = "neuron",
             cellSubType = self.cellSubType,
             )
+        self.cellType = "neuron"
 
 @dataclass
 class CellCompartment(ScipyenDataclass):
