@@ -280,14 +280,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
     def _makeObjectRow_(self: typing.Self, obj: object, /,
                        objDict: dict, objKey: object,
-                       objKeyType: type, visited:bool=False) -> tuple:
-
-        # if "reference" in objDict:
-        #     item0 = QtGui.QStandardItem(objName)
-        #     item0.setData(objName, QtCore.Qt.DisplayRole)
-        #     item0.setData(objDict["objType"], ObjectTypeRole) # noqa
-        #     # item0.setData(type(objKey).__name__, QtCore.Qt.ToolTipRole)
-        #     item0.setData(objDict["objType"].__name__, QtCore.Qt.ToolTipRole)
+                       objKeyType: type, visited:tuple=tuple()) -> tuple:
 
 
 
@@ -340,6 +333,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
         #
         item0.setData(QtCore.QVariant(objKeyType), ObjectKeyTypeRole) # noqa
 
+        if visited:
+            typeName = visited[1].__name__
+
         # for user's benefit — good to know the type of the object is represented
         # in this row.
         item1 = QtGui.QStandardItem(typeName)
@@ -359,13 +355,17 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # b) offer a delegate editor widget so that user can modify the value
         #
         # "choices" goes as item data with objectDataRole for THIS item
-        item2 = QtGui.QStandardItem(f"{info}")
-        item2.setData(info, QtCore.Qt.EditRole)
+        if visited:
+            targetPath = visited[2]
+            item2 = QtGui.QStandardItem(f"<reference to {targetPath}>")
+        else:
+            item2 = QtGui.QStandardItem(f"{info}")
+            item2.setData(info, QtCore.Qt.EditRole)
         # NOTE: 2026-02-10 09:33:22
         # execute the code line below NOT here, but conditionally in
         # self._buildBranch_:
         # item2.setData(QtCore.QVariant(obj), ObjectDataRole)
-        item2.setData(objDict.get("choices", dict()), DataChoicesRole) # noqa
+            item2.setData(objDict.get("choices", dict()), DataChoicesRole) # noqa
 
         #
         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
@@ -416,7 +416,14 @@ class DataTreeModel(QtGui.QStandardItemModel):
                       parentItem: QtGui.QStandardItem,
                       row: int) -> QtGui.QStandardItem:
 
-        rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType)
+        visited = tuple()
+
+        if not issubclass(
+            type(obj), NOTMEMOIZED + PODS
+        ) and id(obj) in self._visited_:
+            visited = self._visited_[id(obj)]
+
+        rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType, visited)
 
         objItem = rowItems[0]
 
@@ -426,14 +433,23 @@ class DataTreeModel(QtGui.QStandardItemModel):
             objItem.insertRow(0, [dataItem])
         else:
             dataItem = rowItems[-1]
-            dataItem.setData(QtCore.QVariant(obj), ObjectDataRole) # noqa
+            if len(visited) == 0:
+                dataItem.setData(QtCore.QVariant(obj), ObjectDataRole) # noqa
 
         accessType = objDict.get("accessType", None)
 
         objItem.setData(QtCore.QVariant(accessType), ObjectDataAccessTypeRole) # noqa
 
+        if not parentItem:
+            parentItem = self.invisibleRootItem()
+
         if parentItem:
             parentItem.insertRow(row, rowItems)
+            if not issubclass(
+                type(obj), NOTMEMOIZED + PODS
+            ) and id(obj) not in self._visited_:
+                itemPath = f"{self._rootTitle_}{self.getPathForLeaf(pItem)}"
+                self._memoize_(obj, itemPath)
 
         return objItem
 
@@ -444,7 +460,14 @@ class DataTreeModel(QtGui.QStandardItemModel):
           objDict: dict, objKey: object, objKeyType: type,
           parentItem: QtGui.QStandardItem, row: int) -> QtGui.QStandardItem:
 
-        rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType)
+        visited = tuple()
+
+        if not issubclass(
+            type(obj), NOTMEMOIZED + PODS
+        ) and id(obj) in self._visited_:
+            visited = self._visited_[id(obj)]
+
+        rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType, visited)
         pItem = rowItems[0]
 
         k = 0
@@ -461,22 +484,18 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
             pItem.setData(QtCore.QVariant(accessType), ObjectDataAccessTypeRole) # noqa
 
-
             if parentItem:
                 parentItem.insertRow(row, rowItems)
 
-            if not issubclass(
-                type(obj), NOTMEMOIZED + PODS
-            ):
-                if id(obj) in self._visited_:
-                    x = self._visited_.get(id(obj), None)
-                    if x is not None:
-                        oType = x[1]
-                        path = x[2]
-                        desc = f"<reference to {oType.__name__} at {path}>"
-                else:
-                    itemPath = self._getPathForItemOrIndex_(pItem)
+                if not issubclass(
+                    type(obj), NOTMEMOIZED + PODS
+                ) and id(obj) not in self._visited_:
+                    # itemPath = self._getPathForItemOrIndex_(pItem)
+                    itemPath = f"{self._rootTitle_}{self.getPathForLeaf(pItem)}"
                     self._memoize_(obj, itemPath)
+
+        if len(visited):
+            return pItem
 
         for key, value in obj.items():
             if isinstance(key, str):
@@ -484,12 +503,20 @@ class DataTreeModel(QtGui.QStandardItemModel):
             else:
                 keyName = f"{key}"
 
+            visited = tuple()
+
+            if not issubclass(
+                type(value), NOTMEMOIZED + PODS
+            ) and id(value) in self._visited_:
+                visited = self._visited_[id(value)]
+
             pValue, valDict = self._parseObject_(value, self._showPrivate_)
 
             if objDict.get("readOnly", False) is True:
                 valDict["readOnly"] = True
 
             self._buildBranch_(pValue, valDict, keyName, type(key), pItem, k)
+
             k += 1
 
 
@@ -582,15 +609,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
         objType = type(obj)
         choices = dict()
         readOnly = False
-
-#         if not issubclass(
-#             type(obj), NOTMEMOIZED + PODS
-#         ) and id(obj) in self._visited_:
-#             return obj, {"reference": self._visited_[id(obj)],
-#                          "objType": type(obj)}
-#
-#         else:
-#             pData, objDict = self._parseObject_(obj, includePrivateMembers)
 
         if isDataclass(obj):
             datafields = dataclasses.fields(obj)
@@ -1705,6 +1723,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                        leaf: typing.Union[QtCore.QModelIndex,
                                           QtGui.QStandardItem],
                        pathOnly: bool = False,
+                       # includeRoot:bool = False
                        ) -> str:
         path = self._getPathForItemOrIndex_(leaf)
         if len(path):
