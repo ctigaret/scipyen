@@ -246,38 +246,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
     def readOnly(self: typing.Self, val: bool):
         self._readOnly_ = val is True
 
-    def setModelData(
-        self,
-        obj: object,
-        rootTitle: str = "",
-        predicate: typing.Optional[types.FunctionType] = None,
-        showPrivate: bool = False,
-        dataTypeStr: typing.Optional[str] = None,
-        hideRoot: bool = False,
-        readOnly: bool = False,
-    ):
-        # print(f"{self.__class__.__name__}.setModelData(obj: {type(obj).__name__})")
-        self._visited_.clear()
-        self._predicate_ = predicate
-        self._showPrivate_ = showPrivate is True
-        self._hideRoot_ = hideRoot is True
-        self._readOnly_ = readOnly is True
-
-        self._rootTitle_ = rootTitle if (
-            isinstance(rootTitle, str)
-            and len(rootTitle.strip())
-            ) else "/"
-
-        self._modelData_ = obj
-
-        self.setHorizontalHeaderLabels(["Object", "Type", "Value / Information"])
-
-        pData, objDict = self._parseObject_(obj, self._showPrivate_)
-
-        self._privateData_ = pData
-
-        self._buildTree_(self._privateData_, objDict, self._rootTitle_)
-
     def _makeObjectRow_(self: typing.Self, obj: object, /,
                        objDict: dict, objKey: object,
                        objKeyType: type, visited:tuple=tuple()) -> tuple:
@@ -392,6 +360,43 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         return (item0, item1, item2)
 
+    def setModelData(
+        self,
+        obj: object,
+        rootTitle: str = "",
+        predicate: typing.Optional[types.FunctionType] = None,
+        showPrivate: bool = False,
+        dataTypeStr: typing.Optional[str] = None,
+        hideRoot: bool = False,
+        readOnly: bool = False,
+    ):
+        # print(f"{self.__class__.__name__}.setModelData(obj: {type(obj).__name__})")
+        self._visited_.clear()
+        self._predicate_ = predicate
+        self._showPrivate_ = showPrivate is True
+        self._hideRoot_ = hideRoot is True
+        self._readOnly_ = readOnly is True
+
+        self._rootTitle_ = rootTitle if (
+            isinstance(rootTitle, str)
+            and len(rootTitle.strip())
+            ) else "/"
+
+        self._modelData_ = obj
+
+        self.setHorizontalHeaderLabels(["Object", "Type", "Value / Information"])
+
+        pData, objDict = self._parseObject_(obj, self._showPrivate_)
+        # if not isinstance(self._rootTitle_, str) or len(self._rootTitle_.strip()) == 0:
+        #     topName = "/"
+        # else:
+        #     topName = self._rootTitle_
+        # self._visited_[id(obj)] = (0, type(obj), topName)
+
+        self._privateData_ = pData
+
+        self._buildTree_(self._privateData_, objDict, self._rootTitle_)
+
     def _buildTree_(self: typing.Self,
                     obj: object,
                     objDict: dict,
@@ -420,8 +425,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         if not issubclass(
             type(obj), NOTMEMOIZED + PODS
-        ) and id(obj) in self._visited_:
-            visited = self._visited_[id(obj)]
+        ):
+            if id(obj) in self._visited_:
+                visited = self._visited_[id(obj)]
 
         rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType, visited)
 
@@ -448,7 +454,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             if not issubclass(
                 type(obj), NOTMEMOIZED + PODS
             ) and id(obj) not in self._visited_:
-                itemPath = f"{self._rootTitle_}{self.getPathForLeaf(pItem)}"
+                itemPath = f"{self._rootTitle_}{self.getPathForLeaf(objItem)}"
                 self._memoize_(obj, itemPath)
 
         return objItem
@@ -489,10 +495,13 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
                 if not issubclass(
                     type(obj), NOTMEMOIZED + PODS
-                ) and id(obj) not in self._visited_:
-                    # itemPath = self._getPathForItemOrIndex_(pItem)
-                    itemPath = f"{self._rootTitle_}{self.getPathForLeaf(pItem)}"
-                    self._memoize_(obj, itemPath)
+                ):
+                    if id(obj) not in self._visited_:
+                        # itemPath = self._getPathForItemOrIndex_(pItem)
+                        itemPath = f"{self._rootTitle_}{self.getPathForLeaf(pItem)}"
+                        self._memoize_(obj, itemPath)
+                    # else:
+
 
         if len(visited):
             return pItem
