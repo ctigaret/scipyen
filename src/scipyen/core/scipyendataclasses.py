@@ -776,10 +776,9 @@ class Neuron(Cell):
 
     def __post_init__(self: typing.Self):
         assert isinstance (self.cellSubType, NeuronType), f"Wrong subtype {self.cellSubType} for Neuron"
-        super().__init__(
-            self, self.name, self.description,
-            cellSubType = self.cellSubType,
-            )
+        # super().__init__(
+        #     self, self.name, self.description,
+        #     )
         self.cellType = "neuron"
 
 @dataclass
@@ -805,9 +804,9 @@ class NeuronCompartment(CellCompartment):
     def __post_init__(self: typing.Self):
         assert isinstance(self.compartmentType, NeuronCompartmentType), f"Wrong compartment type: {self.compartmentType}"
         assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
-        super().__init__(self, compartmentType = self.compartmentType,
-                         compartmentID = self.compartmentID,
-                         parent = self.parent)
+        # super().__init__(self, compartmentType = self.compartmentType,
+        #                  compartmentID = self.compartmentID,
+        #                  parent = self.parent)
 
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t") # noqa
@@ -826,9 +825,9 @@ class AxonalCompartment(NeuronCompartment):
     def __post_init__(self: typing.Self):
         assert isinstance(self.compartmentType, AxonalCompartmentType), f"Wrong compartment type: {self.compartmentType}"
         assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
-        super().__init__(self, compartmentType = self.compartmentType,
-                         compartmentID = self.compartmentID,
-                         parent = self.parent)
+        # super().__init__(self, compartmentType = self.compartmentType,
+        #                  compartmentID = self.compartmentID,
+        #                  parent = self.parent)
 
 @dataclass
 class DendriticCompartment(NeuronCompartment):
@@ -838,9 +837,9 @@ class DendriticCompartment(NeuronCompartment):
     def __post_init__(self: typing.Self):
         assert isinstance(self.compartmentType, DendriticCompartmentType), f"Wrong compartment type: {self.compartmentType}"
         assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
-        super().__init__(self, compartmentType = self.compartmentType,
-                         compartmentID = self.compartmentID,
-                         parent = self.parent)
+        # super().__init__(self, compartmentType = self.compartmentType,
+        #                  compartmentID = self.compartmentID,
+        #                  parent = self.parent)
 
 @dataclass
 class ChemicalSynapse(ScipyenDataclass):
@@ -988,8 +987,9 @@ class Treatment(Procedure):
     procedureType:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
 
     def __post_init__(self):
-        super().__init__(name=self.name, description=self.description,
-                         procedureType = ProcedureType.treatment)
+        self.procedureType = ProcedureType.treatment
+        # super().__init__(name=self.name, description=self.description,
+        #                  procedureType = ProcedureType.treatment)
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
