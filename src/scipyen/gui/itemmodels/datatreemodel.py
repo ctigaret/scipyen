@@ -610,6 +610,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 where a combo box is appropriate for choosing a value from a predefined
                 set; for all other object types, this will be empty.
 
+            "readOnly" ↦ flag indicating if the represented object can be edited
+                in the datatreeview. Some object types are immutable by design
+                (e.g., bytes, bytearray, tuple, frozenset).
+
+
         """
         # mro = inspect.getmro(type(obj))
         indirect: bool = False
@@ -1004,17 +1009,23 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(deque)
     @_parseObject_.register(NeoObjectList)
     @_parseObject_.register(set)
+    @_parseObject_.register(frozenset)
     def _(self: typing.Self,
-          obj: typing.Union[list, tuple, deque, set, NeoObjectList],
+          obj: typing.Union[list, tuple, deque, set, NeoObjectList, frozenset],
                    includePrivateMembers: bool = False) -> tuple:
         objType = type(obj)
         tip = objType.__name__
+        readOnly = False
+
+        if isinstance(obj, (tuple, frozenset)):
+            readOnly = True
 
         if is_namedtuple(obj):
             pData = obj._asDict() if hasattr(obj, "_asDict") else obj._asdict()
             tip += "(namedtuple)"
             memberAccess = (".",)
             accessType = "attribute"
+            readOnly = True
         else:
             pData = dict(enumerate(obj))
             memberAccess = ("[","]")
@@ -1042,6 +1053,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "memberAccess": memberAccess,
             "accessType": accessType,
             "choices": dict(),
+            "readOnly": readOnly,
             }
 
     @_parseObject_.register(str)
@@ -1050,6 +1062,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     def _(self: typing.Self, obj: typing.Union[str, bytes, bytearray],
           _: bool = True) -> tuple:
         objType = type(obj)
+        readOnly = False
         tip = objType.__name__
         n = len(obj)
         if n > 100:
@@ -1060,6 +1073,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
         else:
             info = obj if isinstance(obj, str) else obj.decode()
 
+        if isinstance(obj, (bytes, bytearray)):
+            readOnly = True
+
         return  obj, {
             "indirect": False,
             "objDataAsChild": False,
@@ -1069,6 +1085,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "memberAccess": tuple(),
             "accessType": None,
             "choices": dict(),
+            "readOnly": readOnly,
             }
 
     @_parseObject_.register(pathlib.Path)
