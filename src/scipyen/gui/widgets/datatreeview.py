@@ -5,28 +5,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""
-.. note::
-
-    NOTE: 2026-02-02 08:56:30
-
-    Hitting a wall of bricks here...
-
-    The only QModelIndex constructor API exposed in PyQt6 QModelIndex
-    seems to be:
-
-.. ::
-
-    QModelIndex()
-    QModelIndex(a0: QModelIndex)
-    QModelIndex(a0: QPersistentModelIndex)
-
-
-I.e., there seems to be no way I can generate a QModelIndex via, say,
-
-.. ::
-
-    QtCore.QModelIndex(row:int, column:int, data:typing.Any)
-
+New data viewer widget, based on datatreemodel
 """
 from __future__ import print_function
 
@@ -153,32 +132,8 @@ from gui.pictgui import WorkerThread
 # from gui.widgets.small_widgets import QuantitySpinBox, ComplexSpinBox
 from gui.delegates import PythonItemDelegate
 from gui.workspacegui import GuiMessages, WorkspaceGuiMixin
-from gui.itemmodels.roles import *
+from gui.itemmodels.roles import * #noqa
 from gui.itemmodels.datatreemodel import DataTreeModel
-
-NOTMEMOIZED = (
-    tuple,
-    type(None),
-    type(MISSING),
-    type(pd.NA),
-    type,
-    np.ndarray,
-    types.ModuleType,
-    pkgutil.ModuleInfo,
-)
-
-PODS = (
-    bool,
-    int,
-    float,
-    complex,
-    bytes,
-    bytearray,
-    str,
-    np.integer,
-    np.floating,
-    np.complexfloating,
-)
 
 class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     sig_itemDoubleClicked = Signal(QtGui.QStandardItem, name="sig_itemDoubleClicked")
@@ -222,15 +177,15 @@ For a given item:
 
         model = self.model()
         index = item.index()
-        objData = item.data(ObjectDataRole)
-        objType = item.data(ObjectTypeRole)
+        objData = item.data(ObjectDataRole) # noqa
+        objType = item.data(ObjectTypeRole) # noqa
 
         if index.column() == 0 and item.hasChildren():
             for row in range(item.rowCount()):
                 childItem = item.child(row, 0)
                 infoItem = item.child(row, 2)
                 if row == 0:
-                    hasEditorWidgetChild = childItem.data(StandaloneEditorWidgetRole)
+                    hasEditorWidgetChild = childItem.data(StandaloneEditorWidgetRole) # noqa
                     if hasEditorWidgetChild is True:
                         childIndex = item.child(0).index()
                         self.setFirstColumnSpanned(0, index, True)
@@ -241,7 +196,7 @@ For a given item:
                                                                     inModel = False,
                                                                     parent = self)
                         if (
-                            item.data(ReadOnlyRole) is True
+                            item.data(ReadOnlyRole) is True # noqa
                             or self.model().readOnly
                             ):
                             if hasattr(editorWidget,  "readOnly"):
@@ -260,24 +215,24 @@ For a given item:
             # print(f"\tindex display: {index.data(QtCore.Qt.DisplayRole)}")
             # print(f"\tindex object data {index.data(ObjectDataRole)}")
             # print(f"\tindex row {index.row()}")
-            signalBlocker = QtCore.QSignalBlocker(self.model())
+            signalBlocker = QtCore.QSignalBlocker(self.model()) # noqa
             # index = infoItem.index()
             # row = index.row()
             infoItem = model.itemFromIndex(index)
             parentItem = infoItem.parent()
             if parentItem:
                 objItem = parentItem.child(infoItem.row(), 0)
-                objType = objItem.data(ObjectTypeRole)
+                objType = objItem.data(ObjectTypeRole) # noqa
 
             # NOTE: 2026-02-12 14:58:10
             # inhibit editing for immutable collections - e.g. tuple, for now
-            parentType = parentItem.data(ObjectTypeRole)
+            parentType = parentItem.data(ObjectTypeRole) # noqa
             # TODO 2026-02-12 14:59:32 to expand in parentheses as needed
             if (
                 (
                     parentType in (tuple, )
-                    or parentItem.data(ReadOnlyRole) is True
-                    or objItem.data(ReadOnlyRole) is True
+                    or parentItem.data(ReadOnlyRole) is True # noqa
+                    or objItem.data(ReadOnlyRole) is True # noqa
                     )
                 or self.model().readOnly
                 ):
@@ -345,7 +300,7 @@ For a given item:
                             filter(
                                 (
                                     lambda i: i.column() == 0
-                                    and not i.data(StandaloneEditorWidgetRole)
+                                    and not i.data(StandaloneEditorWidgetRole) # noqa
                                 ),
                                 items
                                 )
@@ -366,7 +321,7 @@ For a given item:
 
         # l_pathToStr = lambda s: s.replace(".", "_").replace("[", "_").replace("]", "_") is isinstance(s, str) else ""
 
-        l_getName = lambda i: self.model().getPathForLeaf(i) if fullPathAsName else i.data(QtCore.Qt.DisplayRole)
+        l_getName = lambda i: self.model().getPathForLeaf(i) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
 
         names, objects = zip(
             *list(
@@ -379,7 +334,7 @@ For a given item:
                             filter(
                                 (
                                     lambda i: i.column() == 0
-                                    and not i.data(StandaloneEditorWidgetRole)
+                                    and not i.data(StandaloneEditorWidgetRole) # noqa
                                 ),
                                 items
                                 )

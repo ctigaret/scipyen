@@ -809,6 +809,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(type)
     @_parseObject_.register(enum.EnumType)
     @_parseObject_.register(enum.Enum)
+    @_parseObject_.register(enum.IntEnum)
+    @_parseObject_.register(enum.Flag)
     @_parseObject_.register(TypeEnum)
     def _(self: typing.Self,
           obj: typing.Union[type, enum.EnumType, enum.Enum, TypeEnum],
@@ -821,10 +823,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
         memberAccess = tuple()
         accessType = None
 
-        if isinstance(obj, (enum.EnumType, TypeEnum, enum.Enum)):
+        if isinstance(obj, (enum.EnumType, TypeEnum, enum.Enum, enum.IntEnum)):
             memberAccess = (".", )
             accessType = "attribute"
-            if isinstance(obj, (enum.Enum, TypeEnum)):
+            if isinstance(obj, (enum.Enum, enum.IntEnum, TypeEnum)):
                 info = obj.name
             if hasattr(obj, "__members__"):
                 choices = dict(obj.__members__)
@@ -1837,7 +1839,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         item = self.itemFromIndex(modelIndex)
 
-        if item.data(ReadOnlyRole) is True:
+        if item.data(ReadOnlyRole) is True: # noqa
             return
 
         # NOTE: 2026-02-10 09:18:53
@@ -1857,14 +1859,18 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         objItem = item
 
-        if item.column() == 2 and role == ObjectDataRole:
+        # if isinstance(value, (enum.Enum, enum.IntEnum, enum.Flag, TypeEnum)):
+        #     print(f"setting value as {value}")
+
+        if item.column() == 2 and role == ObjectDataRole: # noqa
             parentItem = item.parent()
             if not parentItem:
                 return False
             objItem = parentItem.child(item.row(), 0)
 
         # print(f"{self.__class__.__name__}.setData {value} for objItem {objItem.data(QtCore.Qt.DisplayRole)} , row {item.row()}")
-        objItem.setData(QtCore.QVariant(value), ObjectDataRole)
+        objItem.setData(QtCore.QVariant(value), ObjectDataRole) # noqa
+
         path = self._getPathForItemOrIndex_(objItem)
         # print(f"\taccess to objItem: {path}")
 
@@ -1882,16 +1888,20 @@ class DataTreeModel(QtGui.QStandardItemModel):
             pass
 
         if OK:
-            objType = objItem.data(ObjectTypeRole)
+            objType = objItem.data(ObjectTypeRole) # noqa
 
             if objType is pathlib.Path:
                 newVal = pathlib.Path(newVal)
 
-            objItem.setData(newVal, ObjectDataRole)
+            objItem.setData(newVal, ObjectDataRole) # noqa
+
 
             if item != objItem:
-                item.setData(QtCore.QVariant(newVal), QtCore.Qt.DisplayRole)
-                item.setData(newVal, ObjectDataRole)
+                if isinstance(newVal, (enum.Enum, enum.IntEnum, enum.Flag, TypeEnum)):
+                    item.setData(QtCore.QVariant(value.name), QtCore.Qt.DisplayRole)
+                else:
+                    item.setData(QtCore.QVariant(newVal), QtCore.Qt.DisplayRole)
+                item.setData(newVal, ObjectDataRole) # noqa
 
             self.dataChanged.emit(modelIndex, modelIndex)
             self.sig_modelDataChanged.emit()

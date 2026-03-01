@@ -17,6 +17,7 @@ import pandas as pd
 import quantities as pq
 import neo
 import pywt
+from enum import (IntEnum, auto)
 #### END 3rd party modules
 
 #### BEGIN scipyen core modules
@@ -29,6 +30,10 @@ from .prog import safewrapper, with_doc
 
 from plots.plots import plot_wavelet
 #### END scipyen core modules
+
+class BoxcarDetectionMethod(IntEnum):
+    state_levels = auto()
+    kmeans = auto()
 
 
 def simplify_2d_shape(xy: np.ndarray, max_points: int = 5, k: int = 3):
@@ -808,7 +813,7 @@ def state_levels(x: np.ndarray, **kwargs):
             These are passed as arguments to generate_bin_width() function (in this module)
 
             Their default values are, respectively: 15 bit, 10 V, and 1 (for Axon Digidata 1550)
-    
+
             WARNING: generate_bin_width() may generatge unreasonably large numbers of bins!
 
     levels: float or sequence of floats
@@ -998,7 +1003,7 @@ def remove_dc(
             sequence of unique valid indices) in the half open interval
 
             [ -x.size[1], x.size[1] )
-    
+
     Var-positional parameters (**kwargs, see estimate_dc and state_levels:
         bins:typing.Optional[int] = None, bw:typing.Optional[float]=None,
         adcres:typing.Optional[float]=None, adcrange:typing.Optional[float]=None,
@@ -1015,7 +1020,7 @@ def remove_dc(
     adcres = kwargs.get("adcres", None)
     adcrange = kwargs.get("adcrange", None)
     adcscale = kwargs.get("adcscale", None)
-    
+
     if not isinstance(x, np.ndarray):
         raise TypeError(f"Expecting a numpy array; got {type(x).__name__} instead")
     if x.ndim > 2:
@@ -1554,53 +1559,53 @@ def convolve(sig:np.ndarray, w, **kwargs):
         applied for each channel
 
     w : 1D array-like: convlution window (or 'kernel')
-    
+
     Var-keyword parameters:
     -----------------------
     name:str name of the resulting signal
     units: pq.Quantity
-    
+
     mode, method : str — passed on to the scipy.signal.convolve function
-    NOTE: by default, these two parameters get the default values as 
+    NOTE: by default, these two parameters get the default values as
     specified in scipy.signal.convolve:
-    
+
     `mode` = "valid"
     `method` = "auto"
-    
+
     restoreEnds:bool, default is True
         The various modes of convolution will either append to ('full'), trim from
         ('valid') or alter ('same') the ends of the signal.
-    
+
         This parameter will restore the ends of the convolved signal such that,
 regardless of the convolution mode:
-    
+
     1. the result will have the same number of samples along the axis of convolution
-    
+
     2. the samples at both ends of the result retain the values in the original
-    signal; the number of samples affected equals half the number of samples 
+    signal; the number of samples affected equals half the number of samples
     in the kernel `w`: w.size//2.
-    
+
     """
     # CHANGELOG 2025-04-28 17:38:52
     # now also accepts DataSignal, numpy arrays and Quantity arrays
     #
-    
+
     from scipy.signal import convolve
 
     name = kwargs.pop("name", "")
 
     units = kwargs.pop("units", pq.dimensionless)
-    
+
     restoreEnds = kwargs.pop("restoreEnds", True) == True
 
     # kwargs["mode"] = "same"  # force "same" mode for convolution
-    
+
     nPad = w.size//2
-    
+
     kwargs["mode"] = kwargs.get("mode", "valid")
     # print(f"convolve mode = {mode}, nPad = {nPad}")
     # kwargs["mode"] = mode
-    
+
     # NOTE: 2025-04-28 21:43:13
     # there is a reason to pass different modes; therefore correct the padding only when
     # mode is "same"
@@ -1608,25 +1613,25 @@ regardless of the convolution mode:
         # nSamp = sig.shape[0]
         if sig.shape[1] == 1:
             cvl = convolve(sig.magnitude.flatten(), w, **kwargs)
-            
+
             if restoreEnds:
                 if kwargs["mode"] == "valid":
                     padLeft  = sig.magnitude[:nPad, 0].flatten()
                     padRight = sig.magnitude[-nPad:,0].flatten()
                     cvl = np.concatenate((padLeft, cvl, padRight))
-                    
+
                 elif kwargs["mode"] == "full":
                     # when 'full' signal is padded with window.size samples at both ends
                     # remove extra window half-size and the remainder replace with the original
                     # samples - will introduce errors than are smaller than if left unchanged
-                    cvl = cvl[nPad:-nPad]  
+                    cvl = cvl[nPad:-nPad]
                     cvl[:nPad]  = sig.magnitude[:nPad, 0].flatten()
                     cvl[-nPad:] = sig.magnitude[-nPad:,0].flatten()
-                    
+
                 elif kwargs["mode"] == "same":
                     cvl[:nPad]  = sig.magnitude[:nPad, 0].flatten()
                     cvl[-nPad:] = sig.magnitude[-nPad:,0].flatten()
-                
+
             ret = sig.__class__(
                 cvl,
                 units=sig.units,
@@ -1638,27 +1643,27 @@ regardless of the convolution mode:
         else:
             csig = list(map(lambda k: convolve(sig.magnitude[:, k].flatten(), w, **kwargs)[:, np.newaxis],
                             range(sig.shape[1])))
-            
+
             if restoreEnds:
                 if kwargs["mode"] == "valid":
                     for k, cvl in enumerate(csig):
                         padLeft  = sig.magnitude[:nPad, k].flatten()
                         padRight = sig.magnitude[-nPad:,k].flatten()
                         csig[k] = np.concatenate((padLeft, cvl, padRight))
-                        
+
                 elif kwargs["mode"] == "full":
                     for k, cvl in enumerate(csig):
                         cvl = cvl[nPad:-nPad]
                         cvl[:nPad]  = sig.magnitude[:nPad, 0].flatten()
                         cvl[-nPad:] = sig.magnitude[-nPad:,0].flatten()
                         csig[k] = cvl
-                        
+
                 elif kwargs["mode"] == "same":
                     for k, cvl in enumerate(csig):
                         cvl[:nPad] =  sig.magnitude[:nPad, k].flatten()
                         cvl[-nPad:] = sig.magnitude[-nPad:,k].flatten()
                         csig[k] = cvl
-                
+
             ret = sig.__class__(
                 np.concatenate(csig, axis=1),
                 units=sig.units,
@@ -1668,26 +1673,26 @@ regardless of the convolution mode:
             )
 
         ret.annotations.update(sig.annotations)
-        
+
     else:
         if sig.shape[1] == 1:
             ret = convolve(sig.magnitude.flatten() if isinstance(sig, pq.Quantity) else sig, w, **kwargs)[:,np.newaxis]
-            
+
             if restoreEnds:
                 if kwargs["mode"] == "valid":
                     padLeft = sig.magnitude[:nPad,0].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad,0].flatten()
                     padRight = sig.magnitude[-nPad:,0].flatten() if isinstance(sig, pq.Quantty) else sig[-nPad:,0].flatten()
                     ret = np.concatenate((padLeft, ret, padRight))
-                    
+
                 elif kwargs["mode"] == "full":
                     ret = ret[nPad:-nPad,0]
                     ret[:nPad]  = sig.magnitude[:nPad, 0].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad,0].flatten()
                     ret[-nPad:] = sig.magnitude[-nPad:,0].flatten() if isinstance(sig, pq.Quantty) else sig[-nPad:,0].flatten()
-                    
+
                 elif kwargs["mode"] == "same":
                     ret[:nPad]  = sig.magnitude[:nPad, 0].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad,0].flatten()
                     ret[-nPad:] = sig.magnitude[-nPad:,0].flatten() if isinstance(sig, pq.Quantty) else sig[-nPad:,0].flatten()
-                
+
         else:
             csig = list(map(lambda k: convolve(sig.magnitude[:,k].flatten() if isinstance(sig, pq.Quantity) else sig[:,k]),
                             range(sig.shape[1])))
@@ -1697,21 +1702,21 @@ regardless of the convolution mode:
                         padLeft = sig.magnitude[:nPad, k].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad, k].flatten()
                         padRight = sig.magnitude[-nPad:, k].flatten() if isinstance(sig, pq.Quantity) else sig[-nPad:].flatten()
                         csig[k] = np.concatenate((padLeft, cvl, padRight))
-                        
+
                 elif kwargs["mode"] == "full":
                     for k, cvl in enumerate(csig):
                         cvl = cvl[nPad:-nPad, 0].flatten()
                         cvl[:nPad]  = sig.magnitude[:nPad, 0].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad,0].flatten()
                         cvl[-nPad:] = sig.magnitude[-nPad:,0].flatten() if isinstance(sig, pq.Quantty) else sig[-nPad:,0].flatten()
                         csig[k] = cvl
-                        
+
                 elif kwargs["mode"] == "same":
                     for k, cvl in enumerate(csig):
                         cvl[:nPad] =  sig.magnitude[:nPad, k].flatten() if isinstance(sig, pq.Quantity) else sig[:nPad, k].flatten()
                         cvl[-nPad:] = sig.magnitude[-nPad:,k].flatten() if isinstance(sig, pq.Quantity) else sig[-nPad:].flatten()
                         csig[k] = cvl
-                    
-                    
+
+
             ret = np.concatenate(csig, axis=1)
             if isinstance(sig, pq.Quantity):
                 ret *= sig.units
@@ -1720,7 +1725,9 @@ regardless of the convolution mode:
 
 
 @safewrapper
-def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
+def parse_step_waveform_signal(sig,
+    method: BoxcarDetectionMethod = BoxcarDetectionMethod.state_levels,
+    **kwargs):
     r"""Parse a step waveform -- containing two states ("high" and "low").
 
     DEPRECATED: Please use detect_boxcar(…) instead.
@@ -1789,7 +1796,7 @@ def parse_step_waveform_signal(sig, method="state_levels", **kwargs):
     # 1) get transition times from injected current
     # use filtered signal, if available
 
-    if method == "state_levels":
+    if method == BoxcarDetectionMethod.state_levels:
         levels = kwargs.pop("levels", 0.5)
         adcres = kwargs.pop("adcres", 15)
         adcrange = kwargs.pop("adcrange", 10)
@@ -2953,11 +2960,11 @@ def detect_boxcar(
 
     Var-keyword parameters:
     =======================
-    • method: str; default is 'kmeans'; valid values are 'kmeans', 'state_levels',
-        'states' ('states' is an alias/shorthand for 'state_levels')
+    • method: BoxcarDetectionMethod; default, this is BoxcarDetectionMethod.kmeans
+         valid values are ``BoxcarDetectionMethod.kmeans``, ``BoxcarDetectionMethod.state_levels``,
 
-    When 'method' is 'states' or 'state_levels', the following keyword parameters
-    control the behaviour of the state_levels(…) function :
+    When 'method' is ``BoxcarDetectionMethod.state_levels``, the following
+    keyword parameters control the behaviour of the state_levels(…) function :
 
     • box_size
     • levels
@@ -2965,8 +2972,8 @@ def detect_boxcar(
     • moment
     • bins, bw
 
-    When 'method' is 'kmeans' the function passes he kmeans parameter 'k_or_guess' to
-    2 (i.e. classify 'x' data in levels).
+    When 'method' is ``BoxcarDetectionMethod.kmeans`` the function passes the
+    value 2 as the parameter 'k_or_guess' of the kmeans(…) function
 
     The following keyword parameters control the behaviour of kmeans(…):
 
@@ -3139,11 +3146,11 @@ def detect_boxcar(
     else:
         sig_filt = sig
 
-    method = kwargs.pop("method", "kmeans")  # better default
+    method = kwargs.pop("method", BoxcarDetectionMethod.kmeans)
 
-    if not isinstance(method, str):
+    if not isinstance(method, BoxcarDetectionMethod):
         raise TypeError(
-            f"'methd' expected to be a str; instead, got {type(method).__name__}"
+            f"'methd' expected to be a BoxcarDetectionMethod; instead, got {type(method).__name__}"
         )
 
     # NOTE: 2023-06-19 08:59:37
@@ -3152,13 +3159,14 @@ def detect_boxcar(
     # NOTE: 2023-06-19 09:00:05
     # get the transition levels - first check what method we use
 
-    if method.lower() not in ("kmeans", "state_levels", "states"):
-        raise ValueError(
-            f"'method' {method} is invalid; expecting one of 'state_levels' or 'kmeans'"
-        )
+    # if method.lower() not in ("kmeans", "state_levels", "states"):
+    #     raise ValueError(
+    #         f"'method' {method} is invalid; expecting one of 'state_levels' or 'kmeans'"
+    #     )
 
     try:
-        if method.lower() in ("state_levels", "states"):
+        # if method.lower() in ("state_levels", "states"):
+        if method == BoxcarDetectionMethod.state_levels:
             # print("detect_boxcar using state_levels")
             # NOTE: 2023-07-02 15:57:07
             # remove the kwargs normally expected by kmeans(…)
