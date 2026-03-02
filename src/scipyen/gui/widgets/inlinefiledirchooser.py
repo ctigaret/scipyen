@@ -137,27 +137,21 @@ class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
                 options = QtWidgets.QFileDialog.DontResolveSymlinks
                 )
 
+        if isinstance(ret, tuple):
+            ret = ret[0]
+
         if len(ret):
             # print(f"{ret}")
-            if isinstance(ret, tuple):
-                ret = ret[0]
-
-            self.initial = pathlib.Path(ret)
-
-            txt = guiutils.get_elided_text(
-                ret,
-                self.launchPushButton.size().width(),
-                QtCore.Qt.ElideMiddle
-                )
-
-            self.launchPushButton.setText(txt)
+            newPath = pathlib.Path(ret)
+            if self.path != newPath:
+                self.path = newPath
 
     @property
-    def initial(self) -> pathlib.Path:
+    def path(self) -> pathlib.Path:
         return self._path_
 
-    @initial.setter
-    def initial(self, val: pathlib.Path):
+    @path.setter
+    def path(self, val: pathlib.Path):
         if isinstance(val, pathlib.Path):
             if not val.exists():
                 QtWidgets.QMessageBox.critical(
@@ -169,7 +163,13 @@ class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
             if val != self._path_:
                 self._path_ = val
 
-            self.launchPushButton.setText(val.as_posix())
+                txt = guiutils.get_elided_text(
+                    val.as_posix(),
+                    self.launchPushButton.size().width(),
+                    QtCore.Qt.ElideMiddle
+                    )
+
+            self.launchPushButton.setText(txt)
 
     @property
     def dirsOnly(self) -> bool:

@@ -42,20 +42,140 @@ from gui.painting_shared import (FontStyleType, standardQtFontStyles,
                                  FontWeightType, standardQtFontWeights)
 
 from gui import quickdialog as qd
-from gui.guiutils import (
+from gui.guiutils import (DisplayHint, getDesktopHeight, csqueeze,
     InftyDoubleValidator, ComplexValidator, validatorString,
     get_elided_text, get_current_font_metrics,
     get_text_width)
 
 from core import scipyen_quantities as scq
+from iolib.navigation.navigator import UrlNavigatorButtonBase
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
+# class ElidedPushButton(QtWidgets.QPushButton):
+class ElidedPushButton(UrlNavigatorButtonBase):
+    def __init__(self, text:str = "", parent=None):
+        super().__init__(parent=parent)
+        self.setMouseTracking(True)
+        if not isinstance(text, str) or len(text.strip()) == 0:
+            # self._text_ = "PushButton"
+            self._text_ = ""
+        else:
+            self._text_ = text
 
-class ElidedPushButton(QtWidgets.QPushButton):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._text_: str = ""
+    # def __init__(self, *args, **kwargs):
+    #     super().__init__(*args, **kwargs)
+    #     self._text_: str = ""
+
+    def paintEvent(self, evt: QtGui.QPaintEvent):
+        painter = QtGui.QPainter(self)
+        font = QtGui.QFont(self.font())
+        painter.setFont(font)
+        buttonWidth = self.width()
+        preferredWidth = self.sizeHint().width()
+        if preferredWidth < self.minimumWidth():
+            preferredWidth = self.minimumWidth()
+
+        if buttonWidth > preferredWidth:
+            buttonWidth = preferredWidth
+
+        buttonHeight = self.height()
+        fgColor = self.foregroundColor()
+
+        self.drawHoverBackground(painter)
+
+        textLeft = 0
+        textWidth = buttonWidth
+
+        leftToRight = self.layoutDirection() == QtCore.Qt.LeftToRight
+
+        option = QtWidgets.QStyleOption()
+        option.initFrom(self)
+        option.rect = QtCore.QRect(0, 0, int(self.width()), int(self.height()))
+        option.palette = self.palette()
+        option.palette.setColor(QtGui.QPalette.Text, fgColor)
+        option.palette.setColor(QtGui.QPalette.WindowText, fgColor)
+        option.palette.setColor(QtGui.QPalette.ButtonText, fgColor)
+
+        painter.setPen(fgColor)
+
+        clipped = self.isTextClipped()
+        # print(f"{self.__class__.__name__}<{self.plainText()}> clipped: {clipped}")
+        textRect = QtCore.QRect(textLeft, 0, textWidth, buttonHeight)
+
+        if clipped:
+            bgColor = QtGui.QColor(fgColor)
+            bgColor.setAlpha(0)
+            if __has_PyQt6__ or __has_PySide6__:
+                gradient = QtGui.QLinearGradient(QtCore.QPointF(textRect.topLeft()),
+                                                 QtCore.QPointF(textRect.topRight()))
+            else:
+                gradient = QtGui.QLinearGradient(textRect.topLeft(), textRect.topRight())
+            if leftToRight:
+                gradient.setColorAt(0.8, fgColor)
+                gradient.setColorAt(1.0, bgColor)
+            else:
+                gradient.setColorAt(0.0, bgColor)
+                gradient.setColorAt(0.2, fgColor)
+
+            pen = QtGui.QPen()
+            pen.setBrush(QtGui.QBrush(gradient))
+            painter.setPen(pen)
+
+        textFlags = QtCore.Qt.AlignVCenter if clipped else QtCore.Qt.AlignCenter
+        # if self._showMnemonic_:
+        #     textFlags |= QtCore.Qt.TextShowMnemonic
+        #     painter.drawText(textRect, textFlags, self.text())
+        # else:
+        painter.drawText(textRect, textFlags, self.plainText())
+
+    def enterEvent(self, evt:QtGui.QEnterEvent):
+        super().enterEvent(evt)
+        # print(f"{self.__class__.__name__}<'{self.plainText()}' sizeHint: {self.sizeHint()}, width: {self.width()}, arrowWidth: {self.arrowWidth()}>.enterEvent : {evt.pos()}")
+
+        if self.isTextClipped():
+            self.setToolTip(self.plainText())
+
+        evt.accept()
+
+    def leaveEvent(self, evt:QtCore.QEvent):
+        # if self.__class__.__name__ == "UrlNavigatorButton":
+        #     print(f"{self.__class__.__name__}.enterEvent: {evt.pos()}")
+
+        super().leaveEvent(evt)
+
+        self.setToolTip("")
+        # self.setDisplayHintEnabled(DisplayHint.EnteredHint, False)
+
+        # if self._hoverArrow_:
+        #     self._hoverArrow_ = False
+        self.update()
+        evt.accept()
+
+    def isTextClipped(self):
+        availableWidth = self.width() - 2 * self.BorderWidth
+        # if len(self._text_) > 0:
+        #     availableWidth -= self.arrowWidth() - self.BorderWidth
+        adjustedFont = self.font()
+        # adjustedFont.setBold(len(self._subDir_) == 0)
+        return QtGui.QFontMetrics(adjustedFont).size(QtCore.Qt.TextSingleLine, self.text()).width() >= availableWidth
+
+    def drawHoverBackground(self, painter:QtGui.QPainter):
+        backgroundColor = self.palette().color(QtGui.QPalette.Highlight) if self.isHighlighted else QtCore.Qt.transparent
+        if not self._active_ and self.isHighlighted:
+            backgroundColor.setAlpha(128)
+        option = QtWidgets.QStyleOptionViewItem()
+        option.initFrom(self)
+        option.viewItemPosition = QtWidgets.QStyleOptionViewItem.OnlyOne
+        primitive = QtWidgets.QStyle.PE_PanelItemViewItem
+
+        if self.isHighlighted:
+            option.state = QtWidgets.QStyle.State_Enabled | QtWidgets.QStyle.State_MouseOver
+        else:
+            option.state = QtWidgets.QStyle.State_Enabled
+
+        painter.setBackground(backgroundColor)
+        self.style().drawPrimitive(primitive, option, painter, self)
 
     def setText(self, text:str):
         self._text_ = text
@@ -70,6 +190,7 @@ class ElidedPushButton(QtWidgets.QPushButton):
             super().setText(txt)
         else:
             super().setText(text)
+        self.updateMinimumWidth()
 
     def text(self) -> str:
         return self._text_
@@ -79,21 +200,37 @@ class ElidedPushButton(QtWidgets.QPushButton):
 
     def resizeEvent(self, evt: QtGui.QResizeEvent):
         # print(f"{self.__class__.__name__}.resizeEvent(…)")
-        print(f"\toldSize: {evt.oldSize()}")
-        print(f"\tnewSize: {evt.size()}")
-        print(f"\tmySize: {self.size()}")
+        # print(f"\toldSize: {evt.oldSize()}")
+        # print(f"\tnewSize: {evt.size()}")
+        # print(f"\tmySize: {self.size()}")
         self.setText(self._text_)
         super().resizeEvent(evt)
-        # evt.accept()
+        evt.accept()
 
     def sizeHint(self) -> QtCore.QSize:
         adjustedFont = self.font()
         # adjustedFont.setBold(len(self._text_) == 0)
         fontMetric = QtGui.QFontMetrics(adjustedFont)
         width = fontMetric.size(QtCore.Qt.TextSingleLine,
-                                self._text_).width() #+ self.arrowWidth() + 4 * self.BorderWidth
+                                self._text_).width() + 4 * self.BorderWidth
         return QtCore.QSize(width, super().sizeHint().height())
 
+    @property
+    def isHighlighted(self) ->bool:
+        return self.isDisplayHintEnabled(DisplayHint.EnteredHint) or self.isDisplayHintEnabled(DisplayHint.DraggedHint) or self.isDisplayHintEnabled(DisplayHint.PopupActiveHint)
+
+    def updateMinimumWidth(self):
+        oldMinWidth = self.minimumWidth()
+        minWidth = self.sizeHint().width()
+
+        if minWidth < 40:
+            minWidth = 40
+
+        elif minWidth > 150:
+            minWidth = 150
+
+        if oldMinWidth != minWidth:
+            self.setMinimumWidth(minWidth)
 
 
 
