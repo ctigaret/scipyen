@@ -128,10 +128,10 @@ from core.workspacefunctions import (validate_varname, user_workspace)
 # from gui.widgets.tablewidget import SimpleTableWidget
 # from gui.widgets.tableeditorwidget import (TableEditorWidget,
 #                                            TabularDataModel,)
-from gui.pictgui import WorkerThread
+# from gui.pictgui import WorkerThread
 # from gui.widgets.small_widgets import QuantitySpinBox, ComplexSpinBox
 from gui.delegates import PythonItemDelegate
-from gui.workspacegui import GuiMessages, WorkspaceGuiMixin
+from gui.workspacegui import WorkspaceGuiMixin
 from gui.itemmodels.roles import * #noqa
 from gui.itemmodels.datatreemodel import DataTreeModel
 

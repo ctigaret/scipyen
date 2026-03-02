@@ -42,11 +42,64 @@ from gui.painting_shared import (FontStyleType, standardQtFontStyles,
                                  FontWeightType, standardQtFontWeights)
 
 from gui import quickdialog as qd
-from gui.guiutils import (InftyDoubleValidator, ComplexValidator, validatorString)
+from gui.guiutils import (
+    InftyDoubleValidator, ComplexValidator, validatorString,
+    get_elided_text, get_current_font_metrics,
+    get_text_width)
 
 from core import scipyen_quantities as scq
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
+
+
+class ElidedPushButton(QtWidgets.QPushButton):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._text_: str = ""
+
+    def setText(self, text:str):
+        self._text_ = text
+        w = get_text_width(text)
+        if w >= self.size().width():
+            txt = get_elided_text(
+                    text,
+                    self.size().width(),
+                    QtCore.Qt.ElideMiddle
+                    )
+
+            super().setText(txt)
+        else:
+            super().setText(text)
+
+    def text(self) -> str:
+        return self._text_
+
+    def plainText(self) -> str:
+        return self._text_
+
+    def resizeEvent(self, evt: QtGui.QResizeEvent):
+        # print(f"{self.__class__.__name__}.resizeEvent(…)")
+        print(f"\toldSize: {evt.oldSize()}")
+        print(f"\tnewSize: {evt.size()}")
+        print(f"\tmySize: {self.size()}")
+        self.setText(self._text_)
+        super().resizeEvent(evt)
+        # evt.accept()
+
+    def sizeHint(self) -> QtCore.QSize:
+        adjustedFont = self.font()
+        # adjustedFont.setBold(len(self._text_) == 0)
+        fontMetric = QtGui.QFontMetrics(adjustedFont)
+        width = fontMetric.size(QtCore.Qt.TextSingleLine,
+                                self._text_).width() #+ self.arrowWidth() + 4 * self.BorderWidth
+        return QtCore.QSize(width, super().sizeHint().height())
+
+
+
+
+
+
+
 
 Ui_QuantityChooserWidget, QWidget = loadUiType(os.path.join(__module_path__, "quantitychooserwidget.ui"))
 

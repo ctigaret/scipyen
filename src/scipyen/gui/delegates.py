@@ -303,8 +303,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                      ) -> QtWidgets.QWidget:
         r"""Work around for use independently of an item model.
 
-    Bypasses the QModelIndex paradigm because a QTreeWidgetItem does not expose
-     QModelIndex API
+        Bypasses the QModelIndex paradigm because a QTreeWidgetItem does not expose
+        QModelIndex API
 
     """
         from gui.widgets.tableeditorwidget import TableEditorWidget # import here to avoid circular imports (delegates is imported by tableeditorwidget as well)

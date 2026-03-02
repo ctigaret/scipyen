@@ -1895,10 +1895,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
             objItem.setData(newVal, ObjectDataRole) # noqa
 
-
             if item != objItem:
                 if isinstance(newVal, (enum.Enum, enum.IntEnum, enum.Flag, TypeEnum)):
-                    item.setData(QtCore.QVariant(value.name), QtCore.Qt.DisplayRole)
+                    item.setData(QtCore.QVariant(newVal.name), QtCore.Qt.DisplayRole)
+                elif isinstance(newVal, bool):
+                    item.setData(QtCore.QVariant(str(newVal)), QtCore.Qt.DisplayRole)
                 else:
                     item.setData(QtCore.QVariant(newVal), QtCore.Qt.DisplayRole)
                 item.setData(newVal, ObjectDataRole) # noqa
