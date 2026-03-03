@@ -111,8 +111,8 @@ class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
                         | QtWidgets.QFileDialog.DontResolveSymlinks
                         )
             else:
-                flags = (QtWidgets.QFileDialog.DontUseNativeDialog
-                        | QtWidgets.QFileDialog.ShowDirsOnly
+                flags = (QtWidgets.QFileDialog.ShowDirsOnly
+                        | QtWidgets.QFileDialog.DontResolveSymlinks
                         )
 
             ret = QtWidgets.QFileDialog.getExistingDirectory(

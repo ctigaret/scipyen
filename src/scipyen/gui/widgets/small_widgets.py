@@ -54,18 +54,13 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 # class ElidedPushButton(QtWidgets.QPushButton):
 class ElidedPushButton(UrlNavigatorButtonBase):
-    def __init__(self, text:str = "", parent=None):
+    def __init__(self, text: str = "", elideText: bool = True, parent = None):
         super().__init__(parent=parent)
         self.setMouseTracking(True)
-        if not isinstance(text, str) or len(text.strip()) == 0:
-            # self._text_ = "PushButton"
-            self._text_ = ""
-        else:
-            self._text_ = text
-
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     self._text_: str = ""
+        self._elideText_ = elideText is True
+        self._text_ = ""
+        if isinstance(text, str) and len(text.strip()):
+            self.setText(text)
 
     def paintEvent(self, evt: QtGui.QPaintEvent):
         painter = QtGui.QPainter(self)
@@ -103,35 +98,45 @@ class ElidedPushButton(UrlNavigatorButtonBase):
         # print(f"{self.__class__.__name__}<{self.plainText()}> clipped: {clipped}")
         textRect = QtCore.QRect(textLeft, 0, textWidth, buttonHeight)
 
-        if clipped:
-            bgColor = QtGui.QColor(fgColor)
-            bgColor.setAlpha(0)
-            if __has_PyQt6__ or __has_PySide6__:
-                gradient = QtGui.QLinearGradient(QtCore.QPointF(textRect.topLeft()),
-                                                 QtCore.QPointF(textRect.topRight()))
-            else:
-                gradient = QtGui.QLinearGradient(textRect.topLeft(), textRect.topRight())
-            if leftToRight:
-                gradient.setColorAt(0.8, fgColor)
-                gradient.setColorAt(1.0, bgColor)
-            else:
-                gradient.setColorAt(0.0, bgColor)
-                gradient.setColorAt(0.2, fgColor)
+        text = self.plainText()
 
-            pen = QtGui.QPen()
-            pen.setBrush(QtGui.QBrush(gradient))
-            painter.setPen(pen)
+        if clipped:
+            if self._elideText_:
+                w = get_text_width(text)
+                # if w >= self.size().width():
+                if w >= buttonWidth:
+                    text = get_elided_text(
+                            text,
+                            buttonWidth,
+                            # self.size().width(),
+                            QtCore.Qt.ElideMiddle
+                    )
+            else:
+                bgColor = QtGui.QColor(fgColor)
+                bgColor.setAlpha(0)
+                if __has_PyQt6__ or __has_PySide6__:
+                    gradient = QtGui.QLinearGradient(QtCore.QPointF(textRect.topLeft()),
+                                                    QtCore.QPointF(textRect.topRight()))
+                else:
+                    gradient = QtGui.QLinearGradient(textRect.topLeft(), textRect.topRight())
+                if leftToRight:
+                    gradient.setColorAt(0.8, fgColor)
+                    gradient.setColorAt(1.0, bgColor)
+                else:
+                    gradient.setColorAt(0.0, bgColor)
+                    gradient.setColorAt(0.2, fgColor)
+
+                pen = QtGui.QPen()
+                pen.setBrush(QtGui.QBrush(gradient))
+                painter.setPen(pen)
 
         textFlags = QtCore.Qt.AlignVCenter if clipped else QtCore.Qt.AlignCenter
-        # if self._showMnemonic_:
-        #     textFlags |= QtCore.Qt.TextShowMnemonic
-        #     painter.drawText(textRect, textFlags, self.text())
-        # else:
-        painter.drawText(textRect, textFlags, self.plainText())
+
+        # painter.drawText(textRect, textFlags, self.plainText())
+        painter.drawText(textRect, textFlags, text)
 
     def enterEvent(self, evt:QtGui.QEnterEvent):
         super().enterEvent(evt)
-        # print(f"{self.__class__.__name__}<'{self.plainText()}' sizeHint: {self.sizeHint()}, width: {self.width()}, arrowWidth: {self.arrowWidth()}>.enterEvent : {evt.pos()}")
 
         if self.isTextClipped():
             self.setToolTip(self.plainText())
@@ -139,26 +144,17 @@ class ElidedPushButton(UrlNavigatorButtonBase):
         evt.accept()
 
     def leaveEvent(self, evt:QtCore.QEvent):
-        # if self.__class__.__name__ == "UrlNavigatorButton":
-        #     print(f"{self.__class__.__name__}.enterEvent: {evt.pos()}")
-
         super().leaveEvent(evt)
 
         self.setToolTip("")
-        # self.setDisplayHintEnabled(DisplayHint.EnteredHint, False)
 
-        # if self._hoverArrow_:
-        #     self._hoverArrow_ = False
         self.update()
         evt.accept()
 
     def isTextClipped(self):
         availableWidth = self.width() - 2 * self.BorderWidth
-        # if len(self._text_) > 0:
-        #     availableWidth -= self.arrowWidth() - self.BorderWidth
-        adjustedFont = self.font()
-        # adjustedFont.setBold(len(self._subDir_) == 0)
-        return QtGui.QFontMetrics(adjustedFont).size(QtCore.Qt.TextSingleLine, self.text()).width() >= availableWidth
+        font = self.font()
+        return QtGui.QFontMetrics(font).size(QtCore.Qt.TextSingleLine, self._text_).width() >= availableWidth
 
     def drawHoverBackground(self, painter:QtGui.QPainter):
         backgroundColor = self.palette().color(QtGui.QPalette.Highlight) if self.isHighlighted else QtCore.Qt.transparent
@@ -179,17 +175,18 @@ class ElidedPushButton(UrlNavigatorButtonBase):
 
     def setText(self, text:str):
         self._text_ = text
-        w = get_text_width(text)
-        if w >= self.size().width():
-            txt = get_elided_text(
-                    text,
-                    self.size().width(),
-                    QtCore.Qt.ElideMiddle
-                    )
-
-            super().setText(txt)
-        else:
-            super().setText(text)
+        super().setText(self._text_)
+        # w = get_text_width(text)
+        # if w >= self.size().width():
+        #     txt = get_elided_text(
+        #             text,
+        #             self.size().width(),
+        #             QtCore.Qt.ElideMiddle
+        #             )
+        #
+        #     super().setText(txt)
+        # else:
+        #     super().setText(text)
         self.updateMinimumWidth()
 
     def text(self) -> str:
@@ -208,9 +205,9 @@ class ElidedPushButton(UrlNavigatorButtonBase):
         evt.accept()
 
     def sizeHint(self) -> QtCore.QSize:
-        adjustedFont = self.font()
-        # adjustedFont.setBold(len(self._text_) == 0)
-        fontMetric = QtGui.QFontMetrics(adjustedFont)
+        font = self.font()
+        fontMetric = QtGui.QFontMetrics(font)
+
         width = fontMetric.size(QtCore.Qt.TextSingleLine,
                                 self._text_).width() + 4 * self.BorderWidth
         return QtCore.QSize(width, super().sizeHint().height())
@@ -218,6 +215,15 @@ class ElidedPushButton(UrlNavigatorButtonBase):
     @property
     def isHighlighted(self) ->bool:
         return self.isDisplayHintEnabled(DisplayHint.EnteredHint) or self.isDisplayHintEnabled(DisplayHint.DraggedHint) or self.isDisplayHintEnabled(DisplayHint.PopupActiveHint)
+
+    @property
+    def elideText(self) -> bool:
+        return self._elideText_
+
+    @elideText.setter
+    def elideText(self, val: bool):
+        self._elideText_ = val is True
+        self.update()
 
     def updateMinimumWidth(self):
         oldMinWidth = self.minimumWidth()
