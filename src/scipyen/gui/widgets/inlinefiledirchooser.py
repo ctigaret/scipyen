@@ -71,16 +71,20 @@ else:
 
 class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
     sig_pathChanged = Signal(pathlib.Path, name = "sig_pathChanged")
-    sig_dataChanged = Signal(name = "sig_dataChganed")
+    sig_dataChanged = Signal(name = "sig_dataChanged")
+    _sig_newPath_ = Signal(pathlib.Path, name = "_sig_newPath_")
 
     def __init__(self,
                  initial: typing.Optional[pathlib.Path] = None,
                  dirsOnly: bool = False,
                  readOnly:bool = False,
+                 # asDelegate: bool = False,
                  parent: typing.Optional[QtWidgets.QWidget] = None):
         QtWidgets.QWidget.__init__(self, parent = parent)
         self._dirsOnly_ = dirsOnly is True
         self._readOnly_ = readOnly is True
+        self._pendingChange_: bool = False
+        # self._isDelegate_:bool = asDelegate is True
 
         if (not isinstance(initial, pathlib.Path)
             or not initial.exists()):
@@ -112,6 +116,8 @@ class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
     def _slot_launchAction_(self):
         if self._readOnly_:
             return
+
+        self._pendingChange_ = True
 
         if self._dirsOnly_:
             if "win32" in sys.platform:
@@ -149,11 +155,16 @@ class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
         if isinstance(ret, tuple):
             ret = ret[0]
 
-        if len(ret):
-            # print(f"{ret}")
-            newPath = pathlib.Path(ret)
-            if self.path != newPath:
-                self.path = newPath
+        if not isinstance(ret, str) or len(ret.strip()) == 0:
+            self._pendingChange_ = False
+            return
+
+        newPath = pathlib.Path(ret)
+        if newPath == self.path:
+            self._pendingChange_ = False
+            return
+
+        self._sig_newPath_.emit(newPath)
 
     def value(self) -> pathlib.Path:
         return self.path
@@ -164,6 +175,11 @@ class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
             return
 
         self.path = path
+
+    @Slot(pathlib.Path)
+    def _slot_newPath_(self, val: pathlib.Path):
+        if isinstance(val, pathlib.Path) and val.exists():
+            self.path = val
 
     @property
     def readOnly(self) -> bool:
@@ -184,6 +200,7 @@ class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
             return
 
         if val != self._path_:
+            self._pendingChange_ = False
             self._path_ = val
             self.launchPushButton.setText(val.as_posix())
             self.sig_pathChanged.emit(self._path_)

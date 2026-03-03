@@ -54,7 +54,7 @@ from gui.widgets import small_widgets as smw
 from gui.widgets import inlinefiledirchooser as ifdc
 from gui import quickdialog as qd
 from core import typeenum
-from gui.itemmodels.roles import *
+from gui.itemmodels.roles import * # noqa
 
 class CutFileSystemItemDelegate(QtWidgets.QStyledItemDelegate):
     # WARNING: 2026-01-25 22:25:36 TODO
@@ -62,7 +62,7 @@ class CutFileSystemItemDelegate(QtWidgets.QStyledItemDelegate):
     def paint(self, painter, option, index):
         # BUG: 2026-01-25 22:25:50 TODO/FIXME
         # screws up painting
-        print(f"{self.__class__.__name__}.paint: option = {option}\n")
+        # print(f"{self.__class__.__name__}.paint: option = {option}\n")
         painter.setPen(QtWidgets.QApplication.palette().color(QtGui.QPalette.Inactive, QtGui.QPalette.Text))
         super().paint(painter, option, index)
         # self.initStyleOption()
@@ -457,6 +457,12 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             if not inModel:
                 widget.setValue(data)
                 widget.sig_dataChanged.connect(self.slot_dataChanged)
+            else:
+                widget.sig_dataChanged.connect(self.slot_commitAndCloseEditor)
+                if hasattr(widget, "setFrame"):
+                    widget.setFrame(False)
+                widget.setAutoFillBackground(True)
+                return widget
 
         elif isinstance(data, (str, np.character, bytes, bytearray)):
             if isinstance(data, str):
@@ -516,6 +522,12 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         widget.setAutoFillBackground(True)
 
         return widget
+
+    @Slot()
+    def slot_commitAndCloseEditor(self):
+        editor = self.sender()
+        self.commitData.emit(editor)
+        self.closeEditor.emit(editor)
 
     @Slot()
     def slot_dataChanged(self): #, o:typing.Any):
@@ -748,19 +760,24 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                                             int(np.round(data.microsecond/1000, 3)))
                         editor.setTime(qTime)
 
-            # elif isinstance(data, pathlib.Path):
-            #     assert isinstance(editor, QtWidgets.QLineEdit), f"Incompatible editor editor type ({type(editor).__name__}) for string data"
-            #     editor.setText(data)
+            elif isinstance(data, pathlib.Path):
+                assert isinstance(editor, ifdc.InlineFileDirChooserWidget), f"Incompatible editor editor type ({type(editor).__name__}) for pathlib.Path data"
+                editor.setValue(data)
 
 
     def setModelData(self, editor: QtWidgets.QWidget,
                      model: QtCore.QAbstractItemModel,
                      index: QtCore.QModelIndex):
         r"""Sets data back into the QModelIndex"""
-        originalData = index.data(ObjectDataRole)
+        originalData = index.data(ObjectDataRole) # noqa
 
         if isinstance(editor, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox,
                                smw.QuantitySpinBox)):
+            data = editor.value()
+
+        elif isinstance(editor, ifdc.InlineFileDirChooserWidget):
+            if not editor._pendingChange_:
+                return
             data = editor.value()
 
         elif isinstance(editor, QtWidgets.QLineEdit):
