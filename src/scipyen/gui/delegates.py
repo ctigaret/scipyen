@@ -51,6 +51,7 @@ import vigra
 import quantities as pq
 from core import scipyen_quantities as scq
 from gui.widgets import small_widgets as smw
+from gui.widgets import inlinefiledirchooser as ifdc
 from gui import quickdialog as qd
 from core import typeenum
 from gui.itemmodels.roles import *
@@ -443,6 +444,18 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             widget = TableEditorWidget(parent, readOnly=False)
             if not inModel:
                 widget.setData(data)
+                widget.sig_dataChanged.connect(self.slot_dataChanged)
+
+        elif isinstance(data, pathlib.Path):
+            if data.is_dir():
+                widget = ifdc.InlineDirChooserWidget(
+                    initial=data, parent=parent)
+            elif data.is_file():
+                widget = ifdc.InlineFileChooserWidget(
+                    initial=data, parent=parent)
+
+            if not inModel:
+                widget.setValue(data)
                 widget.sig_dataChanged.connect(self.slot_dataChanged)
 
         elif isinstance(data, (str, np.character, bytes, bytearray)):

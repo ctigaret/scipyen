@@ -328,7 +328,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
             item2 = QtGui.QStandardItem(f"<reference to {targetPath}>")
         else:
             item2 = QtGui.QStandardItem(f"{info}")
-            item2.setData(info, QtCore.Qt.EditRole)
+            if isinstance(obj, pathlib.Path):
+                item2.setData(obj, QtCore.Qt.EditRole)
+            else:
+                item2.setData(info, QtCore.Qt.EditRole)
         # NOTE: 2026-02-10 09:33:22
         # execute the code line below NOT here, but conditionally in
         # self._buildBranch_:
@@ -1094,10 +1097,13 @@ class DataTreeModel(QtGui.QStandardItemModel):
     def _(self: typing.Self, obj: pathlib.Path,
           _: bool = True) -> tuple:
         objType = type(obj)
-        info = f"{obj}"
+        # info = f"{obj}"
+        info = obj.as_posix()
         tip = objType.__name__
-        pData = obj.as_posix()
-        indirect = True
+        # pData = obj.as_posix()
+        pData = obj
+        # indirect = True
+        indirect = False
         return  pData, {
             "indirect": indirect,
             "objDataAsChild": False,
@@ -1890,7 +1896,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         if OK:
             objType = objItem.data(ObjectTypeRole) # noqa
 
-            if objType is pathlib.Path:
+            if objType is pathlib.Path and not isinstance(newVal, pathlib.Path):
                 newVal = pathlib.Path(newVal)
 
             objItem.setData(newVal, ObjectDataRole) # noqa

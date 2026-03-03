@@ -42,10 +42,9 @@ from gui.painting_shared import (FontStyleType, standardQtFontStyles,
                                  FontWeightType, standardQtFontWeights)
 
 from gui import quickdialog as qd
-from gui.guiutils import (DisplayHint, getDesktopHeight, csqueeze,
+from gui.guiutils import (DisplayHint,
     InftyDoubleValidator, ComplexValidator, validatorString,
-    get_elided_text, get_current_font_metrics,
-    get_text_width)
+    get_elided_text, get_text_width)
 
 from core import scipyen_quantities as scq
 from iolib.navigation.navigator import UrlNavigatorButtonBase
@@ -58,6 +57,10 @@ class ElidedPushButton(UrlNavigatorButtonBase):
         super().__init__(parent=parent)
         self.setMouseTracking(True)
         self._elideText_ = elideText is True
+        self.setElideTextAction = QtGui.QAction("Elide text", self)
+        self.setElideTextAction.setCheckable(True)
+        self.setElideTextAction.setChecked(self._elideText_ is True)
+        self.setElideTextAction.toggled.connect(self._slot_setElideText)
         self._text_ = ""
         if isinstance(text, str) and len(text.strip()):
             self.setText(text)
@@ -103,7 +106,6 @@ class ElidedPushButton(UrlNavigatorButtonBase):
         if clipped:
             if self._elideText_:
                 w = get_text_width(text)
-                # if w >= self.size().width():
                 if w >= buttonWidth:
                     text = get_elided_text(
                             text,
@@ -176,17 +178,6 @@ class ElidedPushButton(UrlNavigatorButtonBase):
     def setText(self, text:str):
         self._text_ = text
         super().setText(self._text_)
-        # w = get_text_width(text)
-        # if w >= self.size().width():
-        #     txt = get_elided_text(
-        #             text,
-        #             self.size().width(),
-        #             QtCore.Qt.ElideMiddle
-        #             )
-        #
-        #     super().setText(txt)
-        # else:
-        #     super().setText(text)
         self.updateMinimumWidth()
 
     def text(self) -> str:
@@ -196,13 +187,14 @@ class ElidedPushButton(UrlNavigatorButtonBase):
         return self._text_
 
     def resizeEvent(self, evt: QtGui.QResizeEvent):
-        # print(f"{self.__class__.__name__}.resizeEvent(…)")
-        # print(f"\toldSize: {evt.oldSize()}")
-        # print(f"\tnewSize: {evt.size()}")
-        # print(f"\tmySize: {self.size()}")
         self.setText(self._text_)
         super().resizeEvent(evt)
         evt.accept()
+
+    def contextMenuEvent(self, evt: QtGui.QContextMenuEvent):
+        menu = QtWidgets.QMenu(self)
+        menu.addAction(self.setElideTextAction)
+        menu.exec(evt.globalPos())
 
     def sizeHint(self) -> QtCore.QSize:
         font = self.font()
@@ -223,7 +215,13 @@ class ElidedPushButton(UrlNavigatorButtonBase):
     @elideText.setter
     def elideText(self, val: bool):
         self._elideText_ = val is True
+        signalBlocker = QtCore.QSignalBlocker(self.setElideTextAction)
+        self.setElideTextAction.setChecked(self._elideText_ is True)
         self.update()
+
+    @Slot(bool)
+    def _slot_setElideText(self, val: bool):
+        self.elideText = val is True
 
     def updateMinimumWidth(self):
         oldMinWidth = self.minimumWidth()

@@ -55,7 +55,8 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-from gui import guiutils
+# from gui import guiutils
+from core.prog import scipywarn
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __ui_file__ = "inlinefiledirchooser.ui"
@@ -69,12 +70,17 @@ else:
         from_imports = True, import_from = "gui.widgets")
 
 class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
+    sig_pathChanged = Signal(pathlib.Path, name = "sig_pathChanged")
+    sig_dataChanged = Signal(name = "sig_dataChganed")
+
     def __init__(self,
                  initial: typing.Optional[pathlib.Path] = None,
                  dirsOnly: bool = False,
+                 readOnly:bool = False,
                  parent: typing.Optional[QtWidgets.QWidget] = None):
         QtWidgets.QWidget.__init__(self, parent = parent)
         self._dirsOnly_ = dirsOnly is True
+        self._readOnly_ = readOnly is True
 
         if (not isinstance(initial, pathlib.Path)
             or not initial.exists()):
@@ -104,6 +110,9 @@ class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
 
     @Slot()
     def _slot_launchAction_(self):
+        if self._readOnly_:
+            return
+
         if self._dirsOnly_:
             if "win32" in sys.platform:
                 flags = (QtWidgets.QFileDialog.DontUseNativeDialog
@@ -146,30 +155,39 @@ class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
             if self.path != newPath:
                 self.path = newPath
 
+    def value(self) -> pathlib.Path:
+        return self.path
+
+    def setValue(self, path: pathlib.Path):
+        if not isinstance(path, pathlib.Path) or not path.exists():
+            scipywarn(f"Supplied value ({path}) is not a valid Path")
+            return
+
+        self.path = path
+
+    @property
+    def readOnly(self) -> bool:
+        return self._readOnly_
+
+    @readOnly.setter
+    def readOnly(self, val: bool):
+        self._readOnly_ = val is True
+
     @property
     def path(self) -> pathlib.Path:
         return self._path_
 
     @path.setter
     def path(self, val: pathlib.Path):
-        if isinstance(val, pathlib.Path):
-            if not val.exists():
-                QtWidgets.QMessageBox.critical(
-                    self, "Directory/File Chooser",
-                    f"Path {val.as_posix()} does not exist"
-                    )
-                return
+        if not isinstance(val, pathlib.Path) or not val.exists():
+            scipywarn(f"Supplied value ({val}) is not a valid Path")
+            return
 
-            if val != self._path_:
-                self._path_ = val
-
-                txt = guiutils.get_elided_text(
-                    val.as_posix(),
-                    self.launchPushButton.size().width(),
-                    QtCore.Qt.ElideMiddle
-                    )
-
-            self.launchPushButton.setText(txt)
+        if val != self._path_:
+            self._path_ = val
+            self.launchPushButton.setText(val.as_posix())
+            self.sig_pathChanged.emit(self._path_)
+            self.sig_dataChanged.emit()
 
     @property
     def dirsOnly(self) -> bool:
@@ -178,5 +196,19 @@ class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
     @dirsOnly.setter
     def dirsOnly(self, val:bool):
         self._dirsOnly_ = val is True
-        sigBlock = QtCore.QSignalBlocker(self.dirsOnlyCheckBox)
+        sigBlock = QtCore.QSignalBlocker(self.dirsOnlyCheckBox) # noqa
         self.dirsOnlyCheckBox.setChecked(self._dirsOnly_ is True)
+
+class InlineFileChooserWidget(InlineFileDirChooserWidget):
+    def __init__(self,
+                 initial: typing.Optional[pathlib.Path] = None,
+                 parent: typing.Optional[QtWidgets.QWidget] = None):
+        super().__init__(initial = initial, dirsOnly = False, parent = parent)
+        self.dirsOnlyCheckBox.setVisible(False)
+
+class InlineDirChooserWidget(InlineFileDirChooserWidget):
+    def __init__(self,
+                 initial: typing.Optional[pathlib.Path] = None,
+                 parent: typing.Optional[QtWidgets.QWidget] = None):
+        super().__init__(initial = initial, dirsOnly = True, parent = parent)
+        self.dirsOnlyCheckBox.setVisible(False)
