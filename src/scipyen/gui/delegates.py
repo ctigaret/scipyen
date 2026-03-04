@@ -42,6 +42,7 @@ try:
 except:
     __has_qtdbus__ = False
 
+from core.datatypes import (is_namedtuple, TypeEnum) # noqa
 from core.prog import (safewrapper, safeguiwrapper, scipywarn, print_styled) # noqa
 from core.sysutils import adapt_ui_path # noqa
 
@@ -297,7 +298,11 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         choices: typing.Optional[
                                 typing.Union[
                                     typing.Sequence[
-                                        typing.Union[enum.Enum, str]
+                                        typing.Union[enum.Enum,
+                                                     enum.IntEnum,
+                                                     enum.Flag,
+                                                     TypeEnum,
+                                                     str]
                                                     ],
                                     typing.Dict]
                                 ] = None,
@@ -472,10 +477,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 if (
                     (
                     isinstance(choices, typing.Sequence)
-                    and all(isinstance(v, (enum.Enum, str)) for v in choices)
-                    ) or isinstance(choices, dict)
+                    and all(isinstance(v, (enum.Enum, enum.IntEnum, TypeEnum, enum.Flag, str)) for v in choices)
+                    ) or isinstance(choices, (dict, types.MappingProxyType))
                     ) and len(choices) > 0:
-                    if isinstance(choices, dict):
+                    if isinstance(choices, (dict, types.MappingProxyType)):
                         entries = list(choices.keys())
                         values = list(choices.values())
                     else:

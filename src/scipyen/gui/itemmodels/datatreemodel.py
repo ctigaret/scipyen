@@ -77,7 +77,7 @@ import meshio
 # ### END 3rd party modules
 
 import core.datatypes as datatypes
-from core.datatypes import (is_namedtuple, TypeEnum)
+from core.datatypes import (is_namedtuple, TypeEnum) # noqa
 from core.prog import scipywarn
 from core import taxonbridge
 from core import bgbridge as bgbridge
@@ -333,10 +333,13 @@ class DataTreeModel(QtGui.QStandardItemModel):
             else:
                 item2.setData(info, QtCore.Qt.EditRole)
         # NOTE: 2026-02-10 09:33:22
-        # execute the code line below NOT here, but conditionally in
-        # self._buildBranch_:
-        # item2.setData(QtCore.QVariant(obj), ObjectDataRole)
-            item2.setData(objDict.get("choices", dict()), DataChoicesRole) # noqa
+            # execute the code line below NOT here, but conditionally in
+            # self._buildBranch_:
+            # item2.setData(QtCore.QVariant(obj), ObjectDataRole)
+            choices = objDict.get("choices", dict())
+            # if issubclass(objDict["objType"], enum.Enum):
+            #     print(f"{self.__class__.__name__}._makeObjectRow_ for '{objName}' -> choices = {choices}")
+            item2.setData(choices, DataChoicesRole) # noqa
 
         #
         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
@@ -546,17 +549,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
         if id(obj) not in self._visited_:
             idx = len(self._visited_)
             self._visited_[id(obj)] = (idx, type(obj), path)
-
-    # def _parse_(self:typing.Self, obj: object,
-    #                   includePrivateMembers: bool = False) -> tuple:
-    #     if not issubclass(
-    #         type(obj), NOTMEMOIZED + PODS
-    #     ) and id(obj) in self._visited_:
-    #         return obj, {"reference": self._visited_[id(obj)],
-    #                      "objType": type(obj)}
-    #
-    #     else:
-    #         pData, objDict = self._parseObject_(obj, includePrivateMembers)
 
     @singledispatchmethod
     def _parseObject_(self, obj: object,
@@ -816,7 +808,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(enum.Flag)
     @_parseObject_.register(TypeEnum)
     def _(self: typing.Self,
-          obj: typing.Union[type, enum.EnumType, enum.Enum, TypeEnum],
+          obj: typing.Union[type, enum.EnumType, enum.Enum, enum.Flag, TypeEnum],
           includePrivateMembers: bool = False) -> tuple:
         objType = type(obj)
         info = obj
@@ -826,10 +818,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
         memberAccess = tuple()
         accessType = None
 
-        if isinstance(obj, (enum.EnumType, TypeEnum, enum.Enum, enum.IntEnum)):
+        if isinstance(obj, (
+            enum.EnumType, TypeEnum, enum.Enum, enum.IntEnum, enum.Flag)):
             memberAccess = (".", )
             accessType = "attribute"
-            if isinstance(obj, (enum.Enum, enum.IntEnum, TypeEnum)):
+            if isinstance(obj, (enum.Enum, enum.IntEnum, TypeEnum, enum.Flag)):
                 info = obj.name
             if hasattr(obj, "__members__"):
                 choices = dict(obj.__members__)
