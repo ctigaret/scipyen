@@ -259,6 +259,7 @@ For a given item:
             self._setupChildDataItem_(objItem)
             self.expandToDepth(1)
             self.resizeColumnToContents(0)
+            self.resizeColumnToContents(1)
 
 
     @property
