@@ -6,17 +6,18 @@
 
 r"""
 """
-import os, sys, typing, math, pathlib, enum, datetime
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+import os, sys, typing, types, math, pathlib, enum, datetime # noqa
+from functools import partial
+import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
     import PySide6
-    from PySide6 import Shiboken
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -36,24 +37,24 @@ else:
 __has_qtdbus__ = False
 
 try:
-    from qtpy import QtDBus
+    from qtpy import QtDBus # noqa
     __has_qtdbus__ = True
 except:
     __has_qtdbus__ = False
 
-from core.prog import (safewrapper, safeguiwrapper, scipywarn, print_styled)
-from core.sysutils import adapt_ui_path
+from core.prog import (safewrapper, safeguiwrapper, scipywarn, print_styled) # noqa
+from core.sysutils import adapt_ui_path # noqa
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 import numpy as np
 import vigra
 import quantities as pq
-from core import scipyen_quantities as scq
+# from core import scipyen_quantities as scq
 from gui.widgets import small_widgets as smw
 from gui.widgets import inlinefiledirchooser as ifdc
-from gui import quickdialog as qd
-from core import typeenum
+# from gui import quickdialog as qd
+# from core import typeenum
 from gui.itemmodels.roles import * # noqa
 
 class CutFileSystemItemDelegate(QtWidgets.QStyledItemDelegate):
@@ -140,6 +141,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         super().__init__(parent=parent)
         # self._model_ = None
         self._useObjectDataRole_: bool = False
+        self._currentModelIndex_: typing.Optional[QtCore.QModelIndex] = None
 
         self._enforceFloat_:bool = enforceFloat
 
@@ -176,9 +178,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         if not all(isinstance(k, int) and k >= 0 for k in keys):
             return False
 
-        checkSubKeys = lambda v: all(k in ("editable", "choices") for k in v.keys())
-        checkChoices = lambda v: isinstance(v["choices"], typing.Sequence) and len(v["choices"]) > 0 and all(isinstance(o, str) for o in v["choices"])
-        checkEditable= lambda v: isinstance(v["editable"], bool)
+        checkSubKeys = lambda v: all(k in ("editable", "choices") for k in v.keys()) # noqa
+        checkChoices = lambda v: isinstance(v["choices"], typing.Sequence) and len(v["choices"]) > 0 and all(isinstance(o, str) for o in v["choices"]) # noqa
+        checkEditable= lambda v: isinstance(v["editable"], bool) # noqa
 
         if not all(isinstance(v, dict) and checkSubKeys(v) and checkChoices(v) and checkEditable(v) for v in values):
             return False
@@ -449,20 +451,21 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         elif isinstance(data, pathlib.Path):
             if data.is_dir():
                 widget = ifdc.InlineDirChooserWidget(
-                    initial=data, parent=parent)
+                    initial=data, parent=parent, asDelegate=True)
             elif data.is_file():
                 widget = ifdc.InlineFileChooserWidget(
-                    initial=data, parent=parent)
+                    initial=data, parent=parent, asDelegate=True)
 
             if not inModel:
                 widget.setValue(data)
                 widget.sig_dataChanged.connect(self.slot_dataChanged)
             else:
-                widget.sig_dataChanged.connect(self.slot_commitAndCloseEditor)
                 if hasattr(widget, "setFrame"):
                     widget.setFrame(False)
-                widget.setAutoFillBackground(True)
-                return widget
+                widget.sig_dispatchAction.connect(self._slot_dispatchedAction_)
+            # widget.setAutoFillBackground(True)
+            # # widget.sig_dataChanged.connect(self.slot_commitAndCloseEditor)
+            # return widget
 
         elif isinstance(data, (str, np.character, bytes, bytearray)):
             if isinstance(data, str):
@@ -502,7 +505,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 widget.setMaximumHeight(200)
                 if isinstance(data, str):
                     widget.setReadOnly(False)
-                    widget.textChanged().connect(self.slot_dataChanged)
+                    widget.textChanged.connect(self.slot_dataChanged)
                 else:
                     widget.setReadOnly(True)
             else:
@@ -523,6 +526,36 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         return widget
 
+    @Slot(partial)
+    @Slot(types.FunctionType)
+    def _slot_dispatchedAction_(self,
+                                fn: typing.Union[partial, types.FunctionType]):
+        sender = self.sender()
+        ret = fn()
+        if isinstance(ret, tuple):
+            ret = ret[0]
+
+        if isinstance(ret, str) and len(ret.strip()):
+            ret = pathlib.Path(ret)
+
+        elif not isinstance(ret, pathlib.Path):
+            return
+
+        # print(f"{self.__class__.__name__}._slot_dispatchedAction_: ret = {ret}\n\tfrom sender: {type(sender)}\n")
+
+        if (
+            isinstance(ret, pathlib.Path)
+            and isinstance(sender, ifdc.InlineFileDirChooserWidget)
+            and isinstance(self._currentModelIndex_, QtCore.QModelIndex)
+            ):
+            model = self._currentModelIndex_.model()
+            role = ObjectDataRole if self._useObjectDataRole_ else QtCore.Qt.EditRole
+            model.setData(self._currentModelIndex_, ret, role)
+            # if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole):
+            #     model.setData(self._currentModelIndex_, ret.as_posix(), QtCore.Qt.DisplayRole)
+
+        self._currentModelIndex_ = None
+
     @Slot()
     def slot_commitAndCloseEditor(self):
         editor = self.sender()
@@ -539,6 +572,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
     def createEditor(self, parent:QtWidgets.QWidget, option:int,
                      index:QtCore.QModelIndex) -> QtWidgets.QWidget | None:
+        self._currentModelIndex_ = index
         # NOTE: 2025-09-27 10:29:14 ATTENTION
         # editor data, although it can also be set here, it should be set through
         # self.setEditorData(), overridden below
@@ -557,7 +591,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         # one should restrict everything to string, in the custom item model, as
         # as this cannot cover every possibility
 
-        data = index.data(ObjectDataRole)
+        data = index.data(ObjectDataRole) # noqa
         if data is not None:
             self._useObjectDataRole_ = True
 
@@ -568,15 +602,15 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         # disp = index.data(QtCore.Qt.DisplayRole)
         # CAUTION: Standard item model and standard items treat DisplayRole and
         # DisplayRole as being the same; in such case I need a custom role
-        dataChoices = index.data(DataChoicesRole)
+        dataChoices = index.data(DataChoicesRole) # noqa
 
 
         # NOTE: 2025-09-27 11:06:52
         # some models may be able to prevent editing indexes with certain rows
         # and/or columns; AFAIK, this functionality is not provided by stock Qt
-        # item# models and must be implemented in my custom QAbstractItemModel
+        # item models and must be implemented in my custom QAbstractItemModel
         # subclasses (e.g. TabularDataModel in tableeditorwidget.py). My implementation
-        # uses two pythonic properties of the item model: 'immutableColumns' and
+        # employs two pythonic properties of the item model: 'immutableColumns' and
         # 'immutableRows', which I use below
         model = index.model()
 
@@ -613,12 +647,13 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
             choices = self._columnChoices_[index.column()]["choices"]
 
+
         return self.createWidget(data, choices, True, parent)
 
     def setEditorData(self, editor: QtWidgets.QWidget,
                       index: QtCore.QModelIndex):
         r"""Sets the value of the editor widget based on the EditRole data in the QModelIndex"""
-        data = index.data(ObjectDataRole)
+        data = index.data(ObjectDataRole) # noqa
         if data is not None:
             self._useObjectDataRole_ = True
         else:
@@ -628,7 +663,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         # NOTE: 2026-02-10 09:48:29
         # because for QStandardItems EditRole and DisplayRole do the same thing
         disp = f"{index.data(QtCore.Qt.DisplayRole)}"
-        dataChoices = index.data(DataChoicesRole)
+        dataChoices = index.data(DataChoicesRole) # noqa
 
         if dataChoices:
             choices = dataChoices
@@ -775,10 +810,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                                smw.QuantitySpinBox)):
             data = editor.value()
 
-        elif isinstance(editor, ifdc.InlineFileDirChooserWidget):
-            if not editor._pendingChange_:
-                return
-            data = editor.value()
+        # elif isinstance(editor, ifdc.InlineFileDirChooserWidget):
+        #     if not editor._pendingChange_:
+        #         return
+        #     data = editor.value()
 
         elif isinstance(editor, QtWidgets.QLineEdit):
             data = editor.text()
@@ -832,6 +867,11 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         elif isinstance(editor, QtWidgets.QCheckBox):
             data = editor.isChecked()
 
-        role = ObjectDataRole if self._useObjectDataRole_ else QtCore.Qt.EditRole
+        else:
+            return
+
+        role = ObjectDataRole if self._useObjectDataRole_ else QtCore.Qt.EditRole  # noqa
         # print(f"{self.__class__.__name__}.setModelData -> editor: {type(editor).__name__}, row = {index.row()}, column = {index.column()}, data = {data} for role = {role}")
         model.setData(index, data, role)
+        if isinstance(self._currentModelIndex_, QtCore.QModelIndex):
+            self._currentModelIndex_ = None

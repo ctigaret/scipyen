@@ -1842,6 +1842,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 value: object, role = QtCore.Qt.EditRole) -> bool:
         if self._modelData_ is None:
             return False
+        # print(f"{self.__class__.__name__}.setData {value}\n\tfor index {modelIndex.data(QtCore.Qt.DisplayRole)},\n\trow {modelIndex.row()}\n")
 
         item = self.itemFromIndex(modelIndex)
 
@@ -1868,13 +1869,14 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # if isinstance(value, (enum.Enum, enum.IntEnum, enum.Flag, TypeEnum)):
         #     print(f"setting value as {value}")
 
+        # print(f"{self.__class__.__name__}.setData {value}\n\tfor objItem {objItem.data(QtCore.Qt.DisplayRole)},\n\trow {item.row()}\n")
+
         if item.column() == 2 and role == ObjectDataRole: # noqa
             parentItem = item.parent()
             if not parentItem:
                 return False
             objItem = parentItem.child(item.row(), 0)
 
-        # print(f"{self.__class__.__name__}.setData {value} for objItem {objItem.data(QtCore.Qt.DisplayRole)} , row {item.row()}")
         objItem.setData(QtCore.QVariant(value), ObjectDataRole) # noqa
 
         path = self._getPathForItemOrIndex_(objItem)
@@ -1891,6 +1893,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             newVal = eval(accexpr)
             OK = True
         except:
+            traceback.print_exc()
             pass
 
         if OK:

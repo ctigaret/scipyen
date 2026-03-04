@@ -592,12 +592,14 @@ class DirectoryObserver(QtCore.QObject):
 
 class FileIOGui(object):
     @safewrapper
-    def chooseFile(self, caption:typing.Optional[str]=None,
-                   fileFilter:typing.Optional[str]=None,
-                   single:typing.Optional[bool]=True,
-                   save:bool=False,
-                   targetDir:typing.Optional[str]=None,
-                   **kwargs):
+    def chooseFile(self, caption:typing.Optional[str] = None,
+                   fileFilter:typing.Optional[str] = None,
+                   single:typing.Optional[bool] = True,
+                   save:bool = False,
+                   targetDir:typing.Optional[
+                       typing.Union[str,pathlib.Path]] = None,
+                   asPath: bool = False,
+                   **kwargs) -> tuple:
         r"""Launcher of file open dialog
 
         Parameters:
@@ -657,6 +659,10 @@ class FileIOGui(object):
             path = pathlib.Path(suggestedName)
             targetDir = targetDir / path
 
+        elif isinstance(suggestedName, pathlib.Path):
+            targetDir = targetDir.join(suggestedName)
+
+
         if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
@@ -675,10 +681,27 @@ class FileIOGui(object):
 
         fn, fl = opener(parent=self, directory=targetDir.as_posix(), **kw)
 
+        if asPath:
+            if len(fn.strip()):
+                fn = pathlib.Path(fn)
+            else:
+                fn = None
+
         return fn, fl
 
     @staticmethod
-    def chooseFile_static(parent:typing.Optional[QtWidgets.QWidget]=None, caption:typing.Optional[str]=None, fileFilter:typing.Optional[str]=None, single:typing.Optional[bool]=True, save:bool=False, targetDir:typing.Optional[str]=None):
+    def chooseFile_static(parent: typing.Optional[QtWidgets.QWidget] = None,
+                          caption: typing.Optional[str] = None,
+                          fileFilter: typing.Optional[str] = None,
+                          single: typing.Optional[bool] = True,
+                          save: bool = False,
+                          targetDir:typing.Optional[
+                              typing.Union[
+                                  str, pathlib.Path
+                                  ]
+                              ] = None,
+                              asPath: bool = False,
+                              **kwargs) -> tuple:
         r"""Launcher of file open dialog (static version)
 
         Parameters:
@@ -721,9 +744,23 @@ class FileIOGui(object):
         if targetDir is None:
             targetDir = os.getcwd()
 
-        if isinstance(targetDir, str):
-            if len(targetDir.strip()) == 0 or not os.path.isdir(targetDir):
-                targetDir = os.getcwd()
+        if (
+            isinstance(targetDir, pathlib.Path)
+            and targetDir.exists()
+            and targetDir.is_dir()
+            ):
+            targetDir = targetDir.as_posix()
+
+        elif (
+            not isinstance(targetDir, str)
+            or len(targetDir.strip()) == 0
+            or not os.path.isdir(targetDir)
+            ):
+            targetDir = os.getcwd()
+        # else:
+        #     targetDir = os.getcwd()
+
+        # suggestedName = kwargs.pop("fileName", None)
 
         if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
@@ -741,36 +778,89 @@ class FileIOGui(object):
 
         fn, fl = opener(parent=parent, directory=targetDir, **kw)
 
+        if asPath:
+            if len(fn.strip()):
+                fn = pathlib.Path(fn)
+            else:
+                fn = None
+
         return fn, fl
 
     @safewrapper
-    def chooseDirectory(self, caption:typing.Optional[str]=None,targetDir:typing.Optional[str]=None):
+    def chooseDirectory(self, caption: typing.Optional[str] = None,
+                        targetDir: typing.Optional[
+                            typing.Union[str, pathlib.Path]] = None,
+                        asPath: bool = False) -> typing.Optional[typing.Union[str|pathlib.Path]]:
         if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
             kw = {}
 
-        if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
-            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(self, caption=caption, directory=targetDir, **kw))
+        if ((isinstance(targetDir, str)
+                and len(targetDir.strip())
+                and os.path.exists(targetDir)
+                and os.path.isdir(targetDir)
+                )
+            or (isinstance(targetDir, pathlib.Path)
+                and targetDir.exists()
+                and targetDir.isdir()
+                )
+            ):
+            if isinstance(targetDir, pathlib.Path):
+                targetDir = targetDir.as_posix()
+
+            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(
+                parent, caption=caption, directory=targetDir, **kw))
         else:
-            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(self, caption=caption, **kw))
+            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(
+                self, caption=caption, **kw))
+
+        if asPath:
+            if not isinstance(dirName, str) or len(dirName.strip()) == 0:
+                return None
+            return pathlib.Path(dirName)
 
         return dirName
 
     @staticmethod
-    def chooseDirectory_static(parent:typing.Optional[QtWidgets.QWidget]=None, caption:typing.Optional[str]=None,targetDir:typing.Optional[str]=None):
+    def chooseDirectory_static(parent: typing.Optional[QtWidgets.QWidget] = None,
+                               caption: typing.Optional[str] = None,
+                               targetDir: typing.Optional[
+                                   typing.Union[
+                                       str, pathlib.Path
+                                       ]
+                                   ] = None,
+                                   asPath: bool = False) -> typing.Optional[typing.Union[str|pathlib.Path]]:
         if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
-            kw = {"options":options}
+            kw = {"options": options}
         else:
             kw = {}
 
-        if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
-            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(parent, caption=caption, directory=targetDir, **kw))
-        else:
-            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(parent, caption=caption, **kw))
+        if ((isinstance(targetDir, str)
+                and len(targetDir.strip())
+                and os.path.exists(targetDir)
+                and os.path.isdir(targetDir)
+                )
+            or (isinstance(targetDir, pathlib.Path)
+                and targetDir.exists()
+                and targetDir.is_dir()
+                )
+            ):
+            if isinstance(targetDir, pathlib.Path):
+                targetDir = targetDir.as_posix()
 
+            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(
+                parent, caption=caption, directory=targetDir, **kw))
+        else:
+            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(
+                parent, caption=caption, **kw))
+
+        if asPath:
+            if not isinstance(dirName, str) or len(dirName.strip()) == 0:
+                return None
+            return pathlib.Path(dirName)
         return dirName
 
 class FileStatChecker(QtCore.QObject):
