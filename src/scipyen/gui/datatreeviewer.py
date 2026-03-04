@@ -687,7 +687,8 @@ A lot of things copied from there, EXCEPT that it now uses
     @Slot(QtGui.QStandardItem)
     def slot_itemDoubleClicked(self: typing.Self, item:QtGui.QStandardItem):
         if item.column() == 0:
-            obj = item.data(ObjectDataRole)
+            # obj = item.data(ObjectDataRole)
+            obj = self.treeView.model().getDataObjectForLeaf(item)
             readOnly = item.data(ReadOnlyRole) is True
             name = item.data(QtCore.Qt.DisplayRole)
             if obj is not None:
