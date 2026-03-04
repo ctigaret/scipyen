@@ -74,28 +74,6 @@
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_6">
      <item>
-      <widget class="QToolButton" name="procedureToolButton">
-       <property name="toolTip">
-        <string>Procedure (treatment, etc)</string>
-       </property>
-       <property name="statusTip">
-        <string>Procedure (treatment, etc)</string>
-       </property>
-       <property name="whatsThis">
-        <string>Procedure (treatment, etc)</string>
-       </property>
-       <property name="text">
-        <string>Procedure</string>
-       </property>
-       <property name="icon">
-        <iconset theme="view-task"/>
-       </property>
-       <property name="autoRaise">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QToolButton" name="triggersToolButton">
        <property name="toolTip">
         <string>Detect and edit trigger protocols</string>
@@ -111,72 +89,6 @@
        </property>
        <property name="icon">
         <iconset theme="mark-location"/>
-       </property>
-       <property name="autoRaise">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QToolButton" name="dateTimeToolButton">
-       <property name="toolTip">
-        <string>Date, time of recording and  analysis</string>
-       </property>
-       <property name="statusTip">
-        <string>Date, time of recording and  analysis</string>
-       </property>
-       <property name="whatsThis">
-        <string>Date, time of recording and  analysis</string>
-       </property>
-       <property name="text">
-        <string>Date, time</string>
-       </property>
-       <property name="icon">
-        <iconset theme="change-date-symbolic"/>
-       </property>
-       <property name="autoRaise">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QToolButton" name="annotationsToolButton">
-       <property name="toolTip">
-        <string>Additional structured descriptors (key, value pairs)</string>
-       </property>
-       <property name="statusTip">
-        <string>Additional structured descriptors (key, value pairs)</string>
-       </property>
-       <property name="whatsThis">
-        <string>Additional structured descriptors (key, value pairs)</string>
-       </property>
-       <property name="text">
-        <string>Annotations</string>
-       </property>
-       <property name="icon">
-        <iconset theme="database-index"/>
-       </property>
-       <property name="autoRaise">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QToolButton" name="notesToolButton">
-       <property name="toolTip">
-        <string>Edit description (notes)</string>
-       </property>
-       <property name="statusTip">
-        <string>Edit description (notes)</string>
-       </property>
-       <property name="whatsThis">
-        <string>Edit description (notes)</string>
-       </property>
-       <property name="text">
-        <string>Notes</string>
-       </property>
-       <property name="icon">
-        <iconset theme="description"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
@@ -228,28 +140,6 @@
       </widget>
      </item>
      <item>
-      <widget class="QToolButton" name="saveToolButton">
-       <property name="toolTip">
-        <string>Save metadata to file</string>
-       </property>
-       <property name="statusTip">
-        <string>Save metadata to file</string>
-       </property>
-       <property name="whatsThis">
-        <string>Save metadata to file</string>
-       </property>
-       <property name="text">
-        <string>Save</string>
-       </property>
-       <property name="icon">
-        <iconset theme="document-save"/>
-       </property>
-       <property name="autoRaise">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QToolButton" name="loadToolButton">
        <property name="toolTip">
         <string>Load meta-data from file</string>
@@ -265,6 +155,28 @@
        </property>
        <property name="icon">
         <iconset theme="document-open"/>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="saveToolButton">
+       <property name="toolTip">
+        <string>Save metadata to file</string>
+       </property>
+       <property name="statusTip">
+        <string>Save metadata to file</string>
+       </property>
+       <property name="whatsThis">
+        <string>Save metadata to file</string>
+       </property>
+       <property name="text">
+        <string>Save</string>
+       </property>
+       <property name="icon">
+        <iconset theme="document-save"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
