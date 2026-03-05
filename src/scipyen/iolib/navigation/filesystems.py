@@ -5,14 +5,14 @@
 
 r"""
 """
-import os, sys, pathlib, traceback, typing, types
+import os, sys, pathlib, traceback, typing, types, stat, datetime # noqa
 import dataclasses
 import psutil
-from functools import (singledispatch, singledispatchmethod)
-from enum import Enum, IntEnum
+from functools import (singledispatch, singledispatchmethod) # noqa
+from enum import Enum, IntEnum # noqa
 import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
@@ -28,14 +28,14 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
+
     from qtpy import sip
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
-    
+
 
 # from . import networkmounts
 # from iolib.navigation.networkmounts import (NetworkMounts, NetworkMountsType)
@@ -44,9 +44,9 @@ else:
 # "standard" file system item operations for the file system viewer - single item selected
 #
 #                               Shown for   Enabled if:                                         Acts on:
-#                               item type   item permissions        parent item permissions 
+#                               item type   item permissions        parent item permissions
 #                                           ReadOwner|WriteOwner|   ReadOwner|WriteOwner|ReadGroup|WriteGroup
-#                                           ReadGroup|WriteGroup    
+#                                           ReadGroup|WriteGroup
 # ---------------------------------------------------------------------------------------------------------
 # Create New -> submenu         directory                                                       item
 # Cut                           all                                 WriteOwner|WriteGroup       item
@@ -66,12 +66,12 @@ else:
 # class FileSystemItemData:
 #     def __init__(self, value):
 #         self.value = value
-#         
+#
 # FileSystemItemDataType = QtCore.QMetaType.registerType(FileSystemItemData, "FileSystemItemData")
 
 class FsType(IntEnum):pass
-FsType = IntEnum("FsType", 
-                 ["Unknown", 
+FsType = IntEnum("FsType",
+                 ["Unknown",
                    "Nfs",          # NFS or other full-featured networked filesystems (autofs, subfs, cachefs, sshfs)
                    "Smb",          # SMB/CIFS mount (networked but with some FAT-like behavior)
                    "Fat",          # FAT or similar (msdos, FAT, VFAT)
@@ -115,7 +115,7 @@ class FileSystemModel(QtGui.QFileSystemModel):
     def __init__(self, parent:typing.Optional[QtCore.QObject] = None):
         super().__init__(parent=parent)
         self._cutIndexes_:typing.Sequence[QtCore.QModelIndex] = list()
-        
+
     def data(self, index:QtCore.QModelIndex, role:QtCore.Qt.ItemDataRole=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
         # NOTE: 2026-01-25 21:20:01
         # not sure this does anything meaningful...
@@ -126,23 +126,22 @@ class FileSystemModel(QtGui.QFileSystemModel):
         if index in self._cutIndexes_:
             if role == QtCore.Qt.ForegroundRole:
                 return QtWidgets.QApplication.palette().brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
-            
+
         return super().data(index, role)
-    
+
     @property
     def cutIndexes(self) -> list:
         return self._cutIndexes_
-    
+
     @cutIndexes.setter
     def cutIndexes(self, value:typing.Sequence[QtCore.QModelIndex]):
         if len(value) and not all(isinstance(v, QtCore.QModelIndex) for v in value):
             return
-    
+
         self._cutIndexes_ = value
-            
 
 class FileOperationJob(QtCore.QObject):
-    sig_finished = Signal(name="sig_finished")
+    sig_finished = Signal(name="sig_finished") # noqa
     def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
         self.loopControl:dict = {"break": False}
         self.progressCounter:int = 0
@@ -177,7 +176,7 @@ class FileOperationJob(QtCore.QObject):
         progressDlg.setMinimumDuration(1000)
         progressDlg.canceled.connect(self._slot_breakLoop)
         kw = {"source": source, "destination": destination, "jobType": jobType,
-              "loopControl": self.loopControl}
+              "loopControl": self.loopControl} # noqa
         workerThread = pgui.LoopWorkerThread(self, self._operateFile_, **kw)
         workerThread.signals.signal_Progress[int].connect(progressDlg.setValue)
         workerThread.signals.signal_Result[object].connect(self.workerReady)
@@ -208,15 +207,15 @@ class FileOperationJob(QtCore.QObject):
         jobType: str = kwargs.pop("jobType", "copy")
         source: typing.optional[typing.Sequence[pathlib.Path]] = kwargs.pop("source", list())
         destination: typing.Optional[typing.Sequence[pathlib.Path]] = kwargs.pop("destination", list())
-        loopControl = kwargs.pop("loopControl", None)
-        progressSignal = kwargs.pop("progressSignal", None)
-        canceledSignal = kwargs.pop("canceledSignal", None)
-        
+        loopControl = kwargs.pop("loopControl", None) # noqa
+        progressSignal = kwargs.pop("progressSignal", None) # noqa
+        canceledSignal = kwargs.pop("canceledSignal", None) # noqa
+
         # print(f"{self.__class__.__name__}._operateFile_: jobType = {jobType}")
         if len(source) == 0:
             return
 
-        if len(source) != len(destination) and jobType not in ("trash", "delete"):
+        if len(source) != len(destination) and jobType not in ("trash", "delete"): # noqa
             scipywarn(f"Mismatch between number of source ({len(source)}) and destination files ({destination})")
             return
 
@@ -224,18 +223,16 @@ class FileOperationJob(QtCore.QObject):
 
         OK = True
 
-        canceled = False
+        canceled = False # noqa
 
-        # print(f"{self.__class__.__name__}._operateFile_:\nsource:\n{source}\ndestination:\n{destination}\n")
-        
-        if jobType == "trash":
+        if jobType == "trash": # noqa
             for src in source:
                 srcFile = QtCore.QFile(src.as_posix())
                 result = srcFile.moveToTrash()
                 OK &= result
                 if result:
                     self.progressCounter += 1
-                    
+
         elif jobType == "delete":
             for src in source:
                 if src.is_file():
@@ -250,7 +247,7 @@ class FileOperationJob(QtCore.QObject):
                     OK &= result
                     if result:
                         self.progressCounter += 1
-        
+
         else:
             for k, src in enumerate(source):
                 try:
@@ -261,7 +258,6 @@ class FileOperationJob(QtCore.QObject):
                         if jobType == "move" and result:
                             srcFile = QtCore.QFile(src.as_posix())
                             result = srcFile.remove()
-                        # self.progressCounter += 1
                     elif src.is_dir():
                         result = self._copyDirectory_(QtCore.QDir(s), QtCore.QDir(d))
                         if jobType == "move" and result:
@@ -323,8 +319,6 @@ class FileOperationJob(QtCore.QObject):
 
         return True
 
-
-
 def typeFromName(name:str):
     from core.prog import scipywarn
     found = list(filter(lambda x: x.name == name, fsMap))
@@ -332,7 +326,7 @@ def typeFromName(name:str):
         if len(found) > 1:
             scipywarn(f"Ambiguous file system type detection for '{name}'")
         return found[0].type
-    
+
     return FsType.Other
 
 def determineFileSystemType(path:str) -> FsType:
@@ -342,13 +336,13 @@ def determineFileSystemType(path:str) -> FsType:
         partitions = psutil.disk_partitions(True)
         ppath = pathlib.Path(path).absolute() # wrap in a pathlib.Path for the code below
                                              # and ensure this is absolute
-        
+
         # NOTE: 2025-01-07 19:34:21
         # get the mount point for the partition where this path is located
-        # • check that the mount point of the partitions reported by psutil is 
+        # • check that the mount point of the partitions reported by psutil is
         #   among the parents of the path (this is why path has to be wrapped in a pathlib.Path)
         #
-        #   ∘ NOTE: In UNIX, this may return more than one mount point for a regular path 
+        #   ∘ NOTE: In UNIX, this may return more than one mount point for a regular path
         #       (either file or directory). This is because ALL partitions are mounted
         #       in the root partition, which itself is mounted at the '/' mount point
         #
@@ -356,32 +350,32 @@ def determineFileSystemType(path:str) -> FsType:
         #       physically located on a disk partition that is different from
         #       the one containing the root file system (not the 'root' user!):
         #
-        #       This user home partition will be mounted in the root file system at 
-        #       some mount point (usually '/home'). Because the root file system is 
-        #       already mounted at the '/' mount point, psutils will report TWO disk 
-        #       partitions as residence for this file, with mount points, respectively, 
+        #       This user home partition will be mounted in the root file system at
+        #       some mount point (usually '/home'). Because the root file system is
+        #       already mounted at the '/' mount point, psutils will report TWO disk
+        #       partitions as residence for this file, with mount points, respectively,
         #       of '/' and '/home'. Bpth of these mount points are 'parents' of the file
         #       represented by 'path', with '/home' being obviously a descendant of '/'.
         #
-        #       In the (unusual) case where a partition on an externaldisk (e.g. 
-        #       a hotplugged USB disk or 'key') is manually mounted by the user in 
+        #       In the (unusual) case where a partition on an externaldisk (e.g.
+        #       a hotplugged USB disk or 'key') is manually mounted by the user in
         #       their own home directory, there will be yet another mount point,
         #       in effect a descendant of '/home'.
-        #       
-        #      Therefore the partition of interest here (the one corresponding to 
-        #      the physical place where the file resides) is the partition with 
+        #
+        #      Therefore the partition of interest here (the one corresponding to
+        #      the physical place where the file resides) is the partition with
         #      the longest mount point naame (in characters)  i.e. the deepest nested
         #      "child path"
         #
-        #   ∘ the next line returns to tuples: 
+        #   ∘ the next line returns to tuples:
         #       ▷ the first (mpl) has the length of the string representation of the mount point
         #       ▷ the second (mpp) is the partition on which the path exists
         mpl, mpp = zip(*list(map(lambda x: (len(x.mountpoint), x), filter(lambda x: x.mountpoint in map(lambda p: p.as_posix(), ppath.parents), partitions))))
         # (WARNING: not checking for the unlikely case here none of the mount points are among the path's parents)
-        
+
         pathPartition = mpp[mpl.index(max(mpl))] # that is usually the last element in the list
         return typeFromName(pathPartition.fstype)
-        
+
     pass
 
 def fileSystemType(path:str) -> FsType:
@@ -392,7 +386,7 @@ def fileSystemType(path:str) -> FsType:
         return FsType.Nfs
     else:
         return determineFileSystemType(path)
-        
+
 def fileSystemName(ftype:FsType) -> str:
     # TODO 2025-01-07 19:03:57
     # figure out translations - what context here?
@@ -545,6 +539,23 @@ def networkFolders():
 def fsTypes():
     from core.utilities import unique
     return sorted(unique(list(map(lambda x: x.fstype, get_disk_partitions(False)))))
+
+def getFileCreationDateTime(
+    s: typing.Union[str, pathlib.Path],
+    followSymLink: bool = False,
+    ) -> datetime.datetime | None:
+    if isinstance(s, str):
+        s = pathlib.Path(s)
+
+    elif not isinstance(s, pathlib.Path):
+        raise TypeError(f"Expecting a string or a pathlib.Path object; got {type(s).__name__} instead")
+
+    if s.exists():
+        fs = s.lstat() if (s.is_symlink() and followSymLink) else s.stat()
+        if hasattr(fs, "st_birthtime"):
+            return datetime.datetime.fromtimestamp(fs.st_birthtime)
+        else:
+            return datetime.datetime.fromtimestamp(fs.st_ctime)
 
 
 

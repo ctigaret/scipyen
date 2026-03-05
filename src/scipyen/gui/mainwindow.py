@@ -6840,14 +6840,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if not self.fileSystemModel.rootDirectory().isEmpty():
                 selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
                                 if item.column() == 0]  # list of QModelIndex
-                # if self.fileTransferJob == "move":
-                #     rows = list(map(lambda i: i.row(), selectedItems))
-                #     for row in rows:
-                #         self.fileSystemTreeView.setItemDelegateForRow(row, self._cutFileSystemItemTreeViewDelegate_)
-                # else:
-                #     # for row in self.
-                #     self.fileSystemTreeView.setItemDelegate(self._defaultFileSystemTreeViewItemDelegate_)
-                # self.fileSystemTreeView.update()
                 fileNames = set([self.fileSystemModel.filePath(i) for i in selectedItems])
                 fileUrls = list(sorted(map(lambda i: QtCore.QUrl(f"file://{i}"), fileNames)))
 
@@ -6872,8 +6864,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             targetDir = self.fileSystemModel.rootDirectory()
             itempathstr = self.fileSystemModel.rootPath()
 
-        # print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory:\ntargetDir:\n\t{targetDir} = {targetDir.fileName()}")
-
         clipboard = QtGui.QGuiApplication.clipboard()
         mimeData = clipboard.mimeData()
 
@@ -6882,14 +6872,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             sourceFileNames = list(map(lambda u: u.toLocalFile(), urls))
             targetFileNames = list(map(lambda u: u.fileName(), urls))
             if not targetDir.isEmpty():
-                # print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory:\ntargetFileNames:\n\t{targetFileNames}")
                 targetFileNames = list(map(lambda f: self._checkItemExistsInDir_(f, targetDir), targetFileNames))
             # else:
 
             source = list(map(lambda f: pathlib.Path(f), sourceFileNames))
             dest = list(map(lambda f: pathlib.Path(itempathstr).joinpath(f), targetFileNames))
 
-            # print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory:\nsource:\n\t{source},\ndestination:\n\t{dest}\n")
             transferJob = FileOperationJob(parent=self)
             transferJob.sig_finished.connect(self._slot_transferJobFinished_)
             transferJob.run(source, dest, self.fileTransferJob)
@@ -6943,7 +6931,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                         if ret != QtWidgets.QMessageBox.Yes:
                             return
 
-                # print(f"{self.__class__.__name__}._slot_pasteIntoFileSystemDirectory will create {fileName} in {targetDir.path()}\n")
                 target = pathlib.Path(targetDir.path()).joinpath(fileName).as_posix()
 
                 if isinstance(data, str):
@@ -6969,13 +6956,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if len(selectedItems):
             src = list(map(lambda p: p.as_posix(), source))
             if len(selectedItems) == 1:
-                # ret = self.questionMessage("Move to Trash — Scipyen", f"Do you really want to move this item to trash?\n\n<code>{src[0]}</code>")
                 ret = self.detailedMessage("Move to Trash — Scipyen", f"Do you really want to move this item to trash?", info = f"<code>{src[0]}</code>",
                                            msgType = "Question", buttons=QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
                                            defaultButton=QtWidgets.QMessageBox.No)
             else:
-                # srcDetails = src if len(src) < 10 else src[:4] + ["…"] + src[-4:]
-
                 ret = self.detailedMessage("Move to Trash — Scipyen", f"Do you really want to move these {len(src)} items to trash?",
                                            detail="\n".join(src), msgType = "Question", buttons=QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
                                            defaultButton=QtWidgets.QMessageBox.No)
@@ -6998,14 +6982,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if len(selectedItems):
             src = list(map(lambda p: p.as_posix(), source))
             if len(selectedItems) == 1:
-                # ret = self.questionMessage("Delete Item — Scipyen", f"Do you really want to delete this item?\n\n<code>{src[0]}</code>\n\n<b>This action cannot be undone!</b>")
                 ret = self.detailedMessage("Delete Items — Scipyen", f"Do you really want to delete this item",
                                            info = f"<code>{src[0]}</code>\n\n<p><b>This action cannot be undone!</b>",
                                            msgType = "Question", buttons=QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
                                            defaultButton=QtWidgets.QMessageBox.No)
             else:
-                # srcDetails = src if len(src) < 10 else src[:4] + ["…"] + src[-4:]
-
                 ret = self.detailedMessage("Delete Items — Scipyen", f"Do you really want to delete these {len(src)} items?",
                                            info = "<b>This action cannot be undone!</b>",
                                            detail="\n".join(src), msgType = "Question", buttons=QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
@@ -7071,37 +7052,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @Slot()
     def _slot_transferJobFinished_(self):
-        # self.fileSystemTreeView.setItemDelegate(self._defaultFileSystemTreeViewItemDelegate_)
-        # self.fileSystemTreeView.update()
-        # if self.fileTransferJob == "trash":
-        #     # NOTE: Notify trash system ?!?  qdbus?
-        #     try:
-        #         if sys.platform == "win32":
-        #             import ctypes
-        #             ctypes.windll.user32.SendMessageTimeout(
-        #                 0xFFFF,  # HWND_BROADCAST
-        #                 0x0010,  # WM_COMMAND
-        #                 0x74,     # Refresh command
-        #                 0,        # Not used
-        #                 0,        # Not used
-        #                 1000,     # Timeout in milliseconds
-        #                 None      # No additional data
-        #             )
-        #         elif sys.platform == "darwin":
-        #             subprocess.run(['osascript', '-e', 'tell application "Finder" to set visible of process "Finder" to false'])
-        #             subprocess.run(['osascript', '-e', 'tell application "Finder" to set visible of process "Finder" to true'])
-        #         else:
-        #             if desktoputils.is_kde():
-        #                 import dbus
-        #                 session_bus = dbus.SessionBus()
-        #                 plasma_shell = session_bus.get_object('org.kde.plasmashell', '/PlasmaShell')
-        #                 # plasma_shell.refreshCurrentShell() # NO!!!
-        #             # elif desktoputils.is_gnome():
-        #                 # subprocess.run(['gio', 'trash', '-R', '.']) # also BS?
-        #             # subprocess.run(['xdg-user-dirs-update', '--set', 'TRASH']) # BS.
-        #     except:
-        #         traceback.print_exc()
-
         self.fileTransferJob = None
 
     def _checkItemExistsInDir_(self, fileName:str, testDir:typing.Union[str, QtCore.QDir], autorename:bool=True):
@@ -7132,9 +7082,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
                 if not self.fileSystemModel.isDir(item):
                     item = self.fileSystemModel.parent(item)
-                    # return
-                # if not isinstance(item, QtCore.QModelIndex) or not item.data(QtGui.QFileSystemModel.FileInfoRole):
-                #     item = self.fileSystemModel.index(self.currentDir)
 
                 info = item.data(QtGui.QFileSystemModel.FileInfoRole)
                 if not info.exists() or not info.isDir() or not info.isWritable():
@@ -7142,12 +7089,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
                 parent = item
                 folderName = self._checkItemExistsInDir_(folderName, self.fileSystemModel.filePath(item))
-                # itemdir = QtCore.QDir(self.fileSystemModel.filePath(item))
-                # entries = itemdir.entryList(QtCore.QDir.Dirs | QtCore.QDir.NoDotAndDotDot)
-                #
-                # if folderName in entries:
-                #     folderName = counter_suffix(folderName, entries, bracketed=True, start=1,
-                #                                 returns_counter=False)
 
             elif len(selectedItems) == 0:
                 parent = self.fileSystemModel.rootDirectory()
@@ -7158,7 +7099,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             path = pathlib.Path(self.fileSystemModel.rootPath())
 
         d = qd.QuickDialog(self, "Create New Folder")
-        # d.addLabel("Enter new folder name:")
         folderNameInput = qd.StringInput(d, "New folder name:")
         folderNameInput.setToolTip("To create a folder with subfolders, separate their names with '/'.\nBe cautious of spaces between the separator '/' and the folder names.")
         folderNameInput.setValue(folderName)
@@ -7184,7 +7124,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                         newQDir = QtCore.QDir(newDirPath.as_posix())
                         newQDir.mkdir(part)
                         newDirPath = newDirPath.joinpath(part)
-                    # currentDir = pathlib.Path(self.fileSystemModel.filePath(parent)) / part
 
 
             else:
@@ -7200,19 +7139,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     path = path.joinpath(part)
                     parent = QtCore.QDir(path.as_posix())
 
-            # else:
-            #     parent.mkdir
-
-        # parent = item.parent()
-
-
     @Slot()
     @safewrapper
     def slot_openCurrentDirInSystemTerminal(self):
         terminalLauncher = QtCore.QTimer(self)
         terminalLauncher.singleShot(0, self._slot_launchSystemTerminal)
-        # terminalLauncher.setSingleShot(True)
-        # terminalLauncher.timeout.connect(self._slot_launchSystemTerminal)
         terminalLauncher.deleteLater()
 
     @Slot()

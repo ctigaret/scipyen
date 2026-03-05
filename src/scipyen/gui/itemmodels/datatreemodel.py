@@ -337,13 +337,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
             # self._buildBranch_:
             # item2.setData(QtCore.QVariant(obj), ObjectDataRole)
             choices = objDict.get("choices", dict())
-            # if issubclass(objDict["objType"], enum.Enum):
-            #     print(f"{self.__class__.__name__}._makeObjectRow_ for '{objName}' -> choices = {choices}")
             item2.setData(choices, DataChoicesRole) # noqa
 
         #
         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
-        # for item in (item0, item1, item2):
 
         readOnly = objDict.get("readOnly", False)
 
@@ -834,7 +831,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
                     # this only works for TypeEnum
                     #
                     choices = dict(zip(obj.names(), obj.values()))
-                    # choices = list(obj.names())
                 except:
                     scipywarn(f"Cannot access enumeration values for {type(obj).__name__}")
                     choices = dict()
@@ -1021,6 +1017,12 @@ class DataTreeModel(QtGui.QStandardItemModel):
         if is_namedtuple(obj):
             pData = obj._asDict() if hasattr(obj, "_asDict") else obj._asdict()
             tip += "(namedtuple)"
+            memberAccess = (".",)
+            accessType = "attribute"
+            readOnly = True
+        elif isinstance(obj, os.stat_result):
+            pData = dict(filter(lambda t: any(t[0].startswith(s) for s in ("n_", "st_")), inspect.getmembers(obj)))
+            tip += "(stat result)"
             memberAccess = (".",)
             accessType = "attribute"
             readOnly = True

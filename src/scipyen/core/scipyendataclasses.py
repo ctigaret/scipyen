@@ -27,6 +27,7 @@ import warnings
 import weakref
 import h5py
 import treelib
+import pathlib
 from copy import (deepcopy, copy,)
 
 #### END core python modules
@@ -116,6 +117,47 @@ class DoseDescriptor:
             raise TypeError(f"Expecting a scalar dosage Quantity, or None; instead got {type(value).__name__}")
 
         setattr(obj, self._name, value)
+
+class FileOriginDescriptor:
+    r"""Use stat() to update the owner's ``file_datetime`` field, if it exists"""
+    def __set_name__(self, obj:object, name:str):
+        if len(name.strip()) == 0:
+            raise ValueError("Cannot accept an empty name")
+        self._name = "_"+name
+
+    def __get__(self, obj:object, objtype:type) -> object:
+        if obj is None:
+            return #self._default
+        return getattr(obj, self._name, None)
+
+    def __set__(
+        self,
+        obj:object,
+        value:typing.Optional[
+            typing.Union[str, pathlib.Path,
+                         typing.Sequence[typing.Union[str, pathlib.Path]]]
+            ] = None):
+        from iolib.navigation.filesystems import getFileCreationDateTime
+        if isinstance(value, typing.Sequence) and all (isinstance(v, (str, pathlib.Path)) for v in value):
+            setattr(obj, self._name, value)
+            if hasattr(obj, "file_datetime"):
+                obj.file_datetime = list(map(lambda f: getFileCreationDateTime(f), value))
+
+        elif isinstance(value, (str, pathlib.Path)):
+            setattr(obj, self._name, value)
+            if hasattr(obj, "file_datetime"):
+                obj.file_datetime = getFileCreationDateTime(value)
+
+        elif value is None:
+            setattr(obj, self._name, value)
+            if hasattr(obj, "file_datetime"):
+                obj.file_datetime = None
+
+        else:
+            raise TypeError(f"Expecting a str, pathlib.Path object, or a sequence of these; instead, got a {type(value).__name__}")
+
+
+
 
 @dataclass
 class ScipyenDataclass:
@@ -984,7 +1026,7 @@ class Treatment(Procedure):
     # allow combination of compounds
     route:AdministrationRoute = AdministrationRoute.null
 
-    procedureType:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment)
+    procedureType:ImmutableDescriptor = ImmutableDescriptor(default=ProcedureType.treatment) # does not work ?!?
 
     def __post_init__(self):
         self.procedureType = ProcedureType.treatment
