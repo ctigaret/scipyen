@@ -158,6 +158,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._immutability_:dict = {"columns": list(), "rows": list(), "joint":False}
         self._rowBatchSize_:int = 10
         self._columnBatchSize_:int = 10
+        self._canAddRemoveRows_:bool = False
+        self._canAddRemoveColumns_:bool = False
 
         # self._immutableColumns_:typing.Sequence[int] = list()  # of column indexes
         # self._immutableRows_:typing.Sequence[int] = list()     # of row indexes
@@ -333,16 +335,22 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelData_ = data
                 self._modelDataRows_ = data.shape[0]
                 self._modelDataColumns_ = data.shape[1]
+                self._canAddRemoveColumns_ = True
+                self._canAddRemoveRows_ = True
 
             elif isinstance(data, pd.Series):
                 self._modelData_ = data
                 self._modelDataRows_ = data.shape[0]
                 self._modelDataColumns_ = 1
+                self._canAddRemoveRows_ = True
+                self._canAddRemoveColumns_ = False
 
             elif isinstance(data, pd.Index):
                 self._modelData_ = data
                 self._modelDataRows_ = data.shape[0]
                 self._modelDataColumns_ = 1
+                self._canAddRemoveRows_ = True
+                self._canAddRemoveColumns_ = False
 
             elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
                 self._modelData_ = vigrautils.kernel2array(data)
@@ -350,11 +358,16 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelDataColumns_ = 1
                 self._is_vigra_filter_kernel_ = True
                 self._original_data_ = data
+                self._canAddRemoveRows_ = False
+                self._canAddRemoveColumns_ = False
 
             elif isinstance(data, np.ndarray):
                 # trying to streamline this
                 # NOTE: 2025-11-23 09:45:45 FIXME/TODO - TOO SLOW!
                 # lazy display alleviates this to some degree (see self.fetchMore(…))
+                self._canAddRemoveRows_ = True
+                self._canAddRemoveColumns_ = True
+
                 if isinstance(data, neo.core.dataobject.DataObject):
                     # NOTE: 2025-09-27 10:38:00
                     # for regularly sampled signals (neo.AnalogSignal, DataSignal)
@@ -370,6 +383,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         if data.ndim > 1:
                             # include domain as the first column
                             self._modelDataColumns_ = data.shape[1] + 1
+                            self._modelDataRows_ = data.shape[0]
 
                             if isinstance(data, (neo.AnalogSignal, DataSignal)):
                                 # NOTE: 2025-09-27 11:05:05 see NOTE: 2025-09-27 10:38:00
@@ -389,6 +403,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     else:
                         self._modelDataRows_ = 1
                         self._modelDataColumns_ = 1
+                        # self._canAddRemoveColumns_ = True
 
                     self._modelData_ = data
 
@@ -415,6 +430,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelData_ = data
                 self._modelDataRows_ = 0
                 self._modelDataColumns_ = 0
+                self._canAddRemoveRows_ = False
+                self._canAddRemoveColumns_ = False
 
             self._displayedRows_ = 0
 
@@ -436,6 +453,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # print(f"{self.__class__.__name__}.setModelData({type(data).__name__}) took {timer.elapsed()} milliseconds")
         #
         # ### END   report timing
+
+    def addRow(self, row:object):
+        if not self._canAddRemoveRows_:
+            return
+
+        # if isinstance()
 
     @safewrapper
     def _getHeaderData_(self, section, orientation, role = QtCore.Qt.DisplayRole):
