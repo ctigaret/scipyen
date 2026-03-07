@@ -413,7 +413,7 @@ class SpinBox(QtWidgets.QFrame):
         if isinstance(value, pq.Quantity) and value.size != 1:
             raise TypeError("Cannot set value to a non-scalar quantity")
         if self._type_ == "i":
-            self.spinBox.setMaxImum(round(value))
+            self.spinBox.setMaximum(round(value))
         else:
             self.spinBox.setMaximum(value)
         

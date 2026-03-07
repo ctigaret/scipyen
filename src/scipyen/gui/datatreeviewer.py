@@ -164,6 +164,8 @@ A lot of things copied from there, EXCEPT that it now uses
                  useTableEditor:bool = True,
                  predicate: typing.Optional[typing.Any] = None,
                  readOnly: bool = True,
+                 initialExpandDepth: int = 1,
+                 autoResizeColumns: set[int] = {0,1},
                  *args, **kwargs):
         r"""
         Parameters:
@@ -229,12 +231,35 @@ A lot of things copied from there, EXCEPT that it now uses
 
         self._obj_to_view_ = (dataclasses.MISSING, "")
 
+        self._initialExpandDepth_: int = initialExpandDepth
+
+        self._autoResizeColumns_: set[int] = autoResizeColumns
+
         super().__init__(data=data, parent=parent, win_title=win_title,
                          doc_title = doc_title, ID=ID, *args, **kwargs)
 
     def _configureUI_(self):
+        self.fileMenu = QtWidgets.QMenu("File")
+        self.menuBar().addMenu(self.fileMenu)
+        # NOTE: 2026-03-07 08:56:37 TODO
+        # add here file menu actions
+        self.settingsMenu = QtWidgets.QMenu("Settings")
+        self.menuBar().addMenu(self.settingsMenu)
+        self.initialExpandToLevelAction = QtGui.QAction(
+            QtGui.QIcon.fromTheme("expand"), "Auto-expand nodes", self)
+        self.initialExpandToLevelAction.setMenuRole(QtGui.QAction.PreferencesRole)
+        self.initialExpandToLevelAction.triggered.connect(self._slot_setInitialAutoExpandNodesLevel)
+        self.settingsMenu.addAction(self.initialExpandToLevelAction)
+        self.autoResizeColumnsAction = QtGui.QAction(
+            QtGui.QIcon.fromTheme("resizecol"), "Auto-resize columns", self)
+        self.autoResizeColumnsAction.setMenuRole(QtGui.QAction.PreferencesRole)
+        self.autoResizeColumnsAction.triggered.connect(self._slot_setAutoResizeColumns)
+        self.settingsMenu.addAction(self.autoResizeColumnsAction)
+        # self.menuBar.addAction(self.settingsAction)
         self.treeView = DataTreeView(parent = self,
-                                     supported_data_types = tuple(self.viewer_for_types))
+                                     supported_data_types = tuple(self.viewer_for_types),
+                                     initialExpandDepth = self._initialExpandDepth_,
+                                     autoResizeColumns = self._autoResizeColumns_)
                                      # ,
                                      # readOnly = self._readOnly_)
 
@@ -657,11 +682,38 @@ A lot of things copied from there, EXCEPT that it now uses
             self._sig_setTreeViewData_.emit(what)
 
     @Slot()
+    def _slot_setInitialAutoExpandNodesLevel(self):
+        d = quickdialog.QuickDialog(
+            self, "Automatically expand nodes")
+        w = quickdialog.SpinBox(d, "Expand to level:")
+        w.setMinimum(0)
+        w.setMaximum(2)
+        w.setValue(self._initialExpandDepth_)
+        d.addWidget(w)
+        d.resize(-1,-1)
+
+        if d.exec():
+            val = w.value()
+            self.initialExpandDepth = val
+
+    @Slot()
+    def _slot_setAutoResizeColumns(self):
+        d = quickdialog.QuickDialog(
+            self, "Automatically resize columns")
+        w = quickdialog.StringInput(d, "Comma-separated column indices:")
+        w.setValue(", ".join(list(map(lambda v: f"{v}", self._autoResizeColumns_))))
+
+        d.resize(-1,-1)
+
+        if d.exec():
+            val = w.value()
+            if len(val.strip()):
+                indices = set(list(map(lambda s: eval(s), val.split(","))))
+                self.autoResizeColumns = indices
+
+    @Slot()
     def _slot_treeViewPopulated(self):
         self._slot_update_title()
-        # self.treeView.collapseAll()
-        # self.treeView.expandToDepth(1)
-        # self.treeView.resizeColumnToContents(0)
 
     @Slot()
     @safewrapper
@@ -669,7 +721,6 @@ A lot of things copied from there, EXCEPT that it now uses
         worker = WorkerThread(self, self._populateTreeView_)
         worker.signals.signal_Finished.connect(self._slot_treeViewPopulated)
         worker.run()
-
 
     @Slot()
     @safewrapper
@@ -694,6 +745,44 @@ A lot of things copied from there, EXCEPT that it now uses
             if obj is not None:
                 self.treeView.readOnly = readOnly
                 self.view(obj, name)
+
+    @property
+    def initialExpandDepth(self) -> int:
+        return self._initialExpandDepth_
+
+    @markConfigurable("InitialExpandDepth", "qt", trait_notifier=True)
+    @initialExpandDepth.setter
+    def initialExpandDepth(self, val: int):
+        if val in range(3):
+            self._initialExpandDepth_ = val
+            self.treeView.initialExpandDepth = self._initialExpandDepth_
+            self.slot_refreshDataDisplay()
+
+    @property
+    def autoResizeColumns(self) -> set:
+        return self._autoResizeColumns_
+
+    @markConfigurable("AutoResizeColumns", "qt", trait_notifier = True)
+    @autoResizeColumns.setter
+    def autoResizeColumns(self,
+                          val: typing.Union[set[int], str, typing.Sequence[int]]):
+        indices = set()
+        if isinstance(val, str):
+            try:
+                if len(val.strip()):
+                    indices = set(list(map(lambda s: eval(s), val)))
+                    if not all((isinstance(v, int) and v in range(3)) for v in indices):
+                        scipywarn("Invalid indices: all must be integers in range 0-2 inclusive")
+                        indices = set()
+            except:
+                traceback.print_exc()
+
+        elif isinstance(val, (typing.Sequence, set)) and all((isinstance(v, int) and v in range(3)) for v in val):
+            indices = set(val)
+
+        self._autoResizeColumns_ = indices
+        self.treeView.autoResizeColumns = self._autoResizeColumns_
+        self.slot_refreshDataDisplay()
 
     @property
     def readOnly(self: typing.Self) -> bool:

@@ -139,6 +139,14 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     sig_itemDoubleClicked = Signal(QtGui.QStandardItem, name="sig_itemDoubleClicked")
     def __init__(self: typing.Self, *args, **kwargs):
         parent = kwargs.pop("parent", None)
+        initialExpandDepth = kwargs.pop("initialExpandDepth", 1)
+
+        assert (initialExpandDepth >=0 and initialExpandDepth < 3), f"Invalid value for 'initialExpandDepth': expecting an int >=0 and < 3; got {initialExpandDepth} instead"
+        self.initialExpandDepth: int = kwargs.pop("initialExpandDepth", 1)
+
+        autoResizeColumns = kwargs.pop("autoResizeColumns", {0,1})
+        assert (isinstance(autoResizeColumns, set) and all((isinstance(v, int) and v in range(3)) for v in autoResizeColumns)), f"Invalid value for 'autoResizeColumns'; expecting a set of ints, each in range(3); instead, got {autoResizeColumns}"
+        self.autoResizeColumns: set[int] = kwargs.pop("autoResizeColumns", set())
         super().__init__(parent=parent)
         super().setModel(DataTreeModel())
         self._delegate_ = PythonItemDelegate()
@@ -257,10 +265,22 @@ For a given item:
             # tree; all of objects "internals" are child rows of it.
             objItem = root.child(0,0)
             self._setupChildDataItem_(objItem)
-            self.expandToDepth(1)
-            self.resizeColumnToContents(0)
-            self.resizeColumnToContents(1)
+            if self.initialExpandDepth == 0:
+                self.colapseAll()
+            else:
+                self.expandToDepth(self.initialExpandDepth)
+            for col in self.autoResizeColumns:
+                self.resizeColumnToContents(col)
+            # self.resizeColumnToContents(0)
+            # self.resizeColumnToContents(1)
 
+    @property
+    def hasData(self) -> bool:
+        return self.model()._modelData_ is not None
+
+    @property
+    def data(self) -> object:
+        return self.model()._modelData_
 
     @property
     def readOnly(self: typing.Self) -> bool:
