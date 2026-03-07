@@ -321,14 +321,24 @@ class OptionalStringInput(QtWidgets.QFrame):
         return unicode(self.variable.text())
 
 class StringInput(OptionalStringInput):
-    def __init__(self, parent:QtWidgets.QWidget, label:str):
+    def __init__(self, parent:QtWidgets.QWidget, label:str,
+                 allowEmptyString:bool = False):
         OptionalStringInput.__init__(self, parent, label)
+        self._allowEmptyString_ = allowEmptyString is True
             
     def validate(self):
-        if self.text() == "":
+        if len(self.text().strip()) == 0 and not self._allowEmptyString_:
             QtWidgets.QMessageBox.critical(None, "Error","Field '%s' empty" % (self.label.text()))
             return False
         return True
+
+    @property
+    def allowEmptyString(self) -> bool:
+        return self._allowEmptyString_
+
+    @allowEmptyString.setter
+    def allowEmptyString(self, val: bool):
+        self._allowEmptyString_ = val is True
     
 OutputVariable = StringInput
 InputVariable = StringInput

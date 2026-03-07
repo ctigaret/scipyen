@@ -266,13 +266,12 @@ For a given item:
             objItem = root.child(0,0)
             self._setupChildDataItem_(objItem)
             if self.initialExpandDepth == 0:
-                self.colapseAll()
+                self.collapseAll()
             else:
                 self.expandToDepth(self.initialExpandDepth)
             for col in self.autoResizeColumns:
-                self.resizeColumnToContents(col)
-            # self.resizeColumnToContents(0)
-            # self.resizeColumnToContents(1)
+                if col >=0 and col < 3:
+                    self.resizeColumnToContents(col)
 
     @property
     def hasData(self) -> bool:
@@ -344,25 +343,49 @@ For a given item:
 
         l_getName = lambda i: self.model().getPathForLeaf(i) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
 
-        names, objects = zip(
-            *list(
-                    map(
-                        lambda i: (
-                                    l_getName(i),
-                                    self.model().getDataObjectForLeaf(i)
+        # selection = zip(
+        #     *list(
+        #             map(
+        #                 lambda i: (
+        #                             l_getName(i),
+        #                             self.model().getDataObjectForLeaf(i)
+        #                             ),
+        #                 list(
+        #                     filter(
+        #                         (
+        #                             lambda i: i.column() == 0
+        #                             and not i.data(StandaloneEditorWidgetRole) # noqa
+        #                         ),
+        #                         items
+        #                         )
+        #                     )
+        #                 )
+        #             )
+        #     )
+
+        selection = list(
+                        map(
+                            lambda i: (
+                                        l_getName(i),
+                                        self.model().getDataObjectForLeaf(i)
+                                        ),
+                            list(
+                                filter(
+                                    (
+                                        lambda i: i.column() == 0
+                                        and not i.data(StandaloneEditorWidgetRole) # noqa
                                     ),
-                        list(
-                            filter(
-                                (
-                                    lambda i: i.column() == 0
-                                    and not i.data(StandaloneEditorWidgetRole) # noqa
-                                ),
-                                items
+                                    items
+                                    )
                                 )
                             )
                         )
-                    )
-            )
+
+        if len(selection):
+            names, objects = zip(*selection)
+        else:
+            names = list()
+            objects = list()
 
         if pathOnly:
             return names
@@ -375,6 +398,17 @@ For a given item:
             return list()
 
         return self.exportDataForItems(items, pathOnly = True)
+
+    def update(self):
+        super().update()
+        if self.initialExpandDepth == 0:
+            self.collapseAll()
+        else:
+            self.expandToDepth(self.initialExpandDepth)
+        for col in self.autoResizeColumns:
+            if col >=0 and col < 3:
+                self.resizeColumnToContents(col)
+
 
     @Slot(object)
     def slot_setData(self: typing.Self, what: dict):

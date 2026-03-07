@@ -700,7 +700,8 @@ A lot of things copied from there, EXCEPT that it now uses
     def _slot_setAutoResizeColumns(self):
         d = quickdialog.QuickDialog(
             self, "Automatically resize columns")
-        w = quickdialog.StringInput(d, "Comma-separated column indices:")
+        w = quickdialog.StringInput(d, "Comma-separated column indices:",
+                                    allowEmptyString = True)
         w.setValue(", ".join(list(map(lambda v: f"{v}", self._autoResizeColumns_))))
 
         d.resize(-1,-1)
@@ -710,6 +711,9 @@ A lot of things copied from there, EXCEPT that it now uses
             if len(val.strip()):
                 indices = set(list(map(lambda s: eval(s), val.split(","))))
                 self.autoResizeColumns = indices
+
+            else:
+                self.autoResizeColumns = set()
 
     @Slot()
     def _slot_treeViewPopulated(self):
@@ -756,7 +760,8 @@ A lot of things copied from there, EXCEPT that it now uses
         if val in range(3):
             self._initialExpandDepth_ = val
             self.treeView.initialExpandDepth = self._initialExpandDepth_
-            self.slot_refreshDataDisplay()
+            self.treeView.update()
+            # self.slot_refreshDataDisplay()
 
     @property
     def autoResizeColumns(self) -> set:
@@ -782,7 +787,8 @@ A lot of things copied from there, EXCEPT that it now uses
 
         self._autoResizeColumns_ = indices
         self.treeView.autoResizeColumns = self._autoResizeColumns_
-        self.slot_refreshDataDisplay()
+        self.treeView.update()
+        # self.slot_refreshDataDisplay()
 
     @property
     def readOnly(self: typing.Self) -> bool:
