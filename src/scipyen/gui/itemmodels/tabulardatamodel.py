@@ -11,7 +11,7 @@ r"""Table Editor widget and custom table model, for tabular-like data
 #### BEGIN core python modules
 from __future__ import print_function
 
-import os, inspect, warnings, traceback, datetime, typing
+import os, inspect, warnings, traceback, datetime, typing, numbers
 from functools import singledispatch
 #### END core python modules
 
@@ -1038,10 +1038,14 @@ def _addRow_(self,
     raise NotImplementedError(f"Object of type {type (obj).__name__} are not supported")
 
 @_addRow_.register(pd.DataFrame)
-def _(obj: pd.DataFrame, row: typing.Union[typing.Sequence, pd.Series],
-      in_place: bool = False) -> object:
-    if isinstance(row, pd.Series):
+def _(obj: pd.DataFrame,
+      row: typing.Union[typing.Sequence, pd.Series],
+      in_place: bool = False) -> pd.DataFrame:
+    if isinstance(row, (pd.Series, np.ndarray)):
+        assert(row.size == len(obj.columns)), f"Mismatch between the number of row elements ({row.size}) and target columns ({len(obj.columns)})"
+        assert row.ndim==1, f"Wrong row dimensionality ({row.ndim}); should be 1"
         row = tuple(row)
+
     if isinstance(row, typing.Sequence):
         assert len(row) == len(obj.columns), f"Mismatch between the number of row elements ({len(row)}) and target columns ({len(obj.columns)})"
 
@@ -1063,15 +1067,24 @@ def _(obj: pd.DataFrame, row: typing.Union[typing.Sequence, pd.Series],
 @_addRow_.register(pd.Index)
 def _(obj: typing.Union[pd.Series, pd.Index],
       row: typing.Union[dt.Number, str, pq.Quantity],
-      in_place: bool = False) -> object:
-    if isinstance(row, pq.Quantity):
+      in_place: bool = False) -> pd.Series | pd.Index:
+    if isinstance(row, np.ndarray):
         if row.size > 1:
             raise ValueError("Can only add a scalar object")
-    row = (row, )
-    dtype = obj[col].dtype
+        row = tuple(row)
+
+    elif isinstance(row, typing.Sequence):
+        if len(row) > 1:
+            raise ValueError("Can only add a scalar object")
+
+    else:
+        row = (row,)
+
+    dtype = obj.dtype
     rtype = type(row[0])
+    # print(f"{rtype} -> {np.dtype(rtype)}")
     if np.dtype(rtype) is not dtype:
-        raise TypeError(f"Row element {k} expected to resolve to {dtype}; got {rtype.__name__} instead")
+        raise TypeError(f"Row data expected to resolve to {dtype}; got {rtype.__name__} instead")
 
     ret = obj if in_place else obj.copy()
     ret.loc[len(obj)] = row[0]
@@ -1082,7 +1095,7 @@ def _(obj: typing.Union[pd.Series, pd.Index],
 @_addRow_.register(pq.Quantity)
 def _(obj: typing.Union[pq.Quantity, np.ndarray],
       row: typing.Union[typing.Sequence[pq.Quantity], pq.Quantity],
-      in_place: bool = False) -> object:
+      in_place: bool = False) -> typing.Union[pq.Quantity, np.ndarray]:
 
     if isinstance(obj, pd.Quantity):
         units = obj.units
@@ -1124,7 +1137,8 @@ def _(obj: typing.Union[neo.IrregularlySampledSignal,
                         IrregularlySampledDataSignal],
       row: typing.Union[neo.IrregularlySampledSignal,
                         IrregularlySampledDataSignal],
-      in_place: bool = False) -> object:
+      in_place: bool = False) -> typing.Union[neo.IrregularlySampledSignal,
+                                              IrregularlySampledDataSignal]:
     r"""Concnatenates irregular signals on their domain axis"""
     if type(row) is not type(obj):
         raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
@@ -1140,13 +1154,15 @@ def _(obj: typing.Union[neo.IrregularlySampledSignal,
         row.times = row.times.rescale(domainUnits)
 
     ret = obj.concatenate(row, allow_overlap=True)
+    ret.file_origin = ""
 
     return ret
 
 @_addRow_.register(neo.Epoch)
 @_addRow_.register(DataZone)
 def _(obj: typing.Union[neo.Epoch, DataZone],
-      row, in_place:bool=False) -> object:
+      row: typing.Union[neo.Epoch, DataZone],
+      in_place:bool=False) -> typing.Union[neo.Epoch, DataZone]:
     if type(row) is not type(obj):
         raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
 
@@ -1178,17 +1194,27 @@ def _(obj: typing.Union[neo.Epoch, DataZone],
 
     labels = np.concatenate((obj.labels, row.labels), axis=0)
 
-    return type(obj)(times = times, durations = durations, labels = labels)
+    return type(obj)(times = times, durations = durations, labels = labels,
+                     name = obj.name, description = obj.description,
+                     file_origin = "",
+                     array_annotations = obj.array_annotations,
+                     **obj.annotations)
 
 @_addRow_.register(neo.Event)
 @_addRow_.register(DataMark)
 @_addRow_.register(TriggerEvent)
 def _(obj: typing.Union[neo.Event, DataMark, TriggerEvent],
-      row, in_place:bool=False) -> object:
+      row: typing.Union[neo.Event, DataMark, TriggerEvent],
+      in_place:bool=False) -> typing.Union[neo.Event, DataMark, TriggerEvent]:
     if type(row) is not type(obj):
         raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
 
     assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
+
+    # NOTE: 2026-03-08 22:19:12
+    # using neo.Event.merge is enticing, but the code below ensures the row is
+    # appended
+    # return obj.merge(row)
 
     objTimes = obj.times
     rowTimes = row.times
@@ -1208,7 +1234,11 @@ def _(obj: typing.Union[neo.Event, DataMark, TriggerEvent],
 
     labels = np.concatenate((obj.labels, row.labels), axis=0)
 
-    ret = type(obj)(times = times, labels = labels)
+    ret = type(obj)(times = times, labels = labels,
+                     name = obj.name, description = obj.description,
+                     file_origin = "",
+                     array_annotations = obj.array_annotations,
+                     **obj.annotations)
 
     if isinstance(obj, (DataMark, TriggerEvent)):
         ret.type = obj.type
@@ -1218,9 +1248,10 @@ def _(obj: typing.Union[neo.Event, DataMark, TriggerEvent],
 @_addRow_.register(neo.AnalogSignal)
 @_addRow_.register(DataSignal)
 def _(obj: typing.Union[neo.AnalogSignal, DataSignal],
-      row, in_place=False):
-    if not isinstance(row, pq.Quantity):
-        raise TypeError(f"Row expected to be a Quantity; got {type(row).__name__} instead")
+      row: typing.Union[np.ndarray, pq.Quantity],
+      in_place=False) -> neo.AnalogSignal | DataSignal:
+    if not isinstance(row, [pq.Quantity, np.ndarray]):
+        raise TypeError(f"Row expected to be a Quantity or a numpy array; got {type(row).__name__} instead")
 
     if row.ndim == 0:
         if obj.shape[1] > 1:
@@ -1233,7 +1264,7 @@ def _(obj: typing.Union[neo.AnalogSignal, DataSignal],
     elif row.ndim > 2:
         raise ValueError(f"Unexpected row shape ({row.shape})")
 
-    if row.units != obj.units:
+    if isinstance(row, pq.Quantity) and row.units != obj.units:
         if not scq.unitsConvertible(row, obj):
             raise TypeError(f"Incompatible units: expecting {obj.units}; got {row.units} instead")
 
@@ -1242,7 +1273,7 @@ def _(obj: typing.Union[neo.AnalogSignal, DataSignal],
     sampling_rate = obj.sampling_rate
 
     objData = obj.magnitude
-    rowData = row.magnitude
+    rowData = row.magnitude if isinstance(row, pq.Quantity) else row
 
     if rowData.ndim < 2:
         rowData = np.atleast_2d(rowData)
@@ -1251,7 +1282,63 @@ def _(obj: typing.Union[neo.AnalogSignal, DataSignal],
 
     ret = type(obj)(newData, units = newData.units, t_start = obj.t_start,
                     sampling_rate = obj.sampling_rate,
-                    name = obj.name, array_annotations = obj.array_annotations,
+                    name = obj.name, description = obj.description,
+                    file_origin = "",
+                    array_annotations = obj.array_annotations,
                     **obj.annotations)
 
     return ret
+
+@_addRow_.register(neo.SpikeTrain)
+def _(obj: neo.SpikeTrain,
+      row: neo.SpikeTrain, in_place = False) -> neo.SpikeTrain:
+    if not isinstance(row, neo.SpikeTrain):
+        raise TypeError(f"Row expected a SpikeTrain; instead got a {type(row).__name__}")
+
+    assert(row.size == 1), "Expecting exactly one timestamp"
+    assert(row.left_sweep == obj.left_sweep), "Both argument must have the same 'left_sweep'"
+
+    # NOTE: 2026-03-08 22:21:00 see NOTE: 2026-03-08 22:19:12
+    # return obj.merge(row)
+
+    times = obj.times
+    waveforms = obj.waveforms
+
+    time = row.times
+    waves = row.waveforms
+
+    if time.units != times.units:
+        if not scq.unitsConvertible(time, times):
+            raise TypeError(f"Incompatible domain units: row ({time.units}) vs tareget ({times.units})")
+
+        time = time.rescale(times.units)
+
+    newTimes = np.concatenate(
+        (np.atleast_1d(times.magnitude),
+         np.atleast_1d(time.magnitude)), axis=0) * times.units
+
+    if waveforms is None:
+        if isinstance(wave, np.ndarray):
+            shape = (obj.size, ) + wave.shape[0:2]
+            full_waveforms = np.concatenate((np.full(shape, np.nan), wave), axis=0)
+        else:
+            full_waveforms = None
+
+    else:
+        full_waveforms = np.concatenate((waveforms, wave), axis=0)
+
+    t_stop = np.max(obj.t_stop, row.t_stop)
+    t_start = np.min(obj.t_start, row.t_start)
+
+    return neo.SpikeTrain(newTimes, t_stop, units = newTimes.units,
+                          sampling_rate = obj.sampling_rate,
+                          t_start = t_start,
+                          waveforms = full_waveforms,
+                          left_sweep = obj.left_sweep,
+                          file_origin = "",
+                          array_annotations = obj.array_annotations,
+                          **obj.annotations)
+
+
+
+
