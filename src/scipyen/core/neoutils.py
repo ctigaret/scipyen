@@ -3806,7 +3806,8 @@ def concatenate_signals(
     to two signal objects.
 
     When the 'axis' parameters is the default (1) this is useful to collapse
-    several analog signals into a single multi-channel signal (a.k.a 'merging').
+    several analog signals into a single multi-channel signal (a.k.a 'merging',
+    see also ``neo.AnalogSignal.merge``).
 
     Here a "channel" is one data column in the signal.
 

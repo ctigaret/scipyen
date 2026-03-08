@@ -12,6 +12,7 @@ r"""Table Editor widget and custom table model, for tabular-like data
 from __future__ import print_function
 
 import os, inspect, warnings, traceback, datetime, typing
+from functools import singledispatch
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -71,9 +72,11 @@ from core.datazone import DataZone
 
 import core.datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
+import core.datatypes as dt
 from core.datatypes import array_slice
 from core.sysutils import adapt_ui_path
 from core import scipyen_quantities as scq
+from core import neoutils
 
 #### END pict.core modules
 
@@ -454,11 +457,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         #
         # ### END   report timing
 
-    def addRow(self, row:object):
-        if not self._canAddRemoveRows_:
-            return
+    # def rowOps(self, row:object):
+    #     if not self._canAddRemoveRows_:
+    #         return
 
         # if isinstance()
+
+    # def colOps()
 
     @safewrapper
     def _getHeaderData_(self, section, orientation, role = QtCore.Qt.DisplayRole):
@@ -953,6 +958,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     @property
     def immutability(self) -> dict:
+        r"""Mapping row & col indexes where cell contents CANNOT be altered.
+    E.g.: {"columns": [2,3], "rows": [0,1], "joint":False}
+    """
         return self._immutability_
 
     @immutability.setter
@@ -991,6 +999,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     @property
     def immutableColumns(self) -> typing.Sequence[int]:
+        r"""Indexes of columns where the contents CANNOT be changed"""
         return self._immutability_["columns"]
 
     @immutableColumns.setter
@@ -999,8 +1008,250 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     @property
     def immutableRows(self) -> typing.Sequence[int]:
+        r"""Indexes of rows where the contents CANNOT be changed"""
         return self._immutability_["rows"]
 
     @immutableRows.setter
     def immutableRows(self, value:typing.Sequence[int]):
         self._immutability_["rows"] = value
+
+    @property
+    def canAlterRows(self) -> bool:
+        return self._canAddRemoveRows_
+
+    @canAlterRows.setter
+    def canAlterRows(self, val: bool):
+        self._canAddRemoveRows_ = val is True
+
+    @property
+    def canAlterColumns(self) -> bool:
+        return self._canAddRemoveColumns_
+
+    @canAlterColumns.setter
+    def canAlterColumns(self, val: bool):
+        self._canAddRemoveColumns_ = val is True
+
+@singledispatch
+def _addRow_(self,
+             obj: object, row: object, in_place: bool = False) -> object:
+    r"""Appends a row of data to the object"""
+    raise NotImplementedError(f"Object of type {type (obj).__name__} are not supported")
+
+@_addRow_.register(pd.DataFrame)
+def _(obj: pd.DataFrame, row: typing.Union[typing.Sequence, pd.Series],
+      in_place: bool = False) -> object:
+    if isinstance(row, pd.Series):
+        row = tuple(row)
+    if isinstance(row, typing.Sequence):
+        assert len(row) == len(obj.columns), f"Mismatch between the number of row elements ({len(row)}) and target columns ({len(obj.columns)})"
+
+        for k, col in enumerate(obj.columns):
+            dtype = obj[col].dtype
+            rtype = type(row[k])
+            if np.dtype(rtype) is not dtype:
+                raise TypeError(f"Row element {k} expected to resolve to {dtype}; got {rtype.__name__} instead")
+
+    else:
+        raise TypeError(f"Row expected a pd.Series or a sequence of objects; got {type(row).__name__} instead")
+
+    ret = obj if in_place else obj.copy()
+    ret.loc[len(obj)] = row
+
+    return ret
+
+@_addRow_.register(pd.Series)
+@_addRow_.register(pd.Index)
+def _(obj: typing.Union[pd.Series, pd.Index],
+      row: typing.Union[dt.Number, str, pq.Quantity],
+      in_place: bool = False) -> object:
+    if isinstance(row, pq.Quantity):
+        if row.size > 1:
+            raise ValueError("Can only add a scalar object")
+    row = (row, )
+    dtype = obj[col].dtype
+    rtype = type(row[0])
+    if np.dtype(rtype) is not dtype:
+        raise TypeError(f"Row element {k} expected to resolve to {dtype}; got {rtype.__name__} instead")
+
+    ret = obj if in_place else obj.copy()
+    ret.loc[len(obj)] = row[0]
+
+    return ret
+
+@_addRow_.register(np.ndarray)
+@_addRow_.register(pq.Quantity)
+def _(obj: typing.Union[pq.Quantity, np.ndarray],
+      row: typing.Union[typing.Sequence[pq.Quantity], pq.Quantity],
+      in_place: bool = False) -> object:
+
+    if isinstance(obj, pd.Quantity):
+        units = obj.units
+        obj = obj.magnitude
+
+        if isinstance(row, pq.Quantity):
+            if row.units != units:
+                if scq.unitsConvertible(row, units):
+                    row = row.rescale(units)
+                else:
+                    raise TypeError(f"Row units ({row.units}) are incompatible with target's units ({units})")
+
+        row = row.magnitude
+
+    assert row.ndim == obj.ndim, f"Mismatch between dimensions: for row ({row.ndim}) vs target ({obj.ndim})"
+
+    try:
+        if obj.ndim == 0:
+            # NOTE: 2026-03-08 10:24:58
+            # in_place does not make sense here , as concatenation of dimensionless
+            # arrays is non-sensical; hence both obj and row MUST be converted
+            # to 1D arrays
+            ret = np.concat((np.atleast_1d(obj.magnitude), np.atleast_1d(row.magnitude)))
+
+        else:
+            ret = np.concat((obj.magnitude, row.magnitude), axis=0)
+
+        if isinstance(obj, pq.Quantity):
+            return ret * obj.units
+
+        return ret
+    except:
+        # traceback.print_exc()
+        raise
+
+@_addRow_.register(neo.IrregularlySampledSignal)
+@_addRow_.register(IrregularlySampledDataSignal)
+def _(obj: typing.Union[neo.IrregularlySampledSignal,
+                        IrregularlySampledDataSignal],
+      row: typing.Union[neo.IrregularlySampledSignal,
+                        IrregularlySampledDataSignal],
+      in_place: bool = False) -> object:
+    r"""Concnatenates irregular signals on their domain axis"""
+    if type(row) is not type(obj):
+        raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
+
+    assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
+
+    domainUnits = obj.times.units
+    rowDomainUnits = row.times.units
+
+    if rowDomainUnits != domainUnits:
+        if not scq.unitsConvertible(rowDomainUnits, domainUnits):
+            raise TypeError(f"Incompatible domain units between row ({rowDomainUnits}) and target ({domainUnits})")
+        row.times = row.times.rescale(domainUnits)
+
+    ret = obj.concatenate(row, allow_overlap=True)
+
+    return ret
+
+@_addRow_.register(neo.Epoch)
+@_addRow_.register(DataZone)
+def _(obj: typing.Union[neo.Epoch, DataZone],
+      row, in_place:bool=False) -> object:
+    if type(row) is not type(obj):
+        raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
+
+    assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
+
+    objTimes = obj.times
+    rowTimes = row.times
+
+    objDurations = obj.durations
+    rowDurations = row.durations
+
+    domainUnits = objTimes.units
+    rowDomainUnits = rowTimes.units
+
+    if rowDomainUnits != domainUnits:
+        if not scq.unitsConvertible(rowDomainUnits, domainUnits):
+            raise TypeError(f"Incompatible domain units between row ({rowDomainUnits}) and target ({domainUnits})")
+        rowTimes = rowTimes.rescale(domainUnits)
+
+    if rowDurations.units != objDurations.units:
+        if not scq.unitsConvertible(rowDuration.units, objDurations.units):
+            raise TypeError(f"Incompatible domain units between row ({rowDurations.units}) and target ({objDurations.units})")
+
+        rowDurations = rowDurations.rescale(objDurations.units)
+
+    times = np.concatenate((objTimes, rowTimes), axis=0) * objTimes.units
+
+    durations = np.concatenate((objDurations, rowDurations), axis=0) * objDurations.units
+
+    labels = np.concatenate((obj.labels, row.labels), axis=0)
+
+    return type(obj)(times = times, durations = durations, labels = labels)
+
+@_addRow_.register(neo.Event)
+@_addRow_.register(DataMark)
+@_addRow_.register(TriggerEvent)
+def _(obj: typing.Union[neo.Event, DataMark, TriggerEvent],
+      row, in_place:bool=False) -> object:
+    if type(row) is not type(obj):
+        raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
+
+    assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
+
+    objTimes = obj.times
+    rowTimes = row.times
+
+    if isinstance(obj, (TriggerEvent, DataMark)):
+        assert (row.type == obj.type), "Incompatible trigger event type"
+
+    domainUnits = objTimes.units
+    rowDomainUnits = rowTimes.units
+
+    if rowDomainUnits != domainUnits:
+        if not scq.unitsConvertible(rowDomainUnits, domainUnits):
+            raise TypeError(f"Incompatible domain units between row ({rowDomainUnits}) and target ({domainUnits})")
+        rowTimes = rowTimes.rescale(domainUnits)
+
+    times = np.concatenate((objTimes, rowTimes), axis=0) * objTimes.units
+
+    labels = np.concatenate((obj.labels, row.labels), axis=0)
+
+    ret = type(obj)(times = times, labels = labels)
+
+    if isinstance(obj, (DataMark, TriggerEvent)):
+        ret.type = obj.type
+
+    return ret
+
+@_addRow_.register(neo.AnalogSignal)
+@_addRow_.register(DataSignal)
+def _(obj: typing.Union[neo.AnalogSignal, DataSignal],
+      row, in_place=False):
+    if not isinstance(row, pq.Quantity):
+        raise TypeError(f"Row expected to be a Quantity; got {type(row).__name__} instead")
+
+    if row.ndim == 0:
+        if obj.shape[1] > 1:
+            raise ValueError(f"Not enough data points; expected {obj.shape[1]}")
+
+    elif row.ndim == 1:
+        if row.size != obj.shape[1]:
+            raise ValueError(f"Mismatch in data points; expected {obj.shape[1]}, got {row.size} instead")
+
+    elif row.ndim > 2:
+        raise ValueError(f"Unexpected row shape ({row.shape})")
+
+    if row.units != obj.units:
+        if not scq.unitsConvertible(row, obj):
+            raise TypeError(f"Incompatible units: expecting {obj.units}; got {row.units} instead")
+
+        row = row.rescale(obj.units)
+
+    sampling_rate = obj.sampling_rate
+
+    objData = obj.magnitude
+    rowData = row.magnitude
+
+    if rowData.ndim < 2:
+        rowData = np.atleast_2d(rowData)
+
+    newData = np.concatenate((objData, rowData), axis=0) * obj.units
+
+    ret = type(obj)(newData, units = newData.units, t_start = obj.t_start,
+                    sampling_rate = obj.sampling_rate,
+                    name = obj.name, array_annotations = obj.array_annotations,
+                    **obj.annotations)
+
+    return ret

@@ -311,8 +311,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self._dataModel_ = TabularDataModel(parent=self)
         self.tableView.setModel(self._dataModel_)
 
-
-
     @property
     def model(self):
         return self.tableView.model()
@@ -363,9 +361,19 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         if self._readOnly_:
             self.tableView.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
             self.tableView.setItemDelegate(self._defaultItemDelegate_)
+            # NOTE:2026-03-08 09:38:02
+            # don't change these: these depend on the type of the data represented
+            # in the model
+            # self.tableView.model.canAlterRows = False
+            # self.tableVire.model.canAlterColumns = False
             self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-locked"))
             self.setEditableToolButton.setToolTip("Editing disabled; toggle to enable")
         else:
+            # NOTE:2026-03-08 09:38:02
+            # don't change these: these depend on the type of the data represented
+            # in the model
+            # self.tableView.model.canAlterRows = True
+            # self.tableVire.model.canAlterColumns = True
             self.tableView.setEditTriggers(self._defaultEditTriggers_)
             self.tableView.setItemDelegate(self._editItemDelegate_)
             self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-unlocked"))

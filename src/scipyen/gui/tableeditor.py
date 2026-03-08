@@ -131,6 +131,7 @@ class TableEditor(ScipyenViewer):
                         TriggerEvent: 0, 
                         TriggerProtocol: 0,
                         np.ndarray: 0, 
+                        # pq.Quantity: 0,
                         vigra.VigraArray: 0, 
                         vigra.filters.Kernel1D: 0,
                         vigra.filters.Kernel2D: 0}
@@ -333,7 +334,8 @@ class TableEditor(ScipyenViewer):
                        TriggerEvent, TriggerProtocol,
                        np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D), *args, **kwargs):
         
-        if type(data) not in self.viewer_for_types or not any([t in type(data).mro() for t in self.viewer_for_types]):
+        if (type(data) not in self.viewer_for_types
+            and not any(t in inspect.getmro(type(data)) for t in self.viewer_for_types)):
             raise TypeError("%s cannot handle data type %s" % (type(self).__name__, type(data).__name__))
         
         self._data_ = data

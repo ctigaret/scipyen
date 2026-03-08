@@ -347,6 +347,8 @@ A lot of things copied from there, EXCEPT that it now uses
         # the case where a single item is selected
         if len(items) == 1:
             names, objects =  self.treeView.exportDataForItems(items)
+            if len(objects) == 0:
+                return
             obj = objects[0]
             name = names[0]
             self._obj_to_view_ = (obj, name)
