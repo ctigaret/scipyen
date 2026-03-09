@@ -1339,6 +1339,10 @@ def _(obj: neo.SpikeTrain,
                           array_annotations = obj.array_annotations,
                           **obj.annotations)
 
+@_addRow_.register(TriggerProtocol)
+def _(obj: TriggerProtocol, row: TriggerEvent, in_place = False):
+    pass
+
 
 
 
