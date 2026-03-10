@@ -106,7 +106,7 @@ class TriggerProtocol:
 
     TriggerProtocol objects contain a combination of TriggerEvent types and the
     indices of segments (sweep or data frame)¹ from a collection, where this
-    combination is appled. By "combination" we mean any association of a
+    combination is appled. A "combination" is any association of a
     'presynaptic', 'postsynaptic', 'photostimulation', and 'imaging' TriggerEvent
     objects.
 
@@ -256,15 +256,11 @@ class TriggerProtocol:
     segments:typing.Union[int, list[int], tuple[int], range, slice] = dataclasses.field(default_factory = list)
 
     name:str = dataclasses.field(default="Protocol")
-    # these are in addition to the _recommended_attrs inherited from BaseNeo
+    t_start: typing.Optional[pq.Quantity] = None
+    t_stop: typing.Optional[pq.Quantity] = None
     file_origin:typing.Union[str, pathlib.Path] = dataclasses.field(default = "")
     file_datetime:datetime = dataclasses.field(default = datetime.now())
     rec_datetime:datetime = dataclasses.field(default = datetime.now())
-
-#     _data_attributes_ = (("file_datetime", datetime),
-#                          ("rec_datetime", datetime))
-#
-#     _decsriptor_attributes_ = _data_attributes_ + neo.core.baseneo.BaseNeo._recommended_attrs
 
     def __len__(self):
         r"""The number of TriggerEvents, of any type, in this protocol
@@ -329,6 +325,16 @@ class TriggerProtocol:
 
     def __repr__(self):
         return self.__str__()
+
+    def t0(self) -> pq.Quantity | None:
+        events = self.events
+        if len(events):
+            return events[0].times.min()
+
+    def t1(self) -> pq.Quantity | None:
+        events = self.events
+        if len(events):
+            return events[-1].times.max()
 
     def getEvent(self, event_type):
         r"""Returns the event specified by type
@@ -535,6 +541,7 @@ class TriggerProtocol:
         return ret # so we can chain this call e.g. return self.copy().shift(value)
 
     def reverseAcquisition(self, copy=False):
+        r"""Changes the sign of the ``acquisition`` and ``imagingDelay`` attributes"""
         if copy:
             ret = self.copy()
 
@@ -839,8 +846,8 @@ class TriggerProtocol:
             if value is None:
                 value = self.segments.stop
 
-            if not isinstance(value, int):
-                raise TypeError("When segment index is a slice a value of type int is required")
+            elif not isinstance(value, int):
+                raise TypeError("When segment index is a slice, a value of type int is required")
 
             return [x for x in range(*self.segments.indices(value))]
 
@@ -935,22 +942,29 @@ class TriggerProtocol:
 
 class TriggerProtocolList(NeoObjectList):
     r"""Inspired by neo.ObjectList"""
-    allowed_contents = (TriggerProtocol)
-    def __init__(self, items = None, parent: object = None):
-        if items is None:
-            self._items = list()
-        else:
-            for item in items:
-                if not isinstance(item, self.allowed_contents):
-                    raise TypeError(f"Can only contain TriggerProtocol objects, not {type(item).__name__}")
+    allowed_contents = (TriggerProtocol, )
+    def __init__(self, *items, parent: object = None):
+        self._items = list()
+        if len(items):
+            if len(items) == 1 and isinstance(items[0], typing.Sequence):
+                items = items[0]
+
+            if any(
+                not isinstance(i, self.allowed_contents)
+                or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents)))
+                for i in items):
+                raise TypeError(f"Can only contain TriggerProtocol objects, not {type(item).__name__}")
+
+            self._items = list(items)
 
         if parent is not None and ScipyenDataclass not in inspect.getmro(type(parent)):
             raise TypeError(f"Parent must be a ScipyenDataclass; got {type(parent).__name__} instead")
-        self.parent = parent
+
+        self._parent = parent
 
     @property
     def parent(self) -> ScipyenDataclass | None:
-        return self.parent
+        return self._parent
 
     def __iter__(self):
         """Implement iter(self)"""
@@ -966,13 +980,6 @@ class TriggerProtocolList(NeoObjectList):
             raise ValueError(f"Index {i} out of range for {len(self._items)} items")
         if i < len(self._items) and i >= -len(self._items):
             return self._items[i]
-        # if self._items is None:
-        #     self._spiketrains_from_array()
-        # items = self._items[i]
-        # if is_spiketrain_or_proxy(items):
-        #     return items
-        # else:
-        #     return SpikeTrainList(items=items)
 
     def __setitem__(self, i: int, value: TriggerProtocol):
         if not isinstance(value, TriggerProtocol):
@@ -987,12 +994,16 @@ class TriggerProtocolList(NeoObjectList):
 
     def __str__(self):
         """Return str(self)"""
-        return (
-            f"TriggerProtocolList containing {len(self._items)} protocols"
-        )
+        return f"<{self.__class__.__name__}> with {len(self._items)} protocols"
 
     def __repr__(self):
-        return "<TriggerProtocolList>"
+        s = [f"<{self.__class__.__name__}> with {len(self._items)} protocols",
+            ]
+
+        if len(self._items):
+            s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
+
+        return "\n".join(s)
 
     def __len__(self):
         """Return len(self)"""
@@ -1001,6 +1012,116 @@ class TriggerProtocolList(NeoObjectList):
     def _add_triggerprotocols(self, other: typing.Self, in_place=False) -> typing.Self:
         self._items = self._items + other._items
         return self
+
+    def __add__(self, other):
+        """Return self + other"""
+        ret = self.__class__(self._items, parent=self.parent)
+        if isinstance(other, self.__class__):
+            return ret._add_triggerprotocols(other)
+        elif isinstance(other, TriggerProtocol):
+            ret._items.append(other)
+            return ret
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, TriggerProtocol) for o in other)):
+            ret._items.extend(list(other))
+            return ret
+        else:
+            return ret
+
+    def __iadd__(self, other):
+        """Return self"""
+        if isinstance(other, self.__class__):
+            return self._add_triggerprotocols(other, in_place=True)
+        elif isinstance(other, TriggerProtocol):
+            self._items.append(other)
+            return self
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, TriggerProtocol) for o in other)):
+            self._items.extend(list(other))
+            return self
+        else:
+            return self
+
+    def __radd__(self, other):
+        """Return other + self"""
+        ret = self.__class__(self._items, parent=self.parent)
+        if isinstance(other, self.__class__):
+            return other._add_spiketrainlists(ret)
+        elif isinstance(other, TriggerProtocol):
+            ret._items.append(other)
+            return ret
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, TriggerProtocol) for o in other)):
+            ret._items.extend(list(other))
+            return ret
+        else:
+            return ret
+
+    def append(self, obj):
+        """
+        Appends to the TriggerProtocolList a new TriggerProtocol
+
+        Parameters
+        ----------
+        obj: TriggerProtocol
+
+        """
+        if not isinstance(obj, TriggerProtocol):
+            raise TypeError("Can only append TriggerProtocol objects")
+        self._items.append(obj)
+
+    def extend(self, iterable):
+        """Extends the SpikeTrainList with additional SpikeTrain's from an iterable
+
+        Parameters
+        ----------
+        iterable: iterable[TriggerProtocol]
+
+        """
+        if all (isinstance(o, TriggerProtocol) for o in iterable):
+            self._items.extend(iterable)
+        else:
+            raise TypeError("Can only append TriggerProtocol objects")
+
+    def protocols_by_segments(self) -> list:
+        if len(self._items) == 0:
+            return list()
+        ret = dict()
+        for item in self._items:
+            if isinstance(item.segments, int):
+                if item.segment in ret:
+                    ret[f"{item.segment}"].append(item)
+                else:
+                    ret[f"{item.segment}"] = [item]
+
+            elif (
+                    isinstance(item.segments, range) or
+                    (
+                        isinstance(item.segments, (tuple, list)) and
+                        all(isinstance(x, int) for x in item.segments)
+                    )
+                ):
+                for ndx in item.segments:
+                    if ndx in ret:
+                        ret[f"{ndx}"].append(item)
+                    else:
+                        ret[f"{ndx}"] = [item]
+
+            elif isinstance(item.segments, slice):
+                ndx = f"{item.segments}"
+                if ndx in ret:
+                    ret[ndx].append([item])
+                else:
+                    ret[ndx] = [item]
+
+            else:
+                if "*" in ret:
+                    ret["*"].append(item)
+                else:
+                    ret["*"] = [item]
+
+        return dict(sorted(ret.items(), key = lambda x: x[0]))
+
 
 #### BEGIN Module-level functions
 

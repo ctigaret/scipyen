@@ -5,10 +5,10 @@
 r"""TriggerEvent class
 
 Changelog:
-2021-01-06 14:34:02 tolerances and equal_nan moved to datatypes module, 
+2021-01-06 14:34:02 tolerances and equal_nan moved to datatypes module,
     as module contants
-    
-    
+
+
 
 """
 import warnings
@@ -27,7 +27,7 @@ from core.prog import scipywarn
 from core.scipyen_quantities import checkTimeUnits, unitsConvertible
 #from core.utilities import unique
 
-def _new_DataMark(cls, places = None, labels=None, units=None, name=None, 
+def _new_DataMark(cls, places = None, labels=None, units=None, name=None,
                   file_origin=None, description=None, mark_type=None,
                   segment=None, relative=None, array_annotations=None, annotations={}):
     if not isinstance(annotations, dict):
@@ -38,18 +38,18 @@ def _new_DataMark(cls, places = None, labels=None, units=None, name=None,
                 annotations = dict(annotations)
             except:
                 annotations = dict() # just so that we aren't left hanging out
-                
-    e = cls(places=places, labels=labels, units=units, name=name, 
-            mark_type=mark_type, file_origin=file_origin, 
-            description=description, relative=relative, 
+
+    e = cls(places=places, labels=labels, units=units, name=name,
+            mark_type=mark_type, file_origin=file_origin,
+            description=description, relative=relative,
             array_annotations=array_annotations,
             **annotations)
-    
+
     e.segment=segment
-    
+
     return e
 
-def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None, 
+def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None,
                description=None, file_origin=None, event_type=None,
                segment=None, relative=None, array_annotations=None, annotations={}):
     r"""Keep for old pickles
@@ -62,37 +62,37 @@ def _new_TriggerEvent(cls, times = None, labels=None, units=None, name=None,
                 annotations = dict(annotations)
             except:
                 annotations = dict() # just so that we aren't left hanging out
-                
+
     e = TriggerEvent(times=times, labels=labels, units=units, name=name,
-                      description=description, file_origin=file_origin, 
-                      event_type=event_type, relative=relative, 
+                      description=description, file_origin=file_origin,
+                      event_type=event_type, relative=relative,
                       array_annotations=array_annotations,
                       **annotations)
-    
+
     e.segment=segment
-    
+
     return e
-    
+
 class MarkType(TypeEnum):
     r"""Some useful data mark types
-    
+
     name            value                       description
     ----------------------------------------------------------------------------
     unspecified     0
     up              1                           "upward" deflection (step, edge)
     down            2                           "downward" deflection (step, edge)
-    pulse           up | down = 3 = down | up   sequence of two steps in opposite 
+    pulse           up | down = 3 = down | up   sequence of two steps in opposite
                                                 directions
-    bipulse         4                           sequence of two pulses in opposite 
+    bipulse         4                           sequence of two pulses in opposite
                                                 directions (biphasic pulse)
     pbip            bipulse | up    = 5         biphasic, first pulse positive
     nbip            bipulse | down  = 6         biphasic, first pulse negative
-    slope           7                           upward -> positive; 
+    slope           7                           upward -> positive;
                                                 downward -> negative
-    angle           slope = 7 
+    angle           slope = 7
     pslope          slope | up       = 8        "positive" angle (CCW on unit circle)
     nslope          slope | down     = 9        "negative" angle (CW on unit circle)
-    triangle        16                          sequence of two slopes in opposite 
+    triangle        16                          sequence of two slopes in opposite
                                                 directions; can be asymmetric
     peak            triangle | up     = 17      triangle, first slope up
     trough          triangle | down   = 18      triangle, first slope down
@@ -101,11 +101,11 @@ class MarkType(TypeEnum):
     wave            chirp
     uchirp          wave | up         = 65      wave of increasing frequency
                                                 (up-chirp)
-    dchirp          wave | down       = 66      wave of decreasing frequency 
+    dchirp          wave | down       = 66      wave of decreasing frequency
                                                 (down-chirp)
     user            128
-    place           up | down | pulse | bipulse | pbip | nbip | slope | pslope | 
-                    nslope | triangle | peak | trough | wave | uchirp | dchirp | 
+    place           up | down | pulse | bipulse | pbip | nbip | slope | pslope |
+                    nslope | triangle | peak | trough | wave | uchirp | dchirp |
                     user
     """
     unspecified = 0
@@ -116,7 +116,7 @@ class MarkType(TypeEnum):
     pbip        = bipulse | up      # = 5: biphasic, first pulse positive
     nbip        = bipulse | down    # = 6: biphasic, first pulse negative
     slope       = 7                 # upward -> positive; downward -> negative
-    angle       = slope             # = 7 
+    angle       = slope             # = 7
     pslope      = slope | up        # = 8: "positive" angle (CCW on unit circle)
     nslope      = slope | down      # = 9: "negative" angle (CW on unit circle)
     triangle    = 16                # sequence of two slopes in opposite directions; can be asymmetric
@@ -129,16 +129,16 @@ class MarkType(TypeEnum):
     dchirp      = wave | down       # = 66: wave of decreasing frequency: down-chirp
     user        = 128
     place       = up | down | pulse | bipulse | pbip | nbip | slope | pslope | nslope | triangle | peak | trough | wave | uchirp | dchirp | user
-    
+
 
 class TriggerEventType(TypeEnum):
     r"""Convenience enum type for trigger event types.
-    
+
     Inherits introspection methods from dataypes.TypeEnum.
-    
+
     Types are defined as follows:
     =============================
-    
+
     Primitive types:
     -----------------
     unspecified         =  0
@@ -149,19 +149,19 @@ class TriggerEventType(TypeEnum):
     imaging_line        = 16 # TTL trigger for a scanning line of the imaging system
     sweep               = 32 # "external" trigger for electrophysiology acquisition
     user                = 64 # anything else
-    
+
     frame               = imaging_frame (*)
     line                = imaging_line (*)
-    
+
     Composite (or derived) types:
     -----------------------------
     synaptic            = presynaptic | postsynaptic  = 3
     stimulus            = presynaptic | postsynaptic | photostimulation = 7
     imaging             = imaging_frame | imaging_line = 24
     acquisition         = imaging | sweep = 56
-    
+
     (*) this is just an alias
-    
+
     """
     unspecified         =  0
     presynaptic         =  1 # synaptic stimulus (e.g. delivered via TTL to stim box)
@@ -177,7 +177,7 @@ class TriggerEventType(TypeEnum):
     line                = imaging_line                  # 16
     imaging             = imaging_frame | imaging_line  # 24
     acquisition         = imaging | sweep               # 56
-    
+
 class DataMark(neo.Event):
     r"""Similar to neo.Event but suitable to all domains, not just time
     NOTE: 2025-10-21 22:18:38 CHANGE:
@@ -186,39 +186,39 @@ class DataMark(neo.Event):
     _single_parent_objects = ('Segment',)
     _single_parent_attrs = ('segment',)
     _quantity_attr = ('places', 'times',)
-    _necessary_attrs = (('places', pq.Quantity, 1), 
+    _necessary_attrs = (('places', pq.Quantity, 1),
                         ('times', pq.Quantity, 1),
                         ('labels', np.ndarray, 1, np.dtype('U')),
                         ('relative', bool, 1, False))
-    
+
     _parent_attrs = ("segment", )
 
     @classmethod
     def parseValues(cls, value, units:typing.Optional[pq.Quantity]=None) -> pq.Quantity:
         r""" Parses values to an array of quantities suitable for a TriggerEvent
-        
+
         Parameters:
         ==========
-        
+
         value:
-        
+
             1) a number
-            
+
             2) a python quantity with time units
-            
+
             3) a numpy array with numbers or characters (in the latter case, must
                         be fully convertible to a numeric array)
-            
-            4) a sequence of where elements are all of the same type enumerated 
+
+            4) a sequence of where elements are all of the same type enumerated
                 above
-                
+
                 NOTE: sequences with a mixture of element types are not allowed
-            
+
         units: a pyton.Quantity time unit or None
-        
+
             When None, when value is a TriggerEvent the function uses the TriggerEvent units
             otherwise assigns the default (pq.s)
-        
+
         """
         from core.datatypes import is_string
         if units is None:
@@ -227,30 +227,30 @@ class DataMark(neo.Event):
                     if not isinstance(value, TriggerEvent):
                         raise TypeError(f"Expecting a TriggerEvent for this {cls.__name__} object; got {type(value).__name__} instead")
                 units = value.units
-                
+
             else:
                 units = pq.arbitrary_unit
-            
+
         elif not isinstance(units, pq.Quantity):
             raise TypeError("units expected to be a Python Quantity; got %s instead" % type(units).__name__)
-        
+
             units = units.units
-        
+
         # if cls.__name__ == "TriggerEvent" and not checkTimeUnits(units):
         if cls is TriggerEvent and not checkTimeUnits(units):
             raise TypeError("expecting a time unit; got %s instead" % units)
-            
+
         if isinstance(value, (tuple, list)):
             # value is a sequence of...
             if all([isinstance(v, numbers.Number) for v in value]): # plain numbers
                 times = np.array(value) * units
-                
+
             #elif all([isinstance(v, pq.Quantity) and checkTimeUnits(v) for v in value]): # python quantities
             elif all([isinstance(v, pq.Quantity) for v in value]): # python quantities
                 if cls is TriggerEvent:
                     if not all(checkTimeUnits(v) for v in value):
                         raise TypeError(f"Expecting time units for a {cls.__name__} object")
-                    
+
                 if any([v.ndim > 0 for v in value]):
                     # in case the values in the sequence are dimensioned arrays
                     # but reject if any has ndim > 1 (enforce time stamps to be
@@ -258,72 +258,72 @@ class DataMark(neo.Event):
                     if any([v.ndim > 1 for v in value]):
                         raise TypeError("Cannot accept places as python quantity arrays with more than one dimension")
                     times = np.hstack(value) * value[0].units
-                    
+
                 else:
                     times = np.array(value) * value[0].units
-                    
+
             elif all([isinstance(v, np.ndarray) for v in value]):
                 # sequence of numpy arrays
                 times_list = list()
                 for v in value:
                     if is_numeric(v):
                         times_list.append(v)
-                        
+
                     elif is_string(v):
                         vv = np.genfromtxt(v)
                         if np.isnan(vv).any():
                             warngins.warn("Character array conversion produced nan values")
-                            
+
                         times_list.append(vv)
-                        
+
                     else:
                         raise TypeError("Incompatible numpy array kind %s" % v.dype.kind)
-                    
+
                 if len(times_list):
                     times = np.hstack(times_list) * units
-                    
+
                 else:
                     raise ValueError("cannot convert %s to time stamps" % value)
-                
+
             else:
                 raise TypeError("When a sequence, the value must contain elements of the same type, either number scalars or python quantities with time units")
-                    
+
         elif isinstance(value, numbers.Number):
             times = np.array([value]) * units # create a dimensioned array
-            
+
         elif isinstance(value, pq.Quantity):
             if not checkTimeUnits(value):
                 raise TypeError("value is expected to have units compatible to %s, but has %s instead" % (units, value.units))
-            
+
             times = value.flatten() # enforce a row vector, even for undimensioned objects (with ndim = 0)
-            
+
         elif isinstance(value, np.ndarray):
             # when value has ndim 0 (undimensioned), flatten() will enforce
             # a minimum of 1 dimension
             if is_numeric(value):
                 times = value.flatten() * units
-                
+
             elif is_string(value):
                 ss = np.genfromtxt(value)
-                
+
                 if np.isnan(ss).any():
                     raise ValueError("Could not fully convert value %s to a numeric numpy array" % value)
-                
+
                 times = ss.flatten() * units
-                
+
             else:
                 raise TypeError("When value is a numpy array it must has a dtype that is either numeric or character; in the latter case is must be fully convertible to a numeric array")
-            
+
         elif isinstance(value, cls):
             times = value.times
-            
+
         else:
             raise TypeError("value expected to be a numeric scalar, python quantity with time units, a numpy array, a sequence of these, or a TriggerEvent; got %s instead" % type(value).__name__)
-            
+
         return times
 
-    def __new__(cls, places=None, times=None, labels=None, units=None, name=None, 
-                description=None, file_origin=None, mark_type=None, event_type=None, 
+    def __new__(cls, places=None, times=None, labels=None, units=None, name=None,
+                description=None, file_origin=None, mark_type=None, event_type=None,
                 relative=None, array_annotations=None, **annotations):
         from core.datatypes import is_string
         if isinstance(places, (neo.Event, DataMark)):
@@ -337,7 +337,7 @@ class DataMark(neo.Event):
             description = evt.description
             file_origin = evt.file_origin
             annotations = evt.annotations
-            
+
         elif isinstance(times, (neo.Event, DataMark)):
             # for copy c'tor
             evt = times
@@ -349,24 +349,24 @@ class DataMark(neo.Event):
             description = evt.description
             file_origin = evt.file_origin
             annotations = evt.annotations
-            
+
         else:
             if places is None:
                 if times is None:
                     places = np.array([])
-                    
+
                 elif isinstance(times, (list, tuple)):
                     places = np.array(times)
-                    
+
                 elif isinstance(places, np.ndarray):
                     places = np.array(times)
-                    
+
             elif isinstance(places, (list, tuple)):
                 places = np.array(places)
-                
+
             elif isinstance(places, np.ndarray):
                 places = np.array(places)
-                
+
             if not isinstance(units, pq.Quantity):
                 if isinstance(places, pq.Quantity):
                     units = places.units
@@ -375,44 +375,44 @@ class DataMark(neo.Event):
                         units = pq.s
                     else:
                         units = pq.arbitrary_unit
-                        
+
             if not isinstance(places, pq.Quantity):
                 places = places * units
-                
+
             times = places
-                
+
             if labels is None:
                 labels = np.array([], dtype='S')
-                
+
             else:
                 if isinstance(labels, str):
                     labels = np.array([labels] * times.size)
-                    
+
                 elif isinstance(labels, (tuple, list)):
                     if not all([isinstance(l, str) for l in labels]):
                         raise TypeError("When ''labels' is a sequence, all elements must be str")
-                    
+
                     if len(labels) < times.size:
                         labels += [labels[-1]] * (times.size - len(labels))
-                        
+
                     elif len(labels) > times.size:
                         labels = labels[:times.size]
-                        
+
                     labels = np.array(labels)
-                    
+
                 elif isinstance(labels, np.ndarray):
                     if not is_string(labels):
                         raise TypeError("When 'labels' is a numpy array, it must contain strings")
-                    
+
                     if labels.size < times.size:
                         labels = np.append(labels, [labels[-1]] * (times.size - labels-size))
-                        
+
                     elif labels.size > times.size:
                         labels = labels[:times.size]
-                        
+
                 else:
                     raise TypeError("'labels' must be either a str, a sequence of str or a numpy array of strings; got %s instead" % type(labels).__name__)
-                        
+
             if units is None:
                 # No keyword units, so get from `times`
                 if not hasattr(places, "units"):
@@ -423,10 +423,10 @@ class DataMark(neo.Event):
             if mark_type is None:
                 if isinstance(event_type, (int, TriggerEventType)):
                     mark_type = event_type
-                    
+
             if not isinstance(relative, bool):
                 relative = False
-                
+
             # NOTE: 2021-11-11 09:39:49
             # ONLY for TriggerEvent
             # check to make sure the units are time
@@ -435,73 +435,73 @@ class DataMark(neo.Event):
             if cls.__name__ == "TriggerEvent":
                 if not checkTimeUnits(units):
                     raise TypeError(f"Expecting time unitsl got {units} instead")
-            
+
         obj = pq.Quantity(places.magnitude, units=units).view(cls)
         obj._labels = labels
         obj._relative = relative
         obj.segment = None
         # obj.name = name
-        
+
         # print(f"{cls.__name__}.__new__(labels = {labels})")
         return obj
 
-    
-    def __init__(self, places=None, times=None, labels=None, units=None, name=None, 
-                 description=None, file_origin=None, mark_type=None, 
+
+    def __init__(self, places=None, times=None, labels=None, units=None, name=None,
+                 description=None, file_origin=None, mark_type=None,
                  relative = None, array_annotations=None, **annotations):
         r"""Constructs a DataMark.
-        
+
         For DataMark objects, event_type is by default MarkType.unspecified
-        
-        For TriggerEvent objects, the default values of 'event_type' is 
+
+        For TriggerEvent objects, the default values of 'event_type' is
         TriggerEventType.unspecified.
         """
         DataObject.__init__(self, name=name, file_origin=file_origin, description=description,
                             array_annotations=array_annotations, **annotations)
-        
+
         # print(f"{self.__class__.__name__}.__init__(labels = {labels})")
 
         if not isinstance(annotations, dict):
             annotations = dict()
-        
+
         self.annotations = annotations
         self._relative = relative
-        
+
         # NOTE: see NOTE: 2021-11-11 09:39:49
-        
+
         if self.__class__.__name__ == "TriggerEvent":
             if mark_type is None:
                 self.__mark_type__ = TriggerEventType.unspecified
                 # self.__mark_type__ = TriggerEventType.presynaptic
-                
+
             elif isinstance(mark_type, str):
                 if mark_type in TriggerEventType.__members__:
                     self.__mark_type__ = TriggerEventType[mark_type]
-                    
+
                 else:
                     warngins.warning("Unknown event type %s; mark_type will be set to %s " % (mark_type, TriggerEventType.unspecified))
                     self.__mark_type__ = TriggerEventType.unspecified
                     # warngins.warning("Unknown event type %s; mark_type will be set to %s " % (mark_type, TriggerEventType.presynaptic))
                     # self.__mark_type__ = TriggerEventType.presynaptic
-            
+
             elif isinstance(mark_type, TriggerEventType):
                 self.__mark_type__ = mark_type
-                
+
             else:
                 warngins.warn("'mark_type' parameter expected to be a TriggerEventType enum value, a TriggerEventType name, or None; got %s instead" % type(mark_type).__name__)
                 self.__mark_type__ = TriggerEventType.unspecified
                 # self.__mark_type__ = TriggerEventType.presynaptic
-                
+
         else:
             # self.__mark_type__ = MarkType.place
             self.__mark_type__ = MarkType.unspecified
-            
+
         if hasattr(self, "_labels") and self._labels is None:
             self.setLabel(labels)
-        
+
         if isinstance(name, str) and len(name.strip()):
             self._name_ = name
-                
+
         else:
             if self.__class__.__name__ == "TriggerEvent":
                 self._name_ = self.mark_type.name
@@ -511,28 +511,28 @@ class DataMark(neo.Event):
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
-        
+
         result =  self.is_same_as(other)
-            
+
         if result:
             result &= self.name == other.name
-            
+
         if result:
             result &= self.labels.size == other.labels.size
-            
+
         if result:
             result &= self.labels.shape == other.labels.shape
-            
+
         if result:
             result &= np.all(self.labels == other.labels)
-        
+
         return result
-        
+
     def __array_finalize__(self, obj):
         super(DataMark, self).__array_finalize__(obj)
         # self.__mark_type__ = getattr(obj, "__mark_type__", MarkType.place)
         self.__mark_type__ = getattr(obj, "__mark_type__", MarkType.unspecified)
-        
+
         self._labels = getattr(obj, 'labels', None)
         self._relative = getattr(obj, "relative", False)
         self.annotations = getattr(obj, 'annotations', None)
@@ -549,18 +549,18 @@ class DataMark(neo.Event):
     def __repr__(self):
         result = str(self)
         return result
-    
+
     def __str__(self):
         import itertools
-        
+
         if self.times.size > 1:
             if self.labels is not None:
                 if self.labels.size > 0:
                     objs = ['%s@%s' % (label, time) for label, time in itertools.zip_longest(self.labels, self.times, fillvalue="")]
-                    
+
                 elif self.labels.size == 0:
                     objs = ["%s" % time for time in self.times]
-            
+
             else:
                 objs = ["%s" % time for time in self.times]
 
@@ -568,42 +568,42 @@ class DataMark(neo.Event):
             if self.labels is not None:
                 if self.labels.size > 0:
                     objs = ["%s@%s" % (label, self.times) for label in self.labels]
-                
+
                 else:
                     objs = ["%s@%s" % (self.labels, self.times)]
-                    
+
             else:
                 objs = ["%s" % self.times]
-            
+
         result = "TriggerEvent (%s): %s, %s" % (self.type.name, self.name, ", ".join(objs))
-        
+
         if self.__class__.__name__ == "TriggerEvent":
             tail = f"({self.type.name}): {self.name}, {', '.join(objs)}"
         else:
             tail = f": {self.name}, {', '.join(objs)}"
-            
+
         result = f"{self.__class__.__name__} {tail}"
-        
+
         return result
-    
+
     def __reduce__(self):
         if not isinstance(self.annotations, dict):
             annots = {}
-            
+
         else:
             annots = self.annotations
-        
+
         if not hasattr(self, 'array_annotations'):
             self.array_annotations = ArrayDict(self._get_arr_ann_length())
 
-        return _new_DataMark, (self.__class__, self.times, self.labels, 
-                               self.units, self.name, self.description, 
-                               self.file_origin, self.__mark_type__, 
+        return _new_DataMark, (self.__class__, self.times, self.labels,
+                               self.units, self.name, self.description,
+                               self.file_origin, self.__mark_type__,
                                self.segment, self.array_annotations, annots)
-    
+
     def get_labels(self):
         return self._labels
-    
+
     def set_labels(self, labels):
         if self._labels is not None and self._labels.size > 0 and len(labels) != self.size:
             raise ValueError("Labels array has different length to places ({} != {})"
@@ -613,35 +613,35 @@ class DataMark(neo.Event):
     def merge(self, other):
         r"""Merge this event with the time stamps from other event
         Both events must have the same type.
-        
+
         Returns:
         ========
-        
+
         A new DataMark with the same type as self
-        
+
         NOTE the new time stamps are stored in sorted order, by value!
-        
+
         """
         if isinstance(self, TriggerEvent):
             if other.__mark_type__ != self.__mark_type__:
                 raise TypeError("Can only merge synaptic events of the same type")
-        
+
         my_times_labels = list(zip(self.times, self.labels))
-        
+
         other_times_labels = list(zip(other.times, other.labels))
-        
+
         new_times_labels = sorted(my_times_labels + other_times_labels, key = lambda x: x[0])
-        
+
 #         othertimes = other.times.rescale(self.times.units)
 #         times = np.hstack([self.times, othertimes]).sort() * self.times.units
 #         labels = np.hstack([self.labels, other.labels]) # CAUTION this will mix the labels!
-#         
+#
         # NOTE: 2019-03-15 18:45:20
         # preserve _MY_ labels!
         # new_labels = np.full_like(labels, labels[0], dtype=labels.dtype)
-        
+
         new_times, new_labels = zip(*new_times_labels)
-        
+
         # take care of the other constructor parameters
         kwargs = {}
 
@@ -650,24 +650,24 @@ class DataMark(neo.Event):
             attr_other = getattr(other, name)
             if attr_self == attr_other:
                 kwargs[name] = attr_self
-                
+
             else:
                 kwargs[name] = "merge(%s, %s)" % (attr_self, attr_other)
-                
+
         if isinstance(self, TriggerEvent):
             kwargs["mark_type"] = self.__mark_type__
 
         merged_annotations = self.annotations.copy()
-        
+
         merged_annotations.update(other.annotations)
-        
+
         kwargs['array_annotations'] = self._merge_array_annotations(other)
 
         kwargs.update(merged_annotations)
-        
+
         return self.__class__(times=new_times, labels=new_labels, **kwargs)
         #return TriggerEvent(times=times, labels=new_labels, **kwargs)
-    
+
     def rescale(self, units):
         '''
         Return a copy converted to the specified units
@@ -680,22 +680,22 @@ class DataMark(neo.Event):
         r"""Label individual marks (or time stamps) according to the 'value' parameter
         When 'value' is a:
         • str => all marks get the same label
-        • iterable of str => marks get the label at the corresponding index in 
+        • iterable of str => marks get the label at the corresponding index in
             the iterable
-            WARNING: requires that the iterable yield as many elements as there 
+            WARNING: requires that the iterable yield as many elements as there
             are marks in the DataMark instance
     """
         from core.datatypes import is_string
-        
+
         # print(f"{self.__class__.__name__}.setLabel({value})")
-        
+
         if isinstance(value, str):
             setattr(self, "labels", np.array([value] * self.times.size))
-            
+
         elif isinstance(value, (tuple, list)) and all([isinstance(l, str) for l in value]):
             if len(value) == self.times.flatten().size:
                 setattr(self, "labels", np.array(value))
-                
+
             else:
                 raise ValueError("When given as a list, value must have as many elements as times (%d); got %d instead" % (self.times.flatten().size, len(value)))
 
@@ -705,13 +705,13 @@ class DataMark(neo.Event):
                     setattr(self, "labels", np.array([TriggerEvent.defaultLabel(self.__mark_type__)] * self.times.size))
                 else:
                     setattr(self, "labels", np.array(["DataMark"] * self.times.size))
-                    
+
             elif value.flatten().size != self.times.flatten().size:
                 setattr(self, "labels", np.array([value.flatten()[0]] * self.times.size))
-                
+
             else:
                 setattr(self, "labels", value)
-                
+
         elif value is None:
             if isinstance(self, TriggerEvent):
                 def_label = TriggerEvent.defaultLabel(self.__mark_type__)
@@ -722,25 +722,25 @@ class DataMark(neo.Event):
                 setattr(self, "labels", np.full_like(self.times.magnitude, TriggerEvent.defaultLabel(self.__mark_type__), dtype=np.dtype(str)))
             else:
                 setattr(self, "labels", np.full_like(self.times.magnitude, "DataMark", dtype=np.dtype(str)))
-                    
+
     def setLabels(self, value):
         self.setLabel(value)
-        
+
     def shift(self, value, copy=False):
         r"""Adds value to the places attribute (shifting).
-        
+
         Value must be a pq.Quantity with the same units as the times attribute,
         or a scalar
         """
         if copy:
             ret = self.copy()
-            
+
         else:
             ret = self
-            
+
         if isinstance(value, Real):
             value = value * ret.times.units
-            
+
         elif isinstance(value, pq.Quantity):
             # check for units
             if hasattr(value, 'dimensionality'):
@@ -760,9 +760,9 @@ class DataMark(neo.Event):
             raise TypeError("value was expected to be a scalar or a python Quantity with %s units; got %s insteads" % (self.time.units, value))
 
         ret += value
-        
+
         return ret # for convenience so that we can chain this e.g. "return obj.copy().shift()"
-        
+
     def place_shift(self, t_shift):
         r"""
         Shifts places by given amount.
@@ -785,7 +785,7 @@ class DataMark(neo.Event):
         new_evt.array_annotate(**self.array_annotations)
 
         return new_evt
-    
+
     def time_shift(self, t_shift):
         r"""Delegates to place_shift.
         for API compatibility with neo.Event
@@ -794,13 +794,13 @@ class DataMark(neo.Event):
 
     def __getitem__(self, i):
         # obj = super(self.__class__, self).__getitem__(i) # BUG 2023-11-01 22:49:26 FIXME
-        # obj = super().__getitem__(i) 
+        # obj = super().__getitem__(i)
         obj = self.__class__(super().__getitem__(i), labels = self._labels[i])
         # if self._labels is not None and self._labels.size > 0:
         #     obj._labels = self._labels[i]
         # else:
         #     obj._labels = self._labels
-            
+
         try:
             obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
             # obj._copy_data_complement(self)
@@ -814,26 +814,26 @@ class DataMark(neo.Event):
         '''
         for attr in ("labels", "name", "file_origin", "description", "annotations"):
             setattr(self, attr, getattr(other, attr, None))
-            
+
         if isinstance(self, TriggerEvent):
             # setattr(self, "__event_type__", getattr(other, "__event_type__", TriggerEventType.presynaptic))
             setattr(self, "__event_type__", getattr(other, "__event_type__", TriggerEventType.unspecified))
-        
-    @staticmethod
-    def defaultLabel(event_type):
+
+    @classmethod
+    def defaultLabel(cls, event_type):
         if isinstance(event_type, str):
             if event_type in MarkType.names():
                 event_type = MarkType.namevalue(event_type)
             else:
                 return
-            
+
         elif isinstance(event_type, int):
             tt = tuple(t for t in MarkType.values() if event_type & t)
             if len(tt):
                 event_type = tt[0]
             else:
                 return
-            
+
         if isinstance(event_type, MarkType):
             return event_type.name
 
@@ -858,46 +858,46 @@ class DataMark(neo.Event):
 
     def append_marks(self, value):
         r"""Appends more marks
-        
+
         Parameters:
         ==========
         value: See DataMark.parseValues
-        
+
         Returns:
         =======
-        A TriggerEvent with updated time stamps but with the same event type and 
-        labels as self. 
-        
+        A TriggerEvent with updated time stamps but with the same event type and
+        labels as self.
+
         NOTE the new time stamps are stored in the given order and NOT sorted
         by value!
-        
-        In addition, the labels array is updated to have the same length as the 
+
+        In addition, the labels array is updated to have the same length as the
         times attribute of the returned event object.
         """
         appended_times = self.__class__.parseValues(value, self.units)
-        
+
         new_times = np.hstack((self.times, appended_times)) * self.units
-        
+
         evt_type = self.__mark_type__
-        
+
         new_labels = np.full_like(new_times.magnitude, self.labels[0], dtype=self.labels.dtype)
-        
+
         name = self.name
-        
+
         # take care of the other constructor parameters
         kwargs = {}
 
         for name in ("name", "description", "file_origin"):#, "__protocol__"):
             attr_self = getattr(self, name)
-            
+
             kwargs[name] = getattr(self, name)
-            
+
         kwargs["mark_type"] = self.__mark_type__
 
         kwargs.update(self.annotations)
 
         return self.__class__(times = new_times, labels=new_labels, **kwargs)
-    
+
     def region_slice(self, t_start, t_stop):
         '''
         Creates a new :class:`DataMark` corresponding to the time slice of
@@ -913,29 +913,29 @@ class DataMark(neo.Event):
             _t_stop = np.inf
 
         indices = (self >= _t_start) & (self <= _t_stop)
-        
+
         times = self.times[indices]
         labels = self.labels[indices]
-        
-        new_obj = self.__class__(times=times, labels=labels, 
+
+        new_obj = self.__class__(times=times, labels=labels,
                                  units=self.units, name=self.name,
                                  description=self.description,
                                  file_origin=self.file_origin,
                                  relative=self.relative,
                                  array_annotations=self.array_annotations,
                                  **self.annotations)
-        
+
         if isinstance(self, TriggerEvent):
             new_obj.type = self.type
-        
+
         return new_obj
-    
+
     def time_slice(self, t_start, t_stop):
         r"""Delegates to region_slice.
         For API compatibility with neo.Event
         """
         return self.region_slice(t_start, t-stop)
-    
+
     def as_array(self, units=None):
         r"""
         Return the event times as a plain NumPy array.
@@ -952,77 +952,77 @@ class DataMark(neo.Event):
         Return the event times as a quantities array.
         """
         return self.view(pq.Quantity)
-    
-    def is_same_as(self, other, rtol = RELATIVE_TOLERANCE, atol =  ABSOLUTE_TOLERANCE, 
+
+    def is_same_as(self, other, rtol = RELATIVE_TOLERANCE, atol =  ABSOLUTE_TOLERANCE,
                    equal_nan = EQUAL_NAN):
         r"""Work around standard equality test
         Compares event type, time stamps, labels and name.
-        
+
         Time stamps are compared within a relative and absolute tolerances by
         calling numpy.isclose()
-        
+
         Positional parameters:
         =====================
         other: a TriggerEvent
-        
+
         Named parameters (see numpy.isclose()):
         ================
         rtol, atol: float scalars: relative and absolute tolerances (see numpy.isclose())
-            Their default values are the :class: variables TriggerEvent.relative_tolerance (1e-4) and 
+            Their default values are the :class: variables TriggerEvent.relative_tolerance (1e-4) and
             TriggerEvent.absolute_tolerance (1e-4)
-        
+
         equal_nan: boolean, default if the :class: variable TriggerEvent.equal_nan (True)
             When True, two numpy.nan values are taken as equal.
-            
+
         """
         if not isinstance(other, self.__class__):
             raise TypeError(f"A {self.__class__.__name__} object was expected; got {type(other).__name__} instead")
-        
+
         if isinstance(self, TriggerEvent):
             result = other.type == self.type
-            
+
         else:
             result = True
-        
+
         if result:
             compatible_units = other.units == self.units
-            
+
             if not compatible_units:
                 self_dim    = pq.quantity.validate_dimensionality(self.units)
-                
+
                 other_dim   = pq.quantity.validate_dimensionality(other.units)
-                
+
                 if self_dim != other_dim:
                     try:
                         cf = pq.quantity.get_conversion_factor(other_dim, self_dim)
                         compatible_units = True
-                        
+
                     except AssertionError:
                         compatible_units = False
-                    
+
             result &= compatible_units
-            
-        if result: 
+
+        if result:
             result &= other.flatten().size == self.flatten().size
-            
-        if result: 
-            result &= np.all(np.isclose(other.magnitude, self.magnitude, 
+
+        if result:
+            result &= np.all(np.isclose(other.magnitude, self.magnitude,
                                         rtol=rtol, atol=atol, equal_nan=equal_nan))
-        
+
         if result:
             result &= other.labels.size == self.labels.size
-            
+
         if result:
             result &= np.all(other.labels.flatten() == self.labels.flatten())
-            
+
         if result:
             result &= other.name == self.name
-            
+
         if result:
             result = getattr(other, "relative", False) == getattr(self, "relative", False)
-        
+
         return result
-            
+
     def to_zone(self, pairwise=False, durations=None, to_epoch:bool=False):
         r"""
         Returns a new Epoch object based on the times and labels in the TriggerEvent object.
@@ -1033,11 +1033,11 @@ class DataMark(neo.Event):
            `n-1` epochs, where the end of one epoch is the beginning of the next.
            This assumes that the events are ordered in time; it is the
            responsibility of the caller to check this is the case.
-           
+
         2. If `pairwise` is True, then the event times will be taken as pairs
            representing the start and end time of an epoch. The number of
            events must be even, otherwise a ValueError is raised.
-           
+
         3. If `durations` is given, it should be a scalar Quantity or a
            Quantity array of the same size as the Event.
            Each event time is then taken as the start of an epoch of duration
@@ -1076,7 +1076,7 @@ class DataMark(neo.Event):
             # Mode 3
             times = self.times
             labels = self.labels
-        
+
         relative = getattr(self, "relative", False)
         if to_epoch:
             if relative:
@@ -1084,188 +1084,188 @@ class DataMark(neo.Event):
             return neo.Epoch(times=times, durations=durations, labels=labels)
         else:
             return DataZone(times=times, durations=durations, labels=labels, relative=relative)
-        
+
 
     def to_epoch(self, pairwise=False, durations=None):
         return self.to_zone(pairwise=pairwise, durations=durations, to_epoch=True)
-            
+
     labels = property(get_labels, set_labels)
-    
-            
+
+
     @property
     def places(self):
         return pq.Quantity(self)
-    
+
     @property
     def times(self):
         return self.places
-    
+
     @property
     def relative(self) -> bool:
         r"""Indicates if the domain value is relative to the start of the signal.
         """
         return getattr(self, "_relative", False)
-    
+
     @relative.setter
     def relative(self, val:bool):
         self._relative = val == True
-    
+
     @property
     def name(self):
         return self._name_
-    
+
     @name.setter
     def name(self, value):
         if isinstance(value, str) or value is None:
             self._name_ = value
-            
+
         else:
             raise TypeError("Expecting a str or None; got %s" % type(value).__name__)
 
     @property
     def type(self):
         return self.__mark_type__
-    
+
     @type.setter
     def type(self, value):
         if not isinstance(value, (MarkType, TriggerEventType)):
             raise TypeError("Expecting a MarkType or TriggerEventType enum value; got %s instead" % type(value).__name__)
-        
+
         self.__mark_type__ = value
 
     @property
     def mark_type(self):
         return self.type
-    
+
     @mark_type.setter
     def mark_type(self, value):
         self.type = value
-        
+
 
 class TriggerEvent(DataMark):
     r"""Trigger event.
-    
+
     Encapsulates a neo.Event-like object that can be stored in a neo.Segment's
     "events" attribute.
-    
+
     NOTE: 2019-10-13 11:38:13
     Changed to inherit neo.core.dataobject.DataObject, but still modeled as
     neo.Event (in fact a lot of code copied from neo.Event as of neo version
     0.8.0).
-    
-    Defines the additional attribute __event_type__ which can have one of the 
+
+    Defines the additional attribute __event_type__ which can have one of the
     values in the TriggerEventType enum.
-    
+
     In addition, all labels must be the same, reflecting the trigger event type.
-    
+
     Additional API:
-    
+
     append_times: appends one or more time "stamps" to the event
-    
+
     NOTE: to select only a few time "stamps" and have them as a TriggerEvent,
-    use numpy array indexing methods, but with caveats as outlined below. 
+    use numpy array indexing methods, but with caveats as outlined below.
     See also "Indexing" chapter in Numpy Reference  Manual.
-    
+
     ATTENTION: Caveats of numpy array indexing (examples):
-    
+
     Example 1: (basic indexing)
     ---------------------------
-    event[k] 
+    event[k]
         k is an int
         returns a python Quantity, not a TriggerEvent!
-            this is an "undimensioned" object: 
+            this is an "undimensioned" object:
                 obj.ndim = 0; len(obj) raises TypeError
                 and it needs to be flatten()-ed
-    
+
     Example 2: (basic indexing/slicing)
     -------------------------------------
-    event[k:l], event[:l], event[k:] etc ... 
+    event[k:l], event[:l], event[k:] etc ...
         k, l are int
         returns a TriggerEvent of the same type as this one
         labels attribute is NOT indexed (i.e. stays the same as the original event)
-        
-    Example 3: (advanced indexing) 
+
+    Example 3: (advanced indexing)
     -------------------------------
     event[(k,l), ]      # NOTE the last comma!
         k, l are int
         returns a TriggerEvent of the same type
         again labels are not modified, as in Example 2
-        
+
     Example 4:( boolean array indexing)
     ----------------------------------
-    event[ndx] 
+    event[ndx]
         ndx is a boolean array (e.g., np.array([True, True, False, True])
         returns a TriggerEvent of the same type
         again labels are not modified, as in Example 3
-        
-    SOLUTION: 
+
+    SOLUTION:
         For Example 1: construct a new TriggerEvent using the return object
             as times, then take all other constructor parameters from the original
-            TriggerEvent object. 
-            
+            TriggerEvent object.
+
             It is recommended to flatten() the return object first.
-            
+
         For Examples 2:4 the workaround is to construct a new TriggerEvent using
         the returned object (TriggerEvent) as the only parameter to the constructor.
-        
+
     Inherits DataMark.
     """
-    
+
     from gui import cursors
-    
+
     _single_parent_objects = ('Segment',)
     _single_parent_attrs = ('segment',)
     _quantity_attr = 'times'
-    _necessary_attrs = (('times', pq.Quantity, 1), 
-                        ('labels', np.ndarray, 1, np.dtype('S')), 
+    _necessary_attrs = (('times', pq.Quantity, 1),
+                        ('labels', np.ndarray, 1, np.dtype('S')),
                         ("__event_type__", TriggerEventType, TriggerEventType.unspecified))
                         # ("__event_type__", TriggerEventType, TriggerEventType.presynaptic))
 
     #relative_tolerance = 1e-4
     #absolute_tolerance = 1e-4
     #equal_nan = True
-    
-    @staticmethod
-    def defaultLabel(event_type:typing.Optional[typing.Union[int,str,TriggerEventType, MarkType]]=None):
+
+    @classmethod
+    def defaultLabel(cls, event_type:typing.Optional[typing.Union[int,str,TriggerEventType, MarkType]]=None):
         if isinstance(event_type, str):
             if event_type in TriggerEventType.names():
                 event_type = TriggerEventType.namevalue(event_type)
             else:
                 return
-                
+
         elif isinstance(event_type, int):
             tt = tuple(t for t in TriggerEventType.values() if event_type & t)
             if len(tt):
                 event_type = tt[0]
             else:
                 return
-            
+
         elif not isinstance(event_type, TriggerEventType):
             return "event"
-        
+
         if event_type & TriggerEventType.presynaptic:
             return "pre"
-        
+
         elif event_type & TriggerEventType.postsynaptic:
             return "post"
-        
+
         elif event_type & TriggerEventType.photostimulation:
             return "photo"
-        
+
         elif event_type & TriggerEventType.imaging:
             return "imaging"
-        
+
         elif event_type & TriggerEventType.sweep:
             return "sweep"
-        
+
         elif event_type & TriggerEventType.user:
             return "user"
-        
+
         else:
             return "event"
-        
+
     parseTimeValues = DataMark.parseValues
-    
+
     def __new__(cls, times=None, labels=None, units=None, name=None, description=None,
                 file_origin=None, event_type=None, relative=None,
                 array_annotations=None, **annotations):
@@ -1283,18 +1283,18 @@ class TriggerEvent(DataMark):
             description = evt.description
             file_origin = evt.file_origin
             annotations = evt.annotations
-            
+
             if isinstance(evt, TriggerEvent):
                 event_type = evt.event_type
         else:
             if times is None:
                 times = np.array([])
-            
+
             elif isinstance(times, (list, tuple)):
                 if all(isinstance(v, pq.Quantity) for v in times):
                     if not checkTimeUnits(times[0]):
                         raise TypeError(f"Expecing time unitsl got {times[0].units} instead")
-                    
+
                     if not all(v.units == times[0].units for v in times[1:]):
                         times_ = list()
                         times_.append(times[0])
@@ -1302,51 +1302,51 @@ class TriggerEvent(DataMark):
                             if not unitsConvertible(v, times[0]):
                                 raise TypeError(f"'times' parametre has inconsistent units")
                             times_.append(v.rescale(times[0]))
-                            
+
                         times = times_
-                        
+
                     times = np.array(times) * times[0].units
                 else:
                     times = np.array(times)
-                
+
             if labels is None:
                 l = cls.defaultLabel(event_type)
                 ll = [f"trigger{k}" for k in range(times.size)]
                 labels = np.array(ll, dtype='U')
-                
+
             else:
                 if isinstance(labels, str):
                     ll = [f"{labels}{k}" for k in range(times.size)]
                     # print(f"ll = {ll}")
                     # labels = np.array(ll, dtype="U")
                     labels = np.array(ll)
-                    
+
                 elif isinstance(labels, (tuple, list)):
                     if not all([isinstance(l, str) for l in labels]):
                         raise TypeError("When ''labels' is a sequence, all elements must be str")
-                    
+
                     if len(labels) < times.size:
                         labels += [f"{labels[-1]}{k}" for k in range(len(labels), times.size)]
-                        
+
                     elif len(labels) > times.size:
                         labels = labels[:times.size]
-                        
+
                     labels = np.array(labels)
-                    
+
                 elif isinstance(labels, np.ndarray):
                     if not is_string(labels):
                         raise TypeError("When 'labels' is a numpy array, it must contain strings")
-                    
+
                     if labels.size < times.size:
                         ll = np.append(labels, [f"{labels[-1]}{k}" for k in range(labels.size, times.size, )])
                         labels = ll
-                        
+
                     elif labels.size > times.size:
                         labels = labels[:times.size]
-                        
+
                 else:
                     raise TypeError("'labels' must be either a str, a sequence of str or a numpy array of strings; got %s instead" % type(labels).__name__)
-            
+
             if units is None:
                 # No keyword units, so get from `times`
                 if not hasattr(times, "units"):
@@ -1356,10 +1356,10 @@ class TriggerEvent(DataMark):
             else:
                 if not checkTimeUnits(units):
                     raise ValueError(f"Incompatible units specified: {units}")
-                
+
             if not isinstance(times, pq.Quantity):
                 times = times * units
-                
+
             if not isinstance(relative, bool):
                 relative = False
 
@@ -1367,43 +1367,43 @@ class TriggerEvent(DataMark):
         obj._labels = labels
         obj._relative = relative
         obj.segment = None
-        
+
         # print(f"{cls.__name__}.__new__: labels -> {obj._labels}")
-        
+
         return obj
 
-    
+
     def __init__(self, times=None, labels=None, units=None, name=None, description=None,
                 file_origin=None, event_type=None, relative=None,
                 array_annotations=None, **annotations):
         r"""Constructs a TriggerEvent.
-        
+
         NOTE: 2025-10-21 22:16:29 CHANGE:
         By default its __mark_type__ is TriggerEventType.unspecified
-    
+
         Parameters:
         ===========
-    
+
         time:   iterable of times (Quantity scalars, Quantity array, floats, numpy array-like), or None
         labels: iterable  of strings (labels for each time point in the event)
         units:  Quantity or UnitQuantity (typically, this would be in time units, e.g. pq.s, or pq.ms)
                 where pq is the alias to python Quantities package
         name:   string, name of the trigger event
         event_type: see TriggerEventType; default is TriggerEventType.unspecified
-        
+
         """
         super().__init__(places=None, times=times, labels=labels, units=units, name=name,
-                         description=description, file_origin=file_origin, 
+                         description=description, file_origin=file_origin,
                          mark_type=event_type, relative=relative,
                          array_annotations=array_annotations,
                          **annotations)
-        
+
     def __array_finalize__(self, obj):
         super(TriggerEvent, self).__array_finalize__(obj)
-        
+
         # self.__mark_type__ = getattr(obj, "__mark_type__", TriggerEventType.presynaptic)
         self.__mark_type__ = getattr(obj, "__mark_type__", TriggerEventType.unspecified)
-        
+
         self._labels = getattr(obj, '_labels', None)
         self._relative = getattr(obj, "relative", False)
         self.annotations = getattr(obj, 'annotations', None)
@@ -1416,38 +1416,38 @@ class TriggerEvent(DataMark):
         # This ensures the attribute exists
         if not hasattr(self, 'array_annotations'):
             self.array_annotations = ArrayDict(self._get_arr_ann_length())
-            
+
     def __reduce__(self):
         if not isinstance(self.annotations, dict):
             annots = {}
-            
+
         else:
             annots = self.annotations
-        
+
         if not hasattr(self, 'array_annotations'):
             self.array_annotations = ArrayDict(self._get_arr_ann_length())
 
-        return _new_TriggerEvent, (self.__class__, self.times, self.labels, 
-                               self.units, self.name, self.description, 
-                               self.file_origin, self.event_type, 
+        return _new_TriggerEvent, (self.__class__, self.times, self.labels,
+                               self.units, self.name, self.description,
+                               self.file_origin, self.event_type,
                                self.segment, self.array_annotations, annots)
-    
+
     def append_times(self, value):
         r"""Appends time values to this event.
-        
+
         Parameters:
         ==========
         value: See DataMark.parseValues
-        
+
         Returns:
         =======
-        A TriggerEvent with updated time stamps but with the same event type and 
-        labels as self. 
-        
+        A TriggerEvent with updated time stamps but with the same event type and
+        labels as self.
+
         NOTE the new time stamps are stored in the given order and NOT sorted
         by value!
-        
-        In addition, the labels array is updated to have the same length as the 
+
+        In addition, the labels array is updated to have the same length as the
         times attribute of the returned event object.
         """
         return self.append_marks(value) # inherited from DataMark
@@ -1462,11 +1462,11 @@ class TriggerEvent(DataMark):
            `n-1` epochs, where the end of one epoch is the beginning of the next.
            This assumes that the events are ordered in time; it is the
            responsibility of the caller to check this is the case.
-           
+
         2. If `pairwise` is True, then the event times will be taken as pairs
            representing the start and end time of an epoch. The number of
            events must be even, otherwise a ValueError is raised.
-           
+
         3. If `durations` is given, it should be a scalar Quantity or a
            Quantity array of the same size as the Event.
            Each event time is then taken as the start of an epoch of duration
@@ -1506,16 +1506,16 @@ class TriggerEvent(DataMark):
             # Mode 3
             times = self.times
             labels = self.labels
-            
+
         relative = getattr(self, "relative", False)
-        
+
         if to_epoch:
             if relative:
                 scipywarn(f"{self.__class__.__name__}: Creating a neo.Epoch while domain coordinates are relative! neo.Epoch only supports absolute coordinates")
             return neo.Epoch(times=times, durations=durations, labels=labels)
         else:
             return DataZone(times=times, durations=durations, labels=labels, relative=relative)
-            
+
     def to_dataCursors(self, window:typing.Union[float, pq.Quantity]):
         if isinstance(window, float):
             window  = window * self.times.units
@@ -1525,20 +1525,20 @@ class TriggerEvent(DataMark):
                     window = window.rescale(self.times.units)
                 else:
                     raise TypeError(f"'window' has incompatible units ({window.units}); expecting {self.time.units}")
-                
+
         return list(map(lambda k: self.cursors.DataCursor(self.times[k], span=window, name=str(self.labels[k])), range(self.size)))
-        
-        
-        
+
+
+
     def to_epoch(self, pairwise=False, durations=None):
         return self.to_zone(pairwise=pairwise, durations=durations, to_epoch=True)
 
     @property
     def event_type(self):
         return self.__mark_type__
-    
+
     @event_type.setter
     def event_type(self, value):
         self.__mark_type__ = value
-        
-        
+
+
