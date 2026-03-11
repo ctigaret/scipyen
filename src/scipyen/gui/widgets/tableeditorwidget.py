@@ -66,7 +66,7 @@ from core.strutils import str2float
 from core.prog import (safewrapper, scipywarn)
 
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType)
-from core.triggerprotocols import TriggerProtocol
+from core.triggerprotocols import TriggerProtocolList
 from core.datazone import DataZone
 
 import core.datasignal
@@ -100,20 +100,21 @@ TabularType = typing.Union[pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
                            neo.AnalogSignal, neo.IrregularlySampledSignal,
                            neo.Epoch, neo.Event, neo.SpikeTrain,
                            DataSignal, IrregularlySampledDataSignal,
-                           TriggerEvent, TriggerProtocol,
+                           TriggerEvent, TriggerProtocolList,
                            np.ndarray, vigra.VigraArray,
                            vigra.filters.Kernel1D, vigra.filters.Kernel2D]
 
 Ui_TableEditorWidget, QWidget = loadUiType(__ui_path__)
 
 class TableEditorWidget(QWidget, Ui_TableEditorWidget):
+    r"""Uses TableDataView as the UI"""
     # TODO 2019-11-01 22:57:01
     # finish implementing all these
     viewer_for_types = (pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
                        neo.AnalogSignal, neo.IrregularlySampledSignal,
                        neo.Epoch, neo.Event, neo.SpikeTrain,
                        DataSignal, IrregularlySampledDataSignal,
-                       TriggerEvent, TriggerProtocol,
+                       TriggerEvent, TriggerProtocolList,
                        np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D)
 
     view_action_name = "Table"

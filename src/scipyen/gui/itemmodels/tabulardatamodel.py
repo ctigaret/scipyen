@@ -67,7 +67,8 @@ from core.strutils import str2float
 from core.prog import (safewrapper, scipywarn)
 
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType)
-from core.triggerprotocols import TriggerProtocol
+from core.marktrain import MarkTrain
+from core.triggerprotocols import (TriggerProtocol, TriggerProtocolList)
 from core.datazone import DataZone
 
 import core.datasignal
@@ -323,7 +324,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # ### END   Define timer debug
         try:
 
-            if not isinstance(data, (pd.Series, pd.DataFrame, pd.Index, np.ndarray, vigra.filters.Kernel1D, vigra.filters.Kernel2D, type(None))):
+            if not isinstance(data, (pd.Series, pd.DataFrame, pd.Index, np.ndarray, vigra.filters.Kernel1D, vigra.filters.Kernel2D, TriggerProtocolList, type(None))):
                 raise TypeError("%s data is not yet supported" % type(data).__name__)
 
             self.beginResetModel()
@@ -1290,10 +1291,11 @@ def _(obj: typing.Union[neo.AnalogSignal, DataSignal],
     return ret
 
 @_addRow_.register(neo.SpikeTrain)
-def _(obj: neo.SpikeTrain,
-      row: neo.SpikeTrain, in_place = False) -> neo.SpikeTrain:
-    if not isinstance(row, neo.SpikeTrain):
-        raise TypeError(f"Row expected a SpikeTrain; instead got a {type(row).__name__}")
+@_addRow_.register(MarkTrain)
+def _(obj: typing.Union[neo.SpikeTrain, MarkTrain],
+      row: typing.Union[neo.SpikeTrain, MarkTrain], in_place = False) -> typing.Union[neo.SpikeTrain, MarkTrain]:
+    if not isinstance(row, type(obj)):
+        raise TypeError(f"Row expected to be a {type(obj).__name__}; instead got a {type(row).__name__}")
 
     assert(row.size == 1), "Expecting exactly one timestamp"
     assert(row.left_sweep == obj.left_sweep), "Both argument must have the same 'left_sweep'"
@@ -1309,7 +1311,7 @@ def _(obj: neo.SpikeTrain,
 
     if time.units != times.units:
         if not scq.unitsConvertible(time, times):
-            raise TypeError(f"Incompatible domain units: row ({time.units}) vs tareget ({times.units})")
+            raise TypeError(f"Incompatible domain units: row ({time.units}) vs target ({times.units})")
 
         time = time.rescale(times.units)
 
@@ -1339,9 +1341,20 @@ def _(obj: neo.SpikeTrain,
                           array_annotations = obj.array_annotations,
                           **obj.annotations)
 
-@_addRow_.register(TriggerProtocol)
-def _(obj: TriggerProtocol, row: TriggerEvent, in_place = False):
-    pass
+@_addRow_.register(TriggerProtocolList)
+def _(obj: TriggerProtocolList, row: TriggerProtocol, in_place: bool = False):
+    if not isinstance(row, TriggerProtocol):
+        raise TypeError(f"Cannot add {type(row).__name__}")
+
+    if in_place:
+        obj += row
+        return obj
+
+    else:
+        ret = TriggerProtocolList(obj._items)
+        ret += row
+        return ret
+
 
 
 

@@ -13,6 +13,7 @@ Changelog:
 """
 import warnings
 import typing
+import types
 import numbers
 #from enum import IntEnum
 from copy import (deepcopy, copy,)
@@ -20,11 +21,12 @@ from itertools import chain
 import numpy as np
 import quantities as pq
 import neo
+from neo.core.baseneo import (BaseNeo, MergeError, merge_annotations)
 from neo.core.dataobject import (DataObject, ArrayDict,)
 from core.typeenum import TypeEnum
 from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
 from core.prog import scipywarn
-from core.scipyen_quantities import checkTimeUnits, unitsConvertible
+from core.scipyen_quantities import (checkTimeUnits, unitsConvertible)
 #from core.utilities import unique
 
 def _new_DataMark(cls, places = None, labels=None, units=None, name=None,
@@ -1527,8 +1529,6 @@ class TriggerEvent(DataMark):
                     raise TypeError(f"'window' has incompatible units ({window.units}); expecting {self.time.units}")
 
         return list(map(lambda k: self.cursors.DataCursor(self.times[k], span=window, name=str(self.labels[k])), range(self.size)))
-
-
 
     def to_epoch(self, pairwise=False, durations=None):
         return self.to_zone(pairwise=pairwise, durations=durations, to_epoch=True)

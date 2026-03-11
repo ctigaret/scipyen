@@ -26,14 +26,14 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
+
     from qtpy import sip
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
-    
+
 
 from pyqtgraph import (DataTreeWidget, TableWidget, )
 #from pyqtgraph.widgets.TableWidget import _defersort
@@ -45,7 +45,7 @@ import pandas as pd
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-import core.datatypes  
+import core.datatypes
 
 import imaging.axiscalibration
 from imaging.axiscalibration import AxesCalibration
@@ -75,104 +75,104 @@ from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 
 class SimpleTableWidget(TableWidget): # TableWidget imported from pyqtgraph
     r"""Another simple table widget, which allows zero-based row/column indices.
-    
+
     Ultimatly inherits from QTableWidget
-    
+
     """
     def __init__(self, *args, natural_row_index=False, natural_col_index=False, **kwds):
         self._pythonic_col_index = not natural_col_index
         self._pythonic_row_index = not natural_row_index
         super().__init__(*args, **kwds)
-        
+
     def setData(self, data):
         super().setData(data)
         #if isinstance(data, neo.core.dataobject.DataObject):
-            
+
         if isinstance(data, (np.ndarray, tuple, list, deque)):
             if self._pythonic_col_index:
                 self.setHorizontalHeaderLabels(["%d"%i for i in range(self.columnCount())])
-                
+
             if self._pythonic_row_index:
                 self.setVerticalHeaderLabels(["%d"%i for i in range(self.rowCount())])
-                
+
         elif isinstance(data, pd.Series):
             self.setHorizontalHeaderLabels(["%s"%i for i in data.index])
             self.setVerticalHeaderLabels([data.name])
-            
+
         elif isinstance(data, pd.DataFrame):
             self.setHorizontalHeaderLabels(["%s"%i for i in data.index])
             self.setVerticalHeaderLabels([data.columns])
-            
+
         elif isinstance(data, pd.Index):
             self.setHorizontalHeaderLabels(["%s"%i for i in data])
-            
-        
+
+
     def iterFirstAxis(self, data):
         r"""Overrides TableWidget.iterFirstAxis.
-        
+
         Avoid exceptions when data is a dimesionless array.
-        
-        In the original TableWidget from pyqtgraph this method fails when data 
+
+        In the original TableWidget from pyqtgraph this method fails when data
         is a dimesionless np.ndarray (i.e. with empty shape and ndim = 0).
-        
+
         This kind of arrays unfortunately can occur when creating a numpy
         array (either directly in the numpy library, or in the python Quantities
         library):
-        
+
         Example 1 - using python quantities:
         ------------------------------------
-        
+
         In: import quantities as pq
-        
+
         In: a = 1*pq.s
-        
+
         In: a
         Out: array(1.)*s
-        
+
         In: a.shape
         Out: ()
-        
+
         In: a.ndim
         Out: 0
-        
+
         In: a[0]
         IndexError: too many indices for array: array is 0-dimensional, but 1 were indexed
-        
+
         Example 2 - directly creating a numpy array:
         --------------------------------------------
-        
+
         In: b = np.array(1)
-        
+
         In: b
         Out: array(1)
-        
+
         In: b.shape
         Out: ()
-        
+
         In: b.ndim
         Out: 0
-        
+
         In: b[0]
         IndexError: too many indices for array: array is 0-dimensional, but 1 were indexed
-        
-        This will cause self.iterFirstAxis(a) to raise 
+
+        This will cause self.iterFirstAxis(a) to raise
         IndexError: tuple index out of range
-        
-        
+
+
         HOWEVER, the value of the unique element of the array can be retrieved
         by using its "take" method:
-        
+
         In: a.take(0)
         Out: 1.0
-        
+
         In: b.take(0)
         Out: 1
 
-        
+
         """
         if len(data.shape) == 0 or data.ndim == 0:
             yield(data.take(0))
-            
+
         else:
             for i in range(data.shape[0]):
                 yield data[i]

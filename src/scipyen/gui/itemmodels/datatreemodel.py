@@ -130,7 +130,7 @@ from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 
 from core.scipyendataclasses import isDataclass
 
-# from gui.widgets.tablewidget import SimpleTableWidget
+# from gui.widgets.simpletablewidget import SimpleTableWidget
 # from gui.widgets.tableeditorwidget import (TableEditorWidget,
 #                                            TabularDataModel,)
 # from gui.pictgui import WorkerThread
@@ -1004,9 +1004,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(NeoObjectList)
     @_parseObject_.register(set)
     @_parseObject_.register(frozenset)
+    # @_parseObject_.register(TriggerProtocolList)
     def _(self: typing.Self,
-          obj: typing.Union[list, tuple, deque, set, NeoObjectList, frozenset],
-                   includePrivateMembers: bool = False) -> tuple:
+            obj: typing.Union[list, tuple, deque, set, NeoObjectList, frozenset],
+            includePrivateMembers: bool = False) -> tuple:
         objType = type(obj)
         tip = objType.__name__
         readOnly = False
@@ -1379,7 +1380,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
 
     @_parseObject_.register(Interval)
-    def _(self: typing.Self, obj: Interval) -> tuple:
+    def _(self: typing.Self, obj: Interval, _: bool = True) -> tuple:
         pData = {
                     "t0": obj.t0,
                     "t1": obj.t1,
@@ -1408,7 +1409,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
     @_parseObject_.register(neo.Epoch)
     @_parseObject_.register(DataZone)
-    def _(self: typing.Self, obj: typing.Union[neo.Epoch, DataZone]) -> tuple:
+    def _(self: typing.Self, obj: typing.Union[neo.Epoch, DataZone],
+          _: bool = True) -> tuple:
         objType = type(obj)
         pData = {
                     "times": obj.times,
@@ -1439,7 +1441,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(DataMark)
     @_parseObject_.register(TriggerEvent)
     def _(self: typing.Self,
-          obj: typing.Union[neo.Event, DataMark, TriggerEvent]) -> tuple:
+          obj: typing.Union[neo.Event, DataMark, TriggerEvent],
+          _: bool = True) -> tuple:
         objType = type(obj)
         pData = {"times": obj.times, "labels": obj.labels}
 
@@ -1451,8 +1454,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
         klass = "Mark" if isinstance(obj, DataMark) else tip
 
         tip = type(obj).__name__
+        n = obj.size
         desc = strutils.pluralize('subinterval', n)
-        info = f"{klass} '{obj.name}' with {len(obj)} {desc}"
+        info = f"{klass} '{obj.name}' with {n} {desc}"
 
         return pData, {
             "indirect": True,

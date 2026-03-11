@@ -92,7 +92,7 @@ from core.scipyen_config import markConfigurable
 # from gui.tableeditor import (TableEditorWidget, TabularDataModel,)
 
 # from gui.widgets.interactivetreewidget import InteractiveTreeWidget
-# from gui.widgets.tablewidget import SimpleTableWidget
+# from gui.widgets.simpletablewidget import SimpleTableWidget
 # from gui.widgets.tableeditorwidget import (TableEditorWidget, TabularDataModel)
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog

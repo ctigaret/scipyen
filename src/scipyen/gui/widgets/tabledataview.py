@@ -22,8 +22,6 @@ import pandas as pd
 r"""Custom table view, with placeholder text
 """
 
-
-
 import quantities as pq
 #import xarray as xa
 import numpy as np
@@ -60,7 +58,7 @@ class TableDataView(QtWidgets.QTableView):
     """
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
-        
+
     def paintEvent(self, event):
         r"""Paints a placeholder text when there is no data"""
         super().paintEvent(event)
@@ -77,4 +75,4 @@ class TableDataView(QtWidgets.QTableView):
         painter.drawText(self.viewport().rect(), QtCore.Qt.AlignCenter, elided_text)
         painter.restore()
 
-        
+

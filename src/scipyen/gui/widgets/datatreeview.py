@@ -125,7 +125,7 @@ from core.workspacefunctions import (validate_varname, user_workspace)
 
 # from core.scipyendataclasses import isDataclass
 
-# from gui.widgets.tablewidget import SimpleTableWidget
+# from gui.widgets.simpletablewidget import SimpleTableWidget
 # from gui.widgets.tableeditorwidget import (TableEditorWidget,
 #                                            TabularDataModel,)
 # from gui.pictgui import WorkerThread
