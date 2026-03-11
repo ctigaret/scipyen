@@ -223,6 +223,8 @@ class TriggerProtocol:
     stimulation, etc).
 
     """
+    name:str = dataclasses.field(default="Protocol")
+
     # TODO validators for these below -- maybe ?
     presynaptic:typing.Optional[TriggerEvent] = dataclasses.field(default=None)
     postsynaptic:typing.Optional[TriggerEvent] = dataclasses.field(default=None)
@@ -255,7 +257,6 @@ class TriggerProtocol:
     # TODO: a validator to check type and contents
     segments:typing.Union[int, list[int], tuple[int], range, slice] = dataclasses.field(default_factory = list)
 
-    name:str = dataclasses.field(default="Protocol")
     t_start: typing.Optional[pq.Quantity] = None
     t_stop: typing.Optional[pq.Quantity] = None
     file_origin:typing.Union[str, pathlib.Path] = dataclasses.field(default = "")
@@ -330,11 +331,15 @@ class TriggerProtocol:
         events = self.events
         if len(events):
             return events[0].times.min()
+        else:
+            return self.t_start
 
     def t1(self) -> pq.Quantity | None:
         events = self.events
         if len(events):
             return events[-1].times.max()
+        else:
+            return self.t_stop
 
     def getEvent(self, event_type):
         r"""Returns the event specified by type
@@ -937,14 +942,19 @@ class TriggerProtocol:
                    acquisition      = components["acquisition"],
                    imaging_delay    = components["imagingDelay"],
                    segment_index    = components["segmentIndex"],
-                   name             = attrs["name"])
+                   name             = attrs["name"],
+                   t_start          = attrs["t_start"],
+                   t_stop           = attrs["t_stop"])
 
 
 class TriggerProtocolList(NeoObjectList):
     r"""Inspired by neo.ObjectList"""
     allowed_contents = (TriggerProtocol, )
-    def __init__(self, *items, parent: object = None):
+    def __init__(self, *items, name:typing.Optional[str] = None,
+                 parent: object = None):
+        self.name = "" if not isinstance(name, str) else name
         self._items = list()
+
         if len(items):
             if len(items) == 1 and isinstance(items[0], typing.Sequence):
                 items = items[0]
@@ -997,10 +1007,15 @@ class TriggerProtocolList(NeoObjectList):
         return f"<{self.__class__.__name__}> with {len(self._items)} protocols"
 
     def __repr__(self):
-        s = [f"<{self.__class__.__name__}> with {len(self._items)} protocols",
+        header = f"<{self.__class__.__name__}>"
+        if isinstance(self.name, str) and len(self.name.strip()):
+            header += f" '{self.name}'"
+
+        s = [f"{header} with {len(self._items)} protocols",
             ]
 
         if len(self._items):
+            s[0]+= ":"
             s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
 
         return "\n".join(s)
@@ -1113,6 +1128,24 @@ class TriggerProtocolList(NeoObjectList):
                     ret[ndx].append([item])
                 else:
                     ret[ndx] = [item]
+
+            elif isinstance(item.segments, typing.Sequence):
+                if len(items.segments) > 0:
+                    if all(isinstance(i, int) for i in item.segments):
+                        for i in item.segments:
+                            ndx = f"{i}"
+                            if ndx in ret:
+                                ret[ndx].append(item)
+                            else:
+                                ret[ndx]= [item]
+                    else:
+                        raise ValueError("segment indcexes musty all be integers")
+
+                else:
+                    if "*" in ret:
+                        ret["*"].append(item)
+                    else:
+                        ret["*"] = [item]
 
             else:
                 if "*" in ret:
