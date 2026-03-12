@@ -192,11 +192,12 @@ class TriggerProtocol:
                         frame, imaging line, or sweep, in the cases where the
                         the acquisition device is triggered externally
 
+    imagingDelay:      python Quantity scalar
+
     segmentIndex:       indexing object (e.g, list of indices, a range, or a slice)
                         for the frames (segments or sweeps) where this protocol
                         applies; it may be empty.
 
-    imaging_delay:      python Quantity scalar
 
     The first three event types describe above can each be a TriggerEvent object
     or None.
@@ -897,9 +898,9 @@ class TriggerProtocol:
                 oname = name
 
             h5io.toHDF5(trigger, entity,
-                                  name=name, oname=oname,
-                                  compression = compression, chunks=chunks,
-                                  track_order = track_order, entity_cache=entity_cache)
+                        name=name, oname=oname,
+                        compression = compression, chunks=chunks,
+                        track_order = track_order, entity_cache=entity_cache)
 
 
         return entity
@@ -940,7 +941,7 @@ class TriggerProtocol:
                    post             = components["postsynaptic"],
                    photo            = components["photostimulation"],
                    acquisition      = components["acquisition"],
-                   imaging_delay    = components["imagingDelay"],
+                   imagingDelay     = components["imagingDelay"],
                    segment_index    = components["segmentIndex"],
                    name             = attrs["name"],
                    t_start          = attrs["t_start"],

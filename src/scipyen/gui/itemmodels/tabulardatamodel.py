@@ -159,6 +159,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelData_:typing.Any= None
         self._modelDataRows_:int = 0
         self._modelDataColumns_:int = 0
+        self._modelDataHeaderSections_: typing.Optional[
+            typing.Union[typingMapping, typing.Sequence]
+            ] = None
         self._immutability_:dict = {"columns": list(), "rows": list(), "joint":False}
         self._rowBatchSize_:int = 10
         self._columnBatchSize_:int = 10
@@ -339,6 +342,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelData_ = data
                 self._modelDataRows_ = data.shape[0]
                 self._modelDataColumns_ = data.shape[1]
+                self._modelDataHeaderSections_ = dict(enumerate(data.columns))
                 self._canAddRemoveColumns_ = True
                 self._canAddRemoveRows_ = True
 
@@ -346,6 +350,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelData_ = data
                 self._modelDataRows_ = data.shape[0]
                 self._modelDataColumns_ = 1
+                self._modelDataHeaderSections_ = {0: data.name}
                 self._canAddRemoveRows_ = True
                 self._canAddRemoveColumns_ = False
 
@@ -353,17 +358,33 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelData_ = data
                 self._modelDataRows_ = data.shape[0]
                 self._modelDataColumns_ = 1
+                self._modelDataHeaderSections_ = {0: "Index or Column"}
                 self._canAddRemoveRows_ = True
                 self._canAddRemoveColumns_ = False
 
             elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
                 self._modelData_ = vigrautils.kernel2array(data)
                 self._modelDataRows_ = data.shape[0]
-                self._modelDataColumns_ = 1
-                self._is_vigra_filter_kernel_ = True
+                self._modelDataColumns_ = 1 if isinstance(data, vigra.filters.Kernel1D) else 2
+                self._modelDataHeaderSections_ = {0: "Sample"} if isinstance(data, vigra.filters.Kernel1D) else {0: "X", 1: "Y"}
+                self._is_vigra_filter_kernel_  = True
                 self._original_data_ = data
                 self._canAddRemoveRows_ = False
                 self._canAddRemoveColumns_ = False
+
+            elif isinstance(data, TriggerProtocolList):
+                self._modelData_ = data
+                self._original_data_ = data
+                self._modelDataRows_ = len(data)
+                self._modelDataColumns_ = len(TriggerEventType) + 3 # includes name, imagingDelay, and segmentIndex
+                self._is_vigra_filter_kernel_ = 1
+                self._canAddRemoveRows_ = True
+                self._canAddRemoveColumns_ = True
+                self._modelDataHeaderSections_ = dict(((0,"Name"), ) +
+                                        tuple(map(
+                                            lambda x: (x[0]+1, x[1]),
+                                            enumerate(TriggerEventType.names()))) +
+                                        ((13,"Imaging delay"), (14, "Frames or Segments")))
 
             elif isinstance(data, np.ndarray):
                 # trying to streamline this
@@ -387,6 +408,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         if data.ndim > 1:
                             # include domain as the first column
                             self._modelDataColumns_ = data.shape[1] + 1
+                            aannots = data.array_annotations
+                            if len(aannots) and "channel_names" in aannots:
+                                self._modelDataHeaderSections_ = dict(
+                                    (
+                                        ((0:"Time"), ) +
+                                        tuple(map(lambda x: (x[0]+1, x), enumerate(aannots["channel_names"]))
+                                              )
+                                    )
                             self._modelDataRows_ = data.shape[0]
 
                             if isinstance(data, (neo.AnalogSignal, DataSignal)):
@@ -429,6 +458,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     else:
                         self._modelDataRows_ = 1
                         self._modelDataColumns_ = 1
+
 
             elif data is None:
                 self._modelData_ = data
@@ -679,6 +709,18 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     else:
                         return QtCore.QVariant()
 
+            elif isinstance(self._modelData_, TriggerProtocolList):
+                if orientation == QtCore.Qt.Horizontal: # horizontal (columns) header
+                    if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
+                        if section in range(self._modelDataColumns_):
+                            return QtCore.QVariant(headerSections[section])
+                        else:
+                            return QtCore.QVariant()
+                    else:
+                        return QtCore.QVariant()
+                else:
+                    return QtCore.QVariant(f"{section}")
+
             elif isinstance(self._modelData_, neo.core.dataobject.DataObject):
                 if orientation == QtCore.Qt.Horizontal: # horizontal (columns) header
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
@@ -714,11 +756,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             return QtCore.QVariant("%s" % section)
 
                         elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-
                             return QtCore.QVariant("%s" % self._modelData_[section,:].dtype)
 
                         else:
                             return QtCore.QVariant()
+
             elif isinstance(self._modelData_, np.ndarray):
                 if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
                     lbl = f"{section}"
@@ -786,6 +828,25 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     ret = val if role == QtCore.Qt.EditRole else val.isoformat(" ")
                 else:
                     ret = val if role == QtCore.Qt.EditRole else f"{val}"
+
+            elif isinstance(self._modelData_, TriggerProtocolList):
+                protocol = self._modelData_[row]
+                # if col == 0:
+                #     val = protocol.name
+                # elif col == 1:
+                #     val = protocol.presynaptic
+                # elif col == 2:
+                #     val = protocol.postsynaptic
+                # elif col == 3:
+                #     val = protocol.photostimulation
+                # elif col == 4:
+                #     val = protocol.acquisition
+                # elif col == 5:
+                #     val = protocol.imaging_delay
+                # elif col == 6:
+                #     val = protocol.imaging_delay
+                # elif col == 7:
+                #     val = protocol.segmentIndex
 
             elif isinstance(self._modelData_, neo.core.dataobject.DataObject):
                 if col == 0:
