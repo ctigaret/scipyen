@@ -942,6 +942,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(self._modelData_, TriggerProtocolList):
                 protocol = self._modelData_[row]
                 val = getattr(protocol, self._modelDataHeaderSections_[col])
+                if isinstance(val, TriggerEvent):
+                    val = val.times
+
                 ret = val if role == QtCore.Qt.EditRole else f"{val.magnitude}" if isinstance(self._modelData_, pq.Quantity) else f"{val}"
 
             elif isinstance(self._modelData_, neo.core.dataobject.DataObject):
@@ -1007,25 +1010,22 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             else:
                 pyvalue = value
 
-            # print(f"{self.__class__.__name__}._setDataValue_: row={row}, col={col} -> pyvalue={pyvalue}")
-
-            if row >= self._modelData_.shape[0]:
-                return False
-
             if isinstance(self._modelData_, pd.DataFrame):
+                if row >= self._modelData_.shape[0]:
+                    return False
                 self._modelData_.iloc[row, col] = pyvalue
                 # self._modelData_.at[row, col] = pyvalue
-                # print(f"{self.__class__.__name__}._setDataValue_: self._modelData_.iloc[{row}, {col}] -> {self._modelData_.iloc[row, col]}")
                 return True
-                # self._modelData_.at[data_row, data_col] = pyvalue
 
             elif isinstance(self._modelData_, pd.Series):
+                if row >= self._modelData_.shape[0]:
+                    return False
                 self._modelData_.iloc[row] = pyvalue
-                # self._modelData_.at[row] = pyvalue
                 return True
-                # self._modelData_.at[data_row] = pyvalue
 
             elif isinstance(self._modelData_, neo.dataobject.DataObject):
+                if row >= self._modelData_.shape[0]:
+                    return False
                 if col >= self._modelData_.shape[1] + 1:
                     # because the signal's domain is on column 0, what is shown
                     # here has one extra column
@@ -1083,6 +1083,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         return False
 
             elif isinstance(self._modelData_, np.ndarray):
+                if row >= self._modelData_.shape[0]:
+                    return False
                 if self._modelData_.ndim == 1:
                     self._modelData_[row] = pyvalue
                 elif self._modelData_.ndim == 2:
@@ -1091,6 +1093,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     self._original_data_ = vigrautils.kernelfromarray(self._modelData_)
 
                 return True
+            elif isinstance(self._modelData_, TriggerProtocolList):
+                if row >= len(self._modelData_):
+                    return False
+
+                attr = self._modelDataHeaderSections_[col]
+
+
             else:
                 return False
 

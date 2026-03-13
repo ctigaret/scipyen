@@ -1152,11 +1152,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             fval = float(value.magnitude)
 
             if not (self._keepDimensionless_ or self._forceDimensionless_):
-                if scq.unitsConvertible(self.units, value.units):
-                    if fval > -math.inf and fval < math.inf:
-                        fval = float(value.rescale(self.units).magnitude)
-                else:
-                    self.units = value.units
+                if value.units != self.units:
+                    if scq.unitsConvertible(self.units, value.units):
+                        if fval > -math.inf and fval < math.inf:
+                            fval = float(value.rescale(self.units).magnitude)
+                    else:
+                        self.units = value.units
 
             self._magnitude_ = fval
 
