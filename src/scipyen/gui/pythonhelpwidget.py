@@ -375,7 +375,9 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         self.queryComboBox.clear()
         self._lastQuery_ = None
         for q in self._cache_:
-            if isinstance(q.get("imgdir", None), TemporaryDirectory):
+            if (isinstance(q, dict)
+                and isinstance(q.get("imgdir", None),
+                               TemporaryDirectory)):
                 q["imgdir"].cleanup()
                 
         self._cache_.clear()

@@ -28,10 +28,14 @@ Additional functions include alternatives to Python's ``pydoc.modules`` and
     ``docutils`` package (I tried the directives ``.. code-block:: python3``
     and ``.. literal-block::``, to no avail).
     
-    Therefore I am falling back on simply using the ``::`` directive in docstrings,
-    so that the ``docutils.publish*`` functions will output the directive contents
-    un-tagged text between ``<pre class="literal-block">`` and ``</pre>`` HTML tags
-    and apply the pygments highlighter on *this* output.
+    Therefore I am falling back on simply using the literal block directive (`::`)
+    in docstrings, so that the ``docutils.publish*`` functions will output the
+    directive contents as un-tagged text, between ``<pre class="literal-block">``
+    and ``</pre>`` HTML tags; then I apply the pygments highlighter on *this*
+    output.
+
+    NOTE: the directive if just ``::`` on a line of its own, **NOT** ``.. ::``
+    or anything else...
     )
 
 """
@@ -304,8 +308,10 @@ def pub_rst(s:str) -> str:
     ret_html = parts['html_body']
     return ret_html
 
-def rst_latex_2_html(text:str, 
-                     imgdir:typing.Optional[typing.Union[TemporaryDirectory, pathlib.Path, str]]=None) -> str:
+def rst_latex_2_html(text: str,
+                     imgdir: typing.Optional[
+                         typing.Union[TemporaryDirectory, pathlib.Path, str]
+                         ] = None) -> str:
     latex_formatter = partial(format_latex, imgdir=imgdir)
     
     # html = rst_to_html_with_highlighting(latex_formatter(text.replace("\n", "\n ")))
@@ -316,16 +322,6 @@ def rst_latex_2_html(text:str,
     # src_pattern = r'src=["\']([^"\']+)["\'][^>]*>'
     matches = re.findall(pattern, html)
     for match in matches:
-        # print(f"match = {match}")
-        # src_match = re.findall(src_pattern, match)
-        # print(f"src_match = {src_match}")
-        # if len(src_match):
-        #     src_match = src_match[0]
-        #     match = match.replace(src_match, f"src='{src_match}'")
-        #     smatch = match.replace(src_match)
-        # html.replace(match, f"<div><br>{match}<br></div>")
-        # html.replace(match, f"<div><table><tr><td>{match}</td></tr></table></div>")
-        # html.replace(match, f"<p><div>{match}</div><p>")
         smatch = match.replace("/>", ' style="display: block; margin: 0 auto;" />')
         html.replace(match, f"<p><div>{smatch}</div><p>")
     
@@ -336,15 +332,10 @@ def rst_to_html_with_highlighting(rst_text) -> str:
 This one  "By William	July 8, 2025
 https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python-for-documentation/
  """
-    # print(f"helpsystem.helputils.rst_to_html_with_highlighting()")
-    # print(f"helpsystem.helputils.rst_to_html_with_highlighting(rst_text={rst_text})")
-
     parts = publish_parts(rst_text, writer_name='html5', settings_overrides=docutils_settings_overrides)
     body_html = parts['html_body']
-    # ret_html = parts['whole']
     
     def replace_code_block(match):
-        # print(f"helputils.rst_to_html_with_highlighting.replace_code_block(match = {match})")
         code = match.group(1)
         code = html.unescape(code)
         return mypylight(code)
@@ -353,20 +344,6 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
     # I'm having trouble with how the ``.. code-block::`` directive is rendered
     # but WITHOUT colour highlighting...
     pattern = r'<pre class="literal-block">(.+?)</pre>' 
-    
-#     try:
-#         matches = re.findall(pattern, body_html, re.DOTALL|re.MULTILINE)
-#         for k, match in matches:
-#             print(f"helputils.rst_to_html_with_highlighting: match {k} = {match[0]}")
-#             snippet = replace_code_block(match[0])
-#             body_html = body_html.replace(match[0], snippet)
-#         
-#         out_html = body_html
-#     except:
-#         traceback.print_exc()
-#         out_html = body_html
-        
-    # out_html = body_html
     
     try:
         out_html = re.sub(pattern, replace_code_block, body_html, flags=re.DOTALL|re.MULTILINE)
@@ -799,7 +776,7 @@ def helpdisp(imgdir:TemporaryDirectory, info:oinspect.OInfo,
     if isinstance(bf, io.StringIO):
         bf_page(bf, info_b["text/html"])
     else:
-        shell.display(info_b)
+        shell.display_formatter.format(info_b)
     
 def bf_page(bf:io.StringIO, strng:str):
     for line in strng.splitlines():
@@ -1032,7 +1009,8 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
         if detail_level > 0 and info["source"]:
             append_field(bundle, "Source", "source", py_formatter, shell=shell)
         else:
-            append_field(bundle, "Docstring", "docstring", rst_formatter, shell=shell)
+            append_field(bundle, "Docstring", "docstring", py_formatter, shell=shell)
+            # append_field(bundle, "Docstring", "docstring", rst_formatter, shell=shell)
             for field in _extra_info_fields:
                 if info[field]:
                     append_field(bundle, field.capitalize(), field, py_formatter, shell=shell)
@@ -1218,13 +1196,6 @@ reStructuredText-formatted text with ``.. image::`` directives
                 pngfile.write(pngdata)
                 
             snippet = f"\n .. image:: {filepath.as_posix()}\n"
-            # print(f"\tsnippet {k} = {snippet}")
-            
-            # snippet = f"\n\n\n .. image:: \n    {filepath.as_posix()}\n    :align: left\n\n"
-            
-            # if ll.startswith("$$"):
-            #     snippet = "\n\n" + snippet + "\n\n"
-                
             txt = txt.replace(ltx, snippet)
         else:
             prog.scipywarn(f"LaTeX rendering error for string {ltx}")
@@ -1645,3 +1616,30 @@ detail_level: int, 0 or 1, default is 0
         
     return ret, reformat
 
+# NOTE: 2026-03-14 21:10:53
+# use these for debugging
+def test_rst_formatter(text, shell, imgdir) -> Bundle:
+    # shell = guiutils.getScipyenConsoleShell()
+    _format = lambda t: shell.inspector.format(t)
+    rst_latex_fmt = partial(rst_latex_2_html, imgdir=imgdir)
+    return {
+        'text/plain': _format(text),
+        # 'text/html': rst_to_html_with_highlighting(latex_formatter(text.replace("\n", "\n ")))
+        'text/html': rst_latex_fmt(text)
+    }
+
+def test_py_formatter(text, shell, imgdir) -> Bundle:
+    # shell = guiutils.getScipyenConsoleShell()
+    _format = lambda t: shell.inspector.format(t)
+    return {
+        'text/plain': _format(text),
+        'text/html': mypylight(text)
+    }
+
+def test_bland_formatter(text, shell, imgdir) -> Bundle:
+    # shell = guiutils.getScipyenConsoleShell()
+    _format = lambda t: shell.inspector.format(t)
+    return {
+        'text/plain': _format(text),
+        'text/html': text
+    }

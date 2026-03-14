@@ -232,8 +232,8 @@ class TriggerProtocol:
     photostimulation:typing.Optional[TriggerEvent] = dataclasses.field(default=None)
 
     # TODO a validator for these two
-    acquisition:list[TriggerEvent] = dataclasses.field(default_factory = list)
-    userEvents:list[TriggerEvent] = dataclasses.field(default_factory = list)
+    acquisition:typing.Optional[TriggerEvent] = dataclasses.field(default_factory = None)
+    userEvents:typing.Optional[TriggerEvent] = dataclasses.field(default_factory = None)
 
     # This is the delay between the start of an electrophysiology segment and
     # that of an image acquisition and helps to temporally map the events in

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# SPDX-FileCopyrightText: 2022 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-FileCopyrightText: 2022-2026 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -47,11 +47,12 @@ from gui.guiutils import (DisplayHint,
     get_elided_text, get_text_width)
 
 from core import scipyen_quantities as scq
+from core import strutils as strutils
+
 from iolib.navigation.navigator import UrlNavigatorButtonBase
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-# class ElidedPushButton(QtWidgets.QPushButton):
 class ElidedPushButton(UrlNavigatorButtonBase):
     def __init__(self, text: str = "", elideText: bool = True, parent = None):
         super().__init__(parent=parent)
@@ -236,13 +237,10 @@ class ElidedPushButton(UrlNavigatorButtonBase):
         if oldMinWidth != minWidth:
             self.setMinimumWidth(minWidth)
 
-
-
-
-
-
-
-Ui_QuantityChooserWidget, QWidget = loadUiType(os.path.join(__module_path__, "quantitychooserwidget.ui"))
+Ui_QuantityChooserWidget, QWidget = loadUiType(
+    os.path.join(__module_path__,
+                 "quantitychooserwidget.ui")
+    )
 
 class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
     r"""Compound widget allowing the user to choose a physical dimensionality.

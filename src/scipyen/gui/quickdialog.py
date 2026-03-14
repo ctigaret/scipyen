@@ -638,6 +638,7 @@ class QuickDialogComboBox(QtWidgets.QFrame):
             self.variable.setCurrentIndex(index)
             
     def setText(self, text:str):
+        r"""Set the current text"""
         if isinstance(text, str):
             self.variable.setCurrentText(text)
             
@@ -653,7 +654,7 @@ class QuickDialogComboBox(QtWidgets.QFrame):
     def connectIndexChanged(self, slot:object):
         r"""Connects the combobox currentIndexChanged signal.
         """
-        # NOTE: this is an overlaoded signal, with two versions 
+        # NOTE: this is an overloaded signal, with two versions
         # (respectively, with a str and int argument).
         # Therefore it is expected that the connected slot is also overloaded
         # to accept a str or an int
@@ -855,7 +856,10 @@ class QuickDialog(QtWidgets.QDialog):
         self.buttons.layout.addWidget(self.buttons.Cancel)
         self.layout.addWidget(self.buttons)
         
-    def addWidget(self, widget:QtWidgets.QWidget, stretch:int = 0, alignment:typing.Optional[QtCore.Qt.AlignmentFlag] = None):
+    def addWidget(self,
+                  widget: QtWidgets.QWidget,
+                  stretch: int = 0,
+                  alignment: typing.Optional[QtCore.Qt.AlignmentFlag] = None):
         if alignment is None:
             alignment = QtCore.Qt.AlignTop
         self.layout.insertWidget(len(self.widgets), widget, stretch, alignment)
@@ -902,10 +906,8 @@ class QuickDialog(QtWidgets.QDialog):
             self.help.setReadOnly(1)
             self.help.setWordWrap(QtWidgets.QTextEdit.WidgetWidth)
         else:
-            #self.help = qt.QVBox(self)
             self.help = QtWidgets.QVGroupBox(self)
             self.help.setLayout(QtWidgets.QVBoxLayout())
-            #self.help.text = QtCore.QtextEdit(self.help)
             self.help.text = QtWidgets.QTextEdit(self.help)
             self.help.text.setText(helpString)
             self.help.text.setReadOnly(1)

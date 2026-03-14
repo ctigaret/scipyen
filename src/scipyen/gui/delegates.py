@@ -779,7 +779,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 editor.setValue(data)
 
             elif isinstance(data, str) or "str" in type(data).__name__:
-                assert isinstance(editor, QtWidgets.QLineEdit), f"Incompatible editor editor type ({type(editor).__name__}) for string data"
+                assert isinstance(editor, (QtWidgets.QLineEdit, QtWidgets.QPlainTextEdit)), f"Incompatible editor editor type ({type(editor).__name__}) for string data"
                 editor.setText(data)
 
             elif isinstance(data, (datetime.datetime, datetime.date, datetime.time)):

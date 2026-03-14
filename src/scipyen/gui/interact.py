@@ -91,7 +91,6 @@ def selectWSData(*args, title="", single=True, asDict=False, **kwargs):
     
     ws = kwargs.pop("ws", user_workspace())
     
-    #ws = user_workspace()
     user_ns_visible = dict([(k,v) for k,v in ws.items() if not k.startswith("_") and k not in ws["mainWindow"].workspaceModel.user_ns_hidden])
     
     name_vars = lsvars(*args, glob=True, ws=user_ns_visible, **kwargs)
@@ -124,25 +123,28 @@ def selectWSData(*args, title="", single=True, asDict=False, **kwargs):
 
 def getInputs(**kwargs):
     r"""Calls 'getInput' with a prompt mapping created from key/value pairs
-    Returns a list.
-    
-    Typical use:
-    
+Returns a list.
+
+Typical use:
+::
     a, b, c = getInputs(a=1, b=2, c=3)
-    """
+
+"""
     
     return getInput(kwargs, mapping=False)
 
 def packInputs(**kwargs):
-    r"""Verison of getInputs that returns a dict
-    Typical use:
-    
-    result = getInputs(a=1, b=2, c=3)
-    
-    resut
+    r"""Version of getInputs that returns a dict
+
+Typical use:
+::
+    result = packInputs(a=1, b=2, c=3)
+
+    result
+
     {'a': 1, 'b': 2, 'c': 3}
     
-    """
+"""
     
     return getInput(kwargs, mapping=True)
 
@@ -174,7 +176,7 @@ def getInput(prompts:dict, mapping:bool=False):
     The dict maps the keys in 'prompts' to the object values.
     
     In either case, the object values are those set in by interaction with the 
-    diaog.
+    dialog.
     
     """
     dlg = qd.QuickDialog(title="Input values")

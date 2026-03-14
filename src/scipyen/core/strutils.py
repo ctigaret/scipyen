@@ -72,6 +72,10 @@ else:
 
 SUPERSCRIPT_UNICODE = {"-":"⁻",
                     "+":"⁺",
+                    "=":"⁼",
+                    "(":"⁽",
+                    ")":"⁾",
+                    "!":"ꜝ",
                     "0":"⁰",
                     "1":"¹",
                     "2":"²",
@@ -82,11 +86,15 @@ SUPERSCRIPT_UNICODE = {"-":"⁻",
                     "7":"⁷",
                     "8":"⁸",
                     "9":"⁹",
-                    "a":"ᵃ", 
+                    "a":"ᵃ",
+                    "α":"ᵅ",
                     "b":"ᵇ",
+                    "β":"ᵝ",
                     "c":"ᶜ",
                     "d":"ᵈ",
+                    "δ":"ᵟ",
                     "e":"ᵉ",
+                    "ϵ":"ᵋ",
                     "f":"ᶠ",
                     "g":"ᵍ",
                     "h":"ʰ",
@@ -101,12 +109,54 @@ SUPERSCRIPT_UNICODE = {"-":"⁻",
                     "r":"ʳ",
                     "s":"ˢ",
                     "t":"ᵗ",
+                    "θ":"ᶿ",
                     "u":"ᵘ",
                     "v":"ᵛ",
                     "w":"ʷ",
                     "x":"ˣ",
                     "y":"ʸ",
-                    "z":"ᶻ"}
+                    "z":"ᶻ",
+                    "γ":"ᵞ",
+                        }
+
+SUBSCRIPT_UNICODE = {"-":"₋",
+                    "+":"₊",
+                    "=":"₌",
+                    "(":"₍",
+                    ")":"₎",
+                    "0":"₀",
+                    "1":"₁",
+                    "2":"₂",
+                    "3":"₃",
+                    "4":"₄",
+                    "5":"₅",
+                    "6":"₆",
+                    "7":"₇",
+                    "8":"₈",
+                    "9":"₉",
+                    "a":"ₐ",
+                    "β":"ᵦ",
+                    "χ":"ᵪ",
+                    "e":"ₑ",
+                    "γ":"ᵧ",
+                    "h":"ₕ",
+                    "i":"ᵢ",
+                    "j":"ⱼ",
+                    "k":"ₖ",
+                    "l":"ₗ",
+                    "m":"ₘ",
+                    "n":"ₙ",
+                    "o":"ₒ",
+                    "p":"ₚ",
+                    "ϕ":"ᵩ",
+                    "r":"ᵣ",
+                    "ρ":"ᵨ",
+                    "s":"ₛ",
+                    "ə":"ₔ",
+                    "t":"ₜ",
+                    "u":"ᵤ",
+                    "v":"ᵥ",
+                    "x":"ₓ"}
 
 
 REGEXP_METACHARACTERS = (
@@ -146,8 +196,6 @@ def superscript(s:str)->str:
     
     return "".join(list(map(lambda c: SUPERSCRIPT_UNICODE.get(c,c), s)))
         
-
-
 def is_sequence(s: str) -> bool:
     r"""Return True if the s is a string representation of a tuple or list"""
     if not isinstance(s, str) or len(s.strip())==0:
@@ -257,9 +305,7 @@ def lettersToOrdinal(x: str) -> int:
 
     return l.index(x)
 
-
 letters2ordinal = lettersToOrdinal
-
 
 def str2sequence(s: str) -> typing.List[str]:
     r"""Parses the string representation of a sequence into a sequence of strings"""
@@ -762,6 +808,13 @@ def numbers2str(
     show_units:bool (optional default is False)
         If True, include units in the text representation of python quantity
         values.
+
+    .. :note:
+
+        The reverse conversion is not directly suported, as it
+        is more complicated: it depends on what the string contains (i.e.,
+        comma-/ space-/ tab-separated values; are these strings representations
+        of numbers, and if so, what format etc).
 
     """
 

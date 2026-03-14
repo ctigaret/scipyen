@@ -1541,4 +1541,12 @@ class TriggerEvent(DataMark):
     def event_type(self, value):
         self.__mark_type__ = value
 
+    @property
+    def type(self):
+        return self.event_type
+
+    @type.setter
+    def type(self, val):
+        self.event_type = val
+
 
