@@ -107,7 +107,9 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             self._event_type_ = self._data_.type
 
         self._configureUI_()
-        self.timesLineEdit.installEventFilter(self)
+
+        if isinstance(self._data_, neo.Event):
+            self._update_()
 
     def _configureUI_(self):
         self.setupUi(self)
@@ -117,13 +119,18 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         self.setEventTypeAction.triggered.connect(self._slot_setEventType)
         self.setEventDomanUnitsAction = QtGui.QAction("Units")
         self.setEventDomanUnitsAction.triggered.connect(self._slot_setEventUnits)
-        self.nameLabelsAction = QtGui.QAction("Name & labels")
+        self.nameLabelsAction = QtGui.QAction("Name and labels")
         self.nameLabelsAction.triggered.connect(self._slot_setNameLabels)
-        # self.editTimesAction = QtGui.QAction("Edit...")
-        # self.editTimesAction.triggered.connect(self._slot_editTimes)
         self.timesLineEdit.undoAvailable=True
         self.timesLineEdit.redoAvailable=True
         self.timesLineEdit.setClearButtonEnabled(True)
+        self.timesLineEdit.installEventFilter(self)
+
+        self.timesLineEdit.textChanged.connect(self._slot_timesChanged)
+        self.timesLineEdit.sig_lazy.connect(self._slot_lazyTextChanges)
+
+    def _update_(self):
+        signalBlockers = QtCore.QSignalBlocker(self.timesLineEdit)
         if isinstance(self._times_, np.ndarray):
             if dt.is_vector(self._times_):
                 self.timesLineEdit.setText(strutils.numbers2str(self._times_))
@@ -151,10 +158,8 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             #
             # In addition, numpy arrays are flatten()-ed first!
 
-        self.timesLineEdit.textChanged.connect(self._slot_timesChanged)
-        self.timesLineEdit.sig_lazy.connect(self._slot_lazyTextChanges)
 
-    def _createContextMenu_(self):
+    def _createContextMenu_(self) -> QtWidgets.QMenu:
         menu = QtWidgets.QMenu(self)
         if self.timesLineEdit.isReadOnly():
             editTimesAction = QtGui.QAction("Edit...")
@@ -171,6 +176,8 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             menu.addAction(self.setEventDomanUnitsAction)
 
         menu.addAction(self.nameLabelsAction)
+
+        return menu
 
     def eventFilter(self, obj: QtCore.QObject, evt: QtCore.QEvent) -> bool:
         if obj == self.timesLineEdit and isinstance(evt, QtGui.QContextMenuEvent):
@@ -190,13 +197,16 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
 
     @Slot()
     def _slot_setNameLabels(self):
-        from core import interact
+        from gui import interact
         if self._data_ is None:
-            name = ""
+            name = None
+            labels = None
         else:
             name = getattr(self._data_, "name", "")
             if len(name.strip()) == 0:
                 name = type(self._data_).__name__
+
+            labels = self._data_.labels
             # NOTE: 2026-03-15 16:19:54
             # Get the prefix & suffix for the labels (if any).
             # It generally makes sense for the labels in a neo.Event objects
@@ -208,9 +218,61 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             # assign distinct labels to each time stamp in an Event object
             #
             # The code below tries to distinguish this, using the CONVENTION
-            prefix_suffix = list(zip(*list(map(lambda s: ))))
-        # args = interact.packInputs(name:str = name,
-        #                            label_prefix = )
+            # that the magnitude values in the 'times' array is represented as
+            # comma+space - separated numeric literals
+            prefix, suffix = list(zip(*list(map(lambda s: strutils.get_int_sfx(str(s), use_re=True), labels))))
+
+            # do they have a common prefix?
+            if len(set(prefix)) == 1:
+                # common prefix detected
+                labels = prefix[0]
+
+            else:
+                labels = list(map(lambda s: str(s), labels))
+
+            values = interact.packInputs(name=name, labels=labels)
+
+            self._data_.name = values["name"]
+
+            labels = values["labels"].split(", ")
+
+            if len(labels) > 1:
+                if len(labels) >= self._data_.size:
+                    labels = labels[0:self._data.size]
+
+                elif len(labels) < self._data_.size:
+                    prefix, suffix = list(zip(*list(map(lambda s: strutils.get_int_sfx(str(s), use_re=True), labels))))
+                    print(f"{self.__class__.__name__}._slot_setNameLabels:\nprefix = {prefix},\nsuffix = {suffix}\n\n")
+                    if len(set(prefix)) == 1:
+                        pfx = prefix[0]
+                    else:
+                        pfx = prefix[-1]
+
+                    if (
+                        len(suffix) > 0
+                        and all((
+                            len(s.strip()) > 0
+                            and strutils.isnumber(s)
+                            ) for s in suffix)
+                        ):
+                        sfx = max(list(map(int, suffix))) + 1
+
+                    else:
+                        sfx = 0
+
+
+                    for k in range(sfx, self._data_.size):
+                        labels.append(f"{pfx}{k}")
+
+            elif len(labels) == 1:
+                labels = labels[0]
+
+            else:
+                return
+
+            # self._createEvent_()
+            self._data_.labels = labels
+
 
     @Slot()
     def _slot_editTimes(self):
@@ -376,6 +438,8 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             self._units_ = self._data_.times.units
             if isinstance(self._data_, (DataMark, TriggerEvent)):
                 self._event_type_ = self._data_.type
+
+            self._update_()
 
         else:
             self._data_type_ = None

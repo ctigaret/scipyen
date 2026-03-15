@@ -606,11 +606,23 @@ class DataMark(neo.Event):
     def get_labels(self):
         return self._labels
 
-    def set_labels(self, labels):
-        if self._labels is not None and self._labels.size > 0 and len(labels) != self.size:
+    def set_labels(self, labels: typing.Union[str, typing.Sequence[str], np.ndarray]):
+        if isinstance(labels, str):
+            labels = np.array([labels])
+        elif isinstance(labels, typing.Sequence) and all(isinstance(l, str) for l in labels):
+            labels = np.array(labels)
+        elif isinstance(labels, np.ndarray):
+            if labels.dtype.type is not np.str_:
+                raise TypeError("Expecting an array-like of strings")
+
+        else:
+            raise TypeError("Expecting a string or an array-like of strings")
+
+        if self._labels is not None and self._labels.size > 0 and labels.size != self.size:
             raise ValueError("Labels array has different length to places ({} != {})"
-                            .format(len(labels), self.size))
-        self._labels = np.array(labels)
+                            .format(labels.size, self.size))
+        self._labels = labels
+        # self._labels = np.array(labels)
 
     def merge(self, other):
         r"""Merge this event with the time stamps from other event

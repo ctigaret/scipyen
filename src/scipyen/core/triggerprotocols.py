@@ -226,14 +226,13 @@ class TriggerProtocol:
     """
     name:str = dataclasses.field(default="Protocol")
 
-    # TODO validators for these below -- maybe ?
-    presynaptic:typing.Optional[TriggerEvent] = dataclasses.field(default=None)
-    postsynaptic:typing.Optional[TriggerEvent] = dataclasses.field(default=None)
-    photostimulation:typing.Optional[TriggerEvent] = dataclasses.field(default=None)
-
-    # TODO a validator for these two
-    acquisition:typing.Optional[TriggerEvent] = dataclasses.field(default_factory = None)
-    userEvents:typing.Optional[TriggerEvent] = dataclasses.field(default_factory = None)
+    # TODO 2026-03-15 21:12:09
+    # validators or descriptors for these below
+    presynaptic:typing.Optional[TriggerEvent] = dataclasses.field(default = None)
+    postsynaptic:typing.Optional[TriggerEvent] = dataclasses.field(default = None)
+    photostimulation:typing.Optional[TriggerEvent] = dataclasses.field(default = None)
+    acquisition:typing.Optional[TriggerEvent] = dataclasses.field(default = None)
+    userEvents:typing.Optional[TriggerEvent] = dataclasses.field(default = None)
 
     # This is the delay between the start of an electrophysiology segment and
     # that of an image acquisition and helps to temporally map the events in

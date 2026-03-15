@@ -53,14 +53,14 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
+
     from qtpy import sip
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
-    
+
 
 # import qtpy
 # qtpy.API = os.environ["QT_API"]
@@ -193,9 +193,9 @@ import errno, os
 def superscript(s:str)->str:
     if len(s)==1:
         return SUPERSCRIPT_UNICODE.get(s, s)
-    
+
     return "".join(list(map(lambda c: SUPERSCRIPT_UNICODE.get(c,c), s)))
-        
+
 def is_sequence(s: str) -> bool:
     r"""Return True if the s is a string representation of a tuple or list"""
     if not isinstance(s, str) or len(s.strip())==0:
@@ -291,7 +291,7 @@ def lettersToOrdinal(x: str) -> int:
     """
     if not isinstance(x, str) or len(x.strip()) == 0:
         return -1
-    
+
     x = "".join(tuple(x.lower()))
 
     l = list(string.ascii_lowercase)
@@ -311,7 +311,7 @@ def str2sequence(s: str) -> typing.List[str]:
     r"""Parses the string representation of a sequence into a sequence of strings"""
     if not isinstance(s, str) or len(s.strip()) == 0:
         return list()
-    
+
     possibleSequence = False
 
     if s.startswith("(") and s.endswith(")"):
@@ -358,7 +358,7 @@ def str2range(s: str) -> range:
     r"""Parses the string representation of a range into a range object"""
     if not isinstance(s, str) or len(s.strip()) == 0:
         return range(0,0)
-    
+
     parts = list(int(s_) for s_ in s.split(":"))
     if len(parts) <= 3:
         return range(*parts)
@@ -493,7 +493,7 @@ Examples:
 """
     if not isinstance(s, str) or len(s.strip()) == 0:
         return ("", None)
-    
+
     if bracketed:
         # pattern = _re.compile(r"\(\d+\)$")
         pattern = _re.compile(r"(.*?)??(\(\d+\))$")
@@ -559,52 +559,59 @@ Examples:
 
 def counter_suffix(x:str, strings:typing.List[str], sep:str="_",
                    bracketed:bool=False, start:int=0,
+                   use_re: bool = False,
                    returns_counter:typing.Optional[bool]=None) -> typing.Optional[typing.Union[str, int, typing.Tuple[str, int]]]:
     r"""Appends a counter suffix to x:str if x is found in the list of strings
-    
-    Parameters:
-    ==========
-    
-    :x: string to check for existence
-    
-    :strings: sequence of str to check for existence of x
-    
-    :sep: default is "_"; suffix separator
 
-    :bracketed: When True, uses f=the format <abc...> (x) where 'x' is the counter
-    
-    :start: start value for counter suffix
+Parameters:
+==========
 
-    :returns_counter: emutaes a tri-state flag ("three-valued logic"):
+:x: string to check for existence
 
-        * True ↦ the function returns the new counter (int).
+:strings: sequence of str to check for existence of x
 
-        * False ↦ the function returns a suffixed string
+:sep: default is "_"; suffix separator
 
-        * None (the default) ↦ the function returns a tuple with the new string *and* the new counter.
+:use_re: When True, use regular expressions to detect integral suffixes in ``strings``
 
-    """
+:bracketed: When True, uses the format <abc...> (x) where 'x' is the counter
+
+.. note::
+
+    Avoid this for setting identifier names, as the brackets are illegal characters for identifiers.
+
+:start: start value for counter suffix
+
+:returns_counter: tri-state flag ("three-valued logic"):
+
+    * True ↦ the function returns the new counter (int).
+
+    * False ↦ the function returns a suffixed string
+
+    * None (the default) ↦ the function returns a tuple with the new string *and* the new counter.
+
+"""
     if not isinstance(strings, (tuple, list)) and not hasattr(strings, "__iter__"):
         raise TypeError("Second positional parameter was expected to be an iterable; got %s instead" % type(strings).__name__)
-    
+
     if not all ([isinstance(s, str) for s in strings]):
         raise TypeError("Second positional parameter was expected to contain str elements only")
-    
+
     if not isinstance(sep, str):
         raise TypeError("Separator must be a str; got %s instead" % type(sep).__name__)
-    
+
     if not isinstance(start, int):
         raise TypeError(f"'start' expected to be an int; got {type(start).__name__} instead")
-    
+
     if start < 0:
         raise ValueError(f"'start' expected to be a positive int (>= 0); instead, got {start}")
-    
+
     if len(strings):
 
         make_suffix = lambda c: f" ({c})" if bracketed else sep + f"{c}" if isinstance(sep, str) and len(sep) else f"{c}"
 
-        base, cc = get_int_sfx(x, sep=sep, bracketed=bracketed)
-        
+        base, cc = get_int_sfx(x, sep=sep, use_re=use_re, bracketed=bracketed)
+
         # print(f"counter_suffix: base = {base}, cc = {cc}")
 
         clashes = list(filter(lambda s: s.startswith(base), strings))
@@ -712,7 +719,7 @@ def strcat(a: str, b: str) -> str:
     r"""Just a convenience function for ''.join((a,b))"""
     if not all([isinstance(s, str) for s in (a,b)]):
         return ""
-    
+
     return "".join((a, b))
 
 
@@ -861,7 +868,10 @@ def numbers2str(
 
     fmt = "%." + mag_format + format
 
-    if show_units and all([isinstance(v, pq.Quantity) for v in val]):
+    if (
+        all([isinstance(v, pq.Quantity) for v in val])
+        and show_units
+        ):
         txt = ", ".join(
             [quantity2str(i, precision=precision, format=format) for i in val]
         )
@@ -900,12 +910,12 @@ def isnumber(s: str) -> bool:
 
     except:
         return False
-    
+
 def is_svg(s:str) -> bool:
     from lxml import etree
     if not isinstance(s, str) or len(s.strip()) == 0:
         return False
-    
+
     ret = False
     try:
         root = etree.fromstring(s)
@@ -917,9 +927,9 @@ def is_svg(s:str) -> bool:
         pattern = r'<svg[^>]*>(.*?)<\/svg>'
         matches = _re.findall(pattern, s, _re.DOTALL)
         ret = len(matches)>0 and len(matches[0])>0
-        
+
     return ret
-    
+
 def is_html(s:str) -> bool:
     from lxml import html
     if not isinstance(s, str) or len(s.strip()) == 0:
@@ -930,7 +940,7 @@ def is_html(s:str) -> bool:
     except:
         return False
     # return all(v in s for v in ("<html>", "</html>"))
-    
+
 def is_xml(s:str) -> bool:
     from lxml import etree
     try:
@@ -941,7 +951,7 @@ def is_xml(s:str) -> bool:
     if not isinstance(s, str) or len(s.strip()) == 0:
         return False
     return "<xml" in s
-    
+
 def is_latex(s:str) -> bool:
     if not isinstance(s, str) or len(s.strip()) == 0:
         return False
@@ -955,7 +965,7 @@ def is_ReST(s:str) -> bool:
     pattern = r"(^[=]+$|^[-]+$|^~+$|^`[^`]+`_|\s*:\w+:\s+.*|^\s*[\*\+\-]\s+.*|^\s*\d+\.\s+.*|^\s*.. .*)"
     matches = _re.findall(pattern, s, _re.MULTILINE)# | _re.DOTALL)
     return len(matches)>0 and len(matches[0])>0
-    
+
 def is_markdown(s:str) -> bool:
     if not isinstance(s, str) or len(s.strip()) == 0:
         return False
@@ -963,19 +973,19 @@ def is_markdown(s:str) -> bool:
     matches = _re.findall(pattern, s, _re.MULTILINE)# | _re.DOTALL)
     return len(matches)>0 and len(matches[0])>0
 
-def str2svg(s:str, width:int, height:int, /, 
-            font_size:int=10, x:int=0, y:int=0, 
+def str2svg(s:str, width:int, height:int, /,
+            font_size:int=10, x:int=0, y:int=0,
             stroke_width:typing.Optional[int]=None,
-            stroke:typing.Optional[str]="auto", 
+            stroke:typing.Optional[str]="auto",
             fill:typing.Optional[str]="auto",
             *args, **kwargs) -> dw.Drawing | None:
     r"""Draws a string as SVG using the ``drawsvg 2.x`` package.
     Returns:
     ========
     A drawsvg.Drawing object.
-    
+
     The SVG string is obtained by calling
-    
+
     ::
         d.as_svg()
 
@@ -986,60 +996,60 @@ def str2svg(s:str, width:int, height:int, /,
     from gui.guiutils import isDarkGui
     from gui.scipyen_colormaps import is_color
     from functools import partial
-    
+
     if not isinstance(s, str) or len(s.strip()) == 0:
         return
     # if not isinstance(s, str):
-    #     raise TypeError(f"Expecting a string; isnetad got a {type(s).__name))}") 
+    #     raise TypeError(f"Expecting a string; isnetad got a {type(s).__name))}")
     # if len(s.strip()) == 0:
     #     return
-    
+
     if not is_color(fill):
         if fill == "auto":
             fill = "#ffffff" if isDarkGui() else "#000000"
         else:
             fill = None
-        
+
     if not is_color(stroke):
         if stroke == "auto":
             stroke = "#ffffff" if isDarkGui() else "#000000"
         else:
             stroke = None
-        
+
     d = dw.Drawing(width, height)
     DrawText = partial(dw.Text, font_size=font_size, x=x, y=y, stroke_width=stroke_width, stroke=stroke, fill = fill, *args, **kwargs)
-        
+
     d.append(DrawText(s))
-    
+
     return d
-    
-def render_latex(l:str, backend:str="auto", out:str="ipython", 
+
+def render_latex(l:str, backend:str="auto", out:str="ipython",
                 darkmode:typing.Optional[bool]=None, wrap:bool=False,
                 **kwargs) -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage, IPImage, dict]]:
     r"""Graphic rendering of a LaTeX string.
 
     Positional parameters:
     =======================
-    
+
     :l: The LaTeX string to be rendered. Must contain a math LaTeX environment,
         and assumes the use of the 'amsmath' LaTeX package. The string is NOT
         verified for compliance with LaTeX.
-    
-    :backend: The backend used to render the LaTeX string 'l'. 
+
+    :backend: The backend used to render the LaTeX string 'l'.
         One of "auto" (default), "dvipng", "matplotlib".
         The "dvipng" backend uses the 'dvipng' utility, which requires a LaTeX
         distribution installed locally.
         The "matplotlib" backend uses the renderer supplied by the 'matplotlib'
-        package, which *may* use the 'dvipng' utility from a local LaTeX 
+        package, which *may* use the 'dvipng' utility from a local LaTeX
         distribution (if available) or the 'matplotlib.mathtext' module as fallback.
-        Both "dvipng" and "matplotlib" backends are involed indirectly, via 
+        Both "dvipng" and "matplotlib" backends are involed indirectly, via
         ``IPython.lib.latextools.latex_to_png(…)`` function.
         The "auto" backend tries "dvipng" first, then "matplotlib", before failing.
-    
+
         .. note::
             This parameter is *ignored* if ``out`` is "svg" (see below)
-        
-    :out: The kind of output generated. One of "ipython" (default), "bytes", 
+
+    :out: The kind of output generated. One of "ipython" (default), "bytes",
         "img", "pix", or "pil".
         * "ipython" generates an IPython Image object that is readily displayed
             by suitable IPython frontends (e.g. qtconsole)
@@ -1048,56 +1058,56 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
         * "img" generates a QtGui.QImage object
         * "pil" generates a PIL.Image.Image object
         * "svg" generates an SVG string and *ignores* the ``backend`` parameter; returns a mapping where the SVG output is found under the key ``svg``
-    
+
         .. note::
             The "svg" output requires the package latex2png from https://github.com/Moonbase59/latex2svg.git#
-    
-    :darkmode: Optional flag indicating if the generated graphic is suitable for a dark 
+
+    :darkmode: Optional flag indicating if the generated graphic is suitable for a dark
         (True) or bright (False) background. Except for the "pil" output and the
         "matplotlib" backend, the graphic data has transparent background. This
         flag simply determines the foregreound color (white for ``darkmode=True``,
-        black for ``darkmode=False``)   
-    
+        black for ``darkmode=False``)
+
         .. note::
             By default, this is None, in which case the use of dark mode style will be detected
-    
+
     :wrap: Flag passed on to IPython's ``latex_to_png(…)`` function
-    
+
     Var-keyword parameters:
     =======================
-    
-    :kwargs: passed directly to ``IPython.lib.latextools.latex_to_png(…)`` 
+
+    :kwargs: passed directly to ``IPython.lib.latextools.latex_to_png(…)``
     function
-    
+
     Returns:
     ========
-    
+
     An object of the type determined by the value of the 'out' parameter:
-    
+
     * "ipython" ↦ ``IPython.core.display.Image``
     * "bytes"   ↦ ``bytes`` (PNG data)
     * "pix"     ↦ ``QtGui.QPixmap``
     * "img"     ↦ ``QtGui.QImage``
     * "pil"     ↦ ``PIL.Image.Image``
-        
+
 """
     from io import BytesIO
     from base64 import b64encode
     from IPython.lib import latextools
     from core.prog import scipywarn
     from gui.guiutils import isDarkGui
-    
+
     hasLatex2SVG = False
-    
+
     if not isinstance(l, str) or len(l.strip()) == 0:
         return
-    
+
     try:
         import latex2svg
         hasLatex2SVG = True
     except:
         pass
-    
+
     if not isinstance(darkmode, bool):
         darkmode = isDarkGui()
 
@@ -1105,22 +1115,22 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
         backend = "auto"
     else:
         backend = backend.lower()
-        
+
     if out.lower() == "svg":
         if not hasLatex2SVG:
             scipywarn("The Python package latex2svg is required. Please install it.")
             return
-        
-        # NOTE: 2026-01-16 00:13:14 
+
+        # NOTE: 2026-01-16 00:13:14
         # special case of SVG output requested
         # syscheck = subprocess.run("dvisvgm", capture_output=True)
         # if syscheck.returncode != 0:
         #     scipywarn("The 'dvisvgm' utility is not available. Is LaTeX installed?")
         #     return
-        
+
         params = latex2svg.default_params.copy()
         params["optimizer"] = None
-        
+
         if darkmode:
             try:
                 syscheck = subprocess.run(["kpsewhich", "xcolor.sty"], capture_output=True)
@@ -1135,13 +1145,13 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
             except FileNotFoundError:
                 scipywarn("LaTeX 'kpsewhich' utility do not appear to be installed. bailing out")
                 return
-                
+
             pparts = params["preamble"].strip().split("\n")
             pparts.append("\\usepackage{xcolor}")
             params["preamble"] = "\n".join([""] + pparts + [""])
-            
+
             # print("strutils.render_latex: 'l' contains single backslashes : ", "\\" in l)
-            
+
             # NOTE: 2026-01-18 11:47:19
             # below, avoid splitting by "$" or "$$" as these characters may be encountered
             # WITHIN the actual expression
@@ -1152,16 +1162,16 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
                 lparts.insert(0,"$$\\begingroup\\color{white}")
                 lparts.append("\\endgroup$$")
                 l = "".join(lparts)
-                
+
             elif l.startswith("$") and l.endswith("$"):
                 # lparts = l.split("$")
                 lparts = [l[1:-1]]
                 lparts.insert(0, "$\\begingroup\\color{white} ")
                 lparts.append(" \\endgroup$")
                 l = "".join(lparts)
-                
+
         return latex2svg.latex2svg(l, params)
-        
+
     color = "#FFFFFF" if darkmode else "#000000"
 
     encode = kwargs.get("encode", False)
@@ -1170,7 +1180,7 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
         out = "base64"
 
     # print(f"strutils.render_latex: darkmode = {darkmode}, color={color}, backend={backend}, encode={encode}, out={out}")
-        
+
     if backend == "auto":
         data = latextools.latex_to_png(l, backend="dvipng", wrap=wrap, color=color, **kwargs)
         if not isinstance(data, bytes):
@@ -1179,7 +1189,7 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
             if not isinstance(data, bytes):
                 scipywarn("All available backends have failed; check the parameters to this function call")
                 return
-                
+
     elif backend in ("dvipng", "matplotlib"):
         data = latextools.latex_to_png(l, backend=backend, wrap=wrap, color=color)
         # data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
@@ -1188,7 +1198,7 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
             return
     else:
         raise ValueError(f"Unknown/unsupported backend {backend}")
-    
+
     if out.lower() not in ("bytes", "img", "pix", "pil", "ipython", "base64"):
         raise ValueError(f"I do not understand 'out' parameter ({out}); expecting one of 'bytes', 'img', 'pix', 'pil', 'ipython' (case-insensitive)")
     elif out.lower() == "ipython":
@@ -1211,21 +1221,21 @@ def render_latex(l:str, backend:str="auto", out:str="ipython",
             return ret
 
 def findlatex(s:str) -> list:
-    
+
     # GTP-4o mini
     # Explanation of the Pattern:
-    # 
+    #
     # \$[^\$]*\$: Matches inline LaTeX surrounded by dollar signs (e.g., $E = mc^2$).
     # |: Acts as an OR operator.
     # \\(begin|end)\{[^\}]*\}: Matches LaTeX environments, like \begin{equation} and \end{equation}.
     # |\\[a-zA-Z]+(?:\{[^\}]*\})?: Matches LaTeX commands (e.g., \frac{a}{b}), where the command may have optional braces for arguments.
-    # 
+    #
     # Usage
-    # 
+    #
     # This pattern allows you to extract LaTeX content from your strings, which is particularly useful for processing documents that contain mathematical notation or formatting commands.
-    # 
+    #
     # You can adjust the pattern according to your needs, adding more LaTeX commands or structures as necessary.
-    
+
     import re
 
     if not isinstance(s, str) or len(s.strip()) == 0:
@@ -1243,9 +1253,9 @@ def findlatex(s:str) -> list:
     # # Display matches
     # for match in matches:
     #     print(match[0])  # match[0] contains the full matched LaTeX
-        
+
     return list(map(lambda m: m[0].replace("\\\\", "\\"), matches))
-    
+
 
 def latexunicode2sympy(c:str, asSymbol:bool=True) -> typing.Optional[str | sympy.Symbol]:
     from core.prog import scipywarn
@@ -1264,12 +1274,12 @@ def latexunicode2sympy(c:str, asSymbol:bool=True) -> typing.Optional[str | sympy
             return c_rep
     else:
         scipywarn(f"No appropriate symbol found for {c}")
-        
+
 def parse_version_string(s: str) -> list:
     if not isinstance(s, str) or len(s.strip()) == 0:
         return list()
     parts = s.split(".")
-    
+
 def jaccard(s1, s2) -> float:
     if not all([isinstance(s, str) and len(s.strip()) for s in (s1,s2)]):
         return 0.
@@ -1278,7 +1288,7 @@ See also similar_strings, which uses difflib.SequenceMatcher
 """
     set1 = set(s1)
     set2 = set(s2)
-    
+
     return len(set1 & set2) / len(set1 | set2)
 
     # ### BEGIN fool around, do NOT delete

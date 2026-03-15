@@ -336,9 +336,12 @@ def is_callable(x):
 def is_vector(x):
     r"""Returns True if x is a numpy array encapsulating a vector.
 
-    A vector is taken to be a numpy array with one dimension, or a numpy
-    array with two dimensions (ndim == 2) with one singleton dimension
-    """
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+A vector is taken to be a numpy array with one dimension, or a numpy array |nbsp|
+with more than one dimensions and all but one axes are singleton axes.
+"""
     import numpy as np
 
     if not isinstance(x, np.ndarray):
@@ -357,11 +360,14 @@ def is_vector(x):
         return False
 
 def is_column_vector(x):
-    r"""Returns True if x is a numpy arrtay encapsulating a column vector.
+    r"""Returns True if x is a numpy array encapsulating a column vector.
 
-    A column vector is taken to be a numpy array with one dimension or a numpy
-    array with two dimensions where axis 1 is singleton
-    """
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+A column vector is taken to be a numpy array with one dimension or with |nbsp|
+two dimensions where axis 1 is a singleton axis.
+"""
     import numpy as np
 
     if not isinstance(x, np.ndarray):
@@ -376,12 +382,15 @@ def is_column_vector(x):
     else:
         return False
 
-def isRowVector(x):
-    r"""Returns True if x is a numpy array encapsulating a column vector.
+def is_row_vector(x):
+    r"""Returns True if x is a numpy array encapsulating a row vector.
 
-    A column vector is taken to be a numpy array with one dimension or a numpy
-    array with two dimensions where axis 0 is singleton
-    """
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+A row vector is taken to be a numpy array with one dimension, or with |nbsp|
+two dimensions where axis 0 is a singleton axis.
+"""
     import numpy as np
 
     if not isinstance(x, np.ndarray):
