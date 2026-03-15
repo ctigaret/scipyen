@@ -459,6 +459,71 @@ class LazyLineEdit(QtWidgets.QLineEdit):
         else:
             super().keyPressEvent(event)
 
+class LineEdit(QtWidgets.QLineEdit):
+    sig_enterPressed = Signal(str, name="sig_enterPressed")
+    sig_lazy = Signal(bool, name="sig_lazy")
+    r"""QLineEdit with custom context menu and, optionally, lazy notifications"""
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
+                 lazy: bool = False):
+        super().__init__(parent=parent)
+        self._lazy_: bool = lazy is True
+        self._custom_menu_: typing.Optional[QtWidgets.QMenu] = None
+
+    def keyPressEvent(self, event):
+        if not self._lazy_:
+            super().keyPressEvent(event)
+        else:
+            if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+                # print(f"{self.__class__.__name__}.keyPressEvent: text = '{self.text()}'")
+                # self.textChanged.emit(self.text())
+                self.sig_enterPressed.emit(self.text())
+            else:
+                # needed in order to update the widget
+                super().keyPressEvent(event)
+
+    def contextMenuEvent(self, evt: QtGui.QContextMenuEvent):
+        if isinstance(self._custom_menu_, QtWidgets.QMenu):
+            self._custom_menu_.addSeparator()
+            self._custom_menu_.addMenu(self.createStandardContextMenu())
+            self._custom_menu_.exec(evt.globalPos())
+        else:
+            menu = self.createStandardContextMenu()
+            menu.exec(evt.globalPos())
+
+    @property
+    def customMenu(self) -> QtWidgets.QMenu | None:
+        return self._custom_menu_
+
+    @customMenu.setter
+    def customMenu(self, menu: QtWidgets.QMenu):
+        if isinstance(menu, QtWidgets.QMenu):
+            self._custom_menu_ = menu
+
+    @property
+    def lazy(self) -> bool:
+        r"""When True, the widget emits sig_enterPressed after pressing the Enter (Return) key.
+    The textChanged signal should NOT be connected to any slot in your UI.
+    Instead, connect the sig_enterPressed signal of this widget to your UI slot(s).
+
+    When, False, then you should connect the textChanged signal to your UI slot(s)
+    as per usual.
+
+    To be notified by changes in the "lazy" status, connect to the sig_lazy signal
+
+    .. warning::
+        If sig_enterPressed is also connected you may obtain undesired, duplicate
+        notifications.
+    """
+        return self._lazy_
+
+    @lazy.setter
+    def lazy(self, val: bool):
+        self._lazy_ = val is True
+        self.sig_lazy.emit(self._lazy_)
+        # if self._lazy_:
+        #     if self.receivers(self.textChanged):
+        #         self.textChanged.disconnect()
+
 
 class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     r"""Subclass of QDoubleSpinBox aware of Python quantities.

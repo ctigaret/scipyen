@@ -67,9 +67,6 @@ class _InputSpec():
             elif not isinstance(default, mytype): # consistency/sanity check
                 raise TypeError(f"default expected to be a {type.__name__}; got {type(default).__name__} instead")
             
-        # else:
-        #     mytype = type(default)
-
         self._default=default
         self._mytype=mytype
         

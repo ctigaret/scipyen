@@ -118,6 +118,9 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         self.setEventDomanUnitsAction.triggered.connect(self._slot_setEventUnits)
         # self.editTimesAction = QtGui.QAction("Edit...")
         # self.editTimesAction.triggered.connect(self._slot_editTimes)
+        self.timesLineEdit.undoAvailable=True
+        self.timesLineEdit.redoAvailable=True
+        self.timesLineEdit.setClearButtonEnabled(True)
         if isinstance(self._times_, np.ndarray):
             if dt.is_vector(self._times_):
                 self.timesLineEdit.setText(strutils.numbers2str(self._times_))
@@ -146,6 +149,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             # In addition, numpy arrays are flatten()-ed first!
 
         self.timesLineEdit.textChanged.connect(self._slot_timesChanged)
+        self.timesLineEdit.sig_lazy.connect(self._slot_lazyTextChanges)
 
     def contextMenuEvent(self, evt: QtGui.QContextMenuEvent):
         if self._data_ is not None:
@@ -332,6 +336,16 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             self._units_ = None
             self._event_type_ = None
 
+    @Slot(bool)
+    def _slot_lazyTextChanges(self, val:bool):
+        if val is True:
+            if self.timesLineEdit.receivers(self.timesLineEdit.textChanged) > 0:
+                self.timesLineEdit.textChanged.disconnect(self._slot_timesChanged)
+            self.timesLineEdit.sig_enterPressed.connect(self._slot_timesChanged)
+        else:
+            if self.timesLineEdit.receivers(self.timesLineEdit.sig_enterPressed) > 0:
+                self.timesLineEdit.sig_enterPressed.disconnect(self._slot_timesChanged)
+            self.timesLineEdit.textChanged.connect(self._slot_timesChanged)
 
 
 

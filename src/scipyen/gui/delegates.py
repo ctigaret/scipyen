@@ -516,7 +516,11 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             else:
                 if isinstance(data, str):
                     # widget = QtWidgets.QLineEdit(parent)
-                    widget = smw.LazyLineEdit(parent)
+                    widget = smw.LineEdit(parent, lazy=True)
+                    widget.undoAvailable = True
+                    widget.redoAvailable = True
+                    widget.setClearButtonEnabled(True)
+                    # widget = smw.LazyLineEdit(parent)
                     widget.setText(data)
                     widget.sig_enterPressed.connect(self.slot_dataChanged)
                 else:
