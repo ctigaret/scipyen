@@ -454,26 +454,43 @@ def get_int_sfx(s: str, sep: str = "_",
                 use_re: bool = False, bracketed:bool=False) -> typing.Tuple[str, int]:
     r"""Parses an integral suffix from the string.
 
-    The suffix needs to be delimited by the sep string.
+.. |nbsp| unicode:: 0xA0
+   :trim:
 
-    Returns the string base and the integer value as given by the literal suffix.
+The suffix is delimited from the prefix by the sep string, which may be empty ("")
 
-    If a literal suffix is absent, the value is None
+Returns the string base (the prefix) and the integer value as given by the literal suffix.
 
-    e.g.:
+If a literal suffix is absent, the value is None.
+
+Parameters:
+===========
+    :s: The string to be tested for the presence of an integral suffix
+
+    :sep: The separator between the prefix and the suffix; default is "_" (underscore)
+
+    :use_re: When True, use regular expressions (see ``re`` module in the standard Python library)
+        Default is False.
+
+.. note::
+    When ``sep`` is not a string, or is an empty string, the function will |nbsp|
+    *automatically* use regular expressions.
+
+Examples:
+
+::
 
     get_int_sfx("some_name", sep="_") -> ("some_name", None)
 
-    but:
+    # but:
 
     get_int_sfx("some_name_0", sep="_") -> ("some_name", 0)
 
-    whereas:
+    # whereas:
 
     get_int_sfx("some_name_1", sep="_") -> ("some_name", 1)
 
-
-    """
+"""
     if not isinstance(s, str) or len(s.strip()) == 0:
         return ("", None)
     

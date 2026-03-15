@@ -2268,7 +2268,7 @@ class UrlNavigatorPathSelectorEventFilter(QtCore.QObject):
             action = menu.activeAction()
             if action is not None:
                 url = QtCore.QUrl(action.data().toString())
-                print(f"{self.__class__.__name__}.eventFilter: url = {url}")
+                # print(f"{self.__class__.__name__}.eventFilter: url = {url}")
                 if url.isValid():
                     menu.close()
                     self.tabRequested.emit(url)

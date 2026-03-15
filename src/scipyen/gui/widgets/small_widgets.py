@@ -482,13 +482,17 @@ class LineEdit(QtWidgets.QLineEdit):
                 super().keyPressEvent(event)
 
     def contextMenuEvent(self, evt: QtGui.QContextMenuEvent):
+        stdMenu = self.createStandardContextMenu()
         if isinstance(self._custom_menu_, QtWidgets.QMenu):
-            self._custom_menu_.addSeparator()
-            self._custom_menu_.addMenu(self.createStandardContextMenu())
-            self._custom_menu_.exec(evt.globalPos())
-        else:
-            menu = self.createStandardContextMenu()
+            menu = QtWidgets.QMenu(self)
+            for action in self._custom_menu_.actions():
+                menu.addAction(action)
+            menu.addSeparator()
+            for action in stdMenu.actions():
+                menu.addAction(action)
             menu.exec(evt.globalPos())
+        else:
+            stdMenu.exec(evt.globalPos())
 
     @property
     def customMenu(self) -> QtWidgets.QMenu | None:

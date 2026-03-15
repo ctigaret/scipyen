@@ -7,36 +7,61 @@
 r"""
 This module contains functions used by gui.pythonhelpwidget.
 
-Output from the help systems of IPython (i.e., ``pinfo``, ``pinfo2``) and Python
-(i.e., ``pydoc``) is converted to html with syntax highlighting of embedded Python 
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+Output from the help systems of IPython (i.e., ``pinfo``, ``pinfo2``) and Python |nbsp|
+(i.e., ``pydoc``) is converted to html with syntax highlighting of embedded Python |nbsp|
 code and with embedded LaTeX mathematical expressions rendered as PNG.
 
-Additional functions include alternatives to Python's ``pydoc.modules`` and 
+Additional functions include alternatives to Python's ``pydoc.modules`` and |nbsp|
 ``pydoc.apropos`` to bypass the issues related to importing problematic modules.
 
+Writing docstrings
+==================
 
-.. note:: 
-    Documentation strings (*docstrings*) should use reStructuredText (ReST) formatting.
-    
-    Python's ``pydoc`` help output does not always format the (entire) output as 
+Documentation strings (*docstrings*) in Scipyen should use reStructuredText |nbsp|
+(ReST) formatting, with the following hints:
+
+#. To include python code in your docstrings, please use the ``preformat`` ReST directive ``::`` followed by an empty line then the code text, instead of the more targeted directive |nbsp| ``.. code-block:: python3`` or ``.. literal-block::``, as it doesn't seem to work with my approach (see    **note** below).
+
+
+#. For docstrings wrapped at the page margin, please insert a non-breaking space at the end of the line, to avoid the formatters "lumping" the two lines together without blank space. This can be achieved by creating a custom directive somewhere at the top of the docstring, then using it where needed by entering its literal. This is being extensively used throughout this document and can be seen in the source code. A good example is shown below, and its literal is '\|nbsp\|':
+
+    ::
+
+        .. \|nbsp| unicode:: 0xA0
+
+            :trim:
+
+#. Do NOT break lines in list items (i.e. do not hard-wrap them at the page margin) and always separate them by empty lines.
+
+#. Always finish quoted blocks of text with an empty line
+
+#. You can include LaTeX expressions, to be rendered as images in the Help window. To do this, enter the expression *on its own line*, with an empty line above and one below it (for examples, consult the source code for functions in the ``core.models`` module)
+
+
+.. note::
+    Python's ``pydoc`` help output does not always format the (entire) output as
     ReST, so there is some "gymnastic" performed by helpsystem.scipyen_doc module.
-    
+
     The idea is to format the help output as ReST, then generate HTML5 from it.
-    
-    **HOWEVER**, I am having trouble getting docutils to apply pygments syntax 
-    highlighting for Python code included in ReST docstrings processed with the
-    ``docutils`` package (I tried the directives ``.. code-block:: python3``
+
+    I am having trouble getting docutils to apply pygments syntax highlighting |nbsp|
+    highlighting for Python code included in ReST docstrings processed with the |nbsp|
+    ``docutils`` package (I tried the directives ``.. code-block:: python3`` |nbsp|
     and ``.. literal-block::``, to no avail).
-    
-    Therefore I am falling back on simply using the literal block directive (`::`)
-    in docstrings, so that the ``docutils.publish*`` functions will output the
-    directive contents as un-tagged text, between ``<pre class="literal-block">``
-    and ``</pre>`` HTML tags; then I apply the pygments highlighter on *this*
+
+    Therefore I am falling back on simply using the literal block directive (``::``) |nbsp|
+    in docstrings, so that the ``docutils.publish*`` functions will output the |nbsp|
+    directive contents as un-tagged text, between ``<pre class="literal-block">`` |nbsp|
+    and ``</pre>`` HTML tags; then I apply the pygments highlighter on *this* |nbsp|
     output.
 
-    NOTE: the directive if just ``::`` on a line of its own, **NOT** ``.. ::``
+    NOTE: the directive if just ``::`` on a line of its own, **NOT** ``.. ::`` |nbsp|
     or anything else...
-    )
+
+
 
 """
 
@@ -314,8 +339,8 @@ def rst_latex_2_html(text: str,
                          ] = None) -> str:
     latex_formatter = partial(format_latex, imgdir=imgdir)
     
-    # html = rst_to_html_with_highlighting(latex_formatter(text.replace("\n", "\n ")))
-    html = rst_to_html_with_highlighting(latex_formatter(text))
+    html = rst_to_html_with_highlighting(latex_formatter(text.replace("\n", " \n")))
+    # html = rst_to_html_with_highlighting(latex_formatter(text))
     pattern = r'<img\s+[^>]*>'
     # pattern = r'<img\s+[^>]*src=["\']([^"\']+)["\'][^>]*>'
     # pattern = r'<img\s+[^>]*(src=["\']([^"\']+)["\'][^>]*)>'
@@ -353,7 +378,7 @@ https://www.bomberbot.com/python/converting-restructuredtext-to-html-with-python
         
     # NOTE: 2026-01-10 14:07:32 FIXME/TODO
     # finally, make then inline images "stand" on their own
-    
+    # print(f"rst_to_html_with_highlighting: rst_text:\n{rst_text}\n\nout_html:\n{out_html}\n\n")
     return out_html
 
 def mdhighlight(text):
@@ -759,7 +784,7 @@ def helpdisp(imgdir:TemporaryDirectory, info:oinspect.OInfo,
              candidates_msg:typing.Optional[str] = None,
              shell:typing.Optional[InteractiveShell]=None):
     r"""Stand-in for oinspect.Inspector.pinfo.
-    Outpout is redirected to a buffered IO stream.
+    Output is redirected to a buffered IO stream.
     """
     from core.prog import scipywarn
     assert isinstance(info, oinspect.OInfo), f"Expecting an oinspect.OInfo object; got {type(info).__name__} instead"
@@ -912,6 +937,11 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
 """
     if not isinstance(shell, InteractiveShell):
         shell = guiutils.getScipyenConsoleShell()
+
+    # WARNING: 2026-03-15 17:13:55
+    # comment-out the next line when NOT debugging
+    shell.user_ns["info_obj"] = info
+
     # latex_formatter = partial(format_latex, imgdir=imgdir)
     rst_latex_fmt = partial(rst_latex_2_html, imgdir=imgdir)
     bundle: UnformattedBundle = {
@@ -953,6 +983,7 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
             'text/html': text
         }
 
+
     if info["isalias"]:
         append_field(bundle, "Repr", "string_form", shell=shell)
 
@@ -961,7 +992,7 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
             append_field(bundle, "Source", "source", py_formatter, shell=shell)
         else:
             append_field(bundle, "Docstring", "docstring", rst_formatter, hide_title_in_html=True, shell=shell)
-            
+
         append_field(bundle, "File", "file", shell=shell)
 
     elif info['isclass'] or oinspect.is_simple_callable(obj):
@@ -982,7 +1013,7 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
         append_field(bundle, "File", "file", shell=shell)
         append_field(bundle, "Type", "type_name", py_formatter, shell=shell)
         # append_field(bundle, "Access", "access", py_formatter, shell=shell)
-        
+
         if not oinspect.is_simple_callable(obj):
             append_field(bundle, "Subclasses", "subclasses", py_formatter, shell=shell)
 
@@ -1000,7 +1031,7 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
         append_field(bundle, "Class docstring", "class_docstring", rst_formatter, shell=shell)
         append_field(bundle, "Init docstring", "init_docstring", rst_formatter, shell=shell)
         append_field(bundle, "Call docstring", "call_docstring", py_formatter, shell=shell)
-        
+
         append_field(bundle, "Length", "length", shell=shell)
         append_field(bundle, "File", "file", shell=shell)
 
@@ -1009,7 +1040,10 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
         if detail_level > 0 and info["source"]:
             append_field(bundle, "Source", "source", py_formatter, shell=shell)
         else:
-            append_field(bundle, "Docstring", "docstring", py_formatter, shell=shell)
+            if info["type_name"] == "module":
+                append_field(bundle, "Docstring", "docstring", rst_formatter, shell=shell)
+            else:
+                append_field(bundle, "Docstring", "docstring", py_formatter, shell=shell)
             # append_field(bundle, "Docstring", "docstring", rst_formatter, shell=shell)
             for field in _extra_info_fields:
                 if info[field]:
@@ -1514,8 +1548,8 @@ def format_python_help_output(data:PythonHelpDict, formatter=None,
 
 def run_help_command(cmd:str, namespaces=None, imgdir=None,
                      shell:typing.Optional[InteractiveShell]=None, **kw) -> str | None:
-    """
-kw: 
+    """IPython-like help queries in Scipyen's help window land here.
+kw:
 enable_html: bool, default, is True
 detail_level: int, 0 or 1, default is 0
 """
@@ -1537,8 +1571,8 @@ detail_level: int, 0 or 1, default is 0
     ret = None
     reformat:bool = False
     
-    if cmd.startswith("help"):
-        cmd = cmd.strip("help").strip("(").strip(")").strip("\"")
+    if cmd.startswith("help "):
+        cmd = cmd.strip("help ").strip("(").strip(")").strip("\"")
         if len(cmd) == 0:
             cmd = "help"
         ret = run_python_help(cmd, imgdir=imgdir, shell=shell)

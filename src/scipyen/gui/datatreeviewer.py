@@ -692,7 +692,8 @@ A lot of things copied from there, EXCEPT that it now uses
         w.setMaximum(2)
         w.setValue(self._initialExpandDepth_)
         d.addWidget(w)
-        d.resize(-1,-1)
+        # d.resize(-1,-1)
+        d.adjustSize()
 
         if d.exec():
             val = w.value()
@@ -706,7 +707,8 @@ A lot of things copied from there, EXCEPT that it now uses
                                     allowEmptyString = True)
         w.setValue(", ".join(list(map(lambda v: f"{v}", self._autoResizeColumns_))))
 
-        d.resize(-1,-1)
+        # d.resize(-1,-1)
+        d.adjustSize()
 
         if d.exec():
             val = w.value()

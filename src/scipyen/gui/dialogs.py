@@ -152,7 +152,8 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
             del(self.widgets[self.widgets.index(w)])
             
         self.update()
-        self.resize(-1,-1)
+        # self.resize(-1,-1)
+        self.adjustSize()
         
     def _slot_addEntry(self):
         valid_types = [t.__name__ for t in self._supported_value_types_]
@@ -202,7 +203,8 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
             #     self.addWidget(w)
                 
             self.update()
-            self.resize(-1,-1)
+            # self.resize(-1,-1)
+            self.adjustSize()
     
     def _slot_removeEntry(self):
         dlg = qd.QuickDialog(parent=self, title="Remove Entry")
@@ -226,7 +228,8 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
             #     self.addWidget(w)
                 
             self.update()
-            self.resize(-1,-1)
+            # self.resize(-1,-1)
+            self.adjustSize()
             
     def value(self):
         return self._mapping_

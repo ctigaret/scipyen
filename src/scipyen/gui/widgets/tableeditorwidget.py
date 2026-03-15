@@ -182,6 +182,9 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     def setValue(self: typing.Self, value: TabularType, *args, **kwargs):
         self.setData(value, *args, **kwargs)
 
+    def value(self):
+        return self._data_
+
     def setData(self, data: TabularType, *args, **kwargs):
         r"""Called when this widget is part of TableEditor
     """

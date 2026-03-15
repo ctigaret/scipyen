@@ -176,6 +176,7 @@ def getInput(prompts:dict, mapping:bool=False):
     dialog.
     
     """
+    from gui.widgets.tableeditorwidget import TableEditorWidget
     dlg = qd.QuickDialog(title="Input values")
     if not isinstance(prompts, dict):
         raise TypeError(f"'prompts' expected to be a dict; got {type(prompts).__name__} instead")
@@ -218,6 +219,10 @@ def getInput(prompts:dict, mapping:bool=False):
         elif v_type == bool:
             w = qd.CheckBox(group, "")
             w.setCheckState(QtCore.Qt.Checked if def_val is True else QtCore.Qt.Unchecked)
+
+        elif v_type == np.ndarray:
+            w = TableEditorWidget(dlg)
+            w.setValue(def_val)
             
         else:
             raise TypeError(f"{v_type} types are not yet supported")

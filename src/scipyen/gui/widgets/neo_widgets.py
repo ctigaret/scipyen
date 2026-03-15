@@ -107,6 +107,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             self._event_type_ = self._data_.type
 
         self._configureUI_()
+        self.timesLineEdit.installEventFilter(self)
 
     def _configureUI_(self):
         self.setupUi(self)
@@ -116,6 +117,8 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         self.setEventTypeAction.triggered.connect(self._slot_setEventType)
         self.setEventDomanUnitsAction = QtGui.QAction("Units")
         self.setEventDomanUnitsAction.triggered.connect(self._slot_setEventUnits)
+        self.nameLabelsAction = QtGui.QAction("Name & labels")
+        self.nameLabelsAction.triggered.connect(self._slot_setNameLabels)
         # self.editTimesAction = QtGui.QAction("Edit...")
         # self.editTimesAction.triggered.connect(self._slot_editTimes)
         self.timesLineEdit.undoAvailable=True
@@ -151,22 +154,63 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         self.timesLineEdit.textChanged.connect(self._slot_timesChanged)
         self.timesLineEdit.sig_lazy.connect(self._slot_lazyTextChanges)
 
+    def _createContextMenu_(self):
+        menu = QtWidgets.QMenu(self)
+        if self.timesLineEdit.isReadOnly():
+            editTimesAction = QtGui.QAction("Edit...")
+            editTimesAction.triggered.connect(self._slot_editTimes)
+            menu.addAction(editTimesAction)
+            menu.addSeparator()
+
+        menu.addAction(self.setEventClassAction)
+        if (
+            isinstance(self._data_, DataMark)
+            and not isinstance(self._data_, (TriggerEvent, neo.Event))
+            ):
+            menu.addAction(self.setEventTypeAction)
+            menu.addAction(self.setEventDomanUnitsAction)
+
+        menu.addAction(self.nameLabelsAction)
+
+    def eventFilter(self, obj: QtCore.QObject, evt: QtCore.QEvent) -> bool:
+        if obj == self.timesLineEdit and isinstance(evt, QtGui.QContextMenuEvent):
+
+            self.timesLineEdit.customMenu = self._createContextMenu_()
+            self.timesLineEdit.contextMenuEvent(evt)
+            return True
+        else:
+            self.timesLineEdit.customMenu = None
+            return False
+
     def contextMenuEvent(self, evt: QtGui.QContextMenuEvent):
         if self._data_ is not None:
-            menu = QtWidgets.QMenu(self)
-            if self.timesLineEdit.isReadOnly():
-                editTimesAction = QtGui.QAction("Edit...")
-                editTimesAction.triggered.connect(self._slot_editTimes)
-                menu.addAction(editTimesAction)
-                menu.addSeparator()
-
-            menu.addAction(self.setEventClassAction)
-            if isinstance(self._data_, (DataMark, TriggerEvent)):
-                menu.addAction(self.setEventTypeAction)
-                menu.addAction(self.setEventDomanUnitsAction)
+            menu = self._createContextMenu_()
             menu.exec(evt.globalPos())
-
             evt.setAccepted(True)
+
+    @Slot()
+    def _slot_setNameLabels(self):
+        from core import interact
+        if self._data_ is None:
+            name = ""
+        else:
+            name = getattr(self._data_, "name", "")
+            if len(name.strip()) == 0:
+                name = type(self._data_).__name__
+            # NOTE: 2026-03-15 16:19:54
+            # Get the prefix & suffix for the labels (if any).
+            # It generally makes sense for the labels in a neo.Event objects
+            # (including DataMark objects) to have the form 'abc𝑘' where, BY
+            # CONVENTION, 'abc' is a common string prefix, and '𝑘' is a string
+            # representing a running integer index, usually starting at '0'.
+            #
+            # However, there is no rule that enforces this; therefore, one can
+            # assign distinct labels to each time stamp in an Event object
+            #
+            # The code below tries to distinguish this, using the CONVENTION
+            prefix_suffix = list(zip(*list(map(lambda s: ))))
+        # args = interact.packInputs(name:str = name,
+        #                            label_prefix = )
 
     @Slot()
     def _slot_editTimes(self):
@@ -181,7 +225,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         te = TableEditorWidget(dlg)
         te.setValue(self._times_)
         dlg.addWidget(te)
-        dlg.resize(-1,-1)
+        dlg.adjustSize()
 
         if dlg.exec():
             self._times_ = te.value()
@@ -215,7 +259,8 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             cb.setCurrentIndex(ndx)
 
         dlg.addWidget(cb)
-        dlg.resize(-1,-1)
+        # dlg.resize(-1,-1)
+        dlg.adjustSize()
         if dlg.exec():
             self._data_type_ = self.supported_types[cb.text()]
 
@@ -237,7 +282,8 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             cb.setCurrentIndex(evt_types.index(self._event_type_.name))
 
         dlg.addWidget(cb)
-        dlg.resize(-1,-1)
+        # dlg.resize(-1,-1)
+        dlg.adjustSize()
 
         if dlg.exec():
             evt_typename = cb.text()
@@ -261,7 +307,8 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             units = self._data_.units
         qcw = QuantityChooserWidget(dlg, unit = units)
         dlg.addWidget(qcw)
-        dlg.resize(-1,-1)
+        # dlg.resize(-1,-1)
+        dlg.adjustSize()
         if dlg.exec():
             self._units_ = qcw.value()
 
