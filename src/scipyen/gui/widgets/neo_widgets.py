@@ -121,9 +121,9 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
 
     def _configureUI_(self):
         self.setupUi(self)
-        self.setEventClassAction = QtGui.QAction("Event class")
+        self.setEventClassAction = QtGui.QAction("Class")
         self.setEventClassAction.triggered.connect(self._slot_setEventClass)
-        self.setEventTypeAction = QtGui.QAction("Event type")
+        self.setEventTypeAction = QtGui.QAction("Type")
         self.setEventTypeAction.triggered.connect(self._slot_setEventType)
         self.setEventDomanUnitsAction = QtGui.QAction("Units")
         self.setEventDomanUnitsAction.triggered.connect(self._slot_setEventUnits)
@@ -133,6 +133,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         self.timesLineEdit.redoAvailable=True
         self.timesLineEdit.setClearButtonEnabled(True)
         self.timesLineEdit.installEventFilter(self)
+        self.timesLineEdit.setToolTip("Right click for more actions")
 
         self.timesLineEdit.textChanged.connect(self._slot_timesChanged)
         self.timesLineEdit.sig_lazy.connect(self._slot_lazyTextChanges)
@@ -228,7 +229,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             # The code below tries to distinguish this, using the CONVENTION
             # that the magnitude values in the 'times' array is represented as
             # comma+space - separated numeric literals
-            prefix, suffix = list(zip(*list(map(lambda s: strutils.get_int_sfx(str(s), use_re=True), labels))))
+            prefix, suffix = list(zip(*list(map(lambda s: strutils.get_int_sfx(str(s), sep="", use_re=True), labels))))
 
             # do they have a common prefix?
             if len(set(prefix)) == 1:
@@ -240,7 +241,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
 
             values = interact.packInputs(name=name, labels=labels)
 
-            self._data_.name = values["name"]
+            self._event_name_ = values["name"]
 
             labels = values["labels"].split(", ")
 
@@ -278,9 +279,9 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             else:
                 return
 
-            # self._createEvent_()
-            self._data_.labels = labels
+            self._event_labels_ = labels
 
+            self._createEventObject_()
 
     @Slot()
     def _slot_editTimes(self):
@@ -299,7 +300,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
 
         if dlg.exec():
             self._times_ = te.value()
-        self._createEvent_()
+        self._createEventObject_()
 
     @Slot(str)
     def _slot_timesChanged(self, value:str):
@@ -315,7 +316,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
                 self._times_ = np.array([v])
 
         print(f"{self.__class__.__name__}._slot_timesChanged: self._times_ = {self._times_}")
-        self._createEvent_()
+        self._createEventObject_()
 
     @Slot()
     def _slot_setEventClass(self):
@@ -334,7 +335,16 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         if dlg.exec():
             self._data_type_ = self.supported_types[cb.text()]
 
-        self._createEvent_()
+        if self._data_type_ is TriggerEvent and isinstance(self._event_type_, MarkType):
+            self._event_type_ = TriggerEventType.unspecified
+            self._slot_setEventType()
+
+        elif self._data_type_ is DataMark and isinstance(self._event_type_, TriggerEventType):
+            self._event_type_ = MarkType.unspecified
+            self._slot_setEventType()
+
+        else:
+            self._createEventObject_()
 
     @Slot()
     def _slot_setEventType(self):
@@ -363,7 +373,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         else:
             self._event_type_ = getattr(TriggerEventType, evt_typename)
 
-        self._createEvent_()
+        self._createEventObject_()
 
     @Slot()
     def _slot_setEventUnits(self):
@@ -382,9 +392,9 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         if dlg.exec():
             self._units_ = qcw.value()
 
-        self._createEvent_()
+        self._createEventObject_()
 
-    def _createEvent_(self):
+    def _createEventObject_(self):
         if (isinstance(self._data_type_, type)
             and issubclass(self._data_type_, neo.Event)
             ):
@@ -415,19 +425,22 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
                     if self._data_type_ in (neo.Event, TriggerEvent):
                         raise ValueError("neo.Event and TriggerEvent can only take 1D arrays")
 
+            evt = self._data_type_(self._times_, units=self._units_, labels = self._event_labels_, name=self._event_name_)
 
-
-            evt = self._data_type_(self._times_, units=self._units_)
             if isinstance(evt, TriggerEvent):
                 if isinstance(self._event_type_, TriggerEventType):
                     evt.type = self._event_type_
-                elif self._event_type_ is not None:
+                elif self._event_type_ is None:
+                    self._event_type_ = TriggerEventType.unspecified
+                else:
                     raise TypeError(f"Cannot assign a {type(self._event_type_.__name__)} as type of {type(evt).__name__}")
 
             elif isinstance(evt, DataMark):
                 if isinstance(self._event_type_, MarkType):
                     evt.type = self._event_type_
-                elif self._event_type_ is not None:
+                elif self._event_type_ is None:
+                    self._event_type_ = MarkType.unspecified
+                else:
                     raise TypeError(f"Cannot assign a {type(self._event_type_).__name__} as type of {type(evt).__name__}")
 
             self._data_ = evt
@@ -444,6 +457,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             self._data_type_ = type(val)
             self._times_ = self._data_.times.magnitude
             self._units_ = self._data_.times.units
+            self._event_labels_ = self._data_.labels
             if isinstance(self._data_, (DataMark, TriggerEvent)):
                 self._event_type_ = self._data_.type
 
@@ -453,6 +467,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             self._data_type_ = None
             self._times_ = None
             self._units_ = None
+            self._event_labels_ = None
             self._event_type_ = None
 
     @Slot(bool)
