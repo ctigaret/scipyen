@@ -606,23 +606,80 @@ class DataMark(neo.Event):
     def get_labels(self):
         return self._labels
 
-    def set_labels(self, labels: typing.Union[str, typing.Sequence[str], np.ndarray]):
-        if isinstance(labels, str):
-            labels = np.array([labels])
-        elif isinstance(labels, typing.Sequence) and all(isinstance(l, str) for l in labels):
-            labels = np.array(labels)
-        elif isinstance(labels, np.ndarray):
-            if labels.dtype.type is not np.str_:
-                raise TypeError("Expecting an array-like of strings")
+    def set_labels(self, labels: typing.Optional[typing.Union[str, typing.Sequence[str], np.ndarray]] = None):
+        r"""Label individual marks (or time stamps) according to the 'labels' parameter.
+
+        .. |nbsp| unicode:: 0xA0
+        :trim:
+
+        When 'labels' is a:
+        • str => all marks get the same label
+        • iterable of str => marks get the label at the corresponding index in |nbsp|
+            the iterable.
+
+        .. warning::
+            This requires that the iterable yield as many elements as there |nbsp|
+            are marks in the DataMark or TriggerEvent instance
+    """
+        from core import strutils
+        from core.datatypes import is_string
+
+        if labels is None:
+            if isinstance(self, TriggerEvent):
+                def_label = TriggerEvent.defaultLabel(self.__mark_type__)
+            else:
+                def_label = "DataMark"
+
+            labels = np.full_like(self.times.magnitude, def_label, dtype=np.dtype(str))
 
         else:
-            raise TypeError("Expecting a string or an array-like of strings")
+            if isinstance(labels, str):
+                labels = np.array(list(map(lambda k: f"{labels}{k}", range(self.size))))
+                labels = labels.reshape(self.times.shape)
 
-        if self._labels is not None and self._labels.size > 0 and labels.size != self.size:
-            raise ValueError("Labels array has different length to places ({} != {})"
-                            .format(labels.size, self.size))
+            elif isinstance(labels, typing.Sequence):
+                if all(isinstance(l, str) for l in labels):
+                    if len(labels) < self.flatten().size:
+                        pfx, sfx = strutils.get_int_sfx(labels[-1], sep="", use_re=True)
+                        if strutils.is_numeric(sfx):
+                            sfx = int(sfx)+1
+                        else:
+                            sfx = len(labels)+1
+                        new_labels = list(map(lambda k: f"{pfx}{k}", range(sfx, self.flatten().size)))
+                        labels = labels.extend(new_labels)
+
+                    elif len(labels) > self.size:
+                        labels = labels[:self.size]
+
+                    labels = np.array(labels)
+                else:
+                    labels = None
+
+            elif isinstance(labels, np.ndarray):
+                if not is_string(labels):
+                    raise TypeError("Expecting an array-like of strings")
+
+                if labels.flatten().size != self.flatten().size:
+                    if labels.flatten().size < self.flatten().size:
+                        ll = str(labels[-1])
+                        pfx, sfx = strutils.get_int_sfx(ll, sep="", use_re=True)
+                        if strutils.is_numeric(sfx):
+                            sfx = int(sfx)+1
+                        else:
+                            sfx = labels.flatten().size+1
+                        new_labels = np.array(list(map(lambda k: f"{pfx}{k}", range(sfx, self.size))))
+                        labels = np.concat([labels.flatten(), new_labels], axis=0)
+
+                        labels = labels.reshape(self.shape)
+
+                    elif labels.flatten().size > self.flatten().size:
+                        labels = labels.flatten()[:self.size]
+                        labels = labels.reshape(self.shape)
+
+            else:
+                raise TypeError("Expecting a string or an array-like of strings")
+
         self._labels = labels
-        # self._labels = np.array(labels)
 
     def merge(self, other):
         r"""Merge this event with the time stamps from other event
@@ -691,54 +748,50 @@ class DataMark(neo.Event):
         return obj
 
     def setLabel(self, value):
-        r"""Label individual marks (or time stamps) according to the 'value' parameter
-        When 'value' is a:
-        • str => all marks get the same label
-        • iterable of str => marks get the label at the corresponding index in
-            the iterable
-            WARNING: requires that the iterable yield as many elements as there
-            are marks in the DataMark instance
+        r"""Delegates to self.set_labels(…)
     """
-        from core.datatypes import is_string
-
-        # print(f"{self.__class__.__name__}.setLabel({value})")
-
-        if isinstance(value, str):
-            setattr(self, "labels", np.array([value] * self.times.size))
-
-        elif isinstance(value, (tuple, list)) and all([isinstance(l, str) for l in value]):
-            if len(value) == self.times.flatten().size:
-                setattr(self, "labels", np.array(value))
-
-            else:
-                raise ValueError("When given as a list, value must have as many elements as times (%d); got %d instead" % (self.times.flatten().size, len(value)))
-
-        elif isinstance(value, np.ndarray) and is_string(value):
-            if value.flatten().size == 0:
-                if isinstance(self, TriggerEvent):
-                    setattr(self, "labels", np.array([TriggerEvent.defaultLabel(self.__mark_type__)] * self.times.size))
-                else:
-                    setattr(self, "labels", np.array(["DataMark"] * self.times.size))
-
-            elif value.flatten().size != self.times.flatten().size:
-                setattr(self, "labels", np.array([value.flatten()[0]] * self.times.size))
-
-            else:
-                setattr(self, "labels", value)
-
-        elif value is None:
-            if isinstance(self, TriggerEvent):
-                def_label = TriggerEvent.defaultLabel(self.__mark_type__)
-            else:
-                def_label = "DataMark"
-            #print("setLabel: def_label", def_label)
-            if isinstance(self, TriggerEvent):
-                setattr(self, "labels", np.full_like(self.times.magnitude, TriggerEvent.defaultLabel(self.__mark_type__), dtype=np.dtype(str)))
-            else:
-                setattr(self, "labels", np.full_like(self.times.magnitude, "DataMark", dtype=np.dtype(str)))
+        self.set_labels(value)
+        # from core.datatypes import is_string
+        #
+        # # print(f"{self.__class__.__name__}.setLabel({value})")
+        #
+        # if isinstance(value, str):
+        #     setattr(self, "labels", np.array([value] * self.times.size))
+        #
+        # elif isinstance(value, (tuple, list)) and all([isinstance(l, str) for l in value]):
+        #     if len(value) == self.times.flatten().size:
+        #         setattr(self, "labels", np.array(value))
+        #
+        #     else:
+        #         raise ValueError("When given as a list, value must have as many elements as times (%d); got %d instead" % (self.times.flatten().size, len(value)))
+        #
+        # elif isinstance(value, np.ndarray) and is_string(value):
+        #     if value.flatten().size == 0:
+        #         if isinstance(self, TriggerEvent):
+        #             setattr(self, "labels", np.array([TriggerEvent.defaultLabel(self.__mark_type__)] * self.times.size))
+        #         else:
+        #             setattr(self, "labels", np.array(["DataMark"] * self.times.size))
+        #
+        #     elif value.flatten().size != self.times.flatten().size:
+        #         setattr(self, "labels", np.array([value.flatten()[0]] * self.times.size))
+        #
+        #     else:
+        #         setattr(self, "labels", value)
+        #
+        # elif value is None:
+        #     if isinstance(self, TriggerEvent):
+        #         def_label = TriggerEvent.defaultLabel(self.__mark_type__)
+        #     else:
+        #         def_label = "DataMark"
+        #     #print("setLabel: def_label", def_label)
+        #     if isinstance(self, TriggerEvent):
+        #         setattr(self, "labels", np.full_like(self.times.magnitude, TriggerEvent.defaultLabel(self.__mark_type__), dtype=np.dtype(str)))
+        #     else:
+        #         setattr(self, "labels", np.full_like(self.times.magnitude, "DataMark", dtype=np.dtype(str)))
 
     def setLabels(self, value):
-        self.setLabel(value)
+        r"""Delegates to self.set_labels(…)"""
+        self.set_labels(value)
 
     def shift(self, value, copy=False):
         r"""Adds value to the places attribute (shifting).

@@ -80,6 +80,14 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
                  obj:typing.Optional[
                      typing.Union[neo.Event, DataMark, TriggerEvent]
                      ] = None):
+
+        if not isinstance(parent, QtWidgets.QWidget):
+            obj = parent
+            parent = None
+
+        if not isinstance(obj, (neo.Event, DataMark, TriggerEvent, type(None))):
+            raise TypeError(f"Unsupported data: {type(obj).__name__}")
+
         QWidget.__init__(self, parent=parent)
 
         if obj is not None and not isinstance(obj, (neo.Event, DataMark, TriggerEvent)):
