@@ -102,128 +102,142 @@ DEFAULTS["ImagingFrameTrigger"]["Name"] = "imaging"
 
 @dataclass
 class TriggerProtocol:
-    r"""Encapsulates an experimental stimulation protocol (a.k.a, "triggers").
+    r"""Encapsulates an combination of TriggerEvent objects and indexes of data frames where they are applied.
 
-    TriggerProtocol objects contain a combination of TriggerEvent types and the
-    indices of segments (sweep or data frame)¹ from a collection, where this
-    combination is appled. A "combination" is any association of a
-    'presynaptic', 'postsynaptic', 'photostimulation', and 'imaging' TriggerEvent
-    objects.
+.. |nbsp| unicode:: 0xA0
+    :trim:
 
-    Technically a TriggerProtocol object has TriggerEvent objects of up to three
-    of the following types:
-        up to one presynaptic event type
-        up to one postsynaptic event type
-        up to one photostimulation event type
+TriggerProtocol objects contain a combination of TriggerEvent types and the |nbsp|
+indices of segments (sweep or data frame)¹ from a collection, where this |nbsp|
+combination is appled. A "combination" is any association of a |nbsp|
+'presynaptic', 'postsynaptic', 'photostimulation', and 'imaging' TriggerEvent |nbsp|
+objects.
 
-    and a possibly empty list of TriggerEvent objects of 'imaging_frame',
-    'imaging_line', or 'segment' types, collected under the attribute 'acquisition'.
+Technically a TriggerProtocol object has TriggerEvent objects of up to three |nbsp|
+of the following types:
 
-    A TriggerProtocol has at least one type of TriggerEvent objects, and is
-    associated with at least one neo.Segment, encapsulating the TTL triggers
-    delivered during that particular segment (or "sweep").
+    * up to one presynaptic event type
+    * up to one postsynaptic event type
+    * up to one photostimulation event type
 
-    Note that each TriggerEvent may encapsulate a single TTL trigger or a sequence
-    (a train) of TTL triggers. Each TriggerEvent type ('presynaptic',
-    'postsynaptic', 'photostimulation', 'imaging') may occur at most once, in a
-    protocol. Nevertheless, TriggerEvents of different types can be interlaved
-    by an appropriate choice of time stamps for individual TTL triggers in the
-    TriggerEvent objects.
+and a possibly empty list of TriggerEvent objects of 'imaging_frame', |nbsp|
+'imaging_line', or 'segment' types, collected under the attribute 'acquisition'.
 
-    The same trigger protocol may occur in more than one segment. However, any
-    one segment can be associated with at most one trigger protocol. The data
-    that owns the segments can associate several TriggerProtocol objects, to
-    reflecting the fact that that different protocols may be applied to distinct
-    segments of the data.
+A TriggerProtocol has at least one type of TriggerEvent objects, and is |nbsp|
+associated with at least one neo.Segment, encapsulating the TTL triggers |nbsp|
+delivered during that particular segment (or "sweep").
 
-    Unlike TriggerEvent, a TriggerProtocol is not currently "embedded" in any of
-    the neo containers. Instead, its component TriggerEvent objects are contained
-    ("embedded") in the "events" attribute of the neo.Segment associated with this protocol.
+Note that each TriggerEvent may encapsulate a single TTL trigger or a sequence |nbsp|
+(a train) of TTL triggers. Each TriggerEvent type ('presynaptic', |nbsp|
+'postsynaptic', 'photostimulation', 'imaging') may occur at most once, in a |nbsp|
+protocol. Nevertheless, TriggerEvents of different types can be interlaved |nbsp|
+by an appropriate choice of time stamps for individual TTL triggers in the |nbsp|
+TriggerEvent objects.
 
-    ¹ These terms are synonyms in a broader sense: a segment is an electrophysiology
-    data 'sweep' and may correspond to a single imaging data frame. In Scipyen,
-    an electrophysiology data sweep is encapsulated in a neo.Segment, and an
-    imaging data frame is encapsulated as a VigraArray. The exception from this
-    rule are the data frames in a neo.ImageSequence, whichh are encapsulated as
-    numpy arrays.
+The same trigger protocol may occur in more than one segment. However, any |nbsp|
+one segment can be associated with at most one trigger protocol. The data |nbsp|
+that owns the segments can associate several TriggerProtocol objects, to |nbsp|
+reflecting the fact that that different protocols may be applied to distinct |nbsp|
+segments of the data.
 
-    A TriggerProtocol object has the following attributes:
+Unlike TriggerEvent, a TriggerProtocol is not currently "embedded" in any of |nbsp|
+the neo containers. Instead, its component TriggerEvent objects are contained |nbsp|
+("embedded") in the "events" attribute of the neo.Segment associated with this protocol.
 
-    presynaptic:        Presynaptic event, typically generated via TTL pulses
-                        or trains sent via a digital output channel of the DAQ
-                        device. These TTL signals are used to evoke synaptic
-                        transmission (e.g., by routing to stimulus isolation
-                        devices) or to activate synapses by other means (e.g.,
-                        optically, such as photouncaging, optogenetic activation
-                        but see below).
+¹ These terms are synonyms in a broader sense: a segment is an electrophysiology |nbsp|
+data 'sweep' and may correspond to a single imaging data frame. In Scipyen, |nbsp|
+an electrophysiology data sweep is encapsulated in a neo.Segment, and an |nbsp|
+imaging data frame is encapsulated as a VigraArray. The exception from this |nbsp|
+rule are the data frames in a neo.ImageSequence, whichh are encapsulated as |nbsp|
+numpy arrays.
 
-                        Can be None.
+A TriggerProtocol object has the following attributes:
 
-                        NOTE: TTL-like pulses or trains can also be emulated
-                        via short pulse-like DAC command waveforms, where the DAC
-                        output is routed to a trigered device, instead of the
-                        headstage (and the cell) via the amplifier - these TTL-like
-                        pulses are in V (!)
+:presynaptic:
+    Presynaptic event, typically generated via TTL pulses |nbsp|
+    or trains sent via a digital output channel of the DAQ |nbsp|
+    device. These TTL signals are used to evoke synaptic |nbsp|
+    transmission (e.g., by routing to stimulus isolation |nbsp|
+    devices) or to activate synapses by other means (e.g., |nbsp|
+    optically, such as photouncaging, optogenetic activation |nbsp|
+    but see below).
 
-    postsynaptic:       Postsynaptic event, usually generated via the DAC output
-                        using pulse-like command waveforms, typically used to
-                        evoke postsynaptic spikes
+    Can be None.
 
-                        Can be None.
+    NOTE: TTL-like pulses or trains can also be emulated |nbsp|
+    via short pulse-like DAC command waveforms, where the DAC |nbsp|
+    output is routed to a trigered device, instead of the |nbsp|
+    headstage (and the cell) via the amplifier - these TTL-like |nbsp|
+    pulses are in V (!)
 
-                        NOTE: These can also be generated via digital ("true" TTL)
-                        outputs sent via stimulus isolators to axonal efferents
-                        for antidromic activation of spiking in the recorded cell.
+:postsynaptic:
+    Postsynaptic event, usually generated via the DAC output |nbsp|
+    using pulse-like command waveforms, typically used to |nbsp|
+    evoke postsynaptic spikes
 
-    photostimulation:   Photostimulation event - its main role is to distinguish,
-                        where required, between synaptic stimulation via axonal
-                        activation and synaptic stimulation via photo-uncaging or
-                        optogenetics. These event types also flag the onset of
-                        other light activated processes not necessarily associated
-                        with synaptic function (such as photobleaching or
-                        photoconversion of fluorescent proteins).
+    Can be None.
 
-                        Can be None.
+    NOTE: These can also be generated via digital ("true" TTL) |nbsp|
+    outputs sent via stimulus isolators to axonal efferents |nbsp|
+    for antidromic activation of spiking in the recorded cell. |nbsp|
 
-    acquisition:        A list (posibly empty) of imaging_frame, imaging_line, or
-                        sweep type events.
+:photostimulation:
+    Photostimulation event - its main role is to distinguish, |nbsp|
+    where required, between synaptic stimulation via axonal |nbsp|
+    activation and synaptic stimulation via photo-uncaging or |nbsp|
+    optogenetics. These event types also flag the onset of |nbsp|
+    other light activated processes not necessarily associated |nbsp|
+    with synaptic function (such as photobleaching or |nbsp|
+    photoconversion of fluorescent proteins).
 
-                        These events represent acquisition triggers for imaging
-                        frame, imaging line, or sweep, in the cases where the
-                        the acquisition device is triggered externally
+    Can be None.
 
-    imagingDelay:      python Quantity scalar
+:acquisition:
+    A list (posibly empty) of imaging_frame, imaging_line, or |nbsp|
+    sweep type events.
 
-    segmentIndex:       indexing object (e.g, list of indices, a range, or a slice)
-                        for the frames (segments or sweeps) where this protocol
-                        applies; it may be empty.
+    These events represent acquisition triggers for imaging |nbsp|
+    frame, imaging line, or sweep, in the cases where the |nbsp|
+    the acquisition device is triggered externally.
 
+:imagingDelay:
+    A Python Quantity scalar
 
-    The first three event types describe above can each be a TriggerEvent object
-    or None.
-
-    When 'segmentIndex' is empty, the protocol will apply to ALL data segments or
-    frames in the collection.
-
-    ATTENTION: In a collection of segments (e.g., neo.Block) each segment
-        can have at most one protocol. It follows that a protocol with an
-        empty segmentIndex cannot co-exist with other protocols given that
-        segment collection (an empty segmentIndex implies that the protocol
-        applies to all segments in that collection)
+:segmentIndex:
+    Indexing object (e.g, list of indices, a range, or a slice) |nbsp|
+    for the frames (segments or sweeps) where this protocol |nbsp|
+    applies; it may be empty.
 
 
-    The event_type atribute of the events will be overwritten according to the
-    named parameter to which they are assigned in the function call.
+The first three event types describe above can each be a TriggerEvent object |nbsp|
+or None.
 
-    NOTE: there can be at most ONE TriggerEvent each, of the presynaptic, postsynaptic,
+When 'segmentIndex' is empty, the protocol will apply to ALL data segments or |nbsp|
+frames in the collection.
+
+ATTENTION:
+
+    In a collection of segments (e.g., neo.Block) each segment |nbsp|
+    can have at most one protocol. It follows that a protocol with an |nbsp|
+    empty segmentIndex cannot co-exist with other protocols given that |nbsp|
+    segment collection (an empty segmentIndex implies that the protocol |nbsp|
+    applies to all segments in that collection)
+
+
+The event_type atribute of the events will be overwritten according to the |nbsp|
+named parameter to which they are assigned in the function call.
+
+NOTE:
+
+    Tthere can be at most ONE TriggerEvent each, of the presynaptic, postsynaptic, |nbsp|
     and photostimulation type.
 
-    In turn, each of these events can contain an ARRAY of time values (i.e.,
-    multiple time stamps), so a TriggerEvent can actually encapsulate the notion
-    of an array of events of th same type (e.g. a paired-pulse presynaptic
-    stimulation, etc).
+In turn, each of these events can contain an ARRAY of time values (i.e., |nbsp|
+multiple time stamps), so a TriggerEvent can actually encapsulate the notion |nbsp|
+of an array of events of th same type (e.g. a paired-pulse presynaptic |nbsp|
+stimulation, etc).
 
-    """
+"""
     name:str = dataclasses.field(default="Protocol")
 
     # TODO 2026-03-15 21:12:09

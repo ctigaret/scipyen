@@ -142,12 +142,12 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
     def _update_(self):
         signalBlockers = QtCore.QSignalBlocker(self.timesLineEdit)
         if isinstance(self._times_, np.ndarray):
-            if dt.is_vector(self._times_):
+            if dt.is_vector(self._times_)  or self._times_.ndim == 0:
                 self.timesLineEdit.setText(strutils.numbers2str(self._times_))
                 self.timesLineEdit.setReadOnly(False)
             else:
                 self.timesLineEdit.setText(f"Array with shape {self._times_.shape}")
-                self.timesLineEdit.setReadOnly(True)
+                # self.timesLineEdit.setReadOnly(True)
             # NOTE: 2026-03-14 09:21:01
             # when performing the inverse conversion, KEEP IN MIND THE FOLLOWING:
             # by default, strutils.numbers2str():

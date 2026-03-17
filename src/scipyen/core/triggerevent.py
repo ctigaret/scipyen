@@ -285,7 +285,7 @@ class DataMark(neo.Event):
 
             if labels.flatten().size != n:
                 if labels.flatten().size < n:
-                    ll = str(labels[-1])
+                    ll = str(labels.flatten()[-1])
                     pfx, sfx = strutils.get_int_sfx(ll, sep="", use_re=True)
                     # print(f"{cls.__name__}.prep_labels from array: ll = {ll}, pfx = {pfx}, sfx = {sfx}\n")
                     if dt.is_numeric(sfx):
