@@ -242,6 +242,9 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
 
             values = interact.packInputs(name=name, labels=labels)
 
+            if values is None:
+                return
+
             self._event_name_ = values["name"]
 
             labels = values["labels"].split(", ")

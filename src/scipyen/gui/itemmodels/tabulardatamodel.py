@@ -327,7 +327,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # ### END   Define timer debug
         try:
 
-            if not isinstance(data, (pd.Series, pd.DataFrame, pd.Index, np.ndarray, vigra.filters.Kernel1D, vigra.filters.Kernel2D, TriggerProtocolList, type(None))):
+            if not isinstance(data, (pd.Series, pd.DataFrame, pd.Index,
+                                     np.ndarray, vigra.filters.Kernel1D,
+                                     vigra.filters.Kernel2D,
+                                     TriggerProtocolList,
+                                     type(None))):
                 raise TypeError("%s data is not yet supported" % type(data).__name__)
 
             self.beginResetModel()
@@ -903,8 +907,21 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # print(f"{self.__class__.__name__}._getHeaderData_ took {timer.elapsed()} milliseconds")
 
     def _getModelData_(self, row, col, role = QtCore.Qt.DisplayRole) -> QtCore.QVariant:
+        r"""Retrieves tabular data associated with row & column, given the item role.
+
+    """
+        # TODO: 2026-03-17 13:20:49
+        # if data is None but the owner of accest attibuting values to the data
+        # _AND_ it advertises what types of data are acceptale, then allow creating
+        # a new instance of the acceptable class, via a GUI, before setting a new
+        # value to it
+        #
+        # Must work in concert with PythonItemDelegate and with the various model
+        # data types supported by this item model.
+        #
+        # for now, new data has to be entered by hand...
         try:
-            if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
+            if role not in (ObjectDataRole, QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
                 return QtCore.QVariant()
 
             if isinstance(self._modelData_, pd.DataFrame):
@@ -942,10 +959,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(self._modelData_, TriggerProtocolList):
                 protocol = self._modelData_[row]
                 val = getattr(protocol, self._modelDataHeaderSections_[col])
-                if isinstance(val, TriggerEvent):
-                    val = val.times
+                # print(f"{self.__class__.__name__}._getModelData_: val at row {row}, col {col} is {type(val).__name__}; role is {role}")
+                # if isinstance(val, neo.Event):
+                #     val = val.times
 
-                ret = val if role == QtCore.Qt.EditRole else f"{val.magnitude}" if isinstance(self._modelData_, pq.Quantity) else f"{val}"
+                ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val.times}" if isinstance(val, neo.Event) else f"{val}" # noqa
 
             elif isinstance(self._modelData_, neo.core.dataobject.DataObject):
                 if col == 0:
@@ -972,7 +990,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 if isinstance(val, datetime.datetime):
                     ret = val if role == QtCore.Qt.EditRole else ret.isoformat(" ")
                 else:
-                    ret = val if role == QtCore.Qt.EditRole else f"{val.magnitude}" if isinstance(self._modelData_, pq.Quantity) else f"{val}"
+                    ret = val if role == QtCore.Qt.EditRole else f"{val}" #" f"{val.magnitude}" if isinstance(self._modelData_, pq.Quantity) else f"{val}"
 
             else:
                 return QtCore.QVariant()
@@ -1093,12 +1111,17 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     self._original_data_ = vigrautils.kernelfromarray(self._modelData_)
 
                 return True
+
             elif isinstance(self._modelData_, TriggerProtocolList):
                 if row >= len(self._modelData_):
                     return False
+                protocol = self._modelData_[row]
 
                 attr = self._modelDataHeaderSections_[col]
 
+                setattr(protocol, attr, value)
+
+                return True
 
             else:
                 return False

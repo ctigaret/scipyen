@@ -51,8 +51,10 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 import numpy as np
 import vigra
 import quantities as pq
+import neo
 # from core import scipyen_quantities as scq
 from gui.widgets import small_widgets as smw
+from gui.widgets import neo_widgets as neow
 from gui.widgets import inlinefiledirchooser as ifdc
 # from gui import quickdialog as qd
 # from core import typeenum
@@ -409,23 +411,26 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 if not inModel:
                     widget.setValue(data)
             else:
-                if data.ndim == 0 or (data.ndim ==1 and data.size == 1):
-                    widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
-                    widget.setMinimum(-math.inf * data.units)
-                    widget.setMaximum(math.inf * data.units)
-                    widget.setSingleStep(1.0  * data.units)
-                    widget.disableUnitChange = True
-                    widget.sig_valueChanged.connect(self.slot_dataChanged)
-
-                    if not inModel:
-                        widget.setValue(data)
-
+                if isinstance(data, neo.Event):
+                    widget = neow.SimpleTriggerEventWidget(parent)
                 else:
-                    widget = TableEditorWidget(parent, readOnly=False)
-                    if not inModel:
-                        widget.setData(data)
-                        # widget = TableEditorWidget(parent, readOnly=False)
-                        widget.sig_dataChanged.connect(self.slot_dataChanged)
+                    if data.ndim == 0 or (data.ndim ==1 and data.size == 1):
+                        widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
+                        widget.setMinimum(-math.inf * data.units)
+                        widget.setMaximum(math.inf * data.units)
+                        widget.setSingleStep(1.0  * data.units)
+                        widget.disableUnitChange = True
+                        widget.sig_valueChanged.connect(self.slot_dataChanged)
+
+                        if not inModel:
+                            widget.setValue(data)
+
+                    else:
+                        widget = TableEditorWidget(parent, readOnly=False)
+                        if not inModel:
+                            widget.setData(data)
+                            # widget = TableEditorWidget(parent, readOnly=False)
+                            widget.sig_dataChanged.connect(self.slot_dataChanged)
 
             # print(f"\t-> widget: {type(widget).__name__}")
 
@@ -608,6 +613,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             data = index.data(QtCore.Qt.EditRole)
             self._useObjectDataRole_ = False
 
+        # print(f"{self.__class__.__name__}.createEditor for {type(data).__name__} at row ({index.row()}), col {index.column()}")
+
         # disp = index.data(QtCore.Qt.DisplayRole)
         # CAUTION: Standard item model and standard items treat DisplayRole and
         # DisplayRole as being the same; in such case I need a custom role
@@ -756,10 +763,14 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 editor.setValue(data)
 
             elif isinstance(data, pq.Quantity):
-                if isinstance(data, pq.UnitQuantity):
-                    assert isinstance(editor, smw.QuantityChooserWidget), f"Incompatible editor widget type ({type(editor).__name__}) for UnitQuantity data"
+                data_type_name = type(data).__name__
+                if isinstance(data, neo.Event):
+                    assert isinstance(editor, neow.SimpleTriggerEventWidget), f"Incompatible editor widget type ({type(editor).__name__}) for {data_type_name} data"
+
+                elif isinstance(data, pq.UnitQuantity):
+                    assert isinstance(editor, smw.QuantityChooserWidget), f"Incompatible editor widget type ({type(editor).__name__}) for {data_type_name} data"
                 else:
-                    assert isinstance(editor, smw.QuantitySpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for Quantity data"
+                    assert isinstance(editor, smw.QuantitySpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for {data_type_name} data"
                     if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
                         return
                     # NOTE: 2025-09-27 10:31:23
@@ -819,7 +830,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         originalData = index.data(ObjectDataRole) # noqa
 
         if isinstance(editor, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox,
-                               smw.QuantitySpinBox)):
+                               smw.QuantitySpinBox, neow.SimpleTriggerEventWidget)):
             data = editor.value()
 
         # elif isinstance(editor, ifdc.InlineFileDirChooserWidget):
