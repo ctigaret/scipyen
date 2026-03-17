@@ -219,21 +219,26 @@ class DataMark(neo.Event):
     def prep_labels(cls, labels, mark_type, n, shape):
         from core import strutils
         from core import datatypes as dt
+        # print(f"{cls.__name__}.prep_labels(labels = {labels} ({type(labels).__name__}), mark_type={mark_type}, n = {n}, shape = {shape})\n")
         if labels is None:
             try:
                 def_label = cls.defaultLabel(mark_type)
             except:
                 def_label = "event"
+
             if def_label is None:
                 def_label = "event" if cls.__name__ in ("TriggerEvent", "Event") else "mark"
+
             labels = np.array(list(map(lambda k: f"{def_label}{k}", range(n))))
 
         elif isinstance(labels, str):
             pfx, sfx = strutils.get_int_sfx(labels, sep="", use_re=True)
+            # print(f"{cls.__name__}.prep_labels: pfx = {pfx}, sfx = {sfx}\n")
             if dt.is_numeric(sfx):
                 sfx = int(sfx) + 1
             else:
                 sfx = 0
+
             labels = np.array(list(map(lambda k: f"{pfx}{k}", range(sfx, n))))
 
         elif isinstance(labels, typing.Sequence):
@@ -243,7 +248,7 @@ class DataMark(neo.Event):
                     if dt.is_numeric(sfx):
                         sfx = int(sfx)+1
                     else:
-                        sfx = len(labels)+1
+                        sfx = len(labels)
                     new_labels = list(map(lambda k: f"{pfx}{k}", range(sfx, n)))
                     labels = labels.extend(new_labels)
 
@@ -251,6 +256,8 @@ class DataMark(neo.Event):
                     labels = labels[:n]
 
                 labels = np.array(labels)
+
+                # print(f"\tlabels sequence -> {labels}")
 
             else:
                 try:
@@ -270,7 +277,7 @@ class DataMark(neo.Event):
                     def_label = "event"
                 if def_label is None:
                     def_label = "event" if cls.__name__ in ("TriggerEvent", "Event") else "mark"
-                print(f"def_label -> {def_label}")
+                # print(f"def_label -> {def_label}")
                 labels = np.array(list(map(lambda k: f"{def_label}{k}", range(n))))
 
             if not dt.is_string(labels):
@@ -280,12 +287,17 @@ class DataMark(neo.Event):
                 if labels.flatten().size < n:
                     ll = str(labels[-1])
                     pfx, sfx = strutils.get_int_sfx(ll, sep="", use_re=True)
+                    # print(f"{cls.__name__}.prep_labels from array: ll = {ll}, pfx = {pfx}, sfx = {sfx}\n")
                     if dt.is_numeric(sfx):
                         sfx = int(sfx)+1
                     else:
-                        sfx = labels.flatten().size+1
+                        sfx = labels.flatten().size
+
                     new_labels = np.array(list(map(lambda k: f"{pfx}{k}", range(sfx, n))))
+
+                    # print(f"{cls.__name__}.prep_labels from array: new_labels = {new_labels}\n")
                     labels = np.concat([labels.flatten(), new_labels], axis=0)
+                    # print(f"{cls.__name__}.prep_labels from array -> {labels}\n")
 
                 elif labels.flatten().size > n:
                     labels = labels.flatten()[:n]
@@ -491,53 +503,6 @@ class DataMark(neo.Event):
 
             labels = cls.prep_labels(labels, mark_type, times.size, times.shape)
 
-            # if labels is None:
-            #     try:
-            #         def_label = cls.defaultLabel(self.__mark_type__)
-            #     else:
-            #         def_label = "event"
-            #
-            #     labels = np.array(list(map(lambda k: f"{def_label}{k}"), range(times.size)))
-            #     labels.reshape(times.shape)
-            #     # labels = np.full_like(times.magnitude, def_label, dtype=np.dtype(str))
-            #     # labels = np.array([], dtype='S')
-            #
-            # else:
-            #     if isinstance(labels, str):
-            #         pfx, sfx = strutils.get_int_sfx(labels, sep="", use_re=True)
-            #         if strutils.is_numeric(sfx):
-            #             sfx = int(sfx) + 1
-            #         else:
-            #             sfx = 0
-            #         labels = np.array(list(map(lambda k: f"{pfx}{k}"), range(sfx, times.size)))
-            #         labels.reshape(times.shape)
-            #
-            #     elif isinstance(labels, (tuple, list)):
-            #         if not all([isinstance(l, str) for l in labels]):
-            #             raise TypeError("When 'labels' is a sequence, all elements must be str")
-            #
-            #         if len(labels) < times.size:
-            #             pdx, sfx =
-            #             labels += [labels[-1]] * (times.size - len(labels))
-            #
-            #         elif len(labels) > times.size:
-            #             labels = labels[:times.size]
-            #
-            #         labels = np.array(labels)
-            #
-            #     elif isinstance(labels, np.ndarray):
-            #         if not is_string(labels):
-            #             raise TypeError("When 'labels' is a numpy array, it must contain strings")
-            #
-            #         if labels.size < times.size:
-            #             labels = np.append(labels, [labels[-1]] * (times.size - labels-size))
-            #
-            #         elif labels.size > times.size:
-            #             labels = labels[:times.size]
-            #
-            #     else:
-            #         raise TypeError("'labels' must be either a str, a sequence of str or a numpy array of strings; got %s instead" % type(labels).__name__)
-
             if units is None:
                 # No keyword units, so get from `times`
                 if not hasattr(places, "units"):
@@ -564,7 +529,7 @@ class DataMark(neo.Event):
         obj.segment = None
         # obj.name = name
 
-        # print(f"{cls.__name__}.__new__(labels = {labels})")
+        # print(f"{cls.__name__}.__new__(labels = {obj._labels})")
         return obj
 
 
@@ -601,16 +566,14 @@ class DataMark(neo.Event):
                     self.__mark_type__ = TriggerEventType[mark_type]
 
                 else:
-                    warngins.warning("Unknown event type %s; mark_type will be set to %s " % (mark_type, TriggerEventType.unspecified))
+                    warnings.warning("Unknown event type %s; mark_type will be set to %s " % (mark_type, TriggerEventType.unspecified))
                     self.__mark_type__ = TriggerEventType.unspecified
-                    # warngins.warning("Unknown event type %s; mark_type will be set to %s " % (mark_type, TriggerEventType.presynaptic))
-                    # self.__mark_type__ = TriggerEventType.presynaptic
 
             elif isinstance(mark_type, TriggerEventType):
                 self.__mark_type__ = mark_type
 
             else:
-                warngins.warn("'mark_type' parameter expected to be a TriggerEventType enum value, a TriggerEventType name, or None; got %s instead" % type(mark_type).__name__)
+                warnings.warn("'mark_type' parameter expected to be a TriggerEventType enum value, a TriggerEventType name, or None; got %s instead" % type(mark_type).__name__)
                 self.__mark_type__ = TriggerEventType.unspecified
                 # self.__mark_type__ = TriggerEventType.presynaptic
 
@@ -624,7 +587,7 @@ class DataMark(neo.Event):
                     self.__mark_type__ = MarkType[mark_type]
 
                 else:
-                    warngins.warning("Unknown event type %s; mark_type will be set to %s " % (mark_type, MarkType.unspecified))
+                    warnings.warning("Unknown event type %s; mark_type will be set to %s " % (mark_type, MarkType.unspecified))
                     self.__mark_type__ = MarkType.unspecified
                     # warngins.warning("Unknown event type %s; mark_type will be set to %s " % (mark_type, MarkType.presynaptic))
                     # self.__mark_type__ = MarkType.presynaptic
@@ -633,10 +596,10 @@ class DataMark(neo.Event):
                 self.__mark_type__ = mark_type
 
             else:
-                warngins.warn("'mark_type' parameter expected to be a MarkType enum value, a MarkType name, or None; got %s instead" % type(mark_type).__name__)
+                warnings.warn("'mark_type' parameter expected to be a MarkType enum value, a MarkType name, or None; got %s instead" % type(mark_type).__name__)
                 self.__mark_type__ = MarkType.unspecified
 
-        self.set_labels(labels)
+        # self.set_labels(labels)
 
         if isinstance(name, str) and len(name.strip()):
             self._name_ = name
@@ -1524,44 +1487,6 @@ class TriggerEvent(DataMark):
                 else:
                     times = np.array(times)
 
-            if labels is None:
-                l = cls.defaultLabel(event_type)
-                ll = [f"trigger{k}" for k in range(times.size)]
-                labels = np.array(ll, dtype='U')
-
-            else:
-                if isinstance(labels, str):
-                    ll = [f"{labels}{k}" for k in range(times.size)]
-                    # print(f"ll = {ll}")
-                    # labels = np.array(ll, dtype="U")
-                    labels = np.array(ll)
-
-                elif isinstance(labels, (tuple, list)):
-                    if not all([isinstance(l, str) for l in labels]):
-                        raise TypeError("When ''labels' is a sequence, all elements must be str")
-
-                    if len(labels) < times.size:
-                        labels += [f"{labels[-1]}{k}" for k in range(len(labels), times.size)]
-
-                    elif len(labels) > times.size:
-                        labels = labels[:times.size]
-
-                    labels = np.array(labels)
-
-                elif isinstance(labels, np.ndarray):
-                    if not is_string(labels):
-                        raise TypeError("When 'labels' is a numpy array, it must contain strings")
-
-                    if labels.size < times.size:
-                        ll = np.append(labels, [f"{labels[-1]}{k}" for k in range(labels.size, times.size, )])
-                        labels = ll
-
-                    elif labels.size > times.size:
-                        labels = labels[:times.size]
-
-                else:
-                    raise TypeError("'labels' must be either a str, a sequence of str or a numpy array of strings; got %s instead" % type(labels).__name__)
-
             if units is None:
                 # No keyword units, so get from `times`
                 if not hasattr(times, "units"):
@@ -1577,6 +1502,8 @@ class TriggerEvent(DataMark):
 
             if not isinstance(relative, bool):
                 relative = False
+
+            labels = cls.prep_labels(labels, event_type, times.size, times.shape)
 
         obj = pq.Quantity(times.magnitude, units=units).view(cls)
         obj._labels = labels

@@ -423,7 +423,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
             value = pq.dimensionless
         self.units = value
 
-    def validate(self):
+    def validate(self, *args):
         r"""For compatibilty with qd.QuickDialog"""
         return True
 
@@ -464,10 +464,16 @@ class LineEdit(QtWidgets.QLineEdit):
     sig_lazy = Signal(bool, name="sig_lazy")
     r"""QLineEdit with custom context menu and, optionally, lazy notifications"""
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
-                 lazy: bool = False):
+                 lazy: bool = False,
+                 validator: typing.Optional[QtGui.QValidator] = None):
         super().__init__(parent=parent)
         self._lazy_: bool = lazy is True
         self._custom_menu_: typing.Optional[QtWidgets.QMenu] = None
+        self._validator_: typing.Optional[QtGui.QValidator] = None
+
+        if isinstance(validator, QtGui.QValidator):
+            self._validator_ = validator
+            self._validator_.parent = self
 
     def keyPressEvent(self, event):
         if not self._lazy_:
@@ -493,6 +499,31 @@ class LineEdit(QtWidgets.QLineEdit):
             menu.exec(evt.globalPos())
         else:
             stdMenu.exec(evt.globalPos())
+
+    def validate(sel, *args) -> bool:
+        if self._validator_ is None:
+            return True
+
+        else:
+            return self._validator_.validate(*args) == QtGui.QValidator.Acceptable
+
+    def setValidator(self, val):
+        self.validator = val
+
+    @property
+    def validator(self) -> typing.Optional[QtGui.QValidator]:
+        return self._validator_
+
+    @validator.setter
+    def validator(self, val:QtGui.QValidator):
+        if not isinstance(val, QtGui.QValidator):
+            self._validator_ = None
+
+        else:
+            self._validator_ = val
+            self._validator_.parent = self
+
+        super().setValidator(self._validator_)
 
     @property
     def customMenu(self) -> QtWidgets.QMenu | None:
@@ -1033,43 +1064,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         super().setDecimals(self._decimals_)
 
     def validate(self, text:str, pos:int):
-        # sfxndx = text.find(self.suffix())
-        # if sfxndx > 0:
-        #     ss = text[:sfxndx]
-        #     pos -= len(self.suffix())
-        # else:
-        #     ss = text
-        # valid = super().validate(ss, pos)
-
-        # self._validText_ = valid[0]
-        # return valid # for now...
-
-        # oName = ""
-        # objectName = ""
-        # if self.parent():
-        #     objectName = self.parent().objectName()
-        #     if objectName:
-        #         oName = objectName + ": "
-        # objectName = self.objectName()
-        # if objectName.endswith("startSpinBox"):
-        #     print(f"{oName}{self.__class__.__name__}.validate text: '{text}', pos: {pos} -> create validator")
-
         validator = InftyDoubleValidator(parent=self)
         validator.suffix = self.suffix()
         validator.prefix = self.prefix()
         validator.setDecimals(self.getDecimals())
         valid = validator.validate(text, pos)
         self._validText_ = valid[0]
-
-        # oName = ""
-        # objectName = ""
-        # if self.parent():
-        #     objectName = self.parent().objectName()
-        #     if objectName:
-        #         oName = objectName + ": "
-        # objectName = self.objectName()
-        # if objectName.endswith("startSpinBox"):
-        #     print(f"\t ⇒ {valid[0]}")
 
         if valid[0] == QtGui.QValidator.Acceptable:
             v = valid[1]
@@ -1725,7 +1725,7 @@ class ComplexSpinBox(QtWidgets.QFrame):
 
         return ret * self._units_
 
-    def validate(self):
+    def validate(self, *args):
         r"""For compatibilty with qd.QuickDialog"""
         return True
 

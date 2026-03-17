@@ -74,6 +74,36 @@ class UnitsStringValidator(QtGui.QValidator):
         except:
             return QtGui.QValidator.Invalid
 
+class NumericStringValidator(QtGui.QValidator):
+    r"""WARNING: Don't use yet"""
+    def __init__(self, parent = None):
+        super().__init__(parent)
+
+    def validate(self, s:str, pos: int):
+        from core.strutils import isnumber, is_sequence
+        # from core.datatypes import is_numeric_string
+
+
+        if s is None or len(s.strip()) == 0:
+            return QtGui.QValidator.Intermediate
+
+        if not isinstance(s, str):
+            return QtGui.QValidator.Invalid
+
+        if pos >= len(s) or pos < -len(s):
+            return QtGui.QValidator.Invalid
+
+        ss = s[0:pos]
+
+        if not isnumber(ss) and not is_sequence(ss):
+            return QtGui.QValidator.Intermediate
+
+        try:
+            u = eval(ss)
+            return QtGui.QValidator.Acceptable
+        except:
+            return QtGui.QValidator.Intemediate
+
 class InftyDoubleValidator(QtGui.QDoubleValidator):
     def __init__(self, bottom:float=-math.inf, top:float=math.inf,
                  decimals:int=4, suffix:str="", prefix:str="",

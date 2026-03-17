@@ -53,7 +53,7 @@ from gui.painting_shared import (FontStyleType, standardQtFontStyles,
                                  FontWeightType, standardQtFontWeights)
 
 from gui import quickdialog as qd
-from gui.guiutils import (DisplayHint,
+from gui.guiutils import (DisplayHint, NumericStringValidator,
     InftyDoubleValidator, ComplexValidator, validatorString,
     get_elided_text, get_text_width)
 
@@ -134,6 +134,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         self.timesLineEdit.setClearButtonEnabled(True)
         self.timesLineEdit.installEventFilter(self)
         self.timesLineEdit.setToolTip("Right click for more actions")
+        # self.timesLineEdit.setValidator(NumericStringValidator(self))
 
         self.timesLineEdit.textChanged.connect(self._slot_timesChanged)
         self.timesLineEdit.sig_lazy.connect(self._slot_lazyTextChanges)
@@ -308,14 +309,20 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             self._times_ = None
 
         else:
-            v = eval(value)
-            print(f"{self.__class__.__name__}._slot_timesChanged: v = {v}")
-            if isinstance(v, (tuple, list)):
-                self._times_ = np.array(v)
-            elif isinstance(v, numbers.Number):
-                self._times_ = np.array([v])
+            try:
+                # if not any(s.startswith(x[0]) and s.endswith(x[1]) for x in list(zip(starts, ends))):
+                #     s = f""
 
-        print(f"{self.__class__.__name__}._slot_timesChanged: self._times_ = {self._times_}")
+                v = eval(value)
+                # print(f"{self.__class__.__name__}._slot_timesChanged: v = {v}")
+                if isinstance(v, (tuple, list)):
+                    self._times_ = np.array(v)
+                elif isinstance(v, numbers.Number):
+                    self._times_ = np.array([v])
+            except:
+                return
+
+        # print(f"{self.__class__.__name__}._slot_timesChanged: self._times_ = {self._times_}")
         self._createEventObject_()
 
     @Slot()
@@ -430,6 +437,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             if isinstance(evt, TriggerEvent):
                 if isinstance(self._event_type_, TriggerEventType):
                     evt.type = self._event_type_
+
                 elif self._event_type_ is None:
                     self._event_type_ = TriggerEventType.unspecified
                 else:

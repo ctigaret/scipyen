@@ -197,28 +197,107 @@ def superscript(s:str)->str:
     return "".join(list(map(lambda c: SUPERSCRIPT_UNICODE.get(c,c), s)))
 
 def is_sequence(s: str) -> bool:
-    r"""Return True if the s is a string representation of a tuple or list"""
+    r"""Test if ``s`` is a string representation of a tuple or list.
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+Parameters:
+===========
+:s: string to test
+
+Returns:
+========
+
+A ``bool`` indicating if ``s`` is a sequence-like string.
+
+"""
+    import re
+
     if not isinstance(s, str) or len(s.strip())==0:
         return False
 
-    possibleSequence = False
-    if s.startswith("(") and s.endswith(")"):
-        possibleSequence = True
-        seqStart = "("
-        seqEnd = ")"
+#     pattern0 = r'^\[.*\]$|^\(.*\)$'
+#
+#     match0 = re.match(pattern0, s)
 
-    elif s.startswith("[") and s.endswith("]"):
-        possibleSequence = True
-        seqStart = "["
-        seqEnd = "]"
+    # s = s.strip() # remove spaces at the ends
 
-    if possibleSequence:
-        ss = s[1:-1].replace(" ", "")
-        if "," in ss:
-            if len(ss.split(".")):
-                return True
+    starts = ["(", "[", "{"]
+    ends = [")", "]", "}"]
+    #
+    # for s0,s1 in zip(starts, ends):
+    #     if s.startswith(s0) and s.endswith(s1):
+    #         continue
+    #     s = f"{s0}{s}{s1}"
+    #     break
 
-    return False
+    # pattern = r'^\[.*\]$|^\(.*\)$'
+    pattern = r'[\[|\(|\{](.+?)[\]|\)|\}]'
+
+    match = re.match(pattern, s)
+
+    if match:
+        return True
+    else:
+        return False
+
+    # print(f"match = {match}")
+    # if match:
+    #     inner_content = match.group(1)
+    #     print(f"inner_content = {inner_content}")
+    #     # delimiters = set(re.findall(r'(?<!\w)[,;](?=\s*[\w\("])', inner_content))
+    #     delimiters = set(re.findall(r'(?<!\w)[,](?=\s*[\w\("])', inner_content))
+    #     print(f"delimiters found: {delimiters}")
+    #     delimiters.discard("")
+    #     # if len(delimiters) == 0:
+    #     #     delimiters.add(" ") # allow space as delimiters
+    #     print(f"valid delimiters: {delimiters}")
+    #     if len(delimiters) != 1:
+    #         ret = False
+    #     else:
+    #         ret = list(delimiters)[0] if ret_delim else True
+    #
+    #     return ret
+
+    # return False
+
+    #
+    # possibleSequence = False
+    #
+    # for s0,s1 in zip(starts, ends):
+    #     if s.startswith(s0):
+    #         s = s[1:]
+    #         if s.endswith(s1):
+    #             s = s[:-1]
+    #         break # avoid unravelling inner sequence-like strings
+    #
+    # if "," in s:
+    #     if len(s.replace(" ", "").split(",")):
+    #         if ret_delim:
+    #             return ","
+    #         else:
+    #             return True
+    #     else:
+    #         if ret_delim:
+    #             return
+    #         else:
+    #             return False
+    #
+    # else:
+    #     if len(s.split(" ")):
+    #         if ret_delim:
+    #             return " "
+    #         else:
+    #             return True
+    #
+    #     else:
+    #         if ret_delim:
+    #             return
+    #         else:
+    #             return False
+    #
+    # return False
 
 
 def is_cached_output_varname(s: str) -> bool:
@@ -905,9 +984,7 @@ def isnumber(s: str) -> bool:
 
     try:
         v = eval(s)
-        if isinstance(v, numbers.Number):
-            return True
-
+        return isinstance(v, numbers.Number)
     except:
         return False
 

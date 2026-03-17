@@ -445,8 +445,6 @@ def sequence_element_type(s):
     from core.utilities import unique
     return unique(tuple(type(e) for e in s))
 
-
-
 def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
                 ref:typing.Union[type, typing.Sequence[type], typing.Set[type], typing._UnionGenericAlias],
                 use_mro:bool=False,
@@ -943,7 +941,7 @@ def is_string(array) -> bool:
     return np.asarray(array).dtype.kind in NUMPY_STRING_KINDS
 
 def is_numeric_string(array) -> bool:
-    r"""Determines if the argument is a string array that can be parsed as numeric.
+    r"""Test if argument is a string array or sequence that resolves to numbers.
     """
     if isinstance(array, str):
         array = [array]
