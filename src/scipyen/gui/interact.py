@@ -253,6 +253,7 @@ dialog.
             return dict(zip(prompts.keys(), ret))
         return ret
 
-
+def newObject(t: type):
+    pass
 
 

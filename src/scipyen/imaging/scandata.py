@@ -1687,26 +1687,26 @@ class ScanData(BaseScipyenData):
     #
     # however, this one below is required for the _get_data_child_component_(…)
     # instance method and for setting up the framesMap attribute
-    _data_children_:typing.ClassVar = (
+    _data_children_: typing.ClassVar[tuple] = (
         ("scans",                           tuple(), (list, tuple),   vigra.VigraArray),
         ("scene",                           tuple(), (list, tuple),   vigra.VigraArray),
         ("electrophysiology",               (neo.Block(name="Electrophysiology"), None)),
         )
     
-    _derived_data_children_:typing.ClassVar = (
+    _derived_data_children_: typing.ClassVar[tuple] = (
         # ("scansBlock",                      neo.Block(name="Scans")),
         # ("scansProfiles",                   neo.Block(name="Scan region scans profiles")),
         # ("sceneBlock",                      neo.Block(name="Scene")),
         # ("sceneProfiles",                   neo.Block(name="Scan region scene profiles")),
         )
     
-    _result_data_:typing.ClassVar = (
+    _result_data_: typing.ClassVar[tuple] = (
         # ("electrophysiologyResult",         pd.DataFrame),
         # ("imagingResult",                   pd.DataFrame),
         # ("result",                          pd.DataFrame),
         )
     
-    _data_attributes_:typing.ClassVar = (
+    _data_attributes_: typing.ClassVar[tuple] = (
         # ("sceneAxesCalibration",            list,   AxesCalibration),
         # ("scansAxesCalibration",            list,   AxesCalibration),
         # ("sceneLayout",                     Bunch),
@@ -1715,7 +1715,7 @@ class ScanData(BaseScipyenData):
         # ("triggerProtocols",                list)
         )
     
-    _graphics_attributes_:typing.ClassVar = (
+    _graphics_attributes_: typing.ClassVar[tuple] = (
         # ("scansCursors",                    dict, Cursor),
         # ("scansRois",                       dict, PlanarGraphics),
         # ("scanTrajectory",                  (PlanarGraphics, type(None))),
@@ -1723,13 +1723,13 @@ class ScanData(BaseScipyenData):
         # ("sceneRois",                       dict, PlanarGraphics),
         )
     
-    _metadata_attributes_:typing.ClassVar = (
+    _metadata_attributes_: typing.ClassVar[tuple] = (
         # ("analysisUnits",                   set, AnalysisUnit),
         # ("analysisUnit",                    AnalysisUnit),
         # ("metadata",                        dict),
         )
     
-    _option_attributes_:typing.ClassVar = (
+    _option_attributes_: typing.ClassVar[tuple] = (
         # ("analysisOptions",                 dict),
         # ("analysisMode",                    ScanDataAnalysisMode.frame),
         # ("type",                            ScanDataType.linescan),

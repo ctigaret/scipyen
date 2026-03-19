@@ -195,7 +195,7 @@ class AttributeSpecification:
 class DescriptorValidatorABC(ABC):
     r"""Abstract superclass that implements a Python descriptor with validation.
 
-    The descriptor operated on a private attribute of the owner by exposing a
+    The descriptor operates on a private attribute of the owner by exposing a
     public name to the user as getter/setter accessor.
 
     """
@@ -490,179 +490,182 @@ class DescriptorTypeValidator(BaseDescriptorValidator):
 
 class DescriptorGenericValidator(BaseDescriptorValidator):
     def __init__(self, name: str, defval: typing.Any, /, *args, **kwargs):
-        r"""
-        name: `public` name of the descriptor
+        r"""Generic validator for descriptors
 
-        defval: default value (may be None if allow_none)
+Parameters:
+=========
+    name: `public` name of the descriptor
 
-        args: tuple of types or unary predicates;
+    defval: default value (may be None if allow_none)
 
-            NOTE: unary predicates are functions that expect a Python object as
-                the first (only) argument and return a bool.
+    args: tuple of types or unary predicates;
 
-                Functions which expect additional arguments can be 'reduced' to
-                unary predicates by using either:
+        NOTE: unary predicates are functions that expect a Python object as
+            the first (only) argument and return a bool.
 
-                a) functools.partial (for unbound functions such as those defined
-                outside classes)
+            Functions which expect additional arguments can be 'reduced' to
+            unary predicates by using either:
 
-                b) functools.partialmethod (for methods)
+            a) functools.partial (for unbound functions such as those defined
+            outside classes)
 
-        kwargs: currently two keywords are supported:
-            "allow_none": bool (default True) ↦ allow None as a descriptor value
-            "dcriteria": dict (default empty) ↦ specified additional criteria for
-                descriptor values that are collection-like or array-like
-                Use with CAUTION.
+            b) functools.partialmethod (for methods)
 
-        When 'dcriteria' is empty, then no additional criteria are defined, and
-        the descriptor value is validated based on 'name' and 'args' and the
-        'allow_none' keyword.
+    kwargs: currently two keywords are supported:
+        "allow_none": bool (default True) ↦ allow None as a descriptor value
+        "dcriteria": dict (default empty) ↦ specified additional criteria for
+            descriptor values that are collection-like or array-like
+            Use with CAUTION.
 
-        WARNING: In relation to data types (and dtypes): the current implementation
-        is not strict, in the sense that it will allow values with types (or dtypes)
-        that inherit from the type(s) or dtype(s) specified in the criteria below.
+    When 'dcriteria' is empty, then no additional criteria are defined, and
+    the descriptor value is validated based on 'name' and 'args' and the
+    'allow_none' keyword.
 
-        Another current limitation is that collection elements that are themselves
-        array-like or collection-like are NOT subject to the validation process,
-        i.e., the validation does NOT recurse to deeper levels beyond the top
-        container of a nested data structure.
+    WARNING: In relation to data types (and dtypes): the current implementation
+    is not strict, in the sense that it will allow values with types (or dtypes)
+    that inherit from the type(s) or dtype(s) specified in the criteria below.
 
-        Table with type-related properties in the dcriteria dict:
-        key         value is always a nested dict — an empty dict here mean no
-        (a type)        criteria are defined and the descriptor value is validated
-                        based on 'name' and types or predicates in 'args'
+    Another current limitation is that collection elements that are themselves
+    array-like or collection-like are NOT subject to the validation process,
+    i.e., the validation does NOT recurse to deeper levels beyond the top
+    container of a nested data structure.
 
-        ========================================================================
-                    Nested dict key:str ↦ value;
-                    default is in <angle brackets>';
-                    <> means no default
-        ------------------------------------------------------------------------
+    Table with type-related properties in the dcriteria dict:
+    key         value is always a nested dict — an empty dict here mean no
+    (a type)        criteria are defined and the descriptor value is validated
+                    based on 'name' and types or predicates in 'args'
 
-        bytes       'len' ↦ int <NoData>  prescribed length; when NoData, then
-        bytearray         an object with any length is valid
-        str
+    ========================================================================
+                Nested dict key:str ↦ value;
+                default is in <angle brackets>';
+                <> means no default
+    ------------------------------------------------------------------------
 
-        tuple       'len' ↦ int, <NoData>;  prescribed length; when NoData, then
-        list        a tuple with any length is valid
-        deque       'types' ↦ tuple, <(,)>;  prescribed element types; when empty,
-                    then a tuple is any element type is valid.
+    bytes       'len' ↦ int <NoData>  prescribed length; when NoData, then
+    bytearray         an object with any length is valid
+    str
 
-        dict        'len' ↦ int, <NoData>; prescribed length; when NoData, then
-                    a dict with any length is valid
+    tuple       'len' ↦ int, <NoData>;  prescribed length; when NoData, then
+    list        a tuple with any length is valid
+    deque       'types' ↦ tuple, <(,)>;  prescribed element types; when empty,
+                then a tuple is any element type is valid.
 
-                    'types' ↦ tuple, <(,)>;  prescribed value types for the dict
-                        elements; when empty, then the dict elements can have any
-                        any value type.
+    dict        'len' ↦ int, <NoData>; prescribed length; when NoData, then
+                a dict with any length is valid
 
-                    'key_types' ↦ tuple; <(,)>; prescribed key types for the dict
-                        elements; when empty, the dict can use any hashable
-                        object as keys (NOTE: a dict can use any — and only —
-                        hashable type as keys)
+                'types' ↦ tuple, <(,)>;  prescribed value types for the dict
+                    elements; when empty, then the dict elements can have any
+                    any value type.
 
-                    'keys' ↦ tuple of hashable objects, <(,)>; prescribed actual
-                        keys that must be present in the dict (the value they're
-                        mapped to is irrelevant); when empty, then the dict can
-                        contain any key
-                        NOTE: as noted above, these objects MUST be hashable
+                'key_types' ↦ tuple; <(,)>; prescribed key types for the dict
+                    elements; when empty, the dict can use any hashable
+                    object as keys (NOTE: a dict can use any — and only —
+                    hashable type as keys)
 
-                    'mapping' ↦ dict of key:hashable type ↦ type or tuple of types,
-                        <>;
-                        This is the most stringent criterion, where a dict
-                        descriptor value is valid if it maps specific keys to
-                        to specific type or types of values.
+                'keys' ↦ tuple of hashable objects, <(,)>; prescribed actual
+                    keys that must be present in the dict (the value they're
+                    mapped to is irrelevant); when empty, then the dict can
+                    contain any key
+                    NOTE: as noted above, these objects MUST be hashable
 
-        numpy.ndarray
-                    'ndim' ↦ int, <NoData>; when NoData, ndms is irrelevant
-                    'shape' ↦ tuple[int], <(,)>; when empty, the array shape is
-                            irrelevant
+                'mapping' ↦ dict of key:hashable type ↦ type or tuple of types,
+                    <>;
+                    This is the most stringent criterion, where a dict
+                    descriptor value is valid if it maps specific keys to
+                    to specific type or types of values.
 
-                    CAUTION: Problem is ill-defined: is the criterion enforcing
-                    a specific dtype or does it also accept dtypes that inherit
-                    from the criterion dtype ? Current implementation does the
-                    latter.
+    numpy.ndarray
+                'ndim' ↦ int, <NoData>; when NoData, ndms is irrelevant
+                'shape' ↦ tuple[int], <(,)>; when empty, the array shape is
+                        irrelevant
 
-                    'dtype' ↦ numpy.dtype, tuple of numpy.dtype, <(,)>; when an
-                            empty tuple, the dtype is irrelevant
+                CAUTION: Problem is ill-defined: is the criterion enforcing
+                a specific dtype or does it also accept dtypes that inherit
+                from the criterion dtype ? Current implementation does the
+                latter.
 
-                    WARNING: 2024-08-02 10:38:40 not implemented
-                    'kind'  ↦ numpy.dtype.kind, tuple of numpy.dtype.kind, <(,)>;
-                            when an empty tuple, this criterion is irrelevant
+                'dtype' ↦ numpy.dtype, tuple of numpy.dtype, <(,)>; when an
+                        empty tuple, the dtype is irrelevant
 
-        quantities.Quantity — in addition to the criteria for numpy.ndarray:
-                    'units' ↦ pq.Quantity, <NoData>; when NoData, this criterion
-                            is irrelevant; otherwise, the descriptor value (a
-                            pq.Qyuantity) must be convertibel to what is specified
-                            here)
+                WARNING: 2024-08-02 10:38:40 not implemented
+                'kind'  ↦ numpy.dtype.kind, tuple of numpy.dtype.kind, <(,)>;
+                        when an empty tuple, this criterion is irrelevant
 
-        vigra.VigraArray   — in addition to the criteria for numpy.ndarray:
-                    'axistags' ↦ vigra.AxisTags, <NoData>; when NoData, this
-                        criterion is irrelevant
+    quantities.Quantity — in addition to the criteria for numpy.ndarray:
+                'units' ↦ pq.Quantity, <NoData>; when NoData, this criterion
+                        is irrelevant; otherwise, the descriptor value (a
+                        pq.Qyuantity) must be convertibel to what is specified
+                        here)
 
-        pandas.Series
-                        'shape' ↦ tuple[int] <(,)>
-                        'index_type' ↦ subclass of pandas.Index, <NoData>
-                        'dtype' ↦ numpy.dtype, tuple of numpy.dtype <(,)>
+    vigra.VigraArray   — in addition to the criteria for numpy.ndarray:
+                'axistags' ↦ vigra.AxisTags, <NoData>; when NoData, this
+                    criterion is irrelevant
 
-        pandas.DataFrame
-                        'shape' ↦ tuple[int] <(,)>
-                        'index_type' ↦ subclass of pandas.Index, <NoData>
-                        'columns_type' ↦ subclass of pandas.Index, <NoData>
+    pandas.Series
+                    'shape' ↦ tuple[int] <(,)>
+                    'index_type' ↦ subclass of pandas.Index, <NoData>
+                    'dtype' ↦ numpy.dtype, tuple of numpy.dtype <(,)>
 
-
-
-        NOTE: Validation is performed in the following order:
-
-        1) if args contains types or str elements that can be resolved to types,
-            validation fails when either:
-
-                a) value is NOT an instance of any of the specified types
-                    (checked using 'isinstance' builtin)
-
-                b) value is a type and is NOT a subclass of any of the specified
-                    types (checked using the 'issubclass' builtin)
-
-        2) if args contains predicate functions, the validation fails when either
-            predicate return False
+    pandas.DataFrame
+                    'shape' ↦ tuple[int] <(,)>
+                    'index_type' ↦ subclass of pandas.Index, <NoData>
+                    'columns_type' ↦ subclass of pandas.Index, <NoData>
 
 
-        3) if value is hashable, validation fails if it is not among the hashable
-        elements in args
 
-        4) if value is not hashable, validation fails if id(value) is not among
-        the id() of the non-hashable elements in args
+    NOTE: Validation is performed in the following order:
 
-        5) if additional criteria are given in kwargs:
+    1) if args contains types or str elements that can be resolved to types,
+        validation fails when either:
 
-            validation fails when:
+            a) value is NOT an instance of any of the specified types
+                (checked using 'isinstance' builtin)
 
-            a) type(value) is not among the keys of kwargs, OR
+            b) value is a type and is NOT a subclass of any of the specified
+                types (checked using the 'issubclass' builtin)
 
-            b) properties of value are distinct from those specified in the
-            additional criteria (see table above)
-
-        An exception is raised when the validation fails.
-
-        To bypass any of (1-4) simply omit those elements in *args;
-
-        To bypass (5) simply omit any kwargs.
-
-        To check for a type regardless of any additional property, one can:
-
-        a) pass the type as argument
-
-        e.g. DescriptorGenericValidator(np.ndarray)
-
-        b) pass a dict with the type name as key, mapped to an empty dict
-
-        e.g. DescriptorGenericValidator({"np.ndarray": {}})
-
-        CAUTION: passing the type as a named argument is a syntax error:
-
-        DescriptorGenericValidator(np.ndarray = {})
-        --> SyntaxError: expression cannot contain assignment, perhaps you meant "=="?
+    2) if args contains predicate functions, the validation fails when either
+        predicate return False
 
 
-        """
+    3) if value is hashable, validation fails if it is not among the hashable
+    elements in args
+
+    4) if value is not hashable, validation fails if id(value) is not among
+    the id() of the non-hashable elements in args
+
+    5) if additional criteria are given in kwargs:
+
+        validation fails when:
+
+        a) type(value) is not among the keys of kwargs, OR
+
+        b) properties of value are distinct from those specified in the
+        additional criteria (see table above)
+
+    An exception is raised when the validation fails.
+
+    To bypass any of (1-4) simply omit those elements in *args;
+
+    To bypass (5) simply omit any kwargs.
+
+    To check for a type regardless of any additional property, one can:
+
+    a) pass the type as argument
+
+    e.g. DescriptorGenericValidator(np.ndarray)
+
+    b) pass a dict with the type name as key, mapped to an empty dict
+
+    e.g. DescriptorGenericValidator({"np.ndarray": {}})
+
+    CAUTION: passing the type as a named argument is a syntax error:
+
+    DescriptorGenericValidator(np.ndarray = {})
+    --> SyntaxError: expression cannot contain assignment, perhaps you meant "=="?
+
+
+    """
         preset_hook = kwargs.pop("preset_hook", None)
         postset_hook = kwargs.pop("postset_hook", None)
         super().__init__(name, defval, True, preset_hook, postset_hook)
