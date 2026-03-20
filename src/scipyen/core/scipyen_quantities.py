@@ -1639,7 +1639,7 @@ class QuantityDescriptorValidator(BaseDescriptorValidator):
 
             # then use it to construct a NEW quantity, so that new instances of
             # this descriptor don't point to the same default!
-            my_default_factory = partial(_defaultQuantity_, default.magnitude, default.units)
+            my_default_factory = partial(pq.Quantity.__new__, default.magnitude, default.units)
             # my_default_factory = lambda: pq.Quantity(default.magnitude * default.units)
             default = dataclasses.MISSING # override default for super().__init__() below
 
@@ -1666,7 +1666,7 @@ class QuantityDescriptorValidator(BaseDescriptorValidator):
                 my_default_factory = default_factory
 
             elif default_factory is dataclasses.MISSING:
-                my_default_factory = partial(_defaultQuantity_, 0, pq.s)
+                my_default_factory = partial(pq.Quantity.__new__, 0, pq.s)
                 # my_default_factory = lambda: 0*pq.s
             else:
                 raise TypeError("Expecting default_factory to be a 0-argument function or dataclasses.MISSING")
@@ -1720,16 +1720,17 @@ class QuantityDescriptorValidator(BaseDescriptorValidator):
                 if not self.validator(value):
                     raise TypeError(f"'value' has wrong units: {value.units}")
 
-        elif inspect.isfunction(value):
-            argspec = inspect.getfullargspec(value)
-            if len(argspec.args):
-                raise TypeError("Expecting a factory without arguments")
+        elif inspect.isfunction(value) or isinstance(value, partial):
+            if inspect.isfunction(value):
+                argspec = inspect.getfullargspec(value)
+                if len(argspec.args):
+                    raise TypeError("Expecting a factory without arguments")
 
-            if len(argspec.kwonlyargs):
-                raise TypeError("Expecting a factory without keyword arguments")
+                if len(argspec.kwonlyargs):
+                    raise TypeError("Expecting a factory without keyword arguments")
 
-            if any(v is not None for v in (argspec.varargs, argspec.varkw, argspec.defaults, argspec.kwonlydefaults)):
-                raise TypeError("Expecting a factory with no arguments at all")
+                if any(v is not None for v in (argspec.varargs, argspec.varkw, argspec.defaults, argspec.kwonlydefaults)):
+                    raise TypeError("Expecting a factory with no arguments at all")
 
             d = value()
 
@@ -1743,5 +1744,5 @@ class QuantityDescriptorValidator(BaseDescriptorValidator):
         else:
             raise TypeError(f"Expecting a python Quantity or a Quantity functor; instead, got {type(value).__name__}")
 
-def _defaultQuantity_(magnitude, units) -> pq.Quantity:
-    return magnitude * units
+# def _defaultQuantity_(magnitude, units) -> pq.Quantity:
+#     return magnitude * units
