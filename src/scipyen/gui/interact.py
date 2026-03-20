@@ -37,6 +37,7 @@ else:
 
 from . import quickdialog as qd
 from .itemslistdialog import ItemsListDialog
+from gui.widgets import small_widgets as smw
 
 
 class _InputSpec():
@@ -183,7 +184,7 @@ dialog.
 
     nVars = len(prompts)
 
-    print(nVars)
+    # print(nVars)
 
     if nVars == 0:
         return
@@ -197,7 +198,6 @@ dialog.
 
     for k,v in prompts.items():
         # label = None
-
         if isinstance(v, _InputSpec):
             def_val  = v.default
             v_type = v.type
@@ -210,30 +210,41 @@ dialog.
             def_val = v
             v_type = type(v)
 
-        if isinstance(v, Tribool):
-            def_text = str(def_val)
-        else:
-            def_text = str(def_val) if (not isinstance(def_val, np.ndarray) and def_val not in (dataclasses.MISSING, None)) else ""
+        # if v_type is Tribool:
+        #     def_text = str(def_val)
+        # else:
+        #     def_text = str(def_val) if (not isinstance(def_val, np.ndarray) and def_val not in (dataclasses.MISSING, None)) else ""
 
-        if v_type == Tribool:
+        if v_type is Tribool:
             w = qd.CheckBox(widget_parent, f"{k}", tristate = True)
             w.setValue(def_val)
+            w.setToolTip("Tri-state checkbox: click to set the desired state: □ (False), ✓ (True) or ⋯ (Undetermined)")
             # w.setCheckState(QtCore.Qt.Checked if def_val is True else QtCore.Qt.Unchecked)
 
-        elif v_type == bool:
+        elif issubclass(v_type, typing.Sequence):
+            if not dt.is_homogeneous_sequence(def_val):
+                raise TypeError("Only sequences homogeneous in their element types are supported")
+            v_type = type(def_val)
+
+
+
+        elif v_type is bool:
             w = qd.CheckBox(widget_parent, f"{k}")
             w.setCheckState(QtCore.Qt.Checked if def_val is True else QtCore.Qt.Unchecked)
+            w.setToolTip("Click to set to □ (False) or ✓ (True)")
             # labels[k] = None
 
         elif issubclass(v_type, (int, np.integer)):
             w = qd.HSpinBox(widget_parent,f"{k}:", widget_type = "i")
             w.setValue(def_val)
+            w.setToolTip("Click to edit, scroll or use arrows to change the value")
             # w = qd.IntegerInput(widget_parent,f"{k}:")
             # w.setValue(def_text)
             # labels[k] = None
 
         elif issubclass(v_type, (float, np.floating)):
-            w = qd.HSpinBox(widget_parent,f"{k}:", widget_type = "f")
+            w = qd.HSpinBox(widget_parent,f"{k}:", widget_type = "q")
+            w.setToolTip("Click to edit, scroll or use arrows to change the value")
             w.setValue(def_val)
             # w = qd.FloatInput(widget_parent, f"{k}:")
             # w.setValue(def_text)
@@ -242,30 +253,58 @@ dialog.
         elif issubclass(v_type, complex):
             w = qd.HSpinBox(widget_parent,f"{k}:", widget_type = "c")
             w.setValue(def_val)
-
-        elif issubclass(v_type, pq.Quantity) and def_val.size <= 1:
-            w = qd.HSpinBox(widget_parent,f"{k}:", widget_type = "q")
-            w.setValue(def_val)
+            w.setToolTip("Click to edit, scroll or use arrows to change the value")
 
         elif issubclass(v_type, str):
             w = qd.StringInput(widget_parent, f"{k}:")
             w.setText(def_val)
+            w.setToolTip("Click to edit text")
             # labels[k] = None
 
-
-        elif v_type == np.ndarray:
-            if dt.is_vector(def_val) and def_val.size <= 5:
-                w = qd.StringInput(widget_parent, f"{k}:")
-                # labels[k] = None
+        elif issubclass(v_type, np.ndarray):
+            if dt.is_scalar(def_val):
                 if def_val.dtype.type is np.str_:
-                    w.setText(", ".join(list(def_val)))
+                    w = qd.StringInput(widget_parent, f"{k}:")
+                    # w.setText(", ".join(list(def_val)))
+                    w.setText(str(def_val[0]))
+                    w.setToolTip("Click to edit text")
+
                 elif issubclass(def_val.dtype.type, np.number):
-                    w.setText(strutils.numbers2str(def_val))
+                    if issubclass(def_val.dtype.type, complex):
+                        w = qd.HSpinBox(widget_parent, f"{k}:", "c")
+
+                    else:
+                        w = qd.HSpinBox(widget_parent, f"{k}:", "q")
+
+                    w.setValue(def_val)
+                    if isinstance(def_val, pq.Quantity):
+                        w.setToolTip("Left click to edit, scroll or use arrows to change the value;\nRight click for more options")
+                    else:
+                        w.setToolTip("Click to edit, scroll or use arrows to change the value")
+
                 else:
                     raise TypeError(f"Unsupported array dtype {def_val.dtype} ({def_val.dtype.type})")
+
+            elif dt.is_vector(def_val):
+                # NOTE: 2026-03-20 12:39:44
+                # case of arrays with just one element treated above
+                if def_val.size <= 5:
+                    w = qd.StringInput(widget_parent, f"{k}:")
+                    w.setToolTip("Click to edit text")
+
+                    if def_val.dtype.type is np.str_:
+                        w.setText(", ".join(list(def_val)))
+
+                    elif issubclass(def_val.dtype.type, np.number):
+                        w.setText(strutils.numbers2str(def_val))
+
+                    else:
+                        raise TypeError(f"Unsupported array dtype {def_val.dtype} ({def_val.dtype.type})")
+
             else:
                 w = TableEditorWidget(widget_parent)
                 w.setValue(def_val)
+                w.setToolTip("Double click in cells to edit contents")
                 label = QtWidgets.QLabel(f"{k}:", widget_parent)
                 labels[k] = label
 

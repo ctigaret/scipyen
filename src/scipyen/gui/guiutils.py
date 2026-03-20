@@ -83,26 +83,33 @@ class NumericStringValidator(QtGui.QValidator):
         from core.strutils import isnumber, is_sequence
         # from core.datatypes import is_numeric_string
 
+        ss = s[0:pos] if (pos >=-len(s) or pos < len(s)) else s
+
+        print(f"{self.__class__.__name__}.validate('{s}', {pos}) -> '{ss}'")
 
         if s is None or len(s.strip()) == 0:
+            print(f"{self.__class__.__name__}: empty string")
             return QtGui.QValidator.Intermediate
 
         if not isinstance(s, str):
+            print(f"{self.__class__.__name__}: no string")
             return QtGui.QValidator.Invalid
 
-        if pos >= len(s) or pos < -len(s):
+        if pos > len(s) or pos < -len(s):
+            print(f"{self.__class__.__name__}: out of bounds")
             return QtGui.QValidator.Invalid
-
-        ss = s[0:pos]
 
         if not isnumber(ss) and not is_sequence(ss):
             return QtGui.QValidator.Intermediate
 
         try:
+            # BUG: 2026-03-20 16:26:39 FIXME/TODO:
+            # allow naked sequence forms and naked quantity forms e.g.
+            # 0.2 s, 0.3 s
             u = eval(ss)
             return QtGui.QValidator.Acceptable
         except:
-            return QtGui.QValidator.Intemediate
+            return QtGui.QValidator.Intermediate
 
 class InftyDoubleValidator(QtGui.QDoubleValidator):
     def __init__(self, bottom:float=-math.inf, top:float=math.inf,

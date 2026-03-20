@@ -196,7 +196,13 @@ def superscript(s:str)->str:
 
     return "".join(list(map(lambda c: SUPERSCRIPT_UNICODE.get(c,c), s)))
 
-def is_sequence(s: str) -> bool:
+def subscript(s:str)->str:
+    if len(s)==1:
+        return SUBSCRIPT_UNICODE.get(s, s)
+
+    return "".join(list(map(lambda c: SUBSCRIPT_UNICODE.get(c,c), s)))
+
+def is_sequence(s: str, matches: bool = False) -> bool:
     r"""Test if ``s`` is a string representation of a tuple or list.
 
 .. |nbsp| unicode:: 0xA0
@@ -211,36 +217,56 @@ Returns:
 
 A ``bool`` indicating if ``s`` is a sequence-like string.
 
+When matches is True, also returns the regexp match and the matched string. |nbsp|
+The latter is needed because in toder to recognise sequence strings in "naked" form |nbsp|
+e.g. '0.2 s, 0.3 s', the function internally encloses the string in parentheses.
+
 """
     import re
 
+    match = None
+    decorated = False
+    string = ""
+
     if not isinstance(s, str) or len(s.strip())==0:
-        return False
+        ret = False
 
-#     pattern0 = r'^\[.*\]$|^\(.*\)$'
-#
-#     match0 = re.match(pattern0, s)
-
-    # s = s.strip() # remove spaces at the ends
-
-    starts = ["(", "[", "{"]
-    ends = [")", "]", "}"]
-    #
-    # for s0,s1 in zip(starts, ends):
-    #     if s.startswith(s0) and s.endswith(s1):
-    #         continue
-    #     s = f"{s0}{s}{s1}"
-    #     break
-
-    # pattern = r'^\[.*\]$|^\(.*\)$'
-    pattern = r'[\[|\(|\{](.+?)[\]|\)|\}]'
-
-    match = re.match(pattern, s)
-
-    if match:
-        return True
     else:
-        return False
+
+#         pattern0 = r'^\[.*\]$|^\(.*\)$'
+#
+#         match0 = re.match(pattern0, s)
+
+        # s = s.strip() # remove spaces at the ends
+
+        # starts = ["(", "[", "{"]
+        # ends = [")", "]", "}"]
+
+        # pattern = r'^\[.*\]$|^\(.*\)$'
+        pattern = r'[\[|\(|\{](.+?)[\]|\)|\}]'
+
+        match = re.match(pattern, s)
+
+        if match:
+            ret = True
+            string = match.string
+        else:
+            # NOTE: 2026-03-20 15:59:32
+            # try and see is decorating with '(' and ')' turns it into a sequence string
+            ss = "(" + s + ")"
+            decorated = True
+            match = re.match(pattern, ss)
+            if match:
+                string = match.string[1:-1]
+                ret = True
+            else:
+                ret = False
+
+    if matches:
+        return ret, match, string
+
+    else:
+        return ret
 
     # print(f"match = {match}")
     # if match:

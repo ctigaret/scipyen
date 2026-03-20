@@ -864,10 +864,11 @@ def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]
     raise TypeError(f"Expecting a scalar int float, complex, numpy array or Pyhon quantities.Quantity; got {type(x).__name__} instead")
 
 def isScalar(x:pq.Quantity):
+    from core.datatypes import is_scalar
     if not isinstance(x, pq.Quantity):
         raise TypeError(f"Expecting a Quantity; intead, got a {type(x).__name__}")
     # NOTE: x.size==1 is True for an array with one element regardless of its ndim
-    return x.ndim == 0 or x.size == 1
+    return is_scalar(x) # x.ndim == 0 or x.size == 1
 
 def ensureScalar(x:pq.Quantity):
     if not isinstance(x, pq.Quantity):

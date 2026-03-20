@@ -463,10 +463,12 @@ class LineEdit(QtWidgets.QLineEdit):
     sig_enterPressed = Signal(str, name="sig_enterPressed")
     sig_lazy = Signal(bool, name="sig_lazy")
     r"""QLineEdit with custom context menu and, optionally, lazy notifications"""
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
+    def __init__(self, contents: typing.Optional[str] = None,
+                 parent: typing.Optional[QtWidgets.QWidget] = None,
                  lazy: bool = False,
                  validator: typing.Optional[QtGui.QValidator] = None):
         super().__init__(parent=parent)
+        self._variable_ = contents
         self._lazy_: bool = lazy is True
         self._custom_menu_: typing.Optional[QtWidgets.QMenu] = None
         self._validator_: typing.Optional[QtGui.QValidator] = None
@@ -474,6 +476,27 @@ class LineEdit(QtWidgets.QLineEdit):
         if isinstance(validator, QtGui.QValidator):
             self._validator_ = validator
             self._validator_.parent = self
+
+        if isinstance(self._variable_, str):
+            self.setText(self._variable_)
+
+    def value(self) -> str:
+        self._variable_ = super().text()
+        return self._variable_
+
+    def setValue(self, val: str):
+        if not isinstance(val, str):
+            raise TypeError(f"Expecting a string, got a {type(val).__name__} instead")
+
+        self._variable_ = val
+        super().setText(self._variable_)
+
+
+    def text(self) -> str:
+        return self.value()
+
+    def setText(self, val:str):
+        self.setValue(val)
 
     def keyPressEvent(self, event):
         if not self._lazy_:
@@ -500,7 +523,7 @@ class LineEdit(QtWidgets.QLineEdit):
         else:
             stdMenu.exec(evt.globalPos())
 
-    def validate(sel, *args) -> bool:
+    def validate(self, *args) -> bool:
         if self._validator_ is None:
             return True
 
@@ -1243,30 +1266,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         else:
             raise ValueError(f"Incompatible value: {value}")
 
-        if isinstance(self._magnitude_, (float, int)):
-            super().setValue(float(self._magnitude_))
-            text = f"{self._magnitude_:.{self.decimals}}"
-            specialText = r"-Inf" if self._magnitude_ in (-math.inf, -np.inf) else r"Inf" if self._magnitude_ in (math.inf, np.inf) else ""
-            if len(specialText):
-                super().setSpecialValueText(specialText)
-                text = specialText
-            else:
-                super().setSpecialValueText("")
-
-            if len(self._prefix_):
-                text = f"{self._prefix_} {text} "
-
-            if len(self._suffix_):
-                text = f"{text} {self._suffix_}"
-
-            # print(f"{self.objectName()}: {self.__class__.__name__}.setValue({value}) -> text = {text}")
-
-            signalBlock = QtCore.QSignalBlocker(self.lineEdit())
-            self.lineEdit().setText(text)
-
-        elif self._magnitude_ in (pd.NA, math.nan, np.nan):
+        if self._magnitude_ is pd.NA:
             super().setMinimum(-math.inf)
-            specialText = "NA" if self._magnitude_ is pd.NA else "NaN"
+            specialText = r"NA"
             super().setSpecialValueText(specialText)
             super().setValue(-math.inf)
 
@@ -1280,6 +1282,50 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
             signalBlock = QtCore.QSignalBlocker(self.lineEdit())
             self.lineEdit().setText(text)
+
+        elif self._magnitude_ in (math.nan, np.nan):
+            super().setMinimum(-math.inf)
+            specialText = r"NaN"
+            super().setSpecialValueText(specialText)
+            super().setValue(-math.inf)
+
+            text = specialText
+
+            if len(self._prefix_):
+                text = f"{self._prefix_} {text}"
+
+            if len(self._suffix_):
+                text = f"{text} {self._suffix_}"
+
+            signalBlock = QtCore.QSignalBlocker(self.lineEdit())
+            self.lineEdit().setText(text)
+
+        elif isinstance(self._magnitude_, (float, int)):
+            super().setValue(float(self._magnitude_))
+            text = f"{self._magnitude_:.{self.decimals}}"
+            specialText = r""
+            if self._magnitude_ in (-math.inf, -np.inf):
+                specialText = r"-Inf"
+            elif self._magnitude_ in (math.inf, np.inf):
+                specialText = r"Inf"
+
+            if len(specialText):
+                super().setSpecialValueText(specialText)
+                text = specialText
+            else:
+                super().setSpecialValueText(r"")
+
+            if len(self._prefix_):
+                text = f"{self._prefix_} {text} "
+
+            if len(self._suffix_):
+                text = f"{text} {self._suffix_}"
+
+            # print(f"{self.objectName()}: {self.__class__.__name__}.setValue({value}) -> text = {text}")
+
+            signalBlock = QtCore.QSignalBlocker(self.lineEdit())
+            self.lineEdit().setText(text)
+
 
         else:
             raise TypeError(f"Expecting a scalar quantity, a float or pd.NA; instead, got {type(value).__name__}")
@@ -2109,4 +2155,12 @@ class ComplexSpinBox(QtWidgets.QFrame):
     def rescaleOnUnitChange(self, val:bool):
         if not (self._keepDimensionless_ or self._forceDimensionless_):
             self._rescaleOnUnitChange_ = val
+
+# class SequenceEditor(LineEdit):
+#     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
+#                  lazy: bool = False,
+#                  validator: typing.Optional[QtGui.QValidator] = None):
+#         super().__init__(parent, lazy, validator)
+
+
 

@@ -28,6 +28,7 @@ import datetime
 from enum import (Enum, IntEnum, EnumMeta, EnumType)
 import inspect
 import numbers
+import fractions
 import math
 import dataclasses
 from dataclasses import (dataclass, KW_ONLY, MISSING, field)
@@ -358,6 +359,28 @@ with more than one dimensions and all but one axes are singleton axes.
 
     else:
         return False
+
+def is_scalar(x):
+    r"""Checks if ``x`` is a numeric scalar or a numpy array with one element"""
+    import numpy as np
+    if isinstance(x, (bool, int, float, complex, numbers.Rational, fractions.Fraction)):
+        return False
+    elif isinstance(x, np.ndarray):
+        return x.ndim == 0 or x.size == 1
+    else:
+        return False
+
+def is_homogeneous_sequence(x: typing.Sequence):
+    if not isinstance(x, typing.Sequence):
+        return False
+
+    if len(x) == 1:
+        return True
+
+    etype = type(x[0])
+
+    return all(isinstance(e, etype), x[1:])
+
 
 def is_column_vector(x):
     r"""Returns True if x is a numpy array encapsulating a column vector.
