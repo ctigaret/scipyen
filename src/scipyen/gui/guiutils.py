@@ -5,7 +5,7 @@
 
 r"""Various helpers for GUI
 """
-import sys, os, typing, warnings, math, io, pathlib
+import sys, os, typing, warnings, math, io, pathlib, traceback, numbers
 from enum import IntEnum
 import numpy as np
 from ipykernel.inprocess.ipkernel import InProcessInteractiveShell
@@ -81,11 +81,12 @@ class NumericStringValidator(QtGui.QValidator):
 
     def validate(self, s:str, pos: int):
         from core.strutils import isnumber, is_sequence
+        import core.scipyen_quantities as scq
         # from core.datatypes import is_numeric_string
 
         ss = s[0:pos] if (pos >=-len(s) or pos < len(s)) else s
 
-        print(f"{self.__class__.__name__}.validate('{s}', {pos}) -> '{ss}'")
+        # print(f"{self.__class__.__name__}.validate('{s}', {pos}) -> '{ss}'")
 
         if s is None or len(s.strip()) == 0:
             print(f"{self.__class__.__name__}: empty string")
@@ -108,8 +109,30 @@ class NumericStringValidator(QtGui.QValidator):
             # 0.2 s, 0.3 s
             u = eval(ss)
             return QtGui.QValidator.Acceptable
+        except SyntaxError:
+            flag, match, string, delims = is_sequence(ss, True, True)
+            # print(f"{self.__class__.__name__}.validate: -> delims = {delims}")
+            if len(delims) and len(delims[-1].strip()):
+                try:
+                    test = tuple(map(lambda x: scq.str2quantity(x), ss.split(delims[-1])))
+                    if all(isinstance(v, (numbers.Number, pq.Quantity)) for v in test):
+                        if len(ss) == len(s):
+                            return QtGui.QValidator.Acceptable
+                        else:
+                            return QtGui.QValidator.Intermediate
+
+                    else:
+                        return QtGui.QValidator.Invalid
+
+                except:
+                    # traceback.print_exc()
+                    return QtGui.QValidator.Invalid
+            else:
+                # traceback.print_exc()
+                return QtGui.QValidator.Intermediate
         except:
-            return QtGui.QValidator.Intermediate
+            # traceback.print_exc()
+            return QtGui.QValidator.Invalid
 
 class InftyDoubleValidator(QtGui.QDoubleValidator):
     def __init__(self, bottom:float=-math.inf, top:float=math.inf,

@@ -881,49 +881,71 @@ def ensureScalar(x:pq.Quantity):
 
     return x.flatten()[0] # this deals with arrays with higher dimensions but with just one element
 
-def str2quantity(x:str):
+def str2quantity(x:str, force_dimensionality: bool = False):
     r"""Reconstruct a scalar quantity or dimensionality from a str.
-    Performs the reverse of quantity2str.
 
-    Parameters:
-    ==========
-    x: str of the format "<[number][space]>[unit symbol]" where the part between
-        angle brackets is optional
+.. |nbsp| unicode:: 0xA0
+   :trim:
 
-    Example 1. Converting a scalar quantity:
-    ========================================
-    a = 1 * pq.pA
+Performs the reverse of quantity2str.
 
-    b = quantity2str(a, precision=4, format="f") → "1.0000 pA"
+Can also be used to retrieve a numeric scalar from its string representation.
 
-    The round-trip is completed (with loss of precision) by str2quantity:
+Parameters:
+==========
+:x: str of the format "<number><space><unit_symbol>" where the parts |nbsp|
+between angle brackets are optional (but the string must contain at least |nbsp|
+one of them).
 
-    str2quantity(b) → array(1.)*pA
+:force_dimensionality: When ``True``, and the <unit_symbol> is absent, returns a |nbsp|
+scalar quantity with units ``dimensionless``.
+    When ``False`` (the *default*), and <unit_symbol> is absent, returns a numeric scalar
 
-    Example 2: Converting a dimensionality:
-    =======================================
+Returns:
+========
 
-    b1 = quantity2str(a.dimensionality) → "pA"
+When unit_symbol is absent, returns a numeric scalar (int, float), unless |nbsp|
+force_dimensionality is ``True``
 
-    Round-trip:
+Example 1. Converting a scalar quantity:
+========================================
+a = 1 * pq.pA
 
-    str2quantity(b1) → UnitCurrent('picoampere', 0.001 * nA, 'pA')
+b = quantity2str(a, precision=4, format="f") → "1.0000 pA"
 
-    """
+The round-trip is completed (with loss of precision) by str2quantity:
+
+str2quantity(b) → array(1.)*pA
+
+Example 2: Converting a dimensionality:
+=======================================
+
+b1 = quantity2str(a.dimensionality) → "pA"
+
+Round-trip:
+
+str2quantity(b1) → UnitCurrent('picoampere', 0.001 * nA, 'pA')
+
+"""
     if not isinstance(x, str):
         raise TypeError(f"Expecting a str; got {type(x).__name__} instead")
     parts = x.split()
     if len(parts) == 1:
         # just a dimensionality str
         # NOTE: will raise if str is incorrect
-        return unitQuantityFromNameOrSymbol(parts[0])
+        ret = unitQuantityFromNameOrSymbol(parts[0])
+        if force_dimensionality:
+            ret *= pq.dimensionless
+
+        return ret
+
     elif len(parts) == 2:
         # will raise if x is wrong
         val = eval(parts[0])
         unit = unitQuantityFromNameOrSymbol(parts[1])
         return val * unit
     else:
-        raise ValueError(f"Expecting a str of the form '<number><space><UnitQuantity symbol>'; indtead, got {x}")
+        raise ValueError(f"Expecting a str of the form '<number><space><UnitQuantity symbol>'; instead, got '{x}'")
 
 def shortSymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]) -> str:
     r"""Returns the (short) symbol of this quantity's units)
@@ -973,7 +995,11 @@ def prettySymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]) 
     return delim.join(list(map(lambda v: f"{v[0]}{_pretty_power_(v[1])}", list((k.symbol, p) for k,p in x.items()))))
 
 
-def quantity2str(x:typing.Union[pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality],
+def quantity2str(x:typing.Union[
+                    pq.Quantity,
+                    pq.UnitQuantity,
+                    pq.dimensionality.Dimensionality
+                    ],
                  precision:int = 2,
                  format:str="f"):
     r"""Returns a str representation of a scalar Quantity or Dimensionality.

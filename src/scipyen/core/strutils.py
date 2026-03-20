@@ -202,7 +202,7 @@ def subscript(s:str)->str:
 
     return "".join(list(map(lambda c: SUBSCRIPT_UNICODE.get(c,c), s)))
 
-def is_sequence(s: str, matches: bool = False) -> bool:
+def is_sequence(s: str, matches: bool = False, delimiters: bool = False) -> bool:
     r"""Test if ``s`` is a string representation of a tuple or list.
 
 .. |nbsp| unicode:: 0xA0
@@ -211,6 +211,16 @@ def is_sequence(s: str, matches: bool = False) -> bool:
 Parameters:
 ===========
 :s: string to test
+
+:matches: When ``True``, also return the regexp match object and the matched string
+
+:delimiters: When ``True``, and ``matches`` is also ``True``, then also return |nbsp|
+    the delimiter characters, in addition to the match object and the matched string
+
+.. note::
+
+    When there is no match, returns None for the match, an empty string for the |nbsp|
+    matched string, and an empty list for the delimiter characters.
 
 Returns:
 ========
@@ -221,11 +231,14 @@ When matches is True, also returns the regexp match and the matched string. |nbs
 The latter is needed because in toder to recognise sequence strings in "naked" form |nbsp|
 e.g. '0.2 s, 0.3 s', the function internally encloses the string in parentheses.
 
+When delimiters is True, also returns a list of delimiter characters, sorted.
+
 """
     import re
 
     match = None
-    decorated = False
+    # decorated = False
+    delim_list = list()
     string = ""
 
     if not isinstance(s, str) or len(s.strip())==0:
@@ -249,82 +262,32 @@ e.g. '0.2 s, 0.3 s', the function internally encloses the string in parentheses.
 
         if match:
             ret = True
-            string = match.string
+            # string = match.group(1)
         else:
             # NOTE: 2026-03-20 15:59:32
             # try and see is decorating with '(' and ')' turns it into a sequence string
             ss = "(" + s + ")"
-            decorated = True
+            # decorated = True
             match = re.match(pattern, ss)
             if match:
-                string = match.string[1:-1]
                 ret = True
+                # # string = match.string[1:-1]
+                # string = match.group(1)
+                # delim_list =
             else:
                 ret = False
 
-    if matches:
-        return ret, match, string
+        if match: # get the delimiters
+            string = match.group(1)
+            delim_list = sorted(re.findall(r'[,\s;|]+', string))
 
+    if matches:
+        if delimiters:
+            return ret, match, string, delim_list
+        else:
+            return ret, match, string
     else:
         return ret
-
-    # print(f"match = {match}")
-    # if match:
-    #     inner_content = match.group(1)
-    #     print(f"inner_content = {inner_content}")
-    #     # delimiters = set(re.findall(r'(?<!\w)[,;](?=\s*[\w\("])', inner_content))
-    #     delimiters = set(re.findall(r'(?<!\w)[,](?=\s*[\w\("])', inner_content))
-    #     print(f"delimiters found: {delimiters}")
-    #     delimiters.discard("")
-    #     # if len(delimiters) == 0:
-    #     #     delimiters.add(" ") # allow space as delimiters
-    #     print(f"valid delimiters: {delimiters}")
-    #     if len(delimiters) != 1:
-    #         ret = False
-    #     else:
-    #         ret = list(delimiters)[0] if ret_delim else True
-    #
-    #     return ret
-
-    # return False
-
-    #
-    # possibleSequence = False
-    #
-    # for s0,s1 in zip(starts, ends):
-    #     if s.startswith(s0):
-    #         s = s[1:]
-    #         if s.endswith(s1):
-    #             s = s[:-1]
-    #         break # avoid unravelling inner sequence-like strings
-    #
-    # if "," in s:
-    #     if len(s.replace(" ", "").split(",")):
-    #         if ret_delim:
-    #             return ","
-    #         else:
-    #             return True
-    #     else:
-    #         if ret_delim:
-    #             return
-    #         else:
-    #             return False
-    #
-    # else:
-    #     if len(s.split(" ")):
-    #         if ret_delim:
-    #             return " "
-    #         else:
-    #             return True
-    #
-    #     else:
-    #         if ret_delim:
-    #             return
-    #         else:
-    #             return False
-    #
-    # return False
-
 
 def is_cached_output_varname(s: str) -> bool:
     r"""Returns True if s is an IPython cached output variable"""

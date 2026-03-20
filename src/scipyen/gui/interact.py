@@ -210,11 +210,6 @@ dialog.
             def_val = v
             v_type = type(v)
 
-        # if v_type is Tribool:
-        #     def_text = str(def_val)
-        # else:
-        #     def_text = str(def_val) if (not isinstance(def_val, np.ndarray) and def_val not in (dataclasses.MISSING, None)) else ""
-
         if v_type is Tribool:
             w = qd.CheckBox(widget_parent, f"{k}", tristate = True)
             w.setValue(def_val)
