@@ -1639,8 +1639,10 @@ class QuantityDescriptorValidator(BaseDescriptorValidator):
 
             # then use it to construct a NEW quantity, so that new instances of
             # this descriptor don't point to the same default!
-            my_default_factory = partial(pq.Quantity.__new__, default.magnitude, default.units)
+            # NOTE: 2026-03-20 10:06:39
+            # cannot pickle lambda functions!
             # my_default_factory = lambda: pq.Quantity(default.magnitude * default.units)
+            my_default_factory = partial(pq.Quantity.__new__, default.magnitude, default.units)
             default = dataclasses.MISSING # override default for super().__init__() below
 
         elif default is dataclasses.MISSING:
@@ -1666,8 +1668,9 @@ class QuantityDescriptorValidator(BaseDescriptorValidator):
                 my_default_factory = default_factory
 
             elif default_factory is dataclasses.MISSING:
-                my_default_factory = partial(pq.Quantity.__new__, 0, pq.s)
+                # NOTE: 2026-03-20 10:07:10 Cannot pickle lambda objects
                 # my_default_factory = lambda: 0*pq.s
+                my_default_factory = partial(pq.Quantity.__new__, 0, pq.s)
             else:
                 raise TypeError("Expecting default_factory to be a 0-argument function or dataclasses.MISSING")
 
