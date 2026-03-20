@@ -48,6 +48,7 @@ Useful to have even when vigranumpy is not installed.
 #########################################################################
 import os, typing, inspect, math, types, functools, traceback
 import numpy as np
+from tribool import Tribool
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -349,16 +350,49 @@ class CheckBox(QtWidgets.QCheckBox):
 Inherits directly from QCheckBox. Supports tri-state: use the inherited 
 checkState() method returning a QtCore.Qt.CheckState value
 """
-    def __init__(self, parent:QtWidgets.QWidget, label:str, tristate:bool=False):
+    def __init__(self, parent: QtWidgets.QWidget, label: str, tristate: bool=False):
         QtWidgets.QCheckBox.__init__(self, label, parent)
         self.setTristate(tristate)
         parent.addWidget(self)
 
     def selection(self):
         return self.isChecked()
-    
-    def value(self) -> QtCore.Qt.CheckState:
-        return self.checkState()
+
+    def setValue(self, val: typing.Union[bool, QtCore.Qt.CheckState, int, Tribool]):
+        if isinstance(val, bool):
+            if self.isTristate():
+                self.setCheckState(QtCore.Qt.Checked) if val else self.setCheckState(QtCore.Qt.Unchecked)
+            else:
+                self.setChecked(val is True)
+
+        elif isinstance(val, QtCore.Qt.CheckState):
+            if self.isTristate():
+                self.setCheckState(val)
+            else:
+                self.setChecked(False) if val in (QtCore.Qt.Unchecked) else self.setChecked(True)
+
+        elif isinstance(val, int):
+            if self.isTristate():
+                self.setCheckState(QtCore.Qt.CheckState(val)) if val in range(3) else self.setCheckState(Qtcore.Qt.Unchecked)
+
+            else:
+                self.setChecked(True) if val in (1,2) else self.setChecked(False)
+
+        elif isinstance(val, Tribool):
+            if self.isTristate():
+                self.setCheckState(QtCore.Qt.Checked) if val.value is True else self.setCheckState(QtCore.Qt.Unchecked) if val.value is False else self.setCheckState(QtCore.Qt.PartiallyChecked)
+            else:
+                self.setChecked(val.value is True)
+
+        else:
+            self.setChecked(False)
+
+    def value(self) -> bool | Tribool:
+        if self.isTristate():
+            state = self.checkState()
+            return Tribool(True) if state == QtCore.Qt.Checked else Tribool(False) if state == QtCore.Qt.Unchecked else Tribool()
+        else:
+            return self.isChecked()
     
     def validate(self, *args):
         return True
@@ -370,6 +404,36 @@ class ComplexSpinBox(QtWidgets.QFrame):
     
 class SpinBox(QtWidgets.QFrame):
     r"""Alternative to IntegerInput and FloatInput, with support for python Quantities.
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+Parameters:
+===========
+
+:parent: Parent widget
+
+:label: Label associated with widget, in the dialog
+
+:vertical: Widget orientation
+
+:widget_type: Value type of widget, one of:
+
+    * "i" ↦ integer spin box
+
+    * "d" ↦ floating point spin box
+
+    * "f" ↦ floating point spin box
+
+    * "c" ↦ complex value spin box
+
+    * "q" ↦ Quantity spin box
+
+Var-keyword parameters:
+=======================
+
+Used for ``gui.widget.small_widgets.QuantitySpinBox`` constructor, ignored when |nbsp|
+``widget_type`` is not "q".
 
 """
     def __init__(self, parent:QtWidgets.QWidget, label:str, vertical:int|bool = 0,

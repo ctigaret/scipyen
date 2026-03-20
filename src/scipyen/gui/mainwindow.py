@@ -49,6 +49,7 @@ from copy import copy, deepcopy
 import collections
 from collections import deque, ChainMap
 import cmath
+from tribool import Tribool
 
 # END core python modules
 

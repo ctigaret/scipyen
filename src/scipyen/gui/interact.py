@@ -7,6 +7,7 @@ r"""A collection of functions to prompt user input using GUI
 """
 import typing, collections, dataclasses, os
 import numpy as np
+from tribool import Tribool
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -135,7 +136,7 @@ Typical use:
     return getInput(kwargs, mapping=True)
 
 def getInput(prompts:dict, mapping:bool=False):
-    r"""Opens a quick dialog to prompt user input for integer, float and string values
+    r"""Opens a quick dialog to prompt user input for values.
 
 .. |nbsp| unicode:: 0xA0
    :trim:
@@ -178,10 +179,25 @@ dialog.
         raise TypeError(f"'prompts' expected to be a dict; got {type(prompts).__name__} instead")
 
     prompt_widgets = dict()
+    labels = dict()
 
-    group = qd.VDialogGroup(dlg)
+    nVars = len(prompts)
+
+    print(nVars)
+
+    if nVars == 0:
+        return
+
+    if nVars > 1:
+        group = qd.VDialogGroup(dlg)
+        widget_parent = group
+    else:
+        group = None
+        widget_parent = dlg
 
     for k,v in prompts.items():
+        # label = None
+
         if isinstance(v, _InputSpec):
             def_val  = v.default
             v_type = v.type
@@ -194,31 +210,53 @@ dialog.
             def_val = v
             v_type = type(v)
 
-        def_text = str(def_val) if (not isinstance(def_val, np.ndarray) and def_val not in (dataclasses.MISSING, None)) else ""
+        if isinstance(v, Tribool):
+            def_text = str(def_val)
+        else:
+            def_text = str(def_val) if (not isinstance(def_val, np.ndarray) and def_val not in (dataclasses.MISSING, None)) else ""
 
-        label = QtWidgets.QLabel(f"{k}:", group)
-        group.addWidget(label)
-        group.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Preferred)
-
-        if v_type == int:
-            w = qd.IntegerInput(group,"")
-            w.setValue(def_text)
-
-        elif v_type == float:
-            w = qd.FloatInput(group, "")
-            w.setValue(def_text)
-
-        elif v_type == str:
-            w = qd.StringInput(group, "")
-            w.setText(def_text)
+        if v_type == Tribool:
+            w = qd.CheckBox(widget_parent, f"{k}", tristate = True)
+            w.setValue(def_val)
+            # w.setCheckState(QtCore.Qt.Checked if def_val is True else QtCore.Qt.Unchecked)
 
         elif v_type == bool:
-            w = qd.CheckBox(group, "")
+            w = qd.CheckBox(widget_parent, f"{k}")
             w.setCheckState(QtCore.Qt.Checked if def_val is True else QtCore.Qt.Unchecked)
+            # labels[k] = None
+
+        elif issubclass(v_type, (int, np.integer)):
+            w = qd.HSpinBox(widget_parent,f"{k}:", widget_type = "i")
+            w.setValue(def_val)
+            # w = qd.IntegerInput(widget_parent,f"{k}:")
+            # w.setValue(def_text)
+            # labels[k] = None
+
+        elif issubclass(v_type, (float, np.floating)):
+            w = qd.HSpinBox(widget_parent,f"{k}:", widget_type = "f")
+            w.setValue(def_val)
+            # w = qd.FloatInput(widget_parent, f"{k}:")
+            # w.setValue(def_text)
+            # labels[k] = None
+
+        elif issubclass(v_type, complex):
+            w = qd.HSpinBox(widget_parent,f"{k}:", widget_type = "c")
+            w.setValue(def_val)
+
+        elif issubclass(v_type, pq.Quantity) and def_val.size <= 1:
+            w = qd.HSpinBox(widget_parent,f"{k}:", widget_type = "q")
+            w.setValue(def_val)
+
+        elif issubclass(v_type, str):
+            w = qd.StringInput(widget_parent, f"{k}:")
+            w.setText(def_val)
+            # labels[k] = None
+
 
         elif v_type == np.ndarray:
             if dt.is_vector(def_val) and def_val.size <= 5:
-                w = qd.StringInput(group, "")
+                w = qd.StringInput(widget_parent, f"{k}:")
+                # labels[k] = None
                 if def_val.dtype.type is np.str_:
                     w.setText(", ".join(list(def_val)))
                 elif issubclass(def_val.dtype.type, np.number):
@@ -226,8 +264,10 @@ dialog.
                 else:
                     raise TypeError(f"Unsupported array dtype {def_val.dtype} ({def_val.dtype.type})")
             else:
-                w = TableEditorWidget(dlg)
+                w = TableEditorWidget(widget_parent)
                 w.setValue(def_val)
+                label = QtWidgets.QLabel(f"{k}:", widget_parent)
+                labels[k] = label
 
         else:
             raise TypeError(f"{v_type.__name__} types are not yet supported")
@@ -237,10 +277,26 @@ dialog.
         else:
             w.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Preferred)
 
-        group.addWidget(w, stretch=1)
         prompt_widgets[k] = w
 
-    dlg.addWidget(group, stretch=1)
+        # label = QtWidgets.QLabel(f"{k}:", widget_parent)
+        # labels[k] = label
+
+
+        if isinstance(group, qd.VDialogGroup):
+            group.addWidget(w, stretch=1)
+            if k in labels:
+                group.addWidget(label)
+            group.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Preferred)
+
+        else:
+            if k in labels:
+                dlg.addWidget(label)
+
+    if isinstance(group, qd.VDialogGroup):
+        dlg.addWidget(group, stretch=1)
+    else:
+        dlg.addWidget(w, stretch=1)
 
     # dlg.resize(-1, -1)
     dlg.adjustSize()
@@ -254,6 +310,9 @@ dialog.
         return ret
 
 def newObject(t: type):
-    pass
+    # PODS:
+    if t is bool:
+        pass
+
 
 

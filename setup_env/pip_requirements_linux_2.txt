@@ -235,6 +235,7 @@ tokenizers
 traitlets
 transformers
 treelib # although is a dependency of brainglobe (brainglobe_atlasapi) below
+tribool
 twine
 txt
 typing_extensions

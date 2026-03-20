@@ -1064,3 +1064,4 @@ def namespace_objects(x:types.SimpleNamespace) -> typing.Generator:
         raise TypeError(f"Expecting a types.SimpleNamespace; instead got a {type(x).__name__}")
 
     yield from x.__dict__.items()
+
