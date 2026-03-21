@@ -947,6 +947,170 @@ str2quantity(b1) → UnitCurrent('picoampere', 0.001 * nA, 'pA')
     else:
         raise ValueError(f"Expecting a str of the form '<number><space><UnitQuantity symbol>'; instead, got '{x}'")
 
+# def str2quantity_2(x:str, force_dimensionality: bool = False):
+#     r"""Reconstruct a scalar quantity or dimensionality from a str.
+#
+# .. |nbsp| unicode:: 0xA0
+#    :trim:
+#
+# Performs the reverse of quantity2str.
+#
+# Can also be used to retrieve a numeric scalar from its string representation.
+#
+# Parameters:
+# ==========
+# :x: str of the format "<number><space><unit_symbol>" where the parts |nbsp|
+# between angle brackets are optional (but the string must contain at least |nbsp|
+# one of them).
+#
+# :force_dimensionality: When ``True``, and the <unit_symbol> is absent, returns a |nbsp|
+# scalar quantity with units ``dimensionless``.
+#     When ``False`` (the *default*), and <unit_symbol> is absent, returns a numeric scalar
+#
+# Returns:
+# ========
+#
+# When unit_symbol is absent, returns a numeric scalar (int, float), unless |nbsp|
+# force_dimensionality is ``True``
+#
+# Example 1. Converting a scalar quantity:
+# ========================================
+#
+# ::
+#     a = 1 * pq.pA
+#
+#     b = quantity2str(a, precision=4, format="f") → "1.0000 pA"
+#
+#     # The round-trip is completed (with loss of precision) by str2quantity:
+#
+#     str2quantity(b) → array(1.)*pA
+#
+# Example 2: Converting a dimensionality:
+# =======================================
+#
+# ::
+#     b1 = quantity2str(a.dimensionality) → "pA"
+#
+#     # Round-trip:
+#
+#     str2quantity(b1) → UnitCurrent('picoampere', 0.001 * nA, 'pA')
+#
+# """
+#     import re
+#
+#     if not isinstance(x, str):
+#         raise TypeError(f"Expecting a str; got {type(x).__name__} instead")
+#
+#     # NOTE:
+#     # acceptable formats are
+#
+#     seq, m, string, d = strutils.is_sequence(x, True, True)
+#
+#
+#     # NOTE: 2026-03-21 16:55:44
+#     # pattern for detecting string representation of a quantity array, of the
+#     # form below
+#     # array = np.aray([0,1 0.2]) * pq.s
+#     # array_string = f"{array}"
+#     # -> '[0.1 0.2] s'
+#     pattern1 = r'([\\[|\\(|\\{](.+?)[\\]|\\)|\\}])(\\s+?)(.+?)'
+#
+#     matches = re.findall(pattern1, x)
+#
+#
+#
+#     parts = x.split()
+#     if len(parts) == 1:
+#         # just a dimensionality str
+#         # NOTE: will raise if str is incorrect
+#         ret = unitQuantityFromNameOrSymbol(parts[0])
+#         if force_dimensionality:
+#             ret *= pq.dimensionless
+#
+#         return ret
+#
+#     elif len(parts) >= 2:
+#         # NOTE: 2026-03-21 13:54:33 REMEMBER:
+#         # "f{np.ndarray([0.2, 0.2])*pq.s}" -> '[0.2 0.2] s'
+#         # will raise if x is wrong
+#         # unit = unitQuantityFromNameOrSymbol(parts[-1])
+#         OK, matches, string, delims = strutils.is_sequence(x, True, True)
+#         if OK:
+#             if delims[-1] == " ":
+#                 # is this a sequence of numbers or a sequence of numbers and a string?
+#                 val = list()
+#                 sub_parts = string.split(delims[-1])
+#                 if delims[-1] == " ":
+#                     if len(sub_parts) % 2 == 0:
+#                         # here a string of the form number symbol number symbol ... is OK
+#                         # this signifies a sequence of scalar quantities, possibly each with its own units
+#                         num_parts = sub_parts[0:2:len(sub_parts)]
+#                         sym_parts = sub_parts[1:2:len(sub_parts)]
+#                         assert(all(strutils.isnumber(s) for s in num_parts)), "Unexpected string structure"
+#
+#                         values = list(map(lambda s: eval(s), num_parts))
+#                         units =
+#
+#                         assert(all(not strutils.isnumber(s) for s in sym_parts)), "Unexpected string structure"
+#
+#                     else:
+#                         # here, a string os the form number number ... symbol is OK
+#                         assert(all(strutils.isnumber(s) for s in sub_parts[:-1]))
+#
+#
+#                 for k,v in enumerate(sub_parts):
+#                     if strutils.isnumber(v):
+#                         val.append(eval(v))
+#                     else:
+#                         if k == len(sub_parts)-1:
+#                             unit = unitQuantityFromNameOrSymbol(v)
+#                         else:
+#                             raise ValueError("Unexpected non-numeric string") # WRONG
+#
+#             val = list(map(lambda s: eval(s), string.split(delims[-1])))
+#             if x.startswith("["):
+#                 val = np.array(val)
+#                 val_units = x.split(f"[{string}]")
+#                 if len(val_units) > 1:
+#                     units_s = val_units[-1]
+#                     unit = unitQuantityFromNameOrSymbol(unit_s)
+#                 else:
+#                     if force_dimensionality:
+#                         unit = pq.Dimensionless
+#                     else:
+#                         unit = None
+#
+#             else:
+#
+#
+#             if len(parts) == 2:
+#                 val = eval(parts[0])
+#             else:
+#                 else:
+#
+#
+#         return val * unit
+#
+#     else:
+#         if x.startswith("["):
+#             # possible string representation of a quantity or generic numpy array
+#             OK, matches, string, delims = strutils.is_sequence(x, True, True)
+#             if OK:
+#                 val = np.array(list(map(lambda s: eval(s), string.split(delims[-1]))))
+#                 # NOTE: 2026-03-21 11:12:37
+#                 # check if string ends up with units symbol
+#                 val_units = x.split(f"[{string}]")
+#                 if len(val_units) > 1:
+#                     units_s = val_units[-1]
+#                     unit = unitQuantityFromNameOrSymbol(unit_s)
+#                     return val * unit
+#
+#                 else:
+#                     return val
+#
+#
+#         raise ValueError(f"Expecting a str of the form '<number><space><UnitQuantity symbol>'; instead, got '{x}'")
+
 def shortSymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]) -> str:
     r"""Returns the (short) symbol of this quantity's units)
     E.g., 'V', 'mV', '1/Hz'
@@ -994,52 +1158,70 @@ def prettySymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]) 
 
     return delim.join(list(map(lambda v: f"{v[0]}{_pretty_power_(v[1])}", list((k.symbol, p) for k,p in x.items()))))
 
-
 def quantity2str(x:typing.Union[
                     pq.Quantity,
                     pq.UnitQuantity,
-                    pq.dimensionality.Dimensionality
+                    pq.dimensionality.Dimensionality,
+                    typing.Sequence[pq.Quantity]
                     ],
                  precision:int = 2,
                  format:str="f"):
-    r"""Returns a str representation of a scalar Quantity or Dimensionality.
-    Useful to store quantities via json/yaml etc.
-    WARNING: There will be loss of precision!
+    r"""Returns a str representation of a Dimensionality, Quantity, or Quantity sequence.
 
-    The returned string has the form:
+Useful to store quantities via json/yaml etc.
+WARNING: There will be loss of precision!
 
-    <[number][space]>[unit symbol] where the part between angle brackets is optional
+The returned string has the form:
 
-    Parameters:
-    ===========
-    x: scalar Quantity or Dimensionality
+<[number][space]>[unit symbol] where the part between angle brackets is optional
 
-    Example 1. Converting a scalar quantity:
-    ========================================
+Parameters:
+===========
+
+:x: Object to represent as a string
+
+:precision: number of diit to the riht of the decimal point
+
+:format: format string
+
+Example 1. Converting a scalar quantity:
+========================================
+
+::
+
     a = 1 * pq.pA
 
     b = quantity2str(a, precision=4, format="f") → "1.0000 pA"
 
-    The round-trip is completed (with loss of precision) by str2quantity:
+    # The round-trip is completed (with loss of precision) by str2quantity:
 
     str2quantity(b) → array(1.)*pA
 
-    Example 2: Converting a dimensionality:
-    =======================================
+Example 2: Converting a dimensionality:
+=======================================
+
+::
 
     b1 = quantity2str(a.dimensionality) → "pA"
 
-    Round-trip:
+    # Round-trip:
     str2quantity(b1) → UnitCurrent('picoampere', 0.001 * nA, 'pA')
 
-    """
+"""
+    from core.datatypes import is_vector
+    if isinstance(x, typing.Sequence) and all(isinstance(q, pq.Quantity) for q in x):
+        return ", ".join(list(map(lambda q: quantity2str(q), x)))
+
+
     if not isinstance(x, (pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality)):
         raise TypeError("Expecting a python Quantity or UnitQuantity; got %s instead" % type(x).__name__)
+
     if isinstance(x, pq.dimensionality.Dimensionality):
         return x.string
 
     if x.magnitude.flatten().size != 1:
-        raise TypeError("Expecting a scalar quantity; got a quantity of size %d instead" % x.magnitude.flatten().size)
+        if not is_vector(x):
+            raise TypeError(f"Expecting a scalar quantity or a quantity vector; instead, got a quantity of size {x.magnitude.flatten().size} with {x.ndim} dimensions")
 
     if not isinstance(precision, int):
         raise TypeError("precision expected to be an int; got %s instead" % type(precision).__name__)
@@ -1050,6 +1232,9 @@ def quantity2str(x:typing.Union[
     mag_format = "%d" % precision
 
     fmt = "%." + mag_format + format
+
+    if is_vector(x):
+        return f"{x}"
 
     return " ".join([fmt % x.magnitude, x.units.dimensionality.string])
 

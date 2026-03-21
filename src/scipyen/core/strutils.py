@@ -280,6 +280,8 @@ When delimiters is True, also returns a list of delimiter characters, sorted.
         if match: # get the delimiters
             string = match.group(1)
             delim_list = sorted(re.findall(r'[,\s;|]+', string))
+            if len(delim_list) == 0:
+                ret = False
 
     if matches:
         if delimiters:

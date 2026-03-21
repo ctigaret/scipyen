@@ -82,7 +82,8 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
                      ] = None):
 
         if not isinstance(parent, QtWidgets.QWidget):
-            obj = parent
+            if obj is None and isinstance(parent, (neo.Event, DataMark, TriggerEvent)):
+                obj = parent
             parent = None
 
         if not isinstance(obj, (neo.Event, DataMark, TriggerEvent, type(None))):
@@ -99,6 +100,8 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         self._event_type_ = None
         self._event_name_ = None
         self._event_labels_ = None
+
+        # self._data_type_change_pending_ = None
 
         if self._data_ is not None:
             self._units_ = self._data_.times.units
@@ -121,11 +124,11 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
 
     def _configureUI_(self):
         self.setupUi(self)
-        self.setEventClassAction = QtGui.QAction("Class")
+        self.setEventClassAction = QtGui.QAction("Event Class")
         self.setEventClassAction.triggered.connect(self._slot_setEventClass)
-        self.setEventTypeAction = QtGui.QAction("Type")
+        self.setEventTypeAction = QtGui.QAction("Event Type")
         self.setEventTypeAction.triggered.connect(self._slot_setEventType)
-        self.setEventDomanUnitsAction = QtGui.QAction("Units")
+        self.setEventDomanUnitsAction = QtGui.QAction("Event Units")
         self.setEventDomanUnitsAction.triggered.connect(self._slot_setEventUnits)
         self.nameLabelsAction = QtGui.QAction("Name and labels")
         self.nameLabelsAction.triggered.connect(self._slot_setNameLabels)
@@ -133,7 +136,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         self.timesLineEdit.redoAvailable=True
         self.timesLineEdit.setClearButtonEnabled(True)
         self.timesLineEdit.installEventFilter(self)
-        self.timesLineEdit.setToolTip("Right click for more actions")
+        self.timesLineEdit.setToolTip("Right click for options")
         # self.timesLineEdit.setValidator(NumericStringValidator(self))
 
         self.timesLineEdit.textChanged.connect(self._slot_timesChanged)
@@ -143,7 +146,8 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         signalBlockers = QtCore.QSignalBlocker(self.timesLineEdit)
         if isinstance(self._times_, np.ndarray):
             if dt.is_vector(self._times_)  or self._times_.ndim == 0:
-                self.timesLineEdit.setText(strutils.numbers2str(self._times_))
+                text = ", ".joini(list(map(lambda q: scq.quantity2str(q), self._data_.times)))
+                # self.timesLineEdit.setText(strutils.numbers2str(self._times_))
                 self.timesLineEdit.setReadOnly(False)
             else:
                 self.timesLineEdit.setText(f"Array with shape {self._times_.shape}")
@@ -178,12 +182,17 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             menu.addSeparator()
 
         menu.addAction(self.setEventClassAction)
-        if (
-            isinstance(self._data_, DataMark)
-            and not isinstance(self._data_, (TriggerEvent, neo.Event))
+
+        if (isinstance(self._data_, (DataMark, TriggerEvent))
             ):
             menu.addAction(self.setEventTypeAction)
-            menu.addAction(self.setEventDomanUnitsAction)
+
+            if (
+                isinstance(self._data_, DataMark)
+                and not isinstance(self._data_, TriggerEvent)
+                ):
+                # menu.addAction(self.setEventTypeAction)
+                menu.addAction(self.setEventDomanUnitsAction)
 
         menu.addAction(self.nameLabelsAction)
 
@@ -345,14 +354,20 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         if dlg.exec():
             self._data_type_ = self.supported_types[cb.text()]
 
+        event_type_needs_change: bool = False
+
         if self._data_type_ is TriggerEvent and isinstance(self._event_type_, MarkType):
             self._event_type_ = TriggerEventType.unspecified
-            self._slot_setEventType()
+            event_type_needs_change = True
+            # self._slot_setEventType()
 
         elif self._data_type_ is DataMark and isinstance(self._event_type_, TriggerEventType):
             self._event_type_ = MarkType.unspecified
-            self._slot_setEventType()
+            event_type_needs_change = True
+            # self._slot_setEventType()
 
+        if event_type_needs_change:
+            self._slot_setEventType()
         else:
             self._createEventObject_()
 
@@ -360,9 +375,14 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
     def _slot_setEventType(self):
         dlg = qd.QuickDialog(self, title="Choose Event Type")
         cb = qd.QuickDialogComboBox(dlg, "Type")
-        if isinstance(self._data_, TriggerEvent):
+        if type(self._data_) != self._data_type_:
+            mytype = self._data_type_
+        else:
+            mytype = type(self._data_)
+        # if isinstance(self._data_, TriggerEvent):
+        if mytype == TriggerEvent:
             evt_types = list(TriggerEventType.names())
-        elif isinstance(self._data_, DataMark):
+        elif mytype == DataMark:
             evt_types = list(MarkType.names())
         else:
             return
@@ -378,12 +398,12 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         if dlg.exec():
             evt_typename = cb.text()
 
-        if isinstance(self._data_, DataMark):
-            self._event_type_ = getattr(MarkType, evt_typename)
-        else:
-            self._event_type_ = getattr(TriggerEventType, evt_typename)
+            if isinstance(self._data_, DataMark):
+                self._event_type_ = getattr(MarkType, evt_typename)
+            else:
+                self._event_type_ = getattr(TriggerEventType, evt_typename)
 
-        self._createEventObject_()
+            self._createEventObject_()
 
     @Slot()
     def _slot_setEventUnits(self):

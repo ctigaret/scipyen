@@ -524,11 +524,21 @@ class LineEdit(QtWidgets.QLineEdit):
             stdMenu.exec(evt.globalPos())
 
     def validate(self, *args) -> bool:
+        r"""For compatibilty with qd.QuickDialog"""
         if self._validator_ is None:
             return True
 
         else:
-            return self._validator_.validate(*args) == QtGui.QValidator.Acceptable
+            # print(f"{self.__class__.__name__}.validate({args})")
+            if len(args):
+                if isinstance(args[0], str):
+                    ret = self._validator_.validate(args[0], len(args[0]))
+                    # print(f"{self.__class__.__name__}.validate({args}) -> {ret}")
+                    return ret[0] == QtGui.QValidator.Acceptable
+                else:
+                    return False
+            else:
+                return True
 
     def setValidator(self, val):
         self.validator = val

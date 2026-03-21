@@ -79,7 +79,14 @@ class NumericStringValidator(QtGui.QValidator):
     def __init__(self, parent = None):
         super().__init__(parent)
 
-    def validate(self, s:str, pos: int):
+    # def validate(self, s:str, pos: int) -> QtGui.QValidator.State:
+    def validate(self, s:str, pos: int) -> tuple:
+        r"""Implements Validator.validate().
+.. warning::
+
+    Unlike the Qt6 class, which returns only, QtGui.QValidator.State,  PyQt6 this is supposed to return a triple: QtGui.QValidator.State, str, int
+
+"""
         from core.strutils import isnumber, is_sequence
         import core.scipyen_quantities as scq
         # from core.datatypes import is_numeric_string
@@ -88,51 +95,62 @@ class NumericStringValidator(QtGui.QValidator):
 
         # print(f"{self.__class__.__name__}.validate('{s}', {pos}) -> '{ss}'")
 
-        if s is None or len(s.strip()) == 0:
-            print(f"{self.__class__.__name__}: empty string")
-            return QtGui.QValidator.Intermediate
+        if s is None or isinstance(s, str) and len(s.strip()) == 0:
+            # print(f"{self.__class__.__name__}: None or empty string -> Intermediate")
+            return QtGui.QValidator.Intermediate, s, pos
 
         if not isinstance(s, str):
-            print(f"{self.__class__.__name__}: no string")
-            return QtGui.QValidator.Invalid
+            # print(f"{self.__class__.__name__}.validate: no string -> Invalid")
+            return QtGui.QValidator.Invalid, s, pos
 
         if pos > len(s) or pos < -len(s):
-            print(f"{self.__class__.__name__}: out of bounds")
-            return QtGui.QValidator.Invalid
+            # print(f"{self.__class__.__name__}.validate: out of bounds -> Invalid")
+            return QtGui.QValidator.Invalid, s, pos
 
         if not isnumber(ss) and not is_sequence(ss):
-            return QtGui.QValidator.Intermediate
+            # print(f"{self.__class__.__name__}.validate: not a number or sequence -> Intermediate")
+            return QtGui.QValidator.Intermediate, s, pos
 
         try:
             # BUG: 2026-03-20 16:26:39 FIXME/TODO:
             # allow naked sequence forms and naked quantity forms e.g.
             # 0.2 s, 0.3 s
             u = eval(ss)
-            return QtGui.QValidator.Acceptable
+            # print(f"{self.__class__.__name__}.validate: Acceptable")
+            return QtGui.QValidator.Acceptable, s, pos
+
         except SyntaxError:
             flag, match, string, delims = is_sequence(ss, True, True)
             # print(f"{self.__class__.__name__}.validate: -> delims = {delims}")
             if len(delims) and len(delims[-1].strip()):
                 try:
-                    test = tuple(map(lambda x: scq.str2quantity(x), ss.split(delims[-1])))
-                    if all(isinstance(v, (numbers.Number, pq.Quantity)) for v in test):
+                    parts = tuple(map(lambda x: scq.str2quantity(x), ss.split(delims[-1])))
+                    # print(f"{self.__class__.__name__}.validate: -> parts = {parts}")
+                    if all(isinstance(v, (numbers.Number, pq.Quantity)) for v in parts):
                         if len(ss) == len(s):
-                            return QtGui.QValidator.Acceptable
+                            # print(f"\t: => Acceptable")
+                            return QtGui.QValidator.Acceptable, s, pos
                         else:
-                            return QtGui.QValidator.Intermediate
+                            # print(f"\t: => Intermediate")
+                            return QtGui.QValidator.Intermediate, s, pos
 
                     else:
-                        return QtGui.QValidator.Invalid
+                        # print(f"\t: => Invalid")
+                        return QtGui.QValidator.Invalid, s, pos
 
                 except:
-                    # traceback.print_exc()
-                    return QtGui.QValidator.Invalid
+                    traceback.print_exc()
+                    # print(f"{self.__class__.__name__}.validate: -> cannot parse inner string => Invalid")
+                    return QtGui.QValidator.Invalid, s, pos
             else:
-                # traceback.print_exc()
-                return QtGui.QValidator.Intermediate
-        except:
-            # traceback.print_exc()
-            return QtGui.QValidator.Invalid
+                # print(f"{self.__class__.__name__}.validate: -> no delims => Intermediate")
+                traceback.print_exc()
+                return QtGui.QValidator.Intermediate, s, pos
+
+        except Exception as e:
+            # print(f"{self.__class__.__name__}.validate: -> {e} => Invalid")
+            traceback.print_exc()
+            return QtGui.QValidator.Invalid, s, pos
 
 class InftyDoubleValidator(QtGui.QDoubleValidator):
     def __init__(self, bottom:float=-math.inf, top:float=math.inf,
