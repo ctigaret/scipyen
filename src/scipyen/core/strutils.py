@@ -62,6 +62,9 @@ else:
     __has_sip__ = True
 
 
+from core.regexps import *
+
+
 # import qtpy
 # qtpy.API = os.environ["QT_API"]
 # if os.environ["QT_API"] == "pyside6":
