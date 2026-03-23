@@ -941,7 +941,7 @@ str2quantity(b1) → UnitCurrent('picoampere', 0.001 * nA, 'pA')
     else:
         raise ValueError(f"Expecting a str of the form '<number><space><UnitQuantity symbol>'; instead, got '{x}'")
 
-def str2quantity_2(x:str) -> typing.Optional[
+def str2quantity_2(x:str, force_dimensionless: bool = False) -> typing.Optional[
     typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]]:
     r"""Reconstruct a quantity (salar or array), a sequence of quantities, or dimensionality, from a string.
 
@@ -1049,7 +1049,7 @@ def str2quantity_2(x:str) -> typing.Optional[
             for m in bracketed:
                 values = m[0].split(" ")
                 value = np.array(list(map(lambda s: eval(s), values)))
-                units = unitQuantityFromNameOrSymbol(m[-1])
+                units = unitQuantityFromNameOrSymbol(m[-1], force_dimensionless)
                 # print(f"bracketed m: {m[0]}, value: {value}, units: {units}")
                 result.append(value * units)
 
@@ -1066,7 +1066,7 @@ def str2quantity_2(x:str) -> typing.Optional[
                     if test_m in x:
                         values = m[0].split(" ")
                         value = np.array(list(map(lambda s: eval(s), values)))
-                        units = unitQuantityFromNameOrSymbol(m[-1])
+                        units = unitQuantityFromNameOrSymbol(m[-1], force_dimensionless)
                         # print(f"partially bracketed m: {m[0]}, value: {value}, units: {units}")
                         result.append(value * units)
                         start = x.find(test_m)
@@ -1074,7 +1074,7 @@ def str2quantity_2(x:str) -> typing.Optional[
                         x = x[0:start] + x[stop:]
 
                 if len(x):
-                    remainder = str2quantity_2(x)
+                    remainder = str2quantity_2(x, force_dimensionless)
                     if isinstance(remainder, typing.Sequence) and len(remainder) and all(isinstance(r, (pq.Quantity, typing.Sequence))):
                         result.extend(remainder)
 
@@ -1097,7 +1097,7 @@ def str2quantity_2(x:str) -> typing.Optional[
                     test_m = "".join(list(m))
                     if test_m in x:
                         value = eval(m[0])
-                        units = unitQuantityFromNameOrSymbol(m[-1])
+                        units = unitQuantityFromNameOrSymbol(m[-1], force_dimensionless)
                         result.append(value * units)
 
                 if len(result) == 1:
@@ -1107,11 +1107,12 @@ def str2quantity_2(x:str) -> typing.Optional[
                     return result
 
         else:
+            # if strutils.is_sequence(x):
             # might be a dimensionality string?
-            try:
-                return unitQuantityFromNameOrSymbol(x)
-            except:
-                pass
+            return unitQuantityFromNameOrSymbol(x, force_dimensionless)
+            # try:
+            # except:
+            #     pass
 
 
 def shortSymbol(x:typing.Union[pq.Quantity, pq.dimensionality.Dimensionality]) -> str:
@@ -1778,7 +1779,7 @@ def checkRescale(x: pq.Quantity, y: pq.Quantity) -> pq.Quantity:
 
     return x if x.units == y.units else x.rescale(y.units)
 
-def unitQuantityFromNameOrSymbol(s):
+def unitQuantityFromNameOrSymbol(s, force_dimensionless: bool = False):
     if not isinstance(s, str):
         raise TypeError("Expecting a string; got %s instead" % type(s).__name__)
 
@@ -1800,9 +1801,8 @@ def unitQuantityFromNameOrSymbol(s):
                 ret = [u for u in custom_unit_symbols.values() if u.name == s]
 
             else:
-                warnings.warn("Unknown unit quantity %s" % s, RuntimeWarning)
-
-                ret = pq.dimensionless
+                # warnings.warn("Unknown unit quantity %s" % s, RuntimeWarning)
+                ret = pq.dimensionless if force_dimensionless else None
 
         return ret
 

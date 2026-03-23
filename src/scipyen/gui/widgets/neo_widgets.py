@@ -79,7 +79,8 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
                  obj:typing.Optional[
                      typing.Union[neo.Event, DataMark, TriggerEvent]
-                     ] = None):
+                     ] = None,
+                 precision: typing.Optional[int] = None):
 
         if not isinstance(parent, QtWidgets.QWidget):
             if obj is None and isinstance(parent, (neo.Event, DataMark, TriggerEvent)):
@@ -100,6 +101,8 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         self._event_type_ = None
         self._event_name_ = None
         self._event_labels_ = None
+
+        self._precision_ = precision if (isinstance(precision, int) and precision > 0) else None
 
         # self._data_type_change_pending_ = None
 
@@ -145,8 +148,11 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
     def _update_(self):
         signalBlockers = QtCore.QSignalBlocker(self.timesLineEdit)
         if isinstance(self._times_, np.ndarray):
+            if not isinstance(self._precision_, int):
+                pass
             if dt.is_vector(self._times_)  or self._times_.ndim == 0:
-                text = ", ".joini(list(map(lambda q: scq.quantity2str(q), self._data_.times)))
+                text = ", ".join(list(map(lambda q: scq.quantity2str(q, precision=self._precision_), self._data_.times)))
+                self.timesLineEdit.setText(text)
                 # self.timesLineEdit.setText(strutils.numbers2str(self._times_))
                 self.timesLineEdit.setReadOnly(False)
             else:
@@ -332,6 +338,9 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
                 elif isinstance(v, numbers.Number):
                     self._times_ = np.array([v])
             except:
+            #     try:
+            #         v = scq.str2quantity_2(value)
+            #         if
                 return
 
         # print(f"{self.__class__.__name__}._slot_timesChanged: self._times_ = {self._times_}")

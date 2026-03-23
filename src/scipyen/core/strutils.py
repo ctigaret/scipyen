@@ -238,6 +238,7 @@ When delimiters is True, also returns a list of delimiter characters, sorted.
 
 """
     import re
+    from core.regexps import DELIMITERS, BRACKETED_SEQUENCE
 
     match = None
     # decorated = False
@@ -380,6 +381,12 @@ def lettersToOrdinal(x: str) -> int:
 
 letters2ordinal = lettersToOrdinal
 
+def str2sequence_2(s: str):
+    from core.regexps import BRACKETED_SEQUENCE, DELIMITERS
+
+    DELIMITERS
+
+
 def str2sequence(s: str) -> typing.List[str]:
     r"""Parses the string representation of a sequence into a sequence of strings"""
     if not isinstance(s, str) or len(s.strip()) == 0:
@@ -411,7 +418,7 @@ def str2sequence(s: str) -> typing.List[str]:
             if seqStart == "(" and seqEnd == ")":
                 return tuple(ss.split(delim))
             else:
-                return ss.split  # a list
+                return ss.split()  # a list
         else:
             return s
 

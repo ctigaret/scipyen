@@ -1001,9 +1001,11 @@ class TriggerProtocolList(NeoObjectList):
     def __getitem__(self, i: int) -> TriggerProtocol | None:
         """x.__getitem__(y) <==> x[y]"""
         if len(self._items) == 0:
-            raise ValueError(f"Index {i} out of range for {len(self._items)} items")
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
         if i < len(self._items) and i >= -len(self._items):
             return self._items[i]
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
     def __setitem__(self, i: int, value: TriggerProtocol):
         if not isinstance(value, TriggerProtocol):
@@ -1012,9 +1014,8 @@ class TriggerProtocolList(NeoObjectList):
             raise ValueError(f"Index {i} out of range for {len(self._items)} items")
         if i < len(self._items) and i >= -len(self._items):
             self._items[i] = value
-        # if self._items is None:
-        #     self._spiketrains_from_array()
-        # self._items[i] = value
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
     def __str__(self):
         """Return str(self)"""

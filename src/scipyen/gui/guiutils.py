@@ -124,7 +124,8 @@ class NumericStringValidator(QtGui.QValidator):
             # print(f"{self.__class__.__name__}.validate: -> delims = {delims}")
             if len(delims) and len(delims[-1].strip()):
                 try:
-                    parts = tuple(map(lambda x: scq.str2quantity(x), ss.split(delims[-1])))
+                    # parts = tuple(map(lambda x: scq.str2quantity(x), ss.split(delims[-1])))
+                    parts = tuple(map(lambda x: scq.str2quantity_2(x), ss.split(delims[-1])))
                     # print(f"{self.__class__.__name__}.validate: -> parts = {parts}")
                     if all(isinstance(v, (numbers.Number, pq.Quantity)) for v in parts):
                         if len(ss) == len(s):
