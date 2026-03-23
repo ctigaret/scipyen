@@ -215,7 +215,7 @@ Parameters:
 ===========
 :s: string to test
 
-:matches: When ``True``, also return the regexp match object and the matched string
+:matches: When ``True``, also return a list of the matched (sub)strings
 
 :delimiters: When ``True``, and ``matches`` is also ``True``, then also return |nbsp|
     the delimiter characters, in addition to the match object and the matched string
@@ -238,33 +238,35 @@ When delimiters is True, also returns a list of delimiter characters, sorted.
 
 """
     import re
-    from core.regexps import DELIMITERS, BRACKETED_SEQUENCE
+    from core.regexps import (DELIMITERS, BRACKETED_SEQUENCE,
+                              BRACKETED_NUMERIC_SEQUENCE)
+    from core.utilities import unique
 
-    match = None
     # decorated = False
-    delim_list = list()
-    string = ""
+    match = None
+    matched = ""
+    groups = list()
+    delims = list()
+    # string = ""
 
     if not isinstance(s, str) or len(s.strip())==0:
         ret = False
 
     else:
 
-#         pattern0 = r'^\[.*\]$|^\(.*\)$'
-#
-#         match0 = re.match(pattern0, s)
+        delims = unique(sorted(DELIMITERS.findall(s)))
 
-        # s = s.strip() # remove spaces at the ends
+        match = BRACKETED_SEQUENCE.match(s)
+        # match is needed because it incorporates the brackets
+        # groups contain the matched BETWEEN (and excluding) the brackets
+        # because of this, contents of a group MAY be a syntactically incorrect sequence string
+        # i.e. with missing end bracket
+        # so, might just call:  groups = list(match.groups()) instead
+        # groups = BRACKETED_SEQUENCE.findall(s) # same as match.groups()
 
-        # starts = ["(", "[", "{"]
-        # ends = [")", "]", "}"]
-
-        # pattern = r'^\[.*\]$|^\(.*\)$'
-        pattern = r'[\[|\(|\{](.+?)[\]|\)|\}]'
-
-        match = re.match(pattern, s)
-
-        if match:
+        if match is not None:
+            matched = match.string
+            groups = list(match.groups())
             ret = True
             # string = match.group(1)
         else:
@@ -272,26 +274,27 @@ When delimiters is True, also returns a list of delimiter characters, sorted.
             # try and see is decorating with '(' and ')' turns it into a sequence string
             ss = "(" + s + ")"
             # decorated = True
-            match = re.match(pattern, ss)
-            if match:
+            # match = re.match(pattern, ss)
+            match = BRACKETED_SEQUENCE.match(ss)
+            if match is not None:
+                matched = match.string
+                groups = list(match.groups())
                 ret = True
+            # groups = BRACKETED_SEQUENCE.findall(, ss) # same as match.groups()
+            # if match:
+            # if len(groups):
+            #     ret = True
                 # # string = match.string[1:-1]
                 # string = match.group(1)
                 # delim_list =
             else:
                 ret = False
 
-        if match: # get the delimiters
-            string = match.group(1)
-            delim_list = sorted(re.findall(r'[,\s;|]+', string))
-            if len(delim_list) == 0:
-                ret = False
-
     if matches:
         if delimiters:
-            return ret, match, string, delim_list
+            return ret, matched, groups, delims
         else:
-            return ret, match, string
+            return ret, matched, groups
     else:
         return ret
 
@@ -388,7 +391,19 @@ def str2sequence_2(s: str):
 
 
 def str2sequence(s: str) -> typing.List[str]:
-    r"""Parses the string representation of a sequence into a sequence of strings"""
+    r"""Parses the string representation of a sequence of elements.
+
+.. note::
+
+    Restricted to simple sequences of plain old data (POD) types (numeric scalars,
+    strings), numpy arrays, and tuples or lists.
+
+"""
+
+    OK, groups, delimiters = is_sequence(s, True, True)
+
+
+
     if not isinstance(s, str) or len(s.strip()) == 0:
         return list()
 
