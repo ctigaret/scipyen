@@ -6321,6 +6321,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 self.menuWith_Running_Kernel.addAction(
                     self.actionRunning_IPython_for_Neuron)
 
+            self.menuConsoles.addSeparator()
+            self.menuConsoles.addAction(self.actionOpen_System_Terminal)
+
         # self.actionRestore_Workspace.triggered.connect(self.slot_restoreWorkspace)
         self.actionHelp_On_Console.triggered.connect(self._slot_helpOnConsole_)
 

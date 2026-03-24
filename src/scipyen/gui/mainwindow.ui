@@ -185,7 +185,6 @@
     <property name="icon">
      <iconset theme="akonadiconsole"/>
     </property>
-    <addaction name="actionOpen_System_Terminal"/>
    </widget>
    <widget class="QMenu" name="menuScripts">
     <property name="title">

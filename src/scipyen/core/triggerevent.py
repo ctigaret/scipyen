@@ -667,8 +667,8 @@ class DataMark(neo.Event):
                 objs = ["%s" % time for time in self.times]
 
         else:
-            if self.labels is not None:
-                if self.labels.size > 0:
+            if self.labels is not None and self.labels.size > 0:
+                if self.labels.size > 1:
                     objs = ["%s@%s" % (label, self.times) for label in self.labels]
 
                 else:
