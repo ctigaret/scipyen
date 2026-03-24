@@ -482,7 +482,7 @@ def str2sequence(s: str) -> typing.List[str]:
 
 """
 
-    OK, matches, groups, delimiters = is_sequence(s, True, True)
+    OK, matches, groups, delimiters = is_sequence(s, True, True, True )
 
 
 
