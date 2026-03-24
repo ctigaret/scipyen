@@ -11,6 +11,53 @@ Do NOT import this in your code, but comments in the regexps.py module may |nbsp
 refer to the contents of this module.
 
 """
+
+# # ### BEGIN: NOTE: 2026-03-24 10:37:56 GPT-5 mini, via Duck.ai
+# # in answer to query "stack-based python code for detecting nested sequences in a string"
+# from typing import List, Tuple, Dict
+#
+# # Return type: list of (open_index, close_index, depth, open_char, close_char)
+# def detect_nested_sequences(s: str,
+#                             pairs: Dict[str, str] = None) -> List[Tuple[int,int,int,str,str]]:
+#     if pairs is None:
+#         pairs = {'(': ')', '[': ']', '{': '}'}
+#     open_to_close = pairs
+#     close_to_open = {c: o for o, c in open_to_close.items()}
+#     stack: List[Tuple[str,int,int]] = []  # (open_char, index, depth)
+#     results: List[Tuple[int,int,int,str,str]] = []
+#     max_depth = 0
+#
+#     for i, ch in enumerate(s):
+#         if ch in open_to_close:
+#             depth = len(stack) + 1
+#             stack.append((ch, i, depth))
+#             if depth > max_depth:
+#                 max_depth = depth
+#         elif ch in close_to_open:
+#             if not stack:
+#                 # unmatched closing; skip or handle as needed
+#                 continue
+#             open_ch, open_i, open_depth = stack.pop()
+#             expected_open = close_to_open[ch]
+#             if open_ch != expected_open:
+#                 # mismatched pair: discard or try to recover (here we skip)
+#                 # If needed, you can implement error handling/recovery here.
+#                 continue
+#             results.append((open_i, i, open_depth, open_ch, ch))
+#
+#     # results currently in order of encountering closes; sort by open index if desired
+#     results.sort(key=lambda x: x[0])
+#     return results
+#
+# # Example
+# if __name__ == "__main__":
+#     s = "a(b[c]{d(e)})f"
+#     spans = detect_nested_sequences(s)
+#     for open_i, close_i, depth, o, c in spans:
+#         print(f"{o}@{open_i} ... {c}@{close_i}  depth={depth}  substring='{s[open_i:close_i+1]}'")
+#
+# # ### END  : NOTE: 2026-03-24 10:37:56 GPT-5 mini, via Duck.ai
+
 a = [0.1, 0.2]
 a_s = f"{a}"                                                # '[0.1, 0.2]'
 

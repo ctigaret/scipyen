@@ -205,7 +205,8 @@ def subscript(s:str)->str:
 
     return "".join(list(map(lambda c: SUBSCRIPT_UNICODE.get(c,c), s)))
 
-def is_sequence(s: str, matches: bool = False, delimiters: bool = False) -> bool:
+def is_sequence(s: str, matches: bool = False, delimiters: bool = False,
+                spans: bool = False) -> bool | dict:
     r"""Test if ``s`` is a string representation of a tuple or list.
 
 .. |nbsp| unicode:: 0xA0
@@ -237,24 +238,26 @@ e.g. '0.2 s, 0.3 s', the function internally encloses the string in parentheses.
 When delimiters is True, also returns a list of delimiter characters, sorted.
 
 """
-    import re
+    # import re
     from core.regexps import (DELIMITERS, BRACKETED_SEQUENCE,
                               BRACKETED_NUMERIC_SEQUENCE)
     from core.utilities import unique
 
     # decorated = False
     match = None
-    matched = ""
+    string = None
     groups = list()
     delims = list()
-    # string = ""
+    sequences = list()
 
     if not isinstance(s, str) or len(s.strip())==0:
         ret = False
 
     else:
-
+        # find delimiters
         delims = unique(sorted(DELIMITERS.findall(s)))
+        # check if this is a sequence and also for nested sequences
+        sequences = detect_nested_sequences(s)
 
         match = BRACKETED_SEQUENCE.match(s)
         # match is needed because it incorporates the brackets
@@ -264,37 +267,33 @@ When delimiters is True, also returns a list of delimiter characters, sorted.
         # so, might just call:  groups = list(match.groups()) instead
         # groups = BRACKETED_SEQUENCE.findall(s) # same as match.groups()
 
-        if match is not None:
-            matched = match.string
-            groups = list(match.groups())
+        if match is not None and len(sequences):
             ret = True
+            string = match.string
+            groups = list(match.groups())
+
+
             # string = match.group(1)
         else:
             # NOTE: 2026-03-20 15:59:32
             # try and see is decorating with '(' and ')' turns it into a sequence string
             ss = "(" + s + ")"
-            # decorated = True
-            # match = re.match(pattern, ss)
-            match = BRACKETED_SEQUENCE.match(ss)
-            if match is not None:
-                matched = match.string
-                groups = list(match.groups())
-                ret = True
-            # groups = BRACKETED_SEQUENCE.findall(, ss) # same as match.groups()
-            # if match:
-            # if len(groups):
-            #     ret = True
-                # # string = match.string[1:-1]
-                # string = match.group(1)
-                # delim_list =
-            else:
-                ret = False
+            return is_sequence(ss, matches = matches,
+                               delimiters = delimiters, spans = spans)
 
-    if matches:
+    # print(f"matches = {matches}, delimiters = {delimiters}, spans = {spans} ")
+    if any ((matches, delimiters, spans)):
+        # print(f"returning a dict")
+        result = {"result": ret}
+        if matches:
+            result["string"] = string
         if delimiters:
-            return ret, matched, groups, delims
-        else:
-            return ret, matched, groups
+            result["delimiters"] = delims
+        if spans:
+            result["sequences"] = sequences
+
+        return result
+
     else:
         return ret
 
@@ -389,6 +388,89 @@ def str2sequence_2(s: str):
 
     DELIMITERS
 
+def detect_nested_sequences(s: str,
+                            pairs: typing.Dict[str, str] = None
+                            ) -> typing.List[typing.Tuple[int,int,int,str,str]]:
+    r"""Detects nested sequences (balanced and properly nested delimiters) in a string.
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+The function supports any opening/closing pairs supplied |nbsp|
+(default: (), [], {}).
+
+Returns:
+=======
+List of spans, nesting depth (1 is the outermost), and open & close characters:
+
+    (open_index, close_index, depth, open_character, close_character)
+
+::
+
+    # Example
+
+    if __name__ == "__main__":
+        s = "a(b[c]{d(e)})f"
+        spans = detect_nested_sequences(s)
+        for open_i, close_i, depth, o, c in spans:
+            print(f"{o}@{open_i} ... {c}@{close_i}  depth={depth}  substring='{s[open_i:close_i+1]}'")
+
+
+.. note::
+    GPT-5 mini, via Duck.ai, in answer to the query "stack-based python code for detecting nested sequences in a string"
+"""
+    # NOTE: 2026-03-24 10:41:25 Stack-based function.
+
+    if pairs is None:
+        pairs = {'(': ')', '[': ']', '{': '}'}
+
+    open_to_close: dict = pairs
+    close_to_open: dict = {c: o for o, c in open_to_close.items()}
+    stack: typing.List[typing.Tuple[str,int,int]] = []  # (open_char, index, depth)
+    results: typing.List[typing.Tuple[int,int,int,str,str]] = []
+    max_depth: int = 0
+
+    for i, ch in enumerate(s):
+        if ch in open_to_close:
+            depth = len(stack) + 1
+            stack.append((ch, i, depth))
+            if depth > max_depth:
+                max_depth = depth
+
+        elif ch in close_to_open:
+            if not stack:
+                # unmatched closing; skip or handle as needed
+                continue
+
+            open_ch, open_i, open_depth = stack.pop()
+
+            expected_open = close_to_open[ch]
+
+            if open_ch != expected_open:
+                # mismatched pair: discard or try to recover (here we skip)
+                # If needed, you can implement error handling/recovery here.
+                continue
+
+            results.append((open_i, i, open_depth, open_ch, ch))
+
+    # results currently in order of encountering closes; sort by open index if desired
+    results.sort(key=lambda x: x[0]) # <- sorted by open index
+
+    return results
+
+def parse_sequence(s: str):
+    seqtest = is_sequence(s, matches=True, delimiters = True, spans = True)
+    if not seqtest["result"]:
+        return
+
+    depths = reversed(sorted(list(map(lambda s: seqtest["sequences"]))))
+
+
+
+
+
+
+
 
 def str2sequence(s: str) -> typing.List[str]:
     r"""Parses the string representation of a sequence of elements.
@@ -400,7 +482,7 @@ def str2sequence(s: str) -> typing.List[str]:
 
 """
 
-    OK, groups, delimiters = is_sequence(s, True, True)
+    OK, matches, groups, delimiters = is_sequence(s, True, True)
 
 
 

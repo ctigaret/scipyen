@@ -1168,25 +1168,35 @@ def quantity2str(x:typing.Union[
                     pq.dimensionality.Dimensionality,
                     typing.Sequence[pq.Quantity]
                     ],
-                 precision:int = 2,
+                 precision: typing.Optional[int] = None,
                  format:str="f"):
     r"""Returns a str representation of a Dimensionality, Quantity, or Quantity sequence.
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
 
 Useful to store quantities via json/yaml etc.
 WARNING: There will be loss of precision!
 
 The returned string has the form:
 
-<[number][space]>[unit symbol] where the part between angle brackets is optional
+<[number][space]>[unit symbol] where the part between angle brackets is optional.
+
+For typical cases where ``x`` is a scalar or (small) quaantity arrays, this |nbsp|
+is equivalent to the *f-string* statement
+
+::
+
+    f"{x}""
 
 Parameters:
 ===========
 
-:x: Object to represent as a string: a sequence of Quantity objects or a Quantity
+:x: Object to be represented as a string: a sequence of Quantity objects or a Quantity object
 
-:precision: number of digits to the right of the decimal point
+:precision: number of digits to the right of the decimal point; optional, default is None, in which case the precision will be determined from the values in ``x``
 
-:format: format string
+:format: format string — single character ("f", "g"); optional; default is "f"
 
 .. note::
 
@@ -1232,6 +1242,11 @@ Example 2: Converting a dimensionality:
     if x.magnitude.flatten().size != 1:
         if not is_vector(x):
             raise TypeError(f"Expecting a scalar quantity or a quantity vector; instead, got a quantity of size {x.magnitude.flatten().size} with {x.ndim} dimensions")
+
+    if precision is None:
+        p10 = np.log10(x.magnitude.flatten()).min()
+        if p10 < 0:
+            precision = abs(int(np.floor(p10)) - 1)
 
     if not isinstance(precision, int):
         raise TypeError("precision expected to be an int; got %s instead" % type(precision).__name__)
