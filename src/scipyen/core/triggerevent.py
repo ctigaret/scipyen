@@ -677,12 +677,12 @@ class DataMark(neo.Event):
             else:
                 objs = ["%s" % self.times]
 
-        result = "TriggerEvent (%s): %s, %s" % (self.type.name, self.name, ", ".join(objs))
+        tail = "'%s' (%s): %s" % (self.name, self.type.name, ", ".join(objs))
 
-        if self.__class__.__name__ == "TriggerEvent":
-            tail = f"({self.type.name}): {self.name}, {', '.join(objs)}"
-        else:
-            tail = f": {self.name}, {', '.join(objs)}"
+        # if self.__class__.__name__ == "TriggerEvent":
+        #     tail = f"({self.type.name}): {self.name}, {', '.join(objs)}"
+        # else:
+        #     tail = f": {self.name}, {', '.join(objs)}"
 
         result = f"{self.__class__.__name__} {tail}"
 
@@ -732,7 +732,7 @@ class DataMark(neo.Event):
         from core import strutils
         from core.datatypes import is_string
 
-        print(f"{self.__class__.__name__}.set_labels(labels = {labels})")
+        # print(f"{self.__class__.__name__}.set_labels(labels = {labels})")
         self.__class__.prep_labels(labels, self.mark_type, self.times.size, self.times.shape)
 
         # if labels is None:

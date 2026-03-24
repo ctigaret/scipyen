@@ -245,7 +245,11 @@ stimulation, etc).
     presynaptic:typing.Optional[TriggerEvent] = dataclasses.field(default = None)
     postsynaptic:typing.Optional[TriggerEvent] = dataclasses.field(default = None)
     photostimulation:typing.Optional[TriggerEvent] = dataclasses.field(default = None)
-    acquisition:typing.Optional[TriggerEvent] = dataclasses.field(default = None)
+    acquisition:typing.Optional[
+        typing.Union[
+            TriggerEvent, typing.Sequence[TriggerEvent]
+            ]
+        ] = dataclasses.field(default = None)
     userEvents:typing.Optional[TriggerEvent] = dataclasses.field(default = None)
 
     # This is the delay between the start of an electrophysiology segment and
@@ -314,26 +318,30 @@ stimulation, etc).
         return pre + post + photo + imaging + user
 
     def __str__(self):
-        result = ["%s %s:" % (self.__class__.__name__, self.name)]
+        result = ["%s '%s':" % (self.__class__.__name__, self.name)]
 
-        if self.presynaptic is not None:
-            result += ["\tpresynaptic:\n\t%s" % str(self.presynaptic)]
-
-        if self.postsynaptic is not None:
-            result += ["\tpostsynaptic:\n\t%s" % str(self.postsynaptic)]
-
-        if self.photostimulation is not None:
-            result += ["\tphotostimulation:\n\t%s" % str(self.photostimulation)]
-
-        if isinstance(self.acquisition, (tuple, list)) and len(self.acquisition):
-            result.append("\tacquisition:\n\t%s" % "\n".join([str(a) for a in self.acquisition]))
-
-        elif isinstance(self.acquisition, TriggerEvent):
-            result += ["\tacquisition:\n\t%s" % str(self.acquisition)]
+        result += ["\tpresynaptic:\n\t%s" % str(self.presynaptic)]
+        result += ["\tpostsynaptic:\n\t%s" % str(self.postsynaptic)]
+        result += ["\tphotostimulation:\n\t%s" % str(self.photostimulation)]
+        result += ["\tacquisition:\n\t%s" % str(self.acquisition)]
+        # if self.presynaptic is not None:
+        #     result += ["\tpresynaptic:\n\t%s" % str(self.presynaptic)]
+        #
+        # if self.postsynaptic is not None:
+        #     result += ["\tpostsynaptic:\n\t%s" % str(self.postsynaptic)]
+        #
+        # if self.photostimulation is not None:
+        #     result += ["\tphotostimulation:\n\t%s" % str(self.photostimulation)]
+        #
+        # if isinstance(self.acquisition, (tuple, list)) and len(self.acquisition):
+        #     result.append("\tacquisition:\n\t%s" % "\n".join([str(a) for a in self.acquisition]))
+        #
+        # elif isinstance(self.acquisition, TriggerEvent):
+        #     result += ["\tacquisition:\n\t%s" % str(self.acquisition)]
 
         result += ["\timaging delay: %s" % str(self.imagingDelay)]
 
-        result += ["\tframe (segment): %s" % str(self.segments)]
+        result += ["\tframes (segments): %s" % str(self.segments)]
         result += ["\n"]
 
         return "\n".join(result)

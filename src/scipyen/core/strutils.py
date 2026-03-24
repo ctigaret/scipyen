@@ -459,11 +459,51 @@ List of spans, nesting depth (1 is the outermost), and open & close characters:
     return results
 
 def parse_sequence(s: str):
-    seqtest = is_sequence(s, matches=True, delimiters = True, spans = True)
-    if not seqtest["result"]:
+    if not isinstance(s, str) or len(s.strip()) == 0:
         return
 
-    depths = reversed(sorted(list(map(lambda s: seqtest["sequences"]))))
+    seqtest = is_sequence(s, matches=True, delimiters = True, spans = True)
+    OK, matches, delimiters, sequences = seqtest.values()
+    if not OK:
+        return
+
+    seq_by_depths = sorted(sequences, key=lambda x: x[2])
+
+    # depths = reversed(sorted(list(map(lambda s: seqtest["sequences"]))))
+
+    # outer_delim = None
+
+    c_type = None
+    result_type = None
+    result = None
+
+    temp = dict()
+
+    for k, seq in enumerate(seq_by_depths):
+        open_index, close_index, depth, open_character, close_character = seq
+        ss = s[open_index+1:close_index-1]
+
+        if depth not in temp:
+            temp[depth] = list()
+        if open_character == "(":
+            c_type = tuple
+        elif open_character == "[":
+            c_type = list
+        elif open_character == "{":
+            if ":" in ss:
+                c_type = dict
+            else:
+                c_type = set
+        if depth == 1:
+            if result_type is None:
+                result_type = c_type
+
+            # if len(stack) == 0:
+
+
+
+
+
 
 
 
@@ -481,11 +521,6 @@ def str2sequence(s: str) -> typing.List[str]:
     strings), numpy arrays, and tuples or lists.
 
 """
-
-    OK, matches, groups, delimiters = is_sequence(s, True, True, True )
-
-
-
     if not isinstance(s, str) or len(s.strip()) == 0:
         return list()
 

@@ -1935,13 +1935,15 @@ class QuantityDescriptorValidator(BaseDescriptorValidator):
             # NOTE: 2024-08-20 11:15:23
             # this gets checked by the dataclasse parsing mechanism so we need to
             # return the factory here, instead of the mutable Quantity
-            ret = self.default_factory
+            # ret = self.default_factory
+            ret = None
         else:
             # NOTE: 2024-08-20 11:14:54
             # THAT's the way to do it
             # here, we actually need a puython quantity instance, which may be a
             # realization of the default factory
-            ret = getattr(obj, self.private_name, self.default_factory)
+            # ret = getattr(obj, self.private_name, self.default_factory)
+            ret = getattr(obj, self.private_name, None)
 
             # WARNING: the setter may have assigned a quantity, so we need to check this
             if inspect.isfunction(ret):
@@ -1980,8 +1982,8 @@ class QuantityDescriptorValidator(BaseDescriptorValidator):
                 if not self.validator(d):
                     raise TypeError(f"th factory generates a quantity with wrong units {d.units}")
 
-        else:
-            raise TypeError(f"Expecting a python Quantity or a Quantity functor; instead, got {type(value).__name__}")
+        elif value is not None:
+            raise TypeError(f"Expecting a python Quantity, a functor constructing a default Quantity, or None; instead, got {type(value).__name__}")
 
 # def _defaultQuantity_(magnitude, units) -> pq.Quantity:
 #     return magnitude * units
