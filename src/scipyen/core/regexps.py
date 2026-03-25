@@ -104,7 +104,7 @@ You may then use these pattern objects by calling their methods, e.g.:
 
 """
 
-DELIMITERS = re.compile(r'[,\s;|]+')
+DELIMITERS = re.compile(r'[,\s;:|]+')
 
 BRACKETED_SEQUENCE = re.compile(r'[\[|\(|\{](.+?)[\]|\)|\}]')
 # original pattern in strutils.is_sequence   # OK for a_s -> single match, original string; if delim is ", " -> c'truct a list
