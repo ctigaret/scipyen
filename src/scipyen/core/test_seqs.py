@@ -85,7 +85,6 @@ def eval_seq(s: str):
 
 def test_parse(s):
    seqdepth = lambda x: x[2]
-
    seqstring = lambda x,y: y[x[0]+1: x[1]] # string between brackets
    bseqstring = lambda x,y: y[x[0]: x[1]+1]# as the above but with enclosing brackets
 
@@ -97,8 +96,8 @@ def test_parse(s):
                         x[0],
                         {
                            "sequence": x[1],
-                           "open": x[-2],
-                           "close": x[-1],
+                           "open": x[1][-2],
+                           "close": x[1][-1],
                            "substring": seqstring(x[1],s)
                         }
                      ),

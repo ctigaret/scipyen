@@ -1168,7 +1168,7 @@ def quantity2str(x:typing.Union[
                     pq.dimensionality.Dimensionality,
                     typing.Sequence[pq.Quantity]
                     ],
-                 precision: typing.Optional[int] = None,
+                 precision: typing.Optional[typing.Union[int, str]] = "numpy",
                  format:str="f"):
     r"""Returns a str representation of a Dimensionality, Quantity, or Quantity sequence.
 
@@ -1194,7 +1194,12 @@ Parameters:
 
 :x: Object to be represented as a string: a sequence of Quantity objects or a Quantity object
 
-:precision: number of digits to the right of the decimal point; optional, default is None, in which case the precision will be determined from the values in ``x``
+:precision: ``int`` number of digits to the right of the decimal point, ``None``, or the ``str`` "numpy"
+
+    When ``None``, the precision will be determined from the values in ``x``. |nbsp|
+    Passing the ``str`` "numpy" will use the precision determined from numpy package |nbsp|
+    (see ``numpy.get_printoptions``). This precision can also be set during the current session |nbsp|
+    by calling ``numpy.set_printoptions``.
 
 :format: format string — single character ("f", "g"); optional; default is "f"
 
@@ -1239,29 +1244,32 @@ Example 2: Converting a dimensionality:
     if isinstance(x, pq.dimensionality.Dimensionality):
         return x.string
 
-    if x.magnitude.flatten().size != 1:
-        if not is_vector(x):
-            raise TypeError(f"Expecting a scalar quantity or a quantity vector; instead, got a quantity of size {x.magnitude.flatten().size} with {x.ndim} dimensions")
+    return " ".join([np.array2string(x.magnitude), x.units.dimensionality.string])
 
-    if precision is None:
-        p10 = np.log10(x.magnitude.flatten()).min()
-        if p10 < 0:
-            precision = abs(int(np.floor(p10)) - 1)
+    # if x.magnitude.flatten().size != 1:
+    #     if not is_vector(x):
+    #         raise TypeError(f"Expecting a scalar quantity or a quantity vector; instead, got a quantity of size {x.magnitude.flatten().size} with {x.ndim} dimensions")
 
-    if not isinstance(precision, int):
-        raise TypeError("precision expected to be an int; got %s instead" % type(precision).__name__)
-
-    if precision <= 0:
-        raise ValueError("precision must be strictly positive; got %d instead" % precision)
-
-    mag_format = "%d" % precision
-
-    fmt = "%." + mag_format + format
-
-    if is_vector(x):
-        return f"{x.flatten()}"
-
-    return " ".join([fmt % x.magnitude, x.units.dimensionality.string])
+    # if precision is None:
+    #     p10 = np.log10(x.magnitude.flatten()).min()
+    #     if p10 < 0:
+    #         precision = abs(int(np.floor(p10)) - 1)
+    #
+    # if not isinstance(precision, int) or precision != "numpy":
+    #     raise TypeError("precision expected to be an int or the string 'numpy'; got %s instead" % type(precision).__name__)
+    #
+    # if isinstance(precision, int):
+    #     if precision <= 0:
+    #         raise ValueError("precision must be strictly positive; got %d instead" % precision)
+    #
+    #     mag_format = "%d" % precision
+    #
+    #     fmt = "%." + mag_format + format
+    #
+    # if is_vector(x):
+    #     return f"{x.flatten()}"
+    #
+    # return " ".join([fmt % x.magnitude, x.units.dimensionality.string])
 
 def unitName(x:pq.Quantity) -> str:
     r"""Returns the name of the dimensionality unit.
