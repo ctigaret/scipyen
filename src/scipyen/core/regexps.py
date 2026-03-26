@@ -106,6 +106,11 @@ You may then use these pattern objects by calling their methods, e.g.:
 
 DELIMITERS = re.compile(r'[,\s;:|]+')
 
+# use with by calling its match method
+NUMBER_MATCH = re.compile(r'^\d+(\.\d*?)?')
+
+DIMENSIONALITY_STRING = re.compile(r'([a-zA-Z]+?[\w*/]+?$)')
+
 BRACKETED_SEQUENCE = re.compile(r'[\[|\(|\{](.+?)[\]|\)|\}]')
 # original pattern in strutils.is_sequence   # OK for a_s -> single match, original string; if delim is ", " -> c'truct a list
 # works for b_s but drops the units symbol; if delim is " " -> c'truct a numpy array

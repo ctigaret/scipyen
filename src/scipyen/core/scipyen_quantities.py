@@ -1009,14 +1009,24 @@ def str2quantity_2(x:str, force_dimensionless: bool = False) -> typing.Optional[
 
     All conversions **will** introduce a loss of precision. Tuples of Quantity objects are converted to lists.
 
-
-
 """
     import re
     from core.utilities import unique
 
     if not isinstance(x, str):
         raise TypeError(f"Expecting a str; got {type(x).__name__} instead")
+
+    try:
+        print(f"scq.str2quantity_2 trying strutils.parse_sequence {x}")
+        test_val = strutils.parse_sequence(x)
+        print(f"scq.str2quantity_2 trying strutils.parse_sequence -> {test_val}")
+
+        if isinstance(test_val, np.ndarray):
+            return test_val
+
+    except:
+        traceback.print_exc()
+        pass
 
     delims = unique(sorted(DELIMITERS.findall(x)))
     if len(delims):

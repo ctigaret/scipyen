@@ -24,6 +24,7 @@ from sympy import abc as symabc
 import PIL
 from PIL.Image import Image as PILImage
 import drawsvg as dw
+from tribool import Tribool
 
 import matplotlib.pyplot as plt
 from IPython.core.latex_symbols import (latex_symbols, reverse_latex_symbol)
@@ -211,6 +212,9 @@ def is_sequence(s: str, matches: bool = False, delimiters: bool = False,
 
 .. |nbsp| unicode:: 0xA0
    :trim:
+
+.. note::
+    Enclosing brackets are NOT necessary, here.
 
 Parameters:
 ===========
@@ -458,67 +462,135 @@ List of spans, nesting depth (1 is the outermost), and open & close characters:
 
     return results
 
-def parse_sequence(s: str):
-    if not isinstance(s, str) or len(s.strip()) == 0:
-        return
+def parse_sequence(s: str, check: bool = False) -> typing.Optional[typing.Union[typing.Sequence, np.ndarray, Tribool]]:
+    r"""Parses a string into a sequence of scalars, a plain numpy array or Quantity array.
 
-    seqtest = is_sequence(s, matches=True, delimiters = True, spans = True)
-    OK, matches, delimiters, sequences = seqtest.values()
-    if not OK:
-        return
+.. |nbsp| unicode:: 0xA0
+   :trim:
 
-    seq_by_depths = sorted(sequences, key=lambda x: x[2])
+The scalars can be plain numbers or Quantity scalars.
 
-    # depths = reversed(sorted(list(map(lambda s: seqtest["sequences"]))))
+Works OK for 1D arrays
 
-    # outer_delim = None
+Returns Tribool(False) when s is invalid, Tribool(None) when s is "intermediate"
 
-    c_type = None
-    result_type = None
-    result = None
+"""
+    import quantities as pq
+    from core import scipyen_quantities as scq
+    from core.utilities import unique
 
-    temp = dict()
+    seqdepth = lambda x: x[2]
+    seqstring = lambda x,y: y[x[0]+1: x[1]] # string between brackets
+    bseqstring = lambda x,y: y[x[0]: x[1]+1]# as the above but WITH enclosing brackets
 
-    for k, seq in enumerate(seq_by_depths):
-        open_index, close_index, depth, open_character, close_character = seq
-        ss = s[open_index+1:close_index-1]
+    # as bseqstring but also return the part of 'y' NOT in bseqstring,
+    # effectively splits the original string into the sequence and everything else
+    bseqstringsplit = lambda x,y: (y[x[0]: x[1]+1], y[:x[0]] + y[x[1]+1:])
 
-        if depth not in temp:
-            temp[depth] = list()
-        if open_character == "(":
-            c_type = tuple
-        elif open_character == "[":
-            c_type = list
-        elif open_character == "{":
-            if ":" in ss:
-                c_type = dict
-            else:
-                c_type = set
-        if depth == 1:
-            if result_type is None:
-                result_type = c_type
+    seqs = detect_nested_sequences(s)
 
-            # if len(stack) == 0:
+    if len(seqs) == 1:
+        ss = bseqstringsplit(seqs[0], s)
+        # print(f"ss = {ss}")
+        # first element is ALWAYS the bracketed sequence string, and is guaranteed
+        # by the detection function
+        # here we get the un-bracketed version straight on
+        s_ = ss[0][1:-1]  # un-bracketed version
+        # figure out if the sequence is delimited by spaces or commas
+        # if spaces => this came from a numpy array
+        # if commas => this came from a python list, in which case it should NOT
+        # be followed by a unit-like string; for example, a string like '[x,y] pA'
+        # is syntactically wrong
+        delims = unique(sorted(DELIMITERS.findall(s_)))
+
+        val = None
+
+        if len(delims) == 2:
+            return Tribool(False) # flag as Invalid so validator may attempt fixup
+            # if delims[0] == " " and "," in delims[-1]:
+            #     return Tribool()
+            # else:
+            #     return Tribool(False)
+
+        elif len(delims) == 1:
+            if delims[0] == " ":
+                # numpy array case
+                val = np.fromstring(s_, sep = delims[0])
+
+            elif "," in delims[0]:
+                # case of python list or tuple
+                fn = None # list | tuple | set
+
+                if seqs[0] == "[":
+                    fn = list
+                    # -> list (deque is represented as lists, so
+                    # it is up to the user to figure this out)
+
+                elif seqs[0] == "(":
+                    # -> tuple
+                    fn = tuple
+
+                elif seqs[0] == "{":
+                    # -> set; NOTE: dict NOT supported here
+                    fn = set
+
+                else:
+                    return Tribool(False)
+                    # raise SyntaxError(f"Cannot parse substring {ss} into a sequence or set")
+
+                ss_ = s_.split(delims[0])
+
+                if any(p in (".", " ", "") for p in ss_):
+                    return Tribool() # incomplete sequence, flag as intermediate
 
 
+                # check for any units symbols in the elements
+                val = list()
+
+                for p in ss_:
+                    m = NUMBER_MATCH.match(p)
+                    if m:
+                        v = eval(p[slice(*m.span())])
+                        d = DIMENSIONALITY_STRING.search(p)
+                        if d:
+                            dim = p[slice(*d.span())]
+                            v *= scq.unitQuantityFromNameOrSymbol(dim)
+
+                        val.append(v)
 
 
+                if fn:
+                    val = fn(val)
+
+        else:
+            return Tribool(False)
+            # raise SyntaxError(f"Cannot parse substring {ss[0]} into a sequence or set")
 
 
+        if len(ss) == 2:
+            if isinstance(val, np.ndarray) and len(ss[1].strip()):
+                # try to parse it into a Quantity
+                u = scq.unitQuantityFromNameOrSymbol(ss[1])
+                if isinstance(u, pq.UnitQuantity):
+                    val = val * u
 
+        return val
 
+    elif len(seqs) > 1:
+        depths = unique(list(map(seqdepth, seqs)))
+        if len(depths) > 1 or any(d>1 for d in depths):
+            return Tribool(False)
+            # raise SyntaxError(f"Strings with nested sequences are NOT supported: {s}")
 
+    elif len(seqs) == 0:
+        return  Tribool()
 
-
-
+    return Tribool()
 
 def str2sequence(s: str) -> typing.List[str]:
-    r"""Parses the string representation of a sequence of elements.
+    r"""Splits a string representation of a sequence of elements, into its elements.
 
-.. note::
-
-    Restricted to simple sequences of plain old data (POD) types (numeric scalars,
-    strings), numpy arrays, and tuples or lists.
+Returns a sequence of str. Elements are NOT further parsed into Python objects.
 
 """
     if not isinstance(s, str) or len(s.strip()) == 0:
