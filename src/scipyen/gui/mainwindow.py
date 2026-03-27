@@ -2240,6 +2240,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.textOnlyToolBarToolButtonStyleAction.setChecked(self._tbButtonStyle == QtCore.Qt.ToolButtonTextOnly)
         self.textUnderIconsToolBarToolButtonStyleAction.setChecked(self._tbButtonStyle == QtCore.Qt.ToolButtonTextBesideIcon)
 
+    @markConfigurable("ToolBarButtonStyle", "Qt")
     @toolBarButtonStyle.setter
     def toolBarButtonStyle(self, val:QtCore.Qt.ToolButtonStyle|int|str):
         if isinstance(val, str):
