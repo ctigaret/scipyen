@@ -7540,7 +7540,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
                         cm.addSeparator()
                         if QtCore.QFile.supportsMoveToTrash():
-                            trashAction = cm.addAction(QtGui.QIcon.fromTheme("trash-empty"),"Move To trash")
+                            trashAction = cm.addAction(QtGui.QIcon.fromTheme("trash-empty"),"Move To Wastebin")
                             trashAction.triggered.connect(self._slot_trashFileItems)
 
                         deleteAction = cm.addAction(QtGui.QIcon.fromTheme("edit-delete"),"Delete")
