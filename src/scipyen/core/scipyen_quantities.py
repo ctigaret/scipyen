@@ -243,6 +243,11 @@ vpv = makeScaledUnitQuantity(pq.L/pq.L, name="volume per volume")#, symbol = "kg
 Pound_Sterling = pq.UnitCurrency("Pound_Sterling", symbol="£")
 US_Dollar = pq.UnitCurrency("US_Dollar", symbol="$")
 Euro = pq.UnitCurrency("Euro", symbol = "€")
+Yen = pq.UnitCurrency("Yen", symbol = "¥")
+Cent = pq.UnitCurrency("Cent", symbol = "¢")
+
+DegreeCelsius = makeScaledUnitQuantity(1 * pq.degC, name="Degree Celsius", symbol = "ᵒC")
+DegreeKelvin = makeScaledUnitQuantity(1 * pq.degK, name="Degree Celsius", symbol = "ᵒK")
 
 # ### END custom units
 
@@ -1016,17 +1021,18 @@ def str2quantity_2(x:str, force_dimensionless: bool = False) -> typing.Optional[
     if not isinstance(x, str):
         raise TypeError(f"Expecting a str; got {type(x).__name__} instead")
 
-    try:
-        print(f"scq.str2quantity_2 trying strutils.parse_sequence {x}")
-        test_val = strutils.parse_sequence(x)
-        print(f"scq.str2quantity_2 trying strutils.parse_sequence -> {test_val}")
+    # print(f"scq.str2quantity_2 trying strutils.parse_sequence {x}")
+    test_val = strutils.parse_sequence(x)
+    # print(f"scq.str2quantity_2 trying strutils.parse_sequence {x} -> {test_val}")
 
-        if isinstance(test_val, np.ndarray):
-            return test_val
+    if isinstance(test_val, np.ndarray):
+        return test_val
 
-    except:
-        traceback.print_exc()
-        pass
+    # try:
+    #
+    # except:
+    #     traceback.print_exc()
+    #     pass
 
     delims = unique(sorted(DELIMITERS.findall(x)))
     if len(delims):

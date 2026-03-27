@@ -480,6 +480,8 @@ Returns Tribool(False) when s is invalid, Tribool(None) when s is "intermediate"
     from core.utilities import unique
 
     seqdepth = lambda x: x[2]
+    openchar = lambda x: x[3]
+    closechar = lambda x: x[4]
     seqstring = lambda x,y: y[x[0]+1: x[1]] # string between brackets
     bseqstring = lambda x,y: y[x[0]: x[1]+1]# as the above but WITH enclosing brackets
 
@@ -489,7 +491,11 @@ Returns Tribool(False) when s is invalid, Tribool(None) when s is "intermediate"
 
     seqs = detect_nested_sequences(s)
 
+    # print(f"{len(seqs)} sequences detected")
+
     if len(seqs) == 1:
+        # one sequence = case of strings like [x y z] and optional units symbol
+        ochar = openchar(seqs[0])
         ss = bseqstringsplit(seqs[0], s)
         # print(f"ss = {ss}")
         # first element is ALWAYS the bracketed sequence string, and is guaranteed
@@ -502,88 +508,259 @@ Returns Tribool(False) when s is invalid, Tribool(None) when s is "intermediate"
         # be followed by a unit-like string; for example, a string like '[x,y] pA'
         # is syntactically wrong
         delims = unique(sorted(DELIMITERS.findall(s_)))
+        # print(f"delims = {delims}")
 
         val = None
 
-        if len(delims) == 2:
+        if len(delims) == 0 or len(delims) > 2:
             return Tribool(False) # flag as Invalid so validator may attempt fixup
-            # if delims[0] == " " and "," in delims[-1]:
-            #     return Tribool()
-            # else:
-            #     return Tribool(False)
 
-        elif len(delims) == 1:
-            if delims[0] == " ":
+        elif len(delims) == 2:
+            # bring down to one delimiter only, one of " " (space) "," (comma) or ", " (comma-space)
+            if delims[0] == " " and "," in delims[1]:
+                delims = delims[-1:] # so that delims remains a list
+            else:
+                return Tribool(False)
+
+        if delims[0] == " ":
+            if ochar == "{":
+                # set case
+                ss_ = s_.split(delims[0])
+                v_ = list()
+                try:
+                    for p in ss_:
+                        if NUMBER_MATCH.match(p):
+                            v_.append(eval(p))
+
+                    val = set(v_)
+                except:
+                    return Tribool(False)
+
+            else:
                 # numpy array case
-                val = np.fromstring(s_, sep = delims[0])
+                try:
+                    val = np.fromstring(s_, sep = delims[0])
+                except:
+                    return Tribool(False)
 
-            elif "," in delims[0]:
-                # case of python list or tuple
-                fn = None # list | tuple | set
+        elif "," in delims[0]:
+            # print("comma seq: ")
+            # case of python list or tuple
+            fn = None # list | tuple | set
 
-                if seqs[0] == "[":
-                    fn = list
-                    # -> list (deque is represented as lists, so
-                    # it is up to the user to figure this out)
 
-                elif seqs[0] == "(":
-                    # -> tuple
-                    fn = tuple
+            if ochar == "[":
+                fn = list
+                # -> list (deque is represented as lists, so
+                # it is up to the user to figure this out)
 
-                elif seqs[0] == "{":
-                    # -> set; NOTE: dict NOT supported here
-                    fn = set
+            elif ochar == "(":
+                # -> tuple
+                fn = tuple
+
+            elif ochar == "{":
+                # -> set; NOTE: dict NOT supported here
+                fn = set
+
+            else:
+                return Tribool(False)
+                # raise SyntaxError(f"Cannot parse substring {ss} into a sequence or set")
+
+            ss_ = s_.split(delims[0])
+
+            # print(f"sub-parts ss_ = {ss_}")
+
+            if any(p in (".", " ", "") for p in ss_):
+                return Tribool() # incomplete sequence, flag as intermediate
+
+
+            # check for any units symbols in the elements
+            val = list()
+
+            for p in ss_:
+                m = NUMBER_MATCH.match(p)
+                if m:
+                    v = eval(p[slice(*m.span())])
+
+                    d = DIMENSIONALITY_STRING.search(p)
+
+                    if d:
+                        dim = p[slice(*d.span())]
+                        v *= scq.unitQuantityFromNameOrSymbol(dim)
+
+                    val.append(v)
 
                 else:
                     return Tribool(False)
-                    # raise SyntaxError(f"Cannot parse substring {ss} into a sequence or set")
 
-                ss_ = s_.split(delims[0])
+            if len(val) == 0:
+                return Tribool()
 
-                if any(p in (".", " ", "") for p in ss_):
-                    return Tribool() # incomplete sequence, flag as intermediate
+            if fn:
+                val = fn(val)
 
-
-                # check for any units symbols in the elements
-                val = list()
-
-                for p in ss_:
-                    m = NUMBER_MATCH.match(p)
-                    if m:
-                        v = eval(p[slice(*m.span())])
-                        d = DIMENSIONALITY_STRING.search(p)
-                        if d:
-                            dim = p[slice(*d.span())]
-                            v *= scq.unitQuantityFromNameOrSymbol(dim)
-
-                        val.append(v)
-
-
-                if fn:
-                    val = fn(val)
-
-        else:
-            return Tribool(False)
             # raise SyntaxError(f"Cannot parse substring {ss[0]} into a sequence or set")
 
+            # print(f"value from {ss[0]} -> {val}")
 
         if len(ss) == 2:
-            if isinstance(val, np.ndarray) and len(ss[1].strip()):
-                # try to parse it into a Quantity
-                u = scq.unitQuantityFromNameOrSymbol(ss[1])
+            # print(f"last bit: '{ss[1]}'")
+            if len(ss[1].strip()):
+                u = None
+                if DIMENSIONALITY_STRING.match(ss[1].strip()):
+                    u = scq.unitQuantityFromNameOrSymbol(ss[1])
+
+                # print(f"from '{ss[1]}' -> {u}")
+
+                if isinstance(val, set):
+                    return Tribool(False)
+
+                elif isinstance(val, (tuple, list)):
+                    if all(isinstance(v, pq.Quantity) for v in val):
+                        return Tribool(False)
+
+                    val = np.array(val)
+
+                elif not isinstance(val, np.ndarray):
+                    return Tribool(False)
+
                 if isinstance(u, pq.UnitQuantity):
                     val = val * u
+                else:
+                    return Tribool(False)
 
         return val
 
     elif len(seqs) > 1:
         depths = unique(list(map(seqdepth, seqs)))
+        # print(f"depths = {depths}")
         if len(depths) > 1 or any(d>1 for d in depths):
             return Tribool(False)
             # raise SyntaxError(f"Strings with nested sequences are NOT supported: {s}")
 
     elif len(seqs) == 0:
-        return  Tribool()
+        # no sequence detected by searching for brackets
+        # maybe this is a non-bracketed sequence;
+        # HOWEVER:
+        # the forms below are acceptable and should resolve to array([0.1 0.2 0.3]) * pA:
+        #   0.1 0.2 0.3 pA
+        #   0.1,0.2,0.3,pA
+        #   0.1, 0.2, 0.3, pA
+        # and the next forms w/o units symbol at the end are ALL acceptable and should resolve to array([0.1 0.2 0.3])
+        #   0.1, 0.2, 0.3
+        #   0.1 0.2 0.3
+        # whereas the next forms are ambiguous and therefore invalid
+        #   0.1, 0.2, 0.3 pA
+        #   0.1,0.2,0.3pA
+        #   0.1 0.2 0.3, pA
+        #   0.1 0.2 0.3,pA
+
+        delims = unique(sorted(DELIMITERS.findall(s)))
+        # print(f"0 sequences delims = {delims}")
+        if len(delims) == 0:
+            if any(s.startswith(c) for c in "([{"):
+                if s in "([{":
+                    return Tribool()
+
+                if NUMBER_MATCH.match(s[1:]):
+                    return Tribool()
+                else:
+                    return Tribool(False)
+            else:
+                if NUMBER_MATCH.match(s):
+                    try:
+                        return eval(s)
+                    except:
+                        return Tribool(False)
+
+                elif DIMENSIONALITY_STRING.match(s):
+                    return scw.unitQuantityFromNameOrSymbol(s)
+                else:
+                    return Tribool(False)
+
+        elif len(delims) == 1 and delims[0] == " " or "," in delims[0]:
+            parts = s.split(delims[0])
+
+            if len(parts) == 1:
+                if any(parts[0].startswith(c) for c in "([{"):
+                    if parts[0] in "([{":
+                        return Tribool()
+
+                    if NUMBER_MATCH.match(parts[0][1:]):
+                        return Tribool()
+                    else:
+                        return Tribool(False)
+                else:
+                    if NUMBER_MATCH.match(parts[0]):
+                        try:
+                            return eval(parts[0])
+                        except:
+                            return Tribool(False)
+
+                    elif DIMENSIONALITY_STRING.match(parts[0]):
+                        return scq.unitQuantityFromNameOrSymbol(parts[0])
+
+                    else:
+                        return Tribool(False)
+
+            else:
+                u = None
+                v = list()
+
+                for k,p in enumerate(parts[:-1]):
+                    if k == 0 and any(p.startswith(c) for c in "([{"):
+                        if p in "([{":
+                            return Tribool()
+
+                        if NUMBER_MATCH.match(p[1:]):
+                            return Tribool()
+
+                        else:
+                            return Tribool(False)
+
+                    else:
+                        if any(parts[0].startswith(c) for c in "([{"):
+                            return Tribool()
+
+                        if NUMBER_MATCH.match(p):
+                            try:
+                                v.append(eval(p))
+                            except:
+                                return Tribool(False)
+                        else:
+                            return Tribool(False)
+
+                if len(parts[-1].strip()):
+                    if NUMBER_MATCH.match(parts[-1]):
+                        try:
+                            v.append(eval(parts[-1]))
+                        except:
+                            return Tribool(False)
+
+                    elif DIMENSIONALITY_STRING.match(parts[-1]):
+                        u = scq.unitQuantityFromNameOrSymbol(parts[-1])
+
+                    else:
+                        return Tribool(False)
+
+                if len(v) == 0:
+                    return Tribool()
+
+                elif len(v) > 1:
+                    val = np.array(v)
+                    if isinstance(u, pq.Quantity):
+                        return val * u
+                    else:
+                        return val
+
+                else:
+                    if isinstance(u, pq.Quantity):
+                        return v[0] * u
+                    else:
+                        return v[0]
+
+        else:
+            return Tribool(False)
 
     return Tribool()
 

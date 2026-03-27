@@ -325,14 +325,14 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
     @Slot(str)
     def _slot_timesChanged(self, value:str):
         from core.prog import scipywarn
-        print(f"{self.__class__.__name__}._slot_timesChanged({value})")
+        # print(f"{self.__class__.__name__}._slot_timesChanged({value})")
         if len(value.strip()) == 0:
             self._times_ = None
 
         else:
             try:
                 v = eval(value)
-                print(f"{self.__class__.__name__}._slot_timesChanged -> v = {v}")
+                # print(f"{self.__class__.__name__}._slot_timesChanged -> v = {v}")
                 if isinstance(v, (tuple, list)):
                     self._times_ = np.array(v)
                 elif isinstance(v, numbers.Number):
@@ -340,9 +340,9 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             except:
                 try:
                     # messing about...
-                    # prevent units change via direct editing; use the contex menu for that
+                    # prevent units change via direct editing; use the contex menu instead
                     v = scq.str2quantity_2(value)
-                    print(f"{self.__class__.__name__}._slot_timesChanged: scq.str2quantity_2({value}) -> {v}")
+                    # print(f"{self.__class__.__name__}._slot_timesChanged: scq.str2quantity_2({value}) -> {v}")
                     if isinstance(v, pq.Quantity):
                         self._times_ = v.magnitude
 
@@ -351,7 +351,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
 
                     elif isinstance(v, typing.Sequence) and all(isinstance(x, pq.Quantity) for x in v):
                         if not all(x.units == v[0].units for x in v[1:]):
-                            scipywarn(f"Value {value} containes a mixture of Quantity units ")
+                            scipywarn(f"Value {value} containes a mixture of Quantity units")
                             return
 
                         self._times_ = np.array(list(map(lambda x: x.magnitude, v)))

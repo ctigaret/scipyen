@@ -121,8 +121,8 @@ class NumericStringValidator(QtGui.QValidator):
 
         except SyntaxError:
             u = parse_sequence(ss)
-            print(f"{self.__class__.__name__}.validate({ss}) -> {u}")
             if isinstance(u, Tribool):
+                # print(f"{self.__class__.__name__}.validate({ss}) -> {u}")
                 if u.value is None:
                     self._validation_substring_ = ss
                     return QtGui.QValidator.Intermediate, s, pos
@@ -134,6 +134,7 @@ class NumericStringValidator(QtGui.QValidator):
                     return QtGui.QValidator.Acceptable, s, pos
 
             else:
+                # print(f"{self.__class__.__name__}.validate({ss}) => {type(u).__name__}: {u}")
                 self._validation_substring_ = None
                 return QtGui.QValidator.Acceptable, s, pos
 
@@ -143,9 +144,9 @@ class NumericStringValidator(QtGui.QValidator):
             self._validation_substring_ = None
             return QtGui.QValidator.Invalid, s, pos
 
-def fixup(self, s: str) -> str:
-    if not isinstance(self._validation_substring_, str) or len(self._validation_substring_.strip()) == 0:
-        return s
+    # def fixup(self, s: str) -> str:
+    #     if not isinstance(self._validation_substring_, str) or len(self._validation_substring_.strip()) == 0:
+    #         return s
 
 
 
