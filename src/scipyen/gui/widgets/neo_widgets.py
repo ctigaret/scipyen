@@ -140,7 +140,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         self.timesLineEdit.setClearButtonEnabled(True)
         self.timesLineEdit.installEventFilter(self)
         self.timesLineEdit.setToolTip("Right click for options")
-        # self.timesLineEdit.setValidator(NumericStringValidator(self))
+        self.timesLineEdit.setValidator(NumericStringValidator(self))
 
         self.timesLineEdit.textChanged.connect(self._slot_timesChanged)
         self.timesLineEdit.sig_lazy.connect(self._slot_lazyTextChanges)
@@ -351,18 +351,18 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
 
                     elif isinstance(v, typing.Sequence) and all(isinstance(x, pq.Quantity) for x in v):
                         if not all(x.units == v[0].units for x in v[1:]):
-                            scipywarn(f"Value {value} containes a mixture of Quantity units")
+                            # scipywarn(f"Value {value} containes a mixture of Quantity units")
                             return
 
                         self._times_ = np.array(list(map(lambda x: x.magnitude, v)))
 
 
                     else:
-                        scipywarn(f"Cannot parse '{value}' to a Quantity")
+                        # scipywarn(f"Cannot parse '{value}' to a Quantity")
                         return
 
                 except:
-                    scipywarn(f"Cannot parse '{value}'")
+                    # scipywarn(f"Cannot parse '{value}'")
                     return
 
         # print(f"{self.__class__.__name__}._slot_timesChanged: self._times_ = {self._times_}")
@@ -541,7 +541,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
                 elif scq.unitFamilyName(self._units_) == "Time":
                     units = self._units_
                 else:
-                    scipywarn("Neo Events only support time units")
+                    # scipywarn("Neo Events only support time units")
                     return False
 
             if (not isinstance(self._times_, np.ndarray)
@@ -555,7 +555,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
                 if (self._times_.ndim > 1
                     and any(v > 1 for v in self._times_.shape[1:])):
                     if self._data_class_ in (neo.Event, TriggerEvent):
-                        scipywarn("neo.Event and TriggerEvent can only take 1D arrays")
+                        # scipywarn("neo.Event and TriggerEvent can only take 1D arrays")
                         return False
 
             evt = self._data_class_(self._times_, units=self._units_, labels = self._event_labels_, name=self._event_name_)
@@ -567,7 +567,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
                 elif self._event_type_ is None:
                     self._event_type_ = TriggerEventType.unspecified
                 else:
-                    scipywarn(f"Cannot assign a {type(self._event_type_.__name__)} as type of {type(evt).__name__}")
+                    # scipywarn(f"Cannot assign a {type(self._event_type_.__name__)} as type of {type(evt).__name__}")
                     return False
 
             elif isinstance(evt, DataMark):
@@ -576,7 +576,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
                 elif self._event_type_ is None:
                     self._event_type_ = MarkType.unspecified
                 else:
-                    scipywarn(f"Cannot assign a {type(self._event_type_).__name__} as type of {type(evt).__name__}")
+                    # scipywarn(f"Cannot assign a {type(self._event_type_).__name__} as type of {type(evt).__name__}")
                     return False
 
             self._data_ = evt

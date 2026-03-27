@@ -458,7 +458,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 type(obj), NOTMEMOIZED + PODS
             ) and id(obj) not in self._visited_:
                 itemPath = f"{self._rootTitle_}{self.getPathForLeaf(objItem)}"
-                self._memoize_(obj, itemPath)
+                self._memoize_(obj, itemPath, objDict["objType"])
 
         return objItem
 
@@ -474,7 +474,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
         if not issubclass(
             type(obj), NOTMEMOIZED + PODS
         ) and id(obj) in self._visited_:
-            visited = self._visited_[id(obj)]
+            if objDict["objType"] != self._visited_[id(obj)][-1]:
+                visited = self._visited_[id(obj)]
 
         rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType, visited)
         pItem = rowItems[0]
@@ -502,7 +503,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                     if id(obj) not in self._visited_:
                         # itemPath = self._getPathForItemOrIndex_(pItem)
                         itemPath = f"{self._rootTitle_}{self.getPathForLeaf(pItem)}"
-                        self._memoize_(obj, itemPath)
+                        self._memoize_(obj, itemPath, objDict["objType"])
                     # else:
 
 
@@ -515,12 +516,13 @@ class DataTreeModel(QtGui.QStandardItemModel):
             else:
                 keyName = f"{key}"
 
-            visited = tuple()
-
-            if not issubclass(
-                type(value), NOTMEMOIZED + PODS
-            ) and id(value) in self._visited_:
-                visited = self._visited_[id(value)]
+            # visited = tuple()
+            #
+            # if not issubclass(
+            #     type(value), NOTMEMOIZED + PODS
+            # ) and id(value) in self._visited_:
+            #     if type(value).__name__ != self._visited_[id(obj)][-1]:
+            #         visited = self._visited_[id(value)]
 
             pValue, valDict = self._parseObject_(value, self._showPrivate_)
 
@@ -542,10 +544,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
                                              pkgutil.ModuleInfo))
                          and obj is not None)
 
-    def _memoize_(self, obj, path):
+    def _memoize_(self, obj, path, realtype):
         if id(obj) not in self._visited_:
             idx = len(self._visited_)
-            self._visited_[id(obj)] = (idx, type(obj), path)
+            self._visited_[id(obj)] = (idx, type(obj), path, realtype)
 
     @singledispatchmethod
     def _parseObject_(self, obj: object,
@@ -1888,6 +1890,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         setexpr = accexpr + " = value"
         OK = False
         try:
+            print(f"{self.__class__.__name__}.setData: setexpr = {setexpr}")
             exec(setexpr)
             newVal = eval(accexpr)
             OK = True

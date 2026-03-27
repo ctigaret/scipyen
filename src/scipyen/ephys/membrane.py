@@ -104,6 +104,7 @@ from core.datazone import (DataZone, Interval)
 from core import scipyen_quantities as scq
 from core.scipyen_quantities import unitsConvertible
 import core.neoutils as neoutils
+import core.scipyendataclasses as sdc
 from core.basescipyen import BaseScipyenData
 # from core.utilities import unique
 #import core.triggerprotocols
@@ -7251,16 +7252,14 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
         genotype (e.g., WT, HET, HOM or any other appropriate string)
         NOTE: Case-sensitive
 
-    sex: str (default "M")
-        sex: either "F" or "M"
-        NOTE: Case-insensitive
+    sex: core.scipyendataclasses.GeneticSex
 
     treatment: str (default "veh") ATTENTION: case-sensitive!
 
     age: python Quantity (one of days, months, years), "NA" or None
         Default is None; either None or "NA" result in the string "NA" for age
 
-    post_natal: bool (default True)
+    stage: core.scipyendataclasses.OrganismStage
 
     name: str
         name of the results (string), or None;
@@ -7354,11 +7353,11 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
     else:
         segments = [data]
 
-    cellid = kwargs.pop("cell", "NA")
-    sourceid = kwargs.pop("source", "NA")
-    genotype = kwargs.pop("genotype", "NA")
-    sex = kwargs.pop("sex", "M")
-    age = kwargs.pop("age", "NA")
+    cellid = kwargs.pop("cell", pd.NA)
+    sourceid = kwargs.pop("source", pd.NA)
+    genotype = kwargs.pop("genotype", pd.NA)
+    sex = kwargs.pop("sex", sdc.GeneticSex.undefined)
+    age = kwargs.pop("age", pd.NA)
     passive_analysis = kwargs.pop("passive_analysis", False)
 
     # print(f"analyse_AP_step_injection_series: passive_analysis = {passive_analysis}")
@@ -7372,7 +7371,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
 
     treatment = kwargs.pop("treatment", "veh")
 
-    post_natal = kwargs.pop("post_natal", True)
+    stage = kwargs.pop("stage", sdc.OrganismStage.undefined)
 
     if sex.lower() not in ("m", "f", "na"):
         raise ValueError("Allowed values for sex are 'm' or 'f'; got %s instead" % sex)

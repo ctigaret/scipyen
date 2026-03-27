@@ -732,9 +732,7 @@ class Biometrics(ScipyenDataclass):
     stage: OrganismStage = OrganismStage.postnatal
 
     age: typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
-    # animal's age (more generaly the age of the biological source)- almost
-    # free-form string, see NOTE for animal ID - keep it
-    #   simple, yet meaningful, and indicate units (e.g. 3_mo, or 20_d, or 1_yr)
+
     #
     # NOTE: these are simply for a quick information; in the future Scipyen will
     # provide a more standardized way to store this information, hopefully more
@@ -770,6 +768,87 @@ class Organism(ScipyenDataclass):
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
 
+    @property
+    def genotype(self):
+        if isinstance(self.biometrics, Biometrics):
+            return self.biometrics.genotype
+
+    @genotype.setter
+    def genotype(self, val: typing.Optional[str]):
+        if isinstance(self.biometrics, Biometrics):
+            if isinstance(val, str) and len(val.strip()):
+                self.biometrics.genotype = val
+            else:
+                self.biometrics.genotype = pd.NA
+
+    @property
+    def age(self):
+        if isinstance(self.biometrics, Biometrics):
+            return self.biometrics.age
+
+    @age.setter
+    def age(self, val: typing.Optional[pq.Quantity]):
+        from core import scipyen_quantities as scq
+        if isinstance(self.biometrics, Biometrics):
+            if isinstance(val, pq.Quantity) and scq.checkTimeUnits(val.units):
+                self.biometrics.age = val
+            else:
+                self.biometrics.age = pd.NA
+
+    @property
+    def sex(self):
+        if isinstance(self.biometrics, Biometrics):
+            return self.biometrics.geneticSex
+
+    @sex.setter
+    def sex(self, val: typing.Optional[GeneticSex]):
+        if isinstance(self.biometrics, Biometrics):
+            if isinstance(val, GeneticSex):
+                self.biometrics.sex = val
+            else:
+                self.biometrics.sex = GeneticSex.undefined
+
+    @property
+    def stage(self):
+        if isinstance(self.biometrics, Biometrics):
+            return self.biometrics.stage
+
+    @stage.setter
+    def stage(self, val: typing.Optional[OrganismStage]):
+        if isinstance(self.biometrics, Biometrics):
+            if isinstance(val, OrganismStage):
+                self.biometrics.stage = val
+            else:
+                self.biometrics.stage = OrganismStage.undefined
+
+
+    @property
+    def weight(self):
+        if isinstance(self.biometrics, Biometrics):
+            return self.biometrics.weight
+
+    @weight.setter
+    def weight(self, val: typing.Optional[pq.Quantity]):
+        if isinstance(self.biometrics, Biometrics):
+            if isinstance(val, pq.Quantity):
+                self.biometrics.weight = val
+            else:
+                self.biometrics.weight = pd.NA
+
+    @property
+    def height(self):
+        if isinstance(self.biometrics, Biometrics):
+            return self.biometrics.height
+
+    @height.setter
+    def height(self, val: typing.Optional[pq.Quantity]):
+        if isinstance(self.biometrics, Biometrics):
+            if isinstance(val, pq.Quantity):
+                self.biometrics.height = val
+            else:
+                self.biometrics.height = pd.NA
+
+
 @dataclass
 class Organ(ScipyenDataclass):
     from core.bgbridge import BGStructureDescriptor
@@ -800,10 +879,29 @@ class Organ(ScipyenDataclass):
     structure: BGStructureDescriptor = BGStructureDescriptor()
     parent: Organism = dataclasses.field(default_factory = Organism)
 
+    def getOrganism(self):
+        if isinstance(self.parent, Organism):
+            return self.parent
+
+    def setOrganism(self, o:Organism):
+        if isinstance(o, Organism):
+            self.organism = o
+        else:
+            self.organism = Organism()
+
 @dataclass
 class Tissue(ScipyenDataclass):
     r"""Tissue"""
     parent: Organ = dataclasses.field(default_factory = Organ)
+
+    def getOrganism(self):
+        if isinstance(self.parent, Organ):
+            return self.parent.getOrganism()
+
+    def setOrganism(self, o:Organism):
+        if isinstance(self.parent, Organ):
+            self.parent.setOrganism(o)
+
 
 @dataclass
 class Cell(ScipyenDataclass):
@@ -812,15 +910,20 @@ class Cell(ScipyenDataclass):
 
     parent: typing.Optional[typing.Union[Organ, Tissue]] = dataclasses.field(default_factory = Tissue)
 
+    def getOrganism(self):
+        if isinstance(self.parent, (Organ, Tissue)):
+            return self.parent.getOrganism()
+
+    def setOrganism(self, o:Organism):
+        if isinstance(self.parent, (Organ, Tissue)):
+            self.parent.setOrganism(o)
+
 @dataclass
 class Neuron(Cell):
     cellSubType: NeuronType = NeuronType.undefined
 
     def __post_init__(self: typing.Self):
         assert isinstance (self.cellSubType, NeuronType), f"Wrong subtype {self.cellSubType} for Neuron"
-        # super().__init__(
-        #     self, self.name, self.description,
-        #     )
         self.cellType = "neuron"
 
 @dataclass
@@ -836,6 +939,14 @@ class CellCompartment(ScipyenDataclass):
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
+
+    def getOrganism(self):
+        if isinstance(self.parent, Cell):
+            return self.parent.getOrganism()
+
+    def setOrganism(self, o:Organism):
+        if isinstance(self.parent, Cell):
+            self.parent.setOrganism(o)
 
 
 @dataclass
@@ -867,9 +978,6 @@ class AxonalCompartment(NeuronCompartment):
     def __post_init__(self: typing.Self):
         assert isinstance(self.compartmentType, AxonalCompartmentType), f"Wrong compartment type: {self.compartmentType}"
         assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
-        # super().__init__(self, compartmentType = self.compartmentType,
-        #                  compartmentID = self.compartmentID,
-        #                  parent = self.parent)
 
 @dataclass
 class DendriticCompartment(NeuronCompartment):
@@ -879,9 +987,6 @@ class DendriticCompartment(NeuronCompartment):
     def __post_init__(self: typing.Self):
         assert isinstance(self.compartmentType, DendriticCompartmentType), f"Wrong compartment type: {self.compartmentType}"
         assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
-        # super().__init__(self, compartmentType = self.compartmentType,
-        #                  compartmentID = self.compartmentID,
-        #                  parent = self.parent)
 
 @dataclass
 class ChemicalSynapse(ScipyenDataclass):
@@ -894,10 +999,28 @@ class ChemicalSynapse(ScipyenDataclass):
     def __post_init__(self: typing.Self):
         assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
 
+    def getOrganism(self):
+        parents = (self.preSynapticParent, self.postSynapticParent)
+        if all(isinstance(p, Neuron) and all(p.parent == self.preSynapticParent.parent) for p in parents):
+            return self.preSynapticParent.getOrganism()
+
+    def setOrganism(self, o:Organism):
+        parents = (self.preSynapticParent, self.postSynapticParent)
+        if all(isinstance(p, Neuron) for p in parents):
+            p.setOrganism(o)
+
 @dataclass
 class UltrastructureElement(ScipyenDataclass):
     elementType: UltrastructureElementType = UltrastructureElementType.undefined
     parent: Cell = dataclasses.field(default_factory = Cell)
+
+    def getOrganism(self):
+        if isinstance(self.parent, (Cell, ChemicalSynapse)):
+            return self.parent.getOrganism()
+
+    def setOrganism(self, o:Organism):
+        if isinstance(self.parent, (Cell, ChemicalSynapse)):
+            self.parent.setOrganism(o)
 
 @dataclass
 class ChemicalSynapseUltrastructureElement(UltrastructureElement):
@@ -952,6 +1075,37 @@ class BiologicalSource(ScipyenDataclass):
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
+
+    def getOrganism(self):
+        if isinstance(self.specimen,
+                            (
+                                Organism,
+                                Organ,
+                                Tissue,
+                                Cell,
+                                CellCompartment,
+                                ChemicalSynapse,
+                                UltrastructureElement,
+                                ChemicalSynapseUltrastructureElement
+                            )
+                        ):
+            return self.specimen.getOrganism()
+
+    def setOrganism(val, o:Organism):
+        if isinstance(self.specimen,
+                            (
+                                Organism,
+                                Organ,
+                                Tissue,
+                                Cell,
+                                CellCompartment,
+                                ChemicalSynapse,
+                                UltrastructureElement,
+                                ChemicalSynapseUltrastructureElement
+                            )
+                        ):
+            self.specimen.setOrganism(o)
+
 
 @dataclass
 class Procedure(ScipyenDataclass):
@@ -1599,6 +1753,7 @@ of 'args'.
     # #                            slots=False,
     # #                            weakref_slot=False,
     # #                            module=None)
+
 
 # __all__ = ("AdministrationRoute", "BiologicalSource", "Biometrics",
 #            "BioSourceType", "Cell", "CellCompartment","CellCompartmentType", "Episode",
