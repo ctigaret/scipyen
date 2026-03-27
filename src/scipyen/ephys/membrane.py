@@ -7373,8 +7373,8 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
 
     stage = kwargs.pop("stage", sdc.OrganismStage.undefined)
 
-    if sex.lower() not in ("m", "f", "na"):
-        raise ValueError("Allowed values for sex are 'm' or 'f'; got %s instead" % sex)
+    # if sex.lower() not in ("m", "f", "na"):
+    #     raise ValueError("Allowed values for sex are 'm' or 'f'; got %s instead" % sex)
 
     plot_rheo = kwargs.pop("plot_rheo", False)
 
