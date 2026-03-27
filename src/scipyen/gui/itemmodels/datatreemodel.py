@@ -346,20 +346,28 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         palette = QtWidgets.QApplication.palette()
         font = QtWidgets.QApplication.font()
-        if readOnly:
-            brush = palette.brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
-            font_ = QtGui.QFont(font)
-            font_.setItalic(True)
+        brush = palette.brush(QtGui.QPalette.Active, QtGui.QPalette.Text)
+        readOnlyFont = QtGui.QFont(font)
+        readOnlyFont.setItalic(True)
+        readOnlyBrush = palette.brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
+        # if readOnly:
+        #     brush = palette.brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
+        #     font_ = QtGui.QFont(font)
+        #     font_.setItalic(True)
 
-        else:
-            brush = palette.brush(QtGui.QPalette.Active, QtGui.QPalette.Text)
-            font_ = QtGui.QFont(font)
+        # else:
+        #     brush = palette.brush(QtGui.QPalette.Active, QtGui.QPalette.Text)
+        #     font_ = QtGui.QFont(font)
 
         for item in (item0, item1, item2):
             item.setData(readOnly, ReadOnlyRole)
             item.setData(brush, QtCore.Qt.ForegroundRole)
-            item.setData(font_, QtCore.Qt.FontRole)
             item.setFlags(flags)
+
+        if readOnly:
+            item2.setData(readOnlyBrush, QtCore.Qt.ForegroundRole)
+            item2.setData(readOnlyFont, QtCore.Qt.FontRole)
+
 
         return (item0, item1, item2)
 
