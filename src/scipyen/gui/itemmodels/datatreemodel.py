@@ -619,6 +619,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         objType = type(obj)
         choices = dict()
         readOnly = False
+        # readOnlyChildren = False
 
         if isDataclass(obj):
             datafields = dataclasses.fields(obj)
@@ -1400,6 +1401,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "memberAccess": memberAccess,
             "accessType": None,
             "choices": dict(),
+            "readOnly": True,
             }
 
 
@@ -1497,6 +1499,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     def _(self: typing.Self, obj: pq.Quantity, _: bool=True) -> tuple:
         # print(f"{self.__class__.__name__}._parseObject_({type(obj).__name__})")
         objType = type(obj)
+        readOnly = False
         tip = f"{scq.unitFamilyName(obj.units)} quantity"
         if isinstance(obj, pq.UnitQuantity):
             info = f"{obj} {scq.unitFamilyName(obj)}"
@@ -1510,6 +1513,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 s = " × ".join(list(map(lambda x: f"{x}", obj.shape)))
                 info = f"Quantity array ({obj.units.dimensionality}) with {n} {strutils.pluralize('samples', n)}; shape {s}; dtype {obj.dtype}."
                 objDataAsChild = True
+                readOnly = True
 
         objDict = {
             "indirect": False,
@@ -1520,6 +1524,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "memberAccess": (".", ),
             "accessType": "attribute",
             "choices": dict(),
+            "readOnly": readOnly
             }
 
         # print(f"\t-> {objDict}")
@@ -1586,6 +1591,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "memberAccess": tuple(),
             "accessType": None,
             "choices": dict(),
+            "readOnly": True
             }
 
     @_parseObject_.register(vigra.AxisInfo)

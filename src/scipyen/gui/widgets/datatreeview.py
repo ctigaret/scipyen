@@ -74,62 +74,8 @@ import pandas as pd
 # import vigra
 # ### END 3rd party modules
 
-# import core.datatypes as datatypes
-# from core.datatypes import (is_namedtuple, TypeEnum)
-
-# NOTE: 2026-02-07 09:14:19 FIXME/TODO
-# to break cycling dependencies in systems.PrairieView, which needs this for the
-# importer gui, MOVE the latter to a separate module
-# from systems.PrairieView import *
-
-# from imaging import vigrautils
-
-# import imaging.axiscalibration
-
-# from imaging.axiscalibration import (
-#     AxesCalibration,
-#     AxisCalibrationData,
-#     ChannelCalibrationData,
-# )
-
-# from imaging.axisutils import (axisTypeStrings,
-#                                getValueForAxisType,
-#                                getNameForAxisType)
-
-# import imaging.scandata
-# from imaging.scandata import (ScanData, AnalysisUnit)
-
-# from core.triggerprotocols import TriggerProtocol
-# from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType)
-
-# import core.datasignal as datasignal
-# from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
-
-# import core.datazone as datazone
-# from core.datazone import (DataZone, Interval)
-
-# from core import xmlutils, strutils
-
-# from core import scipyen_quantities as scq
-
 from core.workspacefunctions import (validate_varname, user_workspace)
 
-# from core.utilities import (NestedFinder,
-#                             get_nested_value, set_nested_value,
-#                             unique)
-
-# from core.prog import (safewrapper, safeguiwrapper, print_styled, qVariants,
-#                        is_hashable)
-
-# from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
-
-# from core.scipyendataclasses import isDataclass
-
-# from gui.widgets.simpletablewidget import SimpleTableWidget
-# from gui.widgets.tableeditorwidget import (TableEditorWidget,
-#                                            TabularDataModel,)
-# from gui.pictgui import WorkerThread
-# from gui.widgets.small_widgets import QuantitySpinBox, ComplexSpinBox
 from gui.delegates import PythonItemDelegate
 from gui.workspacegui import WorkspaceGuiMixin
 from gui.itemmodels.roles import * #noqa
@@ -160,16 +106,6 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     def _setupChildDataItem_(self: typing.Self, item: QtGui.QStandardItem,
                              objData: typing.Optional[typing.Any] = None):
         r"""Sets up the editor widgets for the items in the tree model.
-For a given item:
-    * if the child first row child on column 0 represents a hierarchical data
-        structure, it simply becomes is a new branch point, with children representing its elements or members
-        (fields, attributes, etc)
-
-    * else if the contains tabular data (essentially,
-        pandas or numpy array object) then it will iself gain a child item in
-        column 0 that uses a TableEditorWidget (by way of PythonItemDelegate)
-        for read-write access to elements of the data.
-
     * if the
 
     """
@@ -237,11 +173,18 @@ For a given item:
             # inhibit editing for immutable collections - e.g. tuple, for now
             parentType = parentItem.data(ObjectTypeRole) # noqa
             # TODO 2026-02-12 14:59:32 to expand in parentheses as needed
+            # if (
+            #     (
+            #         parentType in (tuple, frozenset)
+            #         or parentItem.data(ReadOnlyRole) is True # noqa
+            #         or objItem.data(ReadOnlyRole) is True # noqa
+            #         )
+            #     or self.model().readOnly
+            #     ):
             if (
                 (
-                    parentType in (tuple, )
-                    or parentItem.data(ReadOnlyRole) is True # noqa
-                    or objItem.data(ReadOnlyRole) is True # noqa
+                    parentType in (tuple, frozenset)
+                    or infoItem.data(ReadOnlyRole) is True # noqa
                     )
                 or self.model().readOnly
                 ):
@@ -251,6 +194,7 @@ For a given item:
                 self.setItemDelegateForColumn(index.column(), self._delegate_)
                 self.setItemDelegateForRow(index.row(), self._delegate_)
                 flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
+
             infoItem.setFlags(flags)
 
     def setData(self: typing.Self, obj: object,
@@ -343,26 +287,6 @@ For a given item:
         # l_pathToStr = lambda s: s.replace(".", "_").replace("[", "_").replace("]", "_") is isinstance(s, str) else ""
 
         l_getName = lambda i: self.model().getPathForLeaf(i) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
-
-        # selection = zip(
-        #     *list(
-        #             map(
-        #                 lambda i: (
-        #                             l_getName(i),
-        #                             self.model().getDataObjectForLeaf(i)
-        #                             ),
-        #                 list(
-        #                     filter(
-        #                         (
-        #                             lambda i: i.column() == 0
-        #                             and not i.data(StandaloneEditorWidgetRole) # noqa
-        #                         ),
-        #                         items
-        #                         )
-        #                     )
-        #                 )
-        #             )
-        #     )
 
         selection = list(
                         map(
