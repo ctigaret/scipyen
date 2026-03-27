@@ -414,8 +414,12 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 if isinstance(data, neo.Event):
                     widget = neow.SimpleTriggerEventWidget(parent)
                 else:
-                    if data.ndim == 0 or (data.ndim ==1 and data.size == 1):
-                        widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
+                    isComplex = issubclass(data.dtype.type, np.complexfloating)
+                    if data.ndim == 0 or (data.ndim == 1 and data.size == 1):
+                        if isComplex:
+                            widget = smw.ComplexSpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
+                        else:
+                            widget = smw.QuantitySpinBox(parent, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
                         widget.setMinimum(-math.inf * data.units)
                         widget.setMaximum(math.inf * data.units)
                         widget.setSingleStep(1.0  * data.units)
@@ -503,6 +507,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                             widget.setFrame(False)
                         widget.setAutoFillBackground(True)
 
+                        if not inModel:
+                            widget.setValue(data)
+
                         return widget
 
                     else:
@@ -511,7 +518,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
             if len(data) > 100:
                 txt = data if isinstance(data, str) else data.decode()
-                widget = QtWidgets.QPlainTextEdit(txt)
+                widget = QtWidgets.QPlainTextEdit(parent, txt)
                 widget.setMaximumHeight(200)
                 if isinstance(data, str):
                     widget.setReadOnly(False)
@@ -521,13 +528,15 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             else:
                 if isinstance(data, str):
                     # widget = QtWidgets.QLineEdit(parent)
-                    widget = smw.LineEdit(parent, lazy=True)
+                    widget = smw.LineEdit(parent=parent, lazy=True)
                     widget.undoAvailable = True
                     widget.redoAvailable = True
                     widget.setClearButtonEnabled(True)
                     # widget = smw.LazyLineEdit(parent)
-                    widget.setText(data)
+                    # widget.setText(data)
                     widget.sig_enterPressed.connect(self.slot_dataChanged)
+                    if not inModel:
+                        widget.setValue(data)
                 else:
                     return
 
@@ -663,8 +672,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
             choices = self._columnChoices_[index.column()]["choices"]
 
-
-        return self.createWidget(data, choices, True, parent)
+        w = self.createWidget(data, choices, True, parent)
+        print(f"{self.__class__.__name__}.createEditor() -> {type(w).__name__}")
+        return w
 
     def setEditorData(self, editor: QtWidgets.QWidget,
                       index: QtCore.QModelIndex):
@@ -762,6 +772,17 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 editor.setDecimals(decimals)
                 editor.setValue(data)
 
+            elif isinstance(data, complex) or "complex" in type(data).__name__:
+                assert isinstance(editor, smw.ComplexSpinBox)
+                if "." in disp:
+                    decimals = len(disp[disp.index("."):])
+                else:
+                    decimals = 0
+                editor.keepDimensionless = True
+                editor.forceDimensionless = True
+                editor.setDecimals(decimals)
+                editor.setValue(data)
+
             elif isinstance(data, pq.Quantity):
                 data_type_name = type(data).__name__
                 if isinstance(data, neo.Event):
@@ -770,7 +791,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 elif isinstance(data, pq.UnitQuantity):
                     assert isinstance(editor, smw.QuantityChooserWidget), f"Incompatible editor widget type ({type(editor).__name__}) for {data_type_name} data"
                 else:
-                    assert isinstance(editor, smw.QuantitySpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for {data_type_name} data"
+                    assert isinstance(editor, (smw.QuantitySpinBox, smw.ComplexSpinBox)), f"Incompatible editor widget type ({type(editor).__name__}) for {data_type_name} data"
                     if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
                         return
                     # NOTE: 2025-09-27 10:31:23

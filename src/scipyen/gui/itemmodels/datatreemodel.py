@@ -478,6 +478,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 visited = self._visited_[id(obj)]
 
         rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType, visited)
+        # rowItems[-1].setData(ReadOnlyRole, True)
+
         pItem = rowItems[0]
 
         k = 0
@@ -526,8 +528,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
             pValue, valDict = self._parseObject_(value, self._showPrivate_)
 
-            if objDict.get("readOnly", False) is True:
-                valDict["readOnly"] = True
+            # if objDict.get("readOnly", False) is True:
+            #     valDict["readOnly"] = True
 
             self._buildBranch_(pValue, valDict, keyName, type(key), pItem, k)
 
@@ -650,6 +652,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             objDataAsChild = False
             memberAccess = (".",)
             accessType = "attribute"
+            readOnly = True
 
         elif HAVE_METAARRAY and (
                 hasattr(obj, "implements") and obj.implements("MetaArray")
@@ -672,6 +675,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             objDataAsChild = False
             memberAccess = tuple()
             accessType = None
+            readOnly = True
 
         elif self._introspect_ and self.introspectable(obj) :
             pData = datatypes.inspect_members(obj, self._predicate_)
@@ -711,7 +715,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
             # )
 
         return pData, {
-            "indirect": indirect, "objDataAsChild": objDataAsChild,
+            "indirect": indirect,
+            "objDataAsChild": objDataAsChild,
             "objInfo": info,
             "memberAccess": memberAccess,
             "accessType": accessType,
@@ -734,6 +739,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         objDataAsChild = False
         memberAccess = tuple()
         accessType = None
+        readOnly = True
 
         return pData, {
             "indirect": indirect,
@@ -744,6 +750,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "objTip": tip,
             "objType": objType,
             "choices": dict(),
+            "readOnly": readOnly,
             }
 
     @_parseObject_.register(datetime.datetime)
@@ -763,6 +770,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         objDataAsChild = False
         memberAccess = tuple()
         accessType = None
+        readOnly = False
 
         return pData, {
             "indirect": indirect,
@@ -774,6 +782,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "objTip": tip,
             "objType": objType,
             "choices": dict(),
+            "readOnly": readOnly,
             }
 
     @_parseObject_.register(types.FunctionType)
@@ -784,6 +793,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                                    types.MethodType,types.BuiltinMethodType,
                                    ),
           _:bool = False) -> tuple:
+        readOnly = True
         objType = type(obj)
         tip = f"{obj}"
         word = "Fuction" if isinstance(obj, (types.FunctionType, types.BuiltinFunctionType)) else "Method"
@@ -798,6 +808,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "memberAccess": tuple(),
             "accessType": None,
             "choices": dict(),
+            "readOnly": readOnly,
             }
 
     @_parseObject_.register(type)
@@ -809,6 +820,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     def _(self: typing.Self,
           obj: typing.Union[type, enum.EnumType, enum.Enum, enum.Flag, TypeEnum],
           includePrivateMembers: bool = False) -> tuple:
+        readOnly = False
         objType = type(obj)
         info = obj
         tip = str(obj)
@@ -836,6 +848,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 except:
                     scipywarn(f"Cannot access enumeration values for {type(obj).__name__}")
                     choices = dict()
+                readOnly = True
 
         return obj, {
             "indirect": False,
@@ -846,6 +859,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "memberAccess": memberAccess,
             "accessType": accessType,
             "choices": choices,
+            "readOnly": readOnly,
             }
 
     @_parseObject_.register(pkgutil.ModuleInfo)
@@ -864,6 +878,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "memberAccess": (".",),
             "accessType": "attribute",
             "choices": dict(),
+            "readOnly": True
             }
 
     @_parseObject_.register(bgbridge.Structure)
@@ -998,6 +1013,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "memberAccess": ("[", "]"),
             "accessType": "key",
             "choices": dict(),
+            "readOnly": True
             }
 
     @_parseObject_.register(list)
@@ -1023,12 +1039,14 @@ class DataTreeModel(QtGui.QStandardItemModel):
             memberAccess = (".",)
             accessType = "attribute"
             readOnly = True
+
         elif isinstance(obj, os.stat_result):
             pData = dict(filter(lambda t: any(t[0].startswith(s) for s in ("n_", "st_")), inspect.getmembers(obj)))
             tip += "(stat result)"
             memberAccess = (".",)
             accessType = "attribute"
             readOnly = True
+
         else:
             pData = dict(enumerate(obj))
             memberAccess = ("[","]")
@@ -1043,6 +1061,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                     )
                 )
             )
+            readOnly = True
 
         n = len(pData)
         info = f"{n} {strutils.pluralize('element', n)}"
@@ -1169,6 +1188,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "memberAccess": (".", ),
             "accessType": "attribute",
             "choices": dict(),
+            "readOnly": True
             }
 
     @_parseObject_.register(types.ModuleType)
@@ -1211,6 +1231,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "memberAccess": (".", ),
             "accessType": "attribute",
             "choices": dict(),
+            "readOnly": True
             }
 
     @_parseObject_.register(vigra.filters.Kernel1D)
@@ -1331,6 +1352,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "memberAccess": memberAccess,
             "accessType": accessType,
             "choices": dict(),
+            "readOnly": True # pending a new widget for this
             }
 
     @_parseObject_.register(pd.DataFrame)
@@ -1847,6 +1869,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         item = self.itemFromIndex(modelIndex)
 
+        # print(f"{self.__class__.__name__}.setData: item at column {item.column()} -> edit data: {item.data(QtCore.Qt.EditRole)}")
+        # print(f"{self.__class__.__name__}.setData: item at column {item.column()} -> read only: {item.data(ReadOnlyRole)}")
+
         if item.data(ReadOnlyRole) is True: # noqa
             return
 
@@ -1881,7 +1906,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         objItem.setData(QtCore.QVariant(value), ObjectDataRole) # noqa
 
         path = self._getPathForItemOrIndex_(objItem)
-        # print(f"\taccess to objItem: {path}")
+        print(f"\taccess to objItem: {path}")
 
         if path[-1] == self._topObjectItem_.data(QtCore.Qt.DisplayRole):
             path[-1] = "self._modelData_"
@@ -1890,7 +1915,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         setexpr = accexpr + " = value"
         OK = False
         try:
-            print(f"{self.__class__.__name__}.setData: setexpr = {setexpr}")
+            # print(f"{self.__class__.__name__}.setData: setexpr = {setexpr}")
             exec(setexpr)
             newVal = eval(accexpr)
             OK = True

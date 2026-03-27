@@ -620,7 +620,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
     _default_singleStep_:int = 1
     _default_stepType_:QtWidgets.QAbstractSpinBox.StepType = QtWidgets.QAbstractSpinBox.DefaultStepType
-    _default_decimals_:int = 3
+    _default_decimals_:int = np.get_printoptions()["precision"]
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget]=None,
                  units: typing.Optional[typing.Union[pq.Quantity,
@@ -731,7 +731,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             self._decimals_ = decimals
 
         elif decimals is None:
-            self._decimals_ = -int(math.log10(abs(self._singleStep_))) if (self._singleStep_ < 1 and self._singleStep_ > -1) else self._default_decimals_
+            self._decimals_ = np.get_printoptions()["precision"]
+            # self._decimals_ = -int(math.log10(abs(self._singleStep_))) if (self._singleStep_ < 1 and self._singleStep_ > -1) else self._default_decimals_
             # self._decimals_ = self._default_decimals_
 
         else:
@@ -1642,6 +1643,7 @@ class ComplexSpinBox(QtWidgets.QFrame):
         self.layout.addWidget(self.jLabel)
         self.layout.addWidget(self.suffixLabel)
         self.layout.addStretch(5)
+        self.setLayout(self.layout)
 
         self._restrictedToFamily_:typing.Optional[str] = None
         self._rescaleOnUnitChange_:bool = False

@@ -149,8 +149,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self.autoResizeColumns: set[int] = kwargs.pop("autoResizeColumns", set())
         super().__init__(parent=parent)
         super().setModel(DataTreeModel())
-        self._delegate_ = PythonItemDelegate()
         self._defaultDelegate_ = self.itemDelegate()
+        self._delegate_ = PythonItemDelegate(parent = self)
         self._dragStartPosition_: typing.Optional[QtCore.QPoint] = None
 
     def setModel(self: typing.Self, model: QtCore.QAbstractItemModel):
@@ -203,10 +203,11 @@ For a given item:
                                                                     choices = list(),
                                                                     inModel = False,
                                                                     parent = self)
-                        if (
-                            item.data(ReadOnlyRole) is True # noqa
-                            or self.model().readOnly
-                            ):
+                        # if (
+                        #     item.data(ReadOnlyRole) is True # noqa
+                        #     or self.model().readOnly
+                        #     ):
+                        if self.model().readOnly:
                             if hasattr(editorWidget,  "readOnly"):
                                 editorWidget.readOnly = True
                         self.setIndexWidget(childIndex, editorWidget)
