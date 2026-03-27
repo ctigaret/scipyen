@@ -245,6 +245,7 @@ US_Dollar = pq.UnitCurrency("US_Dollar", symbol="$")
 Euro = pq.UnitCurrency("Euro", symbol = "€")
 Yen = pq.UnitCurrency("Yen", symbol = "¥")
 Cent = pq.UnitCurrency("Cent", symbol = "¢")
+Peseta = pq.UnitCurrency("Peseta", symbol = "₧")
 
 DegreeCelsius = makeScaledUnitQuantity(1 * pq.degC, name="Degree Celsius", symbol = "ᵒC")
 DegreeKelvin = makeScaledUnitQuantity(1 * pq.degK, name="Degree Celsius", symbol = "ᵒK")
