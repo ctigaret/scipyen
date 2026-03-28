@@ -133,17 +133,11 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                     if hasEditorWidgetChild is True:
                         childIndex = item.child(0).index()
                         self.setFirstColumnSpanned(0, index, True)
-                        # self.setItemDelegateForColumn(childIndex.column(), self._delegate_)
-                        # self.setItemDelegateForRow(childIndex.row(), self._delegate_)
                         editorWidget = self._delegate_.createWidget(objData,
                                                                     choices = list(),
                                                                     inModel = False,
                                                                     parent = self)
-                        # if (
-                        #     item.data(ReadOnlyRole) is True # noqa
-                        #     or self.model().readOnly
-                        #     ):
-                        if self.model().readOnly:
+                        if self.model().readOnly or item.data(ReadOnlyRole) is True:
                             if hasattr(editorWidget,  "readOnly"):
                                 editorWidget.readOnly = True
                         self.setIndexWidget(childIndex, editorWidget)
@@ -156,13 +150,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                     self._setupChildDataItem_(infoItem, objData)
 
         elif index.column() == 2:
-            # print(f"{self.__class__.__name__}._setupChildDataItem_ for column 2")
-            # print(f"\tindex display: {index.data(QtCore.Qt.DisplayRole)}")
-            # print(f"\tindex object data {index.data(ObjectDataRole)}")
-            # print(f"\tindex row {index.row()}")
             signalBlocker = QtCore.QSignalBlocker(self.model()) # noqa
-            # index = infoItem.index()
-            # row = index.row()
             infoItem = model.itemFromIndex(index)
             parentItem = infoItem.parent()
             if parentItem:
@@ -171,31 +159,23 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
             # NOTE: 2026-02-12 14:58:10
             # inhibit editing for immutable collections - e.g. tuple, for now
-            parentType = parentItem.data(ObjectTypeRole) # noqa
+            # parentType = parentItem.data(ObjectTypeRole) # noqa
             # TODO 2026-02-12 14:59:32 to expand in parentheses as needed
             # if (
             #     (
             #         parentType in (tuple, frozenset)
-            #         or parentItem.data(ReadOnlyRole) is True # noqa
-            #         or objItem.data(ReadOnlyRole) is True # noqa
+            #         or infoItem.data(ReadOnlyRole) is True # noqa
             #         )
             #     or self.model().readOnly
             #     ):
-            if (
-                (
-                    parentType in (tuple, frozenset)
-                    or infoItem.data(ReadOnlyRole) is True # noqa
-                    )
-                or self.model().readOnly
-                ):
-                flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
-
-            else:
-                self.setItemDelegateForColumn(index.column(), self._delegate_)
-                self.setItemDelegateForRow(index.row(), self._delegate_)
-                flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
-
-            infoItem.setFlags(flags)
+            #     flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
+            #
+            # else:
+            #     self.setItemDelegateForColumn(index.column(), self._delegate_)
+            #     self.setItemDelegateForRow(index.row(), self._delegate_)
+            #     flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
+            #
+            # infoItem.setFlags(flags)
 
     def setData(self: typing.Self, obj: object,
                 name: typing.Optional[str] = None):
