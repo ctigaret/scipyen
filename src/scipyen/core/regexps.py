@@ -8,8 +8,6 @@ r"""Various compiled regular expression Pattern objects I found useful
    :trim:
 
 
-To understand the comments, see the accompanying test_regexps.py module.
-
 Usage:
 ======
 Import this module in your module; this will compile several re.Pattern objects |nbsp|
@@ -104,47 +102,34 @@ You may then use these pattern objects by calling their methods, e.g.:
 
 """
 
+# TODO/FIXME 2026-03-29 15:23:25
+# MAYBE take into account the system's locale; for now assumes decimal separator being a dot .""
+# CAUTION using commas as decimal separator WILL confuse comma-separated sequences...
 DELIMITERS = re.compile(r'[,\s;:|]+')
 
 # use with by calling its match() or search() method
-# NUMBER_MATCH = re.compile(r'^\d+(\.\d*?)?')
 NUMBER_MATCH = re.compile(r'^\d+\.?\d*')
 
-# DIMENSIONALITY_STRING = re.compile(r'([a-zA-Zμ]+?[\w*/]+?$)')
 DIMENSIONALITY_STRING = re.compile(r'([a-zA-Zμ\$\£\€\¢\¥ΩÅ°ᵒ]+?[μ\$\£\€\¢\¥ΩÅ°ᵒ\w*/]*?$)')
 
 BRACKETED_SEQUENCE = re.compile(r'[\[|\(|\{](.+?)[\]|\)|\}]')
-# original pattern in strutils.is_sequence   # OK for a_s -> single match, original string; if delim is ", " -> c'truct a list
-# works for b_s but drops the units symbol; if delim is " " -> c'truct a numpy array
-# works for c_s -> 2 matches; drops units symbol
-
-
 
 BRACKETED_NUMERIC_SEQUENCE = re.compile(r'[\[|\(|\{]([\[|\(\{]{0,1}[\s0-9.+-,]+?[\]|\)\}]{0,1})[\]|\)|\}]')
 
 BRACKETED_QUANTITY_SEQUENCE = re.compile(r'[\[|\(|\{]([\[|\(\{]{0,1}[\s0-9.+-,]+?[\]|\)\}]{0,1})[\]|\)|\}](\s\*\s){0,1}([\sa-zA-Z]{1,})')
-# Expects 3 groups per match
-# OK for a_s => 2 groups:
-#   1. the list string repr
-#   2. empty string
-#
-# even BETTER for b_s, f_s => two groups:
-#   1 = the array string (delim is " ")
-#   2 = and the units symbol (spaces included)
-#
-# OK for c_s => TWO matches, one per element, each with 2 groups:
-#   1. magnitude (bracketed)
-#   2. units
-
-
 
 NAKED_NUMERIC_SEQUENCE = re.compile(r'([0-9.+-]+?[,]{0,1})') # ([\s])(\s\*\s){0,1}([\sa-zA-Z]{0,})')
+
 NAKED_QUANTITY_SEQUENCE = re.compile(r'([0-9.+-]+?[,]{0,1})([\s])(\s\*\s){0,1}([\sa-zA-Z]{1,})')
 
 
-# OK for d_s, e_s, like pattern5 for b_s, but prone for false positives in free-form strings
-# do NOT use for b_s;
-# does NOT work for a_s
-
-# pattern7 = r'(\b[0-9.+-]+?)([\sa-zA-Z]{1,})'
+SCIENTIFIC_NUMBER_FORMAT_MATCH = re.compile(r'(^[\d]+?[.]??[\d]*?)((e|E)[+-]?[\d]*)')
+# makes sure there is at most a single dot or decimal separator
+# Examples:
+# SCIENTIFIC_NUMBER_FORMAT_MATCH.match("1E-8") -> <re.Match object; span=(0, 4), match='1E-8'>
+# SCIENTIFIC_NUMBER_FORMAT_MATCH.search("1E-8") -> <re.Match object; span=(0, 4), match='1E-8'>
+#
+# find out the exponent (and indirectly figure out the mantissa):
+# SCIENTIFIC_NUMBER_FORMAT_MATCH.findall("1E-8") -> [('E-8', 'E')]
+# SCIENTIFIC_NUMBER_FORMAT_MATCH.findall("6.02214076e+23") -> [('e+23', 'e')]
 

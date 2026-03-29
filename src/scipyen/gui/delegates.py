@@ -53,6 +53,7 @@ import vigra
 import quantities as pq
 import neo
 # from core import scipyen_quantities as scq
+from core import strutils as strutils
 from gui.widgets import small_widgets as smw
 from gui.widgets import neo_widgets as neow
 from gui.widgets import inlinefiledirchooser as ifdc
@@ -762,14 +763,14 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 assert isinstance(editor, QtWidgets.QDoubleSpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for floating point data"
                 # NOTE: 2025-09-27 10:31:43
                 # figure out how many decimals we've got here, see also NOTE: 2025-09-27 10:31:23
-                if "." in disp:
-                    decimals = len(disp[disp.index("."):])
-                else:
-                    decimals = 0
+                # if "." in disp:
+                #     decimals = len(disp[disp.index("."):])
+                # else:
+                #     decimals = 0
                 if isinstance(editor, smw.QuantitySpinBox):
                     editor.keepDimensionless = True
                     editor.forceDimensionless = True
-                editor.setDecimals(decimals)
+                # editor.setDecimals(decimals)
                 editor.setValue(data)
 
             elif isinstance(data, complex) or "complex" in type(data).__name__:
@@ -805,12 +806,12 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     else:
                         s0 = disp.split(" ")[0].strip()
 
-                    if "." in s0:
-                        decimals = len(s0[s0.index(".")-1:]) # count the dot as well
-                    else:
-                        decimals = 0
+                    # if "." in s0:
+                    #     decimals = len(s0[s0.index(".")-1:]) # count the dot as well
+                    # else:
+                    #     decimals = 0
 
-                    editor.setDecimals(decimals)
+                    # editor.setDecimals(decimals)
                     # editor.setSingleStep(1.0  * data.units)
                 editor.setValue(data)
 

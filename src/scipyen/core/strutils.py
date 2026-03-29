@@ -301,6 +301,53 @@ When delimiters is True, also returns a list of delimiter characters, sorted.
     else:
         return ret
 
+def parse_sci_string(x: str) -> tuple:
+    r"""Retrieve mantissa, exponent, and number of digits in the mantissa, within a string containing scientific number format"""
+    if not isnumber(x):
+        return (None, None, 0)
+
+    ee = SCIENTIFIC_NUMBER_FORMAT_MATCH.findall(x)
+    if len(ee):
+        ms, e, e_ = ee[0] # mantissa string, exponent string, exponent char ('e' or 'E')
+        _, es = e.split(e_)
+        # the exponent:
+        if len(es):
+            p = int(es) # exponent power
+        else:
+            p = 0 # exponent power
+
+        m = float(ms) # mantissa
+
+        if "." in ms:
+            i, dec = ms.split(".")
+            d = len(dec) # number of decimals
+        else:
+            d = 0 # number of decimals
+
+    else:
+        if "." in x:
+            parts = x.split(".")
+
+        if len(parts) > 2:
+            return (None, None, None)  # shouldn't really get here as this is not a numeric string hence it would have been rejected above
+
+        m = float(parts[0])
+        p = 0
+        if len(parts) == 2:
+            d = len(parts[1])
+        else:
+            d = 0
+
+    return (m, p, d)
+
+def get_decimals(x:str) -> int:
+    if not isnumber(x):
+        return 0
+
+    m, p, d = parse_sci_string(x)
+
+    return 0 if d is None else d
+
 def is_cached_output_varname(s: str) -> bool:
     r"""Returns True if s is an IPython cached output variable"""
     return isinstance(s, str) and len(s.strip()) and __output_cache_regexp__.match(s) is not None

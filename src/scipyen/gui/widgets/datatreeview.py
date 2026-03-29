@@ -99,6 +99,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self._delegate_ = PythonItemDelegate(parent = self)
         self._dragStartPosition_: typing.Optional[QtCore.QPoint] = None
 
+        self.setItemDelegate(self._delegate_)
+
     def setModel(self: typing.Self, model: QtCore.QAbstractItemModel):
         # disallow changing the model
         pass

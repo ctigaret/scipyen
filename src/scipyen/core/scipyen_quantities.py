@@ -14,7 +14,18 @@ F   : Faraday constant 96485.33212331001 C/mol
 qe  : elementary charge 1.602176634e-19 C
 
 N_A : Avogadro constant 6.02214076e23 mol⁻¹
-    ('N_A' chosen to avoid clashes with pandas.NA)
+N_a, NA: aliases to N_A; to avoid clashes with pandas.NA, please avoid
+    importing these directly into your namespace (wither workspace or
+    module workspace); rather, import the containing module and refer to
+    them by their qualified name, e.g.
+
+::
+
+    from core import scipyen_quantities as scq
+    import pandas as pd
+
+    scq.NA # Avogadro's number
+    pd.NA  # pandas' <NA>
 
 ¹ NOTE: These are aready contained in the "constants" module of the Quantities
 package, as UnitConstant objects, but some are bound to rather "verbose" symbols
@@ -343,8 +354,10 @@ F = 96485.33212331001 * pq.C/pq.mol
 # elementary charge
 qe = 1.602176634e-19 * pq.C
 
-# Avogadro constant
+# Avogadro constant; aliased to N_a, NA
 N_A = 6.02214076e23 * pq.mol**(-1)
+N_a = N_A
+NA = N_A
 
 # Fluo_5F 𝑲d
 Fluo_5F_Kd = 2.3 * pq.micromolar
