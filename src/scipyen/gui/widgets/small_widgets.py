@@ -6,7 +6,7 @@
 r"""
 """
 
-import typing, warnings, math, cmath, os
+import typing, warnings, math, cmath, os, traceback
 import numpy as np
 import quantities as pq
 import pandas as pd
@@ -658,7 +658,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         # self._default_units_ = pq.dimensionless
 
-        self._lineEdit_ = LazyLineEdit(self)
+        # self._lineEdit_ = LazyLineEdit(self)
+        self._lineEdit_ = LineEdit(self)
 
         self.setLineEdit(self._lineEdit_)
 
@@ -677,6 +678,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self._magnitude_: float = 0.0
         self._prefix_ = ""
         self._suffix_ = ""
+        self._specialValueText_: str = ""
 
         if isinstance(units, pq.Quantity):
             self._units_ = units.units
@@ -800,7 +802,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             self._singleStep_ *= ratio
             self._magnitude_ = float(newval.magnitude)
             self._units_ = newval.units
-            super().setValue(self._magnitude_)
+            # self.setValue(self._magnitude_)
             self.setSingleStep(self._singleStep_)
         else:
             self._units_ = value.units
@@ -825,17 +827,23 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         if np.isnan(self._magnitude_):
             text = "NaN"
-            super().setSpecialValueText(text)
+            self._specialValueText_ = text
+            # super().setSpecialValueText(text)
 
         elif np.isinf(self._magnitude_):
             text = "-Inf" if self._magnitude_ in (-np.inf, -math.inf) else "Inf"
-            super().setSpecialValueText(text)
+            self._specialValueText_ = text
+            # super().setSpecialValueText(text)
         else:
             text = f"{self._magnitude_:.{self.decimals}}"
-            super().setSpecialValueText("")
+            self._specialValueText_ = ""
+            # super().setSpecialValueText("")
 
         super().setSuffix(self._suffix_)
         super().setPrefix(self._prefix_)
+
+        if len(self._specialValueText_):
+            text = self._specialValueText_
 
         if len(self._prefix_):
             text = f"{self._prefix_}{text}"
@@ -851,16 +859,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
     @Slot(str)
     def _slot_valueTextChanged(self, s:str):
-        # print(f"{self.__class__.__name__}._slot_valueTextChanged")
-        # oName = ""
-        # objectName = ""
-        # if self.parent():
-        #     objectName = self.parent().objectName()
-        #     if objectName:
-        #         oName = objectName + ": "
-        # objectName = self.objectName()
-        # if objectName.endswith("startSpinBox"):
-        #     print(f"{oname}{self.__class__.__name__}._slot_valueTextChanged(s = '{s}')")
+        print(f"{self.__class__.__name__}._slot_valueTextChanged")
 
         if self._validText_ == QtGui.QValidator.Acceptable:
             try:
@@ -873,10 +872,6 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                     self.sig_valueChanged.emit(self.value())
             except:
                 traceback.print_exc()
-
-    # @Slot(float)
-    # def _slot_valueChanged(self, val):
-    #     self.sig_valueChanged.emit(self.value())
 
     @Slot(bool)
     def _slot_keepDimensionless(self, val:bool):
@@ -1212,6 +1207,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     self.rescaleOnUnitChange is True.
     """
         from core.regexps import SCIENTIFIC_NUMBER_FORMAT_MATCH
+        # traceback.print_stack()
 
         if isinstance(value, pq.Quantity):
             if value.size > 1:
@@ -1249,82 +1245,54 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         else:
             raise ValueError(f"Incompatible value: {value} ({type(value).__name__})")
 
-        self.update()
+        self._update_()
 
-    def update(self):
+    def _update_(self,
+                 forceSgStep: typing.Optional[typing.Union[int, float]] = None,
+                 forceDecimals: typing.Optional[int] = None):
+        signalBlockers = list(map(QtCore.QSignalBlocker, (self, self.lineEdit())))
         if self._magnitude_ is pd.NA:
             self.setMinimum(-math.inf)
             specialText = r"NA"
-            super().setSpecialValueText(specialText)
+            self._specialValueText_ = specialText
+            # super().setSpecialValueText(specialText)
             # super().setValue(-math.inf)
 
-            text = specialText
+            # text = specialText
 
             if len(self._prefix_):
-                text = f"{self._prefix_} {text}"
+                text = f"{self._prefix_} {self._specialValueText_}"
 
             if len(self._suffix_):
                 text = f"{text} {self._suffix_}"
 
-            signalBlock = QtCore.QSignalBlocker(self.lineEdit())
+            # signalBlock = QtCore.QSignalBlocker(self.lineEdit())
             self.lineEdit().setText(text)
 
         elif self._magnitude_ in (math.nan, np.nan):
             self.setMinimum(-math.inf)
             specialText = r"NaN"
-            super().setSpecialValueText(specialText)
+            self._specialValueText_ = specialText
+            # super().setSpecialValueText(specialText)
             # super().setValue(-math.inf)
 
-            text = specialText
+            # text = specialText
 
             if len(self._prefix_):
-                text = f"{self._prefix_} {text}"
+                text = f"{self._prefix_} {self._specialValueText_}"
 
             if len(self._suffix_):
                 text = f"{text} {self._suffix_}"
 
-            signalBlock = QtCore.QSignalBlocker(self.lineEdit())
+            # signalBlock = QtCore.QSignalBlocker(self.lineEdit())
             self.lineEdit().setText(text)
 
         elif isinstance(self._magnitude_, (float, int)):
-            print(f"{self.__class__.__name__}.setValue: {type(self._magnitude_).__name__}: {self._magnitude_}")
-            print(f"\tcurrent decimals: {self._decimals_}")
-            print(f"\tdefault decimals: {self._default_decimals_}")
-            print(f"\tcurrent step: {self._singleStep_}")
-            # super().setValue(float(self._magnitude_))
-            # print(f"\tsuper_value: {super().value()}")
-            # super_text = super().lineEdit().text()
-            # print(f"\tsuper_text: {super_text}")
-            # NOTE: 2026-03-29 12:14:37
-            # the next line formats self._magnitude_ according to the number of decimals
-            # HOWEVER, this does NOT work when the generated text is in scientific format
-            # e.g., '1e-8'
-            text = f"{self._magnitude_:.{self.decimals+1}}"
-            print(f"\ttext: {text}")
-            mantissa, exponent, decimals = strutils.parse_sci_string(text)
-            print(f"\tmantissa = {mantissa}, exponent = {exponent}, decimals = {decimals}")
-            if exponent != 0:
-                sign = "+" if exponent > 0 else "" # '-' wil be automatically inserted by Python library
-                text = f"{mantissa:.{self.decimals}}e{sign}{exponent}"
-            else:
-                text = f"{mantissa:.{self.decimals}}"
-
-            if self._magnitude_ < self._singleStep_:
-                if exponent < 0 and abs(exponent) > self.decimals:
-                    step = 10**exponent
-                else:
-                    step = 10**(-self.decimals + exponent)
-                print(f"\tnew step proposed: {step}")
-                self.setSingleStep(step) # good fallback?
-
-            elif self._magnitude_ > self._singleStep_:
-                if exponent > self.decimals:
-                    step = 10**(exponent - self.decimals)
-                    print(f"\tnew step proposed: {step}")
-                    self.setSingleStep(step) # good fallback?
-
-
-            specialText = r""
+            # print(f"{self.__class__.__name__}._update_: {type(self._magnitude_).__name__}: {self._magnitude_}")
+            # print(f"\tcurrent decimals: {self._decimals_}")
+            # print(f"\tdefault decimals: {self._default_decimals_}")
+            # print(f"\tcurrent step: {self._singleStep_}")
+            # print(f"\tforced  step: {forceSgStep}")
 
             if self._magnitude_ in (-math.inf, -np.inf):
                 specialText = r"-Inf"
@@ -1332,11 +1300,50 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             elif self._magnitude_ in (math.inf, np.inf):
                 specialText = r"Inf"
 
-            if len(specialText):
-                super().setSpecialValueText(specialText)
-                text = specialText
             else:
-                super().setSpecialValueText(r"")
+
+                # super().setValue(float(self._magnitude_))
+                # print(f"\tsuper_value: {super().value()}")
+                # super_text = super().lineEdit().text()
+                # print(f"\tsuper_text: {super_text}")
+                # NOTE: 2026-03-29 12:14:37
+                # the next line formats self._magnitude_ according to the number of decimals
+                # HOWEVER, this does NOT work when the generated text is in scientific format
+                # e.g., '1e-8'
+                text = f"{self._magnitude_:.{self.decimals+1}}"
+                # print(f"\ttext: {text}")
+                mantissa, exponent, decimals = strutils.parse_sci_string(text)
+                # print(f"\tmantissa = {mantissa}, exponent = {exponent}, decimals = {decimals}")
+                if exponent != 0:
+                    sign = "+" if exponent > 0 else "" # '-' wil be automatically inserted by Python library
+                    text = f"{mantissa:.{self.decimals}}e{sign}{exponent}"
+                else:
+                    text = f"{mantissa:.{self.decimals}}"
+
+                if not isinstance(forceSgStep, (int, float)):
+                    if self._magnitude_ < self._singleStep_:
+                        if exponent < 0 and abs(exponent) > self.decimals:
+                            step = 10**exponent
+                        else:
+                            step = 10**(-self.decimals + exponent)
+                        # print(f"\tnew step proposed: {step}")
+                        self.setSingleStep(step) # good fallback?
+
+                    elif self._magnitude_ > self._singleStep_:
+                        if exponent > self.decimals:
+                            step = 10**(exponent - self.decimals)
+                            # print(f"\tnew step proposed: {step}")
+                            self.setSingleStep(step) # good fallback?
+
+
+                specialText = r""
+
+            self._specialValueText_ = specialText
+
+
+            if len(self._specialValueText_):
+                # super().setSpecialValueText(specialText)
+                text = self._specialValueText_
 
             if len(self._prefix_):
                 text = f"{self._prefix_} {text} "
@@ -1346,7 +1353,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
             # print(f"{self.objectName()}: {self.__class__.__name__}.setValue({value}) -> text = {text}")
 
-            signalBlock = QtCore.QSignalBlocker(self.lineEdit())
+            # signalBlock = QtCore.QSignalBlocker(self.lineEdit())
             self.lineEdit().setText(text)
 
         else:
@@ -1536,11 +1543,38 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         return max(minStep, math.pow(10, logVal))
 
     def stepBy(self, steps:int):
-        print(f"{self.__class__.__name__}.stepBy({steps})")
-        print(f"\tcurrent magnitude: {self._magnitude_}")
-        self._magnitude_ = self._magnitude_ + self._singleStep_ * steps
-        print(f"\tnew magnitude: {self._magnitude_}")
-        self.update()
+        signalBlocker = QtCore.QSignalBlocker(self._lineEdit_)
+        step = self._singleStep_ * steps
+        # print(f"{self.__class__.__name__}.stepBy({steps})")
+        # print(f"\tsingle step = {self._singleStep_}; step  = {step}")
+        # print(f"\tcurrent magnitude: {self._magnitude_}")
+        if isinstance(self._singleStep_, pq.Quantity):
+            if self._singleStep_.size != 1:
+                raise ValueError(f"Single step must be a scalar; instead got {self._singleStep_}")
+            stepUnits = self._singleStep_.units
+            if isinstance(self._units_, pq.Quantity):
+                if all(self._units_ != pq.dimensionless) and all(stepUnits != self._units_):
+                    if not scq.unitsConvertible(stepUnits, self._units_):
+                        raise ValueError(f"Step units ({stepUnits}) are incompatible with value's units ({self._units_})")
+
+                    sgStep = self._singleStep_.rescale(self._units_).magnitude
+            else:
+                sgStep = self._singleStep_.magnitude
+
+        elif isinstance(self._singleStep_, (int, float)):
+            sgStep = self._singleStep_
+        else:
+            raise TypeError(f"singleStep has wrong object type: {type(self._singleStep_).__name__}")
+
+        self._magnitude_ = self._magnitude_ + sgStep * steps
+        # print(f"\tnew magnitude: {self._magnitude_}")
+        decimals = self._decimals_
+        self._lineEdit_.lazy = True
+        self._update_(forceSgStep = sgStep)
+        self._lineEdit_.lazy = False
+        # restore single step & decimals
+        # self._singleStep_ = sgStep
+        # self._decimals_ = decimals
         # value = self._magnitude_ + steps * self._singleStep_
         # super().stepBy(steps)
         # txt = self.lineEdit().displayText()
@@ -1548,21 +1582,25 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         # self._magnitude_ = float(val)
         self.sig_valueChanged.emit(self.value())
 
-    def singleStep(self) -> pq.Quantity:
+    def singleStep(self) -> typing.Union[pq.Quantity, float, int]:
         ret = self._singleStep_
         if self._keepDimensionless_ or self._forceDimensionless_:
             return ret
-        return ret * self.units
+        else:
+            return ret * self.units
 
     def setSingleStep(self, value:float|pq.Quantity):
         if isinstance(value, pq.Quantity):
             if value.size != 1:
                 raise TypeError("Scalar quantity expected")
 
-            if not scq.unitsConvertible(value, self.units):
-                raise ValueError(f"Cannot set single step with units ({value.units}) that are not scalable to the current units ({self.units})")
+            if value.units != self.units:
+                if not scq.unitsConvertible(value, self.units):
+                    raise ValueError(f"Cannot set single step with units ({value.units}) that are not scalable to the current units ({self.units})")
+                v = float(value.rescale(self.units).magnitude)
 
-            v = float(value.rescale(self.units).magnitude)
+            else:
+                v = float(value.units)
 
         elif isinstance(value, (float, int)):
             v = float(value)
@@ -1571,7 +1609,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         self._singleStep_ = v
 
-        super().setSingleStep(self._singleStep_)
+        # super().setSingleStep(self._singleStep_)
 
     @property
     def keepDimensionless(self) -> bool:

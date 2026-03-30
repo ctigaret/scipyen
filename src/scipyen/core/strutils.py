@@ -325,17 +325,20 @@ def parse_sci_string(x: str) -> tuple:
             d = 0 # number of decimals
 
     else:
+        p = 0
         if "." in x:
             parts = x.split(".")
 
-        if len(parts) > 2:
-            return (None, None, None)  # shouldn't really get here as this is not a numeric string hence it would have been rejected above
+            if len(parts) > 2:
+                return (None, None, None)  # shouldn't really get here as this is not a numeric string hence it would have been rejected above
 
-        m = float(parts[0])
-        p = 0
-        if len(parts) == 2:
-            d = len(parts[1])
+            m = float(parts[0])
+            if len(parts) == 2:
+                d = len(parts[1])
+            else:
+                d = 0
         else:
+            m = float(x)
             d = 0
 
     return (m, p, d)
