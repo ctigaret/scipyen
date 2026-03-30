@@ -461,9 +461,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             if channel_names is None:
                                 channel_names = list(map(lambda i: f"Channel {i}", range(data.shape[1])))
 
-                            channel_names = list(map(lambda n: f"{channel_names[kc]} ({data[:,kc].dimensionality})",
+                            channel_names = list(map(lambda kc: f"{channel_names[kc]} ({data[:,kc].dimensionality})",
                                                      range(len(channel_names))))
                             headers = [domain_name, ] + channel_names
+
                             self._modelDataHeaderSections_ = dict(
                                     (
                                         tuple(map(lambda x: (x[0]+1, x),
@@ -834,7 +835,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         # for horizontal header, section number is the column number
                         if (isinstance(self._modelDataHeaderSections_, dict)
                             and len(self._modelDataHeaderSections_)):
-                            return QtCore.QVariant(self._modelDataHeaderSections_[section])
+                            # print(f"{self.__class__.__name__}._getHeaderData_({section} ({type(section).__name__})...)")
+                            # print(f"\theader sections: {self._modelDataHeaderSections_}")
+                            key = list(self._modelDataHeaderSections_.keys())[section]
+                            colhead = self._modelDataHeaderSections_[key][1]
+                            return QtCore.QVariant(colhead)
                         else:
                             if section == 0:
                                 domain = getattr(self._modelData_, "times", None)

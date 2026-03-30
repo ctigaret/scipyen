@@ -2332,9 +2332,12 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     sagMinTime      = (sagVm.argmin()+1) * vm.sampling_period + baseT1
 
     # rebound value at the "peak" — as I mention above there may be no such "peak"
-    vrebound        = reboundVm.max()
-    # time of rebound minimum
-    reboundMaxTime  = (reboundVm.argmax()) * vm.sampling_period + ssT1
+    if reboundVm.size > 0:
+        vrebound        = reboundVm.max()
+        # time of rebound minimum
+        reboundMaxTime  = (reboundVm.argmax()) * vm.sampling_period + ssT1
+    else:
+        vrebound = np.nan * v_flt.units
 
 
     #print("sag trough: ", vsag, " found at ", sagMinTime)
@@ -2347,15 +2350,16 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
 
     vsagmin = vsagrise.min()
     vsagmax = vsagrise.max()
-
     vsagrange = vsagmin - vsagmax
-
     # NOTE: would using state_levels, below, yield a better fit & sag separation?
 
     vsag10 = vsagmax + 0.1  * vsagrange
     vsag90 = vsagmax + 0.9  * vsagrange
     # vsag10 = vsagmax
     # vsag90 = vsagmin
+
+
+
 
     #print("vsag10 ", vsag10)
     #print("vsag90 ", vsag90)
@@ -2420,19 +2424,8 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     vfit["fitted_region"] = vsag10_90
 
     try:
-        # popt, pcov = optimize.curve_fit(models.exponential, vsag10_90.times, np.squeeze(vsag10_90), params)
-        # popt, pcov = optimize.curve_fit(models.exponential, vsag10_90_copy.times.magnitude, np.squeeze(vsag10_90_copy).magnitude, params)
-        # popt, pcov = optimize.curve_fit(models.exponential, vsag10_90.times.magnitude, np.squeeze(vsag10_90).magnitude, params)
-
         fitResult = crvf.fit_model(np.squeeze(vsag10_90_copy).magnitude, models.exponential, p0,
                                    x = vsag10_90_copy.times.magnitude, bounds = optimize.Bounds(lb=lb, ub=ub, keep_feasible=kf))
-        #popt, pcov = optimize.curve_fit(models.generic_single_exponential_decay, vsagrise.times, np.squeeze(vsagrise), [offset, scale, delay, decay])
-        # popt, pcov = optimize.curve_fit(models.generic_single_exponential_decay, vsag10_90.times, np.squeeze(vsag10_90), params)
-
-        #print("params ", params)
-        #print("popt ", popt)
-
-        # tau_m = popt[3]
 
         lambda_m = popt[3]
 
@@ -2480,11 +2473,14 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         vfit["fitted_parameters"] = [np.nan] * len(params)
         vfit["fitcurve"] = None
         vfit["Vextrapolated"] = np.nan * vsag10_90.units
+        capacitance = np.nan * pq.pF
         traceback.print_exc()
 
     return vbase, vss, vsag, vrebound, Rin, Rss, capacitance, τm, vfit, v_flt
     # return vbase, vss, vsag, vrebound, Rin, capacitance, τm, vfit, v_flt
 
+
+# def analyse_sag()
 
 def PassiveMembranePropertiesAnalysis(block:neo.Block,
                                       Vm_index:(int,str) = "Vm_prim_1",
@@ -7538,7 +7534,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
     ret["Cell"] = cellid
     ret["Source"] = sourceid
     ret["Age"] = age
-    ret["Post-natal"] = post_natal
+    ret["Stage"] = stage
     ret["Genotype"] = genotype
     ret["Sex"] = sex
     ret["Treatment"] = treatment
