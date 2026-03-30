@@ -93,6 +93,7 @@ else
     if [ -d ${pyqt6_src_dir} ] ; then
         rm -fr ${pyqt6_src_dir}
     fi
+    echo -e "Extracting locally found ${pyqt6_src} archive"
     tar xzf ${pyqt6_src}
 fi
 
