@@ -547,9 +547,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
             if len(data) > 100:
                 txt = data if isinstance(data, str) else data.decode()
-                widget = QtWidgets.QPlainTextEdit(parent, txt)
+                widget = QtWidgets.QPlainTextEdit(txt, parent)
                 widget.setMaximumHeight(200)
-                widget.setPlainText(data)
+                widget.setPlainText(txt)
                 if isinstance(data, str):
                     widget.setReadOnly(False)
                     widget.textChanged.connect(self.slot_dataChanged)

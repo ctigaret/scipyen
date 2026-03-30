@@ -1692,7 +1692,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
     @_parseObject_.register(np.ndarray)
     def _(self: typing.Self, obj: np.ndarray,
-          choces: dict = dict(),
+          choices: dict = dict(),
           _: bool = False) -> tuple:
         objType = type(obj)
 
