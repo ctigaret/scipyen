@@ -788,7 +788,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self.setUnits(value)
 
     def setUnits(self, value:typing.Optional[pq.Quantity] = None):
-        print(f"{self.__class__.__name__}.units.setter: value = {value}")
+        # print(f"{self.__class__.__name__}.setUnits: value = {value}")
         if self._keepDimensionless_ or self._forceDimensionless_:
             return
 
@@ -1052,12 +1052,15 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         """
         if self.specialValueText() == "NA":
             return pd.NA
+
         elif self.specialValueText() == "NaN":
             return np.nan if self._keepDimensionless_ else np.nan * self.units
+
         else:
             ret = self._magnitude_
             if self._keepDimensionless_ or self._forceDimensionless_:
                 return ret
+
             return ret * self.units
 
     def getDecimals(self) -> int:
@@ -1209,6 +1212,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         from core.regexps import SCIENTIFIC_NUMBER_FORMAT_MATCH
         # traceback.print_stack()
 
+        # print(f"{self.__class__.__name__}.setValue({value})")
+
         if isinstance(value, pq.Quantity):
             if value.size > 1:
                 # return # Only scalar quantities are allowed
@@ -1335,8 +1340,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                             # print(f"\tnew step proposed: {step}")
                             self.setSingleStep(step) # good fallback?
 
-
-                specialText = r""
+                specialText = ""
 
             self._specialValueText_ = specialText
 
@@ -1354,7 +1358,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             # print(f"{self.objectName()}: {self.__class__.__name__}.setValue({value}) -> text = {text}")
 
             # signalBlock = QtCore.QSignalBlocker(self.lineEdit())
+            # print(f"\tsetting text to {text}")
             self.lineEdit().setText(text)
+
+            # print(f"\tvalue after update: {self.value()}")
 
         else:
             raise TypeError(f"_magnitude_ expected to be a scalar quantity, a float or pd.NA; instead, got {type(value).__name__}")
@@ -1580,6 +1587,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         # txt = self.lineEdit().displayText()
         # val = self.valueFromText(txt)
         # self._magnitude_ = float(val)
+        # print(f"\tnew magnitude again: {self._magnitude_}")
         self.sig_valueChanged.emit(self.value())
 
     def singleStep(self) -> typing.Union[pq.Quantity, float, int]:

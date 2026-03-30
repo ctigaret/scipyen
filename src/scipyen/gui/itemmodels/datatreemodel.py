@@ -2094,7 +2094,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         objItem.setData(QtCore.QVariant(value), ObjectDataRole) # noqa
 
         path = self._getPathForItemOrIndex_(objItem)
-        print(f"\taccess to objItem: {path}")
+        # print(f"\taccess to objItem: {path}")
 
         if path[-1] == self._topObjectItem_.data(QtCore.Qt.DisplayRole):
             path[-1] = "self._modelData_"
