@@ -257,6 +257,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
         typeName = objDict["objType"].__name__
 
         info = objDict["objInfo"]
+        if isinstance(info, bool):
+            info = f"{info}"
         memberAccess = objDict["memberAccess"]
 
         if isinstance(objKey, str):

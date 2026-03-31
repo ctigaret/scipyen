@@ -1511,10 +1511,12 @@ def rheobase_latency(*args, **kwargs):
 
     Returns:
     --------
+    latencies, rheo_result
 
-    An IrregularlySampledDataSignal with latency vs current injection, with
-    the 'annotations' attribute containing a 'rheobase_latency_analysis' ↦ dict
-    where the dict contains the following key ↦ value mapping:
+
+    :latencies: An IrregularlySampledDataSignal with latency vs current injection
+
+    "rheo_result": dict with key ↦ value mapping:
 
         Irh : experimentally determined rheobase current
 
@@ -1593,6 +1595,11 @@ def rheobase_latency(*args, **kwargs):
 
     CHANGELOG:
     ---------
+
+    2026-03-31 23:27:36
+        rheobase_latency_analysis dict analysis returned instead of embedding in
+            the annotations
+
     2024-01-19 13:32:06
         • now returns an IrregularlySampledDataSignal with the result of rheobase
             analysis embedded in the annotations, mapped to the key "rheobase_latency_analysis"
@@ -1640,7 +1647,7 @@ def rheobase_latency(*args, **kwargs):
             metadata[param] = args[0][param]
 
         # NOTE: 2024-01-19 10:50:56
-        # now. generate a fused latency vs Iinj signal
+        # generate a fused latency vs Iinj signal
         latencies = neoutils.fuse_irregular_signals(*[a["First_AP_latency"] for a in args], name="First AP latency")
 
     elif all(isinstance(a, IrregularlySampledDataSignal) and scq.checkElectricalCurrentUnits(a.times.units) and scq.checkTimeUnits(a.units) for a in args):
@@ -1753,13 +1760,13 @@ def rheobase_latency(*args, **kwargs):
     ret["fitrheo"] = fitrheo
     ret["metadata"] = metadata
 
-    latencies.annotations["rheobase_latency_analysis"] = ret
+    # latencies.annotations["rheobase_latency_analysis"] = ret
 
     if plot:
         plot_rheobase_latency(latencies, fig=fig)
 
 
-    return latencies
+    return latencies, ret
 
 def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=None):
     r"""Convenient function to extract Vm and Im signals as a block.
@@ -4752,12 +4759,12 @@ def detect_AP_waveforms_in_train(sig, iinj,
     Returns:
     --------
 
-    ap_train, ap_waveform_signals
+    ap_train, ap_results, ap_waveform_signals
 
     The returned values, explained:
     -------------------------------
 
-    ap_train : neo.SpikeTrain.
+    :ap_train : neo.SpikeTrain.
         The "times" attribute contains the time values of the AP thresholds
         (starts of the rising phase).
 
@@ -4768,7 +4775,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
             These AP waveforms as neo.AnalogSignals are also returned separately
             as a list of AnalogSignals (not padded)
 
-        The "annotations" attribute contains the following set of pre-defined keys:
+    :ap_results: a dictionary:
 
         "AP_peak_values"
         "AP_peak_amplitudes"
@@ -4839,8 +4846,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
         When no APs were found, the "times" and "waveforms" attributes are empty
         and "annotations" keys are mapped to None except for AP_ref_Vm, if given.
 
-    ap_waveform_signals is a sequence (list) of neo.AnalogSignals,
-        each containing the AP waveform and any subsequent AHP (see NOTE 1);
+    :ap_waveform_signals: list of neo.AnalogSignals, each containing the AP waveform and any subsequent AHP (see NOTE 1);
 
         These do not have identical time domains (although they do have
         the same sampling rate, they will have different t_start and t_stop values).
@@ -4994,31 +5000,31 @@ def detect_AP_waveforms_in_train(sig, iinj,
     #
     # ### END detect APs by thresholding
 
-    train_annotations = dict()
-    train_annotations["AP_peak_values"]          = None
-    train_annotations["AP_peak_amplitudes"]      = None
-    train_annotations["AP_onset_Vm"]             = None
-    train_annotations["AP_durations_V_onset"]    = None
-    train_annotations["AP_half_max"]             = None
-    train_annotations["AP_durations_V_half_max"] = None
-    train_annotations["AP_quart_max"]            = None
-    train_annotations["AP_durations_V_quart_max"]= None
-    train_annotations["AP_third_max"]            = None
-    train_annotations["AP_durations_V_third_max"]= None
-    train_annotations["AP_durations_V_0"]        = None
-    train_annotations["AP_ref_Vm"]               = reference_Vm
-    train_annotations["AP_durations_at_Ref_Vm"]  = None
-    train_annotations["AP_Maximum_dV_dt"]        = None
-    train_annotations["AP_waveform_times"]       = None
-    train_annotations["AP_dV_dt_waveforms"]      = None
-    train_annotations["AP_d2V_dt2_waveforms"]    = None
+    ap_results = dict()
+    ap_results["AP_peak_values"]          = None
+    ap_results["AP_peak_amplitudes"]      = None
+    ap_results["AP_onset_Vm"]             = None
+    ap_results["AP_durations_V_onset"]    = None
+    ap_results["AP_half_max"]             = None
+    ap_results["AP_durations_V_half_max"] = None
+    ap_results["AP_quart_max"]            = None
+    ap_results["AP_durations_V_quart_max"]= None
+    ap_results["AP_third_max"]            = None
+    ap_results["AP_durations_V_third_max"]= None
+    ap_results["AP_durations_V_0"]        = None
+    ap_results["AP_ref_Vm"]               = reference_Vm
+    ap_results["AP_durations_at_Ref_Vm"]  = None
+    ap_results["AP_Maximum_dV_dt"]        = None
+    ap_results["AP_waveform_times"]       = None
+    ap_results["AP_dV_dt_waveforms"]      = None
+    ap_results["AP_d2V_dt2_waveforms"]    = None
 
     # print(f"detect_AP_waveforms_in_train t_start {t_start} t_stop {t_stop}")
-    ap_train = neo.SpikeTrain([], t_start=t_start, t_stop = t_stop, units = pq.s)
+    ap_train = neo.SpikeTrain([], t_start=t_start, t_stop = t_stop, units = pq.s, origin="AP_analysis")
 
     if ap_fast_rise_start_times is None:
-        ap_train.annotations.update(train_annotations)
-        return ap_train, []
+        # ap_train.annotations.update(train_annotations)
+        return ap_train, ap_results, []
 
     # indexing vector for the AP starts in the actual Vm trace
     sig_AP_start_index = [sig.time_index(t) for t in ap_fast_rise_start_times]
@@ -5418,34 +5424,35 @@ def detect_AP_waveforms_in_train(sig, iinj,
                                 left_sweep = ap_fast_rise_start_times - sig.t_start,
                                 sampling_rate = sig.sampling_rate,
                                 name="%s_AP_train" % (sig.name),
-                                description = "AP train for %s signal; dV/dt detection threshold: %g" % (sig.name, thr * pq.V/pq.s))
+                                description = "AP train for %s signal; dV/dt detection threshold: %g" % (sig.name, thr * pq.V/pq.s),
+                                origin="AP_analysis")
 
         ap_train.waveforms = ap_waveforms
 
-        train_annotations["AP_peak_values"]          = ap_Vm_peak_values
-        train_annotations["AP_peak_amplitudes"]      = ap_amplitudes
-        train_annotations["AP_onset_Vm"]             = ap_Vm_onset_values # Vm value at ap_fast_rise_start_times
-        train_annotations["AP_durations_V_onset"]    = ap_durations_Vonset
-        train_annotations["AP_half_max"]             = ap_Vm_hmax_values
-        train_annotations["AP_durations_V_half_max"] = ap_durations_Vhalf_max
-        train_annotations["AP_quart_max"]            = ap_Vm_qmax_values
-        train_annotations["AP_durations_V_quart_max"]= ap_durations_Vquart_max
-        train_annotations["AP_third_max"]            = ap_Vm_tmax_values
-        train_annotations["AP_durations_V_third_max"]= ap_durations_Vthird_max
-        train_annotations["AP_durations_V_0"]        = ap_durations_V0
-        train_annotations["AP_ref_Vm"]               = reference_Vm
-        train_annotations["AP_durations_at_Ref_Vm"]  = ap_durations_Vref
-        train_annotations["AP_Maximum_dV_dt"]        = ap_max_dvdt
-        train_annotations["AP_waveform_times"]       = ap_wave_times
-        train_annotations["AP_dV_dt_waveforms"]      = ap_dvdt_waveform_signals
-        train_annotations["AP_d2V_dt2_waveforms"]    = ap_d2vdt2_waveform_signals
-        train_annotations["Adjusted_AP_waveforms"]   = corrected_AP_waveforms
+        ap_results["AP_peak_values"]          = ap_Vm_peak_values
+        ap_results["AP_peak_amplitudes"]      = ap_amplitudes
+        ap_results["AP_onset_Vm"]             = ap_Vm_onset_values # Vm value at ap_fast_rise_start_times
+        ap_results["AP_durations_V_onset"]    = ap_durations_Vonset
+        ap_results["AP_half_max"]             = ap_Vm_hmax_values
+        ap_results["AP_durations_V_half_max"] = ap_durations_Vhalf_max
+        ap_results["AP_quart_max"]            = ap_Vm_qmax_values
+        ap_results["AP_durations_V_quart_max"]= ap_durations_Vquart_max
+        ap_results["AP_third_max"]            = ap_Vm_tmax_values
+        ap_results["AP_durations_V_third_max"]= ap_durations_Vthird_max
+        ap_results["AP_durations_V_0"]        = ap_durations_V0
+        ap_results["AP_ref_Vm"]               = reference_Vm
+        ap_results["AP_durations_at_Ref_Vm"]  = ap_durations_Vref
+        ap_results["AP_Maximum_dV_dt"]        = ap_max_dvdt
+        ap_results["AP_waveform_times"]       = ap_wave_times
+        ap_results["AP_dV_dt_waveforms"]      = ap_dvdt_waveform_signals
+        ap_results["AP_d2V_dt2_waveforms"]    = ap_d2vdt2_waveform_signals
+        ap_results["Adjusted_AP_waveforms"]   = corrected_AP_waveforms
 
-    ap_train.annotations.update(train_annotations)
+    # ap_train.annotations.update(train_annotations)
 
     # print(f"detect_AP_waveforms_in_train ap_train t_start {ap_train.t_start} t_stop {ap_train.t_stop}")
 
-    return ap_train, ap_waveform_signals
+    return ap_train, ap_results, ap_waveform_signals
 
 def detect_AP_waveforms_in_train_old(sig, iinj,
                                  thr = 10,
@@ -7351,10 +7358,14 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
 
     CHANGELOG
     ---------
+    2026-03-31 23:24:52
+        'rheobase_latency_analysis' key reinstated, due to the restriction on value types in annotations of neo objects
+
     2024-01-19 13:33:54
         • a separate 'rheobase_latency_analysis' key is DROPPED; instead, the
             results of the rheobase - latency analysis are now included in the
             annotations of the 'First_AP_latency' signal
+
 
     """
     if not isinstance(data, (neo.Block, neo.Segment)):
@@ -7658,14 +7669,15 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
 
         for kseg, seg_res in enumerate(ret["Current_injection_steps"]):
             if isinstance(seg_res["AP_analysis"]["AP_train"], neo.SpikeTrain) and len(seg_res["AP_analysis"]["AP_train"]):
-                val = seg_res["AP_analysis"]["AP_train"].annotations["AP_onset_Vm"]
+                val = seg_res["AP_analysis"].get("AP_onset_Vm", None)
+                # val = seg_res["AP_analysis"]["AP_train"].annotations["AP_onset_Vm"]
                 if val is not None:
                     apThr[kseg] = float(val.magnitude[0]) if val.ndim==0 else float(val.magnitude[0][0])
 
                 latval = seg_res["AP_analysis"]["AP_train"][0] - seg_res["AP_analysis"]["AP_train"].t_start
                 apLatency[kseg] = latval.magnitude
 
-            ap_freq = seg_res["AP_analysis"]["Mean_AP_Frequency"]
+            ap_freq = seg_res["AP_analysis"].get("Mean_AP_Frequency", None)
             if apFreqUnits is None:
                 apFreqUnits = ap_freq.units
             apFrequency[kseg] = ap_freq.magnitude
@@ -7711,13 +7723,15 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
             not np.all(np.isnan(ret["First_AP_latency"])):
             # further consistency checks
             try:
-                ret["First_AP_latency"] = rheobase_latency(ret["First_AP_latency"], **rheoargs)
+                latencies, rheo_result = rheobase_latency(ret["First_AP_latency"], **rheoargs)
+                ret["rheobase_latency_analysis"] = {"Latencies": latencies, "Result": rheo_result}
+                # ret["First_AP_latency"] = rheobase_latency(ret["First_AP_latency"], **rheoargs)
 
                 if plot_rheo:
-                    plot_rheobase_latency(ret["First_AP_latency"])
+                    plot_rheobase_latency(ret["rheobase_latency_analysis"])
             except:
                 traceback.print_exc()
-                print(f"\n\n *** rheobase_latency using 'fitrheo# {fitrheo} encountered and Error (see above); check data or toggle 'fitrheo'")
+                print(f"\n\n *** rheobase_latency using 'fitrheo' {fitrheo} encountered and Error (see above); check data or toggle 'fitrheo'")
 
         # NOTE: 2024-01-20 09:28:36
         # add AP_ISI_0_1_Frequency to ret (taken from AP analysis script)
@@ -7770,14 +7784,19 @@ def plot_rheobase_latency(data,
 
     Parameters:
     ===========
-    data: a dictionary as output by rheobase_latency(…) or analyse_AP_step_injection_series(…)
-    xstart: minimum latency (the Frank-Fuortes model generates a hyperbola which may look
+    :data: a dictionary mapping:
+
+            "Latencies" ↦ all latencies (δt from start of current injection to first AP)
+
+            "Result" ↦ rheobase analysis results
+
+    :xstart: minimum latency (the Frank-Fuortes model generates a hyperbola which may look
             wiord in its entirety)
             float, string, or None
 
             When a string, the only supported value is "auto"
 
-    xend: like xstart, for the maximum latency in the plot
+    :xend: like xstart, for the maximum latency in the plot
 
     Returns:
     ========
@@ -7794,6 +7813,7 @@ def plot_rheobase_latency(data,
 
     if isinstance(data, dict):
         if "Summary" in data and isinstance(data["Summary"], dict):
+            # produced by data from sevral trials ?!?
             if "fit" in data["Summary"] and isinstance(data["Summary"]["fit"], dict):
                 data = data["Summary"]
 
@@ -8639,9 +8659,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     # print(f"analyse_AP_step_injection_sweep kwargs thr {kwargs['thr']}")
     # print(f"analyse_AP_step_injection_sweep kwargs t_start {kwargs['t_start']}, t_stop {kwargs['t_stop']}")
 
-    # NOTE: 2024-01-23 15:16:43
-    # next line returns (neo.SpikeTrain, typing.List[neo.AnalogSignal])
-    ap_train, ap_waveform_signals = detect_AP_waveforms_in_train(vstep, i_timings, **kwargs)
+    ap_train, ap_results, ap_waveform_signals = detect_AP_waveforms_in_train(vstep, i_timings, **kwargs)
     # print(f"analyse_AP_step_injection_sweep ap_train t_start = {ap_train.t_start}, t_stop = {ap_train.t_stop}")
 
     result = collections.OrderedDict() #dict()
@@ -8660,7 +8678,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     result["Ihold"] = Ihold
     result["AP_train"] = ap_train
 
-    for key, value in ap_train.annotations.items():
+    for key, value in ap_results.items():
         result[key] = value
 
     # NOTE: mean AP frequency:
@@ -8671,7 +8689,6 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
         # first AP;
         # time of the end of last AP is time of start of last AP + last AP duration at Vonset
 
-        #print("analyse_AP_step_injection_sweep for Iinj %g: ap_train[-1]: %g, AP_durations_V_onset[-1]: %g, ap_train[0]: %g" % (Iinj, ap_train[-1], ap_train.annotations["AP_durations_V_onset"][-1], ap_train[0]))
         mean_ap_freq  = ( len(ap_train) / ( ap_train[-1] - ap_train[0] ) ).rescale(pq.Hz)
         # why do I sometimes get np.nan here ?
         # because you need to also provide a tail in case the last AP is right on the end of the Vm signal!
@@ -8713,7 +8730,8 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
             # NOTE: 2024-01-29 15:19:10
             # AP_durations_V_onset may contain NaNs ⇒ startTimes MAY contain NaNs
 
-            startTimes = (ap_train.times.magnitude.flatten() + ap_train.annotations["AP_durations_V_onset"].magnitude.flatten()) * ap_train.times.units
+            startTimes = (ap_train.times.magnitude.flatten() + ap_results["AP_durations_V_onset"].magnitude.flatten()) * ap_train.times.units
+            # startTimes = (ap_train.times.magnitude.flatten() + ap_train.annotations["AP_durations_V_onset"].magnitude.flatten()) * ap_train.times.units
 
             # therefore take this into account and assign np.nan to startNdx where required
             startNdx = [w.time_index(t) if np.isfinite(t) else np.nan for w, t in zip(ap_waveform_signals, startTimes)]
@@ -8741,7 +8759,8 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
             # print(f"asp_waves_endpoints shape {asp_waves_endpoints.shape}")
             # print(f"ahpPeakValues shape {ahpPeakValues.shape}")
 
-            onsetVms = ap_train.annotations["AP_onset_Vm"].magnitude.flatten()
+            onsetVms = ap_results["AP_onset_Vm"].magnitude.flatten()
+            # onsetVms = ap_train.annotations["AP_onset_Vm"].magnitude.flatten()
 
             # First condition for a fAHP:
             # the minimum value ("trough") needs to be smaller than last value of the waveform
@@ -9174,7 +9193,7 @@ def analyse_AP_step_injection_sweep_old(segment, VmSignal:typing.Union[int, str]
 
     # NOTE: 2024-01-23 15:16:43
     # next line returns (neo.SpikeTrain, typing.List[neo.AnalogSignal])
-    ap_train, ap_waveform_signals = detect_AP_waveforms_in_train(vstep, i_timings, **kwargs)
+    ap_train, ap_results, ap_waveform_signals = detect_AP_waveforms_in_train(vstep, i_timings, **kwargs)
     # print(f"analyse_AP_step_injection_sweep ap_train t_start = {ap_train.t_start}, t_stop = {ap_train.t_stop}")
 
     result = collections.OrderedDict() #dict()
@@ -9201,7 +9220,8 @@ def analyse_AP_step_injection_sweep_old(segment, VmSignal:typing.Union[int, str]
     result["Ihold"] = Ihold
     result["AP_train"] = ap_train
 
-    for key, value in ap_train.annotations.items():
+    # for key, value in ap_train.annotations.items():
+    for key, value in ap_results.items():
         result[key] = value
 
     # NOTE: mean AP frequency:
@@ -9212,7 +9232,6 @@ def analyse_AP_step_injection_sweep_old(segment, VmSignal:typing.Union[int, str]
         # first AP;
         # time of the end of last AP is time of start of last AP + last AP duration at Vonset
 
-        #print("analyse_AP_step_injection_sweep for Iinj %g: ap_train[-1]: %g, AP_durations_V_onset[-1]: %g, ap_train[0]: %g" % (Iinj, ap_train[-1], ap_train.annotations["AP_durations_V_onset"][-1], ap_train[0]))
         mean_ap_freq  = ( len(ap_train) / ( ap_train[-1] - ap_train[0] ) ).rescale(pq.Hz)
         # why do I sometimes get np.nan here ?
         # because you need to also provide a tail in case the last AP is right on the end of the Vm signal!
@@ -9254,7 +9273,8 @@ def analyse_AP_step_injection_sweep_old(segment, VmSignal:typing.Union[int, str]
             # NOTE: 2024-01-29 15:19:10
             # AP_durations_V_onset may contain NaNs ⇒ startTimes MAY contain NaNs
 
-            startTimes = (ap_train.times.magnitude.flatten() + ap_train.annotations["AP_durations_V_onset"].magnitude.flatten()) * ap_train.times.units
+            startTimes = (ap_train.times.magnitude.flatten() + ap_results["AP_durations_V_onset"].magnitude.flatten()) * ap_train.times.units
+            # startTimes = (ap_train.times.magnitude.flatten() + ap_train.annotations["AP_durations_V_onset"].magnitude.flatten()) * ap_train.times.units
 
             # therefore take this into account and assign np.nan to startNdx where required
             startNdx = [w.time_index(t) if np.isfinite(t) else np.nan for w, t in zip(ap_waveform_signals, startTimes)]
@@ -9282,7 +9302,8 @@ def analyse_AP_step_injection_sweep_old(segment, VmSignal:typing.Union[int, str]
             # print(f"asp_waves_endpoints shape {asp_waves_endpoints.shape}")
             # print(f"ahpPeakValues shape {ahpPeakValues.shape}")
 
-            onsetVms = ap_train.annotations["AP_onset_Vm"].magnitude.flatten()
+            onsetVms = ap_results["AP_onset_Vm"].magnitude.flatten()
+            # onsetVms = ap_train.annotations["AP_onset_Vm"].magnitude.flatten()
 
             # First condition for a fAHP:
             # the minimum value ("trough") needs to be smaller than last value of the waveform
@@ -9687,7 +9708,8 @@ def is_AP_spiketrain(x):
     ret = isinstance(x, neo.SpikeTrain)
 
     if ret:
-        ret &= (isinstance(x.name, str) and x.name.endswith("AP_train")) or (all([k.startswith("AP_") for k in x.annotations]))
+        ret &= (isinstance(x.name, str) and x.name.endswith("AP_train")) or x.annotations.get("origin", None) == "AP_analysis"
+        # ret &= (isinstance(x.name, str) and x.name.endswith("AP_train")) or (all([k.startswith("AP_") for k in x.annotations]))
 
     return ret
 

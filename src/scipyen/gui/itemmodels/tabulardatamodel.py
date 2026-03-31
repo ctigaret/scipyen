@@ -425,15 +425,22 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     if data.ndim:
                         self._modelDataRows_ = data.shape[0]
 
+                        domain = getattr(data, "times", None)
+                        domain_name = getattr(data, "domain_name", scq.getUnitFamily(domain))
+                        if len(domain_name) == 0:
+                            domain_name = f"{domain.dimensionality}"
+                        else:
+                            domain_name += f" ({domain.dimensionality})"
+
                         if data.ndim > 1:
                             # include domain as the first column
                             self._modelDataColumns_ = data.shape[1] + 1
-                            domain = getattr(data, "times", None)
-                            domain_name = getattr(data, "domain_name", scq.getUnitFamily(domain))
-                            if len(domain_name) == 0:
-                                domain_name = f"{domain.dimensionality}"
-                            else:
-                                domain_name += f" ({domain.dimensionality})"
+                            # domain = getattr(data, "times", None)
+                            # domain_name = getattr(data, "domain_name", scq.getUnitFamily(domain))
+                            # if len(domain_name) == 0:
+                            #     domain_name = f"{domain.dimensionality}"
+                            # else:
+                            #     domain_name += f" ({domain.dimensionality})"
 
                             channel_names = None
                             if len(data.array_annotations):
@@ -451,6 +458,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                             data.array_annotations["channel_ids"]
                                             )
                                         )
+
                             if channel_names is None:
                                 channel_names = list(map(lambda i: f"Channel {i}", range(data.shape[1])))
 
@@ -466,7 +474,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                     )
                                 )
 
-                            self._modelDataRows_ = data.shape[0]
+                            # self._modelDataRows_ = data.shape[0]
 
                             if isinstance(data, (neo.AnalogSignal, DataSignal)):
                                 # NOTE: 2025-09-27 11:05:05 see NOTE: 2025-09-27 10:38:00
@@ -482,6 +490,42 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                 self._immutableColumns_ = [0]
                                 # below, allow editing t_start
                                 self._immutableRows_ = range(1,self._modelDataRows_)
+
+                        else: # e.g. case of spiketrains:
+                            self._modelDataColumns_ = 1 if isinstance(data, neo.SpikeTrain) else 2
+                            if isinstance(data, neo.SpikeTrain):
+                                headers = [domain_name ]
+                            else:
+                                channel_names = None
+                                if len(data.array_annotations):
+                                    if "channel_names" in data.array_annotations:
+                                        channel_names = list(
+                                            map(
+                                                lambda n: f"{n}",
+                                                data.array_annotations["channel_names"]
+                                                )
+                                            )
+                                    elif "channel_ids" in data.array_annotations:
+                                        channel_names = list(
+                                            map(
+                                                lambda i: f"{i}",
+                                                data.array_annotations["channel_ids"]
+                                                )
+                                            )
+
+                                if channel_names is None:
+                                    channel_names = [f"Channel 0 ({data.dimensionality})"]
+
+                                headers = [domain_name, ] + channel_names
+
+                            self._modelDataHeaderSections_ = dict(
+                                    (
+                                        tuple(map(lambda x: (x[0]+1, x),
+                                                  enumerate(headers))
+                                            )
+                                    )
+                                )
+
 
                     else:
                         self._modelDataRows_ = 1
@@ -970,7 +1014,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 if col == 0:
                     val = self._modelData_.times[row]
                 else:
-                    val = self._modelData_[row, col-1]
+                    if self._modelData_.ndim > 1:
+                        val = self._modelData_[row, col-1]
+                    else:
+                        val = self._modelData_[row]
 
                 if isinstance(val, datetime.datetime):
                     ret = val if role == QtCore.Qt.EditRole else ret.isoformat(" ")
@@ -1045,6 +1092,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(self._modelData_, neo.dataobject.DataObject):
                 if row >= self._modelData_.shape[0]:
                     return False
+
+                if isinstance(self._modelData_, neo.SpikeTrain) and col > 0:
+                    return False
+
                 if col >= self._modelData_.shape[1] + 1:
                     # because the signal's domain is on column 0, what is shown
                     # here has one extra column
@@ -1069,6 +1120,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                 return False
                         else:
                             return False
+
                     else:
                         if isinstance(pyvalue, pq.Quantity):
                             if pyvalue.units != self._modelData_.times.units:

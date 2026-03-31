@@ -96,8 +96,13 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         assert (isinstance(autoResizeColumns, set) and all((isinstance(v, int) and v in range(3)) for v in autoResizeColumns)), f"Invalid value for 'autoResizeColumns'; expecting a set of ints, each in range(3); instead, got {autoResizeColumns}"
         self.autoResizeColumns: set[int] = kwargs.pop("autoResizeColumns", set())
         super().__init__(parent=parent)
+
+        # NOTE: 2026-03-31 22:47:04
+        self.setTextElideMode(QtCore.Qt.ElideMiddle)
+
         super().setModel(DataTreeModel(showMethods = self._showCallables_,
                                        valuesOnly = self._showValuesOnly_))
+
         self._defaultDelegate_ = self.itemDelegate()
         self._delegate_ = PythonItemDelegate(parent = self)
         self._dragStartPosition_: typing.Optional[QtCore.QPoint] = None
@@ -107,6 +112,21 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     def setModel(self: typing.Self, model: QtCore.QAbstractItemModel):
         # disallow changing the model
         pass
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        if self.model()._modelData_ is None:
+            painter = QtGui.QPainter(self.viewport())
+            painter.save()
+            col = self.palette().placeholderText().color()
+            painter.setPen(col)
+            fm = self.fontMetrics()
+            elided_text = fm.elidedText(
+                "No data", QtCore.Qt.ElideRight, self.viewport().width()
+            )
+            painter.drawText(self.viewport().rect(), QtCore.Qt.AlignCenter, elided_text)
+            painter.restore()
+
 
     def _setupChildDataItem_(self: typing.Self, item: QtGui.QStandardItem,
                              objData: typing.Optional[typing.Any] = None):

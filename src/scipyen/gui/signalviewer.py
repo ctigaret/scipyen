@@ -2483,7 +2483,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         sigBlock = QtCore.QSignalBlocker(combo)
         analog = combo == self.analogSignalComboBox
         if len(mapping):
-            entries = ["All"] + list(mapping.keys()) + ["Choose"]
+            entries = ["All"] + list(mapping.keys()) + ["Select..."]
             current_ndx = combo.currentIndex()
             if current_ndx < 0: # for empty combo this is -1
                 current_ndx = 0
@@ -3512,7 +3512,7 @@ anything else       anything else       ❌
         if index == 0: # "All" selected
             self.guiSelectedAnalogSignalEntries.clear()
 
-        elif index == self.analogSignalComboBox.count()-1: # "Choose" selected
+        elif index == self.analogSignalComboBox.count()-1: # "Select ..." selected
 
             available = [self.analogSignalComboBox.itemText(k) for k in range(1, self.analogSignalComboBox.count()-1)]
 
@@ -3611,7 +3611,7 @@ anything else       anything else       ❌
         trigTypeNames = list(TriggerEventType.names())
 
         dlg = qd.QuickDialog(self, "Remove Events & Triggers")
-        evtCombo = qd.QuickDialogComboBox(dlg, "Choose Event Type")
+        evtCombo = qd.QuickDialogComboBox(dlg, "Select Event Type")
         comboItems = ["All Trigger Events"]
         comboItems.extend(trigTypeNames)
         comboItems.append("Select TriggerEvent Type(s)...")
@@ -3716,7 +3716,7 @@ anything else       anything else       ❌
             self.guiSelectedIrregularSignalEntries.clear()
 
         elif index == self.irregularSignalComboBox.count()-1:
-            # "Choose" ⇒ popup up dialog to select which signal to choose
+            # "Select ..." ⇒ popup up dialog to select which signal(s) to show
             available = [self.irregularSignalComboBox.itemText(k) for k in range(1, self.irregularSignalComboBox.count()-1)]
 
             preSelected = [i for i in self.guiSelectedIrregularSignalEntries if i in available]
@@ -5096,7 +5096,7 @@ anything else       anything else       ❌
             return
 
         if not isinstance(crsID, str):
-            d = qd.QuickDialog(self, "Choose cursor to remove")
+            d = qd.QuickDialog(self, "Select cursor to remove")
 
             cursorComboBox = qd.QuickDialogComboBox(d, "Select cursor:")
             cursorComboBox.setItems([c for c in self._data_cursors_])
