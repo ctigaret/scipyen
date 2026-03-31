@@ -2703,8 +2703,11 @@ def ap_waveform_roots(w, value, interpolate=False):
 
     first_index_ge_value = int(ge_value_starts[0])
 
+
     # not sure we really need this
-    first_sample_ge_value = float(w[first_index_ge_value])
+    w_ = w[first_index_ge_value]
+    # print(f"first_index_ge_value = {first_index_ge_value} -> w_ = {w_}")
+    first_sample_ge_value = float(w[first_index_ge_value][0])
     time_of_first_sample_ge_value = float(w.times[first_index_ge_value])
 
     if interpolate:
@@ -2712,16 +2715,16 @@ def ap_waveform_roots(w, value, interpolate=False):
             x0 = time_of_first_sample_ge_value
             y0 = first_sample_ge_value
 
-            x1 = float(w.times[first_index_ge_value + 1])
-            y1 = float(w[first_index_ge_value + 1])
+            x1 = float(w.times[first_index_ge_value + 1][0])
+            y1 = float(w[first_index_ge_value + 1][0])
 
 
         else: # get chord slope AROUND this point
-            x0 = float(w.times[first_index_ge_value - 1])
-            y0 = float(w[first_index_ge_value - 1])
+            x0 = float(w.times[first_index_ge_value - 1][0])
+            y0 = float(w[first_index_ge_value - 1][0])
 
-            x1 = float(w.times[first_index_ge_value + 1])
-            y1 = float(w[first_index_ge_value + 1])
+            x1 = float(w.times[first_index_ge_value + 1][0])
+            y1 = float(w[first_index_ge_value + 1][0])
 
 
         rise_cslope = (y1-y0) / (x1-x0) # chord slope at or around this point
@@ -2756,23 +2759,23 @@ def ap_waveform_roots(w, value, interpolate=False):
         # for conformant APs this falls on the decay phase
         end_index_ge_value = int(ge_value_ends[0])
 
-        end_sample_ge_value = float(w[end_index_ge_value])
+        end_sample_ge_value = float(w[end_index_ge_value][0])
         time_of_end_sample_ge_value = float(w.times[end_index_ge_value])
 
         if interpolate:
             if end_index_ge_value == len(w)-1:
-                x0 = float(w.times[end_index_ge_value-1])
-                y0 = float(w[end_index_ge_value-1])
+                x0 = float(w.times[end_index_ge_value-1][0])
+                y0 = float(w[end_index_ge_value-1][0])
 
                 x1 = time_of_end_sample_ge_value
                 y1 = end_sample_ge_value
 
             else:
-                x0 = float(w.times[end_index_ge_value-1])
-                y0 = float(w[end_index_ge_value-1])
+                x0 = float(w.times[end_index_ge_value-1][0])
+                y0 = float(w[end_index_ge_value-1][0])
 
-                x1 = float(w.times[end_index_ge_value+1])
-                y1 = float(w[end_index_ge_value+1])
+                x1 = float(w.times[end_index_ge_value+1][0])
+                y1 = float(w[end_index_ge_value+1][0])
 
             decay_cslope = (y1-y0) / (x1-x0)
 
@@ -7657,7 +7660,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
             if isinstance(seg_res["AP_analysis"]["AP_train"], neo.SpikeTrain) and len(seg_res["AP_analysis"]["AP_train"]):
                 val = seg_res["AP_analysis"]["AP_train"].annotations["AP_onset_Vm"]
                 if val is not None:
-                    apThr[kseg] = float(val.magnitude[0])
+                    apThr[kseg] = float(val.magnitude[0]) if val.ndim==0 else float(val.magnitude[0][0])
 
                 latval = seg_res["AP_analysis"]["AP_train"][0] - seg_res["AP_analysis"]["AP_train"].t_start
                 apLatency[kseg] = latval.magnitude
@@ -8731,7 +8734,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
 
             ahpTimes = startTimes
 
-            asp_waves_endpoints = np.array([float(w[-1]) if (isinstance(w, neo.core.basesignal.BaseSignal) and w.shape[0] > 0) else np.nan for w in asp_waves]).flatten()
+            asp_waves_endpoints = np.array([float(w[-1][0]) if (isinstance(w, neo.core.basesignal.BaseSignal) and w.shape[0] > 0) else np.nan for w in asp_waves]).flatten()
 
             ahpPeakValues = np.array([w.time_slice(w.t_start, t).min() if (isinstance(w, neo.core.basesignal.BaseSignal) and w.shape[0] > 0) else np.nan for w, t in zip(asp_waves, ahpWstop)])
 

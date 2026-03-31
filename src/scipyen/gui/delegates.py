@@ -631,7 +631,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         self.sig_dataChanged.emit(self.sender())
 
     @Slot(object)
-    def slot_valueChanged(self, o:typing.Any):
+    def slot_valueChanged(self, o:object):
         # print(f"{self.__class__.__name__}.slot_dataChanged({o})")
         # o = self.sender().getValue()
         # self._currentData_ = o
