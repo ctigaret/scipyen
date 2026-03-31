@@ -1439,7 +1439,7 @@ def writeCsv(data, fileName:typing.Optional[typing.Union[str, pathlib.Path]]=Non
             * any other data structure will raise TypeError
     
     """
-    
+    from core import scipyen_quantities as scq
     if fileName is None:
         cframe = inspect.getouterframes(inspect.currentframe())[1][0]
         try:
@@ -1519,11 +1519,17 @@ def writeCsv(data, fileName:typing.Optional[typing.Union[str, pathlib.Path]]=Non
             
         else:
             name = data.name if isinstance(data.name, str) and len(data.name.strip()) else ""
+            if isinstance(data, pq.Quantity):
+                name += f"( {scq.unitSymbol(data)})"
             nChannels = data.shape[1] if data.ndim==2 else 1
+
+            domain = f"{scq.unitFamilyName(data.times)} ({scq.unitSymbol(data.times)})"
                 
-            headerlist = ["Time",name] if isinstance(data, neo.IrregularlySampledSignal) else [strutils.str2symbol(data.domain_name), name]
-            if nChannels > 1:
-                headerlist += list(map(lambda k: f"channel {k}", range(nChannels)))
+            if nChannels == 1:
+                headerlist = [domain, name]
+
+            elif nChannels > 1:
+                headerlist = [domain] + list(map(lambda k: f"{name}, channel {k}", range(nChannels)))
             
         csvfile = open(fileName, "w", newline="")
         writer = csv.writer(csvfile, delimiter="\t")
@@ -1534,10 +1540,18 @@ def writeCsv(data, fileName:typing.Optional[typing.Union[str, pathlib.Path]]=Non
                 
             if nChannels == 1:
                 for t, l in zip(data.times, data):
-                    writer.writerow(["%f %s" % (t, t.units.dimensionality), "%f %s" % (l, l.units.dimensionality)])
+                    if t.ndim> 0:
+                        # t = t[0]
+                        t = t.magnitude[0]
+                    if l.ndim > 0:
+                        # l = l[0]
+                        l = l.magnitude[0]
+                    writer.writerow(["%f" % t, "%f" % l])
+                    # writer.writerow(["%f %s" % (t, t.units.dimensionality), "%f %s" % (l, l.units.dimensionality)])
             else:
                 for t, l in zip(data.times, data):
-                    row = ["%f %s" % (t, t.units.dimensionality)] + list(map(lambda k: "%f %s" % (l[k], l[k].units.dimensionality), range(nChannels)))
+                    row = ["%f" % t] + list(map(lambda k: "%f" % l[k].magnitude[0], range(nChannels)))
+                    # row = ["%f %s" % (t, t.units.dimensionality)] + list(map(lambda k: "%f %s" % (l[k][0], l[k].units.dimensionality), range(nChannels)))
                     writer.writerow(row)
                     
             csvfile.close()

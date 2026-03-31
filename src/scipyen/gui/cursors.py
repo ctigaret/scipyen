@@ -1195,11 +1195,11 @@ class SignalCursor(QtCore.QObject):
                 # self._x_ = x
                 
             elif isinstance(x, pq.Quantity):
-                _x = x.magnitude.flatten()[0]
+                _x = float(x.magnitude.flatten()[0])
                 # self._x_ = x.magnitude.flatten()[0]
                 
             elif x is None:
-                _x = self._x_range_[0] + np.diff(self._x_range_)/2
+                _x = float((self._x_range_[0] + np.diff(self._x_range_)/2).flatten()[0])
                 # self._x_ = self._x_range_[0] + np.diff(self._x_range_)/2
                 
             else:
@@ -1210,11 +1210,11 @@ class SignalCursor(QtCore.QObject):
                 # self._y_ = y
                 
             elif isinstance(y, pq.Quantity):
-                _y = y.magnitude.flatten()[0]
+                _y = float(y.magnitude.flatten()[0])
                 # self._y_ = y.magnitude.flatten()[0]
                 
             elif y is None:
-                _y = self._y_range_[0] + np.diff(self._y_range_)/2
+                _y = float((self._y_range_[0] + np.diff(self._y_range_)/2).flatten()[0])
                 # self._y_ = self._y_range_[0] + np.diff(self._y_range_)/2
             
             else:
@@ -1225,7 +1225,7 @@ class SignalCursor(QtCore.QObject):
                 # self._hWin_ = xwindow
                 
             elif isinstance(xwindow, pq.Quantity):
-                _hWin = xwindow.magnitude.flatten()[0]
+                _hWin = float(xwindow.magnitude.flatten()[0])
                 # self._hWin_ = xwindow.magnitude.flatten()[0]
                 
             elif xwindow is None:
@@ -1240,7 +1240,7 @@ class SignalCursor(QtCore.QObject):
                 # self._vWin_ = ywindow
                 
             elif isinstance(ywindow, pq.Quantity):
-                _vWin = ywindow.magnitude.flatten()[0]
+                _vWin = float(ywindow.magnitude.flatten()[0])
                 # self._vWin_ = ywindow.magnitude.flatten()[0]
                 
             elif ywindow is None:

@@ -4472,28 +4472,28 @@ def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
 
         if ref_value < w.min() or ref_value > w.max():
             # warnings.warn(f"The function get_AP_waveform_crossings(…) cannot determine wave crossing of {ref_value} for wave {wave_index} in step {step_index}", RuntimeWarning)
-            scipywarn(f"The function get_AP_waveform_crossings(…) cannot determine wave crossing of {ref_value} for wave {wave_index} in step {step_index}", RuntimeWarning)
+            # scipywarn(f"The function get_AP_waveform_crossings(…) cannot determine wave crossing of {ref_value} for wave {wave_index} in step {step_index}", RuntimeWarning)
 
             result[ref_name] = (np.nan, np.nan)
 
         rise_x, rise_y, rise_slope, decay_x, decay_y, decay_slope = ap_waveform_roots(w, ref_value)
 
-        if rise_x is np.nan:
-            # warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses {ref_name} ({ref_value})", RuntimeWarning)
-            scipywarn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses {ref_name} ({ref_value})", RuntimeWarning)
-            # print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses the reference {ref_name} ({ref_value})")
+        # if rise_x is np.nan:
+        #     # warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses {ref_name} ({ref_value})", RuntimeWarning)
+        #     scipywarn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses {ref_name} ({ref_value})", RuntimeWarning)
+        #     # print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses the reference {ref_name} ({ref_value})")
 
         if isinstance(rise_x, (tuple, list, np.ndarray)):
             rise_x = rise_x[0]
 
         if decay_x is np.nan:
             if w_corr is not None:
-                scipywarn(f"\x1b[1;36mUsing waveform with a polynomially interpolated envelope for decay crossing of {ref_name} ({ref_value})\x1b[0m in wave {wave_index} of step {step_index}", RuntimeWarning)
+                # scipywarn(f"\x1b[1;36mUsing waveform with a polynomially interpolated envelope for decay crossing of {ref_name} ({ref_value})\x1b[0m in wave {wave_index} of step {step_index}", RuntimeWarning)
                 roots_corr = ap_waveform_roots(w_corr, ref_value)
                 raise_x_corr, raise_y_corr, raise_slope_corr, decay_x, decay_y, decay_slope = roots_corr
 
-            if decay_x is np.nan:
-                scipywarn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses {ref_name} ({ref_value})", RuntimeWarning)
+            # if decay_x is np.nan:
+            #     scipywarn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses {ref_name} ({ref_value})", RuntimeWarning)
 
             # warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses {ref_name} ({ref_value})", RuntimeWarning)
 

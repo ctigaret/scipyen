@@ -4214,7 +4214,10 @@ anything else       anything else       ❌
                     yBounds = [min_point.y(), max_point.y()]
 
             if x is None:
-                x = float(xBounds[0] + np.diff(xBounds)/2)
+                x = xBounds[0] + np.diff(xBounds)
+                if x.ndim>0:
+                    x = x[0]
+                x = float(x)
                 # print(f"auto x = {x}")
 
             elif isinstance(x, pq.Quantity):
@@ -4225,7 +4228,10 @@ anything else       anything else       ❌
 
             if y is None:
                 # y = min_point.y() + (max_point.y() - min_point.y())/2.
-                x = float(yBounds[0] + np.diff(yBounds)/2)
+                x = yBounds[0] + np.diff(yBounds)/2
+                if x.ndim > 0:
+                    x = x[0]
+                x = float(x)
 
             elif isinstance(y, pq.Quantity):
                 y = float(y.magnitude.flatten()[0])
