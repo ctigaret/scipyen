@@ -2424,8 +2424,10 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     vfit["fitted_region"] = vsag10_90
 
     try:
-        fitResult = crvf.fit_model(np.squeeze(vsag10_90_copy).magnitude, models.exponential, p0,
+        fittedCurve, fitResult = crvf.fit_model(np.squeeze(vsag10_90_copy).magnitude, models.exponential, p0,
                                    x = vsag10_90_copy.times.magnitude, bounds = optimize.Bounds(lb=lb, ub=ub, keep_feasible=kf))
+
+        popt = fitResult.Coefficients.Fitted
 
         lambda_m = popt[3]
 
@@ -2453,6 +2455,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         vinf = vsag10_90_extended_fit.time_slice(t0, t1).mean() # "tail" of vfit (at "infinity")
 
         popt[3] = -1./lambda_m if lambda_m != 0. else np.nan
+        vfit["fitModelResult"] = {"curve": fittedCurve, "result": fitResult}
         vfit["fitted_parameters"] = popt
         vfit["fitcurve"] = vsag10_90_extended_fit
         vfit["Vextrapolated"] = vinf
@@ -2470,9 +2473,11 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         Rin = np.abs((vss - vbase) / Iinj).rescale(pq.Mohm)
         Rss = np.nan * pq.Mohm
         vfit = dict()
+        vfit["fitModelResult"] = {"curve": None, "result": None}
         vfit["fitted_parameters"] = [np.nan] * len(params)
         vfit["fitcurve"] = None
         vfit["Vextrapolated"] = np.nan * vsag10_90.units
+        τm = np.nan*pq.ms
         capacitance = np.nan * pq.pF
         traceback.print_exc()
 

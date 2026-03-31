@@ -851,6 +851,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         if len(self._suffix_):
             text = f"{text}{self._suffix_}"
 
+        super().setSpecialValueText(self._specialValueText_)
+        super().setValue(self._magnitude_)
+
         # print(f"{self.objectName()}: {self.__class__.__name__}.units.setter({value}): text -> {text}")
         signalBlock = QtCore.QSignalBlocker(self.lineEdit())
         self.lineEdit().setText(text)
@@ -859,7 +862,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
     @Slot(str)
     def _slot_valueTextChanged(self, s:str):
-        print(f"{self.__class__.__name__}._slot_valueTextChanged")
+        # print(f"{self.__class__.__name__}._slot_valueTextChanged")
 
         if self._validText_ == QtGui.QValidator.Acceptable:
             try:
@@ -1271,6 +1274,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             if len(self._suffix_):
                 text = f"{text} {self._suffix_}"
 
+            super().setSpecialValueText(self._specialValueText_)
+            super().setValue(self._magnitude_)
+
             # signalBlock = QtCore.QSignalBlocker(self.lineEdit())
             self.lineEdit().setText(text)
 
@@ -1288,6 +1294,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
             if len(self._suffix_):
                 text = f"{text} {self._suffix_}"
+
+            super().setSpecialValueText(self._specialValueText_)
+            super().setValue(self._magnitude_)
 
             # signalBlock = QtCore.QSignalBlocker(self.lineEdit())
             self.lineEdit().setText(text)
@@ -1354,6 +1363,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
             if len(self._suffix_):
                 text = f"{text} {self._suffix_}"
+
+            super().setSpecialValueText(self._specialValueText_)
+            super().setValue(self._magnitude_)
 
             # print(f"{self.objectName()}: {self.__class__.__name__}.setValue({value}) -> text = {text}")
 

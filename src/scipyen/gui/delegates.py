@@ -51,6 +51,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 import numpy as np
 import vigra
 import quantities as pq
+import pandas as pd
 import neo
 # from core import scipyen_quantities as scq
 from core import strutils as strutils
@@ -571,6 +572,11 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     #     widget.setValue(data)
                 else:
                     return
+
+        elif isinstance(data, (pd.DataFrame, pd.Series, pd.MultiIndex, pd.Index)):
+            widget = TableEditorWidget(parent, readOnly=False)
+            widget.setData(data)
+            widget.sig_dataChanged.connect(self.slot_dataChanged)
 
         else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
             return
