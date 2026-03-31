@@ -43,9 +43,33 @@ from gui.widgets import small_widgets as smw
 class _InputSpec():
     r"""Encapsulates arguments to interact.getInput(...)
     """
-    __slots__ = ("_default", "_mytype")
+    __slots__ = ("_default", "_mytype", "_choices")
 
-    def __init__(self, mytype=type(dataclasses.MISSING), default = dataclasses.MISSING):
+    def __init__(self, mytype=type(dataclasses.MISSING),
+                 default = dataclasses.MISSING,
+                 choices = dataclasses.MISSING):
+        r"""Constructor for _InputSpec.
+
+    Parameters:
+    ==========
+
+    :mytype:    optional; type of input argument; when MISSING
+
+    :default:   optional; default value of the input argument
+
+    :choices:   optional; indicates the set of values that the argument can take;
+
+                it can be:
+
+                • a dict, EnumType, or set
+
+                • a range object
+
+                • a pair of numbers (min, max)
+
+
+
+    """
         if isinstance(mytype, type):
             if mytype in (type(dataclasses.MISSING), type(None)): # type not specified
                 if default not in (dataclasses.MISSING, None): # get it from default's type
@@ -58,8 +82,9 @@ class _InputSpec():
             elif not isinstance(default, mytype): # consistency/sanity check
                 raise TypeError(f"default expected to be a {type.__name__}; got {type(default).__name__} instead")
 
-        self._default=default
-        self._mytype=mytype
+        self._default   = default
+        self._mytype    = mytype
+        self._choices   = choices
 
     @property
     def type(self):
@@ -68,6 +93,10 @@ class _InputSpec():
     @property
     def default(self):
         return self._default
+
+    @property
+    def choices(self):
+        return self._choices
 
 
 def selectWSData(*args, title="", single=True, asDict=False, **kwargs):

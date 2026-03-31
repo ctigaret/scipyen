@@ -86,6 +86,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     def __init__(self: typing.Self, *args, **kwargs):
         parent = kwargs.pop("parent", None)
         initialExpandDepth = kwargs.pop("initialExpandDepth", 1)
+        self._showCallables_: bool = kwargs.get("showCallables", False)
+        self._showValuesOnly_: bool = kwargs.get("showValuesOnly", True)
 
         assert (initialExpandDepth >=0 and initialExpandDepth < 3), f"Invalid value for 'initialExpandDepth': expecting an int >=0 and < 3; got {initialExpandDepth} instead"
         self.initialExpandDepth: int = kwargs.pop("initialExpandDepth", 1)
@@ -94,7 +96,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         assert (isinstance(autoResizeColumns, set) and all((isinstance(v, int) and v in range(3)) for v in autoResizeColumns)), f"Invalid value for 'autoResizeColumns'; expecting a set of ints, each in range(3); instead, got {autoResizeColumns}"
         self.autoResizeColumns: set[int] = kwargs.pop("autoResizeColumns", set())
         super().__init__(parent=parent)
-        super().setModel(DataTreeModel())
+        super().setModel(DataTreeModel(showMethods = self._showCallables_,
+                                       valuesOnly = self._showValuesOnly_))
         self._defaultDelegate_ = self.itemDelegate()
         self._delegate_ = PythonItemDelegate(parent = self)
         self._dragStartPosition_: typing.Optional[QtCore.QPoint] = None

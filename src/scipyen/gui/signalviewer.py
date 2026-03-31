@@ -2457,8 +2457,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         sep=":"
 
         for k, x in enumerate(sig_ndx_names):
+            # print(f"\tx[1] = {x[1]}, taken = {taken}")
             if x[1] in taken:
-                entry_name = counter_suffix(x[1], taken, sep = sep)
+                entry_name = counter_suffix(x[1], taken, sep = sep)[0]
             else:
                 entry_name = x[1]
 

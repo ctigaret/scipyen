@@ -9,7 +9,7 @@ extricate AP analysis code from here, and move to membrane_properties plugin
 """
 
 #### BEGIN core python modules
-import sys, traceback, inspect, numbers, typing, datetime, dataclasses
+import sys, traceback, inspect, numbers, typing, types, datetime, dataclasses
 import warnings
 import os, pickle
 import collections
@@ -1939,7 +1939,8 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
                    ssEpoch:typing.Optional[typing.Union[neo.Epoch, tuple, list]]=None,
                    steadyStateDuration:pq.Quantity = 0.05 * pq.s,
                    tail = 0.2 * pq.s,
-                   box_size = 0) -> tuple:
+                   box_size = 0,
+                   modelFun: typing.Optional[types.FunctionType] = None) -> tuple:
     r"""Measurement of passive membrane properties.
 
     Uses membrane potential recorded during sweeps containins a step of somatic
@@ -1961,9 +1962,9 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     Parameters:
     ===========
 
-    vm: analogsignal with Vm recorded in current clamp
+    :vm: analogsignal with Vm recorded in current clamp
 
-    im: analogsignal with Im command (injected current in current clamp)
+    :im: analogsignal with Im command (injected current in current clamp)
 
         OR :
             a triplet of scalar pq.Quantity objects in the FOLLOWING order:
@@ -1973,7 +1974,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
 
         OR: a scalar quantity object with units scalable to pq.A
 
-    baseEpoch¹: neo.Epoch, or sequence of t_start, t_stop time points for the
+    :baseEpoch:¹ neo.Epoch, or sequence of t_start, t_stop time points for the
                 baseline before current injection (optional, default is None).
 
                 When a neo.Epoch,this must contain a single time/duration pair
@@ -1981,7 +1982,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
                 Mandatory when im is just a scalar current quantity.
 
 
-    ssEpoch¹:   steady state Vm epoch (optional, default is None) for the
+    :ssEpoch:¹   steady state Vm epoch (optional, default is None) for the
                 steady-state membrane potential DURING the current injection;
 
                 typically, this ends with the current injection
@@ -1994,7 +1995,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
                 times falls on the right regions of the signal.
 
 
-    steadyStateDuration: scalar or python quantity
+    :steadyStateDuration: scalar or python quantity
                 use to calculate the interval for Vm average on baseline and
                 for the steady-state hyperpolarization (i.e. ms BEFORE the END
                 of the current injection) when the two epochs above are NOT
@@ -2004,7 +2005,9 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
 
                 default is 0.05 * pq.s (50 ms)
 
-    box_size: int scalar (default 0) size of the boxcar window for filtering
+    :box_size: int scalar (default 0) size of the boxcar window for filtering
+
+    :modelFun: optional; by default this is models.exponential; when specified, it must be a function for which models.isModelFunction(modelFun) returns True
 
     ¹ NOTE the neo.Epochs are created manually in the signal viewer, to delineate
         the ACTUAL baseline and steady-state periods of the membrane voltage
@@ -2058,7 +2061,13 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     # from scipy.signal import boxcar, convolve
     from scipy.signal import convolve
 
-    print(f"passive_Iclamp: ssEpoch = {ssEpoch}")
+    if not isinstance(modelFun, types.FunctionType):
+        modelFun = models.exponential
+    else:
+        if not models.isModelFunction(modelFun):
+            raise ValueError(f"Expecting a model function; instead, {modelFun.__name__} is an ordinary function")
+
+    # print(f"passive_Iclamp: ssEpoch = {ssEpoch}")
 
     try:
         major, minor, micro = tuple(map(lambda x: int(x), scipy.__version__.split('.')))
@@ -2403,9 +2412,10 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     # params = [α, β, x0, -1./τ]
     params = [α, -β, x0, -1./τ]
 
-    fitParams, _, _, _ = models.exponential.generateFitTable(*params)
+    fitParams, _, _, _ = modelFun.generateFitTable(*params)
+    # fitParams, _, _, _ = models.exponential.generateFitTable(*params)
 
-    fP, _, _, _ = models.bounded_exponential_rise.generateFitTable(*params)
+    # fP, _, _, _ = models.bounded_exponential_rise.generateFitTable(*params)
 
     p0 = list(fitParams["Initial Value"])
     lb = list(fitParams["Lower Bound"])
@@ -2424,8 +2434,10 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     vfit["fitted_region"] = vsag10_90
 
     try:
-        fittedCurve, fitResult = crvf.fit_model(np.squeeze(vsag10_90_copy).magnitude, models.exponential, p0,
+        fittedCurve, fitResult = crvf.fit_model(np.squeeze(vsag10_90_copy).magnitude, modelFun, p0,
                                    x = vsag10_90_copy.times.magnitude, bounds = optimize.Bounds(lb=lb, ub=ub, keep_feasible=kf))
+        # fittedCurve, fitResult = crvf.fit_model(np.squeeze(vsag10_90_copy).magnitude, models.exponential, p0,
+        #                            x = vsag10_90_copy.times.magnitude, bounds = optimize.Bounds(lb=lb, ub=ub, keep_feasible=kf))
 
         popt = fitResult.Coefficients.Fitted
 
@@ -2439,7 +2451,8 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         xx = np.linspace(float(vsag10_90.t_start), float(ssT0), int((float(ssT0)-float(vsag10_90.t_start))*vm.sampling_rate.magnitude))
         #xx = np.linspace(float(vsag10_90.times[0]), float(vsag10_90.times[-1]), vm.shape[0])
 
-        yy = models.exponential(xx, *popt)
+        yy = modelFun(xx, *popt)
+        # yy = models.exponential(xx, *popt)
         # yy = models.generic_single_exponential_decay(xx, *popt)
 
         vsag10_90_extended_fit = neo.AnalogSignal(yy[:, np.newaxis],
@@ -2460,7 +2473,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         vfit["fitcurve"] = vsag10_90_extended_fit
         vfit["Vextrapolated"] = vinf
 
-        print(f"passive_Iclamp: vss = {vss}, vbase = {vbase}, iinj = {Iinj}, np.abs((vss - vbase) / Iinj) = {np.abs((vss - vbase) / Iinj)}")
+        # print(f"passive_Iclamp: vss = {vss}, vbase = {vbase}, iinj = {Iinj}, np.abs((vss - vbase) / Iinj) = {np.abs((vss - vbase) / Iinj)}")
 
         Rin = np.abs((vss - vbase) / Iinj).rescale(pq.Mohm)
         Rss = np.abs((vinf - vbase) / Iinj).rescale(pq.Mohm)

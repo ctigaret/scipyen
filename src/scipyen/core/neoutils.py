@@ -9508,8 +9508,7 @@ def plot_spiketrain_waveforms(x:neo.SpikeTrain,
     #     ):
     #         args = ["o"]
     
-def plot_neo(
-    obj: neo.core.basesignal.BaseSignal,
+def plot_neo(obj: neo.core.basesignal.BaseSignal,
     fig: typing.Optional[typing.Union[mpl.figure.Figure, int]] = None,
     pfun: typing.Callable = plt.plot,
     **kwargs,

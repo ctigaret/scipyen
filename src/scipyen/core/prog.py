@@ -979,7 +979,6 @@ class Timer(object):
         # for use as context manager
         self.stop()
 
-
 class SpecFinder(importlib_abc.MetaPathFinder):
     r"""
     DEPRECATED

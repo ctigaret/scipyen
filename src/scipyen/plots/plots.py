@@ -401,6 +401,7 @@ def plotNeoSignal(data, fig=None, label=None, newPlot=False, title = None,
                   despine=True, panel_size=None, **kwargs):
     r"""
     TODO: plot multiple signals overlaid, with legend
+    Consider DEPRECATED in favour of neoutils.plot_neo.
     """
     import neo
     if not isinstance(data, neo.core.basesignal.BaseSignal):

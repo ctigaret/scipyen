@@ -4667,7 +4667,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
 #             
 #         return waveform
         
-        pass
+        pass # FIXME/TODO 2026-03-31 09:12:45 ?!?
         
     def getEpochAnalogEvent(self, epoch:typing.Union[ABFEpoch, str, int],
                             sweep:int = 0,
@@ -4760,10 +4760,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
             trial (useful to inspect what command waveform the epochs in the DAC
             are configured to generate IF Analog Waveform ws enabled on this DAC)
         
-            NOTE: This parameter is only used when Alternate Waveforms is DISabled!
+            NOTE: This parameter is only used when Alternate Waveforms is *DIS*abled!
         
             BUG: 2024-11-10 01:12:01 FIXME
             this messes up things!
+
+
         Returns:
         --------
         
@@ -4894,7 +4896,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                             name = dac.name)
                 
     def getDACCommandWaveform(self, dac, sweep):
-        r"""Returns the analog waveform emitted by the DAC on a given sweep.
+        r"""Returns the analog waveform emitted by the specified DAC during a sweep.
         This returns the output as defined in the Epochs table, i.e., regardless
         of whether the DAC would output a waveform or not, given the specified
         sweep index.
@@ -8512,9 +8514,13 @@ def _(obj, channel:int) -> bool:
     
     channelEpochInfoPerDac = epochInfoPerDAC[channel]
     
+
+def showEpochsTable(p: ABFProtocol):
+    pass # TODO: 2026-03-31 08:55:59 use interact.packInputs(…)
+
 # ### END module-level functions
     
-        
+
     
     
         

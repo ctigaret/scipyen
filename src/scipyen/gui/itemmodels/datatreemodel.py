@@ -304,7 +304,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         item0.setData(QtCore.QVariant(objKeyType), ObjectKeyTypeRole) # noqa
 
         if visited:
-            typeName = visited[1].__name__
+            typeName = visited[-1].__name__
 
         # for user's benefit — good to know the type of the object is represented
         # in this row.

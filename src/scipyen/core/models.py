@@ -2195,7 +2195,7 @@ def Frank_Fuortes(x:np.ndarray | Real,
     if not all(isinstance(v, float) for v in (τ, x0)):
         raise TypeError("Expecting a sequence of two float scalars or a comma-separated list of two scalars")
 
-    return 1-np.exp(-(x-x0)/tau)
+    return 1-np.exp(-(x-x0)/τ)
 
 @modelfunction(coefficients=("irh", "τ", "x0"))
 def Frank_Fuortes2(x:np.ndarray | Real, irh:typing.Sequence[Real] | Real, /,

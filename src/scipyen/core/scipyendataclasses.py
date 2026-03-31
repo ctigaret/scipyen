@@ -118,6 +118,28 @@ class DoseDescriptor:
 
         setattr(obj, self._name, value)
 
+class ModelFunctionDescriptor:
+    def __set_name__(self, obj: object, name: str):
+        if len(name.strip()) == 0:
+            raise ValueError("Cannot accept an empty name")
+        self._name = "_"+name
+
+    def __get__(self, obj:object, objtype:type) -> object:
+        if obj is None:
+            return #self._default
+        return getattr(obj, self._name, None)
+
+    def __set__(self, obj:object, value:typing.Optional[pq.Quantity] = None):
+        from core import models
+        if isinstance(value, types.FunctionType):
+            if not models.isModelFunction(value):
+                raise ValueError(f"Expecting a model function; instead, {value.__name__} is an ordinary function")
+
+        elif value is not None:
+            raise ValueError(f"Expecting a model function; instead, {value.__name__} is an ordinary function")
+
+        setattr(obj, self._name, value)
+
 class FileOriginDescriptor:
     r"""Use stat() to update the owner's ``file_datetime`` field, if it exists"""
     def __set_name__(self, obj:object, name:str):

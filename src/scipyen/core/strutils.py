@@ -1105,7 +1105,7 @@ Parameters:
     if not isinstance(strings, (tuple, list)) and not hasattr(strings, "__iter__"):
         raise TypeError("Second positional parameter was expected to be an iterable; got %s instead" % type(strings).__name__)
 
-    if not all ([isinstance(s, str) for s in strings]):
+    if len(strings) > 0 and not all ([isinstance(s, str) for s in strings]):
         raise TypeError("Second positional parameter was expected to contain str elements only")
 
     if not isinstance(sep, str):

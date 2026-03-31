@@ -10489,6 +10489,37 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             elif isinstance(obj, vigra.VigraArray):
                 plt.plot(np.arange(obj.shape[0]), np.array(obj))
+
+            elif isinstance(obj, typing.Sequence):
+                try:
+                    if all(isinstance(o, neo.core.basesignal.BaseSignal) for o in obj):
+                        plt.clf()
+                        for o in obj:
+                            neoutils.plot_neo(o, win)
+
+                        lgds = plt.gcf().axes[0].get_legend().texts
+                        for kt, ltext in enumerate(lgds):
+                            txt = f"{kt}: {ltext.get_text()}"
+                            ltext.set_text(txt)
+                            # ltext.update()
+
+
+                    elif all(isinstance(o, pq.Quantity) for o in obj):
+                        # if not all(o.units == obj[0].units for o in obj):
+                        #     raise ValueError("Cannot plot quantities ")
+                        plt.clf()
+                        for ko, o in enumerate(obj):
+                            plt.plot(o.magnitude, label = f"{ko}: {obj.units.dimensionality}")
+
+                    elif all(isinstance(o, np.ndarray)):
+                        plt.clf()
+                        for ko, o in enumerate(obj):
+                            plt.plot(o.magnitude, label = f"data {ko}")
+
+                except:
+                    traceback.print_exc()
+                    return False
+
             else:
                 plt.plot(obj)
 

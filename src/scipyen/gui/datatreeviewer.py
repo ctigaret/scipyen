@@ -199,6 +199,8 @@ A lot of things copied from there, EXCEPT that it now uses
         """
         self._showMethods_:bool=kwargs.get("showMethods", False)
         self._showPrivateMembers_:bool = kwargs.get("showPrivate", False)
+        self._showCallables_: bool = kwargs.get("showCallables", False)
+        self._showValuesOnly_: bool = kwargs.get("showValuesOnly", True)
         self._useTableEditor_ = useTableEditor
         self._readOnly_ = readOnly is True
 
@@ -263,6 +265,8 @@ A lot of things copied from there, EXCEPT that it now uses
                                      # ,
                                      # readOnly = self._readOnly_)
 
+        self.model = self.treeView.model()
+
         self.treeView.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
         # TODO implement dragging from here to the workspace
@@ -295,6 +299,24 @@ A lot of things copied from there, EXCEPT that it now uses
 
         expandAllAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("expand-all"), "Expand All")
         expandAllAction.triggered.connect(self.slot_expandAll)
+
+        resizeColumnsAction = self.toolBar.addAction(
+            QtGui.QIcon.fromTheme("resizecol"), "Fit Columns Size to Contents")
+        resizeColumnsAction.triggered.connect(self.slot_resizeFitColumns)
+
+        showCallablesAction = self.toolBar.addAction(
+            QtGui.QIcon.fromTheme("code-function"), "Show Functions and Methods")
+        showCallablesAction.setCheckable(True)
+        showCallablesAction.setChecked(False)
+
+        showCallablesAction.toggled.connect(self.slot_showCallables)
+
+        showValuesOnlyAction = self.toolBar.addAction(
+            QtGui.QIcon.fromTheme("object"), "Show Value Objects Only")
+        showValuesOnlyAction.setCheckable(True)
+        showValuesOnlyAction.setChecked(False)
+
+        showValuesOnlyAction.toggled.connect(self.slot_showValuesOnly)
 
         self.goFirst = self.toolBar.addAction(QtGui.QIcon.fromTheme("go-first-symbolic"), "First view")
         self.goFirst.triggered.connect(self.slot_goFirst)
@@ -460,8 +482,27 @@ A lot of things copied from there, EXCEPT that it now uses
 
     @Slot()
     @safewrapper
+    def slot_resizeFitColumns(self):
+        for col in range(self.model.columnCount()):
+            self.treeView.resizeColumnToContents(col)
+
+    @Slot()
+    @safewrapper
     def slot_collapseAll(self):
         self.treeView.collapseAll()
+
+    @Slot(bool)
+    @safewrapper
+    def slot_showCallables(self, value: bool):
+        # print(f"{self.__class__.__name__},slot_showCallables({value})")
+        self.model.showMethods = value is True
+        self.slot_refreshDataDisplay()
+
+    @Slot(bool)
+    @safewrapper
+    def slot_showValuesOnly(self, value: bool):
+        self.model.showValuesOnly = value is True
+        self.slot_refreshDataDisplay()
 
     @Slot()
     @safewrapper
@@ -801,3 +842,43 @@ A lot of things copied from there, EXCEPT that it now uses
     @readOnly.setter
     def readOnly(self: typing.Self, val: bool):
         self._readOnly_ = val is True
+
+    @property
+    def showValuesOnly(self) -> bool:
+        return self._showValuesOnly_
+
+    @markConfigurable("ShowValuesOnly", "Qt", trait_notifier = True)
+    @showValuesOnly.setter
+    def showValuesOnly(self, val: bool):
+        self._showValuesOnly_ = val is True
+        showValuesOnlyAction = list(filter(lambda c: isinstance(c, QtGui.QAction) and c.text() == "Show Value Objects Only",
+                                          self.toolBar.children()))
+        if len(showValuesOnlyAction):
+            showValuesOnlyAction = showValuesOnlyAction[0]
+            signalBlockers = QtCore.QSignalBlocker(showValuesOnlyAction)
+            showValuesOnlyAction.setChecked(self._showValuesOnly_)
+
+        if self._data_ is not None:
+            self.slot_showValuesOnly(self._showValuesOnly_)
+
+
+    @property
+    def showCallables(self) -> bool:
+        return self._showCallables_
+
+    @markConfigurable("ShowCallables", "Qt", trait_notifier = True)
+    @showCallables.setter
+    def showCallables(self, value: bool):
+        self._showCallables_ = value is True
+
+        showCallablesAction = list(filter(lambda c: isinstance(c, QtGui.QAction) and c.text() == "Show Functions and Methods",
+                                          self.toolBar.children()))
+        if len(showCallablesAction):
+            showCallablesAction = showCallablesAction[0]
+            signalBlockers = QtCore.QSignalBlocker(showCallablesAction)
+            showCallablesAction.setChecked(self._showCallables_)
+
+        if self._data_ is not None:
+            self.slot_showCallables(self._showCallables_)
+
+

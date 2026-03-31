@@ -3354,7 +3354,7 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
     if tt.lower() == "macro":
         icon = QtGui.QIcon.fromTheme("component")
         
-    if objtype is type:
+    if objtype is type or type in inspect.getmro(objtype):
         tt += f" <{obj.__name__}>"
         icon = QtGui.QIcon.fromTheme("datatype") if obj.__name__ in builtins.__dict__ else QtGui.QIcon.fromTheme("class")
         
