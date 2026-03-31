@@ -1792,7 +1792,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
 
     @_interpret_signal.register(neo.Block)
-    def _(self, obj:neo.Block, /, x, **kwargs):
+    def __interpret_signal(self, obj:neo.Block, /, x, **kwargs):
         self._yData_ = obj
         self._cached_title = getattr(y, "name", None)
 
@@ -1849,7 +1849,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
 
     @_interpret_signal.register(neo.Segment)
-    def _(self, obj:neo.Segment, /, x=None, **kwargs):
+    def __interpret_signal(self, obj:neo.Segment, /, x=None, **kwargs):
         # self._xData_ = None # NOTE: x can still be supplied externally
         self._yData_ = obj
         self._cached_title = getattr(y, "name", None)
@@ -1879,7 +1879,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     @_interpret_signal.register(neo.AnalogSignal)
     @_interpret_signal.register(DataSignal)
-    def _(self,obj, /, x = None, **kwargs):
+    def __interpret_signal(self,obj, /, x = None, **kwargs):
         self._yData_ = obj
         self._cached_title = getattr(y, "name", None)
 
@@ -1925,7 +1925,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     @_interpret_signal.register(neo.IrregularlySampledSignal)
     @_interpret_signal.register(IrregularlySampledDataSignal)
-    def _(self, obj, /, x=None, **kwargs):
+    def __interpret_signal(self, obj, /, x=None, **kwargs):
         self._yData_ = obj
         self._cached_title = getattr(y, "name", None)
         self.frameIndex = range(1)
@@ -1962,7 +1962,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     @_interpret_signal.register(neo.Epoch)
     @_interpret_signal.register(DataZone)
-    def _(self, obj, /, x=None, **kwargs):
+    def __interpret_signal(self, obj, /, x=None, **kwargs):
         self._yData_ = obj
         self._cached_title = getattr(y, "name", None)
         self.dataAxis = 0 # data as column vectors
@@ -1982,7 +1982,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @_interpret_signal.register(neo.Event)
     @_interpret_signal.register(DataMark)
     @_interpret_signal.register(TriggerEvent)
-    def _(self, obj, /, x=None, **kwargs):
+    def __interpret_signal(self, obj, /, x=None, **kwargs):
         self._yData_ = obj
         self._cached_title = getattr(y, "name", None)
         self.dataAxis = 0 # data as column vectors
@@ -1992,17 +1992,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._n_signal_axes_ = 0
 
     @_interpret_signal.register(TriggerProtocol)
-    def _(self, obj, /, x=None, **kwargs):
+    def __interpret_signal(self, obj, /, x=None, **kwargs):
         # TODO
         pass
 
     @_interpret_signal.register(neo.SpikeTrain)
-    def _(self, obj, /, x=None, **kwargs):
+    def __interpret_signal(self, obj, /, x=None, **kwargs):
         # TODO
         pass
 
     @_interpret_signal.register(neo.core.spiketrainlist.SpikeTrainList)
-    def _(self, obj, /, x=None, **kwargs):
+    def __interpret_signal(self, obj, /, x=None, **kwargs):
         self._n_signal_axes_ = 0
         # self._xData_ = None
         self._yData_ = obj
@@ -2014,7 +2014,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
 
     @_interpret_signal.register(vigra.filters.Kernel1D)
-    def _(self, obj:vigra.filters.Kernel1D, /, x=None, **kwargs):
+    def __interpret_signal(self, obj:vigra.filters.Kernel1D, /, x=None, **kwargs):
         self._xData_, self._yData_ = kernel2array(obj)
         self._cached_title = "Vigra Kernel 1D"
         # self._plotEpochs_(clear=True)
@@ -2027,7 +2027,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._n_signal_axes_ = 1
 
     @_interpret_signal.register(np.ndarray)
-    def _(self, obj:np.ndarray, /, x=None, **kwargs):
+    def __interpret_signal(self, obj:np.ndarray, /, x=None, **kwargs):
         if x.ndim > 3:
             raise ValueError('Cannot plot data with more than 3 dimensions')
 
@@ -2801,7 +2801,7 @@ anything else       anything else       ❌
         return
 
     @addDataFrame.register(neo.Block)
-    def _(self, obj:neo.Block):
+    def _addDataFrame(self, obj:neo.Block):
         if len(obj.segments) == 0:
             return
 
@@ -2869,7 +2869,7 @@ anything else       anything else       ❌
 
 
     @addDataFrame.register(neo.Segment)
-    def _(self, obj:neo.Segment):
+    def _addDataFrame(self, obj:neo.Segment):
         if self.yData is None:
             self.setData(obj)
             return
@@ -8501,7 +8501,7 @@ anything else       anything else       ❌
         neo.Epoch                       ↦ _plot_signal_
         neo.SpikeTrain                  ↦ _plot_signal_
         neo.Event                       ↦ _plot_signal_
-        datasignal.DataSignal            ↦ _plot_signal_
+        datasignal.DataSignal           ↦ _plot_signal_
         vigra.Kernel1D, vigra.Kernel2D  ↦ _plotNumpyArray_
             NOTE: These are converted to numpy.ndarray
         numpy.ndarray                   ↦ _plotNumpyArray_
@@ -9056,9 +9056,11 @@ anything else       anything else       ❌
                     self._spiketrains_axis_.update()
 
                 self.spikeTrainsAxis.setVisible(True)
-                if standaloneTrains:
-                    self.spikeTrainsAxis.vb.setXRange(t_min.magnitude, t_max.magnitude,
-                                                      padding=0)
+                # self.spikeTrainsAxis.vb.setXRange(t_min.magnitude, t_max.magnitude,
+                #                                     padding=0)
+                # if standaloneTrains:
+                #     self.spikeTrainsAxis.vb.setXRange(t_min.magnitude, t_max.magnitude,
+                #                                       padding=0)
             else:
                 self.spikeTrainsAxis.setVisible(False)
         else:
@@ -9193,7 +9195,7 @@ anything else       anything else       ❌
         raise NotImplementedError(f"Objects of type {type(obj).__name__} are not supported")
 
     @_plot_data_.register(neo.Block)
-    def _(self, obj:neo.Block, *args, **kwargs):
+    def __plot_data_(self, obj:neo.Block, *args, **kwargs):
         # NOTE: 2019-11-24 22:31:26
         # select a segment then delegate to _plotSegment_()
         # Segment selection is based on self.frameIndex, or on self.channelIndex
@@ -9221,7 +9223,7 @@ anything else       anything else       ❌
         self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
 
     @_plot_data_.register(neo.Segment)
-    def _(self, obj:neo.Segment, *args, **kwargs):
+    def __plot_data_(self, obj:neo.Segment, *args, **kwargs):
         r"""Plots a neo.Segment.
         Plots the signals (optionally the selected ones) present in a segment,
         and the associated epochs, events, and spike trains.
@@ -9283,13 +9285,13 @@ anything else       anything else       ❌
         self.currentFrameAnnotations = {type(obj).__name__ : obj.annotations}
 
     @_plot_data_.register(neo.core.spiketrainlist.SpikeTrainList)
-    def _(self, obj:neo.core.spiketrainlist.SpikeTrainList,
+    def __plot_data_(self, obj:neo.core.spiketrainlist.SpikeTrainList,
           *args, **kwargs):
         self._plotSpikeTrains_(obj)
         self.currentFrameAnnotations = {type(obj).__name__: [st.annotations for st in obj]}
 
     @_plot_data_.register(neo.SpikeTrain)
-    def _(self, obj, *args, **kwargs):
+    def __plot_data_(self, obj, *args, **kwargs):
         self._plotSpikeTrains_(obj)
         self.currentFrameAnnotations = {type(obj).__name__: obj.annotations}
 
@@ -9297,7 +9299,7 @@ anything else       anything else       ❌
     @_plot_data_.register(neo.IrregularlySampledSignal)
     @_plot_data_.register(DataSignal)
     @_plot_data_.register(IrregularlySampledDataSignal)
-    def _(self, obj:typing.Union[neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal],
+    def __plot_data_(self, obj:typing.Union[neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal],
           *args, **kwargs):
         if self.frameAxis == 1:
             if self._current_frame_index_ in self.frameIndex:
@@ -9315,7 +9317,7 @@ anything else       anything else       ❌
 
     @_plot_data_.register(neo.Epoch)
     @_plot_data_.register(DataZone)
-    def _(self, obj:typing.Union[neo.Epoch, DataZone],
+    def __plot_data_(self, obj:typing.Union[neo.Epoch, DataZone],
           *args, **kwargs):
         r""" Plots a single neo.Epoch
         NOTE: a single Epoch MAY contain several time intervals.
@@ -9338,7 +9340,7 @@ anything else       anything else       ❌
     @_plot_data_.register(neo.Event)
     @_plot_data_.register(DataMark)
     @_plot_data_.register(TriggerEvent)
-    def _(self, obj:typing.Union[neo.Event, DataMark],
+    def __plot_data_(self, obj:typing.Union[neo.Event, DataMark],
           *args, **kwargs):
         r"""Plot stand-alone events"""
         if len(obj) == 0:
@@ -9350,7 +9352,7 @@ anything else       anything else       ❌
         self.currentFrameAnnotations = {type(obj).__name__: obj.annotations}
 
     @_plot_data_.register(np.ndarray)
-    def _(self, obj:np.ndarray, *args, **kwargs):
+    def __plot_data_(self, obj:np.ndarray, *args, **kwargs):
         # print(f"{self.__class__.__name__}._plot_data_(obj<{type(obj).__name__}> dims: {obj.ndim})")
         try:
             if obj.ndim > 3:
@@ -9413,13 +9415,13 @@ anything else       anything else       ❌
         self.currentFrameAnnotations = dict()
 
     @_plot_data_.register(type(None))
-    def _(self, obj, *args, **kwargs):
+    def __plot_data_(self, obj, *args, **kwargs):
         pass
 
     @_plot_data_.register(tuple)
     @_plot_data_.register(list)
     @_plot_data_.register(NeoObjectList)
-    def _(self, obj:typing.Union[tuple, list, NeoObjectList],
+    def __plot_data_(self, obj:typing.Union[tuple, list, NeoObjectList],
           *args, **kwargs):
         if len(obj) == 0:
             return False
@@ -10690,13 +10692,13 @@ anything else       anything else       ❌
 
         # NOTE: 2023-07-09 15:25:32
         # link all X axes ot the X axis of the top PlotItem (with index 0)
-        # for ax in self.axes[1:]:
-        #     ax.vb.setXLink(self.axes[0])
+        for ax in self.axes[1:]:
+            ax.vb.setXLink(self.axes[0])
 
         # NOTE: 2023-07-10 12:21:29
         # this links all axes pairwise (2nd to first, 3rd to 2nd etc)
-        for ax in pairwise(self.axes):
-            ax[1].vb.setXLink(ax[0])
+        # for ax in pairwise(self.axes):
+        #     ax[1].vb.setXLink(ax[0])
 
         # NOTE: 2023-07-09 14:28:00
         # this links axes pairwise except for the non-signal axes;
