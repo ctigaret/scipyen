@@ -5,7 +5,7 @@
 
 r"""Base ancestor of Scipyen's data objects: AnalysisUnit, ScanData
 """
-import functools, typing, dataclasses, pathlib
+import functools, typing, dataclasses, pathlib, types
 import collections
 from collections import deque
 from datetime import datetime, date, time, timedelta
@@ -114,5 +114,9 @@ class BaseScipyenData(ScipyenDataclass):
             elif isinstance(self.file_origin, (str, pathlib.Path)):
                 self._file_datetime = getFileCreationDateTime(self.file_origin)
 
+
+class BaseResult(types.SimpleNamespace):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 

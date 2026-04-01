@@ -170,6 +170,9 @@ event_fitted_wave_fields = [("Accept",        np.ndarray, lambda x: check_numpy_
             ]
 
 
+class RheobaseResult(types.SimpleNamespace):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 # NOTE: 2023-06-12 16:09:45
 # measure_Rs_Rin must be defined early so that it can be picked up by the with_doc
@@ -1519,7 +1522,7 @@ def rheobase_latency(*args, **kwargs):
 
     :latencies: An IrregularlySampledDataSignal with latency vs current injection
 
-    "rheo_result": dict with key ↦ value mapping:
+    "rheo_result": RheobaseResult (a SimpleNamespace) with:
 
         Irh : experimentally determined rheobase current
 
@@ -1743,15 +1746,15 @@ def rheobase_latency(*args, **kwargs):
             time_scale = float((1*pq.s).rescale(latencies.units).magnitude)
             xx *= time_scale
 
-    ret = collections.OrderedDict()
+    result = RheobaseResult()
 
-    ret["Irh"] = np.array([irheo]) * latencies.domain.units
-    ret["tau"] = np.array([fit_tau]) * pq.s
+    result.Irh = np.array([irheo]) * latencies.domain.units
+    result.τ = np.array([fit_tau]) * pq.s
 
     if not fitrheo:
-        i_irh = latencies.times.magnitude/ret["Irh"].magnitude
+        i_irh = latencies.times.magnitude/result.Irh.magnitude
         # generate latency vs I/Irh (relative strength)
-        ret["I_Irh"] = IrregularlySampledDataSignal(
+        result.I_Irh = IrregularlySampledDataSignal(
                             signal = latencies.magnitude, # this is time!
                             domain = i_irh, # dimensionless
                             units = latencies.units,
@@ -1759,27 +1762,32 @@ def rheobase_latency(*args, **kwargs):
                             domain_name = "I/Irh",
                             name = "First AP Latency")
 
-        ret["I_Irh"].domain_name = "I/Irh"
+        result.I_Irh.domain_name = "I/Irh"
 
-    ret["fit"] = collections.OrderedDict()
+    fitresult = types.SimpleNamespace()
 
-    ret["fit"]["Irh"] = np.array([fit_rheobase]) * latencies.domain.units
-    ret["fit"]["parameters"] = popt
-    ret["fit"]["R2"] = rsq
-    ret["fit"]["sse"] = sse
-    ret["fit"]["perr"] = perr
-    ret["fit"]["x"] = xx
-    ret["fit"]["y"] = yy
-    ret["fitrheo"] = fitrheo
-    ret["metadata"] = metadata
+    fitresult.Irh = np.array([fit_rheobase]) * latencies.domain.units
+    fitresult.parameters = popt
+    fitresult.R2 = rsq
+    fitresult.sse = sse
+    fitresult.perr = perr
+    fitresult.x = xx
+    fitresult.y = yy
 
-    # latencies.annotations["rheobase_latency_analysis"] = ret
+    result.fit = fitresult
+    # ret["fit"] = types.SimpleNamespace(fitresult)
+
+    result.fitrheo = fitrheo
+    result.metadata = metadata
+
+
+    # result = types.SimpleNamespace(ret)
 
     if plot:
-        plot_rheobase_latency(latencies, fig=fig)
+        plot_rheobase_latency(latencies, result, fig=fig)
 
 
-    return latencies, ret
+    return latencies, result
 
 def extract_Vm_Im(data, VmSignal="Vm_prim_1", ImSignal="Im_sec_1", t0=None, t1=None):
     r"""Convenient function to extract Vm and Im signals as a block.
@@ -7739,7 +7747,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
             # further consistency checks
             try:
                 latencies, rheo_result = rheobase_latency(ret["First_AP_latency"], **rheoargs)
-                ret["rheobase_latency_analysis"] = {"Latencies": latencies, "Result": rheo_result}
+                ret["rheobase_latency_analysis"] = types.SimpleNamespace({"Latencies": latencies, "Result": rheo_result})
                 # ret["First_AP_latency"] = rheobase_latency(ret["First_AP_latency"], **rheoargs)
 
                 if plot_rheo:
@@ -7826,10 +7834,10 @@ def plot_rheobase_latency(data,
 
     #print("xstart", xstart, "xend", xend)
 
-    if not isinstance(data, dict) or len(data) == 0:
+    if not isinstance(data, types.SimpleNamespace) or len(data.__dict__) == 0:
         raise ValueError("data does not seem to contain a rheobase-latency fit")
 
-    latencies = data.get("Latencies", None)
+    latencies = getattr(data, "Latencies", None)
 
     if (not isinstance(latencies, IrregularlySampledDataSignal)
         or latencies.size == 0 or latencies.ndim != 2
@@ -7839,16 +7847,16 @@ def plot_rheobase_latency(data,
         raise ValueError("data does not seem to contain a rheobase-latency fit (no 'Latencies')")
 
 
-    result = data.get("Result", None)
-    if not isinstance(result, dict) or len(result) == 0:
+    result = getattr(data, "Result", None)
+    if not isinstance(result, RheobaseResult) or len(result.__dict__) == 0:
         raise ValueError("data does not seem to contain a rheobase-latency fit (no 'Result' dict)")
 
-    fitrheo = result.get("fitrheo", None)
+    fitrheo = getattr(result, "fitrheo", None)
     if not isinstance(fitrheo, bool):
         raise ValueError("data does not seem to contain a rheobase-latency fit (no 'fitrheo' flag)")
 
     if not fitrheo:
-        I_Irh = result.get("I_Irh", None)
+        I_Irh = getattr(result, "I_Irh", None)
         if not isinstance(I_Irh, IrregularlySampledDataSignal) or I_Irh.size == 0:
             raise ValueError("data does not seem to contain a rheobase-latency fit (invalid 'I-Irh')")
 
@@ -7859,23 +7867,23 @@ def plot_rheobase_latency(data,
         x = latencies.magnitude
         y = latencies.times.magnitude
 
-    fit = result.get("fit", None)
+    fit = getattr(result, "fit", None)
 
-    if not isinstance(fit, dict) or len(fit) == 0:
+    if not isinstance(fit, types.SimpleNamespace) or len(fit.__dict__) == 0:
         raise ValueError("data does not seem to contain a rheobase-latency fit (no 'fit' dict)")
 
-    x1 = fit.get("x", None)
-    y1 = fit.get("y", None)
+    x1 = getattr(fit, "x", None)
+    y1 = getattr(fit, "y", None)
 
     if any(not isinstance(v, np.ndarray) or v.size==0 for v in (x,y)):
         raise ValueError("data does not seem to contain a rheobase-latency fit (invalid fit x and y)")
 
-    Irh = result.get("Irh", None)
+    Irh = getattr(result, "Irh", None)
     if not isinstance(Irh, pq.Quantity) or Irh.size != 1 or not scq.checkElectricalCurrentUnits(Irh):
         raise ValueError("data does not seem to contain a rheobase-latency fit (invalid 'Irh')")
 
-    fittedIrh = fit.get("Irh", None)
-    τ = result.get("tau", result.get("τ", None))
+    fittedIrh = getattr(fit, "Irh", None)
+    τ = getattr(result, "τ", None)
 
     if not isinstance(τ, pq.Quantity) or τ.size != 1 or not scq.checkTimeUnits(τ):
         raise ValueError("data does not seem to contain a rheobase-latency fit (invalid 'τ')")
@@ -7925,7 +7933,7 @@ def plot_rheobase_latency(data,
 
     lbl = r"$\mathrm{\mathsf{I_{rheo}}}$"
 
-    rhtitle = f"{lbl} = {Irh[0]} (fitted: {fittedIrh})"
+    rhtitle = f"{lbl} = {Irh[0]} (fitted: {fittedIrh[0]}); time constant: {τ}"
 
     if title_prefix is None or (isinstance(title_prefix, str) and len(title_prefix.strip()) == 0):
         title = rhtitle
