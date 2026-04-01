@@ -8727,14 +8727,6 @@ anything else       anything else       ❌
                                       axis.listDataItems()))))
         if len(x0) and len(x1):
             yield np.nanmin(x0), np.nanmax(x1)
-#         else:
-#             x0 = None
-#         if len(x1):
-#             x1 = np.nanmin(x1)
-#         else:
-#             x1 = None
-#
-#         return (x0, x1)
 
     def _get_axis_view_X_range(self, axis: typing.Union[int, pg.PlotItem]) -> tuple:
         if isinstance(axis, int):
