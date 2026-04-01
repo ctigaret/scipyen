@@ -1379,7 +1379,7 @@ def fit_Frank_Fuortes(lat, I, fitrheo=False, xstart = 0, xend = 0.1, npts = 100)
 
     """
 
-    print(f"fit_Frank_Fuortes: xstart = {xstart}, xend = {xend}")
+    # print(f"fit_Frank_Fuortes: xstart = {xstart}, xend = {xend}")
 
     lat_ok = np.where(np.isfinite(lat))[0]
 

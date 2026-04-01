@@ -1771,28 +1771,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @safewrapper
     def _interpret_signal(self, obj, /, x=None, **kwargs):
         raise NotImplementedError(f"Plotting is not implemented for objects of type {type(x).__name__}")
-#         ret = dict( x = None,
-#                     y = None,
-#                     dataAxis = 0,
-#                     signalChannelAxis = kwargs.get("signalChannelAxis", 1),
-#                     frameAxis = kwargs.get("frameAxis", None),
-#                     frameIndex = kwargs.get("frameIndex", None),
-#                     _data_frames_ = 0,
-#                     _number_of_frames_ = 0,
-#                     signalChannelIndex = kwargs.get("signalChannelIndex", None),
-#                     irregularSignalChannelAxis = kwargs.get("irregularSignalChannelAxis", None),
-#                     irregularSignalChannelIndex = kwargs.get("irregularSignalChannelIndex", None),
-#                     separateSignalChannels = kwargs.get("separateSignalChannels", False),
-#                     signalIndex = kwargs.get("signalIndex", None),
-#                     irregularSignalIndex = kwargs.get("irregularSignalIndex", None),
-#                     globalAnnotations = kwargs.get("globalAnnotations", None),
-#                     )
-#
-#         return ret
-
 
     @_interpret_signal.register(neo.Block)
-    def __interpret_signal(self, obj:neo.Block, /, x, **kwargs):
+    def __interpret_signal(self, obj: neo.Block, /, x, **kwargs):
         self._yData_ = obj
         self._cached_title = getattr(y, "name", None)
 
@@ -1849,7 +1830,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
 
     @_interpret_signal.register(neo.Segment)
-    def __interpret_signal(self, obj:neo.Segment, /, x=None, **kwargs):
+    def __interpret_signal(self, obj: neo.Segment, /, x=None, **kwargs):
         # self._xData_ = None # NOTE: x can still be supplied externally
         self._yData_ = obj
         self._cached_title = getattr(y, "name", None)
@@ -1879,7 +1860,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     @_interpret_signal.register(neo.AnalogSignal)
     @_interpret_signal.register(DataSignal)
-    def __interpret_signal(self,obj, /, x = None, **kwargs):
+    def __interpret_signal(self, obj: typing.Union[neo.AnalogSignal, DataSignal], /,
+                           x = None, **kwargs):
         self._yData_ = obj
         self._cached_title = getattr(y, "name", None)
 
@@ -1925,7 +1907,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     @_interpret_signal.register(neo.IrregularlySampledSignal)
     @_interpret_signal.register(IrregularlySampledDataSignal)
-    def __interpret_signal(self, obj, /, x=None, **kwargs):
+    def __interpret_signal(self, obj: typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal], /,
+                           x=None, **kwargs):
         self._yData_ = obj
         self._cached_title = getattr(y, "name", None)
         self.frameIndex = range(1)
@@ -1962,7 +1945,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     @_interpret_signal.register(neo.Epoch)
     @_interpret_signal.register(DataZone)
-    def __interpret_signal(self, obj, /, x=None, **kwargs):
+    def __interpret_signal(self, obj: typing.Union[neo.Epoch, DataZone], /,
+                           x=None, **kwargs):
         self._yData_ = obj
         self._cached_title = getattr(y, "name", None)
         self.dataAxis = 0 # data as column vectors
@@ -1982,7 +1966,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @_interpret_signal.register(neo.Event)
     @_interpret_signal.register(DataMark)
     @_interpret_signal.register(TriggerEvent)
-    def __interpret_signal(self, obj, /, x=None, **kwargs):
+    def __interpret_signal(self, obj: typing.Union[neo.Event, DataMark, TriggerEvent], /,
+                           x=None, **kwargs):
         self._yData_ = obj
         self._cached_title = getattr(y, "name", None)
         self.dataAxis = 0 # data as column vectors
@@ -1992,17 +1977,20 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._n_signal_axes_ = 0
 
     @_interpret_signal.register(TriggerProtocol)
-    def __interpret_signal(self, obj, /, x=None, **kwargs):
+    def __interpret_signal(self, obj: TriggerProtocol, /,
+                           x=None, **kwargs):
         # TODO
         pass
 
     @_interpret_signal.register(neo.SpikeTrain)
-    def __interpret_signal(self, obj, /, x=None, **kwargs):
+    def __interpret_signal(self, obj: neo.SpikeTrain, /,
+                           x=None, **kwargs):
         # TODO
         pass
 
     @_interpret_signal.register(neo.core.spiketrainlist.SpikeTrainList)
-    def __interpret_signal(self, obj, /, x=None, **kwargs):
+    def __interpret_signal(self, obj: neo.core.spiketrainlist.SpikeTrainList, /,
+                           x=None, **kwargs):
         self._n_signal_axes_ = 0
         # self._xData_ = None
         self._yData_ = obj
@@ -2014,7 +2002,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
 
     @_interpret_signal.register(vigra.filters.Kernel1D)
-    def __interpret_signal(self, obj:vigra.filters.Kernel1D, /, x=None, **kwargs):
+    def __interpret_signal(self, obj: vigra.filters.Kernel1D, /,
+                           x=None, **kwargs):
         self._xData_, self._yData_ = kernel2array(obj)
         self._cached_title = "Vigra Kernel 1D"
         # self._plotEpochs_(clear=True)
@@ -2027,7 +2016,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._n_signal_axes_ = 1
 
     @_interpret_signal.register(np.ndarray)
-    def __interpret_signal(self, obj:np.ndarray, /, x=None, **kwargs):
+    def __interpret_signal(self, obj: np.ndarray, /, x=None, **kwargs):
         if x.ndim > 3:
             raise ValueError('Cannot plot data with more than 3 dimensions')
 
@@ -2225,7 +2214,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
 
     @safewrapper
-    def _plot_discrete_entities_(self, /, entities:typing.Union[dict, list, neo.core.spiketrainlist.SpikeTrainList],
+    def _plot_discrete_entities_(self, /, entities: typing.Union[dict, list, neo.core.spiketrainlist.SpikeTrainList],
                                  axis:pg.PlotItem, clear:bool=True,
                                  adapt_X_range:bool=True,
                                  minX:typing.Optional[float]=None,
@@ -2309,12 +2298,32 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
             elif all(isinstance(v, neo.SpikeTrain) for v in entities_list):
                 entities_axis.clear()
+                t_min = min(list(map(lambda t: t.t_start, entities_list)))
+                t_max = max(list(map(lambda t: t.t_start, entities_list)))
+
+                # NOTE: 2026-04-02 00:20:23
+                # ensure spikes are embedded in the full signal domain
+                axBounds = tuple(map(lambda ax: tuple(*self._get_axisXDataBounds(ax)), self.signalAxes))
+                if len(axBounds):
+                    minDataX = min(axBounds[0])
+                    maxDataX = max(axBounds[1])
+
+                else:
+                    minDataX = None
+                    maxDataX = None
+
                 for k_train, train in enumerate(entities_list):
                     data_name = getattr(train, "name", None)
                     data_name = data_name if isinstance(data_name, str) and len(data_name.strip()) else "%d" % k_train
 
                     x = train.times.magnitude.flatten() # vector
                     y = np.full(x.shape, height_interval * k_train + height_interval/2) # column vector
+
+                    # NOTE: 2026-04-02 00:20:51 see NOTE: 2026-04-02 00:20:23
+                    # ensuring spike axis  covers the full signal time domain
+                    if minDataX is not None and maxDataX is not None:
+                        x = np.hstack((minDataX, x, maxDataX))
+                        y = np.hstack((np.array([np.nan]), y, np.array([np.nan])))
 
                     self._plot_numeric_data_(entities_axis, x, y,
                                                 symbol=spikeTrainSymbol,
@@ -8704,7 +8713,30 @@ anything else       anything else       ❌
 
         return offset, scale
 
-    def _get_axis_view_X_range(self, axis:typing.Union[int, pg.PlotItem]) -> tuple:
+    def _get_axisXDataBounds(self, axis: typing.Union[int, pg.PlotItem]) -> tuple:
+        # generator!
+        x0 = np.array(list(map(lambda pdi: pdi.xData[0],
+                               filter(lambda i: (isinstance(i, pg.PlotDataItem)
+                                                 and isinstance(i.xData, np.ndarray)
+                                                 and i.xData.size > 0),
+                                      axis.listDataItems()))))
+        x1 = np.array(list(map(lambda pdi: pdi.xData[-1],
+                               filter(lambda i: (isinstance(i, pg.PlotDataItem)
+                                                 and isinstance(i.xData, np.ndarray)
+                                                 and i.xData.size > 0),
+                                      axis.listDataItems()))))
+        if len(x0) and len(x1):
+            yield np.nanmin(x0), np.nanmax(x1)
+#         else:
+#             x0 = None
+#         if len(x1):
+#             x1 = np.nanmin(x1)
+#         else:
+#             x1 = None
+#
+#         return (x0, x1)
+
+    def _get_axis_view_X_range(self, axis: typing.Union[int, pg.PlotItem]) -> tuple:
         if isinstance(axis, int):
             if axis not in range(len(self.axes)):
                 raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
@@ -9031,7 +9063,8 @@ anything else       anything else       ❌
         visibleAxes[-1].getAxis("bottom").setStyle(showValues = True)
 
     @safewrapper
-    def _plotSpikeTrains_(self, trains:typing.Optional[typing.Union[neo.SpikeTrain, neo.core.spiketrainlist.SpikeTrainList, tuple, list]] = None, clear:bool = False, plotLabelText = None, **kwargs):
+    def _plotSpikeTrains_(self, trains: typing.Optional[typing.Union[neo.SpikeTrain, neo.core.spiketrainlist.SpikeTrainList, tuple, list]] = None,
+                          clear:bool = False, plotLabelText = None, **kwargs):
         r"""Common landing zone for SpikeTrainList or collection of SpikeTrain.
         Actual plotting delegated to _plot_discrete_entities_.
         """
@@ -9054,7 +9087,7 @@ anything else       anything else       ❌
                 t_min = min(list(map(lambda t: t.t_start, obj_)))
                 t_max = max(list(map(lambda t: t.t_start, obj_)))
                 # NOTE: 2023-05-16 23:02:20:
-                # is this is a new frame, then call the actual function (_plot_discrete_entities_)
+                # is this is a new frame, then call _plot_discrete_entities_()
                 # otherwise, just set the entities axis visible
                 if self._new_frame_:
                     self._plot_discrete_entities_(obj_, axis=self._spiketrains_axis_, **kwargs)
@@ -9201,7 +9234,7 @@ anything else       anything else       ❌
         raise NotImplementedError(f"Objects of type {type(obj).__name__} are not supported")
 
     @_plot_data_.register(neo.Block)
-    def __plot_data_(self, obj:neo.Block, *args, **kwargs):
+    def __plot_data_(self, obj: neo.Block, *args, **kwargs):
         # NOTE: 2019-11-24 22:31:26
         # select a segment then delegate to _plotSegment_()
         # Segment selection is based on self.frameIndex, or on self.channelIndex
@@ -9229,7 +9262,7 @@ anything else       anything else       ❌
         self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
 
     @_plot_data_.register(neo.Segment)
-    def __plot_data_(self, obj:neo.Segment, *args, **kwargs):
+    def __plot_data_(self, obj: neo.Segment, *args, **kwargs):
         r"""Plots a neo.Segment.
         Plots the signals (optionally the selected ones) present in a segment,
         and the associated epochs, events, and spike trains.
@@ -9291,13 +9324,13 @@ anything else       anything else       ❌
         self.currentFrameAnnotations = {type(obj).__name__ : obj.annotations}
 
     @_plot_data_.register(neo.core.spiketrainlist.SpikeTrainList)
-    def __plot_data_(self, obj:neo.core.spiketrainlist.SpikeTrainList,
+    def __plot_data_(self, obj: neo.core.spiketrainlist.SpikeTrainList,
           *args, **kwargs):
         self._plotSpikeTrains_(obj)
         self.currentFrameAnnotations = {type(obj).__name__: [st.annotations for st in obj]}
 
     @_plot_data_.register(neo.SpikeTrain)
-    def __plot_data_(self, obj, *args, **kwargs):
+    def __plot_data_(self, obj: neo.SpikeTrain, *args, **kwargs):
         self._plotSpikeTrains_(obj)
         self.currentFrameAnnotations = {type(obj).__name__: obj.annotations}
 
@@ -9305,7 +9338,7 @@ anything else       anything else       ❌
     @_plot_data_.register(neo.IrregularlySampledSignal)
     @_plot_data_.register(DataSignal)
     @_plot_data_.register(IrregularlySampledDataSignal)
-    def __plot_data_(self, obj:typing.Union[neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal],
+    def __plot_data_(self, obj: typing.Union[neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal],
           *args, **kwargs):
         if self.frameAxis == 1:
             if self._current_frame_index_ in self.frameIndex:
@@ -9323,7 +9356,7 @@ anything else       anything else       ❌
 
     @_plot_data_.register(neo.Epoch)
     @_plot_data_.register(DataZone)
-    def __plot_data_(self, obj:typing.Union[neo.Epoch, DataZone],
+    def __plot_data_(self, obj: typing.Union[neo.Epoch, DataZone],
           *args, **kwargs):
         r""" Plots a single neo.Epoch
         NOTE: a single Epoch MAY contain several time intervals.
@@ -9346,7 +9379,7 @@ anything else       anything else       ❌
     @_plot_data_.register(neo.Event)
     @_plot_data_.register(DataMark)
     @_plot_data_.register(TriggerEvent)
-    def __plot_data_(self, obj:typing.Union[neo.Event, DataMark],
+    def __plot_data_(self, obj: typing.Union[neo.Event, DataMark],
           *args, **kwargs):
         r"""Plot stand-alone events"""
         if len(obj) == 0:
@@ -9358,7 +9391,7 @@ anything else       anything else       ❌
         self.currentFrameAnnotations = {type(obj).__name__: obj.annotations}
 
     @_plot_data_.register(np.ndarray)
-    def __plot_data_(self, obj:np.ndarray, *args, **kwargs):
+    def __plot_data_(self, obj: np.ndarray, *args, **kwargs):
         # print(f"{self.__class__.__name__}._plot_data_(obj<{type(obj).__name__}> dims: {obj.ndim})")
         try:
             if obj.ndim > 3:
@@ -9427,7 +9460,7 @@ anything else       anything else       ❌
     @_plot_data_.register(tuple)
     @_plot_data_.register(list)
     @_plot_data_.register(NeoObjectList)
-    def __plot_data_(self, obj:typing.Union[tuple, list, NeoObjectList],
+    def __plot_data_(self, obj: typing.Union[tuple, list, NeoObjectList],
           *args, **kwargs):
         if len(obj) == 0:
             return False
@@ -10407,7 +10440,7 @@ anything else       anything else       ❌
             in a single matrix due to shape constraints. NOTE: In this case you
             should clear the plotitem (the axis) beforehand.
 
-        xUnots, yUnits (optional) pq.Quantity or pq.UnitQuantity
+        xUnits, yUnits (optional) pq.Quantity or pq.UnitQuantity
 
         args, kwargs: additional parameters for PlotItem.plot() function (and
             indirectly PlotDataItem constructor and methods).
