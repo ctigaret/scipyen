@@ -1354,6 +1354,9 @@ def fit_Frank_Fuortes(lat, I, fitrheo=False, xstart = 0, xend = 0.1, npts = 100)
             I = 1/f(latency)
 
     """
+
+    print(f"fit_Frank_Fuortes: xstart = {xstart}, xend = {xend}")
+
     lat_ok = np.where(np.isfinite(lat))[0]
 
     delay = np.nanmin(lat)
@@ -1450,18 +1453,18 @@ def fit_Frank_Fuortes(lat, I, fitrheo=False, xstart = 0, xend = 0.1, npts = 100)
 def rheobase_latency(*args, **kwargs):
     r""" Frank & Fuortes (1956) Strength-latency analysis.
 
-        Calculates rheobase and membrane time constant by fitting on
-        1st AP latency vs injected current data.
+    Calculates rheobase and membrane time constant by fitting on
+    1st AP latency vs injected current data.
 
-        Always works on the first detected AP in the train!
+    Always works on the first detected AP in the train!
 
-        References:
+    References:
 
-        Frank & Fuortes (1956) Stimulation of spinal motoneurones with
-        intracellular electrodes. J.Physiol. 134, 451-470
+    Frank & Fuortes (1956) Stimulation of spinal motoneurones with
+    intracellular electrodes. J.Physiol. 134, 451-470
 
-        Spencer & Kandel (1961) Electrophysiology of hippocampal neurons:
-        III. Firing level and time constant. J. Neurophysiol. 24(3), 260-271
+    Spencer & Kandel (1961) Electrophysiology of hippocampal neurons:
+    III. Firing level and time constant. J. Neurophysiol. 24(3), 260-271
 
     Var-positional parameters:
     --------------------------
@@ -1550,6 +1553,12 @@ def rheobase_latency(*args, **kwargs):
             y
                 the fitted curve in the interval 0 .. 0.1 s at 50 points
                 (see NOTE (2))
+
+    TODO:
+        • simplify, do away with plot parameter
+        • to return a result type inheriting from dataclass (uniform across Scipyen)
+        • update docstring, include LaTeX rendering
+
 
     NOTE (1):
         Equation (1) is used for the determination of the membrane time-constant
@@ -1643,25 +1652,24 @@ def rheobase_latency(*args, **kwargs):
         # i.e. their metadata are identical
         # TODO/FIXME: maybe migrate away from a dict (OrderedDict) to a Class
         for param in metadata.keys():
-            assert(len(utilities.unique([a[param] for a in args])) == 1), f"Values of var-positional parameters have different {patam} fields "
+            assert(len(utilities.unique([a[param] for a in args])) == 1), f"Values of var-positional parameters have different {param} fields "
             metadata[param] = args[0][param]
 
         # NOTE: 2024-01-19 10:50:56
         # generate a fused latency vs Iinj signal
-        latencies = neoutils.fuse_irregular_signals(*[a["First_AP_latency"] for a in args], name="First AP latency")
+        latencies = neoutils.fuse_irregular_signals(*[a["First_AP_latency"] for a in args], name="First AP Latency")
 
     elif all(isinstance(a, IrregularlySampledDataSignal) and scq.checkElectricalCurrentUnits(a.times.units) and scq.checkTimeUnits(a.units) for a in args):
         assert(all(a.shape[0] >= minsteps for a in args)), f"All records must have at least {minsteps} current injection steps"
         # NOTE: the approach here is that we cannot check if data comes from the same source
         # unless we annotate those signals in the first place (in the code for analyse_AP_step_injection_series)
         if len(args) > 1: # assume individual First_AP_latency objects from a series of results
-            latencies = neoutils.fuse_irregular_signals(*args, name="First AP latency")
+            latencies = neoutils.fuse_irregular_signals(*args, name="First AP Latency")
 
         else:
             latencies = args[0]
 
     Iinj_mean = latencies.times # same as latencies.domain, as latencies is a IrregularlySampledDataSignal
-    latencies_mean = latencies.flatten()
 
     plot = kwargs.pop("plot", False)
 
@@ -1677,15 +1685,13 @@ def rheobase_latency(*args, **kwargs):
 
     fitrheo = kwargs.get("fitrheo", False)
 
-    xstart = kwargs.get("xstart", 0)
+    xstart = kwargs.get("xstart", None)# latencies.min())
 
     # print(f"rheobase_latency: \n\tIinj_mean = {Iinj_mean.magnitude} \n\tlatencies_mean = {latencies_mean.magnitude}")
 
     if isinstance(xstart, pq.Quantity):
-        # if not unitsConvertible(xstart, latencies_mean.units):
         if not unitsConvertible(xstart, latencies.units):
             raise TypeError("'xstart' expected to have %s units; instead it has %s" % (latencies.units, xstart.units))
-            # raise TypeError("'xstart' expected to have %s units; instead it has %s" % (latencies_mean.units, xstart.units))
 
         if xstart.units != pq.s:
             xstart = xstart.rescale(pq.s)
@@ -1693,16 +1699,17 @@ def rheobase_latency(*args, **kwargs):
     elif isinstance(xstart, numbers.Real):
         xstart *= pq.s
 
-    elif xstart is not None:
+    elif xstart is None:
+        xstart = np.nanmin(latencies)
+
+    else: #if xstart is not None:
         raise TypeError("'xstart' expected to be a float scalar, a Quantity, or None; got %s instead" % type(xstart).__name__)
 
-    xend = kwargs.get("xend", 0)
+    xend = kwargs.get("xend", None)
 
     if isinstance(xend, pq.Quantity):
-        # if not unitsConvertible(xstart, latencies_mean.units):
         if not unitsConvertible(xstart, latencies.units):
             raise TypeError("'xend' expected to have %s units; instead it has %s" % (latencies.units, xend.units))
-            # raise TypeError("'xend' expected to have %s units; instead it has %s" % (latencies_mean.units, xend.units))
 
         if xend.units != pq.s:
             xend = xend.rescale(pq.s)
@@ -1710,14 +1717,24 @@ def rheobase_latency(*args, **kwargs):
     elif isinstance(xend, numbers.Real):
         xend *= pq.s
 
-    elif xend is not None:
+    elif xend is None:
+        xend = np.nanmax(latencies)
+
+    else: #if xend is not None:
         raise TypeError("'xend' expected to be a float scalar, a Quantity, or None; got %s instead" % type(xend).__name__)
 
-    kwargs["xstart"] = xstart.magnitude
-    kwargs["xend"] = xend.magnitude
+    # kwargs["xstart"] = xstart.magnitude
+    # kwargs["xend"] = xend.magnitude
+    # kwargs["fitrheo"] = fitrheo
+
+    # CAUTION: 2026-04-01 14:30:11
+    # latencies are Time vs injected current ! (NOT vice-versa!!!)
+    # so, latencies.times are in fact injected current (usually, pA)
+    # whereas latencies are time values (the "signal")
 
     irheo, fit_tau, fit_rheobase, popt, rsq, sst, sse, pcov, perr, ii, xx, yy = \
-        fit_Frank_Fuortes(latencies.magnitude, latencies.times.magnitude, **kwargs)
+        fit_Frank_Fuortes(latencies.magnitude, latencies.times.magnitude,
+                          fitrheo = fitrheo, xstart = xstart.magnitude, xend = xend.magnitude)
 
     if xx is not None and yy is not None:
         # if latencies_mean.units != pq.s:
@@ -1728,25 +1745,21 @@ def rheobase_latency(*args, **kwargs):
 
     ret = collections.OrderedDict()
 
-    # NOTE: 2024-01-19 13:21:41
-    # DEPRECATED
-
-    # ret["Name"] = "rheobase_latency_analysis"
-
-#     ret["I"]   = IrregularlySampledDataSignal(signal = latencies.times,
-#                                                  domain = [k for k in range(len(args[0]["Injected_current"]))],
-#                                                  units = latencies.times.units,
-#                                                  domain_units = pq.dimensionless)
-#
-#     ret["Latency"] = IrregularlySampledDataSignal(signal = latencies,
-#                                                      domain = [k for k in range(len(args[0]["Injected_current"]))],
-#                                                      units = latencies.units,
-#                                                      domain_units = pq.dimensionless)
-
-    # ret["Latency_v_Iinj"] = latencies
-
     ret["Irh"] = np.array([irheo]) * latencies.domain.units
     ret["tau"] = np.array([fit_tau]) * pq.s
+
+    if not fitrheo:
+        i_irh = latencies.times.magnitude/ret["Irh"].magnitude
+        # generate latency vs I/Irh (relative strength)
+        ret["I_Irh"] = IrregularlySampledDataSignal(
+                            signal = latencies.magnitude, # this is time!
+                            domain = i_irh, # dimensionless
+                            units = latencies.units,
+                            domain_units = pq.dimensionless, # time units !
+                            domain_name = "I/Irh",
+                            name = "First AP Latency")
+
+        ret["I_Irh"].domain_name = "I/Irh"
 
     ret["fit"] = collections.OrderedDict()
 
@@ -7425,9 +7438,11 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
 
     rheoargs["fitrheo"] = kwargs.pop("fitrheo", False)
 
-    rheoargs["xstart"] = kwargs.pop("xstart", 0)
+    # rheoargs["xstart"] = kwargs.pop("xstart", 0)
+    rheoargs["xstart"] = kwargs.pop("xstart", None)
 
-    rheoargs["xend"] = kwargs.pop("xend", 0.1)
+    rheoargs["xend"] = kwargs.pop("xend", None)
+    # rheoargs["xend"] = kwargs.pop("xend", 0.1)
 
     rheoargs["npts"] = kwargs.pop("npts", 100)
 
@@ -7811,242 +7826,355 @@ def plot_rheobase_latency(data,
 
     #print("xstart", xstart, "xend", xend)
 
-    if isinstance(data, dict):
-        if "Summary" in data and isinstance(data["Summary"], dict):
-            # produced by data from sevral trials ?!?
-            if "fit" in data["Summary"] and isinstance(data["Summary"]["fit"], dict):
-                data = data["Summary"]
+    if not isinstance(data, dict) or len(data) == 0:
+        raise ValueError("data does not seem to contain a rheobase-latency fit")
 
-            else:
-                raise ValueError("data does not seem to contain a rheobase-latency fit")
+    latencies = data.get("Latencies", None)
 
-        elif "rheobase_analysis" in data and isinstance(data["rheobase_analysis"], dict):
-            if "fit" in data["rheobase_analysis"] and isinstance(data["rheobase_analysis"]["fit"], dict):
-                data = data["rheobase_analysis"]
+    if (not isinstance(latencies, IrregularlySampledDataSignal)
+        or latencies.size == 0 or latencies.ndim != 2
+        or not scq.checkTimeUnits(latencies)
+        or not scq.checkElectricalCurrentUnits(latencies.times)
+        ):
+        raise ValueError("data does not seem to contain a rheobase-latency fit (no 'Latencies')")
 
-            else:
-                raise ValueError("data does not seem to contain a rheobase-latency fit")
 
-        elif "First_AP_latency" in data:
-            data = data["First_AP_latency"]
+    result = data.get("Result", None)
+    if not isinstance(result, dict) or len(result) == 0:
+        raise ValueError("data does not seem to contain a rheobase-latency fit (no 'Result' dict)")
 
-        elif all([v in data for v in ("I", "Latency", "Irh", "Name", "fitrheo")]):
-            if "fit" not in data or not isinstance(data["fit"], dict):
-                raise ValueError("data does not seem to contain a rheobase-latency fit")
+    fitrheo = result.get("fitrheo", None)
+    if not isinstance(fitrheo, bool):
+        raise ValueError("data does not seem to contain a rheobase-latency fit (no 'fitrheo' flag)")
 
-            if data["Name"] != "rheobase_latency_analysis":
-                raise ValueError("data does not seem to contain a rheobase-latency fit")
+    if not fitrheo:
+        I_Irh = result.get("I_Irh", None)
+        if not isinstance(I_Irh, IrregularlySampledDataSignal) or I_Irh.size == 0:
+            raise ValueError("data does not seem to contain a rheobase-latency fit (invalid 'I-Irh')")
 
-        elif all([v in data for v in ("Irh", "tau", "fit", "fitrheo", "metadata", "plot_data")]):
-            fitrheo = data["fitrheo"]
-            x = data["plot_data"]["X"]
-            y = data["plot_data"]["Y"]
-            x1 = data["plot_data"]["Xfit"]
-            y1 = data["plot_data"]["Yfit"]
-            Irh = data["fit"]["Irh"]
-            tau = data["tau"]
-            x_units = tau.units
-            y_units = Irh.units
-
-            if all(isinstance(x, numbers.Number) for x in (xstart, xend)) and all([np.isinf(x) for x in (xstart, xend)]):
-                ndx = ~np.isnan(x)
-                x1 = x1[ndx,]
-                y1 = y1[ndx,]
-
-            else:
-                if xstart is None:
-                    xstart = 0
-
-                elif xstart == "auto":
-                    xstart = x[y.argmax()]
-
-                elif not isinstance(xstart, (float, int)):
-                    raise TypeError(f"'xstart' expected to be None, a float (in s) or the string 'auto'; got {xstart} instead")
-
-                if xend in (None, "auto"):
-                    xend = np.nanmax(x)
-
-                elif not isinstance(xend, (float, int)):
-                    raise TypeError(f"'xend' expected to be None, a float (in s) or the string 'auto'; got {xend} instead")
-
-            if isinstance(fig, mpl.figure.Figure):
-                plt.figure(fig)
-
-            plt.clf() # this will also create a new figure when fig is None
-
-            if not fitrheo:
-                # y is fit of I/Irh
-                plt.plot(x, y, "o", label="Strength vs Latency")
-                plt.plot(x1,y1, label="Fitted Strength vs Latency")
-                plt.ylabel(r"$\mathrm{\mathsf{I}} \/ / \/\mathrm{\mathsf{I_{rheo}}}$")
-
-            else:
-                # y is fit of I
-                plt.plot(x, y, "o", label="Current vs Latency")
-                plt.plot(x1,y1, label = "Fitted Current vs Latency")
-                plt.ylabel(r"$\mathrm{\mathsf{I}\ (%s)}$" % y_units.dimensionality)
-
-            plt.xlabel("Latency (%s)" % x_units.dimensionality)
-
-            lbl = r"$\mathrm{\mathsf{I_{rheo}}}$"
-            if title_prefix is None or (isinstance(title_prefix, str) and len(title_prefix.strip()) == 0):
-                title = f"{lbl} = {Irh[0]}"
-            else:
-                title = f"{title_prefix} {lbl} = {Irh[0]}"
-            plt.title(title)
-            # plt.title(f"{lbl} = {rad['Irh'][0]}")
-            plt.legend()
-
-            return plt.gca()
-
-        else:
-            raise ValueError("data does not seem to contain a rheobase-latency fit")
-
-    if isinstance(data, dict):
-        if "Latency_v_Iinj" in data.keys() and isinstance(data["Latency_v_Iinj"], IrregularlySampledDataSignal):
-            if not scq.checkTimeUnits(data["Latency_v_Iinj"].units):
-                raise ValueError(f"Wrong units {data['Latency_v_Iinj'].units} in the latency v current injection signal")
-
-            if not scq.checkElectricalCurrentUnits(data["Latency_v_Iinj"].domain.units):
-                raise ValueError(f"Wrong domain units {data['Latency_v_Iinj'].domain.units} in the latency v current injection signal")
-
-            x = data["Latency_v_Iinj"].domain.magnitude
-            x_units = data["Latency_v_Iinj"].domain.units
-
-            y = data["Latency_v_Iinj"].magnitude
-            y_units = data["Latency_v_Iinj"].units
-
-        elif all(k in data.keys() for k in ("Latency", "I")):
-            if not isinstance(data["Latency"], IrregularlySampledDataSignal):
-                raise TypeError(f"Latency per steps expected to be an  IrregularlySampledDataSignal; got {type(data['Latency']).__name__} instead")
-            if not scq.checkTimeUnits(data["Latency"].units):
-                raise ValueError(f"Wrong units {data['Latency'].units} for latencies")
-
-            x = data["Latency"].magnitude
-            x_units = data["Latency"].units
-
-            if not isinstance(data["I"], IrregularlySampledDataSignal):
-                raise TypeError(f"Injected current per steps expected to be an  IrregularlySampledDataSignal; got {type(data['I']).__name__} instead")
-            if not scq.checkElectricalCurrentUnits(data["I"].units):
-                raise ValueError(f"Wrong units {data['I'].units} for injected current")
-
-            y = data["I"].magnitude
-            y_units = data["I"].units
-
-        else:
-            raise ValueError("Cannot find latency vs current magnitude data in the 'data' argument")
-
-        fit = data.get("fit", None)
-
-        if not isinstance(fit, dict):
-            raise ValueError("Latency vs current data has not been yet fitted")
-
-        assert(all(k in fit.keys() for k in ("x", "y", "parameters", "Irh"))), "This does not seem to be a fitted latency v current data"
-
-        fitrheo = data.get("fitrheo", False)
-
-        if not isinstance(fitrheo, bool):
-            fitrheo = False
-
-    elif isinstance(data, IrregularlySampledDataSignal):
-        assert(scq.checkElectricalCurrentUnits(data.domain.units) and scq.checkTimeUnits(data.units)), "Data does not seem to be a latency vs injected current signal"
-        # NOTE: 2024-01-19 12:56:51
-        # check for existence of rheobase-latency fit in the signal's annotations'
-        rheolat = data.annotations.get("rheobase_latency_analysis", None)
-
-        if not isinstance(rheolat, dict):
-            raise ValueError("The rheobase-latency signal has not been fitted yet")
-
-        fit = rheolat.get("fit", None)
-
-        if not isinstance(fit, dict):
-            raise ValueError("Latency vs current data has not been yet fitted")
-
-        assert(all(k in fit.keys() for k in ("x", "y", "parameters", "Irh"))), "This does not seem to be a fitted latency v current data"
-
-        fitrheo = rheolat.get("fitrheo", False)
-
-        if not isinstance(fitrheo, bool):
-            fitrheo = False
-
-        y = data.domain.magnitude
-        y_units = data.domain.units
-
-        x = data.magnitude
-        x_units = data.units
+        x = I_Irh.magnitude
+        y = I_Irh.times.magnitude
 
     else:
-        raise TypeError(f"Wrong data type {type(data).__name__}")
+        x = latencies.magnitude
+        y = latencies.times.magnitude
 
-    try:
-        if all(isinstance(x, numbers.Number) for x in (xstart, xend)) and all([np.isinf(x) for x in (xstart, xend)]):
-            ndx = ~np.isnan(fit["x"])
-            x1 = fit["x"][ndx]
-            y1 = fit["y"][ndx]
+    fit = result.get("fit", None)
 
-        else:
-            if xstart is None:
-                xstart = 0
+    if not isinstance(fit, dict) or len(fit) == 0:
+        raise ValueError("data does not seem to contain a rheobase-latency fit (no 'fit' dict)")
 
-            elif xstart == "auto":
-                xstart = x[y.argmax()]
+    x1 = fit.get("x", None)
+    y1 = fit.get("y", None)
 
-            elif not isinstance(xstart, (float, int)):
-                raise TypeError(f"'xstart' expected to be None, a float (in s) or the string 'auto'; got {xstart} instead")
+    if any(not isinstance(v, np.ndarray) or v.size==0 for v in (x,y)):
+        raise ValueError("data does not seem to contain a rheobase-latency fit (invalid fit x and y)")
 
-            if xend in (None, "auto"):
-                xend = np.nanmax(x)
+    Irh = result.get("Irh", None)
+    if not isinstance(Irh, pq.Quantity) or Irh.size != 1 or not scq.checkElectricalCurrentUnits(Irh):
+        raise ValueError("data does not seem to contain a rheobase-latency fit (invalid 'Irh')")
 
-            elif not isinstance(xend, (float, int)):
-                raise TypeError(f"'xend' expected to be None, a float (in s) or the string 'auto'; got {xend} instead")
+    fittedIrh = fit.get("Irh", None)
+    τ = result.get("tau", result.get("τ", None))
 
-            #print("xstart", xstart, "xend", xend)
+    if not isinstance(τ, pq.Quantity) or τ.size != 1 or not scq.checkTimeUnits(τ):
+        raise ValueError("data does not seem to contain a rheobase-latency fit (invalid 'τ')")
 
-            popt = fit["parameters"]
+    x_units = τ.units
+    y_units = Irh.units
 
-            x1 = np.linspace(xstart, xend, 100)
+    if all(isinstance(x, numbers.Number) for x in (xstart, xend)) and all([np.isinf(x) for x in (xstart, xend)]):
+        ndx = ~np.isnan(x)
+        x1 = x1[ndx,]
+        y1 = y1[ndx,]
 
-            if fitrheo:
-                y1 = 1/models.Frank_Fuortes2(x1, *popt)
+    else:
+        if xstart is None:
+            xstart = 0
 
-            else:
-                y1 = 1/models.Frank_Fuortes(x1, *popt)
+        elif xstart == "auto":
+            xstart = x[y.argmax()]
 
-        Irh = fit["Irh"]
+        elif not isinstance(xstart, (float, int)):
+            raise TypeError(f"'xstart' expected to be None, a float (in s) or the string 'auto'; got {xstart} instead")
 
-        if isinstance(fig, mpl.figure.Figure):
-            plt.figure(fig)
+        if xend in (None, "auto"):
+            xend = np.nanmax(x)
 
-        plt.clf() # this will also create a new figure when fig is None
+        elif not isinstance(xend, (float, int)):
+            raise TypeError(f"'xend' expected to be None, a float (in s) or the string 'auto'; got {xend} instead")
 
-        if not fitrheo:
-            # y is fit of I/Irh
-            plt.plot(x, y/Irh.magnitude, "o", label="Strength vs Latency")
-            plt.plot(x1,y1, label="Fitted Strength vs Latency")
-            plt.ylabel(r"$\mathrm{\mathsf{I}} \/ / \/\mathrm{\mathsf{I_{rheo}}}$")
+    if isinstance(fig, mpl.figure.Figure):
+        plt.figure(fig)
 
-        else:
-            # y is fit of I
-            plt.plot(x, y, "o", label="Current vs Latency")
-            plt.plot(x1,y1, label = "Fitted Current vs Latency")
-            plt.ylabel(r"$\mathrm{\mathsf{I}\ (%s)}$" % y_units.dimensionality)
+    plt.clf() # this will also create a new figure when fig is None
 
-        plt.xlabel("Latency (%s)" % x_units.dimensionality)
+    if not fitrheo:
+        # y is fit of I/Irh
+        plt.plot(x, y, "o", label="Strength vs Latency")
+        plt.plot(x1,y1, label="Fitted Strength vs Latency")
+        plt.ylabel(r"$\mathrm{\mathsf{I}} \/ / \/\mathrm{\mathsf{I_{rheo}}}$")
 
-        lbl = r"$\mathrm{\mathsf{I_{rheo}}}$"
-        if title_prefix is None or (isinstance(title_prefix, str) and len(title_prefix.strip()) == 0):
-            title = f"{lbl} = {Irh[0]}"
-        else:
-            title = f"{title_prefix} {lbl} = {Irh[0]}"
-        plt.title(title)
-        # plt.title(f"{lbl} = {rad['Irh'][0]}")
-        plt.legend()
+    else:
+        # y is fit of I
+        plt.plot(x, y, "o", label="Current vs Latency")
+        plt.plot(x1,y1, label = "Fitted Current vs Latency")
+        plt.ylabel(r"$\mathrm{\mathsf{I}\ (%s)}$" % y_units.dimensionality)
 
-        return plt.gca()
+    plt.xlabel("Latency (%s)" % x_units.dimensionality)
 
-    except Exception as e:
-        print("data does not seem to contain a rheobase-latency fit")
-        raise
+    lbl = r"$\mathrm{\mathsf{I_{rheo}}}$"
+
+    rhtitle = f"{lbl} = {Irh[0]} (fitted: {fittedIrh})"
+
+    if title_prefix is None or (isinstance(title_prefix, str) and len(title_prefix.strip()) == 0):
+        title = rhtitle
+    else:
+        title = f"{title_prefix} {rhtitle}"
+    plt.title(title)
+    # plt.title(f"{lbl} = {rad['Irh'][0]}")
+    plt.legend()
+
+    return plt.gca()
+
+        # if not all(k in data for k in ("Irh", "tau", "fit"))
+
+    # if isinstance(data, dict):
+    #     if "Summary" in data and isinstance(data["Summary"], dict):
+    #         # produced by data from sevral trials ?!?
+    #         if "fit" in data["Summary"] and isinstance(data["Summary"]["fit"], dict):
+    #             data = data["Summary"]
+    #
+    #         else:
+    #             raise ValueError("data does not seem to contain a rheobase-latency fit")
+    #
+    #     elif "rheobase_analysis" in data and isinstance(data["rheobase_analysis"], dict):
+    #         if "fit" in data["rheobase_analysis"] and isinstance(data["rheobase_analysis"]["fit"], dict):
+    #             data = data["rheobase_analysis"]
+    #
+    #         else:
+    #             raise ValueError("data does not seem to contain a rheobase-latency fit")
+    #
+    #     elif "First_AP_latency" in data:
+    #         data = data["First_AP_latency"]
+    #
+    #     elif all([v in data for v in ("I", "Latency", "Irh", "Name", "fitrheo")]):
+    #         if "fit" not in data or not isinstance(data["fit"], dict):
+    #             raise ValueError("data does not seem to contain a rheobase-latency fit")
+    #
+    #         if data["Name"] != "rheobase_latency_analysis":
+    #             raise ValueError("data does not seem to contain a rheobase-latency fit")
+    #
+    #     elif all([v in data for v in ("Irh", "tau", "fit", "fitrheo", "metadata", "plot_data")]):
+    #         fitrheo = data["fitrheo"]
+    #         x = data["plot_data"]["X"]
+    #         y = data["plot_data"]["Y"]
+    #         x1 = data["plot_data"]["Xfit"]
+    #         y1 = data["plot_data"]["Yfit"]
+    #         Irh = data["fit"]["Irh"]
+    #         tau = data["tau"]
+    #         x_units = tau.units
+    #         y_units = Irh.units
+    #
+    #         if all(isinstance(x, numbers.Number) for x in (xstart, xend)) and all([np.isinf(x) for x in (xstart, xend)]):
+    #             ndx = ~np.isnan(x)
+    #             x1 = x1[ndx,]
+    #             y1 = y1[ndx,]
+    #
+    #         else:
+    #             if xstart is None:
+    #                 xstart = 0
+    #
+    #             elif xstart == "auto":
+    #                 xstart = x[y.argmax()]
+    #
+    #             elif not isinstance(xstart, (float, int)):
+    #                 raise TypeError(f"'xstart' expected to be None, a float (in s) or the string 'auto'; got {xstart} instead")
+    #
+    #             if xend in (None, "auto"):
+    #                 xend = np.nanmax(x)
+    #
+    #             elif not isinstance(xend, (float, int)):
+    #                 raise TypeError(f"'xend' expected to be None, a float (in s) or the string 'auto'; got {xend} instead")
+    #
+    #         if isinstance(fig, mpl.figure.Figure):
+    #             plt.figure(fig)
+    #
+    #         plt.clf() # this will also create a new figure when fig is None
+    #
+    #         if not fitrheo:
+    #             # y is fit of I/Irh
+    #             plt.plot(x, y, "o", label="Strength vs Latency")
+    #             plt.plot(x1,y1, label="Fitted Strength vs Latency")
+    #             plt.ylabel(r"$\mathrm{\mathsf{I}} \/ / \/\mathrm{\mathsf{I_{rheo}}}$")
+    #
+    #         else:
+    #             # y is fit of I
+    #             plt.plot(x, y, "o", label="Current vs Latency")
+    #             plt.plot(x1,y1, label = "Fitted Current vs Latency")
+    #             plt.ylabel(r"$\mathrm{\mathsf{I}\ (%s)}$" % y_units.dimensionality)
+    #
+    #         plt.xlabel("Latency (%s)" % x_units.dimensionality)
+    #
+    #         lbl = r"$\mathrm{\mathsf{I_{rheo}}}$"
+    #         if title_prefix is None or (isinstance(title_prefix, str) and len(title_prefix.strip()) == 0):
+    #             title = f"{lbl} = {Irh[0]}"
+    #         else:
+    #             title = f"{title_prefix} {lbl} = {Irh[0]}"
+    #         plt.title(title)
+    #         # plt.title(f"{lbl} = {rad['Irh'][0]}")
+    #         plt.legend()
+    #
+    #         return plt.gca()
+    #
+    #     else:
+    #         raise ValueError("data does not seem to contain a rheobase-latency fit")
+
+    # if isinstance(data, dict):
+    #     if "Latency_v_Iinj" in data.keys() and isinstance(data["Latency_v_Iinj"], IrregularlySampledDataSignal):
+    #         if not scq.checkTimeUnits(data["Latency_v_Iinj"].units):
+    #             raise ValueError(f"Wrong units {data['Latency_v_Iinj'].units} in the latency v current injection signal")
+    #
+    #         if not scq.checkElectricalCurrentUnits(data["Latency_v_Iinj"].domain.units):
+    #             raise ValueError(f"Wrong domain units {data['Latency_v_Iinj'].domain.units} in the latency v current injection signal")
+    #
+    #         x = data["Latency_v_Iinj"].domain.magnitude
+    #         x_units = data["Latency_v_Iinj"].domain.units
+    #
+    #         y = data["Latency_v_Iinj"].magnitude
+    #         y_units = data["Latency_v_Iinj"].units
+    #
+    #     elif all(k in data.keys() for k in ("Latency", "I")):
+    #         if not isinstance(data["Latency"], IrregularlySampledDataSignal):
+    #             raise TypeError(f"Latency per steps expected to be an  IrregularlySampledDataSignal; got {type(data['Latency']).__name__} instead")
+    #         if not scq.checkTimeUnits(data["Latency"].units):
+    #             raise ValueError(f"Wrong units {data['Latency'].units} for latencies")
+    #
+    #         x = data["Latency"].magnitude
+    #         x_units = data["Latency"].units
+    #
+    #         if not isinstance(data["I"], IrregularlySampledDataSignal):
+    #             raise TypeError(f"Injected current per steps expected to be an  IrregularlySampledDataSignal; got {type(data['I']).__name__} instead")
+    #         if not scq.checkElectricalCurrentUnits(data["I"].units):
+    #             raise ValueError(f"Wrong units {data['I'].units} for injected current")
+    #
+    #         y = data["I"].magnitude
+    #         y_units = data["I"].units
+    #
+    #     else:
+    #         raise ValueError("Cannot find latency vs current magnitude data in the 'data' argument")
+    #
+    #     fit = data.get("fit", None)
+    #
+    #     if not isinstance(fit, dict):
+    #         raise ValueError("Latency vs current data has not been yet fitted")
+    #
+    #     assert(all(k in fit.keys() for k in ("x", "y", "parameters", "Irh"))), "This does not seem to be a fitted latency v current data"
+    #
+    #     fitrheo = data.get("fitrheo", False)
+    #
+    #     if not isinstance(fitrheo, bool):
+    #         fitrheo = False
+    #
+    # elif isinstance(data, IrregularlySampledDataSignal):
+    #     assert(scq.checkElectricalCurrentUnits(data.domain.units) and scq.checkTimeUnits(data.units)), "Data does not seem to be a latency vs injected current signal"
+    #     # NOTE: 2024-01-19 12:56:51
+    #     # check for existence of rheobase-latency fit in the signal's annotations'
+    #     rheolat = data.annotations.get("rheobase_latency_analysis", None)
+    #
+    #     if not isinstance(rheolat, dict):
+    #         raise ValueError("The rheobase-latency signal has not been fitted yet")
+    #
+    #     fit = rheolat.get("fit", None)
+    #
+    #     if not isinstance(fit, dict):
+    #         raise ValueError("Latency vs current data has not been yet fitted")
+    #
+    #     assert(all(k in fit.keys() for k in ("x", "y", "parameters", "Irh"))), "This does not seem to be a fitted latency v current data"
+    #
+    #     fitrheo = rheolat.get("fitrheo", False)
+    #
+    #     if not isinstance(fitrheo, bool):
+    #         fitrheo = False
+    #
+    #     y = data.domain.magnitude
+    #     y_units = data.domain.units
+    #
+    #     x = data.magnitude
+    #     x_units = data.units
+    #
+    # else:
+    #     raise TypeError(f"Wrong data type {type(data).__name__}")
+    #
+    # try:
+    #     if all(isinstance(x, numbers.Number) for x in (xstart, xend)) and all([np.isinf(x) for x in (xstart, xend)]):
+    #         ndx = ~np.isnan(fit["x"])
+    #         x1 = fit["x"][ndx]
+    #         y1 = fit["y"][ndx]
+    #
+    #     else:
+    #         if xstart is None:
+    #             xstart = 0
+    #
+    #         elif xstart == "auto":
+    #             xstart = x[y.argmax()]
+    #
+    #         elif not isinstance(xstart, (float, int)):
+    #             raise TypeError(f"'xstart' expected to be None, a float (in s) or the string 'auto'; got {xstart} instead")
+    #
+    #         if xend in (None, "auto"):
+    #             xend = np.nanmax(x)
+    #
+    #         elif not isinstance(xend, (float, int)):
+    #             raise TypeError(f"'xend' expected to be None, a float (in s) or the string 'auto'; got {xend} instead")
+    #
+    #         #print("xstart", xstart, "xend", xend)
+    #
+    #         popt = fit["parameters"]
+    #
+    #         x1 = np.linspace(xstart, xend, 100)
+    #
+    #         if fitrheo:
+    #             y1 = 1/models.Frank_Fuortes2(x1, *popt)
+    #
+    #         else:
+    #             y1 = 1/models.Frank_Fuortes(x1, *popt)
+    #
+    #     Irh = fit["Irh"]
+    #
+    #     if isinstance(fig, mpl.figure.Figure):
+    #         plt.figure(fig)
+    #
+    #     plt.clf() # this will also create a new figure when fig is None
+    #
+    #     if not fitrheo:
+    #         # y is fit of I/Irh
+    #         plt.plot(x, y/Irh.magnitude, "o", label="Strength vs Latency")
+    #         plt.plot(x1,y1, label="Fitted Strength vs Latency")
+    #         plt.ylabel(r"$\mathrm{\mathsf{I}} \/ / \/\mathrm{\mathsf{I_{rheo}}}$")
+    #
+    #     else:
+    #         # y is fit of I
+    #         plt.plot(x, y, "o", label="Current vs Latency")
+    #         plt.plot(x1,y1, label = "Fitted Current vs Latency")
+    #         plt.ylabel(r"$\mathrm{\mathsf{I}\ (%s)}$" % y_units.dimensionality)
+    #
+    #     plt.xlabel("Latency (%s)" % x_units.dimensionality)
+    #
+    #     lbl = r"$\mathrm{\mathsf{I_{rheo}}}$"
+    #     if title_prefix is None or (isinstance(title_prefix, str) and len(title_prefix.strip()) == 0):
+    #         title = f"{lbl} = {Irh[0]}"
+    #     else:
+    #         title = f"{title_prefix} {lbl} = {Irh[0]}"
+    #     plt.title(title)
+    #     # plt.title(f"{lbl} = {rad['Irh'][0]}")
+    #     plt.legend()
+    #
+    #     return plt.gca()
+
+    # except Exception as e:
+    #     print("data does not seem to contain a rheobase-latency fit")
+    #     raise
 
 def test_for_rheobase_latency(data, minsteps=3):
     r"""Tests if data can be used for rheobase-latency analysis.

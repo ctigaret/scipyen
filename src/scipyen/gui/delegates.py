@@ -723,6 +723,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     def setEditorData(self, editor: QtWidgets.QWidget,
                       index: QtCore.QModelIndex):
         r"""Sets the value of the editor widget based on the EditRole data in the QModelIndex"""
+        from gui.widgets.tableeditorwidget import TableEditorWidget
         data = index.data(ObjectDataRole) # noqa
 
         # print(f"{self.__class__.__name__}.setEditorData({editor}, index -> data = {data})")
@@ -840,10 +841,12 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     assert isinstance(editor, smw.QuantityChooserWidget), f"Incompatible editor widget type ({type(editor).__name__}) for {data_type_name} data"
 
                 else:
-                    assert isinstance(editor, (smw.QuantitySpinBox, smw.ComplexSpinBox)), f"Incompatible editor widget type ({type(editor).__name__}) for {data_type_name} data"
+                    assert isinstance(editor, (smw.QuantitySpinBox, smw.ComplexSpinBox, TableEditorWidget)), f"Incompatible editor widget type ({type(editor).__name__}) for {data_type_name} data"
 
-                    if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
+                    if not isinstance(editor, TableEditorWidget) and data.ndim > 0:
                         return
+                    # if data.ndim > 0: # no editing of Quantity ARRAYS; only scalar Quantities can be edited; unlikely to encounter this, but here we go...
+                    #     return
 
                     # NOTE: 2025-09-27 10:31:23
                     # figure out how many decimals are shown — needed to set up the "decimals" property of the spin box

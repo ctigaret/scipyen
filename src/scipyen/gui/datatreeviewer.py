@@ -291,13 +291,22 @@ A lot of things copied from there, EXCEPT that it now uses
         self.toolBar = QtWidgets.QToolBar("Main", self)
         self.toolBar.setObjectName("%s_Main_Toolbar" % self.__class__.__name__)
 
-        refreshAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh")
+        refreshAction = self.toolBar.addAction(
+            QtGui.QIcon.fromTheme("view-refresh"), "Refresh")
         refreshAction.triggered.connect(self.slot_refreshDataDisplay)
 
-        collapseAllAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("collapse-all"), "Collapse All")
+        inlineTablesAction = self.toolBar.addAction(
+            QtGui.QIcon.fromTheme("table"), "Inline Tables")
+        inlineTablesAction.setCheckable(True)
+        inlineTablesAction.setChecked(False)
+        inlineTablesAction.toggled.connect(self.slot_setInlineTables)
+
+        collapseAllAction = self.toolBar.addAction(
+            QtGui.QIcon.fromTheme("collapse-all"), "Collapse All")
         collapseAllAction.triggered.connect(self.slot_collapseAll)
 
-        expandAllAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("expand-all"), "Expand All")
+        expandAllAction = self.toolBar.addAction(
+            QtGui.QIcon.fromTheme("expand-all"), "Expand All")
         expandAllAction.triggered.connect(self.slot_expandAll)
 
         resizeColumnsAction = self.toolBar.addAction(
@@ -375,7 +384,7 @@ A lot of things copied from there, EXCEPT that it now uses
             name = names[0]
             self._obj_to_view_ = (obj, name)
 
-            viewItemData = cm.addAction("View")
+            viewItemData = cm.addAction("View/Edit")
             # viewItemData.setToolTip("View item in a separate window (SHIFT for a new window)")
             # viewItemData.setStatusTip("View item in a separate window (SHIFT for a new window)")
             # viewItemData.setWhatsThis("View item in a separate window (SHIFT for a new window)")
@@ -504,6 +513,12 @@ A lot of things copied from there, EXCEPT that it now uses
         self.model.showValuesOnly = value is True
         self.slot_refreshDataDisplay()
 
+    @Slot(bool)
+    @safewrapper
+    def slot_setInlineTables(self, value: bool):
+        if value != self.model.inlineTables:
+            self.model.inlineTables = value is True
+
     @Slot()
     @safewrapper
     def slot_expandAll(self):
@@ -513,19 +528,32 @@ A lot of things copied from there, EXCEPT that it now uses
     @safewrapper
     def slot_viewItem(self: typing.Self):
         # from core.utilities import get_nested_value
+        print(f"{self.__class__.__name__}.slot_viewItem")
+        print(f"\t{self._obj_to_view_}")
         if self.scipyenWindow is None or "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+            return
+
+        if len(self._obj_to_view_) < 2:
             return
 
         if self._obj_to_view_[0] is dataclasses.MISSING or len(self._obj_to_view_[1].strip()) == 0:
             return
 
-        newWindow = bool(
-            QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
+        if len(self._obj_to_view_) == 3:
+            newWindow = self._obj_to_view_[2] is True
 
-        askForParams = bool(
-            QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+        else:
+            newWindow = bool(
+                QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
 
-        variable, varname = self._obj_to_view_
+        if len(self._obj_to_view_) == 4:
+            askForParams = self._obj_to_view_[3] is True
+
+        else:
+            askForParams = bool(
+                QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+
+        variable, varname = self._obj_to_view_[:2]
 
         if newWindow:
             if not self.scipyenWindow.viewObject(variable, varname, winType=self.__class__,
@@ -540,6 +568,37 @@ A lot of things copied from there, EXCEPT that it now uses
 
         self._obj_to_view_ = (dataclasses.MISSING, "")
 
+    def _editExternally_(self, obj:object, name:str, askForParams:bool):
+        from gui.mainwindow import VTH
+        # print(f"{self.__class__.__name__}._editExternally_({type(obj).__name__}, {name}, {askForParams})")
+        if "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+            return
+
+        handler_specs = VTH.get_handler_spec(type(obj))
+
+        tableEdit = list(filter(lambda x: "TableEditor" in x, handler_specs))
+        dataTreeEdit = list(filter(lambda x: "DataTreeViewer" in x, handler_specs))
+        textEdit = list(filter(lambda x: "TextViewer" in x, handler_specs))
+
+        winType = None
+
+        if len(tableEdit) == 1:
+            winType = tableEdit[0][0]
+
+        elif len(dataTreeEdit) == 1:
+            winType = dataTreeEdit[0][0]
+
+        elif len(textEdit) == 1:
+            winType = textEdit[0][0]
+
+        # print(f"\twinType = {winType}")
+
+        if winType:
+            if not self.scipyenWindow.viewObject(obj, name, winType=winType,
+                                    newWindow=True,
+                                    askForParams=askForParams):
+                self._showInConsole_(obj)
+
     @Slot()
     @safewrapper
     def slot_autoSelectViewer(self):
@@ -548,13 +607,31 @@ A lot of things copied from there, EXCEPT that it now uses
         if "ScipyenWindow" not in type(self.scipyenWindow).__name__:
             return
 
+        if len(self._obj_to_view_) < 2:
+            return
+
         if self._obj_to_view_[0] is dataclasses.MISSING or len(self._obj_to_view_[1].strip()) == 0:
             return
 
-        newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
-        askForParams = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+        if len(self._obj_to_view_) == 3:
+            newWindow = self._obj_to_view_[2] is True
 
-        variable, varname = self._obj_to_view_
+        else:
+            newWindow = bool(
+                QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
+
+        if len(self._obj_to_view_) == 4:
+            askForParams = self._obj_to_view_[3] is True
+
+        else:
+            askForParams = bool(
+                QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+
+        variable, varname = self._obj_to_view_[:2]
+        # newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
+        # askForParams = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+        #
+        # variable, varname = self._obj_to_view_
 
         action = self.sender()
         actionName = action.text().replace("&", "")
@@ -780,20 +857,36 @@ A lot of things copied from there, EXCEPT that it now uses
         if self._obj_to_view_[0] is dataclasses.MISSING or len(self._obj_to_view_[1].strip()) == 0:
             return
 
-        variable, varname = self._obj_to_view_
+        variable, varname = self._obj_to_view_[:2]
         self._showInConsole_(variable)
         self._obj_to_view_ = (dataclasses.MISSING, "")
 
     @Slot(QtGui.QStandardItem)
     def slot_itemDoubleClicked(self: typing.Self, item:QtGui.QStandardItem):
+        # print(f"{self.__class__.__name__}.slot_itemDoubleClicked")
+        askForParams = bool(
+            QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+
+        if not self.model:
+            # print(f"\tno model")
+            return
+
         if item.column() == 0:
-            # obj = item.data(ObjectDataRole)
-            obj = self.treeView.model().getDataObjectForLeaf(item)
             readOnly = item.data(ReadOnlyRole) is True
+            obj = self.treeView.model().getDataObjectForLeaf(item)
+            if obj is None:
+                return
             name = item.data(QtCore.Qt.DisplayRole)
-            if obj is not None:
+            if item.data(ObjectDataEditExternallyRole) is True:
+                # print(f"{self.__class__.__name__}.slot_itemDoubleClicked -> view externally")
+                self._editExternally_(obj, name, askForParams)
+
+            else:
+                # obj = self.treeView.model().getDataObjectForLeaf(item)
+                # name = item.data(QtCore.Qt.DisplayRole)
                 self.treeView.readOnly = readOnly
                 self.view(obj, name)
+                # if obj is not None:
 
     @property
     def initialExpandDepth(self) -> int:

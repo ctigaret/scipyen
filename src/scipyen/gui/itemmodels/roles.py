@@ -41,12 +41,14 @@ ObjectKeyRole = QtCore.Qt.UserRole + 360
 ObjectKeyTypeRole = QtCore.Qt.UserRole + 370
 DataChoicesRole = QtCore.Qt.UserRole + 380
 ReadOnlyRole = QtCore.Qt.UserRole + 390
+ObjectDataEditExternallyRole = QtCore.Qt.UserRole + 400
 
 
 __all__ = ("StandaloneEditorWidgetRole",
            "ObjectTypeRole", "ObjectDataRole",
            "ObjectKeyRole", "ObjectKeyTypeRole",
            "ObjectDataAccessRole", "ObjectDataAccessTypeRole",
-           "DataChoicesRole", "ReadOnlyRole")
+           "DataChoicesRole", "ReadOnlyRole",
+           "ObjectDataEditExternallyRole")
 
 

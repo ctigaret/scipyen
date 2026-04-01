@@ -2301,7 +2301,7 @@ def timefunc(func):
         start = time.perf_counter()
         r = func(*args, **kwargs)
         end = time.perf_counter()
-        print("{}.{} : {}".format(func.__module__, func.__name__, end - start))
+        print("{}.{} : {} s".format(func.__module__, func.__name__, end - start))
         return r
 
     return wrapper
@@ -2317,7 +2317,7 @@ def processtimefunc(func):
         start = time.process_time()
         r = func(*args, **kwargs)
         end = time.process_time()
-        print("{}.{} : {}".format(func.__module__, func.__name__, end - start))
+        print("{}.{} : {} s".format(func.__module__, func.__name__, end - start))
         return r
 
     return wrapper

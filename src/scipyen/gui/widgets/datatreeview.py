@@ -75,6 +75,7 @@ import pandas as pd
 # ### END 3rd party modules
 
 from core.workspacefunctions import (validate_varname, user_workspace)
+from core import prog
 
 from gui.delegates import PythonItemDelegate
 from gui.workspacegui import WorkspaceGuiMixin
@@ -99,6 +100,9 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
         # NOTE: 2026-03-31 22:47:04
         self.setTextElideMode(QtCore.Qt.ElideMiddle)
+
+        # NOTE: 2026-04-01 10:41:46
+        self.setExpandsOnDoubleClick(False)
 
         super().setModel(DataTreeModel(showMethods = self._showCallables_,
                                        valuesOnly = self._showValuesOnly_))
@@ -127,9 +131,9 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             painter.drawText(self.viewport().rect(), QtCore.Qt.AlignCenter, elided_text)
             painter.restore()
 
-
-    def _setupChildDataItem_(self: typing.Self, item: QtGui.QStandardItem,
-                             objData: typing.Optional[typing.Any] = None):
+    # @prog.timefunc
+    def _setupChildDataItem_(self: typing.Self, item: QtGui.QStandardItem): #,
+                             # objData: typing.Optional[typing.Any] = None):
         r"""Sets up the editor widgets for the items in the tree model.
     * if the
 
@@ -145,42 +149,69 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             return
 
         model = self.model()
-        index = item.index()
+        # index = item.index()
         objData = item.data(ObjectDataRole) # noqa
         objType = item.data(ObjectTypeRole) # noqa
 
-        if index.column() == 0 and item.hasChildren():
+        # if index.column() == 0 and item.hasChildren():
+        if item.column() == 0 and item.hasChildren():
             for row in range(item.rowCount()):
                 childItem = item.child(row, 0)
                 infoItem = item.child(row, 2)
                 if row == 0:
                     hasEditorWidgetChild = childItem.data(StandaloneEditorWidgetRole) # noqa
                     if hasEditorWidgetChild is True:
-                        childIndex = item.child(0).index()
-                        self.setFirstColumnSpanned(0, index, True)
-                        editorWidget = self._delegate_.createWidget(objData,
-                                                                    choices = list(),
-                                                                    inModel = False,
-                                                                    parent = self)
-                        if self.model().readOnly or item.data(ReadOnlyRole) is True:
-                            if hasattr(editorWidget,  "readOnly"):
-                                editorWidget.readOnly = True
-                        self.setIndexWidget(childIndex, editorWidget)
                         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
-                        item.child(0).setFlags(flags)
+                        # NOTE: 2026-04-01 11:03:24
+                        # this sets the child in row 0 to span all columns
+                        self.setFirstColumnSpanned(0, item.index(), True)
+
+                        # self.setItemDelegateForColumn(childItem.column(), self._delegate_)
+                        # self.setItemDelegateForRow(childItem.row(), self._delegate_)
+                        childItem.setFlags(flags)
+
+                        # childIndex = item.child(0).index()
+                        # ### BEGIN 2026-04-01 10:52:25 Too slow, but working; DO NOT DELETE
+                        #
+
+                        if hasattr(model, "_inlineTables_") and model._inlineTables_:
+                            editorWidget = self._delegate_.createWidget(objData,
+                                                                        choices = list(),
+                                                                        inModel = False,
+                                                                        parent = self)
+                            if self.model().readOnly or item.data(ReadOnlyRole) is True:
+                                if hasattr(editorWidget,  "readOnly") and type(editorWidget).readOnly.__name__ == "property":
+                                    editorWidget.readOnly = True
+                                elif hasattr(editorWidget, "setReadOnly") and isinstance(type(editorWidget).setReadOnly, (types.FunctionType, types.MethodType)):
+                                    editorWidget.setReadOnly(True)
+                            self.setIndexWidget(childItem.index(), editorWidget)
+
+                        # # self.setIndexWidget(item.child(0).index(), editorWidget)
+                        # # self.setIndexWidget(childIndex, editorWidget)
+                        # # childItem.setFlags(flags)
+                        # # item.child(0).setFlags(flags)
+                        #
+                        # ### END   2026-04-01 10:52:25 Too slow, but working; DO NOT DELETE
+
+                        continue
 
                 self._setupChildDataItem_(childItem)
 
                 if infoItem:
-                    self._setupChildDataItem_(infoItem, objData)
+                    self._setupChildDataItem_(infoItem) #, objData)
 
-        elif index.column() == 2:
+        # elif index.column() == 2:
+        elif item.column() == 2:
             signalBlocker = QtCore.QSignalBlocker(self.model()) # noqa
-            infoItem = model.itemFromIndex(index)
-            parentItem = infoItem.parent()
+            parentItem = item.parent()
             if parentItem:
-                objItem = parentItem.child(infoItem.row(), 0)
+                objItem = parentItem.child(item.row(), 0)
                 objType = objItem.data(ObjectTypeRole) # noqa
+            # infoItem = model.itemFromIndex(index)
+            # parentItem = infoItem.parent()
+            # if parentItem:
+            #     objItem = parentItem.child(infoItem.row(), 0)
+            #     objType = objItem.data(ObjectTypeRole) # noqa
 
             # NOTE: 2026-02-12 14:58:10
             # inhibit editing for immutable collections - e.g. tuple, for now
@@ -202,6 +233,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             #
             # infoItem.setFlags(flags)
 
+    # @prog.timefunc
     def setData(self: typing.Self, obj: object,
                 name: typing.Optional[str] = None):
         signalBlocker = QtCore.QSignalBlocker(self.model()) #noqa

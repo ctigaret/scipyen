@@ -78,7 +78,7 @@ import meshio
 
 import core.datatypes as datatypes
 from core.datatypes import (is_namedtuple, TypeEnum) # noqa
-from core.prog import scipywarn
+from core.prog import (scipywarn, timefunc, processtimefunc)
 from core import taxonbridge
 from core import bgbridge as bgbridge
 
@@ -234,6 +234,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         self._showMethods_ = kwargs.pop("showMethods", False)
 
+        self._inlineTables_: bool = kwargs.pop("inlineTables", False)
         self._showValueAttributesOnly_ = kwargs.pop("valuesOnly", True)
 
         self.setHorizontalHeaderLabels(["Object", "Type", "Value / Information"])
@@ -241,6 +242,23 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @property
     def topObjectItem(self: typing.Self) -> QtGui.QStandardItem | None:
         return self._topObjectItem_
+
+    @property
+    def inlineTables(self) -> bool:
+        return self._inlineTables_
+
+    @inlineTables.setter
+    def inlineTables(self, val: bool):
+        if val != self._inlineTables_:
+            self._inlineTables_ = val is True
+            obj = self._modelData_
+            rootTitle = self._rootTitle_
+            predicate = self._predicate_
+            showPrivate = self._showPrivate_
+            hideRoot = self._hideRoot_
+            readOnly = self._readOnly_
+            self.setModelData(obj, rootTitle, predicate, showPrivate,
+                              hideRoot, readOnly)
 
     @property
     def readOnly(self: typing.Self) -> bool:
@@ -304,6 +322,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # reason) ; therefore, I apply the same philosophy here
         #
         item0.setData(QtCore.QVariant(objKeyType), ObjectKeyTypeRole) # noqa
+
+        editExternally = objDict["objDataAsChild"] and QtCore.QVariant(not self._inlineTables_)
+        item0.setData(editExternally, ObjectDataEditExternallyRole)
 
         if visited:
             typeName = visited[-1].__name__
@@ -381,13 +402,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         return (item0, item1, item2)
 
-    def setModelData(
-        self,
-        obj: object,
-        rootTitle: str = "",
+    # @timefunc
+    def setModelData(self, obj: object, rootTitle: str = "",
         predicate: typing.Optional[types.FunctionType] = None,
         showPrivate: bool = False,
-        dataTypeStr: typing.Optional[str] = None,
+        # dataTypeStr: typing.Optional[str] = None,
         hideRoot: bool = False,
         readOnly: bool = False,
     ):
@@ -405,7 +424,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         self._modelData_ = obj
 
-        self.setHorizontalHeaderLabels(["Object", "Type", "Value / Information"])
+        self.setHorizontalHeaderLabels(["Object", "Type", "Information or Value"])
 
         pData, objDict = self._parseObject_(obj, dict(), self._showPrivate_)
 
@@ -450,9 +469,12 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         objItem = rowItems[0]
 
-        if objDict["objDataAsChild"]:
+        if objDict["objDataAsChild"] and self._inlineTables_:
             dataItem = QtGui.QStandardItem("")
             dataItem.setData(QtCore.QVariant(True), StandaloneEditorWidgetRole) # noqa
+            # if not self._inlineTables_:
+            #     dataItem.setData(QtCore.QVariant("Double-click to edit..."), QtCore.Qt.DisplayRole) # noqa
+            #     dataItem.setData(QtCore.QVariant(obj), ObjectDataRole) # noqa
             objItem.insertRow(0, [dataItem])
         else:
             dataItem = rowItems[-1]
