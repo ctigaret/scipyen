@@ -127,7 +127,7 @@
      <x>0</x>
      <y>0</y>
      <width>827</width>
-     <height>28</height>
+     <height>27</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -179,14 +179,27 @@
      <addaction name="separator"/>
      <addaction name="actionLockToolbars"/>
     </widget>
+    <widget class="QMenu" name="menuAxes">
+     <property name="title">
+      <string>Axes</string>
+     </property>
+     <addaction name="actionLink_X_axes"/>
+     <addaction name="actionShow_X_grid"/>
+     <addaction name="actionShow_Y_grid"/>
+     <addaction name="actionLeft_Axis_Spacer"/>
+     <addaction name="actionEnable_Auto_Range"/>
+    </widget>
+    <widget class="QMenu" name="menuType_Here">
+     <property name="title">
+      <string>Type Here</string>
+     </property>
+    </widget>
     <addaction name="actionShow_Legends"/>
     <addaction name="actionIgnore_empty_spike_trains"/>
-    <addaction name="actionLink_X_axes"/>
     <addaction name="actionShow_Cursor_Edit_Dialog_When_Created"/>
-    <addaction name="actionShow_X_grid"/>
-    <addaction name="actionShow_Y_grid"/>
     <addaction name="menuView"/>
-    <addaction name="actionLeft_Axis_Spacer"/>
+    <addaction name="menuAxes"/>
+    <addaction name="menuType_Here"/>
    </widget>
    <widget class="QMenu" name="cursorsMenu">
     <property name="title">
@@ -394,9 +407,9 @@
    </attribute>
    <addaction name="actionRefresh"/>
    <addaction name="actionLink_X_axes"/>
+   <addaction name="actionAutoScaleSelectedAxis"/>
    <addaction name="actionShow_X_grid"/>
    <addaction name="actionShow_Y_grid"/>
-   <addaction name="actionLeft_Axis_Spacer"/>
   </widget>
   <widget class="QToolBar" name="cursorsToolBar">
    <property name="windowTitle">
@@ -982,6 +995,34 @@
    </property>
    <property name="text">
     <string>Remove All Epochs</string>
+   </property>
+  </action>
+  <action name="actionEnable_Auto_Range">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="auto-scale-all"/>
+   </property>
+   <property name="text">
+    <string>Enable Auto Range</string>
+   </property>
+   <property name="toolTip">
+    <string>Enable Auto Range By Default (All axes)</string>
+   </property>
+  </action>
+  <action name="actionAutoScaleSelectedAxis">
+   <property name="icon">
+    <iconset theme="auto-scale-all"/>
+   </property>
+   <property name="text">
+    <string>Auto Range (X,Y) for  Selected Axis</string>
+   </property>
+   <property name="toolTip">
+    <string>Auto Range (X,Y) for  Selected Axis</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::NoRole</enum>
    </property>
   </action>
  </widget>

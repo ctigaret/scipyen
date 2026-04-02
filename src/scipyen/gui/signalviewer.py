@@ -593,6 +593,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         self._axesColumn_ = 0
 
+        self._enableAutoRangeAllAxesByDefault_: bool = False
+
         # NOTE: 2023-04-26 12:07:26
         # for each axis, the following has a tuple of offset, factor
         # where:
@@ -1123,6 +1125,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionShow_Y_grid.toggled.connect(self._slot_showYgrid)
         self.actionShow_Y_grid.setEnabled(False)
 
+        self.actionEnable_Auto_Range.toggled.connect(self._slot_enableAutoRangeByDefault)
+        self.actionAutoScaleSelectedAxis.triggered.connect(self._slot_autoScaleSelectedAxis)
+
+
         self.actionViewMain_Toolbar.toggled.connect(self.slot_toggleMainToolbar)
         self.actionViewCursors_Toolbar.toggled.connect(self.slot_toggleCursorsToolbar)
         self.actionViewEpochs_Toolbar.toggled.connect(self.slot_toggleEpochsToolbar)
@@ -1308,7 +1314,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @commonAxesXPadding.setter
     def commonAxesXPadding(self, value:float):
         self._common_axes_X_padding_ = value
-        # self._align_X_range()
+        self._process_X_ranges_()
 
     @property
     def editCursorUponCreation(self):
@@ -1496,13 +1502,38 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.showCursorsDockWidgetAction.setChecked(self._cursorsDockWidget_enabled_)
 
     @property
+    def enableAutoRangeAllAxesByDefault(self) -> bool:
+        return self._enableAutoRangeAllAxesByDefault_
+
+    @markConfigurable("DefaultAutoRangeAllAxes")
+    @enableAutoRangeAllAxesByDefault.setter
+    def enableAutoRangeAllAxesByDefault(self, value: bool):
+        enabled = value is True
+        signalBlocker = QtCore.QSignalBlocker(self.actionEnable_Auto_Range)
+        self.actionEnable_Auto_Range.setChecked(enabled)
+
+        self._enableAutoRangeAllAxesByDefault_ = enabled
+
+        if isinstance(getattr(self, "configurable_traits", None), DataBag):
+            self.configurable_traits["DefaultAutoRangeAllAxes"] = self._enableAutoRangeAllAxesByDefault_
+
+        # NOTE: 2026-04-02 10:23:39 TODO
+        # Implement similar for X only and for Y only
+        if len(self.axes):
+            for ax in self.axes:
+                if self._enableAutoRangeAllAxesByDefault_:
+                    ax.vb.enableAutoRange()
+                else:
+                    ax.vb.disableAutoRange()
+
+    @property
     def xAxesLinked(self):
         r"""This is True when all PlotItems but one have X axes linked"""
         return self._xAxesLinked_
 
     @markConfigurable("XAxesLinked")
     @xAxesLinked.setter
-    def xAxesLinked(self, value):
+    def xAxesLinked(self, value: bool):
         # print(f"{self.__class__.__name__}.xAxesLinked.setter value = {value}")
         setAllXLink = value == True
         signalBlocker = QtCore.QSignalBlocker(self.actionLink_X_axes)
@@ -2806,7 +2837,7 @@ anything else       anything else       ❌
         raise NotImplementedError(f"Objects of type {type(obj).__name__} are not supported")
 
     @addDataFrame.register(type(None))
-    def _(self, obj=None):
+    def _addDataFrame(self, obj=None):
         return
 
     @addDataFrame.register(neo.Block)
@@ -8386,6 +8417,22 @@ anything else       anything else       ❌
     def _slot_setXAxesLinked(self, value:bool):
         self.xAxesLinked = value == True
 
+    @Slot()
+    def _slot_autoScaleSelectedAxis(self):
+        if len(self.axes) == 0:
+            return
+
+        ax = self.selectedAxis
+
+        if ax is None:
+            ax = self.axes[0]
+
+        ax.vb.autoRange()
+
+    @Slot(bool)
+    def _slot_enableAutoRangeByDefault(self, value: bool):
+        self.enableAutoRangeAllAxesByDefault = value == True
+
     @Slot(bool)
     def _slot_setEditCursorWhenCreated(self, value):
         # print(f"{self.__class__.__name__}._slot_setEditCursorWhenCreated {value}")
@@ -8433,24 +8480,28 @@ anything else       anything else       ❌
         a Plotitem (signal viewer "axis").
 
         """
+        sender = self.sender()
+        ax_ndx = self.axes.index(sender)
         if not isinstance(vb, pg.ViewBox):
             return
+
+        print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed: x0x1 = {x0x1} in axis {ax_ndx} ('{vb.name}')")
 
         if not isinstance(x0x1, tuple) or len(x0x1) != 2:
             return
 
-        vbAxes = [ax for ax in self.axes if ax.vb == vb]
 
-        if len(vbAxes):
-            vbAxis = vbAxes[0]
+        # vbAxes = [ax for ax in self.axes if ax.vb == vb]
+        #
+        # if len(vbAxes):
+        #     vbAxis = vbAxes[0]
+        #
+        # else:
+        #     return
 
-        else:
-            return
-
-        ax_ndx = self.axes.index(vbAxis)
         self._axes_X_view_ranges_[ax_ndx] = x0x1
 
-        bounds = self._get_axis_data_X_range_(vbAxis)
+        bounds = self._get_axis_data_X_range_(sender)
         offset_scale = self._calculate_new_X_offset_scale_(bounds, x0x1)
         self._axes_X_view_offsets_scales_[ax_ndx] = offset_scale
 
@@ -8576,7 +8627,7 @@ anything else       anything else       ❌
             self._selected_plot_item_ = None
             self._selected_plot_item_index_ = -1
 
-        self._update_annotations_() # is this crashing the thread? -- No!
+        self._update_annotations_() # is this one crashing the thread? -- No!
 
         # Check if cursors want to stay in axis or stay with the domain
         # and act accordingly
@@ -8640,13 +8691,13 @@ anything else       anything else       ❌
         # NOTE: 2024-10-23 11:36:50 FIXME
         # hold off this for now
         # self._adjust_left_label_space_()
-        self.sig_frameDisplayReady.emit()
+        self.sig_frameDisplayReady.emit() # NOTE: 2026-04-02 09:19:39 connected to _slot_post_frameDisplay
         self._new_data_ = False
 
     def _calculate_new_X_offset_scale_(self, databounds:tuple, viewbounds:tuple,
                                        padding:typing.Optional[float] = 0.) -> tuple:
         r"""Calculates the X offset and X view scale given X data bounds and view range.
-    Helper function returning a tuple (offset, scale) used in the _align_X_range
+    Helper function returning a tuple (offset, scale) used in the _process_X_ranges_
     """
         # print(f"{self.__class__.__name__}._calculate_new_X_offset_scale_ databounds = {databounds}, viewbounds = {viewbounds}")
         dspan = databounds[1]-databounds[0]
@@ -8659,7 +8710,7 @@ anything else       anything else       ❌
 
     def _get_axis_X_view_state(self, ax:typing.Union[int, pg.PlotItem]) -> tuple:
         r"""Returns a tuple (offset, scale).
-    When there is no data plottd in the item returns (None, None)"""
+    When there is no data plotted in the item returns (None, None)"""
         if isinstance(ax, pg.PlotItem):
             if ax not in self.axes:
                 raise ValueError(f"Axis {ax} not found in this viewer")
@@ -8844,11 +8895,11 @@ anything else       anything else       ❌
 
     @Slot()
     def _slot_post_frameDisplay(self):
-        self._align_X_range()
+        self._process_X_ranges_()
         self._update_axes_spines_()
 
 
-    def _align_X_range(self, padding:typing.Optional[float] = None):
+    def _process_X_ranges_(self, padding:typing.Optional[float] = None):
         r""" Maintains an X view range for frames with different X data bounds.
     Necessary to recreate a view range to an axis relative to the axis' X data.
 
@@ -8880,150 +8931,159 @@ anything else       anything else       ❌
         # else:
         #     refAxes = self.signalAxes
 
-        # print(f"{self.__class__.__name__}._align_X_range {len(self._x_data_bounds_)}")
-        self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in self.axes]
+        visibleSignalAxes = [ax for ax in self.signalAxes if ax.isVisible()]
+
+        if len(visibleSignalAxes) and self.xAxesLinked:
+            # relink to the topmost visible signal axis
+            for ax in self.axes:
+                if ax != visibleSignalAxes[0]:
+                    ax.vb.setXLink(visibleSignalAxes[0])
+
+
+        # for ax in self.axes:
+        #     ax.vb.updateViewRange(True, True)
+
+        # print(f"{self.__class__.__name__}._process_X_ranges_ {len(self._x_data_bounds_)}")
+        # self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in self.axes]
         # if len(self._x_data_bounds_) == 0:
         #     self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in self.axes]
             # self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in refAxes]
 
-        # print(f"{self.__class__.__name__}._align_X_range x data bounds {list(zip([self.axes.index(ax) for ax in self.axes] ,self._x_data_bounds_))}")
-
-        for ax in self.axes:
-            ax.vb.updateViewRange(True, True)
+        # print(f"{self.__class__.__name__}._process_X_ranges_ x data bounds {list(zip([self.axes.index(ax) for ax in self.axes] ,self._x_data_bounds_))}")
 
 
-        # print(f"{self.__class__.__name__}._align_X_range axeslinked = {self.xAxesLinked}")
-        if self.xAxesLinked: # ← True when ALL axes but one are linked on X (either pairwise or to a common target)
-            # if any(ax.vb.autoRangeEnabled()[0] for ax in self.signalAxes):
-            if any(ax.vb.autoRangeEnabled()[0] for ax in self.axes):
-                return
-            # NOTE: 2023-07-10 10:55:57 FIXME/TODO
-            # still have to figure to figure out this contingency below:
-            # selecting to show just plot items without autoranging
-            # does not respect the view range previously set by the link target !!!
-
-#                 # get the axis which is auto-range enabled on X
-#                 # autoXaxes = [ax for ax in self.axes if ax.vb.autoRangeEnabled()[0]]
-#
-#                 xLinkAxes = list()
-#                 xLinks = [ax.vb.linkedView(0) for ax in self.axes if isinstance(ax.vb.linkedView(0), pg.ViewBox)]
-#                 if len(xLinks): # is this guaranteed to happen ?!?
-#                     xLinkAxes = list(set([[_ax for _ax in self.axes if _ax.vb == xLink][0] for xLink in xLinks]))
-#
-#                 # figure out the following:
-#                 # • if an axis is auto-ranged on X ⇒ continue; else:
-#                 #   ∘ if an axis is X-linked to a target, get the target's viewXrange
-#                 #       and apply it to the axis; else:
-#                 #   ∘ get the topmost X-link target viewX range and apply it to
-#                 #       the axis
-#
-#                 for kax, ax in enumerate(self.axes):
-#                     if ax.vb.autoRangeEnabled()[0]: # ← skip axes auto-ranged on X
-#                         continue
-#                     bounds = self._get_axis_data_X_range_(ax)
-#                     if any(np.isnan(v) for v in bounds): # ← no data
-#                         continue
-#                     xLink = ax.vb.linkedView(0)
-#                     if not isinstance(xLink, pg.ViewBox):
-#                         # get the topmost xLink if this is NOT a linked axis
-#                         # (might happen when individual axes are manually unlinked
-#                         # but self._xAxesLinked_ is not updated, yet there still
-#                         # are at least one link target in the axes)
-#                         xLinkNdx = min([self.axes.index(a) for a in xLinkAxes])
-#                         xLinkAxis = self.axes[xLinkNdx]
-#                         xLink = xLinkAxis.vb
-#
-#                     xLinkViewXrange = xLink.viewRange()[0]
-#                     xLinkAxes = [a for a in self.axes if a.vb == xLink]
-#                     if len(xLinkAxes) == 0:
-#                         continue # shouldn't happen
-#                     xLinkAxis = xLinkAxes[0]
-#                     xLinkAxNdx = self.axes.index(xLinkAxis)
-#                     xLinkXBounds = self._get_axis_data_X_range_(xLinkAxis)
-#                     print(f"{kax} bounds {bounds} link {xLinkAxNdx} link X bounds {xLinkXBounds} link Xview {xLinkViewXrange} ")
-#                     offset, scale = self._axes_X_view_offsets_scales_[xLinkAxNdx]
-#                     if any(np.isnan(v) for v in (offset, scale)):
-#                         offset, scale = self._calculate_new_X_offset_scale_(xLinkXBounds, xLinkViewXrange)
-#                     x0,x1 = bounds
-#                     dx1 = x1-x0
-#                     new_vx0 = x0 - offset
-#                     new_view_dx = dx1 * scale
-#                     new_vx1 = new_vx0 + new_view_dx
-#                     print(f"offset = {offset}, scale = {scale}, dx1 = {dx1}, new_vx0 = {new_vx0}, new_view_dx = {new_view_dx}, new_vx1 = {new_vx1}")
-#                     ax.vb.setXRange(new_vx0, new_vx1, padding=0., update=True)
-#                     self._axes_X_view_ranges_[kax] = (new_vx0, new_vx1)
+        # print(f"{self.__class__.__name__}._process_X_ranges_ axeslinked = {self.xAxesLinked}")
+#         if self.xAxesLinked: # ← True when ALL axes but one are linked on X (either pairwise or to a common target)
+#             # if any(ax.vb.autoRangeEnabled()[0] for ax in self.signalAxes):
+#             if any(ax.vb.autoRangeEnabled()[0] for ax in self.axes):
 #                 return
+#             # NOTE: 2023-07-10 10:55:57 FIXME/TODO
+#             # still have to figure to figure out this contingency below:
+#             # selecting to show just plot items without autoranging
+#             # does not respect the view range previously set by the link target !!!
+#
+# #                 # get the axis which is auto-range enabled on X
+# #                 # autoXaxes = [ax for ax in self.axes if ax.vb.autoRangeEnabled()[0]]
+# #
+# #                 xLinkAxes = list()
+# #                 xLinks = [ax.vb.linkedView(0) for ax in self.axes if isinstance(ax.vb.linkedView(0), pg.ViewBox)]
+# #                 if len(xLinks): # is this guaranteed to happen ?!?
+# #                     xLinkAxes = list(set([[_ax for _ax in self.axes if _ax.vb == xLink][0] for xLink in xLinks]))
+# #
+# #                 # figure out the following:
+# #                 # • if an axis is auto-ranged on X ⇒ continue; else:
+# #                 #   ∘ if an axis is X-linked to a target, get the target's viewXrange
+# #                 #       and apply it to the axis; else:
+# #                 #   ∘ get the topmost X-link target viewX range and apply it to
+# #                 #       the axis
+# #
+# #                 for kax, ax in enumerate(self.axes):
+# #                     if ax.vb.autoRangeEnabled()[0]: # ← skip axes auto-ranged on X
+# #                         continue
+# #                     bounds = self._get_axis_data_X_range_(ax)
+# #                     if any(np.isnan(v) for v in bounds): # ← no data
+# #                         continue
+# #                     xLink = ax.vb.linkedView(0)
+# #                     if not isinstance(xLink, pg.ViewBox):
+# #                         # get the topmost xLink if this is NOT a linked axis
+# #                         # (might happen when individual axes are manually unlinked
+# #                         # but self._xAxesLinked_ is not updated, yet there still
+# #                         # are at least one link target in the axes)
+# #                         xLinkNdx = min([self.axes.index(a) for a in xLinkAxes])
+# #                         xLinkAxis = self.axes[xLinkNdx]
+# #                         xLink = xLinkAxis.vb
+# #
+# #                     xLinkViewXrange = xLink.viewRange()[0]
+# #                     xLinkAxes = [a for a in self.axes if a.vb == xLink]
+# #                     if len(xLinkAxes) == 0:
+# #                         continue # shouldn't happen
+# #                     xLinkAxis = xLinkAxes[0]
+# #                     xLinkAxNdx = self.axes.index(xLinkAxis)
+# #                     xLinkXBounds = self._get_axis_data_X_range_(xLinkAxis)
+# #                     print(f"{kax} bounds {bounds} link {xLinkAxNdx} link X bounds {xLinkXBounds} link Xview {xLinkViewXrange} ")
+# #                     offset, scale = self._axes_X_view_offsets_scales_[xLinkAxNdx]
+# #                     if any(np.isnan(v) for v in (offset, scale)):
+# #                         offset, scale = self._calculate_new_X_offset_scale_(xLinkXBounds, xLinkViewXrange)
+# #                     x0,x1 = bounds
+# #                     dx1 = x1-x0
+# #                     new_vx0 = x0 - offset
+# #                     new_view_dx = dx1 * scale
+# #                     new_vx1 = new_vx0 + new_view_dx
+# #                     print(f"offset = {offset}, scale = {scale}, dx1 = {dx1}, new_vx0 = {new_vx0}, new_view_dx = {new_view_dx}, new_vx1 = {new_vx1}")
+# #                     ax.vb.setXRange(new_vx0, new_vx1, padding=0., update=True)
+# #                     self._axes_X_view_ranges_[kax] = (new_vx0, new_vx1)
+# #                 return
 
-        # NOTE: 2023-10-05 08:46:25
-        # another poss workaround to try: use the first visible signal axis
+        # # NOTE: 2023-10-05 08:46:25
+        # # another poss workaround to try: use the first visible signal axis
+        # #
+        # visibleSignalAxes = [ax for ax in self.signalAxes if ax.isVisible()]
         #
-        visibleSignalAxes = [ax for ax in self.signalAxes if ax.isVisible()]
-
-        if len(visibleSignalAxes):
-            refAxis = visibleSignalAxes[0]
-        else:
-            refAxis = None
-
-        for kax, ax in enumerate(self.axes):
-            # if ax not in self.signalAxes:
-            #     continue
-            # NOTE: 2023-07-10 10:51:10
-            # this loop OK when auto-ranging is disabled across plot items
-            # such as in the case of mouse interaction
-            # still a BUG when showing a linked plot item without its link
-            # target
-            # having them linked still messes up the display of linked plot item
-            # (not target) in isolation
-            # WORKAROUND: for this to work the link target MUST ALSO BE VISIBLE
-            # NOTE: 2023-07-09 21:17:19
-            # this returns the actual data X bounds (see NOTE: 2023-07-09 21:09:08)
-            current_X_bounds = self._get_axis_data_X_range_(ax)
-            # print(f"{self.__class__.__name__}._align_X_range: axis {kax} current X bounds = {current_X_bounds}")
-            if any(np.isnan(v) for v in current_X_bounds): # ← no data !
-                continue
-
-            xLinkAxis = None
-            xLinkAxisNdx = None
-            xLinkXBounds = None
-            xLinkViewXrange = None
-            xLink = ax.vb.linkedView(0)
-            if isinstance(xLink, pg.ViewBox):
-                aa = [a for a in self.axes if a.vb == xLink]
-                ax.vb.blockLink(True)
-                xLink.blockLink(True)
-
-                if len(aa):
-                    xLinkAxis = aa[0]
-                    xLinkAxisNdx = self.axes.index(xLinkAxis)
-                    xLinkXBounds = self._get_axis_data_X_range_(ax)
-                    xLinkViewXrange = xLink.viewRange()[0]
-
-            current_viewXrange = ax.vb.viewRange()[0] if xLinkViewXrange is None else xLinkViewXrange
-
-            offset, scale = self._axes_X_view_offsets_scales_[kax] # if xLinkAxisNdx is None else self._axes_X_view_offsets_scales_[xLinkAxisNdx] # ← set by _slot_plot_axis_x_range_changed
-            view_dx = current_viewXrange[1] - current_viewXrange[0]
-            x0,x1 = current_X_bounds if xLinkXBounds is None else xLinkXBounds
-            dx1 = x1-x0
-            new_vx0 = x0 - offset
-            new_view_dx = dx1 * scale
-            new_vx1 = new_vx0 + new_view_dx
-
-            if any(a!=b for a,b in zip(current_viewXrange, (new_vx0, new_vx1))):
-                # print(f"{self.__class__.__name__}._align_X_range: Axis {kax} ({ax.vb.name}) view range from {current_viewXrange} to: {new_vx0, new_vx1}")
-                try:
-                    ax.vb.setXRange(new_vx0, new_vx1, padding = 0., update=True)
-                except:
-                    traceback.print_exc()
-                if isinstance(xLink, pg.ViewBox):
-                    ax.vb.blockLink(False)
-                    xLink.blockLink(False)
-                self._axes_X_view_ranges_[kax] = (new_vx0, new_vx1)
+        # if len(visibleSignalAxes):
+        #     refAxis = visibleSignalAxes[0]
+        # else:
+        #     refAxis = None
+        #
+        # for kax, ax in enumerate(self.axes):
+        #     # if ax not in self.signalAxes:
+        #     #     continue
+        #     # NOTE: 2023-07-10 10:51:10
+        #     # this loop OK when auto-ranging is disabled across plot items
+        #     # such as in the case of mouse interaction
+        #     # still a BUG when showing a linked plot item without its link
+        #     # target
+        #     # having them linked still messes up the display of linked plot item
+        #     # (not target) in isolation
+        #     # WORKAROUND: for this to work the link target MUST ALSO BE VISIBLE
+        #     # NOTE: 2023-07-09 21:17:19
+        #     # this returns the actual data X bounds (see NOTE: 2023-07-09 21:09:08)
+        #     current_X_bounds = self._get_axis_data_X_range_(ax)
+        #     # print(f"{self.__class__.__name__}._process_X_ranges_: axis {kax} current X bounds = {current_X_bounds}")
+        #     if any(np.isnan(v) for v in current_X_bounds): # ← no data !
+        #         continue
+        #
+        #     xLinkAxis = None
+        #     xLinkAxisNdx = None
+        #     xLinkXBounds = None
+        #     xLinkViewXrange = None
+        #     xLink = ax.vb.linkedView(0)
+        #     if isinstance(xLink, pg.ViewBox):
+        #         aa = [a for a in self.axes if a.vb == xLink]
+        #         ax.vb.blockLink(True)
+        #         xLink.blockLink(True)
+        #
+        #         if len(aa):
+        #             xLinkAxis = aa[0]
+        #             xLinkAxisNdx = self.axes.index(xLinkAxis)
+        #             xLinkXBounds = self._get_axis_data_X_range_(ax)
+        #             xLinkViewXrange = xLink.viewRange()[0]
+        #
+        #     current_viewXrange = ax.vb.viewRange()[0] if xLinkViewXrange is None else xLinkViewXrange
+        #
+        #     offset, scale = self._axes_X_view_offsets_scales_[kax] # if xLinkAxisNdx is None else self._axes_X_view_offsets_scales_[xLinkAxisNdx] # ← set by _slot_plot_axis_x_range_changed
+        #     view_dx = current_viewXrange[1] - current_viewXrange[0]
+        #     x0,x1 = current_X_bounds if xLinkXBounds is None else xLinkXBounds
+        #     dx1 = x1-x0
+        #     new_vx0 = x0 - offset
+        #     new_view_dx = dx1 * scale
+        #     new_vx1 = new_vx0 + new_view_dx
+        #
+        #     if any(a!=b for a,b in zip(current_viewXrange, (new_vx0, new_vx1))):
+        #         # print(f"{self.__class__.__name__}._process_X_ranges_: Axis {kax} ({ax.vb.name}) view range from {current_viewXrange} to: {new_vx0, new_vx1}")
+        #         try:
+        #             ax.vb.setXRange(new_vx0, new_vx1, padding = 0., update=True)
+        #         except:
+        #             traceback.print_exc()
+        #         if isinstance(xLink, pg.ViewBox):
+        #             ax.vb.blockLink(False)
+        #             xLink.blockLink(False)
+        #         self._axes_X_view_ranges_[kax] = (new_vx0, new_vx1)
 
     def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
 
-        if len(visibleAxes) == 0:
-            return
+        # if len(visibleAxes) == 0:
+        #     return
 
         for k, ax in enumerate(self.axes):
             if k > 0:
@@ -9053,6 +9113,7 @@ anything else       anything else       ❌
 
         visibleAxes[-1].getAxis("bottom").showLabel(True)
         visibleAxes[-1].getAxis("bottom").setStyle(showValues = True)
+
 
     @safewrapper
     def _plotSpikeTrains_(self, trains: typing.Optional[typing.Union[neo.SpikeTrain, neo.core.spiketrainlist.SpikeTrainList, tuple, list]] = None,
@@ -9658,13 +9719,13 @@ anything else       anything else       ❌
             del pg.ViewBox.NamedViews[entry]
         vb.name = None
 
-    def _signals_select_(self, signals, signalCBox):
+    def _get_signals_selection_(self, signals, signalCBox):
         r"""Helper method for setting up the collection of selected signals to plot.
         Selection is based on the GUI combo box passed as 2nd parameter to the call.
         signals: collection of signals in a frame
         signalCBox: the combo box for selecting which signal to plot, in GUI
 
-        Called by self._plot_signals_selection_
+        Called by self._plot_selected_signals_
         """
         analog = signalCBox == self.analogSignalComboBox
         if analog:
@@ -9674,13 +9735,13 @@ anything else       anything else       ❌
             guiSelection = self.guiSelectedIrregularSignalEntries
             mapping = self._frame_irregs_map_
 
-        # print(f"{self.__class__.__name__}._signals_select_: {'Analog' if analog else 'Irregular'} guiSelection = {guiSelection},\nmapping = {mapping}")
+        # print(f"{self.__class__.__name__}._get_signals_selection_: {'Analog' if analog else 'Irregular'} guiSelection = {guiSelection},\nmapping = {mapping}")
 
         if len(guiSelection):
             selected_signal_axis_names = guiSelection
             signal_selection = tuple(filter(lambda x: x[1] in guiSelection, mapping.values()))
-            # print(f"{self.__class__.__name__}._signals_select_: selected_signal_axis_names = {selected_signal_axis_names}")
-            # print(f"{self.__class__.__name__}._signals_select_: signal_selection = {signal_selection}")
+            # print(f"{self.__class__.__name__}._get_signals_selection_: selected_signal_axis_names = {selected_signal_axis_names}")
+            # print(f"{self.__class__.__name__}._get_signals_selection_: signal_selection = {signal_selection}")
             if len(signal_selection):
                 selected_signal_ndx, selected_signal_names = zip(*signal_selection)
                 selected_signals = [signals[ndx] for ndx in selected_signal_ndx]
@@ -9699,16 +9760,16 @@ anything else       anything else       ❌
         return selected_signals, selected_signal_names, selected_signal_ndx, selected_signal_axis_names
 
     @safewrapper
-    def _plot_signals_selection_(self, signals, cBox, axis_indices, *args, **kwargs):
+    def _plot_selected_signals_(self, signals, cBox, axis_indices, *args, **kwargs):
         r"""Called by _plot_signals_"""
-        # print(f"{self.__class__.__name__}._plot_signals_selection_: {'analog' if cBox == self.analogSignalComboBox else 'irreglarly sampled'}" )
+        # print(f"{self.__class__.__name__}._plot_selected_signals_: {'analog' if cBox == self.analogSignalComboBox else 'irreglarly sampled'}" )
         used_axes_ndx = list()
         analog = cBox == self.analogSignalComboBox
 
         # NOTE: 2025-03-30 21:07:33
         # Gert the signal selection (if any) from the combo box
-        selected_signals, selected_signal_names, selected_signal_ndx, selected_signal_axis_names = self._signals_select_(signals, cBox)
-        # print(f"\n{self.__class__.__name__}._plot_signals_selection_: selected_signal_names = {selected_signal_names},\n{self.__class__.__name__}._plot_signals_selection_: selected_signal_ndx = {selected_signal_ndx},\n{self.__class__.__name__}._plot_signals_selection_: selected_signal_axis_names = {selected_signal_axis_names}")
+        selected_signals, selected_signal_names, selected_signal_ndx, selected_signal_axis_names = self._get_signals_selection_(signals, cBox)
+        # print(f"\n{self.__class__.__name__}._plot_selected_signals_: selected_signal_names = {selected_signal_names},\n{self.__class__.__name__}._plot_selected_signals_: selected_signal_ndx = {selected_signal_ndx},\n{self.__class__.__name__}._plot_selected_signals_: selected_signal_axis_names = {selected_signal_axis_names}")
 
         # NOTE: 2025-03-30 22:30:33
         # needed for below, see NOTE: 2025-03-30 22:17:05
@@ -9720,7 +9781,7 @@ anything else       anything else       ❌
             used_axes_ndx.append(ax_ndx)
             if k in selected_signal_ndx:
                 plot_name_ndx = selected_signal_ndx.index(k)
-                # print(f"{self.__class__.__name__}._plot_signals_selection_: plot_name_ndx = {plot_name_ndx}")
+                # print(f"{self.__class__.__name__}._plot_selected_signals_: plot_name_ndx = {plot_name_ndx}")
                 plotItemName = selected_signal_axis_names[plot_name_ndx]
                 # plotItemName = plotItemNames[plot_name_ndx]
                 # NOTE: 2023-01-04 22:14:55
@@ -9806,7 +9867,7 @@ anything else       anything else       ❌
         # NOTE: update only those plotItems where a selected signal should be
         # all other plotItems are hidden
         if self._plot_analogsignals_: # flag set up by `Analog` checkbox
-            used_axes_ndx.extend(self._plot_signals_selection_(analog, self.analogSignalComboBox, analog_axes, *args, **kwargs))
+            used_axes_ndx.extend(self._plot_selected_signals_(analog, self.analogSignalComboBox, analog_axes, *args, **kwargs))
 
         else: # hide all analog signal plotItems
             for ax_ndx in analog_axes.values():
@@ -9818,7 +9879,7 @@ anything else       anything else       ❌
         if self._plot_irregularsignals_: # flag set up by `Irregular` checkbox
             kwargs["pen"] = None
             kwargs["pxMode"] = True
-            used_axes_ndx.extend(self._plot_signals_selection_(irregs, self.irregularSignalComboBox, irregs_axes, *args, **kwargs))
+            used_axes_ndx.extend(self._plot_selected_signals_(irregs, self.irregularSignalComboBox, irregs_axes, *args, **kwargs))
 
         else:
             for ax_ndx in irregs_axes.values():
@@ -10111,7 +10172,7 @@ anything else       anything else       ❌
         if not isinstance(self.docTitle, str) or len(self.docTitle.strip()) == 0:
             self.docTitle = signal_name
 
-        # self._align_X_range()
+        self._process_X_ranges_()
         self._update_axes_spines_()
 
     def _make_sig_plot_dict_(self, plotItem:pg.PlotItem,
@@ -10845,8 +10906,14 @@ anything else       anything else       ❌
                 # until we sort out how to manage left axis label spaces
                 # add ALL plotitems to column 0! (or at least ot the same column)
                 self.signalsLayout.addItem(plotItem, row = k, col = self._axesColumn_)
+                plotItem.sigRangeChanged.connect(self._slot_plotItemRangeChanged)
+                # plotItem.sigXRangeChanged.connect(self._slot_plotItemXRangeChanged)
+                # plotItem.sigYRangeChanged.connect(self._slot_plotItemYRangeChanged)
+                plotItem.sigRangeChangedManually.connect(self._slot_plotItemRangeChangedManually)
+
                 plotItem.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
                 plotItem.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
+
                 plotItem.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
                 plotItem.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
                 plotItem.setVisible(False)
@@ -10963,21 +11030,6 @@ anything else       anything else       ❌
             self.actionLink_X_axes.setEnabled(False)
             self.actionShow_X_grid.setEnabled(False)
             self.actionShow_Y_grid.setEnabled(False)
-
-        # visibleAxes = tuple(filter(lambda x: x.isVisible(), self.axes))
-        # if len(visibleAxes):
-        #     signalsLayoutHeight = self.signalsLayout.boundingRect().height()
-        #     viewBoxHeight = signalsLayoutHeight/len(self.axes)
-        #     for plotItem in visibleAxes:
-        #         plotItem.vb.setFixedHeight(viewBoxHeight)
-
-#         for ax in self.signalAxes:
-#             ndx = self.signalsLayout.itemIndex(ax)
-#             self.signalsLayout.layout.setRowStretchFactor(ndx,2)
-#
-#         for ax in (self._events_axis_, self._spiketrains_axis_):
-#             ndx = self.signalsLayout.itemIndex(ax)
-#             self.signalsLayout.layout.setRowStretchFactor(ndx,1)
 
     @Slot(object)
     @safewrapper
@@ -11479,5 +11531,36 @@ anything else       anything else       ❌
     # aliases to setData
     plot = setData
     view = setData
+
+    @Slot(object)
+    def _slot_plotItemRangeChangedManually(self, obj: object):
+        sender=self.sender()
+        print(f"{self.__class__.__name__}._slot_plotItemRangeChangedManually({obj})")
+        print(f"\tfrom sender {sender}")
+
+    @Slot(object, object)
+    def _slot_plotItemRangeChanged(self, obj1: object, obj2: object):
+        sender=self.sender()
+        # NOTE: 2026-04-02 20:28:13
+        # obj1 is the ViewBox
+        name = getattr(obj1, "name", None)
+        if sender in self.axes:
+            ndx = self.axes.index(sender)
+        else:
+            ndx = -1
+        print(f"{self.__class__.__name__}._slot_plotItemRangeChanged(..., {obj2}) in axis {ndx} ('{name}')")
+
+    @Slot(object, object)
+    def _slot_plotItemXRangeChanged(self, obj1: object, obj2: object):
+        sender=self.sender()
+        print(f"{self.__class__.__name__}._slot_plotItemXRangeChanged({obj1},{obj2})")
+        print(f"\tfrom sender {sender}")
+
+
+    @Slot(object, object)
+    def _slot_plotItemYRangeChanged(self, obj1: object, obj2: object):
+        sender=self.sender()
+        print(f"{self.__class__.__name__}._slot_plotItemYRangeChanged({obj1},{obj2})")
+        print(f"\tfrom sender {sender}")
 
 
