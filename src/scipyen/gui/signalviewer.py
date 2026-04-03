@@ -8491,66 +8491,66 @@ anything else       anything else       ❌
     def _slot_setCrosshairCursorColors(self):
         self._gui_chose_cursor_color_("crosshair")
 
-    @Slot(object, object)
-    @safewrapper
-    def _slot_plot_axis_x_range_changed(self, vb, x0x1):
-        r"""Captures changes in the view range on the X axis.
-        Triggered by PlotItem signal sigXRangeChanged.
-        These changes are typically generated using a mouse button pressed in
-        a Plotitem (signal viewer "axis").
+    # @Slot(object, object)
+    # @safewrapper
+    # def _slot_plot_axis_x_range_changed(self, vb, x0x1):
+    #     r"""Captures changes in the view range on the X axis.
+    #     Triggered by PlotItem signal sigXRangeChanged.
+    #     These changes are typically generated using a mouse button pressed in
+    #     a Plotitem (signal viewer "axis").
+    #
+    #     """
+    #     sender = self.sender()
+    #     ax_ndx = self.axes.index(sender)
+    #     if not isinstance(vb, pg.ViewBox):
+    #         return
+    #
+    #     print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed: x0x1 = {x0x1} in axis {ax_ndx} ('{vb.name}')")
+    #
+    #     if not isinstance(x0x1, tuple) or len(x0x1) != 2:
+    #         return
+    #
+    #
+    #     # vbAxes = [ax for ax in self.axes if ax.vb == vb]
+    #     #
+    #     # if len(vbAxes):
+    #     #     vbAxis = vbAxes[0]
+    #     #
+    #     # else:
+    #     #     return
+    #
+    #     self._axes_X_view_ranges_[ax_ndx] = x0x1
+    #
+    #     bounds = self._get_axis_data_X_range_(sender)
+    #     offset_scale = self._calculate_new_X_offset_scale_(bounds, x0x1)
+    #     self._axes_X_view_offsets_scales_[ax_ndx] = offset_scale
+    #
+    #     if self.currentFrame in self._cached_epochs_:
+    #         if len(self._cached_epochs_[self.currentFrame]):
+    #             self._plotEpochs_(from_cache=True)
 
-        """
-        sender = self.sender()
-        ax_ndx = self.axes.index(sender)
-        if not isinstance(vb, pg.ViewBox):
-            return
-
-        print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed: x0x1 = {x0x1} in axis {ax_ndx} ('{vb.name}')")
-
-        if not isinstance(x0x1, tuple) or len(x0x1) != 2:
-            return
-
-
-        # vbAxes = [ax for ax in self.axes if ax.vb == vb]
-        #
-        # if len(vbAxes):
-        #     vbAxis = vbAxes[0]
-        #
-        # else:
-        #     return
-
-        self._axes_X_view_ranges_[ax_ndx] = x0x1
-
-        bounds = self._get_axis_data_X_range_(sender)
-        offset_scale = self._calculate_new_X_offset_scale_(bounds, x0x1)
-        self._axes_X_view_offsets_scales_[ax_ndx] = offset_scale
-
-        if self.currentFrame in self._cached_epochs_:
-            if len(self._cached_epochs_[self.currentFrame]):
-                self._plotEpochs_(from_cache=True)
-
-    @Slot(object)
-    def _slot_plot_axis_range_changed_manually(self, value:object):
-        r"""Triggered by PlotItem's ViewBox sigRangeChangedManually signal"""
-        vb = self.sender()
-
-
-        if value in (pg.ViewBox.RectMode, pg.ViewBox.PanMode):
-            mouseMode = value
-        else:
-            mouseMode = vb.state["mouseMode"]
-
-        # print(f"{self.__class__.__name__} range changed manually in {mouseMode}")
-
-        ax = [ax for ax in self.axes if ax.vb == vb]
-
-        if len(ax) == 0:
-            return
-
-        ax = ax[0]
-        ax.sigXRangeChanged.emit(vb, vb.viewRange()[0])
-        # ax.sigXRangeChanged.emit(vb, (math.nan, math.nan))
-        # ax.sigXRangeChanged.emit(None, None)
+    # @Slot(object)
+    # def _slot_plot_axis_range_changed_manually(self, value:object):
+    #     r"""Triggered by PlotItem's ViewBox sigRangeChangedManually signal"""
+    #     vb = self.sender()
+    #
+    #
+    #     if value in (pg.ViewBox.RectMode, pg.ViewBox.PanMode):
+    #         mouseMode = value
+    #     else:
+    #         mouseMode = vb.state["mouseMode"]
+    #
+    #     # print(f"{self.__class__.__name__} range changed manually in {mouseMode}")
+    #
+    #     ax = [ax for ax in self.axes if ax.vb == vb]
+    #
+    #     if len(ax) == 0:
+    #         return
+    #
+    #     ax = ax[0]
+    #     ax.sigXRangeChanged.emit(vb, vb.viewRange()[0])
+    #     # ax.sigXRangeChanged.emit(vb, (math.nan, math.nan))
+    #     # ax.sigXRangeChanged.emit(None, None)
 
     @safewrapper
     def refresh(self):
@@ -8704,22 +8704,6 @@ anything else       anything else       ❌
                         for tgt in targetItems:
                             ax.addItem(tgt)
 
-
-        # NOTE: 2023-05-09 10:41:27 connected to _slot_post_frameDisplay
-        # this also sets up axes lines visibility & tickmarks
-
-        # cache these now (they may be overwritten in slots triggered by mouse
-        # interactions in the plot item)
-        # for kax, ax in enumerate(self.axes):
-        #     bounds = self._get_axis_data_X_range_(ax)
-        #     if any(np.isnan(v) for v in bounds):
-        #         continue
-        #     self._x_data_bounds_[kax] = bounds
-        #     viewXrange = ax.vb.viewRange()[0]
-        #     self._axes_X_view_ranges_[kax] = viewXrange
-        #     offset, scale = self._calculate_new_X_offset_scale_(bounds, viewXrange)
-        #     self._axes_X_view_offsets_scales_[kax] = (offset, scale)
-
         # NOTE: 2024-10-23 11:36:50 FIXME
         # hold off this for now
         # self._adjust_left_label_space_()
@@ -8742,62 +8726,62 @@ anything else       anything else       ❌
 
         return offset,scale
 
-    def _get_axis_X_view_state(self, ax:typing.Union[int, pg.PlotItem]) -> tuple:
-        r"""Returns a tuple (offset, scale).
-    When there is no data plotted in the item returns (None, None)"""
-        if isinstance(ax, pg.PlotItem):
-            if ax not in self.axes:
-                raise ValueError(f"Axis {ax} not found in this viewer")
-            ax_ndx = self.axes.index(ax)
+    # def _get_axis_X_view_state(self, ax:typing.Union[int, pg.PlotItem]) -> tuple:
+    #     r"""Returns a tuple (offset, scale).
+    # When there is no data plotted in the item returns (None, None)"""
+    #     if isinstance(ax, pg.PlotItem):
+    #         if ax not in self.axes:
+    #             raise ValueError(f"Axis {ax} not found in this viewer")
+    #         ax_ndx = self.axes.index(ax)
+    #
+    #     elif isinstance(ax, int):
+    #         if ax not in range(self.axes):
+    #             raise ValueError(f"Invalid axis index {ax} for {len(self.axes)} axes")
+    #
+    #         ax_ndx = ax
+    #         ax = self.axes[ax_ndx]
+    #
+    #     else:
+    #         raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(ax).__name__} instead")
 
-        elif isinstance(ax, int):
-            if ax not in range(self.axes):
-                raise ValueError(f"Invalid axis index {ax} for {len(self.axes)} axes")
-
-            ax_ndx = ax
-            ax = self.axes[ax_ndx]
-
-        else:
-            raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(ax).__name__} instead")
-
-        xd0, xd1 = self._get_axis_data_X_range_(ax)
-        dspan = xd1 - xd0
-        # xv0, xv1 = ax.vb.viewRange()[0]
-        xv0, xv1 = ax.vb.state["viewRange"][0]
-        vspan = xv1 - xv0
-
-        offset = xd0 - xv0
-        scale = vspan/dspan if dspan != 0. else 1.
-
-        return offset, scale
-
-    def _get_axis_Y_view_state(self, ax:typing.Union[int, pg.PlotItem]) -> tuple:
-        if isinstance(ax, pg.PlotItem):
-            if ax not in self.axes:
-                raise ValueError(f"Axis {ax} not found in this viewer")
-            ax_ndx = self.axes.index(ax)
-
-        elif isinstance(ax, int):
-            if ax not in range(self.axes):
-                raise ValueError(f"Invalid axis index {ax} for {len(self.axes)} axes")
-
-            ax_ndx = ax
-            ax = self.axes[ax_ndx]
-
-        else:
-            raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(ax).__name__} instead")
-
-        yd0, yd1 = self._get_axis_data_Y_range_(ax)
-        dspan = yd1 - yd0
-
-        yv0, yv1 = ax.vb.viewRange()[1]
-        vspan = yv1 - yv0
-
-        offset = yd0 - yv0
-        scale = vspan/dspan if dspan != 0. else 1.
-
-        return offset, scale
-
+    #     # xd0, xd1 = self._get_axis_data_X_range_(ax)
+    #     # dspan = xd1 - xd0
+    #     # # xv0, xv1 = ax.vb.viewRange()[0]
+    #     # xv0, xv1 = ax.vb.state["viewRange"][0]
+    #     # vspan = xv1 - xv0
+    #     #
+    #     # offset = xd0 - xv0
+    #     # scale = vspan/dspan if dspan != 0. else 1.
+    #     #
+    #     # return offset, scale
+    #
+    # # def _get_axis_Y_view_state(self, ax:typing.Union[int, pg.PlotItem]) -> tuple:
+    # #     if isinstance(ax, pg.PlotItem):
+    # #         if ax not in self.axes:
+    # #             raise ValueError(f"Axis {ax} not found in this viewer")
+    # #         ax_ndx = self.axes.index(ax)
+    # #
+    # #     elif isinstance(ax, int):
+    # #         if ax not in range(self.axes):
+    # #             raise ValueError(f"Invalid axis index {ax} for {len(self.axes)} axes")
+    # #
+    # #         ax_ndx = ax
+    # #         ax = self.axes[ax_ndx]
+    # #
+    # #     else:
+    # #         raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(ax).__name__} instead")
+    # #
+    # #     yd0, yd1 = self._get_axis_data_Y_range_(ax)
+    # #     dspan = yd1 - yd0
+    # #
+    # #     yv0, yv1 = ax.vb.viewRange()[1]
+    # #     vspan = yv1 - yv0
+    # #
+    # #     offset = yd0 - yv0
+    # #     scale = vspan/dspan if dspan != 0. else 1.
+    # #
+    # #     return offset, scale
+    #
     def _get_axisXDataBounds(self, axis: typing.Union[int, pg.PlotItem]) -> tuple:
         # generator!
         x0 = np.array(list(map(lambda pdi: pdi.xData[0],
@@ -8812,120 +8796,120 @@ anything else       anything else       ❌
                                       axis.listDataItems()))))
         if len(x0) and len(x1):
             yield np.nanmin(x0), np.nanmax(x1)
+    #
+    # # def _get_axis_view_X_range(self, axis: typing.Union[int, pg.PlotItem]) -> tuple:
+    # #     if isinstance(axis, int):
+    # #         if axis not in range(len(self.axes)):
+    # #             raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
+    # #
+    # #         axis = self.axes[axis]
+    # #
+    # #     elif isinstance(axis, pg.PlotItem):
+    # #         if axis not in self.axes:
+    # #             raise ValueError(f"Axis {axis} is not in this viewer")
+    # #
+    # #     else:
+    # #         raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
+    # #
+    # #     xv0, xv1 = axis.vb.viewRange()[0]
+    # #
+    # #     return xv0, xv1
+    #
+    # def _get_axis_data_X_range_(self, axis:typing.Union[int, pg.PlotItem]) -> tuple:
+    #     if isinstance(axis, int):
+    #         if axis not in range(len(self.axes)):
+    #             raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
+    #
+    #         axis = self.axes[axis]
+    #
+    #     elif isinstance(axis, pg.PlotItem):
+    #         if axis not in self.axes:
+    #             raise ValueError(f"Axis {axis} is not in this viewer")
+    #
+    #     else:
+    #         raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
+    #
+    #     pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
+    #
+    #     # print(f"{self.__class__.__name__}._get_axis_data_X_range_ axis {self.axes.index(axis)} : {len(pdis)} plot data items")
+    #
+    #     if len(pdis):
+    #         # xbounds0, xbounds1 = zip(*map(lambda i_ : i_.dataBounds(0), pdis))
+    #         # NOTE: BUG
+    #         # the 'dataBounds' method returns None, None if the pdi is not
+    #         # visible!
+    #         # NOTE: 2023-07-09 21:09:08
+    #         # use dataRect() instead
+    #         xbounds0, xbounds1 = zip(*map(lambda i_ : (i_.dataRect().x(), i_.dataRect().x() + i_.dataRect().width()), pdis))
+    #         min_x = min(xbounds0)
+    #         max_x = max(xbounds1)
+    #         # print(f"\txbounds0 {xbounds0}, xbounds1 {xbounds1} min_x {min_x}, max_x {max_x}")
+    #         # items_min_x, items_max_x = zip(*list((float(np.nanmin(i.xData)), float(np.nanmax(i.xData))) for i in pdis))
+    #
+    #         # min_x = items_min_x[0] if isinstance(items_min_x, (tuple, list)) else items_min_x
+    #         # max_x = items_max_x[0] if isinstance(items_max_x, (tuple, list)) else items_max_x
+    #
+    #         # NOTE: 2023-07-07 13:17:42
+    #         # when the axis (a pg.PlotItem) is not visibile, neither are its
+    #         # plot data items; in turn, then these are NOT visible, their dataBounds(…)
+    #         # method returns None, None !!!
+    #         if  min_x is None:
+    #             min_x = math.nan
+    #         if max_x is None:
+    #             max_x =math.nan
+    #         return min_x, max_x
+    #
+    #     else:
+    #         return math.nan, math.nan
 
-    def _get_axis_view_X_range(self, axis: typing.Union[int, pg.PlotItem]) -> tuple:
-        if isinstance(axis, int):
-            if axis not in range(len(self.axes)):
-                raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
-
-            axis = self.axes[axis]
-
-        elif isinstance(axis, pg.PlotItem):
-            if axis not in self.axes:
-                raise ValueError(f"Axis {axis} is not in this viewer")
-
-        else:
-            raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
-
-        xv0, xv1 = axis.vb.viewRange()[0]
-
-        return xv0, xv1
-
-    def _get_axis_data_X_range_(self, axis:typing.Union[int, pg.PlotItem]) -> tuple:
-        if isinstance(axis, int):
-            if axis not in range(len(self.axes)):
-                raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
-
-            axis = self.axes[axis]
-
-        elif isinstance(axis, pg.PlotItem):
-            if axis not in self.axes:
-                raise ValueError(f"Axis {axis} is not in this viewer")
-
-        else:
-            raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
-
-        pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
-
-        # print(f"{self.__class__.__name__}._get_axis_data_X_range_ axis {self.axes.index(axis)} : {len(pdis)} plot data items")
-
-        if len(pdis):
-            # xbounds0, xbounds1 = zip(*map(lambda i_ : i_.dataBounds(0), pdis))
-            # NOTE: BUG
-            # the 'dataBounds' method returns None, None if the pdi is not
-            # visible!
-            # NOTE: 2023-07-09 21:09:08
-            # use dataRect() instead
-            xbounds0, xbounds1 = zip(*map(lambda i_ : (i_.dataRect().x(), i_.dataRect().x() + i_.dataRect().width()), pdis))
-            min_x = min(xbounds0)
-            max_x = max(xbounds1)
-            # print(f"\txbounds0 {xbounds0}, xbounds1 {xbounds1} min_x {min_x}, max_x {max_x}")
-            # items_min_x, items_max_x = zip(*list((float(np.nanmin(i.xData)), float(np.nanmax(i.xData))) for i in pdis))
-
-            # min_x = items_min_x[0] if isinstance(items_min_x, (tuple, list)) else items_min_x
-            # max_x = items_max_x[0] if isinstance(items_max_x, (tuple, list)) else items_max_x
-
-            # NOTE: 2023-07-07 13:17:42
-            # when the axis (a pg.PlotItem) is not visibile, neither are its
-            # plot data items; in turn, then these are NOT visible, their dataBounds(…)
-            # method returns None, None !!!
-            if  min_x is None:
-                min_x = math.nan
-            if max_x is None:
-                max_x =math.nan
-            return min_x, max_x
-
-        else:
-            return math.nan, math.nan
-
-    def _get_axis_data_Y_range_(self, axis:typing.Union[int, pg.PlotItem]) -> tuple:
-        if isinstance(axis, int):
-            if axis not in range(len(self.axes)):
-                raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
-
-            axis = self.axes[axis]
-
-        elif isinstance(axis, pg.PlotItem):
-            if axis not in self.axes:
-                raise ValueError(f"Axis {axis} is not in this viewer")
-
-        else:
-            raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
-
-        pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
-
-        if len(pdis):
-            ybounds0, ybounds1 = zip(*map(lambda i_ : i_.dataBounds(1), pdis))
-            min_y = min(ybounds0)
-            max_y = max(ybounds1)
-            return min_y, max_y
-#             items_min_y, items_max_y = zip(*list((float(np.nanmin(i.yData)), float(np.nanmax(i.yData))) for i in pdis))
+#     def _get_axis_data_Y_range_(self, axis:typing.Union[int, pg.PlotItem]) -> tuple:
+#         if isinstance(axis, int):
+#             if axis not in range(len(self.axes)):
+#                 raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
 #
-#             min_y = items_min_y[0] if isinstance(items_min_y, (tuple, list)) else items_min_y
-#             max_y = items_max_y[0] if isinstance(items_max_y, (tuple, list)) else items_max_y
+#             axis = self.axes[axis]
 #
+#         elif isinstance(axis, pg.PlotItem):
+#             if axis not in self.axes:
+#                 raise ValueError(f"Axis {axis} is not in this viewer")
+#
+#         else:
+#             raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
+#
+#         pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
+#
+#         if len(pdis):
+#             ybounds0, ybounds1 = zip(*map(lambda i_ : i_.dataBounds(1), pdis))
+#             min_y = min(ybounds0)
+#             max_y = max(ybounds1)
 #             return min_y, max_y
+# #             items_min_y, items_max_y = zip(*list((float(np.nanmin(i.yData)), float(np.nanmax(i.yData))) for i in pdis))
+# #
+# #             min_y = items_min_y[0] if isinstance(items_min_y, (tuple, list)) else items_min_y
+# #             max_y = items_max_y[0] if isinstance(items_max_y, (tuple, list)) else items_max_y
+# #
+# #             return min_y, max_y
+#
+#         else:
+#             return math.nan, math.nan
 
-        else:
-            return math.nan, math.nan
-
-    def _get_axis_view_Y_range(self, axis:typing.Union[int, pg.PlotItem]) ->tuple:
-        if isinstance(axis, int):
-            if axis not in range(len(self.axes)):
-                raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
-
-            axis = self.axes[axis]
-
-        elif isinstance(axis, pg.PlotItem):
-            if axis not in self.axes:
-                raise ValueError(f"Axis {axis} is not in this viewer")
-
-        else:
-            raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
-
-        yv0, yv1 = axis.vb.viewRange()[1]
-
-        return yv0, yv1
+    # def _get_axis_view_Y_range(self, axis:typing.Union[int, pg.PlotItem]) ->tuple:
+    #     if isinstance(axis, int):
+    #         if axis not in range(len(self.axes)):
+    #             raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
+    #
+    #         axis = self.axes[axis]
+    #
+    #     elif isinstance(axis, pg.PlotItem):
+    #         if axis not in self.axes:
+    #             raise ValueError(f"Axis {axis} is not in this viewer")
+    #
+    #     else:
+    #         raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
+    #
+    #     yv0, yv1 = axis.vb.viewRange()[1]
+    #
+    #     return yv0, yv1
 
     @Slot()
     def _slot_post_frameDisplay(self):
@@ -8960,49 +8944,64 @@ anything else       anything else       ❌
         if len(self.axes) == 0:
             return
 
-        print(f"{self.__class__.__name__}._process_X_ranges_ in frame {self.currentFrame}:")
+        # print(f"{self.__class__.__name__}._process_X_ranges_ in frame {self.currentFrame}:")
 
         if len(self._axesStatesCache_):
             for kax, ax in enumerate(self.axes):
                 cachedState = self._axesStatesCache_[kax] # from previous frame; this is updated at the beginning of self.displayFrame(…)
                 currentState = self.getPlotItemState(ax)
-                print(f"\tfor axis {kax} ('{ax.vb.name}'):")
-                print(f"\tauto-range on X = {cachedState["state"]["autoRange"][0]}")
-                print(f"\tlinked on X     = {cachedState["state"]["linkedViews"][0]}")
+                # print(f"\tfor axis {kax} ('{ax.vb.name}'):")
+                # print(f"\tauto-range on X = {cachedState["state"]["autoRange"][0]}")
+                # print(f"\tlinked on X     = {cachedState["state"]["linkedViews"][0]}")
                 if cachedState["state"]["autoRange"][0]:
                     # skip axes that auto-range on X
                     # but ensure it STAYS auto-ranged
                     ax.vb.enableAutoRange(pg.ViewBox.XAxis)
-                    print(f"\t-> skip X-auto-ranged axis {kax}\n\t---\n")
+                    # print(f"\t-> skip X-auto-ranged axis {kax}\n\t---\n")
                     continue
 
                 # TODO/FIXME 2026-04-03 10:12:53
                 # maybe use np.isclose in the comparisons below
-
-                print(f"\tbounds X left current  = {currentState["bounds"][0][0]}, cached = {cachedState["bounds"][0][0]}")
-                print(f"\tbounds X right current = {currentState["bounds"][0][1]}, cached = {cachedState["bounds"][0][1]}")
+                #
+                # print(f"\tbounds X left current  = {currentState["bounds"][0][0]}, cached = {cachedState["bounds"][0][0]}")
+                # print(f"\tbounds X right current = {currentState["bounds"][0][1]}, cached = {cachedState["bounds"][0][1]}")
 
                 if (currentState["bounds"][0][0] == cachedState["bounds"][0][0]
                     and currentState["bounds"][0][1] == cachedState["bounds"][0][1]):
-                    print(f"\t-> skip axis {kax} with unchanged X bounds \n\t---\n")
+                    # print(f"\t-> skip axis {kax} with unchanged X bounds \n\t---\n")
                     continue
 
-                print(f"\tview range X left current  = {currentState["state"]["viewRange"][0][0]}, cached = {cachedState["state"]["viewRange"][0][0]}")
-                print(f"\tview range X right current = {currentState["state"]["viewRange"][0][1]}, cached = {cachedState["state"]["viewRange"][0][1]}")
-
-                print(f"\tX offset left current  = {currentState["xOffset"][0]}, cached = {cachedState["xOffset"][0]}")
-                print(f"\tX offset right current = {currentState["xOffset"][1]}, cached = {cachedState["xOffset"][1]}")
+                # print(f"\tview range X left current  = {currentState["state"]["viewRange"][0][0]}, cached = {cachedState["state"]["viewRange"][0][0]}")
+                # print(f"\tview range X right current = {currentState["state"]["viewRange"][0][1]}, cached = {cachedState["state"]["viewRange"][0][1]}")
+                #
+                # print(f"\tX offset left current  = {currentState["xOffset"][0]}, cached = {cachedState["xOffset"][0]}")
+                # print(f"\tX offset right current = {currentState["xOffset"][1]}, cached = {cachedState["xOffset"][1]}")
 
                 newViewRangeX = (currentState["bounds"][0][0] + cachedState["xOffset"][0],
                                  currentState["bounds"][0][1] + cachedState["xOffset"][1])
 
-                now_padding = ax.vb.suggestPadding(0)
-                print(f"\tsuggested X padding: cached  = {cachedState["wantsPadX"]}")
-                print(f"\tsuggested X padding: cached  = {currentState["wantsPadX"]}")
-                print(f"\tsuggested X padding: now     = {now_padding}")
+                # now_padding = ax.vb.suggestPadding(0)
+                # print(f"\tsuggested X padding: cached  = {cachedState["suggestPadX"]}")
+                # print(f"\tsuggested X padding: cached  = {currentState["suggestPadY"]}")
+                # print(f"\tsuggested X padding: now     = {now_padding}")
+                #
+                # print(f"\tnew X range left:  {newViewRangeX[0]}")
+                # print(f"\tnew X range right: {newViewRangeX[1]}")
 
-                print(f"\tnew X range left:  {newViewRangeX[0]}")
-                print(f"\tnew X range right: {newViewRangeX[1]}")
+                link = currentState["state"]["linkedViews"][0]
+                # TODO: 2026-04-03 16:10:18
+                # skip if link, and the link view is on auto range
+                if isinstance(link, str):
+                    if link == "":
+                        link = None
+                    else:
+                        link = pg.ViewBox.NamedViews.get(link, link)
+
+                if hasattr(link, 'implements') and link.implements('ViewBoxWrapper'):
+                    link = link.getViewBox()
+
+                if link and link.getState()["autoRange"][0]:
+                    continue
 
                 # inspired by code in pg.ViewBox.setRange(…)
                 # might need to just ditch the y code
@@ -9022,41 +9021,25 @@ anything else       anything else       ❌
 #
 #                     mn -= dx * 0.5
 #                     mx += dx * 0.5
-#
+# #
 #                 quantization_limit = (mn+mx) * 1.5e-15
 #                 if mx-mn < 2*quantization_limit:
 #                     mn -= quantization_limit
 #                     mx += quantization_limit
 #
 #                 assert(math.isfinite(mn) and math.isfinite(mx)), f"Wrong range: {mn} - {mx}"
-#
-#                 p = (mx-mn) * now_padding
-#                 mn -= p
-#                 mx += p
 
-                link = currentState["state"]["linkedViews"][0]
-                # TODO: 2026-04-03 16:10:18
-                # skip if link, and the link view is on auto range
-                if isinstance(link, str):
-                    if link == "":
-                        link = None
-                    else:
-                        link = pg.ViewBox.NamedViews.get(link, link)
+                # p = (mx-mn) * now_padding
+                # mn -= p
+                # mx += p
 
-                if hasattr(link, 'implements') and link.implements('ViewBoxWrapper'):
-                    link = link.getViewBox()
-
-                if link and link.getState()["autoRange"][0]:
-                    continue
 
 
                 ax.vb.linkView(pg.ViewBox.XAxis, None)
-                ax.setXRange(*newViewRangeX)#, padding=cachedState["state"]["defaultPadding"]) # for now...
+                ax.setXRange(*newViewRangeX, padding = 0)#, padding=cachedState["state"]["defaultPadding"]) # for now...
                 ax.vb.linkView(pg.ViewBox.XAxis, link)
 
-                print("\t---\n")
-
-
+                # print("\t---\n")
 
         visibleSignalAxes = [ax for ax in self.signalAxes if ax.isVisible()]
 
@@ -9065,146 +9048,6 @@ anything else       anything else       ❌
             for ax in self.axes:
                 if ax != visibleSignalAxes[0]:
                     ax.vb.setXLink(visibleSignalAxes[0])
-
-
-        # for ax in self.axes:
-        #     ax.vb.updateViewRange(True, True)
-
-        # print(f"{self.__class__.__name__}._process_X_ranges_ {len(self._x_data_bounds_)}")
-        # self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in self.axes]
-        # if len(self._x_data_bounds_) == 0:
-        #     self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in self.axes]
-            # self._x_data_bounds_ = [self._get_axis_data_X_range_(ax) for ax in refAxes]
-
-        # print(f"{self.__class__.__name__}._process_X_ranges_ x data bounds {list(zip([self.axes.index(ax) for ax in self.axes] ,self._x_data_bounds_))}")
-
-
-        # print(f"{self.__class__.__name__}._process_X_ranges_ axeslinked = {self.xAxesLinked}")
-#         if self.xAxesLinked: # ← True when ALL axes but one are linked on X (either pairwise or to a common target)
-#             # if any(ax.vb.autoRangeEnabled()[0] for ax in self.signalAxes):
-#             if any(ax.vb.autoRangeEnabled()[0] for ax in self.axes):
-#                 return
-#             # NOTE: 2023-07-10 10:55:57 FIXME/TODO
-#             # still have to figure to figure out this contingency below:
-#             # selecting to show just plot items without autoranging
-#             # does not respect the view range previously set by the link target !!!
-#
-# #                 # get the axis which is auto-range enabled on X
-# #                 # autoXaxes = [ax for ax in self.axes if ax.vb.autoRangeEnabled()[0]]
-# #
-# #                 xLinkAxes = list()
-# #                 xLinks = [ax.vb.linkedView(0) for ax in self.axes if isinstance(ax.vb.linkedView(0), pg.ViewBox)]
-# #                 if len(xLinks): # is this guaranteed to happen ?!?
-# #                     xLinkAxes = list(set([[_ax for _ax in self.axes if _ax.vb == xLink][0] for xLink in xLinks]))
-# #
-# #                 # figure out the following:
-# #                 # • if an axis is auto-ranged on X ⇒ continue; else:
-# #                 #   ∘ if an axis is X-linked to a target, get the target's viewXrange
-# #                 #       and apply it to the axis; else:
-# #                 #   ∘ get the topmost X-link target viewX range and apply it to
-# #                 #       the axis
-# #
-# #                 for kax, ax in enumerate(self.axes):
-# #                     if ax.vb.autoRangeEnabled()[0]: # ← skip axes auto-ranged on X
-# #                         continue
-# #                     bounds = self._get_axis_data_X_range_(ax)
-# #                     if any(np.isnan(v) for v in bounds): # ← no data
-# #                         continue
-# #                     xLink = ax.vb.linkedView(0)
-# #                     if not isinstance(xLink, pg.ViewBox):
-# #                         # get the topmost xLink if this is NOT a linked axis
-# #                         # (might happen when individual axes are manually unlinked
-# #                         # but self._xAxesLinked_ is not updated, yet there still
-# #                         # are at least one link target in the axes)
-# #                         xLinkNdx = min([self.axes.index(a) for a in xLinkAxes])
-# #                         xLinkAxis = self.axes[xLinkNdx]
-# #                         xLink = xLinkAxis.vb
-# #
-# #                     xLinkViewXrange = xLink.viewRange()[0]
-# #                     xLinkAxes = [a for a in self.axes if a.vb == xLink]
-# #                     if len(xLinkAxes) == 0:
-# #                         continue # shouldn't happen
-# #                     xLinkAxis = xLinkAxes[0]
-# #                     xLinkAxNdx = self.axes.index(xLinkAxis)
-# #                     xLinkXBounds = self._get_axis_data_X_range_(xLinkAxis)
-# #                     print(f"{kax} bounds {bounds} link {xLinkAxNdx} link X bounds {xLinkXBounds} link Xview {xLinkViewXrange} ")
-# #                     offset, scale = self._axes_X_view_offsets_scales_[xLinkAxNdx]
-# #                     if any(np.isnan(v) for v in (offset, scale)):
-# #                         offset, scale = self._calculate_new_X_offset_scale_(xLinkXBounds, xLinkViewXrange)
-# #                     x0,x1 = bounds
-# #                     dx1 = x1-x0
-# #                     new_vx0 = x0 - offset
-# #                     new_view_dx = dx1 * scale
-# #                     new_vx1 = new_vx0 + new_view_dx
-# #                     print(f"offset = {offset}, scale = {scale}, dx1 = {dx1}, new_vx0 = {new_vx0}, new_view_dx = {new_view_dx}, new_vx1 = {new_vx1}")
-# #                     ax.vb.setXRange(new_vx0, new_vx1, padding=0., update=True)
-# #                     self._axes_X_view_ranges_[kax] = (new_vx0, new_vx1)
-# #                 return
-
-        # # NOTE: 2023-10-05 08:46:25
-        # # another poss workaround to try: use the first visible signal axis
-        # #
-        # visibleSignalAxes = [ax for ax in self.signalAxes if ax.isVisible()]
-        #
-        # if len(visibleSignalAxes):
-        #     refAxis = visibleSignalAxes[0]
-        # else:
-        #     refAxis = None
-        #
-        # for kax, ax in enumerate(self.axes):
-        #     # if ax not in self.signalAxes:
-        #     #     continue
-        #     # NOTE: 2023-07-10 10:51:10
-        #     # this loop OK when auto-ranging is disabled across plot items
-        #     # such as in the case of mouse interaction
-        #     # still a BUG when showing a linked plot item without its link
-        #     # target
-        #     # having them linked still messes up the display of linked plot item
-        #     # (not target) in isolation
-        #     # WORKAROUND: for this to work the link target MUST ALSO BE VISIBLE
-        #     # NOTE: 2023-07-09 21:17:19
-        #     # this returns the actual data X bounds (see NOTE: 2023-07-09 21:09:08)
-        #     current_X_bounds = self._get_axis_data_X_range_(ax)
-        #     # print(f"{self.__class__.__name__}._process_X_ranges_: axis {kax} current X bounds = {current_X_bounds}")
-        #     if any(np.isnan(v) for v in current_X_bounds): # ← no data !
-        #         continue
-        #
-        #     xLinkAxis = None
-        #     xLinkAxisNdx = None
-        #     xLinkXBounds = None
-        #     xLinkViewXrange = None
-        #     xLink = ax.vb.linkedView(0)
-        #     if isinstance(xLink, pg.ViewBox):
-        #         aa = [a for a in self.axes if a.vb == xLink]
-        #         ax.vb.blockLink(True)
-        #         xLink.blockLink(True)
-        #
-        #         if len(aa):
-        #             xLinkAxis = aa[0]
-        #             xLinkAxisNdx = self.axes.index(xLinkAxis)
-        #             xLinkXBounds = self._get_axis_data_X_range_(ax)
-        #             xLinkViewXrange = xLink.viewRange()[0]
-        #
-        #     current_viewXrange = ax.vb.viewRange()[0] if xLinkViewXrange is None else xLinkViewXrange
-        #
-        #     offset, scale = self._axes_X_view_offsets_scales_[kax] # if xLinkAxisNdx is None else self._axes_X_view_offsets_scales_[xLinkAxisNdx] # ← set by _slot_plot_axis_x_range_changed
-        #     view_dx = current_viewXrange[1] - current_viewXrange[0]
-        #     x0,x1 = current_X_bounds if xLinkXBounds is None else xLinkXBounds
-        #     dx1 = x1-x0
-        #     new_vx0 = x0 - offset
-        #     new_view_dx = dx1 * scale
-        #     new_vx1 = new_vx0 + new_view_dx
-        #
-        #     if any(a!=b for a,b in zip(current_viewXrange, (new_vx0, new_vx1))):
-        #         # print(f"{self.__class__.__name__}._process_X_ranges_: Axis {kax} ({ax.vb.name}) view range from {current_viewXrange} to: {new_vx0, new_vx1}")
-        #         try:
-        #             ax.vb.setXRange(new_vx0, new_vx1, padding = 0., update=True)
-        #         except:
-        #             traceback.print_exc()
-        #         if isinstance(xLink, pg.ViewBox):
-        #             ax.vb.blockLink(False)
-        #             xLink.blockLink(False)
-        #         self._axes_X_view_ranges_[kax] = (new_vx0, new_vx1)
 
     def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
@@ -11046,6 +10889,7 @@ anything else       anything else       ❌
                 plotItem.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
                 plotItem.setVisible(False)
                 self._signal_axes_.append(plotItem)
+                # # # plotItem.deleteLater()
 
         elif len(self.signalAxes) > _n_signal_axes_:
             # more signal axes than necessary
@@ -11668,8 +11512,8 @@ anything else       anything else       ❌
                 "state": state,
                 "xOffset": xOffset,
                 "yOffset": yOffset,
-                "wantsPadX": suggestedXPadding,
-                "wantsPadY": suggestedYPadding}
+                "suggestPadX": suggestedXPadding,
+                "suggestPadY": suggestedYPadding}
 
 
     @property
