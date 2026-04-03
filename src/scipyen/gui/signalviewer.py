@@ -7570,10 +7570,10 @@ anything else       anything else       ❌
 
                 # self._new_data_ = True
 
-                print(f"{self.__class__.__name__}._set_data_:")
-                print(f"\t_xData_ = {self._xData_}")
-                print(f"\t_yData_ = {self._yData_}")
-                print("\n###\n")
+                # print(f"{self.__class__.__name__}._set_data_:")
+                # print(f"\t_xData_ = {self._xData_}")
+                # print(f"\t_yData_ = {self._yData_}")
+                # print("\n###\n")
 
                 # BUG: 2026-04-03 11:01:44 FIXME
                 # this will call displayFrame twice!
@@ -8960,7 +8960,7 @@ anything else       anything else       ❌
         if len(self.axes) == 0:
             return
 
-        print(f"{self.__class__.__name__}._process_X_ranges_:")
+        print(f"{self.__class__.__name__}._process_X_ranges_ in frame {self.currentFrame}:")
 
         if len(self._axesStatesCache_):
             for kax, ax in enumerate(self.axes):
@@ -8968,29 +8968,95 @@ anything else       anything else       ❌
                 currentState = self.getPlotItemState(ax)
                 print(f"\tfor axis {kax} ('{ax.vb.name}'):")
                 print(f"\tauto-range on X = {cachedState["state"]["autoRange"][0]}")
-                print(f"\tlinked on X = {cachedState["state"]["linkedViews"][0]}")
+                print(f"\tlinked on X     = {cachedState["state"]["linkedViews"][0]}")
                 if cachedState["state"]["autoRange"][0]:
                     # skip axes that auto-range on X
-                    print(f"skip X-auto-ranged axis {kax}\n\t---\n")
+                    # but ensure it STAYS auto-ranged
+                    ax.vb.enableAutoRange(pg.ViewBox.XAxis)
+                    print(f"\t-> skip X-auto-ranged axis {kax}\n\t---\n")
                     continue
 
                 # TODO/FIXME 2026-04-03 10:12:53
                 # maybe use np.isclose in the comparisons below
 
-                print(f"\tbounds X left current = {currentState["bounds"][0][0]}, cached = {cachedState["bounds"][0][0]}")
+                print(f"\tbounds X left current  = {currentState["bounds"][0][0]}, cached = {cachedState["bounds"][0][0]}")
                 print(f"\tbounds X right current = {currentState["bounds"][0][1]}, cached = {cachedState["bounds"][0][1]}")
 
                 if (currentState["bounds"][0][0] == cachedState["bounds"][0][0]
                     and currentState["bounds"][0][1] == cachedState["bounds"][0][1]):
-                    print(f"skip axis {kax} with unchanged X bounds \n\t---\n")
+                    print(f"\t-> skip axis {kax} with unchanged X bounds \n\t---\n")
                     continue
 
-                newViewRangeX = (currentState["bounds"][0][0] + cachedState["xOffsetLeft"],
-                                 currentState["bounds"][0][1] + cachedState["xOffsetRight"])
+                print(f"\tview range X left current  = {currentState["state"]["viewRange"][0][0]}, cached = {cachedState["state"]["viewRange"][0][0]}")
+                print(f"\tview range X right current = {currentState["state"]["viewRange"][0][1]}, cached = {cachedState["state"]["viewRange"][0][1]}")
 
-                # ax.setXRange(*newViewRangeX) # for now...
+                print(f"\tX offset left current  = {currentState["xOffset"][0]}, cached = {cachedState["xOffset"][0]}")
+                print(f"\tX offset right current = {currentState["xOffset"][1]}, cached = {cachedState["xOffset"][1]}")
+
+                newViewRangeX = (currentState["bounds"][0][0] + cachedState["xOffset"][0],
+                                 currentState["bounds"][0][1] + cachedState["xOffset"][1])
+
+                now_padding = ax.vb.suggestPadding(0)
+                print(f"\tsuggested X padding: cached  = {cachedState["wantsPadX"]}")
+                print(f"\tsuggested X padding: cached  = {currentState["wantsPadX"]}")
+                print(f"\tsuggested X padding: now     = {now_padding}")
+
+                print(f"\tnew X range left:  {newViewRangeX[0]}")
+                print(f"\tnew X range right: {newViewRangeX[1]}")
+
+                # inspired by code in pg.ViewBox.setRange(…)
+                # might need to just ditch the y code
+                # limits = ax.vb._effectiveLimits()
+                # print('rng:limits ', limits) # diagnostic output should reflect additional limit in log mode
+                # limits = (self.state['limits']['xLimits'], self.state['limits']['yLimits'])
+                # minRng = [self.state['limits']['xRange'][0], self.state['limits']['yRange'][0]]
+                # maxRng = [self.state['limits']['xRange'][1], self.state['limits']['yRange'][1]]
+
+                # mn = min(newViewRangeX)
+                # mx = max(newViewRangeX)
+
+#                 if mn == mx:
+#                     dx = currentState['state']['viewRange'][0][1] - currentState['state']['viewRange'][0][0]
+#                     if dx == 0:
+#                         dx = 1
+#
+#                     mn -= dx * 0.5
+#                     mx += dx * 0.5
+#
+#                 quantization_limit = (mn+mx) * 1.5e-15
+#                 if mx-mn < 2*quantization_limit:
+#                     mn -= quantization_limit
+#                     mx += quantization_limit
+#
+#                 assert(math.isfinite(mn) and math.isfinite(mx)), f"Wrong range: {mn} - {mx}"
+#
+#                 p = (mx-mn) * now_padding
+#                 mn -= p
+#                 mx += p
+
+                link = currentState["state"]["linkedViews"][0]
+                # TODO: 2026-04-03 16:10:18
+                # skip if link, and the link view is on auto range
+                if isinstance(link, str):
+                    if link == "":
+                        link = None
+                    else:
+                        link = pg.ViewBox.NamedViews.get(link, link)
+
+                if hasattr(link, 'implements') and link.implements('ViewBoxWrapper'):
+                    link = link.getViewBox()
+
+                if link and link.getState()["autoRange"][0]:
+                    continue
+
+
+                ax.vb.linkView(pg.ViewBox.XAxis, None)
+                ax.setXRange(*newViewRangeX)#, padding=cachedState["state"]["defaultPadding"]) # for now...
+                ax.vb.linkView(pg.ViewBox.XAxis, link)
 
                 print("\t---\n")
+
+
 
         visibleSignalAxes = [ax for ax in self.signalAxes if ax.isVisible()]
 
@@ -11585,19 +11651,25 @@ anything else       anything else       ❌
 
         bounds = guiutils.getPlotItemDataBoundaries(o)
         state = o.vb.getState()
-        xOffsetLeft = state["viewRange"][0][0] - bounds[0][0]
-        xOffsetRight = state["viewRange"][0][1] - bounds[0][1]
-        yOffsetBottom = state["viewRange"][1][0] - bounds[1][0]
-        yOffsetTop = state["viewRange"][1][1] - bounds[1][1]
+        suggestedXPadding = o.vb.suggestPadding(0)
+        suggestedYPadding = o.vb.suggestPadding(1)
+
+        # left, right
+        xOffset = (state["viewRange"][0][0] - bounds[0][0],
+                   state["viewRange"][0][1] - bounds[0][1])
+
+        # bottom, top
+        yOffset = (state["viewRange"][1][0] - bounds[1][0],
+                   state["viewRange"][1][1] - bounds[1][1])
 
         return {"name":o.vb.name,
                 "visible": o.isVisible(),
                 "bounds": bounds,
                 "state": state,
-                "xOffsetLeft": xOffsetLeft,
-                "xOffsetRight": xOffsetRight,
-                "yOffsetBottom": yOffsetBottom,
-                "yOffsetTop": yOffsetTop}
+                "xOffset": xOffset,
+                "yOffset": yOffset,
+                "wantsPadX": suggestedXPadding,
+                "wantsPadY": suggestedYPadding}
 
 
     @property
