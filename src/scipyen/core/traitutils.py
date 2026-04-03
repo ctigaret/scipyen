@@ -140,7 +140,13 @@ def traitlet_set(instance, obj, value):
     silent = True
     change_type="modified"
     
-    check_Qt_object = lambda v: isinstance(v, QtCore.QObject) or (__has_PySide6__ and isinstance(v, type) and (hasattr(v, "setupUi") or issubclass(v, Shiboken.Object)))
+    check_Qt_object = lambda v: (isinstance(v, QtCore.QObject)
+                                 or (__has_PySide6__ and isinstance(v, type) and
+                                     (hasattr(v, "setupUi") or
+                                      issubclass(v, Shiboken.Object)
+                                      )
+                                     )
+                                 )
     
     if instance.name and instance.name in obj._trait_values and instance.name in obj.traits():
         old_value = obj._trait_values[instance.name]

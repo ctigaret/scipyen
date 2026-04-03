@@ -595,6 +595,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         self._enableAutoRangeAllAxesByDefault_: bool = False
 
+        # NOTE: 2026-04-03 09:52:22
+        # A better (?) caching for axes X range
+
+        self._axesStatesCache_ = list()
+
         # NOTE: 2023-04-26 12:07:26
         # for each axis, the following has a tuple of offset, factor
         # where:
@@ -7538,6 +7543,10 @@ anything else       anything else       ❌
                 else:
                     self.docTile = self._cached_title
 
+
+                if self._xData_ is not x or self._yData_ is not y:
+                    self._new_data_ = True
+
                 self._xData_ = x
                 self._yData_ = y
 
@@ -7559,10 +7568,21 @@ anything else       anything else       ❌
                 self.actionDetect_Triggers.setEnabled(isEphysDataCollection)
                 self.actionRemoveTriggers.setEnabled(isEphysDataCollection)
 
-                self._new_data_ = True
+                # self._new_data_ = True
 
-                self.observed_vars["xData"] = self._xData_
-                self.observed_vars["yData"] = self._yData_
+                print(f"{self.__class__.__name__}._set_data_:")
+                print(f"\t_xData_ = {self._xData_}")
+                print(f"\t_yData_ = {self._yData_}")
+                print("\n###\n")
+
+                # BUG: 2026-04-03 11:01:44 FIXME
+                # this will call displayFrame twice!
+                # Fixed by avoiding registration of non-data with self.observed_vars
+                if self._xData_ is not None and self._xData_ is not MISSING:
+                    self.observed_vars["xData"] = self._xData_
+
+                if self._yData_ is not None and self._yData_ is not MISSING:
+                    self.observed_vars["yData"] = self._yData_
 
                 # NOTE: 2023-06-02 11:02:18
                 # force plotting when the new data is the same as the existing
@@ -8586,11 +8606,23 @@ anything else       anything else       ❌
         Anything else                   ↦ ignored
 
         """
+        # print("###")
+        # traceback.print_stack()
+        # print("###")
+
         if self._yData_ is None:
             # print(f"{self.__class__.__name__} self._yData_ is None")
             self.clear()
             self._new_data_ = True
             return
+
+        # NOTE: 2026-04-03 09:53:05 see NOTE: 2026-04-03 09:52:22
+        # caching these BEFORE plotting new data, as the new data might bring
+        # a different X domain
+        # if len(self.axes): # same as self.plotItems
+        self._axesStatesCache_ = self.getAxesStates()
+
+        # print(f"{self.__class__.__name__}.displayFrame for {self.currentFrame} with _new_frame_ = {self._new_frame_}: {len(self._axesStatesCache_)} axes states\n\n###\n\n")
 
         self.currentFrameAnnotations = None
 
@@ -8691,7 +8723,9 @@ anything else       anything else       ❌
         # NOTE: 2024-10-23 11:36:50 FIXME
         # hold off this for now
         # self._adjust_left_label_space_()
-        self.sig_frameDisplayReady.emit() # NOTE: 2026-04-02 09:19:39 connected to _slot_post_frameDisplay
+        # NOTE: 2026-04-02 09:19:39
+        # connected to _slot_post_frameDisplay
+        self.sig_frameDisplayReady.emit()
         self._new_data_ = False
 
     def _calculate_new_X_offset_scale_(self, databounds:tuple, viewbounds:tuple,
@@ -8926,10 +8960,37 @@ anything else       anything else       ❌
         if len(self.axes) == 0:
             return
 
-        # if len(self.signalAxes) == 0:
-        #     refAxes = self.axes
-        # else:
-        #     refAxes = self.signalAxes
+        print(f"{self.__class__.__name__}._process_X_ranges_:")
+
+        if len(self._axesStatesCache_):
+            for kax, ax in enumerate(self.axes):
+                cachedState = self._axesStatesCache_[kax] # from previous frame; this is updated at the beginning of self.displayFrame(…)
+                currentState = self.getPlotItemState(ax)
+                print(f"\tfor axis {kax} ('{ax.vb.name}'):")
+                print(f"\tauto-range on X = {cachedState["state"]["autoRange"][0]}")
+                print(f"\tlinked on X = {cachedState["state"]["linkedViews"][0]}")
+                if cachedState["state"]["autoRange"][0]:
+                    # skip axes that auto-range on X
+                    print(f"skip X-auto-ranged axis {kax}\n\t---\n")
+                    continue
+
+                # TODO/FIXME 2026-04-03 10:12:53
+                # maybe use np.isclose in the comparisons below
+
+                print(f"\tbounds X left current = {currentState["bounds"][0][0]}, cached = {cachedState["bounds"][0][0]}")
+                print(f"\tbounds X right current = {currentState["bounds"][0][1]}, cached = {cachedState["bounds"][0][1]}")
+
+                if (currentState["bounds"][0][0] == cachedState["bounds"][0][0]
+                    and currentState["bounds"][0][1] == cachedState["bounds"][0][1]):
+                    print(f"skip axis {kax} with unchanged X bounds \n\t---\n")
+                    continue
+
+                newViewRangeX = (currentState["bounds"][0][0] + cachedState["xOffsetLeft"],
+                                 currentState["bounds"][0][1] + cachedState["xOffsetRight"])
+
+                # ax.setXRange(*newViewRangeX) # for now...
+
+                print("\t---\n")
 
         visibleSignalAxes = [ax for ax in self.signalAxes if ax.isVisible()]
 
@@ -10906,13 +10967,14 @@ anything else       anything else       ❌
                 # until we sort out how to manage left axis label spaces
                 # add ALL plotitems to column 0! (or at least ot the same column)
                 self.signalsLayout.addItem(plotItem, row = k, col = self._axesColumn_)
-                plotItem.sigRangeChanged.connect(self._slot_plotItemRangeChanged)
+
+                # plotItem.sigRangeChanged.connect(self._slot_plotItemRangeChanged)
                 # plotItem.sigXRangeChanged.connect(self._slot_plotItemXRangeChanged)
                 # plotItem.sigYRangeChanged.connect(self._slot_plotItemYRangeChanged)
-                plotItem.sigRangeChangedManually.connect(self._slot_plotItemRangeChangedManually)
+                # plotItem.sigRangeChangedManually.connect(self._slot_plotItemRangeChangedManually)
 
-                plotItem.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
-                plotItem.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
+                # plotItem.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
+                # plotItem.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
 
                 plotItem.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
                 plotItem.scene().sigMouseHover[object].connect(self._slot_mouseHoverInPlotItem)
@@ -10945,8 +11007,8 @@ anything else       anything else       ❌
         # see WARNING 2023-01-17 10:46:04 and NOTE: 2023-01-17 10:44:37
         if not isinstance(self._events_axis_, pg.PlotItem):
             self._events_axis_ = pg.PlotItem(name=self._default_events_axis_name_)
-            self._events_axis_.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
-            self._events_axis_.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
+            # self._events_axis_.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
+            # self._events_axis_.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
             if self._events_axis_.scene() is not None:
                 self._events_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
 
@@ -10959,8 +11021,8 @@ anything else       anything else       ❌
         # see WARNING 2023-01-17 10:46:04 and NOTE: 2023-01-17 10:44:37
         if not isinstance(self._spiketrains_axis_, pg.PlotItem):
             self._spiketrains_axis_ = pg.PlotItem(name=self._default_spiketrains_axis_name_)
-            self._spiketrains_axis_.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
-            self._spiketrains_axis_.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
+            # self._spiketrains_axis_.sigXRangeChanged.connect(self._slot_plot_axis_x_range_changed)
+            # self._spiketrains_axis_.vb.sigRangeChangedManually.connect(self._slot_plot_axis_range_changed_manually)
             if self._spiketrains_axis_.scene() is not None:
                 self._spiketrains_axis_.scene().sigMouseMoved[object].connect(self._slot_mouseMovedInPlotItem)
 
@@ -11513,6 +11575,30 @@ anything else       anything else       ❌
         to_interval = lambda v: Interval(*v[0], extent=True, name = v[1]) if len(v) == 2 else (Interval(*v[0], extent=True, name = f"{v[2]}_h"), Interval(*v[1], extent=True, name = f"{v[2]}_v"))
         if len(values):
             return tuple(map(lambda v: to_interval(v), values))
+
+    def getAxesStates(self) -> list:
+        return list(map(lambda i: self.getPlotItemState(i),self.axes))
+
+    def getPlotItemState(self, o: pg.PlotItem) -> dict|None:
+        if not isinstance(o, pg.PlotItem):
+            return
+
+        bounds = guiutils.getPlotItemDataBoundaries(o)
+        state = o.vb.getState()
+        xOffsetLeft = state["viewRange"][0][0] - bounds[0][0]
+        xOffsetRight = state["viewRange"][0][1] - bounds[0][1]
+        yOffsetBottom = state["viewRange"][1][0] - bounds[1][0]
+        yOffsetTop = state["viewRange"][1][1] - bounds[1][1]
+
+        return {"name":o.vb.name,
+                "visible": o.isVisible(),
+                "bounds": bounds,
+                "state": state,
+                "xOffsetLeft": xOffsetLeft,
+                "xOffsetRight": xOffsetRight,
+                "yOffsetBottom": yOffsetBottom,
+                "yOffsetTop": yOffsetTop}
+
 
     @property
     def signalCursors(self):
