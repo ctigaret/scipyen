@@ -4646,7 +4646,7 @@ anything else       anything else       ❌
 
                 item_path.reverse()
 
-                value = get_nested_value(self.dataAnnotations, item_path[1:]) # because 1st item is the insivible root name
+                value = get_nested_value(self.dataAnnotations, item_path[1:]) # because 1st item is the isVisible root name
 
                 values.append(value)
 
@@ -8941,24 +8941,71 @@ anything else       anything else       ❌
     are linked.
 
         """
-        if len(self.axes) == 0:
+        # if len(self.axes) == 0:
+        #     return
+
+        if len(tuple(filter(lambda ax: ax.isVisible(), self.axes))) == 0:
             return
+
+        getLinkedView = lambda l: pg.ViewBox.NamedViews.get(l, l)
+
+        # visibleSignalAxes = [ax for ax in self.signalAxes if ax.isVisible()]
+        visibleSignalAxes = tuple(filter(lambda ax: ax.isVisible(), self.axes))
+        #
+        # if self.xAxesLinked:
+        #     # relink to the topmost visible signal axis
+        #     for ax in self.axes:
+        #         if ax != visibleSignalAxes[0]:
+        #             ax.vb.setXLink(visibleSignalAxes[0])
+
+        # visibleSignalAxes = tuple(filter(lambda ax: ax.isVisible(), self.signalAxes))
+        # if self.xAxesLinked:
+        #     # relink to the topmost visible signal axis
+        #     for ax in self.axes:
+        #         if ax != visibleSignalAxes[0]:
+        #             ax.vb.setXLink(visibleSignalAxes[0])
+
+        currentStates = self.getAxesStates()
 
         # print(f"{self.__class__.__name__}._process_X_ranges_ in frame {self.currentFrame}:")
 
         if len(self._axesStatesCache_):
             for kax, ax in enumerate(self.axes):
                 cachedState = self._axesStatesCache_[kax] # from previous frame; this is updated at the beginning of self.displayFrame(…)
-                currentState = self.getPlotItemState(ax)
+                # currentState = self.getPlotItemState(ax)
+                cachedLinkedView = getLinkedView(cachedState["state"]["linkedViews"][pg.ViewBox.XAxis])
+                currentLinkedView = ax.vb.linkedView(pg.ViewBox.XAxis)
+                # TODO: 2026-04-03 16:10:18
+                # skip if link, and the link view is on auto range
+# #                 if isinstance(cachedLink, str):
+# #                     if cachedLink == "":
+# #                         cachedLink = None
+# #                     else:
+# #                         cachedLink = pg.ViewBox.NamedViews.get(cachedLink, cachedLink)
+# #
+# #                 if hasattr(cachedLink, 'implements') and cachedLink.implements('ViewBoxWrapper'):
+# #                     cachedLinkItem = cachedLink
+# #                     cachedLink = cachedLinkItem.getViewBox()
+# #
+# #                 elif isinstance
+
+                currentState = currentStates[kax]
                 # print(f"\tfor axis {kax} ('{ax.vb.name}'):")
                 # print(f"\tauto-range on X = {cachedState["state"]["autoRange"][0]}")
                 # print(f"\tlinked on X     = {cachedState["state"]["linkedViews"][0]}")
-                if cachedState["state"]["autoRange"][0]:
+                if cachedState["state"]["autoRange"][pg.ViewBox.XAxis]:
                     # skip axes that auto-range on X
                     # but ensure it STAYS auto-ranged
                     ax.vb.enableAutoRange(pg.ViewBox.XAxis)
                     # print(f"\t-> skip X-auto-ranged axis {kax}\n\t---\n")
                     continue
+
+                elif isinstance(cachedLinkedView, pg.ViewBox) and currentLinkedView == cachedLinkedView:
+                    if not cachedLinkedView.parentItem().isVisible():
+                        if cachedLinkedView.parentItem().vb.state["autoRange"][pg.ViewBox.XAxis]:
+                            ax.vb.enableAutoRange(pg.ViewBox.XAxis)
+                            continue
+
 
                 # TODO/FIXME 2026-04-03 10:12:53
                 # maybe use np.isclose in the comparisons below
@@ -8999,9 +9046,8 @@ anything else       anything else       ❌
                 # ax.setXRange(*newViewRangeX, padding = 0)#, padding=cachedState["state"]["defaultPadding"]) # for now...
                 # ax.vb.linkView(pg.ViewBox.XAxis, link)
 
-        visibleSignalAxes = [ax for ax in self.signalAxes if ax.isVisible()]
-
-        if len(visibleSignalAxes) and self.xAxesLinked:
+        # visibleSignalAxes = tuple(filter(lambda ax: ax.isVisible(), self.signalAxes))
+        if self.xAxesLinked:
             # relink to the topmost visible signal axis
             for ax in self.axes:
                 if ax != visibleSignalAxes[0]:
@@ -11453,8 +11499,8 @@ anything else       anything else       ❌
 
         bounds = guiutils.getPlotItemDataBoundaries(o)
         state = o.vb.getState()
-        suggestedXPadding = o.vb.suggestPadding(0)
-        suggestedYPadding = o.vb.suggestPadding(1)
+        # suggestedXPadding = o.vb.suggestPadding(0)
+        # suggestedYPadding = o.vb.suggestPadding(1)
 
         # left, right
         xOffset = (state["viewRange"][0][0] - bounds[0][0],
@@ -11470,8 +11516,9 @@ anything else       anything else       ❌
                 "state": state,
                 "xOffset": xOffset,
                 "yOffset": yOffset,
-                "suggestPadX": suggestedXPadding,
-                "suggestPadY": suggestedYPadding}
+                # "suggestPadX": suggestedXPadding,
+                # "suggestPadY": suggestedYPadding,
+                }
 
 
     @property
