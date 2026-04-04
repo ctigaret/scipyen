@@ -599,7 +599,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # NOTE: 2026-04-03 09:52:22
         # A better (?) caching for axes X range
 
-        self._axesStatesCache_ = list()
+        # self._axesStatesCache_ = list()
+        self._axesXOffsetsCache_ = list()
 
         # NOTE: 2023-04-26 12:07:26
         # for each axis, the following has a tuple of offset, factor
@@ -8617,7 +8618,8 @@ anything else       anything else       ❌
         # caching these BEFORE plotting new data, as the new data might bring
         # a different X domain
         # if len(self.axes): # same as self.plotItems
-        self._axesStatesCache_ = self.getViewStates()
+        # self._axesStatesCache_ = self.getViewStates()
+        self._axesXOffsetsCache_ = self.getViewXOffsets()
 
         # print(f"{self.__class__.__name__}.displayFrame for {self.currentFrame} with _new_frame_ = {self._new_frame_}: {len(self._axesStatesCache_)} axes states\n\n###\n\n")
 
@@ -8956,36 +8958,40 @@ anything else       anything else       ❌
 
         # print(f"{self.__class__.__name__}._process_X_ranges_ in frame {self.currentFrame}:")
 
-        if len(self._axesStatesCache_):
+        # if len(self._axesStatesCache_):
+        if len(self._axesXOffsetsCache_):
             for kax, ax in enumerate(self.axes):
                 if not ax.isVisible():
                     # print(f"\t-> skip axis {kax} because it is not visible \n\t---\n")
                     continue
-                cachedState = self._axesStatesCache_[kax] # from previous frame; this is updated at the beginning of self.displayFrame(…)
+                # cachedState = self._axesStatesCache_[kax] # from previous frame; this is updated at the beginning of self.displayFrame(…)
+                cachedXOffset = self._axesXOffsetsCache_[kax] # from previous frame; this is updated at the beginning of self.displayFrame(…)
                 currentBounds = guiutils.getPlotItemDataBoundaries(ax)
                 # currentState = self.getPlotItemViewState(ax)
                 # currentState = currentStates[kax]
-                cachedLinkedView = getLinkedView(cachedState["state"]["linkedViews"][0])
-                currentLinkedView = ax.vb.linkedView(0)
+                # cachedXLinkedView = getLinkedView(cachedState["state"]["linkedViews"][0])
+                cachedXLinkedView = cachedXOffset["xLinkedView"]
+                currentXLinkedView = ax.vb.linkedView(0)
 
                 # print(f"\tfor axis {kax} ('{ax.vb.name}'):")
                 # print(f"\tauto-range on X = {cachedState["state"]["autoRange"][0]}")
                 # print(f"\tlinked on X     = {cachedState["state"]["linkedViews"][0]}")
-                if cachedState["state"]["autoRange"][0]:
+                # if cachedState["state"]["autoRange"][0]:
+                if cachedXOffset["autoRangeX"]:
                     # skip axes that auto-range on X
                     # but ensure it STAYS auto-ranged
                     ax.vb.enableAutoRange(0)
                     # print(f"\t-> skip axis {kax} because it is X-auto-ranged axis \n\t---\n")
                     continue
 
-                elif isinstance(cachedLinkedView, pg.ViewBox) and currentLinkedView == cachedLinkedView:
-                    if not cachedLinkedView.parentItem().isVisible():
-                        if cachedLinkedView.parentItem().vb.state["autoRange"][0]:
+                elif isinstance(cachedXLinkedView, pg.ViewBox) and currentXLinkedView == cachedXLinkedView:
+                    if not cachedXLinkedView.parentItem().isVisible():
+                        if cachedXLinkedView.parentItem().vb.state["autoRange"][0]:
                             ax.vb.enableAutoRange(0)
                             # print(f"\t-> skip axis {kax} because is linked to an X-auto-ranged view  \n\t---\n")
                             continue
 
-                if currentLinkedView and currentLinkedView.getState()["autoRange"][0]:
+                if currentXLinkedView and currentXLinkedView.state["autoRange"][0]:
                     continue
 
                 # TODO/FIXME 2026-04-03 10:12:53
@@ -8994,13 +9000,17 @@ anything else       anything else       ❌
 
                 # if (currentState["bounds"][0][0] == cachedState["bounds"][0][0]
                 #     and currentState["bounds"][0][1] == cachedState["bounds"][0][1]):
-                if (currentBounds[0][0] == cachedState["bounds"][0][0]
-                    and currentBounds[0][1] == cachedState["bounds"][0][1]):
+                # if (currentBounds[0][0] == cachedState["bounds"][0][0]
+                #     and currentBounds[0][1] == cachedState["bounds"][0][1]):
+                if (currentBounds[0][0] == cachedXOffset["bounds"][0][0]
+                    and currentBounds[0][1] == cachedXOffset["bounds"][0][1]):
                     # print(f"\t-> skip axis {kax} with unchanged X bounds \n\t---\n")
                     continue
 
-                newViewRangeX = (currentBounds[0][0] + cachedState["xOffset"][0],
-                                 currentBounds[0][1] + cachedState["xOffset"][1])
+                # newViewRangeX = (currentBounds[0][0] + cachedState["xOffset"][0],
+                #                  currentBounds[0][1] + cachedState["xOffset"][1])
+                newViewRangeX = (currentBounds[0][0] + cachedXOffset["xOffset"][0],
+                                 currentBounds[0][1] + cachedXOffset["xOffset"][1])
                 # newViewRangeX = (currentState["bounds"][0][0] + cachedState["xOffset"][0],
                 #                  currentState["bounds"][0][1] + cachedState["xOffset"][1])
 
@@ -9019,22 +9029,25 @@ anything else       anything else       ❌
                 # if link and link.getState()["autoRange"][0]:
                 #     continue
 
-                if currentLinkedView:
-                    currentLinkedView.blockLink(True)
+                if currentXLinkedView:
+                    currentXLinkedView.blockLink(True)
 
-                ax.setXRange(*newViewRangeX, padding = 0)#, padding=cachedState["state"]["defaultPadding"]) # for now...
+                ax.setXRange(*newViewRangeX, padding = 0)
 
-                if currentLinkedView:
-                    currentLinkedView.blockLink(False)
+                if currentXLinkedView:
+                    currentXLinkedView.blockLink(False)
 
         if self.xAxesLinked:
             # relink _ALL_ axes to the topmost visible signal axis
             # (and unlink this from anything else)
-            for ax in self.axes:
-                if ax  == visibleSignalAxes[0]:
-                    ax.vb.setXLink(None)
-                else:
-                    ax.vb.setXLink(visibleSignalAxes[0])
+            if len(visibleSignalAxes):
+                for ax in self.axes:
+                    if ax  == visibleSignalAxes[0]:
+                        if currentXLinkedView:
+                            ax.vb.setXLink(None)
+                    else:
+                        if currentXLinkedView.parentItem() != visibleSignalAxes[0]:
+                            ax.vb.setXLink(visibleSignalAxes[0])
 
     @timefunc
     def _process_X_ranges_2_(self):
@@ -9086,8 +9099,9 @@ anything else       anything else       ❌
                 # if ax in axes_with_X_overlap: # also hide axis values if same boundaries
                 #     prev_ax.getAxis("bottom").setStyle(showValues=False)
 
-        visibleAxes[-1].getAxis("bottom").showLabel(True)
-        visibleAxes[-1].getAxis("bottom").setStyle(showValues = True)
+        if len(visibleAxes):
+            visibleAxes[-1].getAxis("bottom").showLabel(True)
+            visibleAxes[-1].getAxis("bottom").setStyle(showValues = True)
 
 
     @safewrapper
@@ -11505,6 +11519,45 @@ anything else       anything else       ❌
 
         return list(map(lambda i: self.getPlotItemViewState(i), axes))
         # return list(map(lambda i: self.getPlotItemViewState(i), self.axes))
+
+    def getViewXOffsets(self, visibleOnly: typing.Optional[typing.Union[bool, Tribool]] = None) -> list:
+        if isinstance(visibleOnly, Tribool):
+            visibleOnly = visibleOnly.value
+
+        if isinstance(visibleOnly, bool):
+            if visibleOnly:
+                axes = filter(lambda a: a.isVisible(), self.axes)
+            else:
+                axes = filter(lambda a: not a.isVisible(), self.axes)
+        else:
+            axes = self.axes
+
+        return list(map(lambda i: self.getPlotItemXOffsets(i), axes))
+        # return list(map(lambda i: self.getPlotItemViewState(i), self.axes))
+
+    def getPlotItemXOffsets(self, o: pg.PlotItem) -> dict | None:
+        if not isinstance(o, pg.PlotItem):
+            return
+        getLinkedView = lambda l: pg.ViewBox.NamedViews.get(l, l)
+
+        bounds = guiutils.getPlotItemDataBoundaries(o)
+        state = o.vb.getState()
+
+        # left, right
+        xOffset = (state["viewRange"][0][0] - bounds[0][0],
+                   state["viewRange"][0][1] - bounds[0][1])
+
+        # bottom, top
+        yOffset = (state["viewRange"][1][0] - bounds[1][0],
+                   state["viewRange"][1][1] - bounds[1][1])
+
+        return {"name":         o.vb.name,
+                "bounds":       bounds,
+                "xLinkedView":  getLinkedView(state["linkedViews"][0]),
+                "autoRangeX":   state["autoRange"][0],
+                "xOffset":      xOffset,
+                "yOffset":      yOffset,
+                }
 
     def getPlotItemViewState(self, o: pg.PlotItem) -> dict|None:
         if not isinstance(o, pg.PlotItem):
