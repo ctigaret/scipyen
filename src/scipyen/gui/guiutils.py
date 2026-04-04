@@ -299,7 +299,7 @@ def getPlotItemDataBoundaries(item:pg.PlotItem):
     """
     [[vxmin, vxmax], [vymin, vymax]] = item.viewRange()
     plotDataItems = [i for i in item.listDataItems() if isinstance(i, pg.PlotDataItem) and all(v is not None for v in (i.xData, i.yData))]
-    if len(plotDataItems): # no data plotted
+    if len(plotDataItems):
         mfun = lambda x: -np.inf if x is None else x
         pfun = lambda x: np.inf if x is None else x
 
@@ -320,7 +320,7 @@ def getPlotItemDataBoundaries(item:pg.PlotItem):
         if np.isinf(ymax) or np.isnan(ymax):
             ymax = vymax
 
-    else:
+    else: # no data plotted
         xmin = vxmin
         xmax = vxmax
         ymin = vymin
