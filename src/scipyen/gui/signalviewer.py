@@ -215,7 +215,7 @@ from core.neoutils import (get_domain_name,
                            segment_start,
                            )
 
-from core.prog import (safewrapper, show_caller_stack, with_doc, scipywarn)
+from core.prog import (safewrapper, show_caller_stack, with_doc, scipywarn, timefunc)
 from core.datatypes import (array_slice, is_column_vector, is_vector, )
 
 from core.utilities import (normalized_index, normalized_axis_index,
@@ -8916,7 +8916,7 @@ anything else       anything else       ❌
         self._process_X_ranges_()
         self._update_axes_spines_()
 
-
+    @timefunc
     def _process_X_ranges_(self, padding:typing.Optional[float] = None):
         r""" Maintains an X view range for frames with different X data bounds.
     Necessary to recreate a view range to an axis relative to the axis' X data.
@@ -8963,30 +8963,14 @@ anything else       anything else       ❌
                 # TODO/FIXME 2026-04-03 10:12:53
                 # maybe use np.isclose in the comparisons below
                 #
-                # print(f"\tbounds X left current  = {currentState["bounds"][0][0]}, cached = {cachedState["bounds"][0][0]}")
-                # print(f"\tbounds X right current = {currentState["bounds"][0][1]}, cached = {cachedState["bounds"][0][1]}")
 
                 if (currentState["bounds"][0][0] == cachedState["bounds"][0][0]
                     and currentState["bounds"][0][1] == cachedState["bounds"][0][1]):
                     # print(f"\t-> skip axis {kax} with unchanged X bounds \n\t---\n")
                     continue
 
-                # print(f"\tview range X left current  = {currentState["state"]["viewRange"][0][0]}, cached = {cachedState["state"]["viewRange"][0][0]}")
-                # print(f"\tview range X right current = {currentState["state"]["viewRange"][0][1]}, cached = {cachedState["state"]["viewRange"][0][1]}")
-                #
-                # print(f"\tX offset left current  = {currentState["xOffset"][0]}, cached = {cachedState["xOffset"][0]}")
-                # print(f"\tX offset right current = {currentState["xOffset"][1]}, cached = {cachedState["xOffset"][1]}")
-
                 newViewRangeX = (currentState["bounds"][0][0] + cachedState["xOffset"][0],
                                  currentState["bounds"][0][1] + cachedState["xOffset"][1])
-
-                # now_padding = ax.vb.suggestPadding(0)
-                # print(f"\tsuggested X padding: cached  = {cachedState["suggestPadX"]}")
-                # print(f"\tsuggested X padding: cached  = {currentState["suggestPadY"]}")
-                # print(f"\tsuggested X padding: now     = {now_padding}")
-                #
-                # print(f"\tnew X range left:  {newViewRangeX[0]}")
-                # print(f"\tnew X range right: {newViewRangeX[1]}")
 
                 link = currentState["state"]["linkedViews"][0]
                 # TODO: 2026-04-03 16:10:18
@@ -9003,43 +8987,9 @@ anything else       anything else       ❌
                 if link and link.getState()["autoRange"][0]:
                     continue
 
-                # inspired by code in pg.ViewBox.setRange(…)
-                # might need to just ditch the y code
-                # limits = ax.vb._effectiveLimits()
-                # print('rng:limits ', limits) # diagnostic output should reflect additional limit in log mode
-                # limits = (self.state['limits']['xLimits'], self.state['limits']['yLimits'])
-                # minRng = [self.state['limits']['xRange'][0], self.state['limits']['yRange'][0]]
-                # maxRng = [self.state['limits']['xRange'][1], self.state['limits']['yRange'][1]]
-
-                # mn = min(newViewRangeX)
-                # mx = max(newViewRangeX)
-
-#                 if mn == mx:
-#                     dx = currentState['state']['viewRange'][0][1] - currentState['state']['viewRange'][0][0]
-#                     if dx == 0:
-#                         dx = 1
-#
-#                     mn -= dx * 0.5
-#                     mx += dx * 0.5
-# #
-#                 quantization_limit = (mn+mx) * 1.5e-15
-#                 if mx-mn < 2*quantization_limit:
-#                     mn -= quantization_limit
-#                     mx += quantization_limit
-#
-#                 assert(math.isfinite(mn) and math.isfinite(mx)), f"Wrong range: {mn} - {mx}"
-
-                # p = (mx-mn) * now_padding
-                # mn -= p
-                # mx += p
-
-
-
                 ax.vb.linkView(pg.ViewBox.XAxis, None)
                 ax.setXRange(*newViewRangeX, padding = 0)#, padding=cachedState["state"]["defaultPadding"]) # for now...
                 ax.vb.linkView(pg.ViewBox.XAxis, link)
-
-                # print("\t---\n")
 
         visibleSignalAxes = [ax for ax in self.signalAxes if ax.isVisible()]
 
