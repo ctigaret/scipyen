@@ -8987,9 +8987,17 @@ anything else       anything else       ❌
                 if link and link.getState()["autoRange"][0]:
                     continue
 
-                ax.vb.linkView(pg.ViewBox.XAxis, None)
+                if link:
+                    link.blockLink(True)
+
                 ax.setXRange(*newViewRangeX, padding = 0)#, padding=cachedState["state"]["defaultPadding"]) # for now...
-                ax.vb.linkView(pg.ViewBox.XAxis, link)
+
+                if link:
+                    link.blockLink(False)
+
+                # ax.vb.linkView(pg.ViewBox.XAxis, None)
+                # ax.setXRange(*newViewRangeX, padding = 0)#, padding=cachedState["state"]["defaultPadding"]) # for now...
+                # ax.vb.linkView(pg.ViewBox.XAxis, link)
 
         visibleSignalAxes = [ax for ax in self.signalAxes if ax.isVisible()]
 
