@@ -8916,6 +8916,8 @@ anything else       anything else       ❌
         self._process_X_ranges_()
         self._update_axes_spines_()
 
+    # NOTE: 2026-04-04 14:03:37
+    # OK, so _process_X_ranges_ works but it's slow ...
     @timefunc
     def _process_X_ranges_(self, padding:typing.Optional[float] = None):
         r""" Maintains an X view range for frames with different X data bounds.
@@ -8941,8 +8943,8 @@ anything else       anything else       ❌
     are linked.
 
         """
-        # if len(self.axes) == 0:
-        #     return
+        if len(self.axes) == 0:
+            return
 
         if len(tuple(filter(lambda ax: ax.isVisible(), self.axes))) == 0:
             return
@@ -8950,46 +8952,24 @@ anything else       anything else       ❌
         getLinkedView = lambda l: pg.ViewBox.NamedViews.get(l, l)
 
         # visibleSignalAxes = [ax for ax in self.signalAxes if ax.isVisible()]
-        visibleSignalAxes = tuple(filter(lambda ax: ax.isVisible(), self.axes))
-        #
-        # if self.xAxesLinked:
-        #     # relink to the topmost visible signal axis
-        #     for ax in self.axes:
-        #         if ax != visibleSignalAxes[0]:
-        #             ax.vb.setXLink(visibleSignalAxes[0])
+        visibleAxes = tuple(filter(lambda ax: ax.isVisible(), self.axes))
+        visibleSignalAxes = tuple(filter(lambda ax: ax.isVisible(), self.signalAxes))
 
-        # visibleSignalAxes = tuple(filter(lambda ax: ax.isVisible(), self.signalAxes))
-        # if self.xAxesLinked:
-        #     # relink to the topmost visible signal axis
-        #     for ax in self.axes:
-        #         if ax != visibleSignalAxes[0]:
-        #             ax.vb.setXLink(visibleSignalAxes[0])
-
-        currentStates = self.getAxesStates()
+        # currentStates = self.getAxesStates()
 
         # print(f"{self.__class__.__name__}._process_X_ranges_ in frame {self.currentFrame}:")
 
         if len(self._axesStatesCache_):
             for kax, ax in enumerate(self.axes):
+                if not ax.isVisible():
+                    # print(f"\t-> skip axis {kax} because it is not visible \n\t---\n")
+                    continue
                 cachedState = self._axesStatesCache_[kax] # from previous frame; this is updated at the beginning of self.displayFrame(…)
-                # currentState = self.getPlotItemState(ax)
+                currentState = self.getPlotItemState(ax)
+                # currentState = currentStates[kax]
                 cachedLinkedView = getLinkedView(cachedState["state"]["linkedViews"][pg.ViewBox.XAxis])
                 currentLinkedView = ax.vb.linkedView(pg.ViewBox.XAxis)
-                # TODO: 2026-04-03 16:10:18
-                # skip if link, and the link view is on auto range
-# #                 if isinstance(cachedLink, str):
-# #                     if cachedLink == "":
-# #                         cachedLink = None
-# #                     else:
-# #                         cachedLink = pg.ViewBox.NamedViews.get(cachedLink, cachedLink)
-# #
-# #                 if hasattr(cachedLink, 'implements') and cachedLink.implements('ViewBoxWrapper'):
-# #                     cachedLinkItem = cachedLink
-# #                     cachedLink = cachedLinkItem.getViewBox()
-# #
-# #                 elif isinstance
 
-                currentState = currentStates[kax]
                 # print(f"\tfor axis {kax} ('{ax.vb.name}'):")
                 # print(f"\tauto-range on X = {cachedState["state"]["autoRange"][0]}")
                 # print(f"\tlinked on X     = {cachedState["state"]["linkedViews"][0]}")
@@ -8997,13 +8977,14 @@ anything else       anything else       ❌
                     # skip axes that auto-range on X
                     # but ensure it STAYS auto-ranged
                     ax.vb.enableAutoRange(pg.ViewBox.XAxis)
-                    # print(f"\t-> skip X-auto-ranged axis {kax}\n\t---\n")
+                    # print(f"\t-> skip axis {kax} because it is X-auto-ranged axis \n\t---\n")
                     continue
 
                 elif isinstance(cachedLinkedView, pg.ViewBox) and currentLinkedView == cachedLinkedView:
                     if not cachedLinkedView.parentItem().isVisible():
                         if cachedLinkedView.parentItem().vb.state["autoRange"][pg.ViewBox.XAxis]:
                             ax.vb.enableAutoRange(pg.ViewBox.XAxis)
+                            # print(f"\t-> skip axis {kax} because is linked to an X-auto-ranged view  \n\t---\n")
                             continue
 
 
@@ -9048,10 +9029,27 @@ anything else       anything else       ❌
 
         # visibleSignalAxes = tuple(filter(lambda ax: ax.isVisible(), self.signalAxes))
         if self.xAxesLinked:
-            # relink to the topmost visible signal axis
+            # relink _ALL_ axes to the topmost visible signal axis
             for ax in self.axes:
                 if ax != visibleSignalAxes[0]:
                     ax.vb.setXLink(visibleSignalAxes[0])
+
+#     @timefunc
+#     def _process_X_ranges_2_(self):
+#         if len(self.axes) == 0:
+#             return
+#
+#         visibleAxes = tuple(filter(lambda ax: ax.isVisible(), self.axes))
+#         if len(visibleAxes) == 0:
+#             return
+#
+#         visibleSignalAxes = tuple(filter(lambda ax: ax.isVisible(), self.signalAxes))
+#
+#         for kax, ax in enumerate()
+#
+#         if self.xAxesLinked:
+
+
 
     def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
