@@ -2336,8 +2336,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
             elif all(isinstance(v, neo.SpikeTrain) for v in entities_list):
                 entities_axis.clear()
-                t_min = min(list(map(lambda t: t.t_start, entities_list)))
-                t_max = max(list(map(lambda t: t.t_start, entities_list)))
+                # t_min = min(list(map(lambda t: t.t_start, entities_list)))
+                # t_max = max(list(map(lambda t: t.t_stop, entities_list)))
 
                 # NOTE: 2026-04-02 00:20:23
                 # ensure spikes are embedded in the full signal domain
@@ -2359,9 +2359,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
                     # NOTE: 2026-04-02 00:20:51 see NOTE: 2026-04-02 00:20:23
                     # ensuring spike axis  covers the full signal time domain
-                    if minDataX is not None and maxDataX is not None:
-                        x = np.hstack((minDataX, x, maxDataX))
-                        y = np.hstack((np.array([np.nan]), y, np.array([np.nan])))
+                    # if minDataX is not None and maxDataX is not None:
+                    #     x = np.hstack((minDataX, x, maxDataX))
+                    #     y = np.hstack((np.array([np.nan]), y, np.array([np.nan])))
 
                     self._plot_numeric_data_(entities_axis, x, y,
                                                 symbol=spikeTrainSymbol,
@@ -8489,67 +8489,6 @@ anything else       anything else       ❌
     def _slot_setCrosshairCursorColors(self):
         self._gui_chose_cursor_color_("crosshair")
 
-    # @Slot(object, object)
-    # @safewrapper
-    # def _slot_plot_axis_x_range_changed(self, vb, x0x1):
-    #     r"""Captures changes in the view range on the X axis.
-    #     Triggered by PlotItem signal sigXRangeChanged.
-    #     These changes are typically generated using a mouse button pressed in
-    #     a Plotitem (signal viewer "axis").
-    #
-    #     """
-    #     sender = self.sender()
-    #     ax_ndx = self.axes.index(sender)
-    #     if not isinstance(vb, pg.ViewBox):
-    #         return
-    #
-    #     print(f"{self.__class__.__name__}._slot_plot_axis_x_range_changed: x0x1 = {x0x1} in axis {ax_ndx} ('{vb.name}')")
-    #
-    #     if not isinstance(x0x1, tuple) or len(x0x1) != 2:
-    #         return
-    #
-    #
-    #     # vbAxes = [ax for ax in self.axes if ax.vb == vb]
-    #     #
-    #     # if len(vbAxes):
-    #     #     vbAxis = vbAxes[0]
-    #     #
-    #     # else:
-    #     #     return
-    #
-    #     self._axes_X_view_ranges_[ax_ndx] = x0x1
-    #
-    #     bounds = self._get_axis_data_X_range_(sender)
-    #     offset_scale = self._calculate_new_X_offset_scale_(bounds, x0x1)
-    #     self._axes_X_view_offsets_scales_[ax_ndx] = offset_scale
-    #
-    #     if self.currentFrame in self._cached_epochs_:
-    #         if len(self._cached_epochs_[self.currentFrame]):
-    #             self._plotEpochs_(from_cache=True)
-
-    # @Slot(object)
-    # def _slot_plot_axis_range_changed_manually(self, value:object):
-    #     r"""Triggered by PlotItem's ViewBox sigRangeChangedManually signal"""
-    #     vb = self.sender()
-    #
-    #
-    #     if value in (pg.ViewBox.RectMode, pg.ViewBox.PanMode):
-    #         mouseMode = value
-    #     else:
-    #         mouseMode = vb.state["mouseMode"]
-    #
-    #     # print(f"{self.__class__.__name__} range changed manually in {mouseMode}")
-    #
-    #     ax = [ax for ax in self.axes if ax.vb == vb]
-    #
-    #     if len(ax) == 0:
-    #         return
-    #
-    #     ax = ax[0]
-    #     ax.sigXRangeChanged.emit(vb, vb.viewRange()[0])
-    #     # ax.sigXRangeChanged.emit(vb, (math.nan, math.nan))
-    #     # ax.sigXRangeChanged.emit(None, None)
-
     @safewrapper
     def refresh(self):
         r"""
@@ -8711,19 +8650,19 @@ anything else       anything else       ❌
         self.sig_frameDisplayReady.emit()
         self._new_data_ = False
 
-    def _calculate_new_X_offset_scale_(self, databounds:tuple, viewbounds:tuple,
-                                       padding:typing.Optional[float] = 0.) -> tuple:
-        r"""Calculates the X offset and X view scale given X data bounds and view range.
-    Helper function returning a tuple (offset, scale) used in the _process_X_ranges_
-    """
-        # print(f"{self.__class__.__name__}._calculate_new_X_offset_scale_ databounds = {databounds}, viewbounds = {viewbounds}")
-        dspan = databounds[1]-databounds[0]
-        vspan = viewbounds[1]-viewbounds[0]
-
-        offset = databounds[0] - viewbounds[0] + padding
-        scale = vspan/dspan if dspan != 0 else 1
-
-        return offset,scale
+    # def _calculate_new_X_offset_scale_(self, databounds:tuple, viewbounds:tuple,
+    #                                    padding:typing.Optional[float] = 0.) -> tuple:
+    #     r"""Calculates the X offset and X view scale given X data bounds and view range.
+    # Helper function returning a tuple (offset, scale) used in the _process_X_ranges_
+    # """
+    #     # print(f"{self.__class__.__name__}._calculate_new_X_offset_scale_ databounds = {databounds}, viewbounds = {viewbounds}")
+    #     dspan = databounds[1]-databounds[0]
+    #     vspan = viewbounds[1]-viewbounds[0]
+    #
+    #     offset = databounds[0] - viewbounds[0] + padding
+    #     scale = vspan/dspan if dspan != 0 else 1
+    #
+    #     return offset,scale
 
     # def _get_axis_X_view_state(self, ax:typing.Union[int, pg.PlotItem]) -> tuple:
     #     r"""Returns a tuple (offset, scale).
@@ -8917,7 +8856,7 @@ anything else       anything else       ❌
 
     # NOTE: 2026-04-04 14:03:37
     # OK, so _process_X_ranges_ works but it's slow ...
-    @timefunc
+    # @timefunc
     def _process_X_ranges_(self, padding:typing.Optional[float] = None):
         r""" Maintains an X view range for frames with different X data bounds.
     Necessary to recreate a view range to an axis relative to the axis' X data.
@@ -8998,10 +8937,6 @@ anything else       anything else       ❌
                 # maybe use np.isclose in the comparisons below
                 #
 
-                # if (currentState["bounds"][0][0] == cachedState["bounds"][0][0]
-                #     and currentState["bounds"][0][1] == cachedState["bounds"][0][1]):
-                # if (currentBounds[0][0] == cachedState["bounds"][0][0]
-                #     and currentBounds[0][1] == cachedState["bounds"][0][1]):
                 if (currentBounds[0][0] == cachedXOffset["bounds"][0][0]
                     and currentBounds[0][1] == cachedXOffset["bounds"][0][1]):
                     # print(f"\t-> skip axis {kax} with unchanged X bounds \n\t---\n")
@@ -9014,28 +8949,40 @@ anything else       anything else       ❌
                 # newViewRangeX = (currentState["bounds"][0][0] + cachedState["xOffset"][0],
                 #                  currentState["bounds"][0][1] + cachedState["xOffset"][1])
 
-                # link = currentState["state"]["linkedViews"][0]
-                # # TODO: 2026-04-03 16:10:18
-                # # skip if link, and the link view is on auto range
-                # if isinstance(link, str):
-                #     if link == "":
-                #         link = None
+
+                # NOTE: 2026-04-05 07:17:41 this works but can I make this faster?
+                if ax in self.signalAxes:
+                    if currentXLinkedView:
+                        currentXLinkedView.blockLink(True)
+
+                    ax.setXRange(*newViewRangeX, padding = 0)
+
+                    if currentXLinkedView:
+                        currentXLinkedView.blockLink(False)
+
+                # if self.xAxesLinked:
+                #     if ax in self.signalAxes:
+                #         if ax == visibleSignalAxes[0]:
+                #             ax.vb.setXLink(None)
+                #             ax.setXRange(*newViewRangeX, padding = 0)
+                #         else:
+                #             if currentXLinkedView and currentXLinkedView.parentItem() != visibleSignalAxes[0]:
+                #                 ax.vb.setXLink(visibleSignalAxes[0])
+                #                 visibleSignalAxes[0].vb.blockLink(True)
+                #                 ax.setXRange(*newViewRangeX, padding = 0)
+                #                 visibleSignalAxes[0].vb.blockLink(False)
                 #     else:
-                #         link = pg.ViewBox.NamedViews.get(link, link)
+                #         ax.vb.setXLink(visibleSignalAxes[0])
+                #         visibleSignalAxes[0].vb.blockLink(True)
+                #         ax.setXRange(*newViewRangeX, padding = 0)
+                #         visibleSignalAxes[0].vb.blockLink(False)
                 #
-                # if hasattr(link, 'implements') and link.implements('ViewBoxWrapper'):
-                #     link = link.getViewBox()
-                #
-                # if link and link.getState()["autoRange"][0]:
-                #     continue
+                # else:
+                #     ax.vb.setXLink(None)
+                #     ax.setXRange(*newViewRangeX, padding = 0)
 
-                if currentXLinkedView:
-                    currentXLinkedView.blockLink(True)
 
-                ax.setXRange(*newViewRangeX, padding = 0)
 
-                if currentXLinkedView:
-                    currentXLinkedView.blockLink(False)
 
         if self.xAxesLinked:
             # relink _ALL_ axes to the topmost visible signal axis
@@ -9046,8 +8993,10 @@ anything else       anything else       ❌
                         if currentXLinkedView:
                             ax.vb.setXLink(None)
                     else:
-                        if currentXLinkedView.parentItem() != visibleSignalAxes[0]:
+                        if ((currentXLinkedView and currentXLinkedView.parentItem() != visibleSignalAxes[0])
+                            or ax not in self.signalAxes):
                             ax.vb.setXLink(visibleSignalAxes[0])
+
 
     @timefunc
     def _process_X_ranges_2_(self):
