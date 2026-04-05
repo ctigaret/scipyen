@@ -1777,6 +1777,13 @@ of 'args'.
     # #                            module=None)
 
 
+@dataclass
+class TestData:
+    a: typing.Union[str, int] = dataclasses.field(default_factory = str)
+    name: str = ""
+
+
+
 # __all__ = ("AdministrationRoute", "BiologicalSource", "Biometrics",
 #            "BioSourceType", "Cell", "CellCompartment","CellCompartmentType", "Episode",
 #            "Organ", "Organism", "OrganismStage", "Procedure", "ProcedureType",

@@ -71,16 +71,6 @@ else:
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
-#
-# if os.environ["QT_API"] == "pyside6":
-#     import PySide6
-#     from PySide6 import (QtGui, QtCore, QtWidgets,)
-#     import qtpy
-#     qtpy.API = os.environ["QT_API"]
-# else:
-#     import qtpy
-#     qtpy.API = os.environ["QT_API"]
-#     from qtpy import (QtGui, QtCore, QtWidgets,)
 
 import numpy as np
 from numpy import ndarray
@@ -197,6 +187,21 @@ Real: typing.TypeAlias = typing.Union[int, float, np.int64, np.float64]
 Complex: typing.TypeAlias = typing.Union[complex, np.complex128]
 Number: typing.TypeAlias = typing.Union[Real, Complex]
 
+PODS = (
+    bool,
+    int,
+    float,
+    complex,
+    bytes,
+    bytearray,
+    str,
+    np.integer,
+    np.floating,
+    np.complexfloating,
+    Real,
+    Complex,
+    Number
+)
 
 UnitTypes = collections.defaultdict(lambda: "NA",
                                     {"a":"axon", "b":"bouton", "c":"cell",

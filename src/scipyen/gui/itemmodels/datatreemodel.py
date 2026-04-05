@@ -139,6 +139,8 @@ from core.scipyendataclasses import isDataclass
 # from gui.workspacegui import GuiMessages, WorkspaceGuiMixin
 from gui.itemmodels.roles import *
 
+from core.datatypes import PODS
+
 NOTMEMOIZED = (
     tuple,
     type(None),
@@ -150,18 +152,18 @@ NOTMEMOIZED = (
     pkgutil.ModuleInfo,
 )
 
-PODS = (
-    bool,
-    int,
-    float,
-    complex,
-    bytes,
-    bytearray,
-    str,
-    np.integer,
-    np.floating,
-    np.complexfloating,
-)
+# PODS = (
+#     bool,
+#     int,
+#     float,
+#     complex,
+#     bytes,
+#     bytearray,
+#     str,
+#     np.integer,
+#     np.floating,
+#     np.complexfloating,
+# )
 
 # NOTE 2026-02-05 17:48:51 TODO/FIXME
 # look at:

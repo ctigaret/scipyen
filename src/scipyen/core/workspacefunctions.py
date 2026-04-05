@@ -606,16 +606,8 @@ unpack may overwrite variables bound to the same symbol in the target namespace.
     if ws is None:
         ws = user_workspace()
         
-#     elif isinstance(ws, str):
-#         if ws != "caller":
-#             raise ValueError(f"'ws': when a str, this must be 'caller'; got {ws} instead")
-#         
-#         frame_infos = inspect.stack()
-#         ws = frame_infos[1].frame.f_locals
-        
     elif not isinstance(ws, dict):
         raise TypeError(f"'ws': Expected a dict; instead, got a {type(ws).__name__}")
-        # raise TypeError(f"'ws': Expected a dict or the string 'caller'; instead, got a {type(ws).__name__}")
 
     items = map(lambda f: (f.name, getattr(o, f.name)), dataclasses.fields(o))
     for k,v in items:
@@ -630,31 +622,10 @@ unpack may overwrite variables bound to the same symbol in the target namespace.
         name = validate_varname(name, checkUnique=False)
         assignin(v, name, ws)
     
-# def _(x:dict, ws:typing.Optional[typing.Union[dict, str]] = None):
 @unpack.register(dict)
-def _(x:dict, __ws__:typing.Optional[dict] = None):
+def _unpack(x:dict, __ws__:typing.Optional[dict] = None):
     if __ws__ is None:
         __ws__ = user_workspace()
-        
-#     elif isinstance(__ws__, str): # TODO 2025-05-02 14:17:41 allow output into the caller's namespace
-#         if __ws__ != "caller":
-#             raise ValueError(f"'__ws__': when a str, this must be 'caller'; got {ws} instead")
-#         
-#         frame_infos = inspect.stack()
-#         __ws__ = frame_infos[1].frame.f_locals
-#         __code__ = 
-#         
-#         validate_key = lambda k: validate_varname(k, __ws__checkUnique=False) if isinstance(k, str) else validate_varname(f"data_{k}", __ws__, checkUnique=False) if isinstance(k, int) else validate_varname(f"data_{type(k).__name__}", __ws__)
-#         
-#         symbols = dict(map(lambda k: (k, validate_key(k)), keys()))
-#         
-#         for k, v in x.items():
-#             symbol = symbols[k]
-#             eval(f"nonlocal {symbol}")
-#             eval(f"{symbol} = ")
-#         
-#         for k,v in __ws__.items():
-#             print(f"{k}: {v}")
         
     elif not isinstance(ws, dict):
         raise TypeError(f"'ws': Expected a dict; instead, got a {type(ws).__name__}")
@@ -672,25 +643,16 @@ def _(x:dict, __ws__:typing.Optional[dict] = None):
         name = validate_varname(name, __ws__, checkUnique=False)
         assignin(v, name, __ws__)
         
-# def _(x:tuple, ws:typing.Optional[typing.Union[dict, str]] = None):
 @unpack.register(tuple)
-def _(x:tuple, ws:typing.Optional[dict] = None):
+def _unpack(x:tuple, ws:typing.Optional[dict] = None):
     from core.dataypes import is_namedtuple
     if not is_namedtuple(x):
         raise TypeError("Expecting a named tuple")
     if ws is None:
         ws = user_workspace()
-#     
-#     elif isinstance(ws, str):
-#         if ws != "caller":
-#             raise ValueError(f"'ws': when a str, this must be 'caller'; got {ws} instead")
-#         
-#         frame_infos = inspect.stack()
-#         ws = frame_infos[1].frame.f_locals
         
     elif not isinstance(ws, dict):
         raise TypeError(f"'ws': Expected a dict; instead, got a {type(ws).__name__}")
-        # raise TypeError(f"'ws': Expected a dict or the string 'caller'; instead, got a {type(ws).__name__}")
 
     for k, v in map(lambda f: (f, getattr(x, f)), x._fields):
         if not isinstance(k, str):
@@ -703,7 +665,6 @@ def _(x:tuple, ws:typing.Optional[dict] = None):
             
         name = validate_varname(name, checkUnique=False)
         assignin(v, name, ws)
-        
 
 def user_workspace():
     r"""Returns a reference to the user workspace (a.k.a user namespace)

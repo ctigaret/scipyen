@@ -6,7 +6,7 @@
 r"""
 """
 
-import typing, warnings, math, cmath, os, traceback
+import typing, warnings, math, cmath, os, traceback, dataclasses
 import numpy as np
 import quantities as pq
 import pandas as pd
@@ -48,10 +48,34 @@ from gui.guiutils import (DisplayHint,
 
 from core import scipyen_quantities as scq
 from core import strutils as strutils
+from core.datatypes import PODS
 
 from iolib.navigation.navigator import UrlNavigatorButtonBase
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
+
+class PODWidget(QtWidgets.QWidget):
+    r"""GUI to instantiate new POD values"""
+    def __init__(self, varType: typing.Union[
+                                    typing.Set[type], typing.Sequence[type]
+                                    ], /,
+                 default = None,
+                 parent = None):
+        super().__init__(parent = parent)
+
+        assert(isinstance(varType, type) or (isinstance(varType, (typing.Set, typing.Sequence)) and all(isinstance(v, type) for v in varType))), "Expecting a type, or a non-empty set or sequence of types"
+
+        if isinstance(varType, type):
+            if varType not in PODS:
+                raise TypeError(f"Incompatible variable type {vartype}")
+
+        self._vartype_ = varType
+        self._default_ = default
+
+    def _configureUI_(self):
+        pass
+
+
 
 class ElidedPushButton(UrlNavigatorButtonBase):
     def __init__(self, text: str = "", elideText: bool = True, parent = None):

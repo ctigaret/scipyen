@@ -3835,8 +3835,6 @@ def unpack(x:typing.Union[list, tuple, deque], varnames:typing.Sequence[str]):
     
     return list(itertools.zip_longest(varnames, x, fillvalue=NoData()))
     
-
-
 def make_file_filter_string(extList, genericName):
     extensionList = [''.join(i) for i in zip('*' * len(extList), '.' * len(extList), extList)]
 

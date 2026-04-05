@@ -2128,7 +2128,8 @@ def unwind_type_sig(x, include_x:bool=False):
     visited = set()
     return unwind_type(x, include_x, visited)
 
-def unwind_type(x, include_x:bool=False, visited:set = set()):
+# def unwind_type(x, include_x:bool=False, visited:set = set()):
+def unwind_type(x, include_x:bool=False, visited: typing.Optional[set] = None):
     r"""Unwinds a type to its component types.
 This includes special aliases defined in the ``types`` and ``typing`` standard 
 library modules.
@@ -2154,7 +2155,8 @@ library modules.
     =============
     Populates ``visited`` with the "elementary" types found.
 """
-    assert isinstance(visited, set)
+    if not isinstance(visited, set):
+        visited = set()
     
     if isinstance(x, type):
         visited.add(x)

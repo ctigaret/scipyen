@@ -5,7 +5,7 @@
 
 r"""A collection of functions to prompt user input using GUI
 """
-import typing, collections, dataclasses, os
+import typing, collections, dataclasses, os, types
 import numpy as np
 from tribool import Tribool
 import qtpy
@@ -34,7 +34,7 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-
+from core import prog
 from . import quickdialog as qd
 from .itemslistdialog import ItemsListDialog
 from gui.widgets import small_widgets as smw
@@ -47,7 +47,9 @@ class _InputSpec():
 
     def __init__(self, mytype=type(dataclasses.MISSING),
                  default = dataclasses.MISSING,
-                 choices = dataclasses.MISSING):
+                 choices : typing.Optional[
+                                typing.Union[typing.Set, typing.Sequence]
+                                ] = None):
         r"""Constructor for _InputSpec.
 
     Parameters:
@@ -70,21 +72,67 @@ class _InputSpec():
 
 
     """
-        if isinstance(mytype, type):
-            if mytype in (type(dataclasses.MISSING), type(None)): # type not specified
-                if default not in (dataclasses.MISSING, None): # get it from default's type
-                    mytype = type(default)
 
-            if default in (dataclasses.MISSING, None) and mytype not in (type(dataclasses.MISSING), type(None)):
-                # mytype specified, but no default given -> instantiate it from mytype
-                default = mytype()
-
-            elif not isinstance(default, mytype): # consistency/sanity check
-                raise TypeError(f"default expected to be a {type.__name__}; got {type(default).__name__} instead")
-
-        self._default   = default
-        self._mytype    = mytype
+        self._mytype, self._default = self._parse_args_(mytype, default)
+        # self._name = name
         self._choices   = choices
+
+    def _parse_args_(self, x, d):
+        r""""""
+        # NOTE: 2026-04-05 16:57:40 TODO
+        # map typing.Any to object
+        if isinstance(x, dataclasses.Field):
+            # ignores d, as a dataclasses.Field provides their own default value
+            mytype = prog.unwind_type(x.type)
+            # if isinstance(mytype, set) and type(None) in mytype:
+
+            # NOTE: 2026-04-05 16:53:34
+            # dataclass field definition syntax precludes both default and
+            # default_factory to be MISSING (would raise SyntaxError if that was
+            # the case)
+            if x.default_factory is dataclasses.MISSING:
+                default = x.default
+            else:
+                default = x.default_factory()
+
+            # possibly a noop -- when field annotation results in a field
+            # "type" attribute of 'typing.Optional', the NoneType is already
+            # present in the mytype set
+            mytype.add(type(default))
+
+            if len(mytype) == 1:
+                mytype = tuple(mytype)[0]
+
+        elif isinstance(x, (typing._Final, type)):
+            # a default is not needed, but can be used if unwind_type fails
+            mytype = prog.unwind_type(x)
+            if len(mytype) == 0:
+                if d not in (dataclasses.MISSING, None): # get it from default's type
+                    mytype = {type(d)}
+                else:
+                    mytype = {object}
+
+            default = d
+
+        elif x in (type(dataclasses.MISSING), dataclasses.MISSING, None, type(None), typing.Any):
+            # needs the supplied default in 'd'; failing that, assume any object type
+            if d not in (dataclasses.MISSING, None): # get it from default's type
+                mytype = type(d)
+            else:
+                mytype = object
+
+            default = d
+
+        else:
+            # ignores d
+            default = mytype
+            mytype = type(default)
+
+
+        if isinstance(mytype, set) and len(mytype) == 1:
+            mytype = tuple(mytype)[0]
+
+        return mytype, default
 
     @property
     def type(self):
@@ -97,7 +145,6 @@ class _InputSpec():
     @property
     def choices(self):
         return self._choices
-
 
 def selectWSData(*args, title="", single=True, asDict=False, **kwargs):
     r"""Selection of workspace variables from a list
@@ -128,6 +175,7 @@ def selectWSData(*args, title="", single=True, asDict=False, **kwargs):
                             selectmode = selectionMode)
 
     ans = dialog.exec()
+
 
     if ans == QtWidgets.QDialog.Accepted:
         if asDict:
@@ -165,7 +213,7 @@ Typical use:
 
     return getInput(kwargs, mapping=True)
 
-def getInput(prompts:dict, mapping:bool=False):
+def getInput(*prompts, mapping:bool=False):
     r"""Opens a quick dialog to prompt user input for values.
 
 .. |nbsp| unicode:: 0xA0
@@ -173,15 +221,17 @@ def getInput(prompts:dict, mapping:bool=False):
 
 Parameters:
 -----------
-:prompts: a dict with str keys (the name of the prompted variable) mapped to |nbsp|
+:prompts: A ``dict`` with ``str`` keys (the name of the prompted variable) mapped to |nbsp|
 either: |nbsp|
 
-    * an _InputSpec that enapsulates the default prompt value and type of |nbsp|
+    * an ``_InputSpec`` that enapsulates the default prompt value and type of |nbsp|
     the value; the latter is used to determine what kind of GUI input |nbsp|
     field will be used in the dialog as a prompt for the variable.
 
     * any object: the object value is the default, and the object type |nbsp|
     determines what kind of gui input field should be used
+
+or a comma-separated list of _NamedInputSpec objects
 
 :mapping: bool, optional default is False; when True, parameter names are mapped |nbsp|
 to their new values (see below)
@@ -249,8 +299,6 @@ dialog.
             if not dt.is_homogeneous_sequence(def_val):
                 raise TypeError("Only sequences homogeneous in their element types are supported")
             v_type = type(def_val)
-
-
 
         elif v_type is bool:
             w = qd.CheckBox(widget_parent, f"{k}")

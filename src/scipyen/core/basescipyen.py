@@ -80,7 +80,7 @@ class BaseScipyenData(ScipyenDataclass):
         )
 
     # when was data analysed
-    # relevant whehn metadata is associated with a results object.
+    # relevant when metadata is associated with a results object.
     analysis_datetime: typing.Optional[datetime] = dataclasses.field(
         # default_factory = datetime.now
         default = None
