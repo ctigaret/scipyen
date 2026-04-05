@@ -1200,7 +1200,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.analogSignalComboBox.activated[int].connect(self.slot_analogSignalsComboBoxIndexChanged)
 
         self.plotAnalogSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
-        self.plotAnalogSignalsCheckBox.stateChanged[int].connect(self._slot_plotAnalogSignalsCheckStateChanged_)
+        self.plotAnalogSignalsCheckBox.toggled.connect(self._slot_plotAnalogSignalsCheckStateChanged_)
+        # self.plotAnalogSignalsCheckBox.stateChanged[int].connect(self._slot_plotAnalogSignalsCheckStateChanged_)
 
         self.irregularSignalComboBox.clear()
         self.irregularSignalComboBox.setCurrentIndex(0)
@@ -1208,16 +1209,20 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.irregularSignalComboBox.activated[int].connect(self.slot_irregularSignalsComboBoxIndexChanged)
 
         self.plotIrregularSignalsCheckBox.setCheckState(QtCore.Qt.Checked)
-        self.plotIrregularSignalsCheckBox.stateChanged[int].connect(self._slot_plotIrregularSignalsCheckStateChanged_)
+        self.plotIrregularSignalsCheckBox.toggled.connect(self._slot_plotIrregularSignalsCheckStateChanged_)
+        # self.plotIrregularSignalsCheckBox.stateChanged[int].connect(self._slot_plotIrregularSignalsCheckStateChanged_)
 
         self.plotSpikeTrainsCheckBox.setCheckState(QtCore.Qt.Checked)
-        self.plotSpikeTrainsCheckBox.stateChanged[int].connect(self._slot_plotSpikeTrainsCheckStateChanged_)
+        self.plotSpikeTrainsCheckBox.toggled.connect(self._slot_plotSpikeTrainsCheckStateChanged_)
+        # self.plotSpikeTrainsCheckBox.stateChanged[int].connect(self._slot_plotSpikeTrainsCheckStateChanged_)
 
         self.plotEventsCheckBox.setCheckState(QtCore.Qt.Checked)
-        self.plotEventsCheckBox.stateChanged[int].connect(self._slot_plotEventsCheckStateChanged_)
+        self.plotEventsCheckBox.toggled.connect(self._slot_plotEventsCheckStateChanged_)
+        # self.plotEventsCheckBox.stateChanged[int].connect(self._slot_plotEventsCheckStateChanged_)
 
         self.plotEpochsCheckBox.setCheckState(QtCore.Qt.Checked)
-        self.plotEpochsCheckBox.stateChanged[int].connect(self._slot_plotEpochsCheckStateChanged_)
+        self.plotEpochsCheckBox.toggled.connect(self._slot_plotEpochsCheckStateChanged_)
+        # self.plotEpochsCheckBox.stateChanged[int].connect(self._slot_plotEpochsCheckStateChanged_)
 
         #### BEGIN set up annotations dock widget
         #
@@ -3594,31 +3599,42 @@ anything else       anything else       ❌
         self.displayFrame()
         self._new_frame_ = True
 
-    @Slot(int)
-    def _slot_plotSpikeTrainsCheckStateChanged_(self, state):
-        self._plot_spiketrains_ = state == QtCore.Qt.Checked
+    # @Slot(int)
+    @Slot(bool)
+    def _slot_plotSpikeTrainsCheckStateChanged_(self, state: bool):
+        # print(f"{self.__class__.__name__}._slot_plotSpikeTrainsCheckStateChanged_({state})")
+        self._plot_spiketrains_ = state is True
+        # self._plot_spiketrains_ = state == QtCore.Qt.Checked
         self.displayFrame()
 
-    @Slot(int)
-    def _slot_plotEventsCheckStateChanged_(self, state):
-        self._plot_events_ = state == QtCore.Qt.Checked
+    # @Slot(int)
+    @Slot(bool)
+    def _slot_plotEventsCheckStateChanged_(self, state: bool):
+        self._plot_events_ = state is True
+        # self._plot_events_ = state == QtCore.Qt.Checked
         self.displayFrame()
 
-    @Slot(int)
-    def _slot_plotEpochsCheckStateChanged_(self, state):
-        self._plot_epochs_ = state == QtCore.Qt.Checked
+    # @Slot(int)
+    @Slot(bool)
+    def _slot_plotEpochsCheckStateChanged_(self, state: bool):
+        self._plot_epochs_ = state is True
+        # self._plot_epochs_ = state == QtCore.Qt.Checked
         self.displayFrame()
 
-    @Slot(int)
     @safewrapper
-    def _slot_plotAnalogSignalsCheckStateChanged_(self, state):
-        self._plot_analogsignals_ = state == QtCore.Qt.Checked
+    # @Slot(int)
+    @Slot(bool)
+    def _slot_plotAnalogSignalsCheckStateChanged_(self, state: bool):
+        self._plot_analogsignals_ = state is True
+        # self._plot_analogsignals_ = state == QtCore.Qt.Checked
         self.displayFrame()
 
-    @Slot(int)
     @safewrapper
-    def _slot_plotIrregularSignalsCheckStateChanged_(self, state):
-        self._plot_irregularsignals_ = state == QtCore.Qt.Checked
+    # @Slot(int)
+    @Slot(bool)
+    def _slot_plotIrregularSignalsCheckStateChanged_(self, state: bool):
+        self._plot_irregularsignals_ = state is True
+        # self._plot_irregularsignals_ = state == QtCore.Qt.Checked
         self.displayFrame()
 
     @Slot(bool)
@@ -8951,7 +8967,7 @@ anything else       anything else       ❌
 
 
                 # NOTE: 2026-04-05 07:17:41 this works but can I make this faster?
-                if ax in self.signalAxes:
+                if ax in self.signalAxes or len(visibleSignalAxes) == 0:
                     if currentXLinkedView:
                         currentXLinkedView.blockLink(True)
 
@@ -9063,9 +9079,11 @@ anything else       anything else       ❌
         # plot all spike trains stacked in a single axis
         if self._plot_spiketrains_:
             if isinstance(trains, neo.SpikeTrain):
-                if self.ignoreEmptySpikeTrains and len(trains) == 0:
-                    self.spikeTrainsAxis.setVisible(False)
-                    return
+                if len(trains == 0):
+                    if self.ignoreEmptySpikeTrains:
+                        print(f"{self.__class__.__name__}._plotSpikeTrains_ ignoring empty train -> hiding the train axis")
+                        self.spikeTrainsAxis.setVisible(False)
+                        return
 
                 obj_ = [trains]
 
@@ -9075,8 +9093,6 @@ anything else       anything else       ❌
                 obj_ = trains
 
             if len(obj_):
-                t_min = min(list(map(lambda t: t.t_start, obj_)))
-                t_max = max(list(map(lambda t: t.t_start, obj_)))
                 # NOTE: 2023-05-16 23:02:20:
                 # is this is a new frame, then call _plot_discrete_entities_()
                 # otherwise, just set the entities axis visible
@@ -9086,6 +9102,9 @@ anything else       anything else       ❌
                     self._spiketrains_axis_.update()
 
                 self.spikeTrainsAxis.setVisible(True)
+
+                # t_min = min(list(map(lambda t: t.t_start, obj_)))
+                # t_max = max(list(map(lambda t: t.t_start, obj_)))
                 # self.spikeTrainsAxis.vb.setXRange(t_min.magnitude, t_max.magnitude,
                 #                                     padding=0)
                 # if standaloneTrains:
