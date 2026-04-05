@@ -3599,61 +3599,42 @@ anything else       anything else       ❌
         self.displayFrame()
         self._new_frame_ = True
 
-    # @Slot(int)
     @Slot(bool)
     def _slot_plotSpikeTrainsCheckStateChanged_(self, state: bool):
-        # print(f"{self.__class__.__name__}._slot_plotSpikeTrainsCheckStateChanged_({state})")
         self._plot_spiketrains_ = state is True
-        # self._plot_spiketrains_ = state == QtCore.Qt.Checked
         self.displayFrame()
 
-    # @Slot(int)
     @Slot(bool)
     def _slot_plotEventsCheckStateChanged_(self, state: bool):
         self._plot_events_ = state is True
-        # self._plot_events_ = state == QtCore.Qt.Checked
         self.displayFrame()
 
-    # @Slot(int)
     @Slot(bool)
     def _slot_plotEpochsCheckStateChanged_(self, state: bool):
         self._plot_epochs_ = state is True
-        # self._plot_epochs_ = state == QtCore.Qt.Checked
         self.displayFrame()
 
     @safewrapper
-    # @Slot(int)
     @Slot(bool)
     def _slot_plotAnalogSignalsCheckStateChanged_(self, state: bool):
         self._plot_analogsignals_ = state is True
-        # self._plot_analogsignals_ = state == QtCore.Qt.Checked
         self.displayFrame()
 
     @safewrapper
-    # @Slot(int)
     @Slot(bool)
     def _slot_plotIrregularSignalsCheckStateChanged_(self, state: bool):
         self._plot_irregularsignals_ = state is True
-        # self._plot_irregularsignals_ = state == QtCore.Qt.Checked
         self.displayFrame()
 
     @Slot(bool)
     @safewrapper
     def slot_showCursorsDock(self, value:bool):
-        self.cursorsDockWidgetEnabled = value==True
-        # if value == True:
-        #     self.cursorsDockWidget.show()
-        # else:
-        #     self.cursorsDockWidget.hide()
+        self.cursorsDockWidgetEnabled = value is True
 
     @Slot(bool)
     @safewrapper
     def slot_showAnnotationsDock(self, value:bool):
-        self.annotationsDockWidgetEnabled = value == True
-        # if value == True:
-        #     self.annotationsDockWidget.show()
-        # else:
-        #     self.annotationsDockWidget.hide()
+        self.annotationsDockWidgetEnabled = value is True
 
     @Slot()
     @safewrapper
@@ -8572,8 +8553,6 @@ anything else       anything else       ❌
         # NOTE: 2026-04-03 09:53:05 see NOTE: 2026-04-03 09:52:22
         # caching these BEFORE plotting new data, as the new data might bring
         # a different X domain
-        # if len(self.axes): # same as self.plotItems
-        # self._axesStatesCache_ = self.getViewStates()
         self._axesXOffsetsCache_ = self.getViewXOffsets()
 
         # print(f"{self.__class__.__name__}.displayFrame for {self.currentFrame} with _new_frame_ = {self._new_frame_}: {len(self._axesStatesCache_)} axes states\n\n###\n\n")
@@ -8666,76 +8645,6 @@ anything else       anything else       ❌
         self.sig_frameDisplayReady.emit()
         self._new_data_ = False
 
-    # def _calculate_new_X_offset_scale_(self, databounds:tuple, viewbounds:tuple,
-    #                                    padding:typing.Optional[float] = 0.) -> tuple:
-    #     r"""Calculates the X offset and X view scale given X data bounds and view range.
-    # Helper function returning a tuple (offset, scale) used in the _process_X_ranges_
-    # """
-    #     # print(f"{self.__class__.__name__}._calculate_new_X_offset_scale_ databounds = {databounds}, viewbounds = {viewbounds}")
-    #     dspan = databounds[1]-databounds[0]
-    #     vspan = viewbounds[1]-viewbounds[0]
-    #
-    #     offset = databounds[0] - viewbounds[0] + padding
-    #     scale = vspan/dspan if dspan != 0 else 1
-    #
-    #     return offset,scale
-
-    # def _get_axis_X_view_state(self, ax:typing.Union[int, pg.PlotItem]) -> tuple:
-    #     r"""Returns a tuple (offset, scale).
-    # When there is no data plotted in the item returns (None, None)"""
-    #     if isinstance(ax, pg.PlotItem):
-    #         if ax not in self.axes:
-    #             raise ValueError(f"Axis {ax} not found in this viewer")
-    #         ax_ndx = self.axes.index(ax)
-    #
-    #     elif isinstance(ax, int):
-    #         if ax not in range(self.axes):
-    #             raise ValueError(f"Invalid axis index {ax} for {len(self.axes)} axes")
-    #
-    #         ax_ndx = ax
-    #         ax = self.axes[ax_ndx]
-    #
-    #     else:
-    #         raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(ax).__name__} instead")
-
-    #     # xd0, xd1 = self._get_axis_data_X_range_(ax)
-    #     # dspan = xd1 - xd0
-    #     # # xv0, xv1 = ax.vb.viewRange()[0]
-    #     # xv0, xv1 = ax.vb.state["viewRange"][0]
-    #     # vspan = xv1 - xv0
-    #     #
-    #     # offset = xd0 - xv0
-    #     # scale = vspan/dspan if dspan != 0. else 1.
-    #     #
-    #     # return offset, scale
-    #
-    # # def _get_axis_Y_view_state(self, ax:typing.Union[int, pg.PlotItem]) -> tuple:
-    # #     if isinstance(ax, pg.PlotItem):
-    # #         if ax not in self.axes:
-    # #             raise ValueError(f"Axis {ax} not found in this viewer")
-    # #         ax_ndx = self.axes.index(ax)
-    # #
-    # #     elif isinstance(ax, int):
-    # #         if ax not in range(self.axes):
-    # #             raise ValueError(f"Invalid axis index {ax} for {len(self.axes)} axes")
-    # #
-    # #         ax_ndx = ax
-    # #         ax = self.axes[ax_ndx]
-    # #
-    # #     else:
-    # #         raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(ax).__name__} instead")
-    # #
-    # #     yd0, yd1 = self._get_axis_data_Y_range_(ax)
-    # #     dspan = yd1 - yd0
-    # #
-    # #     yv0, yv1 = ax.vb.viewRange()[1]
-    # #     vspan = yv1 - yv0
-    # #
-    # #     offset = yd0 - yv0
-    # #     scale = vspan/dspan if dspan != 0. else 1.
-    # #
-    # #     return offset, scale
-    #
     def _get_axisXDataBounds(self, axis: typing.Union[int, pg.PlotItem]) -> tuple:
         # generator!
         x0 = np.array(list(map(lambda pdi: pdi.xData[0],
@@ -8905,45 +8814,44 @@ anything else       anything else       ❌
 
         getLinkedView = lambda l: pg.ViewBox.NamedViews.get(l, l)
 
-        # visibleSignalAxes = [ax for ax in self.signalAxes if ax.isVisible()]
         visibleAxes = tuple(filter(lambda ax: ax.isVisible(), self.axes))
         visibleSignalAxes = tuple(filter(lambda ax: ax.isVisible(), self.signalAxes))
 
-        # currentStates = self.getViewStates()
+        if self.xAxesLinked: # 2026-04-05 09:04:30
+            # relink _ALL_ axes to the topmost visible signal axis
+            # (and unlink this from anything else)
+            if len(visibleSignalAxes):
+                for ax in self.axes:
+                    currentXLinkedView = ax.vb.linkedView(0)
+                    if ax  == visibleSignalAxes[0]:
+                        if currentXLinkedView:
+                            ax.vb.setXLink(None)
+                    else:
+                        if ((currentXLinkedView and currentXLinkedView.parentItem() != visibleSignalAxes[0])
+                            or ax not in self.signalAxes):
+                            ax.vb.setXLink(visibleSignalAxes[0])
 
-        # print(f"{self.__class__.__name__}._process_X_ranges_ in frame {self.currentFrame}:")
-
-        # if len(self._axesStatesCache_):
         if len(self._axesXOffsetsCache_):
             for kax, ax in enumerate(self.axes):
                 if not ax.isVisible():
                     # print(f"\t-> skip axis {kax} because it is not visible \n\t---\n")
                     continue
-                # cachedState = self._axesStatesCache_[kax] # from previous frame; this is updated at the beginning of self.displayFrame(…)
                 cachedXOffset = self._axesXOffsetsCache_[kax] # from previous frame; this is updated at the beginning of self.displayFrame(…)
                 currentBounds = guiutils.getPlotItemDataBoundaries(ax)
-                # currentState = self.getPlotItemViewState(ax)
-                # currentState = currentStates[kax]
-                # cachedXLinkedView = getLinkedView(cachedState["state"]["linkedViews"][0])
                 cachedXLinkedView = cachedXOffset["xLinkedView"]
                 currentXLinkedView = ax.vb.linkedView(0)
 
-                # print(f"\tfor axis {kax} ('{ax.vb.name}'):")
-                # print(f"\tauto-range on X = {cachedState["state"]["autoRange"][0]}")
-                # print(f"\tlinked on X     = {cachedState["state"]["linkedViews"][0]}")
-                # if cachedState["state"]["autoRange"][0]:
                 if cachedXOffset["autoRangeX"]:
-                    # skip axes that auto-range on X
+                    # skip plot items that auto-range on X axis
                     # but ensure it STAYS auto-ranged
                     ax.vb.enableAutoRange(0)
-                    # print(f"\t-> skip axis {kax} because it is X-auto-ranged axis \n\t---\n")
                     continue
 
                 elif isinstance(cachedXLinkedView, pg.ViewBox) and currentXLinkedView == cachedXLinkedView:
                     if not cachedXLinkedView.parentItem().isVisible():
+                        # also plit items with X axis linked to an auto-ranged but not visible plot item
                         if cachedXLinkedView.parentItem().vb.state["autoRange"][0]:
                             ax.vb.enableAutoRange(0)
-                            # print(f"\t-> skip axis {kax} because is linked to an X-auto-ranged view  \n\t---\n")
                             continue
 
                 if currentXLinkedView and currentXLinkedView.state["autoRange"][0]:
@@ -8958,16 +8866,11 @@ anything else       anything else       ❌
                     # print(f"\t-> skip axis {kax} with unchanged X bounds \n\t---\n")
                     continue
 
-                # newViewRangeX = (currentBounds[0][0] + cachedState["xOffset"][0],
-                #                  currentBounds[0][1] + cachedState["xOffset"][1])
                 newViewRangeX = (currentBounds[0][0] + cachedXOffset["xOffset"][0],
                                  currentBounds[0][1] + cachedXOffset["xOffset"][1])
-                # newViewRangeX = (currentState["bounds"][0][0] + cachedState["xOffset"][0],
-                #                  currentState["bounds"][0][1] + cachedState["xOffset"][1])
-
 
                 # NOTE: 2026-04-05 07:17:41 this works but can I make this faster?
-                if ax in self.signalAxes or len(visibleSignalAxes) == 0:
+                if ax in self.signalAxes:
                     if currentXLinkedView:
                         currentXLinkedView.blockLink(True)
 
@@ -8976,61 +8879,19 @@ anything else       anything else       ❌
                     if currentXLinkedView:
                         currentXLinkedView.blockLink(False)
 
-                # if self.xAxesLinked:
-                #     if ax in self.signalAxes:
-                #         if ax == visibleSignalAxes[0]:
-                #             ax.vb.setXLink(None)
-                #             ax.setXRange(*newViewRangeX, padding = 0)
-                #         else:
-                #             if currentXLinkedView and currentXLinkedView.parentItem() != visibleSignalAxes[0]:
-                #                 ax.vb.setXLink(visibleSignalAxes[0])
-                #                 visibleSignalAxes[0].vb.blockLink(True)
-                #                 ax.setXRange(*newViewRangeX, padding = 0)
-                #                 visibleSignalAxes[0].vb.blockLink(False)
-                #     else:
-                #         ax.vb.setXLink(visibleSignalAxes[0])
-                #         visibleSignalAxes[0].vb.blockLink(True)
-                #         ax.setXRange(*newViewRangeX, padding = 0)
-                #         visibleSignalAxes[0].vb.blockLink(False)
-                #
-                # else:
-                #     ax.vb.setXLink(None)
-                #     ax.setXRange(*newViewRangeX, padding = 0)
-
-
-
-
-        if self.xAxesLinked:
-            # relink _ALL_ axes to the topmost visible signal axis
-            # (and unlink this from anything else)
-            if len(visibleSignalAxes):
-                for ax in self.axes:
-                    if ax  == visibleSignalAxes[0]:
-                        if currentXLinkedView:
-                            ax.vb.setXLink(None)
-                    else:
-                        if ((currentXLinkedView and currentXLinkedView.parentItem() != visibleSignalAxes[0])
-                            or ax not in self.signalAxes):
-                            ax.vb.setXLink(visibleSignalAxes[0])
-
-
-    @timefunc
-    def _process_X_ranges_2_(self):
-        if len(self.axes) == 0:
-            return
-
-        visibleAxes = tuple(filter(lambda ax: ax.isVisible(), self.axes))
-        if len(visibleAxes) == 0:
-            return
-
-
-        visibleSignalAxes = tuple(filter(lambda ax: ax.isVisible(), self.signalAxes))
-
-        if self.xAxesLinked:
-            pass
-
-
-
+        # 2026-04-05 09:04:40
+        # if self.xAxesLinked:
+        #     # relink _ALL_ axes to the topmost visible signal axis
+        #     # (and unlink this from anything else)
+        #     if len(visibleSignalAxes):
+        #         for ax in self.axes:
+        #             if ax  == visibleSignalAxes[0]:
+        #                 if currentXLinkedView:
+        #                     ax.vb.setXLink(None)
+        #             else:
+        #                 if ((currentXLinkedView and currentXLinkedView.parentItem() != visibleSignalAxes[0])
+        #                     or ax not in self.signalAxes):
+        #                     ax.vb.setXLink(visibleSignalAxes[0])
 
     def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
@@ -10775,14 +10636,15 @@ anything else       anything else       ❌
 
     def _setup_axes_(self, _n_signal_axes_:int) -> None:
         r"""Call this ONCE after parsing the data.
+
         In SignalViewer there are n + 2 pg.PlotItem¹ objects:
         n PlotItem to display signals
         1 PlotItem to display events (e.g. triggers, etc)
         1 PlotItem to display spiketrains
 
         The PlotItem objects are stacked vertically in a pg.GraphicsLayout, bound
-        to the instance attribute `signalsLayout`, and associated with a
-        pg.GraphicsLayoutWidget bound to the instance attribute `viewerWidget`.
+        to the SignalViewer instance attribute `signalsLayout`, and associated with a
+        pg.GraphicsLayoutWidget (bound to the instance attribute `viewerWidget`).
 
         NOTE: neo.Epoch objects are displayed using Linear Region Items, in all
             axes
