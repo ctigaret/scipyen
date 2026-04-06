@@ -6,11 +6,12 @@
 r"""
 """
 
-import typing, warnings, math, cmath, os, traceback, dataclasses
+import typing, warnings, math, cmath, os, traceback, dataclasses, sys
 import numpy as np
 import quantities as pq
 import pandas as pd
-from core.utilities import get_least_pwr10
+from tribool import Tribool
+
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -38,6 +39,8 @@ else:
     __has_sip__ = True
 
 
+from core.utilities import (get_least_pwr10, unique)
+from core.inputspec import InputSpec
 from gui.painting_shared import (FontStyleType, standardQtFontStyles,
                                  FontWeightType, standardQtFontWeights)
 
@@ -48,33 +51,11 @@ from gui.guiutils import (DisplayHint,
 
 from core import scipyen_quantities as scq
 from core import strutils as strutils
-from core.datatypes import PODS
+from core import prog
 
 from iolib.navigation.navigator import UrlNavigatorButtonBase
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-
-class PODWidget(QtWidgets.QWidget):
-    r"""GUI to instantiate new POD values"""
-    def __init__(self, varType: typing.Union[
-                                    typing.Set[type], typing.Sequence[type]
-                                    ], /,
-                 default = None,
-                 parent = None):
-        super().__init__(parent = parent)
-
-        assert(isinstance(varType, type) or (isinstance(varType, (typing.Set, typing.Sequence)) and all(isinstance(v, type) for v in varType))), "Expecting a type, or a non-empty set or sequence of types"
-
-        if isinstance(varType, type):
-            if varType not in PODS:
-                raise TypeError(f"Incompatible variable type {vartype}")
-
-        self._vartype_ = varType
-        self._default_ = default
-
-    def _configureUI_(self):
-        pass
-
 
 
 class ElidedPushButton(UrlNavigatorButtonBase):
@@ -275,7 +256,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
 
     This choice can be restricted to a single family.
     """
-    unitChanged = Signal(object, name="unitChanged")
+    valueChanged = Signal(object, name="valueChanged")
 
     _default_units_ = pq.dimensionless
 
@@ -391,12 +372,12 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(self._currentUnitsFamilyName)), key = lambda x: x.name)
         self._setupUnitCombo()
         self._units_ = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
-        self.unitChanged.emit(self._units_)
+        self.valueChanged.emit(self._units_)
 
     @Slot(int)
     def _slot_unitsComboIndexChanged(self, value):
         self._units_ = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
-        self.unitChanged.emit(self._units_)
+        self.valueChanged.emit(self._units_)
 
     @property
     def unitFamily(self):
@@ -514,7 +495,6 @@ class LineEdit(QtWidgets.QLineEdit):
 
         self._variable_ = val
         super().setText(self._variable_)
-
 
     def text(self) -> str:
         return self.value()
@@ -639,8 +619,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     sig_valueChanged:Signal = Signal(object, name="sig_valueChanged")
 
     _default_units_:pq.Quantity         =  pq.dimensionless
-    _default_internal_minimum_:float    = -math.inf
-    _default_internal_maximum_:float    =  math.inf
+    # _default_internal_minimum_:float    = -math.inf
+    # _default_internal_maximum_:float    =  math.inf
+    _default_internal_minimum_:float    = sys.float_info.min
+    _default_internal_maximum_:float    = sys.float_info.max
 
     _default_singleStep_:int = 1
     _default_stepType_:QtWidgets.QAbstractSpinBox.StepType = QtWidgets.QAbstractSpinBox.DefaultStepType
@@ -654,6 +636,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                  singleStep: typing.Optional[float] = None,
                  stepType: typing.Optional[QtWidgets.QAbstractSpinBox.StepType] = None,
                  decimals: typing.Optional[int] = None,
+                 # minimum: typing.Optional[typing.Union[pq.Quantity, float]] = sys.float_info.min,
+                 # maximum: typing.Optional[typing.Union[pq.Quantity, float]] = sys.float_info.max,
                  minimum: typing.Optional[typing.Union[pq.Quantity, float]] = None,
                  maximum: typing.Optional[typing.Union[pq.Quantity, float]] = None,
                  unitsFamily: typing.Optional[str] = None,
@@ -1709,8 +1693,8 @@ class ComplexSpinBox(QtWidgets.QFrame):
         QtWidgets.QFrame.__init__(self, parent)
         if isinstance(parent, QtWidgets.QWidget):
             parent.addWidget(self)
-        self.layout = QtWidgets.QHBoxLayout(self)
-        self.layout.setSpacing(0)
+        self._layout_ = QtWidgets.QHBoxLayout(self)
+        self._layout_.setSpacing(0)
         self.prefixLabel = QtWidgets.QLabel(self)
         self.prefixLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignHCenter)
         self.prefixLabel.setTextInteractionFlags(QtCore.Qt.NoTextInteraction)
@@ -1735,14 +1719,14 @@ class ComplexSpinBox(QtWidgets.QFrame):
         self.suffixLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignHCenter)
         self.suffixLabel.setTextInteractionFlags(QtCore.Qt.NoTextInteraction)
 
-        self.layout.addWidget(self.prefixLabel)
-        self.layout.addWidget(self.realSpinBox)
-        self.layout.addWidget(self.plusLabel)
-        self.layout.addWidget(self.imagSpinBox)
-        self.layout.addWidget(self.jLabel)
-        self.layout.addWidget(self.suffixLabel)
-        self.layout.addStretch(5)
-        self.setLayout(self.layout)
+        self._layout_.addWidget(self.prefixLabel)
+        self._layout_.addWidget(self.realSpinBox)
+        self._layout_.addWidget(self.plusLabel)
+        self._layout_.addWidget(self.imagSpinBox)
+        self._layout_.addWidget(self.jLabel)
+        self._layout_.addWidget(self.suffixLabel)
+        self._layout_.addStretch(5)
+        self.setLayout(self._layout_)
 
         self._restrictedToFamily_:typing.Optional[str] = None
         self._rescaleOnUnitChange_:bool = False
@@ -2274,4 +2258,510 @@ class ComplexSpinBox(QtWidgets.QFrame):
 #         super().__init__(parent, lazy, validator)
 
 
+class GenericInputWidget(QtWidgets.QFrame):
+    r"""GUI to instantiate new POD values"""
 
+    sig_valueChanged = Signal(object, name = "sig_valueChanged")
+
+    SUPPORTED_TYPES = (bool, Tribool, int, float, complex,
+                       np.integer, np.floating, np.complexfloating,
+                       pq.UnitQuantity, pq.Quantity, str)
+
+    def __init__(self, varType: typing.Union[
+                            typing.Set[type], typing.Sequence[type],
+                            InputSpec, dataclasses.Field,
+                            type(dataclasses.MISSING)
+                            ] = dataclasses.MISSING,
+                 default = dataclasses.MISSING,
+                 valueChoices: typing.Optional[
+                     typing.Union[typing.Set, typing.Sequence]
+                     ] = None,
+                 parent = None):
+        super().__init__(parent = parent)
+        if isinstance(parent, QtWidgets.QWidget):
+            parent.addWidget(self)
+
+        self._inputWidget_ = None
+        self._typeCombo_ = None
+
+        if varType == dataclasses.MISSING:
+            # NOTE: 2026-04-06 22:13:01
+            # allow default c'tor, needed to use this by PythonItemDelegate
+            self._vartype_ = varType
+
+        else:
+            if isinstance(varType, InputSpec):
+                default = varType.default
+                valueChoices = varType.choices
+                varType = varType.type
+
+            elif isinstance(varType, dataclasses.Field):
+                varType, default = InputSpec.parse_args(varType, None)
+
+            elif isinstance(varType, typing._Final):
+                t = prog.unwind_type(x)
+                if len(t) == 0:
+                    if default not in (dataclasses.MISSING, None): # get it from default's type
+                        t = {type(default)}
+                    else:
+                        t = {object}
+
+                varType = t
+
+            if not ((isinstance(varType, type) and varType in self.SUPPORTED_TYPES)
+                    or (
+                        isinstance(varType, (typing.Set, typing.Sequence))
+                        and len(varType)>0
+                        and all((isinstance(v, type) and v in self.SUPPORTED_TYPES) for v in varType)
+                        )
+                    ):
+                raise TypeError(f"Expecting a type, or a non-empty set or sequence of types, with all types being one of {self.SUPPORTED_TYPES}")
+
+            self._vartype_ = varType
+
+        if self._vartype_ == dataclasses.MISSING:
+            self._vartype_names_ = list()
+            self._current_vartype_ = dataclasses.MISSING
+            self._default_ = dataclasses.MISSING
+        else:
+            if isinstance(self._vartype_, type):
+                self._vartype_names_ = self._vartype_.__name__
+                self._current_vartype_ = self._vartype_
+
+                if type(default) == self._vartype_:
+                    self._default_ = default
+
+                else:
+                    self._default_ = dataclasses.MISSING
+
+            else:
+                if isinstance(self._vartype_, set):
+                    self._vartype_ = tuple(self._vartype_)
+
+                ndx = 0
+                if type(default) in self._vartype_:
+                    ndx = self._vartype_.index(type(default))
+                    self._default_ = default
+                else:
+                    self._default_ = dataclasses.MISSING
+
+                self._current_vartype_ = self._vartype_[ndx]
+
+                self._vartype_names_ = list(map(lambda t: t.__name__, self._vartype_))
+
+
+            if isinstance(valueChoices, set):
+                valueChoices = list(valueChoices)
+
+        # NOTE: 2026-04-06 15:52:20
+        #  self._value_choices_ is the mapping value_type -> sequence of values of type 'value_type'
+        # print(f"{self.__class__.__name__}.__init__: _vartype_ = {self._vartype_}")
+        if isinstance(valueChoices, typing.Sequence) and len(valueChoices):
+            if all(isinstance(c, self._vartype_) for c in valueChoices):
+                if isinstance(self._vartype_, type):
+                     self._value_choices_ = {self._vartype_: valueChoices}
+
+                else:
+                     self._value_choices_ = dict(map(lambda t: (t, unique(list(filter(lambda c: isinstance(c, t), valueChoices)))), self._vartype_))
+        else:
+             self._value_choices_ = dict()
+
+        self._validator_ = None
+
+        # print(f"{self.__class__.__name__}.__init__ -> _vartype_ = {self._vartype_}, _default_ = {self._default_}")
+        self._configureUI_()
+
+        self._cached_value_ = {self._current_vartype_: self._default_}
+
+    def _configureUI_(self):
+        self._layout_ = QtWidgets.QHBoxLayout(self)
+        self._layout_.setSpacing(0)
+        self._layout_.setContentsMargins(0,0,0,0)
+        self.setLayout(self._layout_)
+
+        self._setup_widgets_()
+
+
+    def _setup_widgets_(self):
+        if self._vartype_ == dataclasses.MISSING:
+            self._inputWidget_ = self._createInputWidget_(self._vartype_)
+        elif isinstance(self._vartype_, type):
+            self._inputWidget_ = self._createInputWidget_(self._vartype_)
+            self._typeCombo_ = None
+        else:
+            self._typeCombo_ = QtWidgets.QComboBox(parent=self)
+            self._typeCombo_.setEditable(False)
+            self._typeCombo_.insertItems(0, self._vartype_names_)
+            if self._current_vartype_ in self._vartype_:
+                ndx = self._vartype_.index(self._current_vartype_)
+                self._typeCombo_.setCurrentIndex(ndx)
+            #     self._current_vartype_ = self._vartype_[0]
+            #     ndx = 0
+            # else:
+            self._inputWidget_ = self._createInputWidget_(self._current_vartype_)
+            self._typeCombo_.currentIndexChanged.connect(self._slot_typeIndexChanged)
+
+        if self._typeCombo_:
+            self._layout_.addWidget(self._typeCombo_)
+
+        self._layout_.addWidget(self._inputWidget_)
+
+        self._layout_.setStretchFactor(self._inputWidget_,1)
+
+    @Slot(object)
+    @Slot(bool)
+    @Slot(Tribool)
+    @Slot(int)
+    @Slot(float)
+    @Slot(complex)
+    @Slot(str)
+    @Slot(np.integer)
+    @Slot(np.floating)
+    @Slot(np.complexfloating)
+    @Slot(pq.UnitQuantity)
+    @Slot(pq.Quantity)
+    @Slot(QtCore.Qt.CheckState)
+    def _slot_inputValueChanged(self, val:object):
+        if isinstance(self._vartype_, type):
+            self._current_vartype_ = self._vartype_
+        else:
+            if not isinstance(self._typeCombo_, QtWidgets.QComboBox):
+                return
+            ndx = self._typeCombo_.currentIndex()
+            if ndx < 0 or ndx >= len(self._vartype_):
+                return
+            self._current_vartype_ = self._vartype_[ndx]
+
+        if isinstance(val, QtCore.Qt.CheckState):
+            if self._current_vartype_  == Tribool:
+                v_ = None if val == QtCore.Qt.PartiallyChecked else True if val == QtCore.Qt.Checked else False
+                self._cached_value_[self._current_vartype_] = Tribool(v_)
+
+            elif self._current_vartype_ == bool:
+                v_ = val == QtCore.Qt.Checked
+                self._cached_value_[self._current_vartype_] = v_
+
+        elif isinstance(val, self._current_vartype_):
+            self._cached_value_[self._current_vartype_] = val
+
+        else:
+            return
+
+        self.sig_valueChanged.emit(self._cached_value_[self._current_vartype_])
+
+    @Slot(int)
+    def _slot_valueChoiceIndexChanged(self, ndx:int):
+        if len(self._value_choices_) == 0:
+            return
+        choices =  self._value_choices_.get(self._current_vartype_, list())
+        if len(choices) == 0:
+            return
+
+        if ndx < 0 or ndx >= len(choices):
+            return
+
+        value = choices[ndx]
+
+        if isinstance(value, self._current_vartype_):
+            self._cached_value_[self._current_vartype_] = value
+
+            self.sig_valueChanged.emit(self._cached_value_[self._current_vartype_])
+
+    @Slot(int)
+    def _slot_typeIndexChanged(self, val: int):
+        if self._typeCombo_:
+            self._layout_.removeWidget(self._inputWidget_)
+            self._current_vartype_ = self._vartype_[val]
+            if self._current_vartype_ in self._cached_value_:
+                cachedVal = self._cached_value_[self._current_vartype_]
+            else:
+                cachedVal = dataclasses.MISSING
+            self._inputWidget_ = self._createInputWidget_(self._current_vartype_)
+            if isinstance(self._inputWidget_, QtWidgets.QComboBox):
+                if self._current_vartype_ in self._value_choices_:
+                    choices = self._value_choices_[self._current_vartype_]
+                    if isinstance(cachedVal, self._current_vartype_):
+                        if cachedVal != dataclasses.MISSING and isinstance(cachedVal, self._current_vartype_):
+                            if cachedVal in choices:
+                                sigBlock = QtCore.QSignalBlocker(self._inputWidget_)
+                                self._inputWidget_.setCurrentIndex(choices.index(cachedVal))
+
+                    ndx = self._inputWidget_.currentIndex()
+
+                    if ndx >=0 and ndx < len(choices):
+                        self._cached_value_[self._current_vartype_] = choices[ndx]
+
+            elif isinstance(self._inputWidget_, QtWidgets.QCheckBox):
+                if isinstance(cachedVal, Tribool):
+                    checkState = QtCore.Qt.Checked if cachedVal.value == True else QtCore.Qt.Checked if cachedVal.value == False else QtCore.Qt.PartiallyChecked
+                    self._inputWidget_.setCheckState(checkState)
+
+                elif isinstance(cachedVal, bool):
+                    self._inputWidget_.setChecked(cachedVal == True)
+
+                state = self._inputWidget_.checkState()
+
+                if self._current_vartype_  == Tribool:
+                    v_ = None if state == QtCore.Qt.PartiallyChecked else True if state == QtCore.Qt.Checked else False
+                    self._cached_value_[self._current_vartype_] = Tribool(v_)
+
+                elif self._current_vartype_ == bool:
+                    v_ = state == QtCore.Qt.Checked
+                    self._cached_value_[self._current_vartype_] = v_
+
+            else:
+                if cachedVal != dataclasses.MISSING:
+                    self._inputWidget_.setValue(cachedVal)
+
+                self._cached_value_[self._current_vartype_] = self._inputWidget_.value()
+
+            self._layout_.addWidget(self._inputWidget_)
+
+    def value(self):
+        if self._cached_value_[self._current_vartype_] == dataclasses.MISSING:
+            if isinstance(self._inputWidget_, QtWidgets.QComboBox):
+                ndx = self._inputWidget_.currentIndex()
+                choices =  self._value_choices_.get(self._current_vartype_, list())
+                if ndx >= 0 and ndx < len(choices):
+                    self._cached_value_[self._current_vartype_] = choices[ndx]
+            else:
+                self._cached_value_[self._current_vartype_] = self._inputWidget_.value()
+
+        return self._cached_value_[self._current_vartype_]
+
+    def setValue(self, val: InputSpec | object):
+        if isinstance(val, InputSpec):
+            default = val.default
+            valueChoices = val.choices
+            self._vartype_ = val.type
+        else:
+            default = val
+            valueChoices = None
+            self._vartype_ = type(val)
+
+        if isinstance(self._vartype_, type):
+            self._vartype_names_ = self._vartype_.__name__
+            self._current_vartype_ = self._vartype_
+
+            if type(default) == self._vartype_:
+                self._default_ = default
+
+            else:
+                self._default_ = dataclasses.MISSING
+
+        else:
+            if isinstance(self._vartype_, set):
+                self._vartype_ = tuple(self._vartype_)
+
+            ndx = 0
+            if type(default) in self._vartype_:
+                ndx = self._vartype_.index(type(default))
+                self._default_ = default
+            else:
+                self._default_ = dataclasses.MISSING
+
+            self._current_vartype_ = self._vartype_[ndx]
+
+            self._vartype_names_ = list(map(lambda t: t.__name__, self._vartype_))
+
+        if isinstance(valueChoices, set):
+            valueChoices = list(valueChoices)
+
+        # NOTE: 2026-04-06 15:52:20
+        #  self._value_choices_ is the mapping value_type -> sequence of values of type 'value_type'
+        # print(f"{self.__class__.__name__}.__init__: _vartype_ = {self._vartype_}")
+        if isinstance(valueChoices, typing.Sequence) and len(valueChoices):
+            if all(isinstance(c, self._vartype_) for c in valueChoices):
+                if isinstance(self._vartype_, type):
+                     self._value_choices_ = {self._vartype_: valueChoices}
+
+                else:
+                     self._value_choices_ = dict(map(lambda t: (t, unique(list(filter(lambda c: isinstance(c, t), valueChoices)))), self._vartype_))
+        else:
+            self._value_choices_ = dict()
+
+        if self._inputWidget_:
+            self._layout_.removeWidget(self._inputWidget_)
+
+        if self._typeCombo_:
+            self._layout_.removeWidget(self._typeCombo_)
+
+        self._cached_value_.clear()
+
+        print(f"{self.__class__.__name__}.setValue -> self._default_ = {self._default_}, self._current_vartype_ = {self._current_vartype_}")
+
+        self._setup_widgets_()
+
+        sigBlock = QtCore.QSignalBlocker(self._inputWidget_)
+
+        if not isinstance(self._inputWidget_, QtWidgets.QLabel):
+            if self._typeCombo_:
+                self._current_vartype_ = self._vartype_[self._typeCombo_.currentIndex()]
+
+            if self._current_vartype_ in self._cached_value_:
+                cachedVal = self._cached_value_[self._current_vartype_]
+            else:
+                cachedVal = dataclasses.MISSING
+
+            if isinstance(self._inputWidget_, QtWidgets.QComboBox):
+                if self._current_vartype_ in self._value_choices_:
+                    choices = self._value_choices_[self._current_vartype_]
+                    if isinstance(cachedVal, self._current_vartype_):
+                        if cachedVal != dataclasses.MISSING and isinstance(cachedVal, self._current_vartype_):
+                            if cachedVal in choices:
+                                self._inputWidget_.setCurrentIndex(choices.index(cachedVal))
+
+                    ndx = self._inputWidget_.currentIndex()
+
+                    if ndx >=0 and ndx < len(choices):
+                        self._cached_value_[self._current_vartype_] = choices[ndx]
+
+            elif isinstance(self._inputWidget_, QtWidgets.QCheckBox):
+                if isinstance(cachedVal, Tribool):
+                    checkState = QtCore.Qt.Checked if cachedVal.value == True else QtCore.Qt.Checked if cachedVal.value == False else QtCore.Qt.PartiallyChecked
+                    self._inputWidget_.setCheckState(checkState)
+                elif isinstance(cachedVal, bool):
+                    self._inputWidget_.setChecked(cachedVal == True)
+
+                state = self._inputWidget_.checkState()
+
+                if self._current_vartype_  == Tribool:
+                    v_ = None if state == QtCore.Qt.PartiallyChecked else True if state == QtCore.Qt.Checked else False
+                    self._cached_value_[self._current_vartype_] = Tribool(v_)
+
+                elif self._current_vartype_ == bool:
+                    v_ = state == QtCore.Qt.Checked
+                    self._cached_value_[self._current_vartype_] = v_
+
+            else:
+                if cachedVal != dataclasses.MISSING:
+                    self._inputWidget_.setValue(cachedVal)
+
+                self._cached_value_[self._current_vartype_] = self._inputWidget_.value()
+
+    def _createInputWidget_(self, t: typing.Union[type, type(dataclasses.MISSING)],
+                            c: typing.Optional[typing.Sequence] = None
+                            ) -> QtWidgets.QWidget:
+        # print(f"{self.__class__.__name__}._createInputWidget_({t})")
+        if t in self._value_choices_ and len(self._value_choices_[t]):
+            w = QtWidgets.QComboBox(parent = self)
+            w.setEditable(False)
+            w.insertItems(0, list(map(lambda v: f"{v}",  self._value_choices_[t])))
+            if isinstance(self._default_, t) and self._default_ in  self._value_choices_[t]:
+                ndx =  self._value_choices_[t].index(self._default_)
+                w.setCurrentIndex(ndx)
+            else:
+                w.setCurrentIndex(0)
+
+            w.currentIndexChanged.connect(self._slot_valueChoiceIndexChanged)
+
+        else:
+            if t == bool:
+                w = QtWidgets.QCheckBox(parent = self)
+                w.setTristate(False)
+                if isinstance(self._default_, bool):
+                    w.setChecked(self._default_ is True)
+                w.toggled.connect(self._slot_inputValueChanged)
+
+            elif t == Tribool:
+                w = QtWidgets.QCheckBox(parent = self)
+                w.setTristate(True)
+                if isinstance(self._default_, Tribool):
+                    checkState = QtCore.Qt.Checked if self._default_.value is True else QtCore.Qt.Unckecked if self._default_.value is False else QtCore.Qt.PartiallyChecked
+                    w.setCheckState(checkState)
+                w.toggled.connect(self._slot_inputValueChanged)
+
+            elif t in (int, np.integer):
+                w = QtWidgets.QSpinBox(parent = self)
+                w.setMinimum(-2147483648)
+                w.setMaximum(2147483647)
+
+                if isinstance(self._default_, t):
+                    w.setValue(self._default_)
+                w.valueChanged.connect(self._slot_inputValueChanged)
+
+            elif t in (float, np.floating):
+                w = QtWidgets.QDoubleSpinBox(parent = self)
+                w.setMinimum(sys.float_info.min)
+                w.setMaximum(sys.float_info.max)
+
+                if isinstance(self._default_, t):
+                    w.setValue(self._default_)
+                w.valueChanged.connect(self._slot_inputValueChanged)
+
+            elif t == (complex, np.complexfloating):
+                w = ComplexSpinBox(parent = self)
+                w.setMinimum(sys.float_info.min)
+                w.setMaximum(sys.float_info.max)
+                if isinstance(self._default_, t):
+                    w.setValue(self._default_)
+                w.sig_valueChanged.connect(self._slot_inputValueChanged)
+
+            elif t == str:
+                print(f"LineEdit -> {self._default_}")
+                w = LineEdit(parent=self)
+                w.undoAvailable=True
+                w.redoAvailable=True
+                w.setClearButtonEnabled(True)
+                if isinstance(self._default_, str):
+                    w.setText(self._default_)
+                w.textChanged.connect(self._slot_inputValueChanged)
+
+            elif t == pq.UnitQuantity:
+                w = QuantityChooserWidget(parent=self)
+                if self._default_ is None:
+                    self._default_ = pq.dimensionless
+                elif isinstance(self._default_, pq.Quantity) and not isinstance(self._default_, pq.UnitQuantity):
+                    if len(self._default_.units.dimensionality) == 1:
+                        self._default_ = self._default_.units.dimensionality[0][0]
+
+                if isinstance(self._default_, pq.UnitQuantity):
+                    w.setValue(self._default_)
+
+                w.valuechanged.connect(self._slot_inputValueChanged)
+
+            elif t == pq.Quantity:
+                w = QuantitySpinBox(parent=self)
+                if isinstance(self._default_, pq.Quantity):
+                    if self._default_.size > 1:
+                        raise ValueError("Only scalar Quantities are supported")
+                    w.setValue(self._default_)
+                w.sig_valueChanged.connect(self._slot_inputValueChanged)
+
+            elif t == dataclasses.MISSING:
+                # FIXME: 2026-04-06 22:10:42
+                # what to do with unsupported types?
+                # currently uses a QLabel with no text, as a placeholder
+                w = QtWidgets.QLabel(parent=self)
+            else:
+                raise TypeError(f"Unsupported data type {t.__name__}")
+
+            if isinstance(w, QtWidgets.QLabel):
+                self._default_ = dataclasses.MISSING
+
+            elif isinstance(w, QtWidgets.QCheckBox):
+                state = w.checkState()
+
+                if self._current_vartype_  == Tribool:
+                    v_ = None if state == QtCore.Qt.PartiallyChecked else True if state == QtCore.Qt.Checked else False
+                    self._default_ = Tribool(v_)
+
+                elif self._current_vartype_ == bool:
+                    v_ = state == QtCore.Qt.Checked
+                    self._default_ = v_
+            else:
+                self._default_ = w.value()
+
+        w.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding,
+                        QtWidgets.QSizePolicy.Fixed)
+
+        return w
+
+    def _check_update_value_choices_(self, t: type, val: typing.Any):
+        if t in  self._value_choices_ and len( self._value_choices_[t]):
+            if isinstance(val, t) and val not in  self._value_choices_[t]:
+                 self._value_choices_[t].insert(0, val)
+
+
+    def validate(self, *args) -> bool:
+        return True # for now...

@@ -41,6 +41,7 @@ import warnings
 import weakref
 import h5py
 import treelib
+from tribool import Tribool
 from copy import (deepcopy, copy,)
 
 #### END core python modules
@@ -183,12 +184,13 @@ ndarray_type = ndarray.__name__
 NUMPY_NUMERIC_KINDS = set("buifc")
 NUMPY_STRING_KINDS = set("SU")
 
-Real: typing.TypeAlias = typing.Union[int, float, np.int64, np.float64]
-Complex: typing.TypeAlias = typing.Union[complex, np.complex128]
+Real: typing.TypeAlias = typing.Union[int, float, np.integer, np.floating]
+Complex: typing.TypeAlias = typing.Union[complex, np.complexfloating]
 Number: typing.TypeAlias = typing.Union[Real, Complex]
 
 PODS = (
     bool,
+    Tribool,
     int,
     float,
     complex,
