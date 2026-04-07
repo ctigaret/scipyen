@@ -119,20 +119,20 @@ mpldatacursor (for python 3)
 # needed for the new plugins framework
 __scipyen_plugin__ = None
 
-from pprint import pprint
+# from pprint import pprint
 
-import sys, os, traceback, numbers, warnings, weakref, inspect, typing, math
+import sys, os, traceback, numbers, warnings, inspect, typing, math
 # import importlib
 import collections
-from collections.abc import Iterable
-from functools import partial, singledispatch, singledispatchmethod
+# from collections.abc import Iterable
+from functools import partial, singledispatchmethod
 from itertools import (cycle, accumulate, chain, pairwise)
-from operator import attrgetter, itemgetter, methodcaller
-from enum import Enum, IntEnum
+from operator import attrgetter #, itemgetter, methodcaller
+# from enum import Enum, IntEnum
 from dataclasses import MISSING
 from tribool import Tribool
 
-from traitlets import Bunch
+# from traitlets import Bunch
 
 
 #### END core python modules
@@ -166,7 +166,7 @@ else:
 
 
 
-import math
+# import math
 import numpy as np
 import pandas as pd
 from pandas import NA
@@ -200,18 +200,21 @@ from iolib import pictio as pio
 
 #### BEGIN pict.core modules
 import core.signalprocessing as sgp
-from core import (xmlutils, strutils, neoutils, svgutils)
+from core import (xmlutils, strutils, svgutils)
+import core.neoutils as neoutils
 import core.scipyen_quantities as scq
 from core.neoutils import (get_domain_name,
                            get_non_empty_spike_trains,
                            get_non_empty_events,
                            get_non_empty_epochs,
-                           normalized_index,
                            check_ephys_data,
                            check_ephys_data_collection,
                            set_relative_time_start,
                            segment_start,
                            )
+
+# NOTE: when needed, call neoutils.normalized_index
+# from core.neoutils import normalized_index as normalized_index_neo
 
 from core.prog import (safewrapper, show_caller_stack, with_doc, scipywarn, timefunc)
 from core.datatypes import (array_slice, is_column_vector, is_vector, )
@@ -249,7 +252,7 @@ from gui import pictgui as pgui
 from gui import quickdialog as qd
 from gui import scipyen_colormaps as colormaps
 
-from gui.scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,Bunch)
+from gui.scipyenviewer import (ScipyenFrameViewer,Bunch)
 # from gui.dataviewer import (InteractiveTreeWidget, DataViewer,)
 from gui.datatreeviewer import DataTreeViewer
 from gui.widgets.datatreeview import DataTreeView
@@ -257,7 +260,7 @@ from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes, cursors2ep
 from gui.widgets.colorwidgets import ColorSelectionWidget, quickColorDialog
 from gui.pictgui import (GuiWorker, WorkerThread)
 from gui.itemslistdialog import ItemsListDialog
-from gui import guiutils # should also register the new symbols
+# from gui import guiutils # should also register the new symbols
 
 #### END gui modules
 
@@ -1358,16 +1361,16 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     def showsLegends(self, value:bool):
         self._show_legends_ = True
         sigBlock = QtCore.QSignalBlocker(self.actionShow_Legends)
-        self.actionShow_Legends.setChecked(value==True)
+        self.actionShow_Legends.setChecked(value)
         self.showLegends(self._show_legends_)
 
     @Slot(bool)
     def _slot_showLegends(self, value):
-        self.showsLegends = value == True
+        self.showsLegends = value
 
     @Slot(bool)
     def _slot_setIgnoreEmptySpikeTrains(self, value):
-        self.ignoreEmptySpikeTrains = value==True
+        self.ignoreEmptySpikeTrains = value
         if self.yData is not None:
             self.displayFrame()
             self._new_data_ = False
@@ -1379,7 +1382,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("IgnoreEmptySpikeTrains", trait_notifier=True)
     @ignoreEmptySpikeTrains.setter
     def ignoreEmptySpikeTrains(self, value):
-        self._ignore_empty_spiketrains_ = value == True
+        self._ignore_empty_spiketrains_ = value
         sigBlock = QtCore.QSignalBlocker(self.actionIgnore_empty_spike_trains)
         self.actionIgnore_empty_spike_trains.setChecked(self._ignore_empty_spiketrains_)
 
@@ -1397,7 +1400,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         if not hasattr(QtGui.QTextOption.WrapMode, val):
             try:
                 wrModes = dict((k,v) for k,v in vars(QtGui.QTextOption).items() if isinstance(v, QtGui.QTextOption.WrapMode))
-                if val not in vrModes:
+                if val not in wrModes:
                     val = fallback
 
             except:
@@ -1447,7 +1450,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("XGrid")
     @xGrid.setter
     def xGrid(self, value:bool):
-        self._xGridOn_ = value == True
+        self._xGridOn_ = value
         signalBlocker = QtCore.QSignalBlocker(self.actionShow_X_grid)
         self.actionShow_X_grid.setChecked(self._xGridOn_)
 
@@ -1463,7 +1466,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("YGrid")
     @xGrid.setter
     def yGrid(self, value:bool):
-        self._yGridOn_ = value == True
+        self._yGridOn_ = value
         signalBlocker = QtCore.QSignalBlocker(self.actionShow_Y_grid)
         self.actionShow_Y_grid.setChecked(self._yGridOn_)
 
@@ -1479,7 +1482,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("AnnotationsDock")
     @annotationsDockWidgetEnabled.setter
     def annotationsDockWidgetEnabled(self, val:bool):
-        self._annotationsDockWidget_enabled_ = val==True
+        self._annotationsDockWidget_enabled_ = val
 
         sigBlocker = [QtCore.QSignalBlocker(w) for w in (self.showAnnotationsDockWidgetAction,
                                                             self.annotationsDockWidget)]
@@ -1615,7 +1618,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("MainToolbarVisible", "qt")
     @mainToolBarVisible.setter
     def mainToolBarVisible(self, value:bool):
-        self._mainToolBarVisible_ = value == True
+        self._mainToolBarVisible_ = value
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewMain_Toolbar, self.mainToolBar)]
         self.mainToolBar.setVisible(self._mainToolBarVisible_)
         self.actionViewMain_Toolbar.setChecked(self._mainToolBarVisible_)
@@ -1627,7 +1630,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("NavigatorVisible", "qt")
     @navigatorVisible.setter
     def navigatorVisible(self, value:bool):
-        self._navigatorVisible_ = value == True
+        self._navigatorVisible_ = value
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewFrame_Navigator, self._frames_spinBoxSlider_)]
         self._frames_spinBoxSlider_.setVisible(self._navigatorVisible_)
         self.actionViewFrame_Navigator.setChecked(self._navigatorVisible_)
@@ -1639,7 +1642,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("SelectorsVisible", "qt")
     @selectorsVisible.setter
     def selectorsVisible(self, value:bool):
-        self._selectorsVisible_ = value == True
+        self._selectorsVisible_ = value
         signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.actionViewSignal_Selectors, self.selectorsWidget)]
         self.selectorsWidget.setVisible(self._selectorsVisible_)
         self.actionViewSignal_Selectors.setChecked(self._selectorsVisible_)
@@ -1651,7 +1654,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @markConfigurable("CursorsShowValue")
     @cursorsShowValue.setter
     def cursorsShowValue(self, val:bool):
-        self._cursorsShowValue_ = val == True
+        self._cursorsShowValue_ = val
         signal_blocker = QtCore.QSignalBlocker(self.setCursorsShowValue)
         self.setCursorsShowValue.setChecked(self._cursorsShowValue_)
         for c in self.cursors:
@@ -1815,7 +1818,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @_interpret_signal.register(neo.Block)
     def __interpret_signal(self, obj: neo.Block, /, x, **kwargs):
         self._yData_ = obj
-        self._cached_title = getattr(y, "name", None)
+        self._cached_title = getattr(obj, "name", None)
 
         # NOTE : 2022-01-17 14:17:23
         # if frameIndex was passed, then self._number_of_frames_ might turn
@@ -8644,132 +8647,24 @@ anything else       anything else       ❌
 
     def _get_axisXDataBounds(self, axis: typing.Union[int, pg.PlotItem]) -> tuple:
         # generator!
-        x0 = np.array(list(map(lambda pdi: pdi.xData[0],
-                               filter(lambda i: (isinstance(i, pg.PlotDataItem)
-                                                 and isinstance(i.xData, np.ndarray)
-                                                 and i.xData.size > 0),
-                                      axis.listDataItems()))))
-        x1 = np.array(list(map(lambda pdi: pdi.xData[-1],
-                               filter(lambda i: (isinstance(i, pg.PlotDataItem)
-                                                 and isinstance(i.xData, np.ndarray)
-                                                 and i.xData.size > 0),
-                                      axis.listDataItems()))))
-        if len(x0) and len(x1):
-            yield np.nanmin(x0), np.nanmax(x1)
-    #
-    # # def _get_axis_view_X_range(self, axis: typing.Union[int, pg.PlotItem]) -> tuple:
-    # #     if isinstance(axis, int):
-    # #         if axis not in range(len(self.axes)):
-    # #             raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
-    # #
-    # #         axis = self.axes[axis]
-    # #
-    # #     elif isinstance(axis, pg.PlotItem):
-    # #         if axis not in self.axes:
-    # #             raise ValueError(f"Axis {axis} is not in this viewer")
-    # #
-    # #     else:
-    # #         raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
-    # #
-    # #     xv0, xv1 = axis.vb.viewRange()[0]
-    # #
-    # #     return xv0, xv1
-    #
-    # def _get_axis_data_X_range_(self, axis:typing.Union[int, pg.PlotItem]) -> tuple:
-    #     if isinstance(axis, int):
-    #         if axis not in range(len(self.axes)):
-    #             raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
-    #
-    #         axis = self.axes[axis]
-    #
-    #     elif isinstance(axis, pg.PlotItem):
-    #         if axis not in self.axes:
-    #             raise ValueError(f"Axis {axis} is not in this viewer")
-    #
-    #     else:
-    #         raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
-    #
-    #     pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
-    #
-    #     # print(f"{self.__class__.__name__}._get_axis_data_X_range_ axis {self.axes.index(axis)} : {len(pdis)} plot data items")
-    #
-    #     if len(pdis):
-    #         # xbounds0, xbounds1 = zip(*map(lambda i_ : i_.dataBounds(0), pdis))
-    #         # NOTE: BUG
-    #         # the 'dataBounds' method returns None, None if the pdi is not
-    #         # visible!
-    #         # NOTE: 2023-07-09 21:09:08
-    #         # use dataRect() instead
-    #         xbounds0, xbounds1 = zip(*map(lambda i_ : (i_.dataRect().x(), i_.dataRect().x() + i_.dataRect().width()), pdis))
-    #         min_x = min(xbounds0)
-    #         max_x = max(xbounds1)
-    #         # print(f"\txbounds0 {xbounds0}, xbounds1 {xbounds1} min_x {min_x}, max_x {max_x}")
-    #         # items_min_x, items_max_x = zip(*list((float(np.nanmin(i.xData)), float(np.nanmax(i.xData))) for i in pdis))
-    #
-    #         # min_x = items_min_x[0] if isinstance(items_min_x, (tuple, list)) else items_min_x
-    #         # max_x = items_max_x[0] if isinstance(items_max_x, (tuple, list)) else items_max_x
-    #
-    #         # NOTE: 2023-07-07 13:17:42
-    #         # when the axis (a pg.PlotItem) is not visibile, neither are its
-    #         # plot data items; in turn, then these are NOT visible, their dataBounds(…)
-    #         # method returns None, None !!!
-    #         if  min_x is None:
-    #             min_x = math.nan
-    #         if max_x is None:
-    #             max_x =math.nan
-    #         return min_x, max_x
-    #
-    #     else:
-    #         return math.nan, math.nan
-
-#     def _get_axis_data_Y_range_(self, axis:typing.Union[int, pg.PlotItem]) -> tuple:
-#         if isinstance(axis, int):
-#             if axis not in range(len(self.axes)):
-#                 raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
-#
-#             axis = self.axes[axis]
-#
-#         elif isinstance(axis, pg.PlotItem):
-#             if axis not in self.axes:
-#                 raise ValueError(f"Axis {axis} is not in this viewer")
-#
-#         else:
-#             raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
-#
-#         pdis = [i for i in axis.items if isinstance(i, pg.PlotDataItem)]
-#
-#         if len(pdis):
-#             ybounds0, ybounds1 = zip(*map(lambda i_ : i_.dataBounds(1), pdis))
-#             min_y = min(ybounds0)
-#             max_y = max(ybounds1)
-#             return min_y, max_y
-# #             items_min_y, items_max_y = zip(*list((float(np.nanmin(i.yData)), float(np.nanmax(i.yData))) for i in pdis))
-# #
-# #             min_y = items_min_y[0] if isinstance(items_min_y, (tuple, list)) else items_min_y
-# #             max_y = items_max_y[0] if isinstance(items_max_y, (tuple, list)) else items_max_y
-# #
-# #             return min_y, max_y
-#
-#         else:
-#             return math.nan, math.nan
-
-    # def _get_axis_view_Y_range(self, axis:typing.Union[int, pg.PlotItem]) ->tuple:
-    #     if isinstance(axis, int):
-    #         if axis not in range(len(self.axes)):
-    #             raise ValueError(f"Invalid axis index {axis} for {len(self.axes)} axes")
-    #
-    #         axis = self.axes[axis]
-    #
-    #     elif isinstance(axis, pg.PlotItem):
-    #         if axis not in self.axes:
-    #             raise ValueError(f"Axis {axis} is not in this viewer")
-    #
-    #     else:
-    #         raise TypeError(f"Invalid axis specification; expected an int or a PlotItem; got {type(axis).__name__} instead")
-    #
-    #     yv0, yv1 = axis.vb.viewRange()[1]
-    #
-    #     return yv0, yv1
+        # NOTE: 2026-04-07 22:42:49
+        # possibly redundant with guiutils.getPlotItemDataBoundaries
+        yield from guiutils.plotItemXDataBounds(axis)
+        # if isinstance(axis, int):
+        #     axis = self.axes[axis]
+        #
+        # x0 = np.array(list(map(lambda pdi: pdi.xData[0],
+        #                        filter(lambda i: (isinstance(i, pg.PlotDataItem)
+        #                                          and isinstance(i.xData, np.ndarray)
+        #                                          and i.xData.size > 0),
+        #                               axis.listDataItems()))))
+        # x1 = np.array(list(map(lambda pdi: pdi.xData[-1],
+        #                        filter(lambda i: (isinstance(i, pg.PlotDataItem)
+        #                                          and isinstance(i.xData, np.ndarray)
+        #                                          and i.xData.size > 0),
+        #                               axis.listDataItems()))))
+        # if len(x0) and len(x1):
+        #     yield np.nanmin(x0), np.nanmax(x1)
 
     @Slot()
     def _slot_post_frameDisplay(self):
@@ -8875,6 +8770,11 @@ anything else       anything else       ❌
 
                     if currentXLinkedView:
                         currentXLinkedView.blockLink(False)
+
+                else:
+                    if len(visibleSignalAxes) == 0:
+                        ax.setXRange(*newViewRangeX, padding = 0)
+
 
         # 2026-04-05 09:04:40
         # if self.xAxesLinked:

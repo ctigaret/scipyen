@@ -292,10 +292,8 @@ def validatorString(val:typing.Union[QtGui.QValidator.State, int]):
     return "Acceptable" if val == QtGui.QValidator.Acceptable else "Intermediate" if val == QtGui.QValidator.Intermediate else "Invalid"
 
 def getPlotItemDataBoundaries(item:pg.PlotItem):
-    r"""Calculates actual data bounds (data domain, `X`, and data range, `Y`)
-    NOTE: 2022-11-21 16:11:36
-    Unless there is data plotted, this does not rely on PlotItem.viewRange()
-    because this extends outside of the data domain and data range.
+    r"""Calculates data bounds (data domain, `X`, and data range, `Y`)
+    Falls back on item's ViewBox view range
     """
     [[vxmin, vxmax], [vymin, vymax]] = item.viewRange()
     plotDataItems = [i for i in item.listDataItems() if isinstance(i, pg.PlotDataItem) and all(v is not None for v in (i.xData, i.yData))]
@@ -325,9 +323,24 @@ def getPlotItemDataBoundaries(item:pg.PlotItem):
         xmax = vxmax
         ymin = vymin
         ymax = vymax
-        # [[xmin, xmax], [ymin, ymax]] = item.viewRange()
 
     return [[xmin, xmax], [ymin, ymax]]
+
+def plotItemXDataBounds(axis: pg.PlotItem):
+    # generator!
+    x0 = np.array(list(map(lambda pdi: pdi.xData[0],
+                            filter(lambda i: (isinstance(i, pg.PlotDataItem)
+                                                and isinstance(i.xData, np.ndarray)
+                                                and i.xData.size > 0),
+                                    axis.listDataItems()))))
+    x1 = np.array(list(map(lambda pdi: pdi.xData[-1],
+                            filter(lambda i: (isinstance(i, pg.PlotDataItem)
+                                                and isinstance(i.xData, np.ndarray)
+                                                and i.xData.size > 0),
+                                    axis.listDataItems()))))
+    if len(x0) and len(x1):
+        yield np.nanmin(x0), np.nanmax(x1)
+
 
 def getMenuActionsTree(w: typing.Optional[QtWidgets.QWidget] = None):
     return dict(map(lambda a: (a.text().replace("&", ""), (a, getMenuActionsTree(a.menu()))), w.actions())) if w else None
