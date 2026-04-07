@@ -182,12 +182,6 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
 
     def _createContextMenu_(self) -> QtWidgets.QMenu:
         menu = QtWidgets.QMenu(self)
-        # if self.timesLineEdit.isReadOnly():
-        # editTimesAction = QtGui.QAction("Edit...")
-        # editTimesAction.triggered.connect(self._slot_editTimes)
-        # menu.addAction(editTimesAction)
-        # menu.addSeparator()
-
         menu.addAction(self.setEventClassAction)
 
         if (isinstance(self._data_, (DataMark, TriggerEvent))
@@ -198,7 +192,6 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
                 isinstance(self._data_, DataMark)
                 and not isinstance(self._data_, TriggerEvent)
                 ):
-                # menu.addAction(self.setEventTypeAction)
                 menu.addAction(self.setEventDomanUnitsAction)
 
         menu.addAction(self.nameLabelsAction)
@@ -305,6 +298,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
 
     @Slot()
     def _slot_editTimes(self):
+        r"""Called when times are edited in a TableEditorWidget"""
         from gui.widgets.tableeditorwidget import TableEditorWidget
         # if not self.timesLineEdit.isReadOnly():
         #     return
@@ -313,7 +307,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
             return
 
         dlg = qd.QuickDialog(self, title = "Edit values")
-        te = TableEditorWidget(dlg)
+        te = TableEditorWidget(parent=dlg)
         te.setValue(self._times_)
         dlg.addWidget(te)
         dlg.adjustSize()
@@ -324,6 +318,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
 
     @Slot(str)
     def _slot_timesChanged(self, value:str):
+        r"""Called when times are edited in-line (in a LineEdit widget)"""
         from core.prog import scipywarn
         # print(f"{self.__class__.__name__}._slot_timesChanged({value})")
         if len(value.strip()) == 0:
@@ -335,8 +330,10 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
                 # print(f"{self.__class__.__name__}._slot_timesChanged -> v = {v}")
                 if isinstance(v, (tuple, list)):
                     self._times_ = np.array(v)
+
                 elif isinstance(v, numbers.Number):
                     self._times_ = np.array([v])
+
             except:
                 try:
                     # messing about...
@@ -592,10 +589,9 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
     def value(self) -> typing.Optional[typing.Union[neo.Event, DataMark, TriggerEvent]]:
         return self._data_
 
-    def setValue(self,
-                 val: typing.Optional[
-                     typing.Union[neo.Event, DataMark, TriggerEvent]
-                     ] = None):
+    def setValue(self, val: typing.Optional[
+                                typing.Union[neo.Event, DataMark, TriggerEvent]
+                                ] = None):
         self._data_ = val
         if isinstance(self._data_, neo.Event):
             self._data_class_ = type(val)

@@ -52,11 +52,10 @@ from gui.guiutils import (DisplayHint,
 from core import scipyen_quantities as scq
 from core import strutils as strutils
 from core import prog
-
+from core import datatypes as dt
 from iolib.navigation.navigator import UrlNavigatorButtonBase
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-
 
 class ElidedPushButton(UrlNavigatorButtonBase):
     def __init__(self, text: str = "", elideText: bool = True, parent = None):
@@ -465,9 +464,12 @@ class LazyLineEdit(QtWidgets.QLineEdit):
             super().keyPressEvent(event)
 
 class LineEdit(QtWidgets.QLineEdit):
+    r"""Line editor widget with custom context menu and, optional lazy notifications of text changes.
+
+    To constrain for numeric values/arrays, including Quantity arrays, use it with guiutils.NumericStringValidator.
+"""
     sig_enterPressed = Signal(str, name="sig_enterPressed")
     sig_lazy = Signal(bool, name="sig_lazy")
-    r"""QLineEdit with custom context menu and, optionally, lazy notifications"""
     def __init__(self, contents: typing.Optional[str] = None,
                  parent: typing.Optional[QtWidgets.QWidget] = None,
                  lazy: bool = False,
@@ -592,9 +594,66 @@ class LineEdit(QtWidgets.QLineEdit):
     def lazy(self, val: bool):
         self._lazy_ = val is True
         self.sig_lazy.emit(self._lazy_)
-        # if self._lazy_:
-        #     if self.receivers(self.textChanged):
-        #         self.textChanged.disconnect()
+
+
+class ArrayEdit(QtWidgets.QFrame):
+    r"""Widget for editing (small) numeric arrays"""
+    sig_valueChanged = Signal(object, name = "sig_valueChanged")
+
+    def __init__(self, value: typing.Optional[np.ndarray] = None,
+                 parent = None):
+        super().__init__(parent = parent)
+        if isinstance(parent, QtWidgets.QWidget):
+            parent.addWidget(self)
+
+        self._inputWidget_ = None
+
+        if isinstance(value, np.ndarray):
+            self._value_ = value
+        else:
+            self._value_ = None
+
+    def _configureUI_(self):
+        self._setup_widgets_()
+
+    def _setup_widgets_(self):
+        if self._value_ is None:
+            w = QtWidgets.QLabel(parent=self)
+        elif isinstance(self._value_, np.ndarray):
+            if not dt.is_vector(self._value_) or self.value.size > 5: # seems like a good compromise?
+                if self._value_.ndim < 3:
+                    # w = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("table"), f"Edit {type(self._value_).__name__} with size {self._value_.size} and shape {self._value_.shape}", self)
+                    w = ElidedPushButton(self)
+                    w.setText(f"Edit {type(self._value_).__name__} with size {self._value_.size} and shape {self._value_.shape}")
+                    w.setIcon(QtGui.QIcon.fromTheme("table"))
+                    w.triggered.connect(self._slot_editExternally)
+                else:
+                    w = QtWidgets.QLabel(parent=self)
+                    w.setText(f"{type(self._value_).__name__} with size {self._value_.size} and shape {self._value_.shape}")
+
+            else:
+                w = LineEdit(parent=self)
+                w.redoAvailable = True
+                w.undoAvailable = True
+                w.setClearButtonEnabled(True)
+                w.setText(f"{self._value_}")
+                w.textChanged.connect(self._slot_valuesEdited)
+                w.sig_lazy.connect(self._slot_valuesLazyEdited)
+
+        self._inputWidget_ = w
+
+    @Slot()
+    def _slot_editExternally(self):
+        from gui.widgets.tableeditorwidget import TableEditorWidget
+        dlg = qd.QuickDialog(self, title = "Edit array values")
+        te = TableEditorWidget(parent=dlg)
+        te.setValue(self._value_)
+        dlg.addWidget(te)
+        dlg.adjustSize()
+
+        if dlg.exec():
+            self._value_ = te.value()
+
 
 
 class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
@@ -1271,10 +1330,6 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             self.setMinimum(-math.inf)
             specialText = r"NA"
             self._specialValueText_ = specialText
-            # super().setSpecialValueText(specialText)
-            # super().setValue(-math.inf)
-
-            # text = specialText
 
             if len(self._prefix_):
                 text = f"{self._prefix_} {self._specialValueText_}"
@@ -1285,17 +1340,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             super().setSpecialValueText(self._specialValueText_)
             super().setValue(self._magnitude_)
 
-            # signalBlock = QtCore.QSignalBlocker(self.lineEdit())
             self.lineEdit().setText(text)
 
         elif self._magnitude_ in (math.nan, np.nan):
             self.setMinimum(-math.inf)
             specialText = r"NaN"
             self._specialValueText_ = specialText
-            # super().setSpecialValueText(specialText)
-            # super().setValue(-math.inf)
-
-            # text = specialText
 
             if len(self._prefix_):
                 text = f"{self._prefix_} {self._specialValueText_}"
@@ -1306,16 +1356,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             super().setSpecialValueText(self._specialValueText_)
             super().setValue(self._magnitude_)
 
-            # signalBlock = QtCore.QSignalBlocker(self.lineEdit())
             self.lineEdit().setText(text)
 
         elif isinstance(self._magnitude_, (float, int)):
-            # print(f"{self.__class__.__name__}._update_: {type(self._magnitude_).__name__}: {self._magnitude_}")
-            # print(f"\tcurrent decimals: {self._decimals_}")
-            # print(f"\tdefault decimals: {self._default_decimals_}")
-            # print(f"\tcurrent step: {self._singleStep_}")
-            # print(f"\tforced  step: {forceSgStep}")
-
             if self._magnitude_ in (-math.inf, -np.inf):
                 specialText = r"-Inf"
 
@@ -1323,19 +1366,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 specialText = r"Inf"
 
             else:
-
-                # super().setValue(float(self._magnitude_))
-                # print(f"\tsuper_value: {super().value()}")
-                # super_text = super().lineEdit().text()
-                # print(f"\tsuper_text: {super_text}")
                 # NOTE: 2026-03-29 12:14:37
                 # the next line formats self._magnitude_ according to the number of decimals
                 # HOWEVER, this does NOT work when the generated text is in scientific format
                 # e.g., '1e-8'
                 text = f"{self._magnitude_:.{self.decimals+1}}"
-                # print(f"\ttext: {text}")
                 mantissa, exponent, decimals = strutils.parse_sci_string(text)
-                # print(f"\tmantissa = {mantissa}, exponent = {exponent}, decimals = {decimals}")
                 if exponent != 0:
                     sign = "+" if exponent > 0 else "" # '-' wil be automatically inserted by Python library
                     text = f"{mantissa:.{self.decimals}}e{sign}{exponent}"
@@ -2251,13 +2287,6 @@ class ComplexSpinBox(QtWidgets.QFrame):
         if not (self._keepDimensionless_ or self._forceDimensionless_):
             self._rescaleOnUnitChange_ = val
 
-# class SequenceEditor(LineEdit):
-#     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
-#                  lazy: bool = False,
-#                  validator: typing.Optional[QtGui.QValidator] = None):
-#         super().__init__(parent, lazy, validator)
-
-
 class GenericInputWidget(QtWidgets.QFrame):
     r"""GUI to instantiate new POD values"""
 
@@ -2265,11 +2294,12 @@ class GenericInputWidget(QtWidgets.QFrame):
 
     SUPPORTED_TYPES = (bool, Tribool, int, float, complex,
                        np.integer, np.floating, np.complexfloating,
-                       pq.UnitQuantity, pq.Quantity, str)
+                       pq.UnitQuantity, pq.Quantity, str, type(None), type(pd.NA))
 
     def __init__(self, varType: typing.Union[
                             typing.Set[type], typing.Sequence[type],
                             InputSpec, dataclasses.Field,
+                            type(None),
                             type(dataclasses.MISSING)
                             ] = dataclasses.MISSING,
                  default = dataclasses.MISSING,
@@ -2288,6 +2318,12 @@ class GenericInputWidget(QtWidgets.QFrame):
             # NOTE: 2026-04-06 22:13:01
             # allow default c'tor, needed to use this by PythonItemDelegate
             self._vartype_ = varType
+
+        elif varType in (None, type(None)):
+            self._vartype_ = type(None)
+
+        elif varType in (pd.NA, type(pd.NA)):
+            self._vartype_ = type(pd.NA)
 
         else:
             if isinstance(varType, InputSpec):
@@ -2349,7 +2385,6 @@ class GenericInputWidget(QtWidgets.QFrame):
 
                 self._vartype_names_ = list(map(lambda t: t.__name__, self._vartype_))
 
-
             if isinstance(valueChoices, set):
                 valueChoices = list(valueChoices)
 
@@ -2376,11 +2411,12 @@ class GenericInputWidget(QtWidgets.QFrame):
     def _configureUI_(self):
         self._layout_ = QtWidgets.QHBoxLayout(self)
         self._layout_.setSpacing(0)
+        self._layout_ = QtWidgets.QHBoxLayout(self)
+        self._layout_.setSpacing(0)
         self._layout_.setContentsMargins(0,0,0,0)
         self.setLayout(self._layout_)
 
         self._setup_widgets_()
-
 
     def _setup_widgets_(self):
         if self._vartype_ == dataclasses.MISSING:
@@ -2698,7 +2734,7 @@ class GenericInputWidget(QtWidgets.QFrame):
                 w.sig_valueChanged.connect(self._slot_inputValueChanged)
 
             elif t == str:
-                print(f"LineEdit -> {self._default_}")
+                # print(f"LineEdit -> {self._default_}")
                 w = LineEdit(parent=self)
                 w.undoAvailable=True
                 w.redoAvailable=True
@@ -2728,6 +2764,10 @@ class GenericInputWidget(QtWidgets.QFrame):
                     w.setValue(self._default_)
                 w.sig_valueChanged.connect(self._slot_inputValueChanged)
 
+            elif t == type(None):
+                w = QtWidgets.QLabel(parent=self)
+                w.setText(f"{self._default_}")
+
             elif t == dataclasses.MISSING:
                 # FIXME: 2026-04-06 22:10:42
                 # what to do with unsupported types?
@@ -2737,7 +2777,12 @@ class GenericInputWidget(QtWidgets.QFrame):
                 raise TypeError(f"Unsupported data type {t.__name__}")
 
             if isinstance(w, QtWidgets.QLabel):
-                self._default_ = dataclasses.MISSING
+                if w.text() == "None":
+                    self._default_ = None
+                elif w.text() == f"{pd.NA}":
+                    self._default_ = pd.NA
+                else:
+                    self._default_ = dataclasses.MISSING
 
             elif isinstance(w, QtWidgets.QCheckBox):
                 state = w.checkState()
