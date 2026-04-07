@@ -8775,21 +8775,6 @@ anything else       anything else       ❌
                     if len(visibleSignalAxes) == 0:
                         ax.setXRange(*newViewRangeX, padding = 0)
 
-
-        # 2026-04-05 09:04:40
-        # if self.xAxesLinked:
-        #     # relink _ALL_ axes to the topmost visible signal axis
-        #     # (and unlink this from anything else)
-        #     if len(visibleSignalAxes):
-        #         for ax in self.axes:
-        #             if ax  == visibleSignalAxes[0]:
-        #                 if currentXLinkedView:
-        #                     ax.vb.setXLink(None)
-        #             else:
-        #                 if ((currentXLinkedView and currentXLinkedView.parentItem() != visibleSignalAxes[0])
-        #                     or ax not in self.signalAxes):
-        #                     ax.vb.setXLink(visibleSignalAxes[0])
-
     def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
 
