@@ -72,9 +72,9 @@ elif os.environ["QT_API"] == "pyqt6":
     from qtpy import sip
     ____has_sip____ = True
     # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
-    QAction = QtWidgets.QAction
-    QActionGroup = QtWidgets.QActionGroup
-    QShortcut = QtWidgets.QShortcut
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
 else:
     from qtpy import sip
     ____has_sip____ = True

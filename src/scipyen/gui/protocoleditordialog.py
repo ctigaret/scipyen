@@ -321,25 +321,25 @@ class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
         
     def _configureUI_(self):
         self.setupUi(self)
-        self.addProtocolAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("list-add"),
+        self.addProtocolAction = QAction(QtGui.QIcon.fromTheme("list-add"),
                                                    "Add protocol", self)
         self.addProtocolAction.triggered.connect(self._slot_addProtocol)
-        self.removeProtocolAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("list-remove"),
+        self.removeProtocolAction = QAction(QtGui.QIcon.fromTheme("list-remove"),
                                                       "Remove protocol", self)
         self.removeProtocolAction.triggered.connect(self._slot_removeProtocol)
-        self.clearProtocolsAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-clear-all"),
+        self.clearProtocolsAction = QAction(QtGui.QIcon.fromTheme("edit-clear-all"),
                                                       "Clear", self)
         
         self.clearProtocolsAction.triggered.connect(self._slot_clearProtocols)
-        self.detectProtocolsAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("tools-wizard"),
+        self.detectProtocolsAction = QAction(QtGui.QIcon.fromTheme("tools-wizard"),
                                                        "Detect trigger events", self)
         self.detectProtocolsAction.triggered.connect(self._slot_detectTriggers)
         
-        self.importProtocolsAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("document-import"),
+        self.importProtocolsAction = QAction(QtGui.QIcon.fromTheme("document-import"),
                                                       "Import triggers", self)
         self.importProtocolsAction.triggered.connect(self._slot_importProtocols)
         
-        self.loadProtocolsAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("document-open"),
+        self.loadProtocolsAction = QAction(QtGui.QIcon.fromTheme("document-open"),
                                                      "Load protocols", self)
         self.loadProtocolsAction.triggered.connect(self._slot_loadProtocols)
         
@@ -358,7 +358,7 @@ class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
         self.protocolTableView.model().dataChanged.connect(self._slot_dataChanged)
         self.protocolTableView.addAction(self.addProtocolAction)
         self.protocolTableView.addAction(self.removeProtocolAction)
-        sep = QtWidgets.QAction(self)
+        sep = QAction(self)
         sep.setSeparator(True)
         self.protocolTableView.addAction(sep)
         self.protocolTableView.addAction(self.detectProtocolsAction)

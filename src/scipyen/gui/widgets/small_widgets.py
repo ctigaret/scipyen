@@ -2390,6 +2390,8 @@ class GenericInputWidget(QtWidgets.QFrame):
 
     def __init__(self, varType: typing.Union[
                             typing.Set[type], typing.Sequence[type],
+                            typing.Sequence[numbers.Number],
+                            pq.UnitQuantity, pq.Quantity,
                             InputSpec, dataclasses.Field,
                             type(None),
                             type(dataclasses.MISSING)
@@ -2456,7 +2458,7 @@ class GenericInputWidget(QtWidgets.QFrame):
                 self._vartype_names_ = self._vartype_.__name__
                 self._current_vartype_ = self._vartype_
 
-                if type(default) == self._vartype_:
+                if type(default) is self._vartype_:
                     self._default_ = default
 
                 else:
@@ -2867,7 +2869,7 @@ class GenericInputWidget(QtWidgets.QFrame):
                     else:
                         raise TypeError("Only sequence of numbers are currently supported")
 
-            elif t == type(None):
+            elif t is type(None):
                 w = QtWidgets.QLabel(parent=self)
                 w.setText(f"{self._default_}")
 

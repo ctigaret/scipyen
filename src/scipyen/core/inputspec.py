@@ -17,10 +17,11 @@ from core import prog
 class InputSpec():
     r"""Encapsulates arguments to interact.getInput(...)
     """
-    __slots__ = ("_default", "_mytype", "_choices")
+    __slots__ = ("_default", "_mytype", "_value", "_choices")
 
     def __init__(self, mytype=type(dataclasses.MISSING),
                  default = dataclasses.MISSING,
+                 value = dataclasses.MISSING,
                  choices : typing.Optional[
                                 typing.Union[typing.Set, typing.Sequence]
                                 ] = None):
@@ -29,9 +30,13 @@ class InputSpec():
     Parameters:
     ==========
 
-    :mytype:    optional; type of input argument; when MISSING
+    :mytype:    optional; type of input argument, or set ot type objects, or MISSING (default)
+
+            When MISSING, it will be inferred from the ``default`` parameter, below, or from the ``value`` parameter (see below)
 
     :default:   optional; default value of the input argument
+
+    :value:     optional; current value (may be different from the default)
 
     :choices:   optional; indicates the set of values that the argument can take;
 
@@ -47,19 +52,24 @@ class InputSpec():
 
     """
 
-        self._mytype, self._default = self.parse_args(mytype, default)
+        self._mytype, self._default, self._value = self.parse_args(mytype, default, value)
         # self._name = name
         self._choices   = choices
 
     @staticmethod
-    def parse_args(x, d = None):
-        r""""""
+    def parse_args(x, d = dataclasses.MISSING, v = dataclasses.MISSING):
+        r"""
+    """
         # NOTE: 2026-04-05 16:57:40 TODO
         # map typing.Any to object
         if isinstance(x, dataclasses.Field):
+            # extracts expected type and default value from the field's attributes;
+            #
             # ignores d, as a dataclasses.Field provides their own default value
             mytype = prog.unwind_type(x.type)
-            # if isinstance(mytype, set) and type(None) in mytype:
+            print(f"\n***\nInputSpec.parse_args(x field) -> mytype = {mytype}")
+
+            genericaliases =
 
             # NOTE: 2026-04-05 16:53:34
             # dataclass field definition syntax precludes both default and
@@ -78,36 +88,67 @@ class InputSpec():
             if len(mytype) == 1:
                 mytype = tuple(mytype)[0]
 
+            elif len(mytype) > 1:
+                mytype = tuple(mytype)
+
+            else:
+                mytype = type(default)
+
+            if v is not dataclasses.MISSING:
+                if not isinstance(v, mytype):
+                    raise TypeError(f"An {mytype} object was expected for 'value'; got {type(v).__name__} instead")
+
         elif isinstance(x, (typing._Final, type)):
             # a default is not needed, but can be used if unwind_type fails
             mytype = prog.unwind_type(x)
             if len(mytype) == 0:
-                if d not in (dataclasses.MISSING, None): # get it from default's type
+                if d is dataclasses.MISSING:
+                    # get it from default's type; allow None as valid default value
                     mytype = {type(d)}
+
+                elif v is not dataclasses.MISSING:
+                        # get it from the value type; allow None as valid default value
+                        mytype = {type(v)}
                 else:
                     mytype = {object}
 
+            else:
+                mytype = tuple(mtype)
+
             default = d
+
+            if v is not dataclasses.MISSING:
+                if not isinstance(v, mytype):
+                    raise TypeError(f"An {mytype} object was expected for 'value'; got {type(v).__name__} instead")
 
         elif x in (type(dataclasses.MISSING), dataclasses.MISSING, None, type(None), typing.Any):
             # needs the supplied default in 'd'; failing that, assume any object type
-            if d not in (dataclasses.MISSING, None): # get it from default's type
+            if d is not dataclasses.MISSING:
                 mytype = type(d)
+            elif v is not dataclasses.MISSING:
+                mytype = type(v)
             else:
                 mytype = object
 
             default = d
+
+            if v is not dataclasses.MISSING:
+                if not isinstance(v, mytype):
+                    raise TypeError(f"An {mytype} object was expected for 'value'; got {type(v).__name__} instead")
 
         else:
             # ignores d
             default = mytype
             mytype = type(default)
 
+            if v is not dataclasses.MISSING:
+                if not isinstance(v, mytype):
+                    raise TypeError(f"An {mytype} object was expected for 'value'; got {type(v).__name__} instead")
 
-        if isinstance(mytype, set) and len(mytype) == 1:
-            mytype = tuple(mytype)[0]
+        # if isinstance(mytype, set) and len(mytype) == 1:
+        #     mytype = tuple(mytype)[0]
 
-        return mytype, default
+        return mytype, default, v
 
     @property
     def type(self):
