@@ -76,7 +76,15 @@ class UnitsStringValidator(QtGui.QValidator):
             return QtGui.QValidator.Invalid
 
 class NumericStringValidator(QtGui.QValidator):
-    r"""WARNING: Don't use yet"""
+    r"""Validator for numeric string representations.
+
+.. warning::
+
+    Incomplete; needs handling of complex numbers and more flexibility wrt locale, decimal v hex etc
+"""
+    # TODO 2026-04-09 00:43:04
+    # complex numbers, lists of complex numbers, other string representations
+    # (Fraction (e.g. 1/2), Decimal with the latter possibily using a decimal.Context)
     def __init__(self, parent = None):
         super().__init__(parent)
         self._validation_substring_ = None

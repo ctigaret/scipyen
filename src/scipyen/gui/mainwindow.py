@@ -27,6 +27,8 @@ import gc
 import io
 import warnings
 import numbers
+import decimal
+import fractions
 import faulthandler
 import importlib
 # NOTE: 2024-09-26 12:16:28

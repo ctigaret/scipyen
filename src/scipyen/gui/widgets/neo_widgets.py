@@ -76,6 +76,8 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
                                )
                         )
 
+    sig_valueChanged = Signal(neo.Event, name="sig_valueChanged")
+
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
                  obj:typing.Optional[
                      typing.Union[neo.Event, DataMark, TriggerEvent]
@@ -363,7 +365,8 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
                     return
 
         # print(f"{self.__class__.__name__}._slot_timesChanged: self._times_ = {self._times_}")
-        self._createEventObject_()
+        if self._createEventObject_():
+            self.sig_valueChanged.emit(self._data_)
 
     @Slot()
     def _slot_setEventClass(self):

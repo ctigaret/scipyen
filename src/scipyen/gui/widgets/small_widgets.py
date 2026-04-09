@@ -7,6 +7,7 @@ r"""
 """
 
 import typing, warnings, math, cmath, os, traceback, dataclasses, sys
+import numbers
 import numpy as np
 import quantities as pq
 import pandas as pd
@@ -46,7 +47,7 @@ from gui.painting_shared import (FontStyleType, standardQtFontStyles,
 
 from gui import quickdialog as qd
 from gui.guiutils import (DisplayHint,
-    InftyDoubleValidator, ComplexValidator, validatorString,
+    InftyDoubleValidator, ComplexValidator, validatorString, NumericStringValidator,
     get_elided_text, get_text_width)
 
 from core import scipyen_quantities as scq
@@ -564,6 +565,24 @@ class LineEdit(QtWidgets.QLineEdit):
 
         super().setValidator(self._validator_)
 
+        if isinstance(self._validator_, NumericStringValidator):
+            tip = self.toolTip()
+            tt = "\n".join(["For numeric 1D arrays enter numbers separated by spaces;",
+                                  "a physical unit symbol at the end generates a Quantity.",
+                                  "",
+                                  "Comma-separated numbers, optionally enclosed between round brackets, generate a tuple.",
+                                  "Enclose in square brackets for a list, or curly brackets for a set of numbers"])
+            if len(tip.strip()):
+                tip = "\n".join([tip,
+                                  "---",
+                                  tt])
+            else:
+                tip = tt
+            self.setToolTip(tip)
+
+    def setValidator(self, val: QtGui.QValidator):
+        self.validator = val
+
     @property
     def customMenu(self) -> QtWidgets.QMenu | None:
         return self._custom_menu_
@@ -596,11 +615,13 @@ class LineEdit(QtWidgets.QLineEdit):
         self.sig_lazy.emit(self._lazy_)
 
 
-class ArrayEdit(QtWidgets.QFrame):
+class ArrayEditorWidget(QtWidgets.QFrame):
     r"""Widget for editing (small) numeric arrays"""
     sig_valueChanged = Signal(object, name = "sig_valueChanged")
 
-    def __init__(self, value: typing.Optional[np.ndarray] = None,
+    def __init__(self, value: typing.Optional[
+                        typing.Union[np.ndarray, typing.Sequence, typing.Set]
+                        ] = None,
                  parent = None):
         super().__init__(parent = parent)
         if isinstance(parent, QtWidgets.QWidget):
@@ -608,25 +629,41 @@ class ArrayEdit(QtWidgets.QFrame):
 
         self._inputWidget_ = None
 
-        if isinstance(value, np.ndarray):
+        if (isinstance(value, np.ndarray) and issubclass(value.dtype.type, np.number)
+            or (isinstance(value, (typing.Sequence, typing.Set)) and all(isinstance(v, numbers.Number) for v in value))):
             self._value_ = value
         else:
             self._value_ = None
 
+        self._configureUI_()
+
     def _configureUI_(self):
+        self._layout_ = QtWidgets.QHBoxLayout(self)
+        self._layout_.setSpacing(0)
+        self._layout_.setContentsMargins(0,0,0,0)
+        # self.setLayout(self._layout_) # already added in layout c'tor with parent=self
         self._setup_widgets_()
 
     def _setup_widgets_(self):
-        if self._value_ is None:
-            w = QtWidgets.QLabel(parent=self)
+        if self._value_ is None or (isinstance(self._value_, (typing.Sequence, typing.Set)) and all(isinstance(v, numbers.Number) for v in self._value_)):
+            w = LineEdit(parent=self)
+            w.redoAvailable = True
+            w.undoAvailable = True
+            w.setClearButtonEnabled(True)
+            w.setValidator(NumericStringValidator(self))
+            if self._value_ is not None:
+                w.setText(f"{self._value_}")
+            w.textChanged.connect(self._slot_valuesEdited)
+            w.sig_lazy.connect(self._slot_lazyTextChanges)
+
         elif isinstance(self._value_, np.ndarray):
-            if not dt.is_vector(self._value_) or self.value.size > 5: # seems like a good compromise?
+            if not dt.is_vector(self._value_) or self._value_.size > 5: # seems like a good compromise?
                 if self._value_.ndim < 3:
                     # w = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("table"), f"Edit {type(self._value_).__name__} with size {self._value_.size} and shape {self._value_.shape}", self)
                     w = ElidedPushButton(self)
                     w.setText(f"Edit {type(self._value_).__name__} with size {self._value_.size} and shape {self._value_.shape}")
                     w.setIcon(QtGui.QIcon.fromTheme("table"))
-                    w.triggered.connect(self._slot_editExternally)
+                    w.clicked.connect(self._slot_editExternally)
                 else:
                     w = QtWidgets.QLabel(parent=self)
                     w.setText(f"{type(self._value_).__name__} with size {self._value_.size} and shape {self._value_.shape}")
@@ -636,11 +673,23 @@ class ArrayEdit(QtWidgets.QFrame):
                 w.redoAvailable = True
                 w.undoAvailable = True
                 w.setClearButtonEnabled(True)
+                w.setValidator(NumericStringValidator(self))
                 w.setText(f"{self._value_}")
                 w.textChanged.connect(self._slot_valuesEdited)
-                w.sig_lazy.connect(self._slot_valuesLazyEdited)
+                w.sig_lazy.connect(self._slot_lazyTextChanges)
 
         self._inputWidget_ = w
+
+        self._layout_.addWidget(self._inputWidget_)
+
+        self._layout_.setStretchFactor(self._inputWidget_,1)
+
+    def _update_(self):
+        signalBlockers = QtCore.QSignalBlocker(self._inputWidget_)
+        self._layout_.removeWidget(self._inputWidget_)
+        self._inputWidget_.deleteLater()
+        self._setup_widgets_()
+
 
     @Slot()
     def _slot_editExternally(self):
@@ -654,7 +703,47 @@ class ArrayEdit(QtWidgets.QFrame):
         if dlg.exec():
             self._value_ = te.value()
 
+    @Slot(bool)
+    def _slot_lazyTextChanges(self, val:bool):
+        if not isinstance(self._inputWidget_, LineEdit):
+            return
+        if val is True:
+            if self._inputWidget_.receivers(self._inputWidget_.textChanged) > 0:
+                self._inputWidget_.textChanged.disconnect(self._slot_timesChanged)
+            self._inputWidget_.sig_enterPressed.connect(self._slot_timesChanged)
+        else:
+            if self.timesLineEdit.receivers(self.timesLineEdit.sig_enterPressed) > 0:
+                self.timesLineEdit.sig_enterPressed.disconnect(self._slot_timesChanged)
+            self.timesLineEdit.textChanged.connect(self._slot_timesChanged)
 
+    @Slot(str)
+    def _slot_valuesEdited(self, value: str):
+       if len(value.strip()) == 0:
+           self._value_ = None
+       else:
+           try:
+               v = eval(value) # will eval numeric sequences; will fail for arrays
+               self._value_ = v
+           except:
+                try:
+                    v = scq.str2quantity_2(value)
+                    self._value_ = v
+                except:
+                    return
+
+    def value(self):
+        return self._value_
+
+    def setValue(self, value: typing.Optional[
+                        typing.Union[np.ndarray, typing.Sequence, typing.Set]
+                        ] = None):
+        if (isinstance(value, np.ndarray) and issubclass(value.dtype.type, np.number)
+            or (isinstance(value, (typing.Sequence, typing.Set)) and all(isinstance(v, numbers.Number) for v in value))):
+            self._value_ = value
+        else:
+            self._value_ = None
+
+        self._update_()
 
 class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     r"""Subclass of QDoubleSpinBox aware of Python quantities.
@@ -1762,7 +1851,7 @@ class ComplexSpinBox(QtWidgets.QFrame):
         self._layout_.addWidget(self.jLabel)
         self._layout_.addWidget(self.suffixLabel)
         self._layout_.addStretch(5)
-        self.setLayout(self._layout_)
+        # self.setLayout(self._layout_)
 
         self._restrictedToFamily_:typing.Optional[str] = None
         self._rescaleOnUnitChange_:bool = False
@@ -2296,6 +2385,9 @@ class GenericInputWidget(QtWidgets.QFrame):
                        np.integer, np.floating, np.complexfloating,
                        pq.UnitQuantity, pq.Quantity, str, type(None), type(pd.NA))
 
+    # TODO: 2026-04-09 01:14:54
+    # implement instantiation of objects with default (0-argument) c'tor -- maybe in a separate widget
+
     def __init__(self, varType: typing.Union[
                             typing.Set[type], typing.Sequence[type],
                             InputSpec, dataclasses.Field,
@@ -2411,10 +2503,8 @@ class GenericInputWidget(QtWidgets.QFrame):
     def _configureUI_(self):
         self._layout_ = QtWidgets.QHBoxLayout(self)
         self._layout_.setSpacing(0)
-        self._layout_ = QtWidgets.QHBoxLayout(self)
-        self._layout_.setSpacing(0)
         self._layout_.setContentsMargins(0,0,0,0)
-        self.setLayout(self._layout_)
+        # self.setLayout(self._layout_) # already added in layout c'tor with parent=self
 
         self._setup_widgets_()
 
@@ -2624,7 +2714,7 @@ class GenericInputWidget(QtWidgets.QFrame):
 
         self._cached_value_.clear()
 
-        print(f"{self.__class__.__name__}.setValue -> self._default_ = {self._default_}, self._current_vartype_ = {self._current_vartype_}")
+        # print(f"{self.__class__.__name__}.setValue -> self._default_ = {self._default_}, self._current_vartype_ = {self._current_vartype_}")
 
         self._setup_widgets_()
 
@@ -2756,13 +2846,26 @@ class GenericInputWidget(QtWidgets.QFrame):
 
                 w.valuechanged.connect(self._slot_inputValueChanged)
 
-            elif t == pq.Quantity:
-                w = QuantitySpinBox(parent=self)
-                if isinstance(self._default_, pq.Quantity):
-                    if self._default_.size > 1:
-                        raise ValueError("Only scalar Quantities are supported")
+            elif t in (pq.Quantity, np.ndarray):
+                if isinstance(self._default_, t):
+                    if self._default_.size == 1:
+                        w = QuantitySpinBox(parent=self)
+                    else:
+                        w = ArrayEditorWidget(parent=self)
                     w.setValue(self._default_)
+                else:
+                    w = QuantitySpinBox(parent=self)
+
                 w.sig_valueChanged.connect(self._slot_inputValueChanged)
+
+            elif t in (tuple, list, set):
+                if isinstance(self._default_, t):
+                    if all(isinstance(v, numbers.Number) for v in self._default_):
+                        w = ArrayEditorWidget(parent=self)
+                        w.setValue(self._default_)
+
+                    else:
+                        raise TypeError("Only sequence of numbers are currently supported")
 
             elif t == type(None):
                 w = QtWidgets.QLabel(parent=self)
