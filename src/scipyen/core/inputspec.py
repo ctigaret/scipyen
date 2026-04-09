@@ -69,7 +69,7 @@ class InputSpec():
             mytype = prog.unwind_type(x.type)
             print(f"\n***\nInputSpec.parse_args(x field) -> mytype = {mytype}")
 
-            genericaliases =
+            # genericaliases =
 
             # NOTE: 2026-04-05 16:53:34
             # dataclass field definition syntax precludes both default and
