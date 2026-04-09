@@ -52,6 +52,7 @@ import collections
 from collections import deque, ChainMap
 import cmath
 from tribool import Tribool
+import datetime
 
 # END core python modules
 
@@ -250,7 +251,8 @@ from core.datazone import (DataZone, Interval,
                            epoch2cursors, epoch2intervals)
 
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
-from core.datatypes import *
+# from core.datatypes import *
+import core.datatypes as datatypes
 
 from core.prog import (safewrapper, deprecation, iter_attribute,
                        filter_type, filterfalse_type,

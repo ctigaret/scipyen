@@ -62,7 +62,8 @@ from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE,
 
 @dataclass
 class TestData:
-    a: typing.Union[str, int, typing.Sequence[int]] = dataclasses.field(default_factory = str)
+    a: str|int|typing.Sequence[int] = dataclasses.field(default_factory = str)
+    # a: typing.Union[str, int, typing.Sequence[int]] = dataclasses.field(default_factory = str)
     b: typing.Optional[typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]] = None
     name: str = ""
 
