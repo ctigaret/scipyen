@@ -141,42 +141,62 @@
      <addaction name="actionChoose_code_editor"/>
      <addaction name="actionUse_system_s_default_code_editor"/>
     </widget>
-    <widget class="QMenu" name="menuFonts">
+    <widget class="QMenu" name="menuFileNavigation">
      <property name="title">
-      <string>Fonts...</string>
+      <string>File Navigation</string>
      </property>
      <property name="icon">
-      <iconset theme="font-face-symbolic"/>
+      <iconset theme="file-catalog-symbolic"/>
      </property>
-     <addaction name="actionUse_system_default_font"/>
-     <addaction name="actionCommandHistoryFont"/>
-     <addaction name="actionWorkplaceFont"/>
+     <addaction name="actionUse_Native_Menu_Bar"/>
+     <addaction name="actionUse_New_Navigator_Look"/>
+     <addaction name="actionHide_Filtered_out_File_Names"/>
+     <addaction name="actionOpeningARecentFileNavigatesToItsDirectory"/>
     </widget>
-    <widget class="QMenu" name="menuIcon_Sizes">
+    <widget class="QMenu" name="menuAppearance">
      <property name="title">
-      <string>Icon Sizes</string>
+      <string>Appearance</string>
      </property>
      <property name="icon">
-      <iconset theme="image-resize-symbolic"/>
+      <iconset theme="edit-paste-style"/>
      </property>
-     <addaction name="actionSet_Icon_Size"/>
-     <addaction name="actionWorkspaceIconSize"/>
-     <addaction name="actionFile_SystemIconSize"/>
+     <widget class="QMenu" name="menuFonts">
+      <property name="title">
+       <string>Fonts...</string>
+      </property>
+      <property name="icon">
+       <iconset theme="font-face"/>
+      </property>
+      <addaction name="actionUse_system_default_font"/>
+      <addaction name="actionCommandHistoryFont"/>
+      <addaction name="actionWorkplaceFont"/>
+     </widget>
+     <widget class="QMenu" name="menuIcon_Sizes">
+      <property name="title">
+       <string>Icon Sizes</string>
+      </property>
+      <property name="icon">
+       <iconset theme="image-resize-symbolic"/>
+      </property>
+      <addaction name="actionSet_Icon_Size"/>
+      <addaction name="actionWorkspaceIconSize"/>
+      <addaction name="actionFile_SystemIconSize"/>
+     </widget>
+     <addaction name="actionGUI_Style"/>
+     <addaction name="actionTool_Button_Style"/>
+     <addaction name="menuFonts"/>
+     <addaction name="menuIcon_Sizes"/>
     </widget>
     <addaction name="actionAuto_launch_Script_Manager"/>
     <addaction name="menuCode_editor"/>
     <addaction name="actionAuto_delete_viewer"/>
     <addaction name="actionSet_user_plugins_directory"/>
     <addaction name="actionConfigure_external_HDF_viewer"/>
-    <addaction name="separator"/>
-    <addaction name="actionGUI_Style"/>
-    <addaction name="actionTool_Button_Style"/>
-    <addaction name="menuIcon_Sizes"/>
-    <addaction name="menuFonts"/>
-    <addaction name="actionUse_Native_Menu_Bar"/>
-    <addaction name="actionUse_New_Navigator_Look"/>
+    <addaction name="useLastHistoryCommandSearchAction"/>
     <addaction name="actionUseShellAutomagic"/>
-    <addaction name="actionHide_Filtered_out_File_Names"/>
+    <addaction name="separator"/>
+    <addaction name="menuAppearance"/>
+    <addaction name="menuFileNavigation"/>
    </widget>
    <widget class="QMenu" name="menuConsoles">
     <property name="title">
@@ -1343,6 +1363,9 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="shortcut">
     <string>Ctrl+Q</string>
    </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::QuitRole</enum>
+   </property>
   </action>
   <action name="action_Console">
    <property name="icon">
@@ -1363,6 +1386,9 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>&amp;On Console</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::ApplicationSpecificRole</enum>
    </property>
   </action>
   <action name="actionImport_PrairieView_data">
@@ -1456,6 +1482,9 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="text">
     <string>&amp;Open...</string>
    </property>
+   <property name="toolTip">
+    <string>Open (click on arrow to the right to reveal recently opened files; hold SHIFT to ALSO change to directory of the recent file)</string>
+   </property>
    <property name="statusTip">
     <string>Opens selected files in the file system browser or via a dialog</string>
    </property>
@@ -1489,6 +1518,9 @@ NOTE: you can click anywhere in the row to select</string>
   <action name="actionConsole_font">
    <property name="text">
     <string>Console font...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
    </property>
   </action>
   <action name="actionEditor">
@@ -1557,6 +1589,9 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="text">
     <string>Auto-launch Script Manager</string>
    </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
+   </property>
   </action>
   <action name="actionChoose_code_editor">
    <property name="icon">
@@ -1564,6 +1599,9 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>Choose code editor</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
    </property>
   </action>
   <action name="actionUse_system_s_default_code_editor">
@@ -1595,6 +1633,9 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="whatsThis">
     <string>When a viewer is closed , also remove it from the user workspace</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
    </property>
   </action>
   <action name="actionOpen_System_Terminal">
@@ -1651,6 +1692,9 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="shortcut">
     <string>Ctrl+Shift+/</string>
    </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::AboutRole</enum>
+   </property>
   </action>
   <action name="actionAbout_Components">
    <property name="icon">
@@ -1658,6 +1702,9 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>About Components</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::ApplicationSpecificRole</enum>
    </property>
   </action>
   <action name="actionLicense">
@@ -1667,6 +1714,9 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="text">
     <string>License</string>
    </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::AboutRole</enum>
+   </property>
   </action>
   <action name="actionAbout_Qt">
    <property name="icon">
@@ -1674,6 +1724,9 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>About Qt</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::AboutQtRole</enum>
    </property>
   </action>
   <action name="actionSet_Icon_Size">
@@ -1685,6 +1738,9 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="toolTip">
     <string>Set Buttons Icon Size</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
    </property>
   </action>
   <action name="actionConfigure_external_HDF_viewer">
@@ -1719,10 +1775,16 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="text">
     <string>Workplace Font...</string>
    </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
+   </property>
   </action>
   <action name="actionCommandHistoryFont">
    <property name="text">
     <string>Command History Font...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
    </property>
   </action>
   <action name="actionDisplay_In_Console">
@@ -1787,6 +1849,9 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="text">
     <string>Use Shell Automagic</string>
    </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
+   </property>
   </action>
   <action name="actionHide_Filtered_out_File_Names">
    <property name="checkable">
@@ -1801,6 +1866,9 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="toolTip">
     <string>Hide non-matching file names when file names filter is used in the File System view</string>
    </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
+   </property>
   </action>
   <action name="actionTool_Button_Style">
    <property name="icon">
@@ -1808,6 +1876,9 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>Tool Button Style...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
    </property>
   </action>
   <action name="actionPython_help">
@@ -1825,6 +1896,31 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="shortcut">
     <string>F1</string>
+   </property>
+  </action>
+  <action name="actionOpeningARecentFileNavigatesToItsDirectory">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Opening a recent file navigates to its directory</string>
+   </property>
+   <property name="toolTip">
+    <string>Check this to enable navigating to the directory of a recent file uppon opening it successfully</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
+   </property>
+  </action>
+  <action name="useLastHistoryCommandSearchAction">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="document-open-recent"/>
+   </property>
+   <property name="text">
+    <string>Show Last Command Search at Startup</string>
    </property>
   </action>
  </widget>

@@ -20,16 +20,16 @@ r"""Main window for the Scipyen application
 import sys
 import os
 import types
-import atexit
+# import atexit
 import re
 import inspect
-import gc
+# import gc
 import io
 import warnings
 import numbers
 import decimal
 import fractions
-import faulthandler
+# import faulthandler
 import importlib
 # NOTE: 2024-09-26 12:16:28
 # I wrap reload with scipyen_plugin_loader.reload, further below
@@ -40,16 +40,19 @@ import traceback
 import keyword
 import inspect
 import weakref
-import itertools, more_itertools # NOTE: 2024-09-26 12:44:08 this is not a core python but might as well be!
+import itertools
+import more_itertools # NOTE: 2024-09-26 12:44:08 this is not a core python but might as well be!
 import typing
 import functools
 import operator
 import json
 import pathlib
 from pprint import pprint
-from copy import copy, deepcopy
+from copy import copy
+from copy import deepcopy
 import collections
-from collections import deque, ChainMap
+# from collections import deque
+# from collections import ChainMap
 import cmath
 from tribool import Tribool
 import datetime
@@ -1580,13 +1583,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._commandHistoryFinderList = collections.deque()
         self._lastCommandFind = str()
         # self._recentScripts = list()
-        self._recentScripts = deque()
+        self._recentScripts = collections.deque()
         self._recent_scripts_dict_ = dict()
         self._showFilesFilter = False
         self._console_docked_ = False
         self._script_manager_autolaunch = False
         self._auto_remove_viewers_ = False
         self._wspace_headers_ = [k for k in standard_obj_summary_headers if k != "Icon"]
+
+        self._navigateToRecentFileDir_: bool = False
 
         self._useSystemDefaultFont:bool = self._useDefaultQApplicationFont
 
@@ -1922,6 +1927,21 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.menuBar().setNativeMenuBar(False)
 
     # ### BEGIN Properties and slots connected to properties
+
+    @property
+    def navigateToRecentFileDirectory(self) -> bool:
+        return self._navigateToRecentFileDir_
+
+    @markConfigurable("ChangeDirUponRecentFileOpen", "Qt")
+    @navigateToRecentFileDirectory.setter
+    def navigateToRecentFileDirectory(self, val:bool):
+        self._navigateToRecentFileDir_ = val is True
+        sigBlock = QtCore.QSignalBlocker(self.actionOpeningARecentFileNavigatesToItsDirectory)
+        self.actionOpeningARecentFileNavigatesToItsDirectory.setChecked(self._navigateToRecentFileDir_ is True)
+        if self._navigateToRecentFileDir_:
+            self.tbOpen.setToolTip("Open (click on arrow to the right to reveal recently opened files; hold SHIFT to ALSO change to directory of the opened recent file)")
+        else:
+            self.tbOpen.setToolTip("Open (click on arrow to the right to reveal recently opened files; hold SHIFT to PREVENT changing to the directory of the opened recent file)")
 
     @property
     def shellAutomagic(self) -> bool:
@@ -5856,6 +5876,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def slot_exportSelectedVariablesToHDF5(self):
         self.saveSelectedVariables(pio.saveHDF5)
 
+    @Slot(bool)
+    def _slot_setNavigateToOpenedRecentFileDirectory(self, val: bool):
+        # print(f"{self.__class__.__name__}._slot_setNavigateToOpenedRecentFileDirectory({val})")
+        self.navigateToRecentFileDirectory = val is True
+
     @Slot()
     @safewrapper
     def slot_saveSelectedVariables(self):
@@ -6430,8 +6455,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.consolesAction.setMenu(self.menuConsoles)
         self.scriptsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("dialog-scripts"), "Scripts")
         self.scriptsAction.setMenu(self.menuScripts)
-        self.settingsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("settings-configure"), "Settings")
-        self.settingsAction.setMenu(self.menuSettings)
         self.applicationsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("homerun"), "Applications")
         self.applicationsAction.setMenu(self.menuApplications)
         self.refreshViewAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
@@ -6440,10 +6463,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.actionHide_Filtered_out_File_Names.toggled.connect(self._slot_hideFilteredFileNames)
         self.hideFilteredOutnamesToolButton.setChecked(self._fileNamesFiltersHides_)
         self.hideFilteredOutnamesToolButton.toggled.connect(self._slot_hideFilteredFileNames)
-        # NOTE: 2024-06-01 18:08:54
-        # 'whats this' action should be the last action added to the toolbar
         self.helpTbAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("help-contents"), "Help")
         self.helpTbAction.setMenu(self.menuHelp)
+        self.settingsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("settings-configure"), "Settings")
+        self.settingsAction.setMenu(self.menuSettings)
+        # NOTE: 2024-06-01 18:08:54
+        # 'whats this' action should be the last action added to the toolbar
         # self.toolBar.addAction(self.whatsThisAction)
 
         tbactions = (self.newViewersAction, self.consolesAction,
@@ -6465,7 +6490,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         else:
             self.tbOpen = [w for w in self.actionOpen.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
 
+        self.actionOpeningARecentFileNavigatesToItsDirectory.toggled.connect(self._slot_setNavigateToOpenedRecentFileDirectory)
+
         self.tbOpen.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
+        self.tbOpen.setToolTip("Open (click on arrow to the right to reveal recently opened files; hold SHIFT to ALSO change to directory of the recent file when opening)")
         self.tbOpen.setMenu(self.recentFilesMenu)
 
         if __has_PyQt6__ or __has_PySide6__:
@@ -6752,13 +6780,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.removeItemFromCommandFinderListAction.triggered.connect(
             self.slot_removeItemFromCommandFinderHistory)
 
-        self.useLastHistoryCommandSearchAction = QAction(QtGui.QIcon.fromTheme("document-open-recent"),
-                                                         "Show Last Command Search at Startup",
-                                                         self)
-        self.menuSettings.addAction(self.useLastHistoryCommandSearchAction)
-
-        self.useLastHistoryCommandSearchAction.setCheckable(True)
-        self.useLastHistoryCommandSearchAction.setChecked(False)
+        # self.useLastHistoryCommandSearchAction = QAction(QtGui.QIcon.fromTheme("document-open-recent"),
+        #                                                  "Show Last Command Search at Startup",
+        #                                                  self)
+        # self.menuSettings.insertAction(self.useLastHistoryCommandSearchAction, self.actionSet_user_plugins_directory)
+        # # self.menuSettings.addAction(self.useLastHistoryCommandSearchAction)
+        #
+        # self.useLastHistoryCommandSearchAction.setCheckable(True)
+        # self.useLastHistoryCommandSearchAction.setChecked(False)
         self.useLastHistoryCommandSearchAction.toggled.connect(self._slot_toggleUseLastHistoryCommandSearch)
 
 
@@ -7964,18 +7993,58 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # print(f"MainWindow.slot_changeDirectory(targetDir = {targetDir})")
         if targetDir is None:
             if isinstance(self.sender(), QAction):
-                targetDir = str(self.sender().text())
+                targetDir = str(self.sender().text()).replace('&', '')
+                pathPart = itemText.split('[')[-1]
+                fName = pathPart.split(']')[0]
+                if os.path.exists(fName):
+                    if os.path.isfile(fName):
+                        targetDir = os.path.dirname(fName)
+                    elif os.path.isdir(fName):
+                        targetDir = fName
 
         if isinstance(targetDir, str) and "&" in targetDir:
             # NOTE: 2017-03-04 16:08:17 because for whatever reason Qt also
             # returns the shortcut indicator character '&'
             targetDir = targetDir.replace('&', '')
+            if os.path.exists(targetDir):
+                if os.path.isfile(targetDir):
+                    targetDir = os.path.dirname(targetDir)
 
-        if targetDir is None or (isinstance(targetDir, str) and len(targetDir.strip()) == 0) or not os.path.exists(targetDir):
+            else:
+                targetDir = None
+
+        elif isinstance(targetDir, pathlib.Path):
+            if targetDir.exists():
+                if targetDir.is_file():
+                    targetDir = targetDir.parent.as_posix()
+                elif targetDir.is_dir():
+                    targetDir = targetDir.as_posix()
+
+                else:
+                    targetDir = None
+            else:
+                targetDir = None
+
+
+        if targetDir is None:# or (isinstance(targetDir, str) and len(targetDir.strip()) == 0) or not os.path.exists(targetDir):
             targetDir = os.getenv(
                 "USERPROFILE") if sys.platform.startswith("win32") else os.getenv("HOME")
 
-        if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
+        if (targetDir is not None
+            and (
+                    (isinstance(targetDir, str)
+                        and targetDir != ""
+                        and os.path.exists(targetDir)
+                    )
+                    or (
+                        isinstance(targetDir, pathlib.Path)
+                        and targetDir.is_dir()
+                        )
+                )
+            ):
+            if isinstance(targetDir, pathlib.Path):
+                targetDir = targetDir.as_posix()
+
             if os.path.isfile(targetDir):
                 targetDir = os.path.dirname(targetDir)
 
@@ -8459,10 +8528,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 self._run_python_source_code_(fileName, paste=False)
 
                 if fileName not in self.recentScripts:
-                    if isinstance(self.recentScripts, deque):
+                    if isinstance(self.recentScripts, collections.deque):
                         self.recentScripts.appendleft(fileName)
                     else:
-                        rscripts = deque(self.recentScripts)
+                        rscripts = collections.deque(self.recentScripts)
                         rscripts.appendleft(fileName)
                         self.recentScripts = rscripts
                         # self.recentScripts.insert(0, fileName)
@@ -8535,7 +8604,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             fName = pathPart.split(']')[0]
             fileReader = self.recentFiles[fName]["loader"]
 
-            self.loadDiskFile(fName, fileReader=fileReader, addToRecent=False)
+            if self.loadDiskFile(fName, fileReader=fileReader, addToRecent=False):
+                if (
+                        (
+                            not self._navigateToRecentFileDir_
+                            and bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+                        )
+                        or ( self._navigateToRecentFileDir_
+                            and not bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+                            )
+                    ):
+                    self.slot_changeDirectory(fName)
 
     @Slot(str)
     @safewrapper
@@ -8566,7 +8645,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @safewrapper
     def loadDiskFile(self, fName:str, fileReader:typing.Optional[typing.Callable]=None,
-                     addToRecent:bool=True, updateUi:bool=True):
+                     addToRecent:bool=True, updateUi:bool=True) -> bool:
         r"""Reads data from a file.
         Common landing point for local data input from the file system.
         Called by various slots connected to File menu actions.
@@ -10206,7 +10285,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if isinstance(obj, numbers.Number):
                 return False
 
-            if isinstance(obj, (tuple, list, deque)) or hasattr(obj, "__iter__") or hasattr(obj, "__len__"):
+            if isinstance(obj, (tuple, list, collections.deque)) or hasattr(obj, "__iter__") or hasattr(obj, "__len__"):
                 if len(obj) < 1:
                     return False
 
@@ -10409,7 +10488,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if isinstance(obj, numbers.Number):
             return False
 
-        if isinstance(obj, (tuple, list, deque)) or hasattr(obj, "__iter__") or hasattr(obj, "__len__"):
+        if isinstance(obj, (tuple, list, collections.deque)) or hasattr(obj, "__iter__") or hasattr(obj, "__len__"):
             try:
                 if len(obj) < 1:
                     return False
@@ -11388,7 +11467,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def _crawl_plugin_UI_menu(self, act:QAction) -> str:
         if not isinstance(act, QAction):
             return str()
-        menu_path = deque()
+        menu_path = collections.deque()
 
         menu_path.append(act.text().replace('&', ''))
 
