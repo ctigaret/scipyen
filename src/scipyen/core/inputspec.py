@@ -69,8 +69,6 @@ class InputSpec():
             mytype = prog.unwind_type(x.type)
             print(f"\n***\nInputSpec.parse_args(x field) -> mytype = {mytype}")
 
-            # genericaliases =
-
             # NOTE: 2026-04-05 16:53:34
             # dataclass field definition syntax precludes both default and
             # default_factory to be MISSING (would raise SyntaxError if that was
@@ -85,6 +83,13 @@ class InputSpec():
             # present in the mytype set
             mytype.add(type(default))
 
+            typing_types = tuple(filter(lambda t: isinstance(t, prog.TYPING_TYPES), mytypes))
+
+            regtypes = tuple(filter(lambda t: not isinstance(t, prog.TYPING_TYPES), mytypes))
+
+            for t in typing_types:
+                mytypes |= prog.unwind_type(t)
+
             if len(mytype) == 1:
                 mytype = tuple(mytype)[0]
 
@@ -93,6 +98,7 @@ class InputSpec():
 
             else:
                 mytype = type(default)
+
 
             if v is not dataclasses.MISSING:
                 if not isinstance(v, mytype):

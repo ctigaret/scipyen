@@ -477,10 +477,12 @@ def sequence_element_type(s):
 
 def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
                 ref:typing.Union[type, typing.Sequence[type], typing.Set[type], typing._UnionGenericAlias],
-                use_mro:bool=False,
-                use_ref_mro:bool=False,
-                check_elements:bool=False,
-                check_keys:bool=False) -> bool:
+                use_mro:bool = False,
+                use_ref_mro:bool = False,
+                return_types: bool = False
+                ) -> bool:
+                # check_elements:bool=False,
+                # check_keys:bool=False) -> bool:
     r"""Checks a type in 't' against a reference type in 'ref'.
 
     't': a type, or a collection of types (i.e., tuple, list or set)
@@ -506,9 +508,6 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     use_ref_mro: bool, optional, default is False; when True, the comparison extends
         to the type hierarchy of objects in 'ref'
 
-    check_elements:bool - Not used
-    check_keys:bool - Not used
-
 
     """
     # NOTE: 2024-01-07 00:12:32
@@ -516,12 +515,15 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     # defined here for future code to check types nested in collections
     t_keys = t_vals = t_elems = None
     ref_keys = ref_vals = ref_elems = None
+    elems_OK = True
+    keys_OK = True
+    vals_OK = True
 
     if isinstance(t, type):
         # single type
         t_set = set(inspect.getmro(t)) if use_mro else {t}
 
-    elif isinstance(t, (tuple, list, set) and all(isinstance(t_, type) for t_ in t)):
+    elif isinstance(t, (tuple, list, set)) and all(isinstance(t_, type) for t_ in t):
         # sequence of types
         t_set = set(itertools.chain_from_iterable([inspect.getmro(t_) for t_ in t])) if use_mro else {t}
 
@@ -549,12 +551,17 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
         ref_set = set(inspect.getmro(ref)) if use_ref_mro else {ref}
 
     elif isinstance(ref, (list, tuple, set)):
-        return any(check_types(t, r_) for r_ in ref)
+        # here, ref is a collection of types!
+        result = any(check_type(t, r_) for r_ in ref)
+        if return_types:
+            return result, t_set, t_keys, t_vals, t_elems
+        return result
         # ref = set(itertools.chain.from_iterable([inspect.getmro(t_) for t_ in ref])) if use_ref_mro else {ref}
 
     elif type(ref).__module__ == "typing":
         ref_origin = typing.get_origin(ref)
         ref_args = typing.get_args(ref)
+
         if ref_origin == typing.Union:
             if len(ref_args) == 0:
                 raise RuntimeError(f"Cannot resolve {ref} with type arguments {ref_args}")
@@ -572,7 +579,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
                     ref_keys = {ref_keys}
                     ref_vals = {ref_vals}
 
-                if issubclass(ref_origin (list, tuple, set, frozentset, collections.deque, collections.abc.Sequence)):
+                if issubclass(ref_origin, (list, tuple, set, frozenset, collections.deque, collections.abc.Sequence)):
                     if len(ref_args) > 1:
                         raise RuntimeError(f"Cannot resolve {ref} with type arguments {ref_args}")
 
@@ -581,9 +588,38 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
                     else:
                         ref_elems = set(ref_args)
 
-                # TODO 2024-01-07 00:12:02
-                # unravel typing types
+        # print(f"** ref_set: {ref_set}**\n")
 
+        if len(ref_set) == 0:
+            if return_types:
+                return False, t_set, t_keys, t_vals, t_elems
+
+            return False
+
+        r_s = tuple(ref_set)
+
+        # check if t is the expected collection type
+        collection_OK = any(issubclass(t_, r_s) for t_ in t_set)
+
+        if collection_OK:
+            # now check for its elements:
+            if len(t_elems) and len(ref_elems):
+                # t is a sequence-like thing
+                r_e = tuple(ref_elems)
+                collection_OK = all(issubclass(t_, r_e) for t_ in t_elems)
+                # print(f"** t_elems {t_elems} ↔ ref_elems {ref_elems} -> collection_OK: {collection_OK}\n")
+
+            elif len(t_keys) and len(ref_keys):
+                r_k = tuple(ref_keys)
+                collection_OK = all(issubclass(t_, r_k) for t_ in t_keys)
+                if len(t_vals) and len(ref_vals):
+                    r_v = tuple(ref_vals)
+                    collection_OK &= all(issubclass(t_, r_v) for t_ in t_vals)
+
+        if return_types:
+            return collection_OK, t_set, t_keys, t_vals, t_elems
+
+        return collection_OK
 
     else:
         raise TypeError(f"'ref': Expecting a type, or a list, set, or tuple of types; instead, got {type(ref).__name__}")
@@ -591,7 +627,13 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     # print(f"final t: {t}")
     # print(f"final ref: {ref}")
 
-    return len(t_set & ref_set) > 0 or any(issubclass(v, tuple(ref_set)) for v in t_set)
+    # print(f"datatypes.check_type:\n\tt_set -> {t_set},\n\tt_elems -> {t_elems},\n\tref_set -> {ref_set},\n\tref_elems -> {ref_elems},\n\tref_keys -> {ref_keys}")
+
+    result = len(t_set & ref_set) > 0 or any(issubclass(v, tuple(ref_set)) for v in t_set)
+    if return_types:
+        return result, t_set, t_keys, t_vals, t_elems
+
+    return result
 
 def check_mapping_fields(x:dict, constraints:list) -> bool:
     if not isinstance(x, dict):

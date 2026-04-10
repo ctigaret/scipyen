@@ -2165,8 +2165,10 @@ library modules.
     elif isinstance(x, TYPING_TYPES):
         if hasattr(x, "__args__"):
             unwind_type(x.__args__, visited=visited)
+
         if include_x:
             visited.add(x)
+
         return visited
     
     elif not isinstance(x, (tuple, list)):
