@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-import collections, numbers, typing, itertools
+import collections, numbers, typing, itertools, dataclasses, os
+from dataclasses import dataclass
 from copy import deepcopy, copy
-from dataclasses import (dataclass, KW_ONLY, MISSING, field)
 
 import numpy as np
 import quantities as pq
@@ -14,11 +14,46 @@ from neo.core.baseneo import BaseNeo, merge_annotations
 from neo.core.dataobject import DataObject, ArrayDict
 import pyqtgraph as pg
 
-from core import quantities as cq
-from core.quantities import check_time_units
-from .prog import (safeWrapper, with_doc)
-from qtpy import QtWidgets
-# from PyQt5 import QtWidgets
+from core import scipyen_quantities as cq
+from core.scipyen_quantities import (checkTimeUnits, unitsConvertible)
+from core.scipyendataclasses import ScipyenDataclass
+# from core.utilities import counter_suffix
+from .prog import (safewrapper, with_doc, scipywarn)
+
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+
+# 
+# import qtpy
+# qtpy.API = os.environ["QT_API"]
+# if os.environ["QT_API"] == "pyside6":
+#     import PySide6
+#     from PySide6 import QtWidgets
+# else:
+#     from qtpy import QtWidgets
 
 def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
              name=None, segment=None, description=None, file_origin=None,
@@ -38,11 +73,12 @@ def _newDataZone(cls, places=None, extents=None, labels=None, units=None,
                    description=description,relative=relative,
                    array_annotations=array_annotations,
                    **annotations)
-    
+    obj.segment=segment
+    return obj
 
 # class DataZone(DataObject):
 class DataZone(neo.Epoch):
-    """neo.Epoch-like for DataSignals
+    r"""neo.Epoch-like for DataSignals
     
     The name 'DataZone' was chosen to avoid possible confusions arising from
     using 'region' in the name (which may imply higher dimensions of the data
@@ -63,10 +99,15 @@ class DataZone(neo.Epoch):
                         ('relative', bool, 1, False))
 
     def __new__(cls, places=None, times=None, extents=None, durations=None, 
-                labels=None, units=None, name=None, description=None, 
-                file_origin=None, segment=None, relative=None,
+                labels:typing.Optional[typing.Union[str, typing.Sequence[str], np.ndarray]]=None, 
+                units:typing.Optional[pq.Quantity]=None, 
+                name:typing.Optional[str]=None, 
+                description:typing.Optional[str]=None, 
+                file_origin:typing.Optional[str]=None, 
+                segment:typing.Optional[int]=None, 
+                relative:typing.Optional[bool]=None,
                 array_annotations=None, **annotations):
-        """
+        r"""
         """
         if places is None:
             if times is None:
@@ -117,11 +158,11 @@ class DataZone(neo.Epoch):
                 places = places * units
                 
             else:
-                if not cq.units_convertible(places, units):
+                if not cq.unitsConvertible(places, units):
                     units = places.units
             
             if isinstance(extents, pq.Quantity):
-                if not cq.units_convertible(places, extents):
+                if not cq.unitsConvertible(places, extents):
                     raise TypeError(f"Extents dimensionality {extents.dimensionality.string} is incompatible with {places.dimensionality.string}")
             else:
                 extents = extents * places.units
@@ -151,7 +192,7 @@ class DataZone(neo.Epoch):
                             description=description, 
                             array_annotations=array_annotations, **annotations)
                 
-        self.__domain_name__ = cq.name_from_unit(self.places)
+        self.__domain_name__ = cq.unitFamilyName(self.places)
             
             
     def __reduce__(self):
@@ -170,11 +211,10 @@ class DataZone(neo.Epoch):
         self.file_origin = getattr(obj, "file_origin", None)
         self.description = getattr(obj, "description", None)
         self.segment = getattr(obj, "segment", None)
-        self.__domain_name__ = cq.name_from_unit(self.units)
-        
         if not hasattr(self, "array_annotations"):
             self.array_annotations = ArrayDict(self._get_arr_ann_length())
-            
+        self.__domain_name__ = cq.unitFamilyName(self.units)
+        
     def __repr__(self):
         objs = ['%s@%s for %s' % (label, str(time), str(dur)) for label, time, dur in
                 zip(self.labels, self.times, self.durations)]
@@ -325,7 +365,7 @@ class DataZone(neo.Epoch):
         return self.zone_slice(t_start, t_stop)
         
     def shift(self, shift):
-        """
+        r"""
         Shifts by a given amount.
 
         Parameters:
@@ -349,7 +389,7 @@ class DataZone(neo.Epoch):
         return new_epc
     
     def time_shift(self, t_shift):
-        """
+        r"""
         Shifts by a given amount.
 
         Parameters:
@@ -366,7 +406,7 @@ class DataZone(neo.Epoch):
         return self.shift(t_shift)
     
     def set_durations(self, durations):
-        """For API compatibility with neo.Epoch
+        r"""For API compatibility with neo.Epoch
         """
         self.extents = durations
         
@@ -375,7 +415,7 @@ class DataZone(neo.Epoch):
     
     @property
     def relative(self) -> bool:
-        """Indicates if the coordinates are relative to signal's domain origin.
+        r"""Indicates if the coordinates are relative to signal's domain origin.
         This is independent of the extents of the data zone.
         """
         return getattr(self, "_relative", False)
@@ -386,10 +426,10 @@ class DataZone(neo.Epoch):
 
     @property
     def domain_name(self):
-        """A brief description of the domain name
+        r"""A brief description of the domain name
         """
         if self.__domain_name__ is None:
-            self.__domain_name__ = name_from_unit(self.domain)
+            self.__domain_name__ = unitFamilyName(self.domain)
             
         return self.__domain_name__
     
@@ -404,13 +444,13 @@ class DataZone(neo.Epoch):
 
     @property
     def domain(self):
-        """Alias to self.places for API compatibility with DataSignal
+        r"""Alias to self.places for API compatibility with DataSignal
         """
         return self.places
 
     @property
     def times(self):
-        """Alias to self.places for API compatibility with neo.Epoch
+        r"""Alias to self.places for API compatibility with neo.Epoch
         """
         return self.places
     
@@ -443,110 +483,848 @@ class DataZone(neo.Epoch):
             raise ValueError("Labels array has different length to times ({} != {})"
                              .format(len(labels), self.size))
         self._labels = np.array(labels)
-
-@dataclass
-class Interval:
-    """Encapsulates an interval of a signal in a Cartesian axis system.
-This can be specified by two landmarks, or by a landmark and an extent
-(or duration) - in this case is similar to a neo.Epoch or DataZone, except that
-if specifies an unique interval.
-
-This class is intended to be a light-weight, convergent common data type useful
-for accessing a signal region (a.k.a "slice") encapsulated in a neo.Epoch, 
-DataZone or SignalCursor.
         
-Suppose you write a function to calculate a measure in a signal based on a cursor
-or an epoch interval. Since a SignalCursor and a neo.Epoch are very different 
-types, you may have to write two separate pieces of code for doing the same thing
-i.e., to calculate something based on the signal values in the region defined by
-        
-    • the SignalCursor xwindow around its x coordinate
-    • the Epoch's interval defined by its time and duration.
-        
-The separate pieces of code will differ in the way that the two parameters
-('x' and 'xwindow', for a SignalCursor, or times[k] and durations[k], for 
-the kᵗʰ interval in an Epoch) are used to determine the start and stop times
-of the signal regions where the calculation is to be made.
-        
-An Interval object brings this to a common denominator, so that it can be used
-directly instead of either a cursor or a Epoch's interval, although functions
-using either types are available as well in the 'ephys.ephys' module in Scipyen.
-        
-An Interval it that it allows storing Epoch intervals SEPARATELY, instead of 
-storing the entire Epoch when that is not desired (one could extract one
-interval from an Epoch and use it to construct another Epoch to be stored; 
-however, the first part of this exercise is already done bny constructing an #
-Interval).
-        
-Another use of Interval is to store SignalCursor coordinates to files; since a
-SignalCursor is a Qt object that handles graphic items, IT IS NOT SERIALIZABLE
-HENCE IT CANNOT BE "PICKLED" or otherwise "saved" to a file.
-        
-The only thing an Interval does not know about is the type of the cursor where 
-the coordinates come from (i.e., vertical or horizontal) but that can be deduced 
-from the context.
-
-A croshair cursor, for example might be stored as a pair of
-Interval objects according to an ad-hoc convention (e.g. the horizontal coordinates
-first, then the vertical coordinates).
-        
-Changelog:
-    2024-02-09 09:53:36 this is now mutable
-        
-"""
-    # __slots__ = ()
-    t0: typing.Union[numbers.Number, pq.Quantity]
-    t1: typing.Union[numbers.Number, pq.Quantity]
-    name: str = "Interval"
-    extent: bool = False
+def _newInterval_(cls, times = None, durations = None, units=None, labels=None, 
+                extent:bool=None, name=None, description=None,
+                file_origin = None, segment = None,
+                array_annotations = None, annotations = None):
     
-    def __init__(self, t0: typing.Union[numbers.Number, pq.Quantity],
-                 t1: typing.Union[numbers.Number, pq.Quantity],
-                 name: str = "Interval", extent:bool=False):
-        OK = all(isinstance(v, numbers.Number) for v in (t0, t1)) or all(isinstance(v, pq.Quantity) and v.ndim==0 for v in (t0, t1))
-        
-        if not OK:
-            raise TypeError(f"Expecting scalar numbers or quantities")
-        
-        if all(isinstance(v, pq.Quantity) for v in (t0,t1)):
-            if t0.units != t1.units:
-                if not units_convertible(t0, t1):
-                    raise TypeError(f"t0 units ({t0.units}) are incompatible with t1 units ({t1.units})")
-                
-                t1 = t1.rescale(t0)
-                
-        if extent:
-            if t1 < 0:
-                raise ValueError(f"extent {t1} must be > = 0)")
+    if not isinstance(annotations, dict):
+        if annotations is None:
+            annotations = dict()
         else:
-            if t0 > t1:
-                raise ValueError(f"t0 ({t0}) should precede t1 ({t1})")
+            try:
+                annotations = dict(annotations)
+            except:
+                annotations = dict() # just so that we aren't left hanging out
         
-        if not isinstance(name, str) or len(name.strip()) == 0:
-            name = self.__class__.__name__
+    obj = Interval(times=times, durations=durations, units=units, labels=labels,
+                   extent=extent, name=name, description=description,
+                   file_origin=file_origin, segment=segment,
+                   array_annotations=array_annotations,
+                   **annotations)
+    obj.segment=segment
+    return obj
+        
+class Interval(DataObject):
+    r"""
+Class similar to **neo.Epoch** and **DataZone** with the following characteristics:
+        
+1. As neo.Epoch and DataZone, the domain coordinates are stored as two Quantity
+1D arrays (vectors) of the same size and physical units, and with as many elements
+as there are sub-intervals.
+        
+These coordinates are accessible via the `times` and `durations` attributes,
+with the same semantics as in neo.Epoch and in DataZone. To avoid confusion, an
+Interval does NOT have `places` and `extents` attributes of DataZone (which are
+effectively aliased `times` and `durations`).
+        
+2. In addition, an Interval objects has the dynamic properties `t0` and `t1`, 
+and the bool attribute `extent` which defines how `t0` and `t1` are calculated
+from the `times` and `durations` attributes:
+        
+When `extent` is True, the object behaves like a SignalCursor, which is
+defined by a central coordinate and a symmetric window around it, *i.e.*,
+a sub-interval 𝒌 is defined as :
 
-        super().__init__()
+    self[𝒌] - self.durations[𝒌]/2 ⋯ self[𝒌] ⋯ self[𝒌] + self.durations[𝒌]/2
         
+    i.e., self[𝒌] is the MID-point of an interval with size = self.durations[𝒌]
+
+    Therefore:
+        
+    `t0` is calculated as self - self.durations/2 — i.e., this is the *first* domain coordinate
+    `t1` is calculated as self + self.durations/2 — i.e., this is the *last* domain coordinate
+        
+When `extent` is False, the object behaves like a neo.Epoch, *i.e.*,
+a sub-interval 𝒌 is defined as:
+
+    self[𝒌] ⋯ self[𝒌] + self.durations[𝒌]
+
+    i.e., self[𝒌] is the start of the sub-interval, whwereas the end of the 
+sub-interval is the start + the sub-interval's duration. 
+
+    Therefore:
+    
+    `t0` is self
+    `t1` is calculated as self + self.durations
+        
+The advantage of this is that one can switch the behaviour by setting the `extent`
+attribute to True or False and query `t0` and `t1` without any changes to the 
+underlying domain coordinates `times` and `durations`.
+
+3. As for DataZone, the physical units (or dimensionality) of the domain 
+coordinates are NOT restricted to time units.
+
+
+ """
+    from core.datasignal import DataSignal
+    _parent_objects = ('Segment',)
+    _parent_attrs = ('segment',)
+    _quantity_attr = ('t0', 't1')
+    _necessary_attrs = (('t0', pq.Quantity, 1),
+                        ('t1', pq.Quantity, 1), 
+                        ('labels', np.ndarray, 1, np.dtype('U')),
+                        ('extent', bool, 1, False))
+    
+    def __new__(cls, times = None, durations = None, 
+                units: typing.Optional[pq.Quantity]=None, 
+                labels: typing.Optional[typing.Union[str, typing.Sequence[str], np.ndarray]]=None, 
+                extent: typing.Optional[bool]=None, 
+                name: typing.Optional[str]=None,
+                description: typing.Optional[str]=None,
+                file_origin:typing.Optional[str] = None, 
+                segment: typing.Optional[int] = None,
+                array_annotations = None, 
+                **annotations):
+        units_ = None
+        if isinstance(times, np.ndarray):
+            assert(times.ndim <= 1), "times must be a 1D array"
+            if isinstance(times, pq.Quantity):
+                units_ = times.units
+                times = times.flatten()
+                
+        elif isinstance(times, typing.Sequence) and alltimes(isinstance(v, numbers.Number) for v in times):
+            times = np.array(times).flatten()
+            
+        elif isinstance(times, numbers.Number):
+            times = np.array([times]).flatten()
+            
+        else:
+            raise TypeError(f"Invalid 'times' ({type(times).__name__})")
+        
+        if isinstance(durations, np.ndarray):
+            assert(durations.ndim <= 1), "durations must be a 1D array"
+            if durations.ndim == 0:
+                durations = durations.flatten()
+            assert durations.size == times.size, "times and durations must have identical size"
+            if isinstance(durations, pq.Quantity):
+                if isinstance(times, pq.Quantity):
+                    if durations.units != times.units:
+                        if unitsConvertible(durations, times):
+                            durations = durations.rescale(times.units)
+                        else:
+                            raise ValueError(f"Units of durations ({durations.units}) are incompatible with those of times ({times.units})")
+                else:
+                    units_ = durations.units
+                    times = times * durations.units
+            
+        elif isinstance(durations, typing.Sequence) and all(isinstance(v, numbers.Number) for v in durations):
+            assert len(durations) == times.size, "times and durations must have identical size"
+            durations = np.array(durations).flatten()
+            
+        elif isinstance(durations, numbers.Number):
+            assert times.size == 1, "times and durations must have identical size"
+            durations = np.array([durations]).flatten()
+            
+        else:
+            raise TypeError(f"Invalid 'durations' ({type(durations).__name__})")
+        
+        if isinstance(times, pq.Quantity) and not isinstance(durations, pq.Quantity):
+            durations = durations * times.units
+        
+        if isinstance(units_, pq.Quantity):
+            if all(isinstance(v, pq.Quantity) for v in (times, durations)):
+                # NOTE: 2025-04-27 10:39:14
+                # ignore silently
+                # if units is not None:
+                #     scipywarn("Ignoring 'units' because times and durations already have them")
+                units = units_
+            else:
+                times = times * units
+                durations = durations * units
+                
+        else:
+            if not isinstance(units, (pq.Quantity, pq.dimensionality.Dimensionality)):
+                raise TypeError(f"'units' must be a pq.Quantity; instead got {type(units)}")
+
+            if not all(isinstance(v, pq.Quantity) for v in (times, durations)):
+                times = times * units
+                durations = durations * units
+        
+        if not isinstance(extent, bool):
+            extent = False
+        if extent:
+            if np.any(durations < 0):
+                # because the window around times cannot be negative
+                raise ValueError("durations must contain only values > = 0")
+            
+        if labels is None:
+            labels = np.array([], dtype='U')
+
+        elif not isinstance(labels, np.ndarray):
+            labels = np.array(labels)
+            if labels.size != times.size and labels.size:
+                raise ValueError("Labels array has different length to times")
+
+        if not isinstance(segment, (neo.Segment, type(None))):
+            raise TypeError(f"'segment' expected to be a neo.Segment or None; instead, got {type(segment).__name__}")
+
+        obj = pq.Quantity.__new__(cls, times, units = units.dimensionality)
+        obj._labels = labels
+        obj._t1 = durations
+        obj._extent = extent == True
+        obj._segment = segment
+        
+        return obj
+    
+    def __init__(self, times = None, durations = None, units=None, labels=None, 
+                extent:bool=None, name=None, description=None,
+                file_origin = None, segment = None,
+                array_annotations = None, **annotations):
+        DataObject.__init__(self, name=name, description=description,
+                            file_origin = file_origin,
+                            array_annotations = array_annotations,
+                            **annotations)
+        
+        self.__domain_name__ = cq.unitFamilyName(self.times)
+        
+    def __reduce__(self):
+        return _newInterval_, (self.__class__, pq.Quantity(self), self._t1, self.units,
+                              self.labels, self.extent, self.name, self.description, 
+                              self.file_origin, self.segment,
+                              self.array_annotations, self.annotations)
+    
+    def __array_finalize__(self, obj):
+        super().__array_finalize__(obj)
+        # self._t0 = getattr(obj, "_t0", None)
+        self._t1 = getattr(obj, "_t1", None)
+        self._labels = getattr(obj, "labels", None)
+        self.extent = getattr(obj, "extent", None)
+        self.name = getattr(obj, "name", None)
+        self.annotations = getattr(obj, "annotations", None)
+        self.file_origin = getattr(obj, "file_origin", None)
+        self.description = getattr(obj, "description",  None)
+        self.segment = getattr(obj, "segment", None)
+        if not hasattr(self, "array_annotations"):
+            self.array_annotations = ArrayDict(self._get_arr_ann_length())
+        self.__domain_name__ = cq.unitFamilyName(self.units)
+        
+    def __repr__(self):
+        times = list(self.times)
+        durations = list(self.durations)
+        # print(f"{self.__class__.__name__}.__repr__: labels = {self.labels}")
+        if isinstance(self.labels, np.ndarray) and self.labels.ndim>0 and self.labels.size>0:
+            labels = list(self.labels)
+        else:
+            labels = [""]
+        objs = ['%s@%s for %s' % (label, str(time), str(dur)) for label, time, dur in
+                zip(labels, times, durations)]
+        return f"<{self.__class__.__name__}:{', '.join(objs)}>"
+
+    def _repr_pretty_(self, pp, cycle):
+        super()._repr_pretty_(pp, cycle)
+        
+    def copy(self) -> typing.Self:
+        times = self.times.magnitude
+        durations = self.durations.magnitude
+        labels = np.array(self.labels)
+        description = str(self.description)
+        segment = int(self.segment) if isinstance(self.segment, int) else None # an int !
+        array_annotations = deepcopy(self.array_annotations)
+        extent = self.extent
+        units = self.units
+        
+        obj = self.__class__(times = times, durations = durations,
+                                           labels = labels, units = units)
+        obj.description = description
+        obj.array_annotations = array_annotations
+        obj.segment = segment
+        obj.extent = extent
+        obj.annotations.update(self.annotations)
+        
+        return obj
+    
+    def rescale(self, units):
+        '''
+        Return a copy converted to the specified units
+        :return: Copy of self with specified units
+        '''
+        # Use simpler functionality, if nothing will be changed
+        dim = pq.quantity.validate_dimensionality(units)
+        if self.dimensionality == dim:
+            return self.copy()
+
+        # Rescale the object into a new object
+        obj = self.duplicate_with_new_data(
+            t0=self.view(pq.Quantity).rescale(dim),
+            t1=self._t1.rescale(dim),
+            labels=self.labels,
+            units=units)
+
+        # Expected behavior is deepcopy, so deepcopying array_annotations
+        obj.array_annotations = deepcopy(self.array_annotations)
+        obj.segment = self.segment
+        obj.extent = self.extent
+        return obj
+
+    def __getitem__(self, i):
+        '''
+        Get the item or slice :attr:`i`.
+        '''
+        obj = super().__getitem__(i)
+        obj._t0 = self.t0[i]
+        obj._t1 = self.t1[i]
+        if self._labels is not None and self._labels.size > 0:
+            obj._labels = self.labels[i]
+        else:
+            obj._labels = self.labels
+        try:
+            # Array annotations need to be sliced accordingly
+            obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
+            obj._copy_data_complement(self)
+        except AttributeError:  # If Quantity was returned, not Epoch
+            obj.times = obj
+            obj.durations = obj._durations
+            obj.labels = obj._labels
+        return obj
+    
+    def __getslice__(self, i, j):
+        '''
+        Get a slice from :attr:`i` to :attr:`j`.attr[0]
+
+        Doesn't get called in Python 3, :meth:`__getitem__` is called instead
+        '''
+        return self.__getitem__(slice(i, j))
+
+    def merge(self, other):
+        '''
+        Merge the another :class:`Epoch` into this one.
+
+        The :class:`Interval` objects are concatenated horizontally
+        (column-wise), :func:`np.hstack`).
+
+        If the attributes of the two :class:`Epoch` are not
+        compatible, and Exception is raised.
+        '''
+        if self.extent != other.extent:
+            raise ValueError("'extent' attribute must be the same in both Interval objects")
+        
+        othert0 = other.rescale(self.units)
+        othert1 = other._t1.rescale(self.units)
+        t0 = np.hstack([self, othert0]) * self.units
+        t1 = np.hstack([self._t1, othert1]) * self.units
+        labels = np.hstack([self.labels, other.labels])
+        kwargs = {}
+        kwargs["extent"] = self.extent
+        for name in ("name", "description", "file_origin"):
+            attr_self = getattr(self, name)
+            attr_other = getattr(other, name)
+            if attr_self == attr_other:
+                kwargs[name] = attr_self
+            else:
+                kwargs[name] = "merge({}, {})".format(attr_self, attr_other)
+
+        merged_annotations = merge_annotations(self.annotations, other.annotations)
+        kwargs.update(merged_annotations)
+
+        kwargs['array_annotations'] = self._merge_array_annotations(other)
+
+        return Interval(t0=t0, t1=t1, labels=labels, **kwargs)
+
+    def _copy_data_complement(self, other):
+        '''
+        Copy the metadata from another :class:`Interval`.
+        Note: Array annotations can not be copied here because length of data can change
+        '''
+        # Note: Array annotations cannot be copied because length of data could be changed
+        # here which would cause inconsistencies. This is instead done locally.
+        for attr in ("name", "file_origin", "description"):
+            setattr(self, attr, deepcopy(getattr(other, attr, None)))
+        self._copy_annotations(other)
+
+    def _copy_annotations(self, other):
+        self.annotations = deepcopy(other.annotations)
+
+    def duplicate_with_new_data(self, t0, t1, labels, units=None, extent=False):
+        '''
+        Create a new :class:`Interval` with the same metadata
+        but different data (t0, t1, labels, units, extent)
+
+        Note: Array annotations can not be copied here because length of data can change
+        '''
+
+        if units is None:
+            units = self.units
+        else:
+            units = pq.quantity.validate_dimensionality(units)
+
+        new = self.__class__(t0=t0, t1=t1, labels=labels, units=units)
+        new._copy_data_complement(self)
+        new._labels = labels
+        new._extent = extent
+        new.segment = self.segment
+        # Note: Array annotations can not be copied here because length of data can change
+        return new
+
+    def interval_slice(self, begin, end):
+        '''
+        Creates a new :class:`Interval` corresponding to the time slice of
+        the original :class:`Interval` between (and including) times
+        :attr:`t_start` and :attr:`t_stop`. Either parameter can also be None
+        to use infinite endpoints for the time interval.
+        '''
+        _t_start = begin
+        _t_stop = end
+        if _t_start is None:
+            _t_start = -np.inf
+        if _t_stop is None:
+            _t_stop = np.inf
+
+        indices = (self.t0 >= _t_start) & (self.t0 <= _t_stop)
+
+        # Time slicing should create a deep copy of the object
+        new_epc = deepcopy(self[indices])
+
+        return new_epc
+    
+    def time_slice(self, t_start, t_stop):
+        return self.interval_slice(t_start, t_stop)
+        
+    def shift(self, shift):
+        r"""
+        Shifts by a given amount.
+
+        Parameters:
+        -----------
+        shift: Quantity
+            Amount by which to shift.
+
+        Returns:
+        --------
+            New instance object starting at 'shift' later than the
+            original (the original is not modified).
+        """
+        t0 = self + t_shift
+        t1 = self._t1
+        new_epc = self.duplicate_with_new_data(t0=t0, t1=t1, labels=self.labels)
+
+        # Here we can safely copy the array annotations since we know that
+        # the length of the Interval does not change.
+        new_epc.array_annotate(**self.array_annotations)
+
+        return new_epc
+    
+    def time_shift(self, t_shift):
+        r"""
+        Shifts by a given amount.
+
+        Parameters:
+        -----------
+        t_shift: Quantity (time)
+            Amount of time by which to shift the :class:`Interval`.
+
+        Returns:
+        --------
+        epoch: :class:`Interval`
+            New instance of an :class:`Interval` object starting at t_shift later than the
+            original :class:`Interval` (the original :class:`Interval` is not modified).
+        """
+        return self.shift(t_shift)
+    
+    @property
+    def domain_name(self):
+        r"""A brief description of the domain name
+        """
+        if self.__domain_name__ is None:
+            self.__domain_name__ = unitFamilyName(self.units)
+            
+        return self.__domain_name__
+    
+    @domain_name.setter
+    def domain_name(self, value):
+        if isinstance(value, str) and len(value.strip()):
+            self.__domain_name__ = value
+    
+    @property
+    def times(self):
+        r"""Read-only. 
+    To create an object with new times use self.duplicate_with_new_data(…)
+    """
+        # for comaptibility wiht neo.Epoch/DataZone, always return self
+        return pq.Quantity(self)
+    
+    @property
+    def durations(self):
+        # this is always self._t1
+        return self._t1
+
+    @durations.setter
+    def durations(self, val):
+        self._t1 = val
+        
+    @property
+    def t0(self):
+        r"""The start points of each interval.
+    Read-only.
+    To create an object with new times use self.duplicate_with_new_data(…)
+    """
+        # NOTE: 2025-04-27 12:03:48
+        # The array in 'self' is always a START point, as in neo.Epoch
+        # self._t1 is always a duration as in neo.Epoch
+        # but when we query 't0' or 't1', they MUST be calculated according to 
+        # 'extent':
+        #
+        # When extent is True, an interval 𝒌 is defined as :
+        #
+        #   self[𝒌] - self._t1[𝒌]/2 ⋯ self[𝒌] ⋯ self[𝒌] + self._t1[𝒌]/2
+        #
+        #   => 
+        #   t0 is self - self._t1/2
+        #   t1 is self + self._t1/2
+        #
+        # When extent is False, an interval 𝒌 is:
+        #
+        #   self[𝒌] ⋯ self[𝒌] + self._t1[𝒌]
+        #
+        #   =>
+        #   t0 is self
+        #   t1 is self + self._t1
+        # 
+        
+        if self.extent:
+            return pq.Quantity(self - self._t1/2)
+        else:
+            return pq.Quantity(self)
+
+    @property
+    def t1(self):
+        r"""The second (end) point of the intrervals.
+    Read-only
+    To create an object with new times use self.duplicate_with_new_data(…)
+    """
+        # see NOTE: 2025-04-27 12:03:48
+        # The array in 'self' is always a START point, as in neo.Epoch
+        # self._t1 is always a duration as in neo.Epoch
+        # but when we query 't0' or 't1', they MUST be calculated according to 
+        # 'extent':
+        #
+        # When extent is True, an interval 𝒌 is defined as :
+        #
+        #   self[𝒌] - self._t1/2[𝒌] ⋯ self[𝒌] ⋯ self[𝒌] + self._t1/2[𝒌]
+        #
+        #   => 
+        #   t0 is self - self._t1/2
+        #   t1 is self + self._t1/2
+        #
+        # When extent is False, an interval 𝒌 is:
+        #
+        #   self[𝒌] ⋯ self[𝒌] + self._t1[𝒌]
+        #
+        #   =>
+        #   t0 is self
+        #   t1 is self + self._t1
+        # 
+        if self.extent:
+            return pq.Quantity(self + self._t1/2)
+        else:
+            return pq.Quantity(self + self._t1)
+        
+    @property
+    def boundaries(self) -> tuple:
+        r"""Tuple (self.t0, self.t1)"""
+        return (self.t0, self.t1)
+        
+    @property
+    def labels(self):
+        return self._labels
+
+    @labels.setter
+    def labels(self, labels):
+        if self.labels is not None and self.labels.size > 0 and len(labels) != self.size:
+            raise ValueError("Labels array has different length to times ({} != {})"
+                             .format(len(labels), self.size))
+        self._labels = np.array(labels)
+        
+    @property
+    def extent(self) -> bool:
+        return self._extent
+    
+    @extent.setter
+    def extent(self, val:bool):
+        if not isinstance(val, bool):
+            val = False
+        self._extent = val
+        
+    @property
+    def segment(self) -> neo.Segment | None:
+        return self._segment
+    
+    @segment.setter
+    def segment(self, val:typing.Optional[neo.Segment] = None):
+        self._segment = val
+    
     @classmethod
-    def from_epoch(cls:type, epoch: typing.Union[neo.Epoch, DataZone],  
-                           index: typing.Union[str, bytes, np.str_, int],
-                           duration: bool = False):
+    def fromNeoEpoch(cls:type, 
+                   epoch: typing.Union[neo.Epoch, DataZone],  
+                   index: typing.Optional[typing.Union[str, bytes, np.str_, int, typing.Sequence[typing.Union[str, bytes, np.str_, int]], np.ndarray, range, slice]] = None,
+                   extent: bool = False,
+                   merge: bool = False,
+                   name: typing.Optional[str] = None,
+                   description: typing.Optional[str] = None):
+        r"""
+        Factory for Interval using a neo.Epoch.
+        
+        WARNING: Floating point divisions during conversion will introduce
+    errors when converting between neo.Epoch and Interval when 'extent' is 
+    True. These errors will accumulate when converting from Epoch to Interval
+    and back to Epoch.
+    """
+        # WARNING 2025-04-27 11:31:48 FIXME/TODO
+        # I could avert floating point division errors by applying these operations
+        # lazily - store the start and stop values as (t0, t0+duration) REGARDLESS
+        # OF THE VALUE OF 'extent', then apply these operations only when the 
+        # corresponding properties (t0 or t1) are queried, and according to the 
+        # value of 'extent'
+        #
+        # I will, however, have to adjust the code for instantiation (__new__, 
+        # __init__, __array_finalize__) and serialization (_newInterval_,
+        # __reduce__) to take this contigency into account.
+        #
         from . import neoutils
         import neo
-        interval = neoutils.get_epoch_interval(epoch, index, duration=False)
-        if len(interval) == 2: # empty labels
-            if isinstance(epoch.name, str) and len(epoch.name.strip()):
-                name = epoch.name
-            else:
-                name = "Interval"
-            interval = tuple([*interval] + [name])
-            
-        return cls(*interval, extent=duration)
+        
+        if not isinstance(epoch, (neo.Epoch, DataZone)):
+            raise TypeError(
+                f"'epoch' expected to be a neo.Epoch; got {type(epoch).__name__} instead"
+            )
+        
+        if isinstance(index, (str, np.str_, bytes)):
+            if isinstance(index, bytes):
+                index = index.decode()
 
+            if index not in epoch.labels:
+                raise ValueError(f"Interval label {index} not found")
+
+            ndx = np.flatnonzero(epoch.labels == index)
+            epoch = epoch[ndx]
+
+        elif isinstance(index, int):
+            if index not in range(-len(epoch), len(epoch)):
+                raise ValueError(
+                    f"Invalid index {index} for an epoch with {len(epoch)} intervals"
+                )
+            ndx = np.array([index])
+            epoch = epoch[ndx]
+            
+        elif isinstance(index, typing.Sequence):
+            if all(isinstance(v, bytes) for v in index):
+                index = list(map(lambda v: v.decode()))
+                
+            if all(isinstance(v, (str, np.str_)) for v in index):
+                try:
+                    ndx = np.array(list(map(lambda v: np.flatnonzero(epoch.labels == v), index))).ravel()
+                except:
+                    print(f"'index' {index} contains invalid labels")
+                    raise
+            elif all(isinstance(v, int) for v in index):
+                ndx = np.array(index).ravel()
+            else:
+                raise TypeError(f"Invalid index specified: {index}")
+                
+            # ndx = np.array(list(map(lambda v: np.flatnonzero(epoch.labels == v.decode()) if isinstance(v, str, np.str_, bytes) else v)))
+            epoch = epoch[ndx]
+            
+        elif isinstance(index, (np.ndarray, slice, range)):
+            epoch = epoch[index]
+            
+        elif index is not None:
+            raise TypeError(
+                f"Invalid index type: {type(index).__name__}"
+            )
+        
+        t = epoch.times.flatten()
+        d = epoch.durations.flatten()
+        labels = epoch.labels
+        name = name if isinstance(name, str) and len(name.strip()) else epoch.name
+        description = description if isinstance(description, str) and len(description.strip()) else epoch.description
+        segment = epoch.segment
+        # name = epoch.labels[ndx].flatten()[0] if ndx in range(epoch.labels.size) else epoch.labels[ndx]
+        
+        if merge and len(epoch) > 1:
+            if ndx is None:
+                # full duration: the very last start time + corresponding duration, minus the very first start time
+                d = t[-1]+d[-1] + t[0] 
+                # the very first start time;
+                t = t[0] 
+            
+        t0, t1 = (t, d)
+
+        return cls(t0, t1, units=None, labels=labels, extent=extent, 
+                  name=name, description=description, segment=segment)
     
+    def toDomainSlices(self, shift:typing.Optional[pq.Quantity] = None) -> np.ndarray:
+        r"""Returns a 2D Quantity array with (t0,t1) row-wise, for each interval"""
+        if shift is None:
+            return np.transpose(np.vstack((self.t0, self.t1))) * self.units
+        else:
+            return np.transpose(np.vstack((self.t0+shift, self.t1+shift))) * self.units
+    
+    def sliceSignal(self, signal:typing.Union[neo.AnalogSignal, DataSignal],
+                    index=None) -> typing.Sequence:
+        domain_slices = self.toDomainSlices()
+        if np.any(domain_slices.flatten() < signal.t_start) :
+            domain_slices = self.toDomainSlices(signal.t_start)
+            
+        if np.any(domain_slices.flatten() > signal.t_stop):
+            raise ValueError(f"The interval {self.t0} — {self.t1} falls outside, or crosses, the signal's domain boundaries ({signal.t_start} — {signal.t_stop}). Consider shifting the interval first")
+        
+        if index is not None:
+            domain_slices = domain_slices[index:]
+            
+        return tuple(map(lambda k: signal.time_slice(*domain_slices[k,:]), range(domain_slices.shape[0])))
+    
+    def reduceSignal(self, fun, signal, index): # TODO 2025-04-27 23:40:01 see ephys.interval_reduce
+        pass
+    
+    def toSignalCursors(self,
+                        signalViewer = None,
+                        axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene, type(dataclasses.MISSING), int, str]]=None,
+                        **kwargs) -> typing.Sequence:
+        r"""Creates vertical or horizontal SignalCursor objects from the sub-intervals.
+        
+        axis:   when None, indicates that we want to go across all axes (hence use the scene)
+                when MISSING, indicates we want to use the currently active axis in the signal viewer
+        
+        signalViewer: when not a SignalViewer instance, this returns the stacked
+            cursor coordinates with one (central coord, window) per row for each
+            sub-interval
+    """
+        from gui.signalviewer import SignalViewer
+        from gui.cursors import SignalCursor, SignalCursorTypes
+        
+        keep_units = kwargs.pop("keep_units", False)
+        cursor_type = SignalCursorTypes.getType(kwargs.pop("cursor_type", "vertical"))
+        
+        if cursor_type in (SignalCursorTypes.crosshair, SignalCursorTypes.point):
+            raise ValueError(f"{cursor_type} cursors are not supported")
+        
+        # a cursor is defined by the central coordinate and a symmetric window 
+        # around it; therefore:
+        if self.extent:
+            # when `extent` is True we need to pass the `times`  (mid-points) and `durations`
+            c = self.times # cursor coordinate
+            w = self.durations # cursor window
+        else:
+            # when extent is False we need to calculate the mid-points and pass `durations`
+            c = self + self.durations/2 # cursor coordinate
+            w = self.durations # cursor window
+        
+        # pack these in a 2D Quantity array, with each row as
+        coords = np.transpose(np.vstack((c, w))) * self.units
+        
+        if isinstance(signalViewer, SignalViewer):
+            if axis is None:
+                axis = signalViewer.scene # multi-axes cursors
+            elif axis is dataclasses.MISSING:
+                axis = signalViewer.currentAxis
+            elif isinstance(axis, (int, str)):
+                axis = signalViewer.axis(axis)
+            else:
+                if isinstance(axis, pg.PlotItem) and axis not in signalViewer.axes:
+                    raise ValueError(f"The specified axis was not found in the signal viewer")
+                
+                elif isinstance(axis, pg.GraphicsScene) and axis is not signalViewer.scene:
+                    raise ValueError(f"The specified axis (a scene) does not belong to the signalViewer")
+                
+            cursorsDict = signal_viewer.getSignalCursors(cursor_type)
+            nExistingCursors = len(cursorsDict)
+            
+            gen_label = lambda k: self.labels[k] if len(self.labels[k]) else f"{cursor_type.name[0]}{nExistingCursors + k}" # e.g. v0, v1, etc
+                
+            gen_cursor = lambda k: SignalCursor(axis, x = coords[k,0], xwindow = coords[k,1], 
+                                                        cursor_type = cursor_type, cursorID = gen_label[k]) \
+                                    if cursor_type == SignalCursorTypes.vertical else \
+                                    SignalCursor(axis, y = coords[k,0], ywindow = coords[k,1], 
+                                                    cursor_type = cursor_type, cursorID = gen_label[k])
+                                
+            cursors = tuple(map(lambda k: gen_cursor(k), range(coords.shape[0])))
+            
+            cursorPen = QtGui.QPen(QtGui.QColor(signalViewer.cursorColors[cursor_type.name]), 1, QtCore.Qt.SolidLine)
+            cursorPen.setCosmetic(True)
+            hoverPen = QtGui.QPen(QtGui.QColor(signalViewer.cursorHoverColor), 1, QtCore.Qt.SolidLine)
+            hoverPen.setCosmetic(True)
+            linkedPen = QtGui.QPen(QtGui.QColor(signalViewer.linkedCursorColors[cursor_type.name]), 1, QtCore.Qt.SolidLine)
+            linkedPen.setCosmetic(True)
+            
+            if isinstance(axis, pg.PlotItem):
+                cursorPrecision = signal_viewer.getAxis_xDataPrecision(axis)
+                
+            elif isinstance(axis, pg.GraphicsScene):
+                pi_precisions = [signal_viewer.getAxis_xDataPrecision(ax) for ax in signal_viewer.plotItems]
+                cursorPrecision = min(pi_precisions)
+                
+            else: 
+                cursorPrecision = None
+
+            for c in cursors:
+                signalViewer.registerCursor(c, pen = cursorPen, hoverPen = hoverPen,
+                                            linkedPen = linkedPen,
+                                            precision = cursorPrecision,
+                                            showValue = signalViewer.cursorsShowValue)
+            return cursors
+        
+        return coords
+
+    def toNeoEpoch(self, enforceDataZone:bool=False, compensateExtent:bool=True) -> neo.Epoch | DataZone:
+        r"""Export to neo.Epoch or DataZone
+    Constructs a neo.Epoch or a DataZone based on the values of 't0' and 't1'.
+    
+    Returns a neo.Epoch if this Interval is defined in the time domain and
+    'enforceDataZone' is False (the default); otherwise, returns a DataZone.
+    
+    An epoch 𝒌 is defined as:
+    
+    epoch.times[𝒌] ⋯ epoch.times[𝒌] + epoch.durations[𝒌]
+    
+    An interval i[𝒌] is defined as:
+    
+    i[𝒌] ⋯ i[𝒌] + i.durations[𝒌], when 'extent' is False
+    
+        i.e., i[𝒌] is the start point
+    
+    i[𝒌] - i.durations[𝒌]/2 ⋯ i[𝒌] ⋯ i[𝒌] + i.durations[𝒌]/2, when extent is True
+        
+        i.e., i[𝒌] is the MIDDLE point
+    
+    Therefore, if the interval was created from a neo.Epoch or DataZone with 
+    'extent' True, the method will generate a DataZone or neo.Epoch left-shifted
+    by an amount equal to half the duration of the original neo.Epoch or DataZone.
+    
+    To recreate the original neo.Epoch or DataZone, when the interval has extent
+    True one must compensate the shift by passing compensateExtent = True to this
+    method, which will result in a neo.Epoch or DataZone based on the internal
+    times of the Interval.
+    
+    By default, compensateExtent is True, so that Interval objects created from
+    a neo.Epoch or DataZone using ``extent = True`` will always recreate the original
+    neo.Epoch or DataZone by this method. To circumvent this behaviour and create
+    a left-shifted verison of the original neo.Epoch or DataZone, the pass
+    'compensateExtent=False'.
+     
+    'compensateExtent' is is ignored when self.extent is False.
+    
+    """
+        name = self.name
+        labels = self.labels
+        
+        cls = neo.Epoch if (cq.checkTimeUnits(self) and not enforceDataZone) else DataZone
+        
+        if self.extent and compensateExtent:
+            times = pq.Quantity(self)
+        else:
+            times = self.t0
+                
+        
+        return cls(times=times, durations=self.durations, labels=self.labels, 
+                        units=self.units, name=self.name,
+                        description=self.description, file_origin=None,
+                        array_annotations = self.array_annotations,
+                        **self.annotations)
+                
 def epoch2intervals(epoch: typing.Union[neo.Epoch, DataZone], keep_units:bool = True,
-                    duration:bool=True) -> typing.List[Interval]:
-    """Generates a sequence of datatypes.Interval objects
+                    duration:bool=False) -> typing.List[Interval]:
+    r"""Generates a sequence of datatypes.Interval objects
     
     Each interval coresponds to the epoch's interval.
     
@@ -570,9 +1348,9 @@ def epoch2intervals(epoch: typing.Union[neo.Epoch, DataZone], keep_units:bool = 
     else:
         return [Interval(t, d if duration else t+d, l, duration) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, labels)]
     
-@safeWrapper
+@safewrapper
 def intervals2epoch(*args, **kwargs):
-    """Construct a neo.Epoch or DataZone from a sequence of intervals.
+    r"""Construct a neo.Epoch or DataZone from a sequence of Interval objects.
     All numeric values in the intervals must be python Quantities.
     
     TODO: 2023-06-13 23:48:09
@@ -580,7 +1358,7 @@ def intervals2epoch(*args, **kwargs):
     Var-positional parameters:
     --------------------------
     
-    datatypes.Interval objects
+    Interval objects
     
     NOTE: When args contains only one element, this can sequence of interval
     tuples as above.
@@ -605,6 +1383,7 @@ def intervals2epoch(*args, **kwargs):
         is the name of the gerenated neo.Epoch or DataZone object
 
 """
+    from core.strutils import counter_suffix
     def __make_unique_label__(label, collection):
         if label in collection:
             label = counter_suffix(label, collection)
@@ -616,16 +1395,26 @@ def intervals2epoch(*args, **kwargs):
     zone = kwargs.pop("zone", False)
     prefix = kwargs.pop("prefix", "interval")
     
-    if len(args) == 1 and isinstance(args[0], (tuple, list)) and not isinstance(args[0], Interval):
-        args = args[0]
+    # print(len(args))
     
-    if not all(isinstance(a, Interval) for a in args):
+    if len(args) == 1 and isinstance(args[0], (tuple, list)) and all(isinstance(a, Interval) for a in args[0]):
+        intervals = args[0]
+        
+    else:
+        intervals = args
+    
+    
+    # print(f"intervals2epoch intervals: {[(i, type(i)) for i in intervals]}")
+    
+    if not all(isinstance(a, Interval) for a in intervals):
         raise TypeError(f"Expecting a sequence of Interval objects")
     
     # takes care of getting durations right, for "true" intervals, and also
     # checks interval labels uniqueness
-    interval_labels = [] # used in the comprehension below,via __make_unique_label__
-    epoch_intervals = list(map(lambda x: (x.t0, x.t1, __make_unique_label__(x.name, interval_labels)) if x.extent else (x.t0, x.t1-x.t0, __make_unique_label__(x.name, interval_labels)), args))
+    interval_labels = kwargs.pop("labels", list()) # used in the comprehension below, via __make_unique_label__
+    uniquename = lambda x:  __make_unique_label__(x.name, interval_labels) if len(interval_labels) else x.name
+    epoch_intervals = list(map(lambda x: (x.t0, x.t1, uniquename(x)) if x.extent else (x.t0, x.t1-x.t0, uniquename(x)), intervals))
+    # epoch_intervals = list(map(lambda x: (x.t0, x.t1, __make_unique_label__(x.name, interval_labels)) if x.extent else (min(x.t0, x.t1), abs(x.t1-x.t0), __make_unique_label__(x.name, interval_labels)), args))
 
     # cache the units, because conversion from a list to a numpy array 'slices'
     # them out
@@ -641,18 +1430,18 @@ def intervals2epoch(*args, **kwargs):
     
     labels = np.array([x[2] for x in epoch_intervals])
     
-    klass = DataZone if zone or not check_time_units(units) else neo.Epoch
+    klass = DataZone if zone or not checkTimeUnits(units) else neo.Epoch
     
     name = kwargs.pop("name", klass.__name__)
     
-    return klass(times, durations=durations, labels=labels, name=name)
+    return klass(times.flatten(), durations=durations.flatten(), labels=labels, name=name)
     
-@safeWrapper
+@safewrapper
 def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone], 
                   signal_viewer: typing.Optional[QtWidgets.QMainWindow] = None, 
                   axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None, 
                   **kwargs):
-    """Creates vertical signal cursors from a neo.Epoch.
+    r"""Creates vertical signal cursors from a neo.Epoch.
     
     Parameters:
     ----------
@@ -703,8 +1492,6 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
     
     from gui.signalviewer import SignalViewer
     from gui.cursors import SignalCursor, SignalCursorTypes
-    from qtpy import QtGui, QtCore
-    # from PyQt5 import QtGui, QtCore
 
     keep_units = kwargs.pop("keep_units", False)
     if not isinstance(keep_units, bool):
@@ -806,21 +1593,37 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
 def intervals2cursors(*args,
                       axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None, 
                       **kwargs):
+    r"""Creates a sequence of SignalCursor objects from a sequence of intervals.
+    The intervals in `args` are NOT Interval objects - please see Interval.toSignalCursors()
+    
+    WARNING: This function will be DEPRECATED
+    
+"""
     from gui.signalviewer import SignalViewer
     from gui.cursors import SignalCursor, SignalCursorTypes
-    from qtpy import QtGui, QtCore
-    # from PyQt5 import QtGui, QtCore
 
     keep_units = kwargs.pop("keep_units", False)
     cursor_type = kwargs.pop("cursor_type", "vertical")
     
+    if len(args) == 1 and isinstance(args[0], (tuple, list)) and all(isinstance(a, Interval) for a in args[0]):
+        intervals = args[0]
+        
+    else:
+        intervals = args
+    
+    
+    # print(f"intervals2epoch intervals: {[(i, type(i)) for i in intervals]}")
+    
+    if not all(isinstance(a, Interval) for a in intervals):
+        raise TypeError(f"Expecting a sequence of Interval objects")
+
     if not isinstance(keep_units, bool):
         keep_units = False
         
     def __strip_units__(v):
         return float(v.magnitude) if (isinstance(v, pq.Quantity) and not keep_units) else v
         
-    ret = [(__strip_units__(i.t0+i.t1/2) if i.extent else __strip__units__(i.t0 + (i.t1 - i.t0)/2), __strip_units__(i.t1) if i.extent else __strip_units__(i.t1-i.t0), i.name) for i in args]
+    ret = [(__strip_units__(i.t0+i.t1/2) if i.extent else __strip_units__(i.t0 + (i.t1 - i.t0)/2), __strip_units__(i.t1) if i.extent else __strip_units__(i.t1-i.t0), i.name) for i in intervals]
 
     signal_viewer = kwargs.pop("signal_viewer", None)
     

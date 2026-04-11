@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""IPython script to manually start NEURON environment with IPython kernel.
+r"""IPython script to manually start NEURON environment with IPython kernel.
 
 ATTENTION: This is intended to start NEURON from a shell, and is independent of 
 Scipyen framework.

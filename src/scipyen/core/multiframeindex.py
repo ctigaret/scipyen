@@ -20,7 +20,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 class IndexProxy(object):
-    """Proxy for accessing a data field in the FrameIndexLookup.
+    r"""Proxy for accessing a data field in the FrameIndexLookup.
     
     The data field itself is a Pandas Series with SparseDtype, contained
     in the 'map' attribute (a DataFrame) of the owner of this proxy, with 
@@ -31,7 +31,7 @@ class IndexProxy(object):
     """
     
     def __init__(self, field:str):
-        """Creates the descriptor corresponding to a data field in the owner.
+        r"""Creates the descriptor corresponding to a data field in the owner.
         Also sets up the field's name as a descriptor of FrameIndexLookup
         """
         if not isinstance(field, str) or len(field.strip()) == 0:
@@ -40,7 +40,7 @@ class IndexProxy(object):
         self._field_ = field
         
     def __get__(self, obj, objtype=None):
-        """Returns the descriptor itself (i.e., this IndexProxy instance).
+        r"""Returns the descriptor itself (i.e., this IndexProxy instance).
         
         The descriptor forwards access & assignment to the corresponding
         Pandas Series object in the owner's 'map' attribute so that the
@@ -55,7 +55,7 @@ class IndexProxy(object):
         return self
     
     def __len__(self):
-        """Returns the number of registered component frame indices.
+        r"""Returns the number of registered component frame indices.
         
         A registered frame index is an int. 
         
@@ -84,7 +84,7 @@ class IndexProxy(object):
         self.private_name = "_" + name + "_"
         
     def __call__(self):
-        """Returns the pandas series corresponding to self._field_
+        r"""Returns the pandas series corresponding to self._field_
         
         The caller is responsible for appropriate indexing into the result.
         """
@@ -108,12 +108,11 @@ class IndexProxy(object):
         sp_set_loc(self._obj_._map_, key, self._field_, value)
         
 class FrameIndexLookup(object):
+    r"""Wrapper around multi-frame indexing using sparse pandas DataFrames.
     
-    """Wrapper around multi-frame indexing using sparse pandas DataFrames.
-    
-    The correspondence between data master ("virtual") frame index and the 
-    index of the frames in the child data objects of the owner are stored in a
-    sparse array wrapped in a Pandas DataFrame.
+    Stores the correspondence between a virtual frame index in a data and the 
+    index of the frames in the child data objects of the data, as a sparse
+    array wrapped in a Pandas DataFrame.
     
     The owner's fields containing child data are stored as column names in 
     the underlying DataFrame (the 'map' attribute of the FrameLookupIndex 
@@ -148,12 +147,13 @@ class FrameIndexLookup(object):
         Frame                                 
         0          0      0                  0
         1          1      1                  1
-        2          2      2               <NA>
+        2          2      2               NaN
 
     In 'framesMap', the 'electrophysiology' has only two frames which by default
     are mapped to the first two master frame indices.
     
-    If this is not what was intended, the mapping can be modified with two calls:
+    If this is not what was intended, the mapping can be modified with two
+    successive calls (NOTE the use of attribute access syntax):
     
         framesMap.electrophysiology[2] = 1
         
@@ -168,7 +168,7 @@ class FrameIndexLookup(object):
                 scans  scene  electrophysiology
         Frame                                 
         0          0      0                  0
-        1          1      1               <NA>
+        1          1      1               NaN
         2          2      2                  1
 
     WARNING: These operations REQUIRE attribute (NOT index) access to the 
@@ -186,9 +186,15 @@ class FrameIndexLookup(object):
     
     """
     
-    def __new__(cls, field_frames:dict, frame_missing = pd.NA,
-                index_name="Frame", **kwargs):
-        
+    def __new__(cls, field_frames:dict, frame_missing = np.nan,
+                index_name:str="Frame", **kwargs):
+        r"""FrameIndexLookup constructor
+    field_frames: dictionary mapping field names (str) ↦ number of frames;
+    frame_missing: the value of the missing value in the underlying sparse arrays
+        by default this is np.nan (can also be math.nan or None). WARNING: please
+        avoid using pandas.NA here
+    index_name:str, default is "Frame"
+    """
         for field in field_frames:
             descr = IndexProxy(field)
             setattr(cls, field, descr)
@@ -197,7 +203,7 @@ class FrameIndexLookup(object):
         return super().__new__(cls)
         
     def __reduce__(self):
-        frames_indices = dict((field, tuple(zip(list(self._map_.index), list(None if v is pd.NA else int(v) for v in self._map_.loc[:,field])))) for field in self._map_.columns)
+        frames_indices = dict((field, tuple(zip(list(self._map_.index), list(None if v is self._frame_missing_ else int(v) for v in self._map_.loc[:,field])))) for field in self._map_.columns)
         return (_new_FrameIndexLookup, 
                 (self.childFrames(),
                 self._frame_missing_,
@@ -205,9 +211,9 @@ class FrameIndexLookup(object):
                 frames_indices,
                 ))
     
-    def __init__(self, field_frames:dict, frame_missing = pd.NA, 
+    def __init__(self, field_frames:dict, frame_missing = np.nan, 
                  index_name="Frame", **kwargs):
-        """
+        r"""
         Parameters:
         ------------
         field_frames: dict 
@@ -238,12 +244,10 @@ class FrameIndexLookup(object):
             (2D views, or segments). In this case, the number of frames of the 
             data in the field is 0 (zero).
             
-        frame_missing: int or any of: 
-            pd.NA, None, np.nan, math.nan, deataclasses.MISSING.
+        frame_missing: int or any of np.nan, or math.nan
             
-            Optional, default is pd.NA.
+            Optional, default is np.nan
             
-        
             The frame index value standing for a missing frame in the named field
             (i.e., when the named field has fewer frames than the highest number 
             of frames across all the named fields in 'field_frames')
@@ -294,21 +298,21 @@ class FrameIndexLookup(object):
         
                 scans  scene  electrophysiology
         0       0      0        0
-        1       1     <NA>      1
-        2       2     <NA>      2
+        1       1     NaN       1
+        2       2     NaN       2
         
         3) The case where the ScanData owner object has only one scene frame, 
         and no electrophysiology
                 scans  scene  electrophysiology
-        0       0      0        <NA>
-        1       1     <NA>      <NA>
-        2       2     <NA>      <NA>
+        0       0      0        NaN
+        1       1     NaN       NaN
+        2       2     NaN       NaN
         
         NOTE 2: the frame_missing value has no meaning for the FrameLookupIndex 
         object: it is just placeholders for the missing field frames. In Examples 2 and 3 above, acessing master frame
         with index 1 in the owner will attempt to access the last available 
         frame in scene (-1); in example 3, accessing master frame 1 will 
-        associate <NA> for electrophysilogy. It is up to the owner to decide
+        associate NaN for electrophysilogy. It is up to the owner to decide
         what to do with these values.
         
         """
@@ -316,15 +320,17 @@ class FrameIndexLookup(object):
         # NOTE: 2022-01-14 23:02:54
         # make sure frame_missing is either an int or any of the "unavailable"
         # constants; set it to pd.NA otherwise:
-        if not isinstance(frame_missing, int) or not any(frame_missing is None, 
-                                                         frame_missing is pd.NA,
-                                                         frame_missing is np.nan,
-                                                         frame_missing is math.nan,
-                                                         frame_missing is MISSING):
+        if not isinstance(frame_missing, int) or not any(frame_missing is np.nan,
+                                                         frame_missing is math.nan):
             
-            frame_missing = pd.NA
-        
-        
+            frame_missing = np.nan
+            
+        elif frame_missing is pd.NA or frame_missing is None:
+            # NOTE: 2025-07-12 15:55:56
+            # pd.NA messes things up when performing operations involving conversion
+            # to numpy arrays implicitly, such ad when pretty printing (in jupyter),
+            # and when comparing sparse arrays (scipyen traitlets)
+            frame_missing = np.nan
         
         # filter out missing fields, to figure out the maximum number of frames 
         # available to the owner of the FrameLookupIndex instance. Field that
@@ -336,7 +342,8 @@ class FrameIndexLookup(object):
         else:
             field_nframes = dict()
             
-        maxFrames = max(v for v in field_nframes.values()) if len(field_nframes) else 0
+        maxFrames = np.nanmax(list(field_nframes.values())) if len(field_nframes) else 0
+        # print(f"{self.__class__.__name__}.__init__: maxFrames -> {maxFrames}")
         #maxFrames = max(v for v in field_nframes.values()) if len(field_nframes) else None
         
         # create a dictionary of pandas Series, mapping field name to either:
@@ -348,20 +355,19 @@ class FrameIndexLookup(object):
         dd = dict()
         
         for field, value in field_frames.items():
-            if not isinstance(value, int):
-                raise TypeError(f"'field_frames' expected to have int values; got {type(value)} for field {field} instead")
-            
-            if value > 0:
+            if value is None:
+                sval = frame_missing
+            elif value > 0:
                 sval = range(maxFrames)
                 if value < maxFrames:
-                    sval = [k if k < value else frame_missing for k in sval]
+                    sval = [k if k < int(value) else frame_missing for k in sval]
                 
             else:
                 if isinstance(maxFrames, int):
                     sval = [frame_missing] * maxFrames
                 else:
                     sval = frame_missing
-                    
+
             dd[field] = pd.Series(sval, name=field, dtype = pd.SparseDtype("int", frame_missing))
             
         # use the created dd dict to generate the map data frame
@@ -391,8 +397,17 @@ class FrameIndexLookup(object):
                         
                     elif all(isinstance(v_, tuple) and len(v_) == 2 and (isinstance(v_[0], int) and (v_[1] is frame_missing or v_[1] is None or isinstance(v_[1], int))) for v_ in v):
                         for v_ in v:
-                            if isinstance(maxFrames, int) and v_[0] not in range(-maxFrames, maxFrames): # allow negative indices
-                                raise ValueError(f"master index {v_[0]} out of range {(-maxFrames, maxFrames-1)}")
+                            if isinstance(maxFrames, int):
+                                if maxFrames > 0:
+                                    if v_[0] not in range(-maxFrames, maxFrames): # allow negative indices
+                                        raise ValueError(f"master index {v_[0]} out of range {(-maxFrames, maxFrames-1)}")
+                                elif maxFrames == 0:
+                                    if v_[0] != 0:
+                                        raise ValueError(f"Bad master index ({v_[0]}) for {maxFrames} frames")
+                                
+                                else:
+                                    raise RuntimeError(f"Bad maxFrames: {maxFrames}")
+                                    
                             
                             if isinstance(field_frames[k], int):
                                 if isinstance(v_[1], int) and v_[1] not in range(-field_frames[k], field_frames[k]):
@@ -414,9 +429,9 @@ class FrameIndexLookup(object):
             return item in range(-l,l)
         
         return False
-        
+    
     def __getitem__(self, key:typing.Union[int, slice, range, collections.abc.Sequence, str]):
-        """Returns the frame mapping for the master frame index given in 'key'.
+        r"""Returns the frame mapping for the master frame index given in 'key'.
         Parameters:
         ----------
         key: either:
@@ -474,7 +489,7 @@ class FrameIndexLookup(object):
         # NOTE: return the key when nothing is mapped to it
         
     def __setitem__(self, key, value):
-        """Item setter
+        r"""Item setter
         
         Parameters:
         -----------
@@ -524,6 +539,12 @@ class FrameIndexLookup(object):
         p.text(f"Frame Indices Map (frame index -> index of component frame or segment):\n")
         p.pretty(self._map_)
         
+    def __repr__(self):
+        return f"{self.__class__.__name__} with {len(self)} frames, data components: {tuple(self.keys())}"
+    
+    def __str__(self):
+        return f"{self.__class__.__name__} with {len(self)} frames, data components: {tuple(self.keys())} and mapping:\n{self._map_}"
+        
     def childFrames(self, field:typing.Optional[str]=None):
         if isinstance(field, str):
             if field in self._map_.columns:
@@ -540,7 +561,7 @@ class FrameIndexLookup(object):
         yield from self._map_.columns
         
     def where(self, field:str, value:int):
-        """Returns the master frame index for the 'field' index 'value'
+        r"""Returns the master frame index for the 'field' index 'value'
         
         Raises KeyError if field is not found.
         """
@@ -562,7 +583,7 @@ class FrameIndexLookup(object):
         
         
     def remap(self, field:str, newMap:dict={}):
-        """Remaps master frame indices to new frame indices of 'field'.
+        r"""Remaps master frame indices to new frame indices of 'field'.
         
         Parameters:
         ===========
@@ -602,7 +623,7 @@ class FrameIndexLookup(object):
                 getattr(self, field)[k] = v
             
     def __check_missing__(self, x):
-        """Quick check for valid missing field frame index value
+        r"""Quick check for valid missing field frame index value
         """
         return x is self.missingFrameIndex if not isinstance(self.missingFrameIndex, int) else x == self.missingFrameIndex
     
@@ -629,22 +650,19 @@ class FrameIndexLookup(object):
         return self._frame_missing_
     
     @missingFrameIndex.setter
-    def missingFrameIndex(self, val:typing.Union[int, type(pd.NA)]):
-        if not isinstance(val, (int, type(pd.NA))):
-            raise ArgumentError(f"'val' expectd an int or pd.NA; got {val} instead")
+    def missingFrameIndex(self, val:typing.Union[int, type(None), float]):
+        if isinstance(val, (pd.NA, type(MISSING))):
+            # allow for older pickles
+            val = np.nan
+            
+        if not isinstance(val, (int, type(None), float)):
+            raise ArgumentError(f"'val' expected an int, np.nan, math.nan or None; got {val} instead")
+        
+        if isinstance(val, float) and val not in (np.nan, math.nan):
+            raise ArgumentError(f"'val' expected an int, np.nan, math.nan or None; got {val} instead")
+        
         self._frame_missing_ = val
         
-    #@property
-    #def missingFieldFrameIndex(self):
-        #return self._field_missing_
-    
-    #@missingFieldFrameIndex.setter
-    #def missingFieldFrameIndex(self, val:typing.Union[int, type(pd.NA)]):
-        #if not isinstance(val, (int, type(pd.NA))):
-            #raise ArgumentError(f"'val' expectd an int or pd.NA; got {val} instead")
-        #self._field_missing_ = val
-        
-    
 def _new_FrameIndexLookup(field_frames, frame_missing, index_name, mapping):
     return FrameIndexLookup(field_frames, frame_missing, index_name, **mapping)
     

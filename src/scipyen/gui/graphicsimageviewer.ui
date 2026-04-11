@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>492</width>
-    <height>531</height>
+    <width>440</width>
+    <height>473</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -23,7 +23,7 @@
    </size>
   </property>
   <property name="contextMenuPolicy">
-   <enum>Qt::CustomContextMenu</enum>
+   <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
   </property>
   <property name="windowTitle">
    <string>ImageViewerWidget</string>
@@ -76,13 +76,13 @@
         <bool>true</bool>
        </property>
        <property name="alignment">
-        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+        <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
        </property>
        <property name="wordWrap">
         <bool>true</bool>
        </property>
        <property name="textInteractionFlags">
-        <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+        <set>Qt::TextInteractionFlag::TextSelectableByKeyboard|Qt::TextInteractionFlag::TextSelectableByMouse</set>
        </property>
       </widget>
      </item>
@@ -95,7 +95,7 @@
         </sizepolicy>
        </property>
        <property name="sizeAdjustPolicy">
-        <enum>QAbstractScrollArea::AdjustToContents</enum>
+        <enum>QAbstractScrollArea::SizeAdjustPolicy::AdjustToContents</enum>
        </property>
        <property name="backgroundBrush">
         <brush brushstyle="SolidPattern">
@@ -107,22 +107,22 @@
         </brush>
        </property>
        <property name="alignment">
-        <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+        <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
        </property>
        <property name="dragMode">
-        <enum>QGraphicsView::ScrollHandDrag</enum>
+        <enum>QGraphicsView::DragMode::ScrollHandDrag</enum>
        </property>
        <property name="cacheMode">
-        <set>QGraphicsView::CacheBackground</set>
+        <set>QGraphicsView::CacheModeFlag::CacheBackground</set>
        </property>
        <property name="transformationAnchor">
-        <enum>QGraphicsView::AnchorUnderMouse</enum>
+        <enum>QGraphicsView::ViewportAnchor::AnchorUnderMouse</enum>
        </property>
        <property name="resizeAnchor">
-        <enum>QGraphicsView::AnchorUnderMouse</enum>
+        <enum>QGraphicsView::ViewportAnchor::AnchorUnderMouse</enum>
        </property>
        <property name="viewportUpdateMode">
-        <enum>QGraphicsView::BoundingRectViewportUpdate</enum>
+        <enum>QGraphicsView::ViewportUpdateMode::BoundingRectViewportUpdate</enum>
        </property>
       </widget>
      </item>

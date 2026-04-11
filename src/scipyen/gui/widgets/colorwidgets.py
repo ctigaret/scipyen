@@ -1,4 +1,4 @@
-"""KColorButton and KColorCombo from KWidgetsAddons framework 'translated' here.
+r"""KColorButton and KColorCombo from KWidgetsAddons framework 'translated' here.
 
 Translation and additional code (C) 2021 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 
@@ -41,13 +41,36 @@ from functools import partial
 
 import numpy as np
 
-from qtpy import QtCore, QtGui, QtWidgets, QtXml
-from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
-# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 
-from core.prog import safeWrapper
+    
+
+from core.prog import safewrapper
 from core.utilities import reverse_mapping_lookup
 from gui.painting_shared import (standardPalette, standardPaletteDict, svgPalette,
                               getPalette, paletteQColor, qcolor,
@@ -67,7 +90,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 
 class ColorPushButton(QtWidgets.QPushButton):
-    """Blunt port (read "almost verbatim code translation") of KColorButton
+    r"""Blunt port (read "almost verbatim code translation") of KColorButton
     
     What is new:
         option to keep alpha value when a color is dropped or pasted onto the widget
@@ -100,9 +123,9 @@ class ColorPushButton(QtWidgets.QPushButton):
         self.setAcceptDrops(True)
         self.clicked.connect(self._chooseColor)
         
-    @safeWrapper
+    @safewrapper
     def initStyleOption(self, opt:QtWidgets.QStyleOptionButton):
-        """Required in all concrete subclasses of QWidget
+        r"""Required in all concrete subclasses of QWidget
         """
         opt.initFrom(self)
         opt.state = QtWidgets.QStyle.State_Sunken if self.isDown() else QtWidgets.QStyle.State_Raised
@@ -166,7 +189,7 @@ class ColorPushButton(QtWidgets.QPushButton):
             sigblock = QtCore.QSignalBlocker(self)
             self.color = value
     
-    @safeWrapper
+    @safewrapper
     def paintEvent(self, ev:QtGui.QPaintEvent):
         painter = QtGui.QPainter(self)
         style = self.style()
@@ -203,25 +226,25 @@ class ColorPushButton(QtWidgets.QPushButton):
             focusOpt.backgroundColor = self.palette().window().color()
             style.drawPrimitive(QtWidgets.QStyle.PE_FrameFocusRect, focusOpt, painter, self)
         
-    @safeWrapper
+    @safewrapper
     def sizeHint(self):
-        """Returns a QSize"""
+        r"""Returns a QSize"""
         opt = QtWidgets.QStyleOptionButton()
         self.initStyleOption(opt)
         return self.style().sizeFromContents(QtWidgets.QStyle.CT_PushButton, opt, QtCore.QSize(16,16), self)
 
-    @safeWrapper
+    @safewrapper
     def minimumSizeHint(self):
-        """Returns a QSize"""
+        r"""Returns a QSize"""
         opt = QtWidgets.QStyleOptionButton()
         self.initStyleOption(opt)
         return self.style().sizeFromContents(QtWidgets.QStyle.CT_PushButton, opt, QtCore.QSize(8,8), self)
     
-    @safeWrapper
+    @safewrapper
     def dragEnterEvent(self, ev:QtGui.QDragEnterEvent):
         ev.setAccepted(canDecode(ev.mimeData()) and self.isEnabled())
     
-    @safeWrapper
+    @safewrapper
     def dropEvent(self, ev:QtGui.QDropEvent):
         # NOTE: 2021-05-14 21:39:47
         # is mimeData.hasColor() is a QVariant<QColor> which is converted by
@@ -234,7 +257,7 @@ class ColorPushButton(QtWidgets.QPushButton):
                 c.setAlpha(self._alpha)
             self.color = c
     
-    @safeWrapper
+    @safewrapper
     def keyPressEvent(self, ev:QtGui.QKeyEvent):
         key = ev.key() | int(ev.modifiers())
         
@@ -252,12 +275,12 @@ class ColorPushButton(QtWidgets.QPushButton):
         else:
             super().keyPressEvent(ev)
     
-    @safeWrapper
+    @safewrapper
     def mousePressEvent(self, ev:QtGui.QMouseEvent):
         self._mPos = ev.pos()
         super().mousePressEvent(ev)
     
-    @safeWrapper
+    @safewrapper
     def mouseMoveEvent(self, ev:QtGui.QMouseEvent):
         if ev.buttons() & QtCore.Qt.LeftButton and \
             (ev.pos() - self._mPos).manhattanLength() > QtWidgets.QApplication.startDragDistance():
@@ -451,11 +474,11 @@ class ColorComboBox(QtWidgets.QComboBox):
         
         # ### END initialization of Qt part
         
-    @safeWrapper
+    @safewrapper
     def dragEnterEvent(self, ev:QtGui.QDragEnterEvent):
         ev.setAccepted(canDecode(ev.mimeData()) and self.isEnabled())
     
-    @safeWrapper
+    @safewrapper
     def dropEvent(self, ev:QtGui.QDropEvent):
         # NOTE: 2021-05-14 21:39:47
         # is mimeData.hasColor() is a QVariant<QColor> which is converted by
@@ -468,19 +491,19 @@ class ColorComboBox(QtWidgets.QComboBox):
                 c.setAlpha(self._alpha)
             self.color = c
     
-    @safeWrapper
+    @safewrapper
     def mousePressEvent(self, ev:QtGui.QMouseEvent):
         self._mPos = ev.pos()
         super().mousePressEvent(ev)
     
-    @safeWrapper
+    @safewrapper
     def mouseMoveEvent(self, ev:QtGui.QMouseEvent):
         if ev.buttons() & QtCore.Qt.LeftButton and \
             (ev.pos() - self._mPos).manhattanLength() > QtWidgets.QApplication.startDragDistance():
             createDrag(self.color, self).exec_()
             self.setDown(False)
             
-    @safeWrapper
+    @safewrapper
     def keyPressEvent(self, ev:QtGui.QKeyEvent):
         key = ev.key() | int(ev.modifiers())
         
@@ -576,7 +599,7 @@ class ColorComboBox(QtWidgets.QComboBox):
             self.update()
     
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slotActivated(self, index:int):
         if index == 0:
             if self._alphaChannelEnabled:
@@ -619,7 +642,7 @@ class ColorComboBox(QtWidgets.QComboBox):
         self.activated[QtGui.QColor].emit(self._internalColor.qcolor)
     
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slotHighlighted(self, index:int):
         if index == 0:
             self._internalColor = self._customColor
@@ -663,7 +686,7 @@ class ColorComboBox(QtWidgets.QComboBox):
     
     @property
     def colors(self) -> typing.List[QtGui.QColor]:
-        """The list of currently displayed colors (beginning with the custom one)
+        r"""The list of currently displayed colors (beginning with the custom one)
         """
         ret = list()
         if self.color.isValid():
@@ -675,7 +698,7 @@ class ColorComboBox(QtWidgets.QComboBox):
     
     @colors.setter
     def colors(self, palette:typing.Union[dict,tuple, list, str, ColorPalette]):
-        """WARNING: Does NOT check the contents of value!
+        r"""WARNING: Does NOT check the contents of value!
         """
         if isinstance(palette, ColorPalette):
             self._color_palette = palette
@@ -705,7 +728,7 @@ class ColorComboBox(QtWidgets.QComboBox):
         
     @property
     def colorNames(self) -> typing.List[str]:
-        """The list of color names in "#rrggbb" format
+        r"""The list of color names in "#rrggbb" format
         """
         ret = [name for name in self._color_palette.keys()]
         if self.color.isValid():
@@ -715,7 +738,7 @@ class ColorComboBox(QtWidgets.QComboBox):
             
     @property
     def qualifiedColorNames(self) -> typing.List[str]:
-        """the list of qualified color names (if they exist), else #rgb names
+        r"""the list of qualified color names (if they exist), else #rgb names
         """
         if len(self._color_palette):
             if self.color().isValid():
@@ -757,7 +780,7 @@ class ColorComboBox(QtWidgets.QComboBox):
         painter.end()
 
 class ColorSelectionWidget(QtWidgets.QWidget):
-    """Combines a ColorComboBox and a ColorPushButton in the same widget
+    r"""Combines a ColorComboBox and a ColorPushButton in the same widget
     """
     colorChanged = Signal(QtGui.QColor, name="colorChanged")
     
@@ -892,7 +915,8 @@ def quickColorDialog(parent:typing.Optional[QtWidgets.QWidget]=None,
         
     dlg.addWidget(group)
     
-    dlg.resize(-1, -1)
+    # dlg.resize(-1, -1)
+    dlg.adjustSize()
         
     dlgret = dlg.exec()
     

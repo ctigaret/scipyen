@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""Provides two IPython (Jupyter) Qt-based consoles for the Scipyen application.
+r"""Provides two IPython (Jupyter) Qt-based consoles for the Scipyen application.
 
 1) An "internal" Jupyter qt console, running an in-process IPython kernel for 
 dat-to-day use.
@@ -44,7 +44,7 @@ some of the lost variables across kill - restart cycles.
 import os
 import signal
 import json
-import sys, typing, traceback, itertools, subprocess, asyncio
+import sys, typing, traceback, itertools, subprocess, asyncio, re
 # BEGIN NOTE: 2022-03-05 16:07:04 For execute_request
 import inspect, time
 # from ipykernel.jsonutil import json_clean
@@ -53,11 +53,43 @@ from functools import partial, partialmethod
 from collections import OrderedDict
 from warnings import warn
 
+import matplotlib as mpl
 
-from qtpy import (QtCore, QtGui, QtWidgets, )
-from qtpy.QtCore import (Signal, Slot, )
-# from PyQt5 import (QtCore, QtGui, QtWidgets, )
-# from PyQt5.QtCore import (Signal, Slot, )
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtSvg)
+from qtpy.QtCore import (Signal, Slot)
+
+__has_PySide6__ = False
+__has_PyQt6__  = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    # QtType = typing.TypeVar("QtType", bound = "Shiboken.Object")
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+elif os.environ["QT_API"] == "pyqt6":
+    __has_PyQt6__ = True
+    from qtpy import sip
+    ____has_sip____ = True
+    # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    from qtpy import sip
+    ____has_sip____ = True
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
+
+__has_qtdbus__ = False
+try:
+    from qtpy import QtDBus
+
+    __has_qtdbus__ = True
+except:
+    pass
 
 #### BEGIN ipython/jupyter modules
 from traitlets.config.application import boolean_flag
@@ -75,6 +107,12 @@ from jupyter_client.localinterfaces import is_local_ip
 from jupyter_client.consoleapp import (
         JupyterConsoleApp, app_aliases, app_flags,
     )
+try:
+    from IPython.core.tips import pick_tip
+    ipythonHasTips = True
+except:
+    ipythonHasTips = False
+    
 
 from qtconsole.svg import save_svg, svg_to_clipboard, svg_to_image
 
@@ -83,10 +121,10 @@ from tornado.queues import Queue
 
 import zmq
 
-# from qtpy import sip as sip
-# import sip
-
 from pygments import styles as pstyles
+#from pygments import style as pstyle
+from pygments.token import Token
+from pygments.style import Style
 
 from qtconsole import styles as styles
 from qtconsole import __version__
@@ -99,49 +137,62 @@ from qtconsole.jupyter_widget import JupyterWidget # for use in the External Con
 # logic, including drag'n drop
 from qtconsole.rich_jupyter_widget import RichJupyterWidget 
 
-from qtconsole.inprocess import QtInProcessKernelManager # for the Scipyen's internal console
+from qtconsole.inprocess import (QtInProcessKernelManager, # for the Scipyen's internal console
+                                 QtInProcessKernelClient)
 from qtconsole.mainwindow import (MainWindow, background,)
 from qtconsole.client import QtKernelClient
 from qtconsole.manager import QtKernelManager
 
 #### END ipython/jupyter modules
-import pkg_resources
+# import pkg_resources
 
 #from core import prog
-from core.prog import safeWrapper
+from core.prog import (safewrapper, with_doc)
 from core.extipyutils_client import (init_commands, execute, ForeignCall,
                                     nrn_ipython_initialization_cmd,)
-from core.strutils import str2symbol
+from core.strutils import str2symbol, counter_suffix
+# from core.utilities import 
 
 from core.scipyen_config import (markConfigurable, ScipyenConfigurable,
                                  saveWindowSettings, loadWindowSettings,)
 
 from gui.workspacegui import WorkspaceGuiMixin
+from gui import scipyen_console_styles
+from gui.scipyen_console_styles import *
+# from gui.kepler_dark_console_pygment_style import KeplerDark
 
 from gui.guiutils import (get_font_style, get_font_weight,)
 
-if sys.version_info.minor < 11:
+if sys.version_info.minor < 11:# or __has_PyQt6__ or __has_PySide6__:
     from core import scipyen_inprocess_3_10
-    from core.scipyen_inprocess_3_10 import ScipyenInProcessKernel
+    from core.scipyen_inprocess import ScipyenInProcessKernel_3_10
+    ScipyenInProcessKernel = ScipyenInProcessKernel_3_10
 else:
     ScipyenInProcessKernel = InProcessKernel
 
 #makeConfigurable = WorkspaceGuiMixin.makeConfigurable
 
-if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+if __has_PyQt6__ or __has_PySide6__:
+    consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.LayoutDirection) ) , 
+                                                key = lambda x: x[1].value))
+else:
     consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.LayoutDirection) ) , 
                                                 key = lambda x: x[1]))
-else:
-    consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in QtCore.Qt.LayoutDirection._member_map_.items()) ,
-                                                key = lambda x: x[1].value))
+# if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+#     consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.LayoutDirection) ) , 
+#                                                 key = lambda x: x[1]))
+# else:
+#     consoleLayoutDirection = OrderedDict(sorted(( (name,val) for name, val in QtCore.Qt.LayoutDirection._member_map_.items()) ,
+                                                # key = lambda x: x[1].value))
 
 defaultFixedFont = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
 
 flags = dict(base_flags)
-qt_flags = {
-    'plain' : ({'JupyterQtConsoleApp' : {'plain' : True}},
-            "Disable rich text support."),
-}
+# qt_flags = {
+#     'plain' : ({'JupyterQtConsoleApp' : {'plain' : True}},
+#             "Disable rich text support."),
+# }
+qt_flags = dict()
 qt_flags.update(boolean_flag(
     'banner', 'JupyterQtConsoleApp.display_banner',
     "Display a banner upon starting the QtConsole.",
@@ -173,180 +224,160 @@ aliases.update(qt_aliases)
 qt_aliases = set(qt_aliases.keys())
 qt_flags = set(qt_flags.keys())
 
-def available_pygments():
-    # NOTE: 2020-12-22 21:35:30
-    # jupyter_qtconsole_colorschemes has entry points in pygments.styles
-    return list(pstyles.get_all_styles())
+def change_error_display_for_style(style:typing.Union[str, Style]):
+    # https://stackoverflow.com/questions/70766518/how-to-change-ipython-error-highlighting-color
+    
+    # TODO: 2024-09-20 12:56:07
+    # match tb highlight in ultratb to a specification in the style itself.
+    #
+    # (for now, it;s just replacing the ugly ansi yellow with the ansi red)
+    if isinstance(style, str):
+        style_name = style
+        style = styles.get_style_by_name(style)
+    elif isinstance(style, Style):
+        style_name = style.name
+    else:
+        raise TypeError(f"Expecting a pygments Style or a str (syle name); instead, got a {type(style).__name__}")
 
-def get_available_syntax_styles():
-    return sorted(list(pstyles.get_all_styles()))
+    is_dark_style = styles.dark_style(style_name)
+    # print(f"change_error_display: using dark style = {is_dark_style}")
+
+    try:
+        from IPython.core import ultratb
+        ultratb.VerboseTB._tb_highlight = "bg:ansired"
+    except Exception:
+        print("Error patching background color for tracebacks, they'll be the ugly default instead")
+
+
+# JUPYTER_PYGMENT_STYLES = list(pstyles.get_all_styles())
+# 
+# PYGMENT_STYLES = sorted(JUPYTER_PYGMENT_STYLES + StyleNames)
+
+# def available_pygments():
+#     # NOTE: 2020-12-22 21:35:30
+#     # jupyter_qtconsole_colorschemes has entry points in pygments.styles
+#     return list(pstyles.get_all_styles())
+# 
+# def get_available_syntax_styles():
+#     return sorted(list(pstyles.get_all_styles()))
+# 
+# def get_style_colors(stylename:str) -> dict:
+#     if stylename == "KeplerDark":
+#         # use my own
+#         # TODO: 2024-09-19 15:24:37 
+#         # give possibility of 
+#         # future additional custom schemes to be packaged with Scipyen
+#         style = KeplerDark
+#         fgcolor = style.style_for_token(Token.Text)['color'] or ''
+#         if len(fgcolor) in (3,6):
+#             # could be 'abcdef' or 'ace' hex, which needs '#' prefix
+#             try:
+#                 int(fgcolor, 16)
+#             except TypeError:
+#                 pass
+#             else:
+#                 fgcolor = "#"+fgcolor
+# 
+#         return dict(
+#             bgcolor = style.background_color,
+#             select = style.highlight_color,
+#             fgcolor = fgcolor
+#         )
+#     
+#     else:
+#         return pstyles.get_colors(stylename)
+    
 
 #current_syntax_styles = get_available_syntax_styles()
 
-#class ScipyenDummySocket(DummySocket):
-    #""" A dummy socket implementing (part of) the zmq.Socket interface. """
-
-    #def getsockopt(self, *args, **kwargs):
-        #pass
-        ##return subprocess.DEVNULL
-    
-# class ScipyenInProcessKernel(InProcessKernel):
-#     """Workaround the following exception when using InProcessKernel (see below).
-#     
-#     Traceback (most recent call last):
-#     File "/home/.../scipyenv39/lib64/python3.9/site-packages/tornado/ioloop.py", line 741, in _run_callback
-#         ret = callback()
-#     File "/home/.../scipyenv39/lib/python3.9/site-packages/ipykernel/kernelbase.py", line 419, in enter_eventloop
-#         schedule_next()
-#     File "/home/.../scipyenv39/lib/python3.9/site-packages/ipykernel/kernelbase.py", line 416, in schedule_next
-#         self.io_loop.call_later(0.001, advance_eventloop)
-#     AttributeError: 'InProcessKernel' object has no attribute 'io_loop'
-#     
-#     See also https://github.com/ipython/ipykernel/issues/319
-#     
-#     (NOTE: This DOES NOT crash the kernel):
-#     ERROR:tornado.application:Exception in callback 
-#     functools.partial(<bound method Kernel.enter_eventloop of <ipykernel.inprocess.ipkernel.InProcessKernel object at 0x7f0b6abe5730>>)
-#     
-#     It turns out that all we need is to set eventloop to None so that tornado
-#     "stays put".
-#     
-#     NOTE: 2022-03-05 16:36:35
-#     In addition, ScipyenInProcessKernel also overrides execute_request to await 
-#     for the _abort_queues instead of calling them directly, see below, at
-#     NOTE: 2022-03-05 16:04:03
-#     
-#     (It is funny that this happens in Scipyen, because this warning does not
-#     appear in jupyter qtconsole launched in the same virtual Python environment
-#     as Scipyen (Python 3.10.2), and I don't think this has anything to do with 
-#     setting eventloop to None)
-# 
-#     """
-#     eventloop = None
-#     
-#     def __init__(self, **traits):
-#         super().__init__(**traits)
-#         
-#     @asyncio.coroutine
-#     def _abort_queues(self):
-#         yield
-#     
-#     async def execute_request(self, stream, ident, parent):
-#         """handle an execute_request
-#         
-#         Overrides ipykernel.inprocess.ipkernel.InProcessKernel which in turn
-#         calls ipykernel.kernelbase.Kernel.execute_request, to fix the issue below
-#         
-#         NOTE: 2022-03-05 16:04:03
-#         
-#         In the InProcessKernel _abort_queues is a coroutine and not a method 
-#         (function); this raises the RuntimeWarning: 
-#         coroutine 'InProcessKernel._abort_queues' was never awaited.
-#         
-#         """
-# 
-#         with self._redirected_io(): # NOTE: 2022-03-14 22:12:02 this is ESSENTIAL!!!
-#             try:
-#                 content = parent['content']
-#                 code = content['code']
-#                 silent = content['silent']
-#                 store_history = content.get('store_history', not silent)
-#                 user_expressions = content.get('user_expressions', {})
-#                 allow_stdin = content.get('allow_stdin', False)
-#             except Exception:
-#                 self.log.error("Got bad msg: ")
-#                 self.log.error("%s", parent)
-#                 return
-# 
-#             stop_on_error = content.get('stop_on_error', True)
-# 
-#             metadata = self.init_metadata(parent)
-# 
-#             # Re-broadcast our input for the benefit of listening clients, and
-#             # start computing output
-#             if not silent:
-#                 self.execution_count += 1
-#                 self._publish_execute_input(code, parent, self.execution_count)
-# 
-#             reply_content = self.do_execute(
-#                 code, silent, store_history,
-#                 user_expressions, allow_stdin,
-#             )
-#             if inspect.isawaitable(reply_content):
-#                 reply_content = await reply_content
-# 
-#             # Flush output before sending the reply.
-#             sys.stdout.flush()
-#             sys.stderr.flush()
-#             # FIXME: on rare occasions, the flush doesn't seem to make it to the
-#             # clients... This seems to mitigate the problem, but we definitely need
-#             # to better understand what's going on.
-#             if self._execute_sleep:
-#                 time.sleep(self._execute_sleep)
-# 
-#             # Send the reply.
-#             reply_content = json_clean(reply_content)
-#             metadata = self.finish_metadata(parent, metadata, reply_content)
-# 
-#             reply_msg = self.session.send(stream, 'execute_reply',
-#                                         reply_content, parent, metadata=metadata,
-#                                         ident=ident)
-# 
-#             self.log.debug("%s", reply_msg)
-# 
-#             if not silent and reply_msg['content']['status'] == 'error' and stop_on_error:
-#                 # NOTE: 2022-03-05 16:04:10 
-#                 # this apparently fixes the issue at NOTE: 2022-03-05 16:04:03
-#                 await self._abort_queues() 
-
 class ScipyenInProcessKernelManager(QtInProcessKernelManager):
-    """Starts our own custom ScipyenInProcessKernel
+    r"""Starts our own custom ScipyenInProcessKernel
     
     Workaround for a bug (?) in InProcessKernel API.
     
-    See ScipyenInProcessKernel docstring.
+    See ScipyenInProcessKernel_3_10 docstring.
     
     """
-    client_class = 'qtconsole.inprocess.QtInProcessKernelClient'
+    # client_class = 'qtconsole.inprocess.QtInProcessKernelClient'
+    client_class = __module__ + '.ScipyenInProcessKernelClient'
     
     def start_kernel(self, **kwds):
+        r"""Starts the ipython kernel.
+        For Python version < 3.11,  the kernel is 
+            core.scipyen_inprocess.ScipyenInProcessKernel_3_10
+    
+        For Python version >= 3.11, the kernel is 
+            ipykernel.inprocess.ipkernel.InProcessKernel
+        """
+        # NOTE: 2025-06-24 21:39:05
+        # ScipyenInProcessKernel is an alias to ScipyenInProcessKernel_3_10
+        # or to stock InProcessKernel
         self.kernel = ScipyenInProcessKernel(parent=self, session=self.session)
 
+class ScipyenInProcessKernelClient(QtInProcessKernelClient):
+    def _dispatch_to_kernel(self, msg):
+        """Send a message to the kernel and handle a reply.
+        NOTE: 2025-06-23 23:36:49 Cezar Tigaret
+        Does away with the RuntimeError thrown by asyncio.get_running_loop()
+        inherited from jupyter_core.utils.run_sync that crept up in / around
+        jupyter_core 5.8.1
+        """
+        kernel = self.kernel
+        if kernel is None:
+            msg = "Cannot send request. No kernel exists."
+            raise RuntimeError(msg)
+
+        stream = kernel.shell_stream
+        self.session.send(stream, msg)
+        msg_parts = stream.recv_multipart()
+        # if run_sync is not None:
+        #     dispatch_shell = run_sync(kernel.dispatch_shell)
+        #     dispatch_shell(msg_parts)
+        # else:
+        #     loop = asyncio.get_event_loop()  # type:ignore[unreachable]
+        #     loop.run_until_complete(kernel.dispatch_shell(msg_parts))
+        loop = asyncio.get_event_loop()  # type:ignore[unreachable]
+        loop.run_until_complete(kernel.dispatch_shell(msg_parts))
+        idents, reply_msg = self.session.recv(stream, copy=False)
+        self.shell_channel.call_handlers_later(reply_msg)
+    
 class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
-    """
+    r"""
     """
     # NOTE: This is , ultimately, a qtconsole.frontend_widget.FrontentWidget
     def __init__(self, *args, **kw):
-        super(RichJupyterWidget, self).__init__(*args, **kw)
         self._console_pygment = ""
         self._console_colors = ""
         self.available_colors = ("nocolor", "linux", "lightbg")
         self.scrollbar_positions = Bunch({QtCore.Qt.LeftToRight: "right",
                                            QtCore.Qt.RightToLeft: "left"})
-        self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL | QtCore.Qt.SHIFT | QtCore.Qt.Key_K), self)
-        # self.clear_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_K), self)
+        self.clear_shortcut = QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL | QtCore.Qt.SHIFT | QtCore.Qt.Key_K), self)
+        # self.clear_shortcut = QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_K), self)
         
         self.clear_shortcut.activated.connect(self.slot_clearConsole)
         
-        self.reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL | QtCore.Qt.SHIFT | QtCore.Qt.ALT | QtCore.Qt.Key_K), self)
-        # self.reset_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.ALT + QtCore.Qt.Key_K), self)
+        self.reset_shortcut = QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL | QtCore.Qt.SHIFT | QtCore.Qt.ALT | QtCore.Qt.Key_K), self)
+        # self.reset_shortcut = QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.ALT + QtCore.Qt.Key_K), self)
         self.reset_shortcut.activated.connect(self.slot_resetConsole)
-        
-        self.kind = "plain"
-        self.custom_page_control = QtWidgets.QPlainTextEdit()
-        # self.kind = "rich"
-        # self.custom_page_control = QtWidgets.QTextEdit()
-        
+#         
+#         self.kind = "plain"
+#         self.custom_page_control = QtWidgets.QPlainTextEdit()
+        self.kind = "rich"
         if not hasattr(self, "_name_to_svg_map"):
             self._name_to_svg_map = dict()
+        super(RichJupyterWidget, self).__init__(*args, **kw)
+        
 
         ScipyenConfigurable.__init__(self)
         
     def _flush_pending_stream(self):
-        """ Flush out pending text into the widget.
+        r""" Flush out pending text into the widget.
         NOTE: 2022-03-14 21:47:39 CMT
         Fixes crashes with long list display until the qtconsole 5.3.0 comes to
         life
+        NOTE: 2024-11-07 08:04:14
+        This is hisoric, consider reverting to the qtconsole code (i.e., remove
+        this method override).
         """
         text = self._pending_insert_text
         self._pending_insert_text = []
@@ -361,7 +392,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
                                                  int(time.time()-t)*1000)) # see NOTE: 2022-03-14 21:47:39 CMT
 
     def clear_last_input(self):
-        """Clears the current block of input NOT executed.
+        r"""Clears the current block of input NOT executed.
         Removes the last input block which has not been sent for execution.
         Useful to remove any commands typed at the console, but not yet executed,
         when an independent execution request is made (e.g. during launch of a script
@@ -379,17 +410,13 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         cursor.endEditBlock()
         
     
-    @safeWrapper
+    @safewrapper
     @Slot()
     def slot_clearConsole(self):
         self.clear()
-        # cursor = self._control.textCursor()
-        # cursor.beginEditBlock()
-        # cursor.insertText('\n')
-        # cursor.endEditBlock()
         
         
-    @safeWrapper
+    @safewrapper
     @Slot()
     def slot_resetConsole(self):
         self.reset(clear=True)
@@ -430,12 +457,12 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
             # In PyQt6 (via qtpy) this throws 
             # argument 1 has unexpected type 'LayoutDirection'
             self._control.setLayoutDirection(value)
-            self.custom_page_control.setLayoutDirection(value) # doesn't work !?
+            # self.custom_page_control.setLayoutDirection(value) # doesn't work !?
         except:
             try:
                 val = QtCore.Qt.LayoutDirection(value.value)
                 self._control.setLayoutDirection(val)
-                self.custom_page_control.setLayoutDirection(val) # doesn't work !?
+                # self.custom_page_control.setLayoutDirection(val) # doesn't work !?
             except:
                 traceback.print_exc()
                 
@@ -443,8 +470,12 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         #     traceback.print_exc()
             
     def guiSetScrollBack(self):
-        value, ok = QtWidgets.QInputDialog.getInt(self, "Scrollback size (lines)", "Number of scrollback lines (-1 for unlimited)",
-                                             value = self.scrollBackSize, min = -1)
+        if os.environ["QT_API"] == "pyside6":
+            value, ok = QtWidgets.QInputDialog.getInt(self, "Scrollback size (lines)", "Number of scrollback lines (-1 for unlimited)",
+                                                value = self.scrollBackSize, minValue = -1)
+        else:
+            value, ok = QtWidgets.QInputDialog.getInt(self, "Scrollback size (lines)", "Number of scrollback lines (-1 for unlimited)",
+                                                value = self.scrollBackSize, min = -1)
         if ok:
             self.scrollBackSize = value
         
@@ -516,19 +547,23 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         self.font = font
         
     @property
-    def colors(self):
+    def consoleColors(self): # FIXME 2025-06-29 09:06:35 should return the pygment?
         return self._console_colors
     
     @markConfigurable("ConsoleColors", "qt")
-    @colors.setter
-    def colors(self, val:str):
+    @consoleColors.setter
+    def consoleColors(self, val:str):
         #print("colors.setter val %s" % val)
         style = self._console_pygment
         
         self.set_pygment(style, val)
         
+    @property
+    def pygment(self) -> str:
+        return self._console_pygment
+        
     # def _create_page_control(self): # doesn't work!
-    #     """Overrides the method in qtconsole.ConsoleWidget
+    #     r"""Overrides the method in qtconsole.ConsoleWidget
     # Keeps the scrollbar position consistent with the terminal console.
     # """
     #     control = super()._create_page_control()
@@ -537,27 +572,94 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     #     return control
         
     def _set_console_colors(self, colors):
-        """Used as a slot for colors menu actions
+        r"""Used as a slot for colors menu actions
         """
-        self.colors = colors
+        self.consoleColors = colors
+
+    # @Slot(str)
+    # def _slot_setConsoleColors(self, colors:str):
+    #     # NOTE: 2024-09-20 09:51:43 duplicates the above
+    #     self.consoleColors = colors
         
     def _set_sb_pos(self, val):# slot for menu action
-        """Used as slot for ScrollBarPosition menu actions
+        r"""Used as slot for ScrollBarPosition menu actions
         """
         # see sb_menu in _supplement_view_menu_
         self.scrollBarPosition = val
         
-    def _set_syntax_style(self, val): # slot for menu action
-        """Used as slot for Syntax style menu action
+    def _set_syntax_style(self, val, *args, **kwargs): # slot for menu action
+        r"""Used as slot for Syntax style menu action
         """
-        #print("_set_syntax_style", val)
+        # print(f"{self.__class__.__name__}._set_syntax_style({val})")
         self.syntaxStyle = val
+        
+    @Slot()
+    def _slot_set_syntax_style(self):
+        r"""Slot for PySide6"""
+        action = self.sender()
+        styleName = action.text()
+        print(f"{self.__class__.__name__}._slot_set_syntax_style: styleName {styleName}")
+        self._set_syntax_style(styleName)
+        
+#     def _svg_to_image(self, string, size=None):
+#         """ Convert a SVG document to a QImage.
+# 
+#         Parameters
+#         ----------
+#         string : basestring
+#             A Python string containing a SVG document.
+# 
+#         size : QSize, optional
+#             The size of the image that is produced. If not specified, the SVG
+#             document's default size is used.
+#         
+#         Raises
+#         ------
+#         ValueError
+#             If an invalid SVG string is provided.
+# 
+#         Returns
+#         -------
+#         A QImage of format QImage.Format_ARGB32.
+#         """
+#         # NOTE: 2026-01-16 22:37:39
+#         # taken from qtconsole.svg module
+#         if isinstance(string, str):
+#             string = bytes(string.encode('utf-8')) # this what I think is missing in the original
+#         # ba = 
+#         renderer = QtSvg.QSvgRenderer(QtCore.QByteArray(string))
+#         if not renderer.isValid():
+#             raise ValueError('Invalid SVG data.')
+# 
+#         if size is None:
+#             size = renderer.defaultSize()
+#         image = QtGui.QImage(size, QtGui.QImage.Format_ARGB32)
+#         image.fill(0)
+#         painter = QtGui.QPainter(image)
+#         renderer.render(painter)
+#         return image
+#     
+#         
+#     def _insert_svg(self, cursor, svg):
+#         """ Insert raw SVG data into the widget.
+#         """
+#         try:
+#             image = self._svg_to_image(svg)
+#         except ValueError:
+#             self._insert_plain_text(cursor, 'Received invalid SVG data.')
+#         else:
+#             format = self._add_image(image)
+#             self._name_to_svg_map[format.name()] = svg
+#             cursor.insertBlock()
+#             cursor.insertImage(format)
+#             cursor.insertBlock()
 
     @property
     def syntaxStyle(self):
-        """Name of the syntax highlight pygment (str)
+        r"""Name of the syntax highlight pygment (str)
         """
-        self._console_pygment = self.syntax_style
+        # update from syntax_style set up via jupyter/pygments mechanism?
+        # self._console_pygment = self.syntax_style
         return self._console_pygment
     
     @markConfigurable("SyntaxStyle", "qt")
@@ -568,21 +670,18 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         
     @property
     def isTopLevel(self):
-        """Overrides WorkspaceGuiMixin.isToplevel; always True for ScipyenConsole.
+        r"""Overrides WorkspaceGuiMixin.isToplevel; always True for ScipyenConsole.
         This is because console inherits from RichJupyterWidget where 'parent'
         is a traitlets.Instance property, and for ScipyenConsole is None.
         """
         return True
+    
 
     def _save_settings_(self):
         gname, pfx = saveWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
 
-    #def _load_settings_(self):
-        ## located in $HOME/.config/Scipyen/Scipyen.conf
-        #gname, pfx = loadWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
-
     def set_pygment(self, scheme:typing.Optional[str]="", colors:typing.Optional[str]=None):
-        """Sets up style sheet for console colors and syntax highlighting style.
+        r"""Sets up style sheet for console colors and syntax highlighting style.
         
         The console widget (a RichJupyterWidget) takes:
         a) a style specified in a style sheet - used for the general appearance of the console 
@@ -591,9 +690,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         
         
         This allows bypassing any style/colors specified in 
-        $HOME/.jupyter/jupyter_qtconsole_config.py
-        
-        and usually retrieved by the app's method config()
+        ~./jupyter/jupyter_qtconsole_config.py
         
         Parameter:
         -------------
@@ -615,22 +712,11 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
             'nocolor'
             
         """
-        # TODO/FIXME: 2023-06-04 10:23:24
-        # figure out how the ?/?? system works, and apply better terminal colors
-        #   for dark backgrounds, to it; in fact, apply the curren terminal colors
-        #   to the displayed help text as well 
-        #   also, figure out how to alter the placement
-        #   of the scrollbar when the console is showing the message from ?/??
-        #   system -> check out _create_page_control in qtconsole/console_widget.py
-        # might have to look at the page and console submodules in IPython/jupyter
-        # but requires deep digging into their code
-        import pkg_resources
-        #print("ConsoleWidget.set_pygment scheme:", scheme, "colors:", colors)
-        if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0):
-            self.set_default_style()
-            #self._control.style = self._initial_style
-            #self.style_sheet = self._initial_style_sheet
-            return
+        
+        # print(f"{self.__class__.__name__}.set_pygment(scheme: {scheme}, colors: {colors})")
+        
+        # import pkg_resources
+        import importlib
         
         # NOTE: 2020-12-23 11:15:50
         # code below is modified from qtconsoleapp module, plus my comments;
@@ -638,28 +724,33 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         # 1. light or lightbg (i.e. colors suitable for schemes with light background)
         # 2. dark or linux (i.e colors suitable for schemes with dark background)
         # 3. nocolor - for black and white scheme
-        if isinstance(colors, str) and len(colors.strip()): # force colors irrespective of scheme
-            colors=colors.lower()
-            if colors in ('lightbg', 'light'):
-                colors='lightbg'
-            elif colors in ('dark', 'linux'):
-                colors='linux'
-            else:
-                colors='nocolor'
-        
-        else: # (colors is "" or anything else)
-            # make an informed choice of colors, according to whether the scheme
-            # is bright (light) or dark
-            if scheme=='bw':
-                colors='nocolor'
-            elif styles.dark_style(scheme):
-                colors='linux'
-            else:
-                colors='lightbg'
-        #else:
-            #colors=None
-            
-        if scheme in available_pygments():
+        try:
+            if isinstance(colors, str) and len(colors.strip()): # force colors irrespective of scheme
+                colors=colors.lower()
+                if colors in ('lightbg', 'light'):
+                    colors='lightbg'
+                elif colors in ('dark', 'linux'):
+                    colors='linux'
+                else:
+                    colors='nocolor'
+
+            else: # (colors is "" or anything else)
+                # make an informed choice of colors, according to whether the scheme
+                # is bright (light) or dark
+                if scheme=='bw':
+                    colors='nocolor'
+                elif styles.dark_style(scheme): # BUG/FIXME: in a conda enviornment this coughs up
+                    colors='linux'
+                else:
+                    colors='lightbg'
+            #else:
+                #colors=None
+        except:
+            traceback.print_exc
+            colors="linux"
+
+        # if scheme in scipyen_console_styles.available_pygments():
+        if scheme in PYGMENT_STYLES:
             #print("found %s scheme" % scheme)
             # rules of thumb:
             #
@@ -674,31 +765,30 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
             #   scheme is a "dark" one or not.
             #
             try:
-                sheetfile = pkg_resources.resource_filename("jupyter_qtconsole_colorschemes", "%s.css" % scheme)
+                # sheetfile = pkg_resources.resource_filename("jupyter_qtconsole_colorschemes", "%s.css" % scheme)
+                sheetfile = importlib.resources.files("jupyter_qtconsole_colorschemes") / f"{scheme}.css"
                 
                 if os.path.isfile(sheetfile):
                     with open(sheetfile) as f:
                         sheet = f.read()
                         
                 else:
+                    #print("no style sheet found for %s" % scheme)
                     sheet = styles.sheet_from_template(scheme, colors)
                     
+                change_error_display_for_style(scheme)
+                    
+                self.style_sheet = sheet
+                self.syntax_style = scheme
                 # also need to call notifiers - this is the order in which they
                 # are called in qtconsoleapp module ('JupyterConsoleApp.init_colors')
                 # not sure whether it makes a difference but stick to it for now
-                self.syntax_style = scheme
-                self.style_sheet = sheet
                 self._syntax_style_changed()
                 self._style_sheet_changed()
                 
                 # remember these changes - to save them in _save_settings_()
                 self._console_pygment = scheme
                 self._console_colors = colors
-                
-                if self.kernel_client:
-                    self._execute("%colors linux", True)
-                    #self.reset(clear=True)
-                    #self.kernel_client.execute("colors %s"% colors, True)
                 
                 # NOTE: 2021-01-08 14:23:14
                 # These two will affect all Jupyter console apps in Scipyen that
@@ -707,11 +797,22 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
                 #JupyterWidget.style_sheet = sheet
                 #JupyterWidget.syntax_style = scheme
                 
+                # NOTE: 2025-03-20 00:08:35
+                # the combination of yellow backgrodun with white foregreound 
+                # that IPython.core.ultratb.VerboseTB creates is downright ugly
+                # 
+                if self.kernel_client:
+                    # self._execute(f"colors {colors}", True)
+                    self._execute(
+f"""
+get_ipython().InteractiveTB.tb_highlight = 'bg:ansired'
+""",
+            True)
             except:
                 traceback.print_exc()
-
+ 
 class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
-    """Inherits qtconsole.mainwindow.MainWindow with a few added perks.
+    r"""Inherits qtconsole.mainwindow.MainWindow with a few added perks.
     """
     # NOTE 2020-07-08 23:24:47
     # not all of these will be useful in the long term
@@ -728,8 +829,12 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
     
     # NOTE: 2021-08-29 19:09:24
     # all widget factories currently generate a RichJupyterWidget
-    def __init__(self, app, consoleapp, confirm_exit=True, new_frontend_factory=None, slave_frontend_factory=None, connection_frontend_factory=None, new_frontend_orphan_kernel_factory=None):
-        """
+    def __init__(self, app, consoleapp, confirm_exit=True, 
+                 new_frontend_factory=None, 
+                 slave_frontend_factory=None, 
+                 connection_frontend_factory=None, 
+                 new_frontend_orphan_kernel_factory=None):
+        r"""
     """
     # ExternalIPython.new_frontend_master → new_frontend_factory
     # ExternalIPython.new_frontend_slave → slave_frontend_factory
@@ -780,9 +885,6 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         # NOTE: Whis won;t have any effect here because during __init__ there's
         # no widget (RichJupyterWidget) yet
         
-        # NOTE: 2021-08-30 10:42:57
-        # Needed for window geometry & position
-        self._load_settings_()
         # NOTE: 2021-01-23 21:15:52 
         # this is the parent (running) Scipyen application, not
         # the ExternalIPython! - this is another 
@@ -841,8 +943,12 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         
         self._cached_connections_ = dict()
         
+        # NOTE: 2021-08-30 10:42:57
+        # Needed for window geometry & position, etc
+        self._load_settings_()
+        
     def _widget(self):
-        """Consistent retrieval of console widget - for look and feel settings
+        r"""Consistent retrieval of console widget - for look and feel settings
         """
         widget = self.active_frontend
         if widget is None:
@@ -856,13 +962,13 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         
         
     def _supplement_file_menu_(self):
-        """To be called separately after calling self.__init__(...).
+        r"""To be called separately after calling self.__init__(...).
         This is because _init__() does not initialize the menus: we don't get 
         a menu until after self.init_menu_bar()
         So it is up to the user of the ExternalConsoleWindow instance to take care
         of that - see ExternalIPython.init_qt_elements
         """
-        self.new_nrn_kernel_tab_act = QtWidgets.QAction("New Tab with New &Kernel + NEURON",
+        self.new_nrn_kernel_tab_act = QAction("New Tab with New &Kernel + NEURON",
             self,
             shortcut="Ctrl+K",
             triggered=self.create_neuron_tab
@@ -871,16 +977,16 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         self.insert_menu_action(self.file_menu, self.new_nrn_kernel_tab_act, self.slave_kernel_tab_act)
 
     def _supplement_kernel_menu_(self):
-        """To be called separately after calling self.__init__().
+        r"""To be called separately after calling self.__init__().
         This is because _init__() does not initialize the menus: we don't get 
         a menu until after self.init_menu_bar()
         So it is up to the user of the ExternalConsoleWindow instance to take care
         of that - see ExternalIPython.init_qt_elements()
         """
-        ctrl = "Meta" if sys.platform == 'darwin' else "Ctrl"
+        ctrl = "Meta" if sys.platform.startswith('darwin') else "Ctrl"
         kernel_menu_separators = [a for a in self.kernel_menu.actions() if a.isSeparator()]
         
-        self.initialize_neuron_act = QtWidgets.QAction("S&tart NEURON in current Kernel",
+        self.initialize_neuron_act = QAction("S&tart NEURON in current Kernel",
                                                        self,
                                                        shortcut=ctrl+"N",
                                                        triggered=self.start_neuron_in_current_tab
@@ -895,26 +1001,45 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             self.add_menu_action(self.kernel_menu, self.initialize_neuron_act)
             
     def _supplement_view_menu_(self):
-        ctrl = "Meta" if sys.platform == 'darwin' else "Ctrl"
+        ctrl = "Meta" if sys.platform.startswith('darwin') else "Ctrl"
+        
+        self.syntax_style_menu.clear()
+        
+        style_group = QActionGroup(self)
+        
+        if os.environ["QT_API"] == "pyside6":
+            actions = [QAction("{}".format(s), self, triggered = self._slot_set_syntax_style) for s in PYGMENT_STYLES]
+        else:
+            actions = [QAction("{}".format(s), self, triggered = partial(self._set_syntax_style, s)) for s in PYGMENT_STYLES]
+        
+        for action in actions:
+            action.setCheckable(True)
+            style_group.addAction(action)
+            self.syntax_style_menu.addAction(action)
+            if action.text() == self.active_frontend.syntaxStyle:
+                action.setChecked(True)
+                self.syntax_style_menu.setDefaultAction(action)
+       
         
         self.colors_menu = self.view_menu.addMenu("Console colors")
-        colors_group = QtWidgets.QActionGroup(self)
+        colors_group = QActionGroup(self)
         for c in self.active_frontend.available_colors:
-            action = QtWidgets.QAction("{}".format(c), self,
-                                       triggered = lambda v, val=c:
-                                           self.active_frontend._set_console_colors(colors=val))
+            if os.environ["QT_API"] == "pyside6":
+                action = QAction("{}".format(c), self, triggered = self._slot_set_syntax_style)
+            else:
+                action = QAction("{}".format(c), self, triggered = partial(self._set_syntax_style, c))
             action.setCheckable(True)
             colors_group.addAction(action)
             self.colors_menu.addAction(action)
-            if c == self.active_frontend.colors:
+            if c == self.active_frontend.syntaxStyle:
                 action.setChecked(True)
                 self.colors_menu.setDefaultAction(action)
                 
         scrollbar_pos = ("left", "right")
         self.sb_menu = self.view_menu.addMenu("Scrollbar position")
-        sb_group = QtWidgets.QActionGroup(self)
+        sb_group = QActionGroup(self)
         for s in self.active_frontend.scrollbar_positions.values():
-            action = QtWidgets.QAction("{}".format(s), self,
+            action = QAction("{}".format(s), self,
                                        triggered = lambda v, val = s:
                                            self.active_frontend._set_sb_pos(val=val))
             action.setCheckable(True)
@@ -925,17 +1050,17 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                 action.setChecked(True)
                 self.sb_menu.setDefaultAction(action)
             
-        self.choose_font_act = QtWidgets.QAction("Font", self, shortcut=ctrl+"F",
-                                                 triggered = self.choose_font)
-        
+        # self.choose_font_act = QAction("Font", self, shortcut=ctrl+"F",
+        #                                          triggered = self.chooseFont)
+        self.choose_font_act = QAction("Font", self, triggered = self.chooseFont)
+        self.choose_font_act.setIcon(QtGui.QIcon.fromTheme("font-face-symbolic"))
         self.add_menu_action(self.view_menu, self.choose_font_act)
         
-    def choose_font(self):
+    def chooseFont(self):
         currentFont = self.consoleFont
-        selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
-        if ok:
+        selectedFont = self.selectFont(currentFont)
+        if isinstance(selectedFont, QtGui.QFont):
             self.active_frontend.font = selectedFont
-            
         
     def _load_settings_(self):
         #print("ExternalConsoleWindow._load_settings_()")
@@ -956,18 +1081,18 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                 
     @property
     def isTopLevel(self):
-        """Overrides WorkspaceGuiMixin.isToplevel; always True for ScipyenConsole.
+        r"""Overrides WorkspaceGuiMixin.isToplevel; always True for ScipyenConsole.
         This is because console inherits from RichJupyterWidget where 'parent'
         is a traitlets.Instance property, and for ScipyenConsole is None.
         """
         return True
 
-    @safeWrapper
+    @safewrapper
     def _save_settings_(self):
         #print("ExternalConsoleWindow._save_settings_")
         saveWindowSettings(self.qsettings, self)#, group_name=self.__class__.__name__)
             
-    @safeWrapper
+    @safewrapper
     def _save_tab_settings_(self, widget):
         return
         ndx = self.tab_widget.indexOf(widget)
@@ -986,8 +1111,8 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         #self.qsettings.endGroup()
         
     def create_tab_with_existing_kernel(self, code=None, **kwargs):
-        """create a new frontend attached to an external kernel in a new tab"""
-        if sys.platform == "win32":
+        r"""create a new frontend attached to an external kernel in a new tab"""
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -1022,20 +1147,27 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         widget=self.new_frontend_orphan_kernel_factory(km, kc)
         if widget:
             self.add_tab_with_frontend(widget)
+            if hasattr(widget, "_set_console_colors"):
+                widget._set_syntax_style(self._console_colors)
+            if hasattr(widget, "_set_syntax_style"):
+                widget._set_syntax_style(self._console_pygment)
             return True
-        
         return False
         
     def create_tab_with_current_kernel(self):
-        """create a new frontend attached to the same kernel as the current tab"""
+        r"""create a new frontend attached to the same kernel as the current tab"""
         current_widget = self.tab_widget.currentWidget()
         current_widget_index = self.tab_widget.indexOf(current_widget)
         current_widget_name = self.tab_widget.tabText(current_widget_index)
         widget = self.slave_frontend_factory(current_widget)
+        if hasattr(widget, "_set_console_colors"):
+            widget._set_syntax_style(self._console_colors)
+        if hasattr(widget, "_set_syntax_style"):
+            widget._set_syntax_style(self._console_pygment)
         self.add_tab_with_frontend(widget)
 
     def create_tab_with_new_frontend(self, code=None, **kwargs):
-        """create a new frontend and attach it to a new tab
+        r"""create a new frontend and attach it to a new tab
         calls ExternalIPython.new_frontend_master, with its own, newly-created
         kernel manager, kernel client and connection file
         """
@@ -1045,6 +1177,11 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             if widget.kernel_client and isinstance(code, str) and len(code.strip()):
                 widget.kernel_client.execute(code=code, **kwargs)
             
+            if hasattr(widget, "_set_console_colors"):
+                widget._set_syntax_style(self._console_colors)
+            if hasattr(widget, "_set_syntax_style"):
+                widget._set_syntax_style(self._console_pygment)
+                
             return True
         return False
             
@@ -1061,7 +1198,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                                                    store_history=False)
         
     def insert_menu_action(self, menu, action, before, defer_shortcut=False):
-        """Inserts action to menu before "before", as well adds it to self
+        r"""Inserts action to menu before "before", as well adds it to self
 
         So that when the menu bar is invisible, its actions are still available.
 
@@ -1077,7 +1214,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             
     def find_widget_with_kernel_manager(self, km, as_widget_list:bool=True, 
                                         alive_only:bool=False, master_only:bool = False):
-        """Find the frontends with the specified kernel manager.
+        r"""Find the frontends with the specified kernel manager.
         
         For a given kernel manager there is onyl one "master" frontend (the 
         frontends that launched the kernel) and zero or more "slaves"
@@ -1126,7 +1263,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             return [self.tab_widget.indexOf(w) for w in filtered_widget_list]
         
     def find_widget_with_kernel_client(self, kc, as_widget_list:bool=True, alive_only=False):
-        """Find the frontends with the specified kernel client.
+        r"""Find the frontends with the specified kernel client.
         
         For a given kernel manager there is only one "master" frontend (the 
         frontends that launched the kernel) and zero or more "slaves"
@@ -1240,7 +1377,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             return ret[0]
         
     def check_workspace(self, ns_name:str):
-        """Checks if the workspace name ns_name is registered
+        r"""Checks if the workspace name ns_name is registered
         
         Parameters:
         ns_name: str; 
@@ -1278,7 +1415,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         cdict = self.get_connection_dict_for_workspace(ns_name)
         return cdict and isinstance(cdict["master"], dict) # definitely a locally managed kernel
         
-    @safeWrapper
+    @safewrapper
     def get_frontend(self, ndx):
         #print("ExternalConsoleWindow.get_frontend ndx =", ndx)
         if isinstance(ndx, int): # index of tab
@@ -1344,9 +1481,9 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         else:
             raise TypeError("Expecting an int or a str; got %s instead" % type(ndx.__name__))
         
-    @safeWrapper
+    @safewrapper
     def prefix_tab_title(self, prefix, ndx):
-        """Prepends prefix to the tab title for tabs with indices in ndx.
+        r"""Prepends prefix to the tab title for tabs with indices in ndx.
         Parameters:
         ----------
         prefix: str - the prefix
@@ -1365,9 +1502,9 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             new_title= "%s%s" % (prefix, old_title)
             self.tab_widget.setTabText(ndx, new_title)
             
-    @safeWrapper
+    @safewrapper
     def unprefix_tab_title(self, prefix, ndx):
-        """Removes prefix from the tab title for tabs with indices in ndx.
+        r"""Removes prefix from the tab title for tabs with indices in ndx.
         Parameters:
         ----------
         prefix: str - the prefix
@@ -1389,10 +1526,38 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             return new_title
         
         return old_title
-            
+    
+    @property
+    def syntaxStyle(self):
+        return self._console_pygment
+    
+    @markConfigurable("SyntaxStyle", "qt")
+    @syntaxStyle.setter
+    def syntaxStyle(self, style:str):
+        self._console_pygment = style
+        if hasattr(self, "active_frontend") and isinstance(self.active_frontend, ConsoleWidget):
+            self.active_frontend._set_syntax_style(style)
+        # colors = self._console_colors
+        
+    def _set_syntax_style(self, style):
+        self.syntaxStyle = style
+
+    @property
+    def consoleColors(self):
+        return self._console_colors
+    
+    @markConfigurable("ConsoleColors", "qt")
+    @consoleColors.setter
+    def consoleColors(self, val:str):
+        self._console_colors = val
+        if hasattr(self, "active_frontend") and isinstance(self.active_frontend, ConsoleWidget):
+            self.active_frontend._set_console_colors(val)
+        
+    def _set_console_colors(self, val:str):
+        self.consoleColors = val
         
     def add_tab_with_frontend(self, frontend, name=None):
-        """ Insert a tab with a given frontend in the tab bar, and give it a name
+        r""" Insert a tab with a given frontend in the tab bar, and give it a name
 
         """
         # NOTE: frontend is the "widget" 
@@ -1475,8 +1640,12 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                         "manager_session_ID": manager_session_ID,
                         "tab_name": ""}
         
-        n_internal_kernels = len([d["master"] for d in self._connections_.values() if d["master"] is not None])
-        n_external_kernels = len([d["master"] for d in self._connections_.values() if d["master"] is None])
+        
+        existing_master_sessions = list(d["master"] for d in self._connections_.values() if d["master"] if not None)
+        existing_master_kernel_names = list(d["tab_name"] for d in existing_master_sessions)
+        existing_slave_sessions = list(d["master"] for d in self._connections_.values() if d["master"] is None)
+        n_masters = len(existing_master_sessions)
+        n_slaves = len([d["master"] for d in self._connections_.values() if d["master"] is None])
         
         if self.is_master_frontend(frontend):
             # NOTE: 2021-01-24 14:36:38
@@ -1487,7 +1656,12 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             if cfile not in self._connections_.keys():
                 # a "master" frontend is by defition connected to an internal
                 # kernel
-                kname = "kernel %d" % n_internal_kernels
+                if n_masters > 0:
+                    # normalized_names = [n.replace(" ", "_") for n in existing_master_kernel_names]
+                    # kname = counter_suffix("kernel", normalized_names).replace("_", " ")
+                    kname = counter_suffix("kernel", existing_master_kernel_names, sep=" ", start=0, returns_counter=False)# .replace("_", " ")
+                else:
+                    kname = "kernel 0"
                 
                 # NOTE: 2021-01-24 21:47:15
                 # distinguish between kernel name (but not the one in the connection file,
@@ -1547,7 +1721,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                 # process (e.g. jupyter notebook); therefore we set up its 
                 # dictionary, but there will be no master
                 external_slave = True
-                kname = "external %d" % n_external_kernels
+                kname = "external %d" % n_slaves
                 
                 if not isinstance(name, str) or len(name.strip()) == 0:
                     name = "%s (slave 0)" % kname
@@ -1616,7 +1790,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         #self._load_settings_()
 
     def closeEvent(self, event):
-        """ Forward the close event to every tabs contained by the windows
+        r""" Forward the close event to every tabs contained by the windows
         """
         self._save_settings_()
         if self.tab_widget.count() == 0:
@@ -1674,7 +1848,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
             event.accept()
             
     def close_tab(self, current_tab):
-        """ Called when you need to try to close a tab.
+        r""" Called when you need to try to close a tab.
 
         It takes the number of the tab to be closed as argument, or a reference
         to the widget inside this tab
@@ -1774,7 +1948,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                         # was not found (e.g. in the case of external kernels)
                         
                         master = self.find_master_tab(closing_widget)
-                        print("master", master)
+                        # print(f"{self.__class__.__name__}close_tab: master: {master}")
                         
                         self.find_master_tab(closing_widget).execute('exit') 
                         
@@ -1924,7 +2098,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                                 "master": self._connections_[cfile]["master"],
                                 "name": self._connections_[cfile]["name"]}
                 
-                #print("remove_connection session_dict =", session_dict)
+                # print(f"{self.__class__.__name__}.remove_connection: session_dict =", session_dict)
                 
                 if isinstance(self._connections_[cfile]["master"], dict) and self._connections_[cfile]["master"]["client_session_ID"] == sessionID:
                     # locally managed kernel
@@ -1935,7 +2109,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                     self.sig_kernel_disconnect.emit(session_dict)
                     
     def close_tab_original(self, current_tab):
-        """ Called when you need to try to close a tab.
+        r""" Called when you need to try to close a tab.
 
         It takes the number of the tab to be closed as argument, or a reference
         to the widget inside this tab
@@ -2060,27 +2234,27 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         self.update_tab_bar_visibility()
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_kernel_client_started_channels(self):
-        """Not in use
+        r"""Not in use
         """
         kc = self.sender()
         if kc.connection_file in self._connections_:
             self.sig_kernel_started_channels.emit(self._connections_[kc.connection_file])
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_kernel_client_stopped_channels(self):
-        """Not in use
+        r"""Not in use
         """
         kc = self.sender()
         if kc.connection_file in self._connections_:
             self.sig_kernel_stopped_channels.emit(self._connections_[kc.connection_file])
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_kernel_restarted(self):
-        """Re-sets the tag title after a kernel restart.
+        r"""Re-sets the tag title after a kernel restart.
         
         """
         # used specifically for NEURON tabs, where quitting NEURON GUI crashes the
@@ -2097,7 +2271,7 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
                     
                 self.sig_kernel_restart.emit(self._connections_[km.connection_file])
         
-    @safeWrapper
+    @safewrapper
     @Slot(object)
     def slot_kernel_shell_chnl_msg_recvd(self, msg):
         #print(msg)
@@ -2145,11 +2319,28 @@ class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):
         self.sig_shell_msg_received.emit(msg)
         
     @property
-    def connections(self):
+    def connections(self) -> dict:
+        r"""Dictionary of connections: connection_file_name ↦ connection_info
+        
+        A connection_info is a mapping:
+        'master' ↦ mapping:
+                    'client_session_ID' ↦ str
+                    'manager_session_ID' ↦ str
+                    'tab_name' ↦ str
+        'slave' ↦ list if mappings with same structure as 'master'
+        'name' ↦ str — typically the same as master's tab_name
+        
+        """
         return self._connections_
+    
+    @property
+    def tabNames(self):
+        r"""List of tab names for external independent processes
+        """
+        return list(v.get('master', dict()).get('tab_name', None) for v in self.connections.values())
         
 class ExternalIPython(JupyterApp, JupyterConsoleApp):
-    """Modifed version of qtconsole.qtconsoleapp.JupyterQtConsoleApp
+    r"""Modifed version of qtconsole.qtconsoleapp.JupyterQtConsoleApp
     """
     #  NOTE 2020-07-08 08:23:39
     #
@@ -2167,7 +2358,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
     #
     name = 'Scypien Console for External IPython'
     version = __version__
-    description = """
+    description = r"""
         The Jupyter QtConsole.
 
         This launches a Console-style application using Qt.  It is not a full
@@ -2218,7 +2409,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         self.build_kernel_argv(self.extra_args)
 
     def new_frontend_master_with_orphan_kernel(self, km, kc):
-        """When user closed a tab but chose to leave the kernel alone.
+        r"""When user closed a tab but chose to leave the kernel alone.
         
         The orphan kernel is still running and its client stil has got a
         reference somewhere - why not re-use them !?
@@ -2258,7 +2449,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         
 
     def new_frontend_master(self):
-        """ Create and return new frontend attached to new kernel, launched on localhost.
+        r""" Create and return new frontend attached to new kernel, launched on localhost.
         This is NOT called upon ExternalIPython.launch(). 
         
         Instead, ExternalIPython.launch() executes the following:
@@ -2317,7 +2508,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         return widget
 
     def new_frontend_connection(self, connection_file):
-        """Create and return a new frontend attached to an existing remote kernel.
+        r"""Create and return a new frontend attached to an existing remote kernel.
         A remote kernel is one created by a jupyter app in a separate process.
         
         'Remote' here means that the kernel was started by another jupyter app
@@ -2343,8 +2534,6 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         # Load defaults from $HOME/.jupyter/jupyter_qtconsole_config.py
         # then override with settings in $HOME/.config/Scipyen/Scipyen.conf
         self.init_colors(widget)
-        #self.init_layout(widget)
-        #widget._load_settings_()
         # ### END
         
         widget._existing = True
@@ -2358,7 +2547,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         return widget
 
     def new_frontend_slave(self, current_widget):
-        """Create and return a new frontend attached to an existing local kernel.
+        r"""Create and return a new frontend attached to an existing local kernel.
 
         Parameters
         ----------
@@ -2392,14 +2581,14 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         return widget
     
     #def init_layout(self, widget=None): # don't remove yet
-        #"""Apply scrollbar position saved in settings ('ExternalConsole/ScrollBarPosition')
+        #r"""Apply scrollbar position saved in settings ('ExternalConsole/ScrollBarPosition')
         #"""
         #if widget and getattr(widget, "_control", None):
             #widget._control.setLayoutDirection(self.window.scrollBarPosition)
             ##widget._control.setLayoutDirection(self.window.getScrollBarPosition())
     
     def init_qt_elements(self):
-        # Create the widget.
+        # Creates the widget and calls kernel initalization commands
         base_path = os.path.abspath(os.path.dirname(__file__))
         
         ip = self.ip
@@ -2412,6 +2601,8 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                                 connection_frontend_factory=self.new_frontend_connection,
                                 new_frontend_orphan_kernel_factory=self.new_frontend_master_with_orphan_kernel,
                                 )
+        # NOTE: 2024-09-22 09:54:24
+        # in Scipyen, widget_factory is Any(ConsoleWidget)
         self.widget = self.widget_factory(config=self.config,
                                         local_kernel=local_kernel)
         
@@ -2450,7 +2641,6 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         self.window._supplement_kernel_menu_()
         self.window._supplement_view_menu_()
         
-        
         # NOTE 2020-07-09 01:05:35
         # run general kernel intialization python commands here, as this function
         # does not call new_frontend_master(...)
@@ -2463,17 +2653,27 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         #print("ExternalIPython.init_qt_elements connection_file =", self.widget.kernel_client.connection_file)
 
         # Ignore on OSX, where there is always a menu bar
-        if sys.platform != 'darwin' and self.hide_menubar:
+        if not sys.platform.startswith('darwin') and self.hide_menubar:
             self.window.menuBar().setVisible(False)
 
         self.window.setWindowTitle('External Scipyen Console')
         
-        
     def _scipyen_init_exec_(self, client):
         client.execute(code="\n".join(init_commands), silent=True, store_history=False)
+        
+    def init_scipyen_gui(self,client=None):
+        if os.environ["QT_API"].lower() in ("pyqt6", "pyside6"):
+            qtgui = "qt6"
+        else:
+            qtgui = "qt5"
+            
+        code = f"if 'ipykernel' in shell.__class__.__module__: shell.run_line_magic('gui', '{qtgui}')"
+        if client is None:
+            client = self.active_kernel_client
+        client.execute(code=code, silent=True, store_history=False)
 
     def init_colors(self, widget):
-        """Configure the coloring of the widget"""
+        r"""Configure the coloring of the widget"""
         #Note: This will be dramatically simplified when colors
         # are removed from the backend.
 
@@ -2530,7 +2730,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
 
 
     def init_signal(self):
-        """allow clean shutdown on sigint"""
+        r"""allow clean shutdown on sigint"""
         signal.signal(signal.SIGINT, lambda sig, frame: self.exit(-2))
         # need a timer, so that QApplication doesn't block until a real
         # Qt event fires (can require mouse movement)
@@ -2543,7 +2743,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
         self._sigint_timer = timer
 
     def _deprecate_config(self, cfg, old_name, new_name):
-        """Warn about deprecated config."""
+        r"""Warn about deprecated config."""
         if old_name in cfg:
             self.log.warning(
                 "Use %s in config, not %s. Outdated config:\n    %s",
@@ -2559,7 +2759,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
             return cfg
 
     def _init_asyncio_patch(self):
-        """
+        r"""
         Same workaround fix as https://github.com/ipython/ipykernel/pull/456
 
         Set default asyncio policy to be compatible with tornado
@@ -2645,35 +2845,19 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
 
     @classmethod
     def launch(cls, argv=None, existing:typing.Optional[str]=None, **kwargs):
-        
-        # NOTE: 2023-07-15 21:33:52
-        # the launch_instance mechanism in jupyter and qtconsole does not return
-        # an instance of this python "app"
-        #scipyenvdir = os.getenv("CONDA_PREFIX")
-        #if scipyenvdir is not None:
-            #if argv is None:
-                #argv=["-Xfrozen_modules=off"]
-            #elif isinstance(argv, tuple):
-                #if len(argv) == 0:
-                    #argv=("-Xfrozen_modules=off", )
-                #else:
-                    #aa = list(argv)
-                    #aa.append(" -Xfrozen_modules=off")
-                    #argv = tuple(aa)
-
-            #elif isinstance(argv, list):
-                #if len(argv) == 0:
-                    #argv=["-Xfrozen_modules=off"]
-                #else:
-                    #argv.append(" -Xfrozen_modules=off")
-
-
-
-
+        r"""Launches an externa IPpython application"""
         # NOTE: 2021-08-29 21:49:44
         # Do NOT confuse this with Scipyen app (self.app)
         # In fact it is a reference to ExternalIPython, which is returned below
-        app = cls.instance(**kwargs) # 
+        withScipyenGui = kwargs.pop("withScipyenGui", False)
+        
+            
+        
+        app = cls.instance(**kwargs) # this is the ExternalIPython instance !
+                                     # WARNING: do not confuse with Scipyen's 
+                                     # global QtApplication
+                                     # NOTE: the latter is the atribute `app` of
+                                     # app (i.e., app.app)
         # TODO 2021-01-15 15:39:44
         # allow launching with an external kernel
         if isinstance(existing, str) and len(existing.strip()):
@@ -2681,14 +2865,23 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
             
         app.initialize(argv)
         app.start()
+        if isinstance(withScipyenGui, bool) and withScipyenGui:
+            if os.environ["QT_API"].lower() in ("pyqt6", "pyside6"):
+                qtgui = "qt6"
+            else:
+                qtgui = "qt5"
+                
+            app.widget.kernel_client.execute(code = f"if 'ipykernel' in shell.__class__.__module__: shell.run_line_magic('gui', '{qtgui}')", silent=True, store_history=False)
+                
+            
 
-        return app
+        return app # the ExternalIPython instance
     
     #### BEGIN some useful properties
     
     @property
     def active_kernel_manager(self):
-        """The kernel manager of the active frontend.
+        r"""The kernel manager of the active frontend.
         This may be different from self.kernel_manager which is only set once
         (and hence is the kernel manager of the first frontend of the console)
         """
@@ -2696,7 +2889,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
     
     @property
     def active_kernel_client(self):
-        """The kernel client of the active frontend.
+        r"""The kernel client of the active frontend.
         This may be different from self.kernel_client which is only set once
         (and hence is the kernel client of the first frontend of the console)
         """
@@ -2704,22 +2897,29 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
     
     @property
     def active_manager_session(self):
-        """The kernel manager session of the active frontend.
+        r"""The kernel manager session of the active frontend.
         This may be different from self.session which is only set once
         (and hence is the session of the first frontend of the console)
         """
         return self.window.active_frontend.kernel_manager.session if self.window.active_frontend else None
     
     @property
+    def active_frontend(self):
+        r"""Returns the active_frontend of the `window` attribute.
+        This may be None, is the kernel was `exit`-ed (and window was closed)
+        """
+        return self.window.active_frontend
+    
+    @property
     def active_client_session(self):
-        """Kernel client session of the active frontend.
+        r"""Kernel client session of the active frontend.
         The manager and client session are different objects.
         """
         return self.window.active_frontend.kernel_client.session if self.window.active_frontend else None
     
     @property
     def scrollBarPosition(self):
-        """Exposes the console window's scrollBarPosition for convenience
+        r"""Exposes the console window's scrollBarPosition for convenience
         """
         return self.window.scrollBarPosition
         #return self.window.getScrollBarPosition()
@@ -2731,9 +2931,11 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
     
     #### END some useful properties
     
-    @safeWrapper
-    def execute(self, *code:typing.Union[str, dict, tuple, list, ForeignCall], where : typing.Optional[typing.Union[int, str, RichJupyterWidget, QtKernelClient]]=None, redirect:typing.Optional[dict]=None, **kwargs):
-        """Execute code asynchronously, in a kernel.
+    @safewrapper
+    def execute(self, *code:typing.Union[str, dict, tuple, list, ForeignCall], 
+                where : typing.Optional[typing.Union[int, str, RichJupyterWidget, QtKernelClient]]=None, 
+                redirect:typing.Optional[dict]=None, **kwargs):
+        r"""Execute code asynchronously, in a kernel.
         By default, code is executed in the kernel behind the active frontend.
         
         Revamped version of the kernel client execute() where "code" can be 
@@ -2778,7 +2980,7 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
                 a ForeignCall object
                 
                 
-        Help on method execute in module jupyter_client.client:
+        Documentation of method 'execute' in module jupyter_client.client:
 
         execute(code, silent=False, store_history=True, user_expressions=None,
                 allow_stdin=None, stop_on_error=True) 
@@ -2993,98 +3195,23 @@ class ExternalIPython(JupyterApp, JupyterConsoleApp):
             return ret
                     
     def get_connection_file(self):
+        r"""Retrieve the connection file from the currently active external process"""
         fcall = ForeignCall(user_expressions={"connection_file":"get_connection_file()"})
         self.execute(fcall)
         
     def get_connection_info(self):
+        r"""Retrieve connection information from the currently active external process"""
         fcall = ForeignCall(user_expressions={"connection_info":"get_connection_info()"})
         self.execute(fcall)
         
-    #def frontend_execute(self, frontend, **kwargs) -> bool:
-        #"""Delegates to frontend.execute() method.
+    @property
+    def connections(self) -> dict:
+        r"""Dictionary of connections (as view from client - side)"""
+        return self.window.connections
         
-        #ATTENTION 
-        #DO NOT confuse frontend.execute() with frontend.kernel_client.execute().
-        #fronted.execute() is actually qtconsole.ConsoleWidget.execute()
-        #although they both end up doing the same thing?
-        
-        #Here we use the former, see RichJupyterWidget.execute(); to execute code
-        #by calling kernel_client.execute() and allow
-        
-        
-        #Parameters:
-        
-        #-----------
-        #frontend: RichJupyterWidget, int or str, or None.
-            #int = the index of the frontend's tab in the tab bar of the console
-                    #window
-                    
-            #str = the title of the frontend's tab, in the console window
-            
-            #RichJupyterWidget: the frontend itself (it may belong to another
-            #console)
-            
-            
-            #When None, this is set to the active frontend. Otherwise, code is 
-            #executed in the specified frontend, or in the frontend at the 
-            #specified index in the console's tab bar, or at the tab with the 
-            #specified title
-            
-        #**kwargs: additional keyword arguments passed directly to 
-            #frontend.execute, as follows:
-            
-            #source : str, optional
-
-                #The source to execute. If not specified, the input buffer will be
-                #used. If specified and 'hidden' is False, the input buffer will be
-                #replaced with the source before execution.
-
-            #hidden : bool, optional (default False)
-
-                #If set, no output will be shown and the prompt will not be modified.
-                #In other words, it will be completely invisible to the user that
-                #an execution has occurred.
-
-            #interactive : bool, optional (default False)
-
-                #Whether the console is to treat the source as having been manually
-                #entered by the user. The effect of this parameter depends on the
-                #subclass implementation.
-
-        #Raises
-        #------
-        #RuntimeError
-            #If incomplete input is given and 'hidden' is True. In this case,
-            #it is not possible to prompt for more input.
-            
-        #ValueError
-            #If the specified frontend index or name was not found
-            
-        #TypeError
-            #If the specified frontend is neither an int, str or RichJupyterWidget
-
-        #Returns
-        #-------
-        #A boolean indicating whether the source was executed.        
-        #"""
-        ## TODO factorize this with self.execute()
-        #if frontend is None:
-            #frontend = self.window.active_frontend
-            
-        #elif isinstance(frontend, (int, str)):
-            #frontend = self.window.get_frontend(frontend)
-            
-        #elif not isinstance(frontend, RichJupyterWidget):
-            #raise TypeError("frontend expected to be a RichJupyterWidget, int or str; got %s instead" % type(frontend).__name__)
-        
-        #if frontend is None:
-            #raise ValueError("Frontend %s not found" % frontend)
-        
-        #return frontend.execute(**kwargs)
-
 # NOTE: use Jupyter (IPython >= 4.x and qtconsole / qt5 by default)
 class ScipyenConsoleWidget(ConsoleWidget):
-    """Console widget with an in-process kernel manager.
+    r"""Console widget with an in-process kernel manager.
     Uses an in-process kernel generated and managed by QtInProcessKernelManager.
     """
     historyItemsDropped = Signal()
@@ -3097,32 +3224,48 @@ class ScipyenConsoleWidget(ConsoleWidget):
     def __init__(self, *args, **kwargs):
         ''' ScipyenConsole constructor
         
-        Using Qt5 gui by default
-        NOTE:
-        Since August 2016 -- using Jupyter/IPython 4.x and qtconsole
         
         Changelog (most recent first):
         -------------------------------
-        NOTE 2020-07-07 12:32:40
-        ALWAYS uses the in-proces Qt kernel manager
-        
+        NOTE 2025: using Qt6/PyQt6 by default
+    
         NOTE 2021-10-06 13:52:58
         Use a customized InProcessKernel, see
         ScipyenInProcessKernelManager and ScipyenInProcessKernel
         for details
         
+        NOTE 2020-07-07 12:32:40
+        ALWAYS uses the in-proces Qt kernel manager
+        
+        NOTE:
+        Since August 2016 -- using Jupyter/IPython 4.x and qtconsole
+        Using Qt5 gui by default
         '''
         self.mainWindow = kwargs.pop("mainWindow", None)
+        self.banner = kwargs.pop("banner", None)
         super().__init__(*args, **kwargs)
 
-        self.kernel_manager = ScipyenInProcessKernelManager() # what if gui is NOT Qt?
+        self.kernel_manager = ScipyenInProcessKernelManager() 
+        # self.kernel_manager = QtInProcessKernelManager()
         self.kernel_manager.start_kernel()
-        self.kernel_manager.kernel.eventloop = None
+        # if not (__has_PyQt6__ or __has_PySide6__):
+        #     self.kernel_manager.kernel.eventloop = None
         self.ipkernel = self.kernel_manager.kernel
-        self.ipkernel.gui = "qt"
+        
+        # NOTE: 2025-06-23 23:18:10
+        # see NOTE: 2025-06-23 23:16:11 below
+        # self.ipkernel.gui = "qt" 
         
         ## NOTE: 2016-03-20 14:37:37
         ## this must be set BEFORE start_channels is called
+        
+        # if isinstance(self.banner, str) and len(self.banner.strip()):
+        #     if ipythonHasTips:
+        #         tip = "Tip: {tip}\n".format(tip=pick_tip())
+        #         self.ipkernel.shell.banner2 = "\n".join([tip, self.banner])
+        #     else:
+        #         self.ipkernel.shell.banner2 = self.banner
+                
         ##self.ipkernel.shell.banner2 = "\n".join(ScipyenConsole.banner)
         #self.ipkernel.shell.banner2 = u'\n*** NOTE: ***\n\nUser variables created here in console be visible in the User variables tab of the PICT main window.\n' +\
         #u'\n\nThe Pict main window GUI object is accessible from the console as `mainWindow` or `mainWindow` (an alias of mainWindow)' +\
@@ -3138,7 +3281,19 @@ class ScipyenConsoleWidget(ConsoleWidget):
         # NOTE: 2019-08-07 16:34:58
         # enforce qt5 backend for matplotlib
         # see NOTE: 2019-08-07 16:34:23 
-        self.ipkernel.shell.run_line_magic("matplotlib", "qt5")
+        # if os.environ["QT_API"].lower() in ("pyqt6", "pyside6"):
+        # if __has_PyQt6__ or __has_PySide6__:
+        #     self.ipkernel.shell.run_line_magic("matplotlib", "qt6")
+        # else:
+        #     self.ipkernel.shell.run_line_magic("matplotlib", "qt5")
+        
+        # NOTE: 2025-06-23 23:16:11
+        if __has_PyQt6__ or __has_PySide6__:
+            self.ipkernel.shell.enable_gui("qt6")
+            self.ipkernel.shell.enable_matplotlib("qt6") # -> selects "qtagg" as backend
+        else:
+            self.ipkernel.shell.enable_gui("qt5")
+            self.ipkernel.shell.enable_matplotlib("qt5") # -> selects "qt5agg" as backend
         
         self.drop_cache=None
         
@@ -3147,7 +3302,8 @@ class ScipyenConsoleWidget(ConsoleWidget):
         # NOTE: 2021-07-18 10:17:26 - FIXME bug or feature?
         # the line below won't have effect unless the RichJupyterWidget is visible
         # e.g. after calling show()
-        #self.set_pygment(self._console_pygment) 
+        #self.set_pygment(self._console_pygment)
+        
         
     def _is_complete(self, source, interactive=True):
         # NOTE: 2021-09-21 16:41:04
@@ -3180,10 +3336,15 @@ class ScipyenConsoleWidget(ConsoleWidget):
         evt.acceptProposedAction();
         evt.accept()
         
-    @safeWrapper
+    @safewrapper
     def dropEvent(self, evt):
-        from textwrap import dedent
+        # from textwrap import dedent
         src = evt.source()
+        mimeData = evt.mimeData()
+        dropAction = evt.dropAction()
+        keyboardModifiers = QtWidgets.QApplication.keyboardModifiers()
+        
+        # print(f"{self.__class__.__name__}.dropEvent: evt: dropAction = {dropAction}, mimeData = {mimeData.text()}")
         
         # NOTE: 2019-08-10 00:23:42
         # for drop events issued by mainWindow's workspace viewer and command
@@ -3230,15 +3391,18 @@ class ScipyenConsoleWidget(ConsoleWidget):
                 # set mainWindow to load the URL asynchronously
                 # this also allows us to decide if we should also cd to the
                 # directory of the (local) URL, by pressing SHIFT while dropping
-                self.loadUrls.emit(urls, evt.keyboardModifiers() == QtCore.Qt.ShiftModifier, evt.pos())
+                # self.loadUrls.emit(urls, evt.keyboardModifiers() == QtCore.Qt.ShiftModifier, evt.pos())
+                self.loadUrls.emit(urls, keyboardModifiers & QtCore.Qt.ShiftModifier, evt.pos())
                 
             elif evt.mimeData().hasText() and len(evt.mimeData().text()):
                 # NOTE: 2019-08-10 00:33:00
                 # just write at the console whatever text has been dropped
                 if evt.proposedAction() in (QtCore.Qt.CopyAction, QtCore.Qt.MoveAction):
                     text = evt.mimeData().text()
-                    echoing = not bool(evt.keyboardModifiers() & QtCore.Qt.ShiftModifier)
-                    store = bool(evt.keyboardModifiers() & QtCore.Qt.ControlModifier)
+                    # echoing = not bool(evt.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+                    # store = bool(evt.keyboardModifiers() & QtCore.Qt.ControlModifier)
+                    echoing = not bool(keyboardModifiers & QtCore.Qt.ShiftModifier)
+                    store = bool(keyboardModifiers & QtCore.Qt.ControlModifier)
                     
                     # NOTE: 2019-08-13 11:08:14
                     # TODO: allow for running the code without writing it in console
@@ -3275,7 +3439,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
                 
         evt.accept()
         
-    @safeWrapper
+    @safewrapper
     def __write_text_in_console_buffer__(self, text):
         from textwrap import dedent
         # NOTE:2019-08-02 13:59:26
@@ -3285,9 +3449,9 @@ class ScipyenConsoleWidget(ConsoleWidget):
             cursor = self._control.textCursor()
             self._insert_plain_text_into_buffer(cursor, dedent(text))
             
-    @safeWrapper
+    @safewrapper
     def writeText(self, text:typing.Union[str, typing.List[str], typing.Tuple[tuple]]):
-        """Writes a text in console buffer
+        r"""Writes a text in console buffer
         """
         if isinstance(text, str):
             self.__write_text_in_console_buffer__(text)
@@ -3308,7 +3472,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
             preceding_text = cursor.selection().toPlainText()
 
             def remove_prompts(line):
-                """Remove all prompts from line."""
+                r"""Remove all prompts from line."""
                 line = self._highlighter.transform_classic_prompt(line)
                 return self._highlighter.transform_ipy_prompt(line)
 
@@ -3355,139 +3519,6 @@ class ScipyenConsoleWidget(ConsoleWidget):
                 
         return text
 
-    def set_pygment(self, scheme:typing.Optional[str]="", colors:typing.Optional[str]=None):
-        """Sets up style sheet for console colors and syntax highlighting style.
-        
-        The console widget (a RichJupyterWidget) takes:
-        a) a style specified in a style sheet - used for the general appearance of the console 
-        (background and ormopt colors, etc)
-        b) a color syntax highlight scheme - used for syntax highlighting
-        
-        
-        This allows bypassing any style/colors specified in 
-        ~./jupyter/jupyter_qtconsole_config.py
-        
-        Parameter:
-        -------------
-        
-        scheme: str (optional, default is the empty string) - name of available 
-                syntax style (pygment).
-                
-                For a list of available pygment names, see
-                
-                available_pygments() in this module
-                
-                When empty or None, reverts to the defaults as set by the jupyter 
-                configuration file.
-                
-        colors: str (optional, default is None) console color set. 
-            There are, by defult, three color sets:
-            'light' or 'lightbg', 
-            'dark' or 'linux',
-            'nocolor'
-            
-        """
-        import pkg_resources
-        #print("console.set_pygment scheme:", scheme, "colors:", colors)
-        if scheme is None or (isinstance(scheme, str) and len(scheme.strip()) == 0):
-            self.set_default_style()
-            #self._control.style = self._initial_style
-            #self.style_sheet = self._initial_style_sheet
-            return
-        
-        # NOTE: 2020-12-23 11:15:50
-        # code below is modified from qtconsoleapp module, plus my comments;
-        # find the value for colors: there are three color sets for prompts:
-        # 1. light or lightbg (i.e. colors suitable for schemes with light background)
-        # 2. dark or linux (i.e colors suitable for schemes with dark background)
-        # 3. nocolor - for black and white scheme
-        if isinstance(colors, str) and len(colors.strip()): # force colors irrespective of scheme
-            colors=colors.lower()
-            if colors in ('lightbg', 'light'):
-                colors='lightbg'
-            elif colors in ('dark', 'linux'):
-                colors='linux'
-            else:
-                colors='nocolor'
-        
-        else: # (colors is "" or anything else)
-            # make an informed choice of colors, according to whether the scheme
-            # is bright (light) or dark
-            if scheme=='bw':
-                colors='nocolor'
-            elif styles.dark_style(scheme):
-                colors='linux'
-            else:
-                colors='lightbg'
-        #else:
-            #colors=None
-            
-        if scheme in available_pygments():
-            #print("found %s scheme" % scheme)
-            # rules of thumb:
-            #
-            # 1. the syntax highlighting scheme is set by setting the console 
-            # (RichJupyterWidget) 'syntax_style' attribute to scheme. 
-            #
-            # 2. the style sheet gives the widget colors ("style") - so we always 
-            #   need a style sheet, and we "pygment" the console by setting its
-            #   'style_sheet' attribute. NOTE that schemes do not always provide
-            #   prompt styling colors, therefore we need to set up a style sheet 
-            #   dynamically based on the colors guessed according to whether the
-            #   scheme is a "dark" one or not.
-            #
-            try:
-                sheetfile = pkg_resources.resource_filename("jupyter_qtconsole_colorschemes", "%s.css" % scheme)
-                
-                if os.path.isfile(sheetfile):
-                    with open(sheetfile) as f:
-                        sheet = f.read()
-                        
-                else:
-                    #print("no style sheet found for %s" % scheme)
-                    sheet = styles.sheet_from_template(scheme, colors)
-                    #if colors:
-                        #sheet = styles.sheet_from_template(scheme, colors)
-                    #else:
-                        #sheet = styles.sheet_from_template(scheme)
-                    
-                self.style_sheet = sheet
-                self.syntax_style = scheme
-                # also need to call notifiers - this is the order in which they
-                # are called in qtconsoleapp module ('JupyterConsoleApp.init_colors')
-                # not sure whether it makes a difference but stick to it for now
-                self._syntax_style_changed()
-                self._style_sheet_changed()
-                
-                # remember these changes - to save them in _save_settings_()
-                self._console_pygment = scheme
-                self._console_colors = colors
-                #self._custom_style_sheet = sheet
-                #self._custom_syntax_scheme = scheme
-                
-                # NOTE: 2021-01-08 14:23:14
-                # These two will affect all Jupyter console apps in Scipyen that
-                # will be launched AFTER the internal console has been initiated. 
-                # These include the ExternalIPython.
-                #JupyterWidget.style_sheet = sheet
-                #JupyterWidget.syntax_style = scheme
-                
-            except:
-                traceback.print_exc()
-                #pass
-            
-            # not needed (for now)
-            #style = pstyles.get_style_by_name(scheme)
-            #try:
-                ##self.syntax_style=scheme
-                #self._control.style = style
-                #self._highlighter.set_style (scheme)
-                #self._custom_syntax_style = style
-                #self._syntax_style_changed()
-            #except:
-                #traceback.print_exc()
-                #pass
-            
 class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     # NOTE: 2023-09-27 12:55:24 TODO
     # to implements julia-style propgress indicators;
@@ -3500,11 +3531,13 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     executed = Signal()
     
     def __init__(self, parent=None, **kwargs):
+        banner = kwargs.pop("banner", None)
         scipyenWindow = kwargs.pop("scipyenWindow", None) # take this out for below...
         super().__init__(parent=parent, **kwargs) # initializes QtWidgets.QMainWindow
         kwargs["scipyenWindow"] = scipyenWindow # ... then place back in kwargs for WorkspaceGuiMixin
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs) # initializes WorkspaceGuiMixin
-        self.consoleWidget = ScipyenConsoleWidget(mainWindow=self._scipyenWindow_) # from WorkspaceGuiMixin
+        self.consoleWidget = ScipyenConsoleWidget(mainWindow=self._scipyenWindow_, 
+                                                  banner=banner) # from WorkspaceGuiMixin
         # self.consoleWidget = ScipyenConsoleWidget(mainWindow=parent)
         self.consoleWidget.setAcceptDrops(True)
         self.setCentralWidget(self.consoleWidget)
@@ -3524,7 +3557,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.loadSettings()
         
     def _configureUI_(self):
-        ctrl = "Meta" if sys.platform == 'darwin' else "Ctrl"
+        ctrl = "Meta" if sys.platform.startswith('darwin') else "Ctrl"
         menuBar = self.menuBar()
         self.file_menu = menuBar.addMenu("File")
         
@@ -3554,48 +3587,48 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.saveRawSelectionToFile.triggered.connect(self._slot_saveRawSelectionToFile)
         
         self.settings_menu = menuBar.addMenu("Settings")
-        
+        # self.settings_menu = menuBar.addMenu(QtGui.QIcon.fromTheme("settings-configure"), "Settings")
+
         self.listMagicsAction = self.file_menu.addAction(QtGui.QIcon.fromTheme("view-list-text"),"List magics")
 
         self.listMagicsAction.triggered.connect(self._slot_listMagics)
         
-        available_syntax_styles = get_available_syntax_styles() # defined in this module
+        available_syntax_styles = scipyen_console_styles.get_available_syntax_styles() # defined in this module
         
-        if len(available_syntax_styles):
+        # if len(available_syntax_styles):
+        if len(PYGMENT_STYLES):
             self.syntax_style_menu = self.settings_menu.addMenu("Syntax Style")
             
-            style_group = QtWidgets.QActionGroup(self)
-            for style in available_syntax_styles:
-                action = QtWidgets.QAction("{}".format(style), self,
-                                       triggered=lambda v,
-                                       syntax_style=style:
-                                           self.active_frontend._set_syntax_style(val=syntax_style))
-        
+            style_group = QActionGroup(self)
+            
+            actions = [QAction("{}".format(s), self, triggered = partial(self.active_frontend._set_syntax_style, s)) for s in PYGMENT_STYLES]
+            
+            for action in actions:
                 action.setCheckable(True)
                 style_group.addAction(action)
                 self.syntax_style_menu.addAction(action)
-                if style == self.active_frontend.syntaxStyle:
+                if action.text() == self.active_frontend.syntaxStyle:
                     action.setChecked(True)
                     self.syntax_style_menu.setDefaultAction(action)
 
         self.colors_menu = self.settings_menu.addMenu("Console Colors")
-        colors_group = QtWidgets.QActionGroup(self)
+        colors_group = QActionGroup(self)
         for c in self.active_frontend.available_colors:
-            action = QtWidgets.QAction("{}".format(c), self,
-                                       triggered = lambda v, val=c:
-                                           self.active_frontend._set_console_colors(colors=val))
+            action = QAction("{}".format(c), self,
+                                       triggered = lambda:
+                                           self.active_frontend._set_console_colors(c))
             action.setCheckable(True)
             colors_group.addAction(action)
             self.colors_menu.addAction(action)
-            if c == self.active_frontend.colors:
+            if c == self.active_frontend.consoleColors:
                 action.setChecked(True)
                 self.colors_menu.setDefaultAction(action)
         
         scrollbar_pos = ("left", "right")
         self.sb_menu = self.settings_menu.addMenu("Scrollbar Position")
-        sb_group = QtWidgets.QActionGroup(self)
+        sb_group = QActionGroup(self)
         for s in self.active_frontend.scrollbar_positions.values():
-            action = QtWidgets.QAction("{}".format(s), self,
+            action = QAction("{}".format(s), self,
                                        triggered = lambda v, val = s:
                                            self.active_frontend._set_sb_pos(val=val))
             action.setCheckable(True)
@@ -3606,23 +3639,43 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                 action.setChecked(True)
                 self.sb_menu.setDefaultAction(action)
 
-        self.choose_font_act = QtWidgets.QAction("Console Font", self, shortcut=ctrl+"F",
-                                                 triggered = self.choose_font)
+        self.choose_font_act = QAction("Console Font", self, triggered = self.chooseFont)
+        self.choose_font_act.setIcon(QtGui.QIcon.fromTheme("font-face-symbolic"))
         
         self.settings_menu.addAction(self.choose_font_act)
         self.addAction(self.choose_font_act)
         
-        self.set_console_scrollbackAction = QtWidgets.QAction("Console scroll back",
-                                                              self, shortcut=ctrl+"L",
-                                                              triggered = self.set_scrollBack)
+        self.set_console_scrollbackAction = QAction("Console scroll back",
+                                                              self, triggered = self.set_scrollBack)
         
         self.settings_menu.addAction(self.set_console_scrollbackAction)
         self.addAction(self.set_console_scrollbackAction)
         
+        self.set_useAutomagicAction = QAction("Use Automagic", self)
+        self.set_useAutomagicAction.setCheckable(True)
+        self.set_useAutomagicAction.toggled.connect(self._slot_useAutomagic)
+        self.settings_menu.addAction(self.set_useAutomagicAction)
+        self.addAction(self.set_useAutomagicAction)
+        
+        self.set_useInlineMatplotlibAction = QAction("Use Inline Matplotlib Figures")
+        self.set_useInlineMatplotlibAction.setCheckable(True)
+        self.set_useInlineMatplotlibAction.setChecked(mpl.get_backend() == "inline")
+        self.set_useInlineMatplotlibAction.toggled.connect(self._slot_useInlineMatplotlib)
+        self.settings_menu.addAction(self.set_useInlineMatplotlibAction)
+        self.addAction(self.set_useInlineMatplotlibAction)
+        
+    
+    @Slot(bool)
+    def _slot_useInlineMatplotlib(self, val:bool):
+        self.mpl_inline = val
+    
+    @Slot(bool)
+    def _slot_useAutomagic(self, val:bool):
+        self.shellAutomagic = val==True
+        
     @Slot()
     def _slot_listMagics(self):
         self.ipkernel.shell.run_cell("%lsmagic")
-            
             
     @Slot()
     def _slot_saveToFile(self):
@@ -3656,15 +3709,53 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     
     def _saveToFile(self, text, mode="python"):
         from iolib import pictio as pio
+        
+        if self.consoleWidget.banner in text:
+            text = text.replace(self.consoleWidget.banner, "")
+            
+        # NOTE: 2025-12-15 23:06:53
+        # last line in ipkernel banner is dynamically generated every time the 
+        # 'banner' property of the ipkernel is accessed (is a dynamic property);
+        # while that's great, it has the incovenience of thwarting any simple 
+        # attempts to remove it from the console text
+        #
+        # therefore, I first remove the "static" part of the ipkernel banner
+        # ('tipless') - thankfully, this dynamic tip is just one line (so far...)
+        ipkbanner = self.consoleWidget.ipkernel.banner.split("\n")
+        nlines = len(ipkbanner)-1
+
+        tipless = "\n".join(ipkbanner[:-2])
+        
+        # print(f"tipless = {tipless}")
+        
+        if tipless in text:
+            # NOTE: 2025-12-15 23:31:15
+            # fish out the ipkernel banner's tip line (the one present in the console)'
+            # but only is the resty of ipkernel banner is present, otherwise this 
+            # WILL eat out other matching lines
+            m = re.search("(?m)Tip:.*$", text)
+            if isinstance(m, re.Match):
+                # tip line found, remove it
+                tiptext = m.group(0)
+                text = text.replace(tiptext, "")
+            # now remove the rest of the ipkernel banner 😄
+            text = text.replace(tipless, "")
+            
+        # BUG/FIXME: 2025-12-15 23:38:41 one last hitch above:
+        # there are too many empty lines left there TODO
+            
         if not isinstance(mode, str) or len(mode.strip()) == 0:
             mode = "python"
             
         if mode.lower() == "raw":
             fileflt = ";;".join(["Text files (*.txt)", "All Files (*.*)"])
+            
         elif mode.lower() == "html/xml":
             fileflt = ";;".join(["HTML file (*.htm*)", "XML file (*.xml)", "All Files (*.*)"])
+            
         else:
             fileflt = ";;".join(["Python source file (*.py)", "All Files (*.*)"])
+            
         if len(text.strip()):
             filename, filefilter = self.chooseFile("Save buffer to file",
                                                    fileFilter = fileflt,
@@ -3686,10 +3777,10 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         if self.active_frontend and hasattr(self.active_frontend, "guiSetScrollBack"):
             self.active_frontend.guiSetScrollBack()
         
-    def choose_font(self):
+    def chooseFont(self):
         currentFont = self.consoleFont
-        selectedFont, ok = QtWidgets.QFontDialog.getFont(currentFont, self)
-        if ok:
+        selectedFont = self.selectFont(currentFont)
+        if isinstance(selectedFont, QtGui.QFont):
             self.active_frontend.font = selectedFont
         
     def closeEvent(self,evt):
@@ -3699,7 +3790,11 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def paste(self, *args, **kwargs):
         self.consoleWidget.paste(*args, **kwargs)
         
+    @with_doc(ConsoleWidget.execute, use_header=True)
     def execute(self, *args, **kwargs):
+        r"""Executes a statement (str).
+    Delegates to self.consoleWidget.execute(…)
+    """
         self.consoleWidget.execute(*args, **kwargs)
         
     def writeText(self, text):
@@ -3707,17 +3802,45 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         
     @property
     def ipkernel(self):
-        """The IPython kernel runnin in this console"""
+        r"""The IPython kernel running in this console"""
         return self.consoleWidget.ipkernel
+    
+    @property
+    def mpl_inline(self) -> bool:
+        return mpl.get_backend() == "inline"
+    
+    @markConfigurable("UseInlineMatplotlib")
+    @mpl_inline.setter
+    def mpl_inline(self, val:bool):
+        sigBlock = QtCore.QSignalBlocker(self.set_useInlineMatplotlibAction)
+        if val == True:
+            mpl.use("inline")
+        else:
+            mpl.use("qtagg")
+            
+        self.set_useInlineMatplotlibAction.setChecked(mpl.get_backend() == "inline")
         
     @property
     def stdout(self):
-        """The standard output stream of the kernel running in this console"""
+        r"""The standard output stream of the kernel running in this console"""
         return self.ipkernel.stdout
     
     @property
+    def shellAutomagic(self) -> bool:
+        return self.shell.magics_manager.auto_magic
+    
+    @shellAutomagic.setter
+    def shellAutomagic(self, val:bool):
+        self.shell.magics_manager.auto_magic = val == True
+        signalBlockers = [QtCore.QSignalBlocker(self.set_useAutomagicAction)]
+        self.set_useAutomagicAction.setChecked(self.shell.magics_manager.auto_magic)
+        if self.scipyenWindow:
+            if self.scipyenWindow.shellAutomagic != self.shell.magics_manager.auto_magic:
+                self.scipyenWindow.shellAutomagic = self.shell.magics_manager.auto_magic
+    
+    @property
     def shell(self):
-        """The interactive shell running in this console"""
+        r"""The interactive shell running in this console"""
         return self.ipkernel.shell
 
     @property

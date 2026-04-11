@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>PythonHelpWidget</class>
+ <widget class="QWidget" name="PythonHelpWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>378</width>
+    <height>300</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Python help</string>
+  </property>
+  <property name="windowIcon">
+   <iconset theme="help-browser"/>
+  </property>
+  <property name="toolTip">
+   <string>Help viewer</string>
+  </property>
+  <property name="statusTip">
+   <string>Help viewer</string>
+  </property>
+  <property name="whatsThis">
+   <string>Help viewer</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <widget class="QComboBox" name="queryComboBox">
+       <property name="toolTip">
+        <string>Help query</string>
+       </property>
+       <property name="editable">
+        <bool>true</bool>
+       </property>
+       <property name="insertPolicy">
+        <enum>QComboBox::InsertPolicy::InsertAtTop</enum>
+       </property>
+       <property name="placeholderText">
+        <string>Type a query</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="prevToolButton">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="toolTip">
+        <string>Previous page</string>
+       </property>
+       <property name="text">
+        <string>Previous</string>
+       </property>
+       <property name="icon">
+        <iconset theme="go-previous"/>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="nextToolButton">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="toolTip">
+        <string>Forward page</string>
+       </property>
+       <property name="text">
+        <string>Forward</string>
+       </property>
+       <property name="icon">
+        <iconset theme="go-next"/>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item row="1" column="0">
+    <widget class="QTextBrowser" name="helpDisplay">
+     <property name="acceptDrops">
+      <bool>false</bool>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+     <property name="placeholderText">
+      <string>Enter a help topic in the field above (e.g., &quot;topics&quot;, &quot;pywt.Wavelet&quot;, etc)</string>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

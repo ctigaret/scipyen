@@ -5,7 +5,7 @@
 
 from abc import ABC
 class ElectrophysiologyProtocol(ABC):
-    """Abstract base class for electrophysiology data acquisition protocols
+    r"""Abstract base class for electrophysiology data acquisition protocols
     
     """
     def __init__(self, **kwargs):

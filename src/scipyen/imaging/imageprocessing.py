@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 Module for image processing routines
 """
 
@@ -46,7 +46,7 @@ from core.datasignal import DataSignal
 
 def getProfile(img, coordinates:typing.Optional[typing.Union[pgui.PlanarGraphics, typing.Sequence[typing.Sequence]]]=None, 
                order:int=1) -> DataSignal:
-    """Retrieves interpolated pixel values at a collection of (X,Y coordinates.
+    r"""Retrieves interpolated pixel values at a collection of (X,Y coordinates.
 
     The (X,Y) coordinates (in the image dimension space) are floating point values, 
     and do not necesarily fall on a pixel coordinates pairs. For this reason, 
@@ -198,7 +198,7 @@ def pureDenoise(image, levels=0, threshold=0, alpha=1, beta=0, sigma2=0):
     return dest
 
 def binomialFilter1D(image, radius):
-    """Image convolution with a 1D binomial kernel or norm 1.0.
+    r"""Image convolution with a 1D binomial kernel or norm 1.0.
     
     Kernel window size is 2*radius +1
     
@@ -228,7 +228,7 @@ def binomialFilter1D(image, radius):
     return dest
     
 def gaussianFilter1D(image, sigma, window=0.0):
-    """Image convolution with a 1D Gaussian kernel of norm 1.0.
+    r"""Image convolution with a 1D Gaussian kernel of norm 1.0.
     
     NOTE: when window is 0.0, the filter has a radius of 3 * sigma; otherwise, 
     its radius is window * sigma
@@ -256,7 +256,7 @@ def gaussianFilter1D(image, sigma, window=0.0):
     return dest
     
 def imageSimilarity(img0, img1, **kwargs):
-    """Delegates to imreg_dft.similarity on two vigra.VigraArray objects.
+    r"""Delegates to imreg_dft.similarity on two vigra.VigraArray objects.
     
     From imreg_dft.similarity documentation:
     ========================================
@@ -366,7 +366,7 @@ def imageSimilarity(img0, img1, **kwargs):
 # TODO: 2021-11-28 13:10:48 move to vigrautils
 
 def sliceFilter():
-    """ TODO 2019-11-14 09:49:22 place CaTanalysis filtering code here
+    r""" TODO 2019-11-14 09:49:22 place CaTanalysis filtering code here
     aims:
     1) make this more generic i.e. 
         1.1) allow the user to select the "slicing" axis along which

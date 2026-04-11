@@ -31,19 +31,29 @@ function show_help ()
     echo -e "\tthis will include installing an activation script for the environmment \n"
 }
 
-if [ -z ${VIRTUAL_ENV} ]; then
-
+if [  -z ${VIRTUAL_ENV} ] | [ -z ${CONDA_PREFX}  ]; then
     if [ -a $HOME/.scipyenrc ] ; then
         source $HOME/.scipyenrc && scipyact
     else
-    echo "Cannot activate a python virtual environment for Scipyen"
-    exit 1
+        echo "Cannot activate an environment for Scipyen"
+        exit 1
     fi
 fi
 
 destination=${HOME}/scipyen_app 
 
 debug=0
+if [ ! -r ${VIRTUAL_ENV}/.python_qt ]; then
+qtapi="PyQt5"
+else
+qtapi=`cat ${VIRTUAL_ENV}/.python_qt`
+fi
+
+echo -e "Seeting up the build for QT API: "${qtapi}
+
+export QT_API=${qtapi,,}
+export PYQTGRAPH_QT_LIB=${qtapi}
+export FORCE_QT_API="1"
 
 for i in "$@" ; do
 #     echo $i
@@ -76,10 +86,13 @@ if [ -d ${destination} ] ; then
     mkdir -p $destination
 fi
 
+realscript=`realpath $0`
+scipyendir=`dirname "$realscript"`
 workdir=${destination}/build
 distdir=${destination}/dist
+splashimgfile=${scipyendir}/payload/splash.png
 
-echo $0: $"debug: "$debug
+# echo $0: $"debug: "$debug
 
 export PYTHONHASHSEED=1
 
@@ -96,25 +109,19 @@ exit 1
 fi
 
 # echo -e "Creating a desktop file for Scipyen_app\n"
-# 
-# # tmpfiledir=$(mktemp -d)
-# # tmpfile=${tmpfiledir}/cezartigaret-Scipyen.desktop
-# # tmpfile=${tmpfiledir}/Scipyen_app.desktop
-# desktopfile=${workdir}/Scipyen_app.desktop
-# 
-# # cat<<END > ${tmpfile}
+# desktopfile=${distdir}/org.Scipyen.desktop
 # cat<<END > ${desktopfile}
 # [Desktop Entry]
 # Type=Application
-# Name[en_GB]=Scipyen app
-# Name=Scipyen app
+# Name[en_GB]=Scipyen
+# Name=Scipyen
 # Comment[en_GB]=Scientific Python Environment for Neurophysiology - PyInstaller frozen application
 # Comment=Scientific Python Environment for Neurophysiology - PyInstaller frozen application
-# GenericName[en_GB]=Scipyen application 
-# GenericName=Scipyen application 
+# GenericName[en_GB]=Scipyen
+# GenericName=Scipyen
 # Icon=pythonbackend
 # Categories=Science;Utilities;
-# Exec=${distdir}/Scipyen_app
+# Exec=scipyen.app
 # MimeType=
 # Path=
 # StartupNotify=true
@@ -125,4 +132,4 @@ fi
 # X-KDE-SubstituteUID=false
 # X-KDE-Username=
 # END
-# 
+

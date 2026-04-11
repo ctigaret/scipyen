@@ -20,11 +20,11 @@ import pandas as pd
 
 
 from core import (prog, traitcontainers, strutils, neoutils, models,)
-from core.prog import (safeWrapper, AttributeAdapter, NoData, BaseDescriptorValidator)
+from core.prog import (safewrapper, AttributeAdapter, NoData, BaseDescriptorValidator, print_styled)
 from core.basescipyen import BaseScipyenData
 from core.traitcontainers import DataBag
-from core import quantities as cq
-from core.quantities import(arbitrary_unit, 
+from core import scipyen_quantities as cq
+from core.scipyen_quantities import(arbitrary_unit, 
                             pixel_unit, 
                             channel_unit,
                             space_frequency_unit,
@@ -32,10 +32,11 @@ from core.quantities import(arbitrary_unit,
                             day_in_vitro,
                             week_in_vitro, postnatal_day, postnatal_month,
                             embryonic_day, embryonic_week, embryonic_month,
-                            unit_quantity_from_name_or_symbol,
-                            check_time_units)
+                            unitQuantityFromNameOrSymbol,
+                            checkTimeUnits)
 
 from core.utilities import (get_index_for_seq, sp_set_loc )
+from core.strutils import counter_suffix
 
 from core.datatypes import (UnitTypes, GENOTYPES, )
 
@@ -92,11 +93,11 @@ class ScanDataAnalysisMode(enum.IntEnum):
     volume      = 2
         
 class ScanData(BaseScipyenData):
-    """Dummy for AnalysisUnit; redefined below
+    r"""Dummy for AnalysisUnit; redefined below
     """
     
 class ScanDataOptions(DataBag):
-    """Do not use ... yet
+    r"""Do not use ... yet
     """
     def __init__(self, detection_predicate=1.3, roi_width = 10, roi_auto_width=False,
                   reference="Ch1", indicator="Ch2", 
@@ -141,13 +142,13 @@ class ScanDataOptions(DataBag):
         
     @property
     def defaults(self):
-        """A ScanDataOptions object with default values"""
+        r"""A ScanDataOptions object with default values"""
         return ScanDataOptions.default()
         # return ScanDataOptions(self.__defaults__())
     
     @classmethod
     def default(cls):
-        """Constructs a ScanDataOptions object with default values
+        r"""Constructs a ScanDataOptions object with default values
         See also the `defaults` property
         """
         return cls(cls.defaultValues)
@@ -161,7 +162,7 @@ class ScanDataOptions(DataBag):
                     int_begin = 0. * pq.s, int_end = 0.5 * pq.s,
                     peak_begin = 0.15 * pq.s, peak_end = 0.3 * pq.s,
                     initial=[], lower=[], upper=[]):
-        """
+        r"""
         Returns a dictionary with default values. 
         Do not confuse with `default`
         """
@@ -418,7 +419,7 @@ class ScanDataOptions(DataBag):
         return ret
 
 class AnalysisUnit(BaseScipyenData):
-    """ Encapsulates a ScanData analysis unit.
+    r""" Encapsulates a ScanData analysis unit.
     
     An AnalysisUnit object semantically links together landmarks and attributes of
     ScanData objects.
@@ -468,7 +469,7 @@ class AnalysisUnit(BaseScipyenData):
     
     # def __init__(self, parent, name=None, description=None, file_origin=None, **kwargs):
     def __post_init__(self):
-        """AnalysisUnit post-init constructor.
+        r"""AnalysisUnit post-init constructor.
         
         Positional parameters:
         ======================
@@ -574,7 +575,7 @@ class AnalysisUnit(BaseScipyenData):
         return self.__str__()
     
     def hasAnalysis(self, frame_or_protocol=None):
-        """Queries whether this analysis unit has been analysed in a given frame.
+        r"""Queries whether this analysis unit has been analysed in a given frame.
         
         To test against a specific protocol frames, 
         
@@ -637,7 +638,7 @@ class AnalysisUnit(BaseScipyenData):
             
     @property
     def frameEventDetection(self):
-        """Returns a nested dict of protocols and frame indices and their associated 
+        r"""Returns a nested dict of protocols and frame indices and their associated 
         success flags.
         
         The list contains two-element tuples, first element if the frame index,
@@ -796,7 +797,7 @@ class AnalysisUnit(BaseScipyenData):
             
 #     @property
 #     def parent(self):
-#         """A ScanData object that is the parent of this unit.
+#         r"""A ScanData object that is the parent of this unit.
 #         """
 #         if not hasattr(self, "_parent_"):
 #             self._parent_ = None
@@ -815,9 +816,9 @@ class AnalysisUnit(BaseScipyenData):
 #         
 #         self._parent_ = obj
             
-    @safeWrapper
+    @safewrapper
     def protocol(self, index:typing.Union[str, int]):
-        """Returns a trigger protocol specified by "index".
+        r"""Returns a trigger protocol specified by "index".
         
         Parameters:
         ==========
@@ -877,7 +878,7 @@ class AnalysisUnit(BaseScipyenData):
         else:
             raise TypeError("'index' expected to be a str or an int; got %s instead" % type(name).__name__)
         
-    @safeWrapper
+    @safewrapper
     def getProtocols(self, names):
         if isinstance(names, (tuple, list)) and all([isinstance(n, str) for n in names]):
             pr_names = [p.name for p in self.protocols]
@@ -896,7 +897,7 @@ class AnalysisUnit(BaseScipyenData):
         
 #     @property
 #     def protocols(self):
-#         """A list of TriggerProtocol objects (references)
+#         r"""A list of TriggerProtocol objects (references)
 #         """
 #         if not hasattr(self, "_protocols_"):
 #             self._protocols_  = list()
@@ -925,7 +926,7 @@ class AnalysisUnit(BaseScipyenData):
             
     @property
     def landmarkFrames(self):
-        """A list of frame indices where landmark is defined, given the protocols.
+        r"""A list of frame indices where landmark is defined, given the protocols.
         Read-only
         
         This property is the intersection between the set of frames associated with
@@ -982,7 +983,7 @@ class AnalysisUnit(BaseScipyenData):
         return result
     
     def scanData(self, average=None):
-        """Returns a ScanData object representing this AnalysisUnit only.
+        r"""Returns a ScanData object representing this AnalysisUnit only.
         This requires the parent ScanData object to be alive.
         
         The function delegates to the ScanData.exportScansAnalysisUnit() function.
@@ -1011,67 +1012,17 @@ class AnalysisUnit(BaseScipyenData):
         
         return result
     
-#     def isSameAs(self, other):
-#         if not isinstance(other, AnalysisUnit):
-#             raise TypeError("Expecting an AnalysisUnit object; got %s instead" % type(other).__name__)
-#         
-#         sameName = self.name == other.name
-#         
-#         sameParent = self.parent == other.parent
-#         
-#         sameSource = self.inScene == other.inScene
-#         
-#         sameLandmark = self.landmark == other.landmark
-#         
-#         sameProtocols = all([p in other.protocols for p in self.protocols])
-#         
-#         sameType = self.unit_type == other.unit_type
-#         
-#         sameCell = self.cell == other.cell
-#         
-#         sameField = self.field == other.field
-#         
-#         sameDescriptors = self.descriptors == other.descriptors
-#         
-#         return sameParent and sameName and sameSource and sameLandmark and sameProtocols and sameType and sameCell and sameField and sameDescriptors
-#     
-#     def is_same_as(self, other):
-#         return self.isSameAs(other)
-    
-#     def copy(self):
-#         """Returns a copy of this object.
-#         
-#         The result's landmark is a references to the landmark and of this unit.
-#         The result's protocols are deep copies of those in this unit.
-#         
-#         """
-#         # NOTE: 2021-11-26 08:42:21
-#         # use copy constructor strategy for trigger protocols so that the new 
-#         # AnalysisUnit objact is detached from the original data protocols; yet
-#         # it retains the reference to the 'parent'
-#         
-#         kwargs = dict((attr[0], getattr(self, attr[0], None)) for attr in self._attributes_ )
-#         kwargs["protocols"] = [p.copy() for p in self.protocols]
-#         kwargs.update(self.annotations)
-#         
-#         result = AnalysisUnit(self.parent, **kwargs)
-#         
-#         return result
-        
 class ScanDataImageParser(AttributeAdapter):
     # def __init__(self, owner=None, fieldname=None):
     def __init__(self, fieldname:str):
         self.fieldname = fieldname
-        # self.obj = owner
-        
-    # def setOwner(self, obj:typing.Any) -> None:
-    #     self.obj = obj
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.__init__(fieldname = {fieldname})')}")
         
     def __call__(self, obj, value):
         self.parseImageData(obj, value)
         
     def parseImageData(self, obj, value):
-        """Proposes a layout and calibrarion for VigraArray axes.
+        r"""Proposes a layout and calibrarion for VigraArray axes.
         Parameters:
         ==========
         value: VigraArray or list of VigraArray objects
@@ -1109,39 +1060,49 @@ class ScanDataImageParser(AttributeAdapter):
         if self.fieldname not in ("scans", "scene"):
             return
         
-        # if not hasattr(obj, "_data_children_"):
-        #     return
-        # 
-        # if not hasattr(obj, self.fieldname):
-        #     return
+        layoutFName = f"{self.fieldname}Layout"
+        frAxisFName = f"{self.fieldname}FrameAxis"
+        axcalFName = f"{self.fieldname}AxesCalibration"
         
-        imageLayout = getattr(obj, f"{self.fieldname}Layout", None)
-        frameAxis = None if not isinstance(imageLayout, dict) else imageLayout.get(f"{self.fieldname}FrameAxis", None)
-        axesCalibration = getattr(obj, f"{self.fieldname}AxesCalibration", None)
+        imageLayout = getattr(obj, f"{layoutFName}", None)
+        framesAxis = None if not isinstance(imageLayout, dict) else imageLayout.get(f"{frAxisFName}", None)
+        axesCalibration = getattr(obj, f"{axcalFName}", None)
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.parseImageData for field \'{self.fieldname}\' of {type(obj).__name__} object', color='yellow')}")
         
+        if axesCalibration is None:
+            # try to see if value has axis calibration
+            if isinstance(value, vigra.VigraArray):
+                axesCalibration = [AxesCalibration(value)]
+            elif isinstance(value, (tuple, list)) and all(isinstance(v, vigra.VigraArray) for v in value):
+                # WARNING: assumes ALL arrays in the list have the same axes, dimensions etc
+                axesCalibration = list(map(lambda v: AxesCalibration(v), value))
+        
+        # print(f"\t{print_styled(f'axesCalibration = {axesCalibration}', color='yellow')}")
+        
+        # NOTE: 2025-07-05 10:11:40
+        # below, 'layout' is a traitlets.Bunch
         data, layout, axesCalibration = self.imageDataLayout(value, 
-                                                            frameAxis = frameAxis,
+                                                            framesAxis = framesAxis,
                                                             axescal = axesCalibration)
         
-        layoutfName = f"{self.fieldname}Layout"
-        axcalfName = f"{self.fieldname}AxesCalibration"
+        # print(f"\t{print_styled(f'after imageDataLayout: axesCalibration = {axesCalibration}', color='green')}")
         
-        setattr(obj, layoutfName, layout)
+        setattr(obj, layoutFName, layout)
         
-        setattr(obj, axcalfName, axesCalibration)
+        setattr(obj, axcalFName, axesCalibration)
         
         # print(f"{self.__class__.__name__}.parseImageData for field {self.fieldname} of {type(obj).__name__} object:")
-        # print(f"\t{layoutfName} set to {getattr(obj, layoutfName, None)}")
-        # print(f"\t{axcalfName} set to {getattr(obj, axcalfName, None)}")
+        # print(f"\t{layoutFName} set to {getattr(obj, layoutFName, None)}")
+        # print(f"\t{axcalFName} set to {getattr(obj, axcalFName, None)}")
         
         return obj
     
-    def imageDataLayout(self,data, 
-                    frameAxis:typing.Optional[vigra.AxisInfo]=None, 
+    def imageDataLayout(self, data:typing.Union[vigra.VigraArray, typing.Sequence], 
+                    framesAxis:typing.Optional[vigra.AxisInfo]=None, 
                     horizontalAxis:typing.Optional[vigra.AxisInfo]=None, 
                     verticalAxis:typing.Optional[vigra.AxisInfo]=None, 
-                    axescal:typing.Optional[AxesCalibration]=None):
-        """ Proposes an axes layout and axes calibration for the data.
+                    axescal:typing.Optional[typing.Sequence[AxesCalibration]]=None):
+        r""" Proposes an axes layout and axes calibration for the data.
         
         See also imaging.vigrautils.proposeLayout()
         
@@ -1156,9 +1117,7 @@ class ScanDataImageParser(AttributeAdapter):
             shapes and axistag keys. If there is more than one vigra array
             in the sequence then all the arrays must have one channel only.
             
-        'layout': traitlets.Bunch or None. When a Bunch, it maps the following
-            key/value pairs:
-            
+        'layout': traitlets.Bunch with the following key ↦ value mapping:
             'nFrames':      int;
                             This is the total number of 2D data 
                             slices (or frames) that can be displayed in a 2D 
@@ -1195,21 +1154,43 @@ class ScanDataImageParser(AttributeAdapter):
             For a detailed explanation of the concept of frames and frames axis
             see imaging.vigrautils.proposeLayout()
 
-        'axes_calibration': an imaging.axiscalibration.AxesCalibration object, 
-                            or None.
+        'axes_calibration': a sequence of imaging.axiscalibration.AxesCalibration
+                            objects, or None.
                             
+        Change: 2025-07-05 11:15:55
+        layout is always a Bunch as above, but with members set to default values
+        of 0 nFrames and None for all axes.
+        
         """
+        layout = Bunch({"nFrames":  0, 
+                        "horizontalAxis": None, 
+                        "verticalAxis":   None, 
+                        "channelsAxis":   None,
+                        "framesAxis":     None})
         if data is None:
-            return (None, None, None)
+            # print(f"{print_styled(f'\n{self.__class__.__name__}.imageDataLayout(data = {data}) will return {(None, None, None)})', color='red')}")
+            return (data, layout, None)
         
         if not isinstance(data, (vigra.VigraArray, tuple, list)):
             raise TypeError(f"Expecting a VigraArray or a sequence (tuple, list) of VigraArrays; got {type(data).__name__} instead")
         
         if isinstance(data, vigra.VigraArray):
-            layout = proposeLayout(data, userFrameAxis = frameAxis, indices = True)
+            # calls imaging.vigrautils.proposeLayout
+            layout = proposeLayout(data, userFrameAxis = framesAxis, indices = True)
             
-            if isinstance(axescal, AxesCalibration) and all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(axescal.axiskeys, data.axistags)):
-                axes_cal = [axscal]
+            if isinstance(axescal, AxesCalibration):
+                if all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(list(axescal.axiskeys()), data.axistags)):
+                    axes_cal = [axescal]
+                else:
+                    raise ValueError(f"Mismatch between the supplied axescalibrations and the axistags of arrays in 'data'")
+                
+            elif isinstance(axescal, (tuple, list)):
+                if len(axescal) != 1:
+                    raise ValueError(f"Expecting one AxesCalibration object; got {len(axescal)} instead")
+                if all(axescal[0].typeFlags(key) == x.typeFlags for (key, x) in zip(list(axescal[0].axiskeys()), data.axistags)):
+                    axes_cal = axescal
+                else:
+                    raise ValueError(f"Mismatch between the axes types in the supplied axescalibrations and the axistags of arrays in 'data'")
             else:
                 axes_cal = [AxesCalibration(data)]
                 
@@ -1218,44 +1199,52 @@ class ScanDataImageParser(AttributeAdapter):
         elif isinstance(data, (tuple, list)):
             if len(data):
                 if not all([isinstance(s, vigra.VigraArray) for s in data]):
-                    raise TypeError("When not empty, data is expected to contain VigraArray objects")
+                    raise TypeError("When a sequence, 'data' is expected to contain VigraArray objects, or to be an empty sequence")
 
                 if not all([s.shape == data[0].shape for s in data[1:]]):
-                    raise TypeError("Image arrays in a sequence must have identical shapes")
+                    raise TypeError("Image arrays in the 'data' sequence must have identical shapes")
 
                 if not all([s.axistags == data[0].axistags for s in data[1:]]):
-                    raise TypeError("Image arrays in a sequence must have identical axistags")
+                    raise TypeError("Image arrays in the 'data' sequence must have identical axistags")
                 
                 if len(data) > 1 and any(s.channels > 1 for s in data):
                     raise TypeError("When more than one image array is supplied, these must have a single channel")
 
                 if not all([s.channels == data[0].channels for s in data[1:]]):
-                    raise TypeError("Image arrays in a sequence must have the same number of channels")
+                    raise TypeError("Image arrays in the 'data' sequence must have the same number of channels")
 
-                # NOTE: 2022-01-06 10:38:28
+                # CAUTION 2022-01-06 10:38:28 CAUTION
                 # when several images are contained in 'data' we assume they
                 # all have the same axes layout
-                layout = proposeLayout(data[0], userFrameAxis = frameAxis, indices = True)
+                layout = proposeLayout(data[0], userFrameAxis = framesAxis, indices = True)
                 
                 if isinstance(axescal, (tuple, list)):
                     if len(axescal) != len(data):
                         raise ValueError(f"Axes calibration expected to be a sequence with as many elements as 'data' ({len(data)}; got {len(axescal)} instead)")
                     
                     if not all(isinstance(ac, AxesCalibration) for ac in axescal):
-                        raise TypeError("Expecting a tuple of AxesCalibration objects")
+                        raise TypeError("Expecting a sequence of AxesCalibration objects")
                     
-                    if all(all(axcal.typeFlags(key) == x.typeFlags for (key, x) in zip(axcal.axiskeys, img.axistags)) for axcal,img in zip(axescal,data)):
+                    if all(all(axcal.typeFlags(key) == x.typeFlags for (key, x) in zip(list(axcal.axiskeys()), img.axistags)) for axcal, img in zip(axescal, data)):
                         axes_cal = [axcal for axcal in axescal]
                     else:
-                        axes_cal = [AxesCalibration(img) for img in data]
-                else:
-                    axes_cal = [AxesCalibration(img) for img in data]
+                        raise ValueError(f"Mismatch between the axes types in the supplied axescalibrations and the axistags of arrays in 'data'")
+                elif isinstance(axescal, AxesCalibration):
+                    if all(all(axescal.typeFlags(key) == x.typeFlags for (key, x) in zip(list(axescal.axiskeys()), img.axistags)) for img in data):
+                        axes_cal = list(map(lambda i: axescal, data))
+                    else:
+                        raise ValueError(f"Mismatch between the axes types in the supplied axescalibrations and the axistags of arrays in 'data'")
+                    
+                elif axescal is None:
+                    axes_cal = list(map(lambda i: AxesCalibration(i), data))
                 
                 return (data, layout, axes_cal)
 
-            return (list(), None, None)
-                
-        return (None, None, None)
+            # print(f"{print_styled(f'\n{self.__class__.__name__}.imageDataLayout(data = {data}) will return {(data, None, None)})')}")
+            return (list(), layout, None)
+        
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.imageDataLayout(data = {type(data).__name__}) will return {(None, None, None)})')}")        
+        return (None, layout, None)
     
 ImageParser = ScanDataImageParser
 
@@ -1266,8 +1255,9 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
     def __call__(self, obj, value):
         self.updateFramesMap(obj, value)
         
+    @safewrapper
     def updateFramesMap(self, obj, value):
-        """Adapts the frames map to the electrophysiology's segments.
+        r"""Adapts the frames map to the electrophysiology's segments.
         
         Sets up a default correspondence:
         
@@ -1298,9 +1288,6 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
         if not isinstance(obj, ScanData):
             return
         
-        if not hasattr(obj, "_data_children_"):
-            return
-        
         if self.fieldname not in tuple(c[0] for c in obj._data_children_):
             return
 
@@ -1314,7 +1301,10 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
         
         field = getattr(obj, self.fieldname)
         
-        if framesMap is None:
+        # print(f"{print_styled(f'\n{self.__class__.__name__}<{self.fieldname}>.updateFramesMap(value={type(value).__name__}) for framesMap {framesMap}', color='yellow')}")
+        
+        if self.fieldname == "framesMap":
+            # update framesMap based on what is already there, discard value
             field_frames = dict((c[0], 0) for c in obj._data_children_)
             for c in field_frames:
                 if c in ("scene","scans"):
@@ -1327,65 +1317,104 @@ class ScanDataFramesMapUpdater(AttributeAdapter):
                     val = len(data.segments) if isinstance(data, neo.Block) else 0
             
                 field_frames[c] = val
-            
-            # NOTE: 2022-01-04 16:06:11
-            # FrameIndexLookup is now MANDATORY - see also NOTE: 2022-01-04 16:05:12
-            framesMap = FrameIndexLookup(field_frames)
-            
-            setattr(obj, "framesMap", framesMap)
-        
+                
+            if framesMap is None:
+                framesMap = FrameIndexLookup(field_frames)
+            # else:
+                
         else:
-            nframes = len(obj.framesMap)
-                
-            if isinstance(field, neo.Block):
-                newframes = len(field.segments)
-                
-            elif isinstance(field, list) and all(isinstance(v, vigra.VigraArray) for v in field):
-                userFrameAxis = getattr(obj, f"{self.fieldname}FrameAxis", None)
-                axesCalibration = getattr(obj, f"{self.fieldname}AxesCalibration", None)
-                layout = getattr(obj, f"{self.fieldname}Layout", None)
-                # NOTE: 2024-08-11 21:27:06 FIXME/TODO
-                # possibly duplicated code!
-                # imageDataLayout is also a method of ScanDataImageParser
-                # data, layout, axesCalibration = obj.imageDataLayout(field,
-                #                                                     frameAxis = userFrameAxis,
-                #                                                     axescal = axesCalibration)
-                newframes = layout.nFrames
-                
-            else:
-                newframes=0
-            
-            if newframes == nframes:
-                # assume 1-2-1 correspondence with the index in framesMap
-                obj.framesMap[self.fieldname] = range(newframes)
-                
-            elif newframes < nframes:
-                value = list(range(newframes))
-                value.extend([obj.framesMap.missingFrameIndex for k in range(newframes, nframes)])
-                        
-                obj.framesMap[self.fieldname] = value
-                
-            else: # --> newframes > nframes
-                # concatenate a new frame index lookup
-                dd = dict()
-                for c in obj._data_children_:
-                    name = c[0]
-                    if name != self.fieldname:
-                        if np.any(obj.framesMap[name].isna()):
-                            val = None
-                        else:
-                            val = 0
-                        dd[name] = val
+            if framesMap is None:
+                # print(f"{print_styled(f'\n\tno framesMap yet', color='yellow')}")
+                field_frames = dict((c[0], 0) for c in obj._data_children_)
+                for c in field_frames:
+                    if c in ("scene","scans"):
+                        f = getattr(obj, f"{c}Layout", None)
+                        nFrames = f.get("nFrames", 0) if isinstance(f, dict) else 0
+                        val = nFrames if isinstance(nFrames, int) else np.prod(nFrames)
                         
                     else:
-                        dd[name] = newframes - nframes
-                        
-                fil = FrameIndexLookup(dd)
-                fil[self.fieldname] = range(nframes, newframes)
+                        data = getattr(obj, c, None)
+                        val = len(data.segments) if isinstance(data, neo.Block) else 0
                 
-                newmap = pd.concat([obj.framesMap.map, fil.map], ignore_index=True)
+                    field_frames[c] = val
                 
-                obj.framesMap.map = newmap
+                # NOTE: 2022-01-04 16:06:11
+                # FrameIndexLookup is now MANDATORY - see also NOTE: 2022-01-04 16:05:12
+                framesMap = FrameIndexLookup(field_frames)
+                # print(f"{print_styled(f'\n\tcreated framsMap with map: {framesMap.map}', color='yellow')}")
+                # setattr(obj, "framesMap", framesMap)
+            
+            else:
+                # nframes = len(obj.framesMap)
+                nframes = len(framesMap)
+                # print(f"{print_styled(f'\n\texisting framesMap with {nframes} frames', color='yellow')}")
+                    
+                if isinstance(field, neo.Block):
+                    newComponentFrames = len(field.segments)
+                    
+                elif isinstance(field, (tuple, list)) and all(isinstance(v, vigra.VigraArray) for v in field):
+                    userFrameAxis = getattr(obj, f"{self.fieldname}FrameAxis", None)
+                    axesCalibration = getattr(obj, f"{self.fieldname}AxesCalibration", None)
+                    layout = getattr(obj, f"{self.fieldname}Layout", None)
+                    # NOTE: 2024-08-11 21:27:06 FIXME/TODO
+                    # possibly duplicated code!
+                    # imageDataLayout is also a method of ScanDataImageParser
+                    # data, layout, axesCalibration = obj.imageDataLayout(field,
+                    #                                                     framesAxis = userFrameAxis,
+                    #                                                     axescal = axesCalibration)
+                    newComponentFrames = layout.nFrames
+                    
+                else:
+                    newComponentFrames=0
+                    
+                # print(f"{print_styled(f'\n\texisting framesMap to get {newComponentFrames} frames for {self.fieldname}', color='yellow')}")
+                
+                if newComponentFrames == nframes:
+                    # assume 1-2-1 correspondence with the index in framesMap
+                    framesMap[self.fieldname] = range(newComponentFrames)
+                    # obj.framesMap[self.fieldname] = range(newComponentFrames)
+                    
+                elif newComponentFrames < nframes:
+                    value = list(range(newComponentFrames))
+                    value.extend([framesMap.missingFrameIndex for k in range(newComponentFrames, nframes)])
+                            
+                    framesMap[self.fieldname] = value
+                    # obj.framesMap[self.fieldname] = value
+                    
+                else: # --> newComponentFrames > nframes
+                    # concatenate a new frame index lookup
+                    # print(f"{print_styled(f'\n\tConcatenating:', color='yellow')}")
+                    dd = dict()
+                    for c in obj._data_children_:
+                        name = c[0]
+                        if name != self.fieldname:
+                            if np.any(framesMap[name].isna()):
+                                val = None
+                            else:
+                                val = 0
+                            dd[name] = val
+                            
+                        else:
+                            dd[name] = newComponentFrames - nframes
+                    
+                    # print(f"{print_styled(f'\n\tdd -> {dd}', color='yellow')}")
+                    fil = FrameIndexLookup(dd)
+                    # print(f"{print_styled(f'\n\tfil -> {fil}', color='yellow')}")
+                    fil[self.fieldname] = range(nframes, newComponentFrames)
+                    
+                    newmap = pd.concat([framesMap.map, fil.map], ignore_index=True)
+                    # print(f"{print_styled(f'\n\tnewmap -> {newmap.to_string()}', color='yellow')}")
+                    # newmap = pd.concat([obj.framesMap.map, fil.map], ignore_index=True)
+                    
+                    framesMap.map = newmap
+                    # obj.framesMap.map = newmap
+                    
+        # objname = getattr(obj, "name", "")
+        # print(f"{print_styled(f'\n\twill assign {framesMap} to \'framesMap\' of {type(obj).__name__} object' + f' {objname}', color='yellow')}")
+        # print(f"{print_styled(f'\n\tframesMap.map is \n{framesMap.map.to_string()}', color='yellow')}")
+        setattr(obj, "framesMap", framesMap)
+        
+        # print(f"{print_styled(f'\n\t{type(obj).__name__} object' + f' {objname}' + f' now has framesMap: {framesMap} with map:\n{framesMap.map.to_string()}', color='yellow')}")
                 
 FramesMapUpdater = ScanDataFramesMapUpdater
 
@@ -1398,12 +1427,15 @@ class ScanDataMetadataAdapter(AttributeAdapter):
             return
         self._parse_metadata_(obj, value)
         
-    @safeWrapper
+    @safewrapper
     def _parse_metadata_(self, obj, value:DataBag):
-        """Sets up analysis type, parses metadata
+        r"""Sets up analysis type, parses metadata
         """
         from gui import pictgui as pgui
         from systems.PrairieView import PVSequenceType
+        
+        if value is None: # FIXME: 2025-01-22 21:07:36
+            return
         
         # print(f"{self.__class__.__name__}._parse_metadata_ value = \n{value}")
         
@@ -1447,47 +1479,95 @@ class ScanDataMetadataAdapter(AttributeAdapter):
             scipywarn(f"{value.type.name} scan data not yet supported")
             # raise NotImplementedError("%s data not yet supported" % value.type)
     
+class ScanDataFramesMapDescriptor(BaseDescriptorValidator):
+    def __init__(self, default:FrameIndexLookup = FrameIndexLookup({"scene":0, "scans":0, "electrophysiology":0}),
+                 preset_hook:typing.Optional[typing.Union[AttributeAdapter, types.MethodType, types.FunctionType]] = None,
+                 postset_hook:typing.Optional[typing.Union[AttributeAdapter, types.MethodType, types.FunctionType]] = None,
+                 accept_none:bool=True):
+        super().__init__("framesMap", default, use_private=True,
+                         postset_hook=postset_hook)
+        self.accept_none = accept_none
+        self.types = (FrameIndexLookup,)
+        
+        def validate(self, value):
+            if not isinstance(value, FrameIndexLookup) or (value is None and not self.accept_none):
+                raise TypeError(f"Invalid value type: {type(value).__name__}")
 
 class ScanDataComponentDescriptor(BaseDescriptorValidator):
     def __init__(self, name:str, default:typing.Any=None, types:typing.Optional[typing.Union[type,tuple]] = None,
                  preset_hook:typing.Optional[typing.Union[AttributeAdapter, types.MethodType, types.FunctionType]] = None,
                  postset_hook:typing.Optional[typing.Union[AttributeAdapter, types.MethodType, types.FunctionType]] = None,
                  accept_none:bool=True):
+        r"""Descriptor for ScanData components.
+    The components are 'scene', 'scans', 'electrophysiology', and 'metadata'.
+    
+    Parameters:
+    ==========
+        name — name of the component descriptor
+        default — the default value; when this is None, then a value of None can
+            be attributed to the component descriptor
+        types — when specified, these are used to validate the value before it is
+            attributed to the component descriptor (this validation occurs IN ADDITION
+            TO checking whether value is None)
+        
+        
+    
+    """
         super().__init__(name, default, use_private=True, 
                          preset_hook=preset_hook, 
                          postset_hook=postset_hook)
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.__init__(name = {name}, default={type(default).__name__}, types={types})')}")
         if isinstance(types, type):
             self.types = (types, )
             
         elif isinstance(type, tuple) and all(isinstance(t, type) for t in types):
-            self.types=types
+            self.types = types
             
         else:
             self.types = tuple()
             
+        self.default = default
+        
         if self.default is None:
             self.accept_none = True
         else:
-            self.accept_none = accept_none
+            self.accept_none = False
             
-    def validate(self, value):
-        if value is None:
-            if not self.accept_none:
-                raise ValueError(f"The descriptor for {self.public_name} does not accept None")
-        else:
-            if len(self.types):
-                assert isinstance(value, self.types), f"Expecting an instance of one of {self.types}; instead, got a {type(value).__name__}"
-        
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.__init__: name: {name} accept_none = {self.accept_none}')}")
+            
+    def validate(self, value:typing.Any):
+        r""" Validates 'value' against the criteria set in the constructor.
+    An invalid 'value' will raise an exception.
+    A 'value' of None is valid only if a default of None was passed to the
+    constructor.
+    Furthermore, 'value' is considered valid if its type is present in the 
+    'types' parameter passed to the constructor, if 'types' is type or a sequence
+    of types.
+    
+    When the constructor's 'default' is None and 'types' is an empty sequence or 
+    None, then 'value' can be anything.
+    """
+        # print(f"{print_styled(f'\n{self.__class__.__name__}.validate for public name: {self.public_name}: accept_none = {self.accept_none}')}")
+            
+        if len(self.types):
+            if self.accept_none:
+                types = self.types + (type(None),)
+            else:
+                types = self.types
+            assert isinstance(value, types), f"{print_styled(f'Expecting an instance of one of {types}; instead, got a {type(value).__name__}', color='red')}"
+
+        elif value is None and not self.accept_none:
+            raise ValueError(f"{print_styled(f'The descriptor for {self.public_name} does not accept None', color='red')}")
         
 @dataclass
 class ScanData(BaseScipyenData):
-    """Encapsulates data from laser scanning imaging and electrophysiology data.
+    r"""Encapsulates data from laser scanning imaging and electrophysiology data.
 
     Work in progress.
         
         
     """
-    #  An almost direct translation of my old matlab LSData data structure.
+    #  ### BEGIN An almost direct translation of my old matlab LSData data structure.
     
     #     NOTE: 2024-08-10 21:21:10
     #     Switching to dataclass-based design
@@ -1595,64 +1675,67 @@ class ScanData(BaseScipyenData):
     #         a scanRegion with states for 26 frames -- why? The original data had
     #         38 frames in this particular example -- see 18l12 CACNA1C152mHET/c01/sp01/ 
     #         Where the did the 26 come from?
+    #
+    #  ### END   An almost direct translation of my old matlab LSData data structure.
+    
     from gui import pictgui as pgui
     
     # ### BEGIN class variables
     # avatars from the old model, kept here because they're still useful
     # NOTE that I gave up the parsing of neo-style attribute specification
     # and use dataclass mechanism instead
-    _data_children_:typing.ClassVar = (
+    #
+    # however, this one below is required for the _get_data_child_component_(…)
+    # instance method and for setting up the framesMap attribute
+    _data_children_: typing.ClassVar[tuple] = (
         ("scans",                           tuple(), (list, tuple),   vigra.VigraArray),
         ("scene",                           tuple(), (list, tuple),   vigra.VigraArray),
         ("electrophysiology",               (neo.Block(name="Electrophysiology"), None)),
         )
     
-    _derived_data_children_:typing.ClassVar = (
-        ("scansBlock",                      neo.Block(name="Scans")),
-        ("scansProfiles",                   neo.Block(name="Scan region scans profiles")),
-        ("sceneBlock",                      neo.Block(name="Scene")),
-        ("sceneProfiles",                   neo.Block(name="Scan region scene profiles")),
+    _derived_data_children_: typing.ClassVar[tuple] = (
+        # ("scansBlock",                      neo.Block(name="Scans")),
+        # ("scansProfiles",                   neo.Block(name="Scan region scans profiles")),
+        # ("sceneBlock",                      neo.Block(name="Scene")),
+        # ("sceneProfiles",                   neo.Block(name="Scan region scene profiles")),
         )
     
-    _result_data_:typing.ClassVar = (
-        ("electrophysiologyResult",         pd.DataFrame),
-        ("imagingResult",                   pd.DataFrame),
-        ("result",                          pd.DataFrame),
+    _result_data_: typing.ClassVar[tuple] = (
+        # ("electrophysiologyResult",         pd.DataFrame),
+        # ("imagingResult",                   pd.DataFrame),
+        # ("result",                          pd.DataFrame),
         )
     
-    _data_attributes_:typing.ClassVar = (
-        ("framesMap",                       FrameIndexLookup),
+    _data_attributes_: typing.ClassVar[tuple] = (
+        # ("sceneAxesCalibration",            list,   AxesCalibration),
+        # ("scansAxesCalibration",            list,   AxesCalibration),
+        # ("sceneLayout",                     Bunch),
+        # ("scansLayout",                     Bunch),
+        # ("framesMap",                       FrameIndexLookup),
+        # ("triggerProtocols",                list)
         )
     
-#     _data_attributes_:typing.ClassVar = (
-#         ("sceneAxesCalibration",            list,   AxesCalibration),
-#         ("scansAxesCalibration",            list,   AxesCalibration),
-#         ("sceneLayout",                     dict),
-#         ("scansLayout",                     dict),
-#         ("framesMap",                       FrameIndexLookup),
-#         )
-#     
-    _graphics_attributes_:typing.ClassVar = (
-        ("scansCursors",                    dict, Cursor),
-        ("scansRois",                       dict, PlanarGraphics),
-        ("scanTrajectory",                  (PlanarGraphics, type(None))),
-        ("sceneCursors",                    dict, Cursor),
-        ("sceneRois",                       dict, PlanarGraphics),
+    _graphics_attributes_: typing.ClassVar[tuple] = (
+        # ("scansCursors",                    dict, Cursor),
+        # ("scansRois",                       dict, PlanarGraphics),
+        # ("scanTrajectory",                  (PlanarGraphics, type(None))),
+        # ("sceneCursors",                    dict, Cursor),
+        # ("sceneRois",                       dict, PlanarGraphics),
         )
     
-    _metadata_attributes_:typing.ClassVar = (
-        ("analysisUnits",                   set, AnalysisUnit),
-        ("analysisUnit",                    AnalysisUnit),
-        ("metadata",                        dict),
+    _metadata_attributes_: typing.ClassVar[tuple] = (
+        # ("analysisUnits",                   set, AnalysisUnit),
+        # ("analysisUnit",                    AnalysisUnit),
+        # ("metadata",                        dict),
         )
     
-    _option_attributes_:typing.ClassVar = (
-        ("analysisOptions",                 dict),
-        ("analysisMode",                    ScanDataAnalysisMode.frame),
-        ("type",                            ScanDataType.linescan),
+    _option_attributes_: typing.ClassVar[tuple] = (
+        # ("analysisOptions",                 dict),
+        # ("analysisMode",                    ScanDataAnalysisMode.frame),
+        # ("type",                            ScanDataType.linescan),
         )
     
-    _attributes_:typing.ClassVar = _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ 
+    # _attributes_:typing.ClassVar = _data_children_ + _derived_data_children_ + _result_data_ + _data_attributes_ + _graphics_attributes_ +_metadata_attributes_ + _option_attributes_ 
     # ### END class variables
     
     # ### BEGIN instance variables 
@@ -1669,59 +1752,32 @@ class ScanData(BaseScipyenData):
     
     # associated electrophysiology data
     electrophysiology:ScanDataComponentDescriptor = ScanDataComponentDescriptor("electrophysiology",
-                                                                                neo.Block(name="Electrophysiology"),
+                                                                                None,
                                                                                 neo.Block,
                                                                                 postset_hook=ScanDataFramesMapUpdater("electrophysiology"))
-  
+    # associated trigger protocols
+    triggerProtocols:list = dataclasses.field(default_factory=list)
+    
     # type of scanning
     type:ScanDataType = dataclasses.field(default=ScanDataType.linescan)
     # scans:list[vigra.VigraArray] = dataclasses.field(default_factory=list)
     
-    # BUG 2024-08-14 21:11:36 FIXME
-    # all attributes derived from the scans/scene image data, and set up by their
-    # corresponding descriptors via preset_hook, are overwritten by the 
-    # defaults below — this involves AxisCalibration and Layout;
-    # on the other hand, NOT specifing them here preserved the attributes as set
-    # by the scan and scene descriptors, but they won't be listed as a field of
-    # ScanData — I need a good fix for this.
-    #
-    # For now, omit them from declared fields and rely on the class attribute
-    # `_attributes_` (a ClassVar) defined above.
-    #
-    # TODO: 2024-08-14 21:34:56 Maybe they should be set up through a postset 
-    # hook like below? Then the question is how to execute more than one 
-    # postset defined in the descriptor?
-    #
-    # NOTE: 2024-08-14 21:28:36 In contrast, attributes set by scans/scene
-    # descriptors via the postset_hook appears immune to the side effect above;
-    # these include framesMap...
-    #
-    # axes calibrations for image data in the scans; initialized/set up by the scans descriptor
-    # scansAxesCalibration:list[AxesCalibration] = dataclasses.field(default_factory=list)
-    # to document; initialized/set up by the scans descriptor
-    # scansLayout:dict = dataclasses.field(default_factory = dict, init=False) 
     # signals containing quantitative data measured in the scans (depends on experiment type)
     scansBlock:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scans"))
+
     # signals containing pixel intensities along scans rois (linescans only) 
     scansProfiles:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scan region scans profiles"))
+
     scansCursors:dict = dataclasses.field(default_factory = dict)
+
     scansRois:dict = dataclasses.field(default_factory = dict)
     
-    # scanTrajectory:typing.Optional[PlanarGraphics] = None
-    # see NOTE: 2024-08-14 21:28:36 for why this is stll here and not commented-out
     scanTrajectory:typing.Optional[PlanarGraphics] = dataclasses.field(default=None)
     
-    # scene:list[vigra.VigraArray] = dataclasses.field(default_factory=list)
-    #
-    # see BUG 2024-08-14 21:11:36 for why these are commented-out
-    # sceneAxesCalibration:list[AxesCalibration] = dataclasses.field(default_factory=list)
-    # sceneLayout:dict = dataclasses.field(default_factory = dict, init=False)
     sceneBlock:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scene"))
     sceneProfiles:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Scan region scene profiles"))
     sceneCursors:dict = dataclasses.field(default_factory = dict)
     sceneRois:dict = dataclasses.field(default_factory = dict)
-    
-    # electrophysiology:typing.Optional[neo.Block] = dataclasses.field(default=neo.Block(name="Electrophysiology"))
     
     # landmark data
     landmark:typing.Optional[PlanarGraphics] = dataclasses.field(default=None)
@@ -1731,15 +1787,23 @@ class ScanData(BaseScipyenData):
     analysisUnits:set[AnalysisUnit] = dataclasses.field(default_factory=set)
     analysisUnit:typing.Optional[AnalysisUnit] = None
     analysisMode:ScanDataAnalysisMode = ScanDataAnalysisMode.frame
+    
     # metadata:typing.Optional[dict] = dataclasses.field(default=None)
-    metadata:ScanDataComponentDescriptor = ScanDataComponentDescriptor("metadata",None, DataBag,
+    metadata:ScanDataComponentDescriptor = ScanDataComponentDescriptor("metadata", None, DataBag,
                                                                        postset_hook=ScanDataMetadataAdapter("metadata"))
 
     # mapping of imaging frames to electrophysiology sweeps
     # → initialized/set up by scans and scene desscriptors (postset hook)
     #
     # see NOTE: 2024-08-14 21:28:36 for why this is stll here and not commented-out
-    framesMap:typing.Optional[FrameIndexLookup] = dataclasses.field(default=None)
+    # BUG: 2025-07-08 23:04:53 FIXME/TODO URGENTLY
+    # this seems to overwrite whatever the ScanDataComponentDescriptor's postset_hook sets as framesMap
+    framesMap:ScanDataComponentDescriptor = ScanDataComponentDescriptor("framesMap", FrameIndexLookup({"scene":0, "scans":0, "electrophysiology":0}), 
+                                                                        FrameIndexLookup,
+                                                                        postset_hook = ScanDataFramesMapUpdater("framesMap"))
+    
+    # user annotations
+    annotations:dict = dataclasses.field(default_factory = dict)
     
     # analysis results data
     electrophysiologyResult:typing.Optional[pd.DataFrame] = dataclasses.field(default=None)
@@ -1750,11 +1814,10 @@ class ScanData(BaseScipyenData):
     modified:bool = dataclasses.field(default=False, compare=False)
     processed:bool = dataclasses.field(default=False, compare=False)
     availableUnitTypes:list = dataclasses.field(default_factory=lambda: [s for s in UnitTypes.values()], compare=False)
-    # availableGenotypes:list = dataclasses.field(default_factory=lambda: [s for s in GENOTYPES], init=False, compare=False)
     # ### END instance variables 
     
     def _get_data_child_component_(self, component:str):
-        """
+        r"""
         Parameters:
         ==========
         component: str, one of: "scans", "scene", "electrophysiology"
@@ -1766,7 +1829,7 @@ class ScanData(BaseScipyenData):
         return getattr(self, component, None)
     
     def _get_component_nFrames_(self, component:str):
-        """Returns the number of data frames in one of the data components.
+        r"""Returns the number of data frames in one of the data components.
         
         Parameters:
         ==========
@@ -1781,7 +1844,7 @@ class ScanData(BaseScipyenData):
         # 'component_name' being one of ('scene' , 'scans')
         #
         #   in the VigraArray case I use the 'nFrames' member of the layout 
-        #   directly, if available, otherwise I calculate it using frameAxis 
+        #   directly, if available, otherwise I calculate it using framesAxis 
         #   (as is it done below) and use the opportunity update the '<component_name>Layout'.
         
         data = self._get_data_child_component_(component)
@@ -1789,107 +1852,41 @@ class ScanData(BaseScipyenData):
             return len(data.segments)
         
         else:
+            layout = getattr(self, f"{component}Layout", None)
+                
             if isinstance(data, (tuple, list)): # scene or scans
                 if len(data) == 0:
                     return 0
-                layout = getattr(self, f"{component}Layout", None)
                 if not isinstance(layout, dict):
                     layout = self.ImageParser(owner=self, fieldname=component).parseImageData(data)
                     
                 nFrames = layout.get("nFrames", 0)
+                
                 return nFrames if isinstance(nFrames, int) else np.prod(nFrames)
             
-    def __reduce__(self):
-        # kw = dict((d[0], getattr(self, d[0], None)) for d in self._attributes_ if d[0] not in ("scene", "scans", "electrophysiology"))# "metadata"))
-        
-        
-        # print(f"{self.__class__.__name__}.__reduce__:\n{list(kw.keys())}")
-        
-        # return (_new_ScanData, (self.scans, self.scene, self.electrophysiology, 
-        #                         kw))
+            elif isinstance(data, vigra.VigraArray):
+                if not isinstance(layout, dict):
+                    layout = self.ImageParser(owner=self, fieldname=component).parseImageData(data)
+                return data.shape[layout.frameAxis]
+                
+            return 0 # no data 
             
+    def __reduce__(self):
+        r"""Required for pickling"""
         kw = dict((f.name, getattr(self, f.name)) for f in dataclasses.fields(self) if f.name not in ("scene", "scans", "electrophysiology"))
-        # kw = dict((f.name, getattr(self, f.name)) for f in dataclasses.fields(self))
         
         return (_new_ScanData, (self.scans, self.scene, self.electrophysiology, 
                                 kw))
-        # return (_new_ScanData, (kw, ))
         
-    @safeWrapper
-    def __post_init__(self, *args, **kwargs):
-        """Constructs a ScanData object.
-        
-        Named parameters:
-        =================
-        
-        For the name and value type of the expected parameters, see
-        ScanData._attributes_
-        
-        The description of the more important ones is given below.
-        
-        scans: a vigra.VigraArray or a list of vigra.VigraArray ojects, or None.
-        
-            When a the VigraArray, scans may contain more than one channel
-                (multi-band array).
-                
-            When a sequence of VigraArrays, each VigraArray in the list MUST be
-                single-band (corresponding to a single channel)
-                
-            Frames are automatically defined as array slices along the highest
-            non-channel axis (or dimension), but this axis can be specified/overridden
-            using "sceneFrameAxis" parameter (see below).
-            
-            Represents the "scene" where an imaging experiment took place (e.g.
-            where a scanline trajectory or a set or imaging ROIs were defined
-            for linescanning or multi-ROI imaging, respectively).
-            
-        scene: similar to "scans", this can be either one (possibly, multi-band) 
-            VigraArray, or a list of single-band VigraArray objects, or None.
-            
-            In either case, the data layout must be resolve to a number of "frames"
-            (possibly just one) along a non-channel axis.
-            
-            The frames can be:
-                
-            a) linescan frames (e.g. repetitions of a linescanning acquisition)
-            
-            b) raster scanning frames (for Z- or T-series)
-            
-        The frames in scans and scene are typically defined along the non-channel
-            axis of the highest order of the image VigraArray. This can be 
-            overridden using 'scansFrameAxis' and 'sceneFrameAxis'
-            parameter (see below).
-            
-            The data in "scans" is the main subject for further analysis.
-            
-        metadata: a dictionary or DataBag with various parameters that determine
-            what kind of imaging experiment is being stored in this object
-            
-            TODO elaborate documentation here.
-            
-            
-        electrophysiology: a neo.Block containing associated electrophysiology data. It should
-            contain as many segments as there are frames in "scans".
-            
-        sceneFrameAxis, scansFrameAxis: vigra.AxisInfo objects along which slices 
-            of scene and scans arrays are taken as "frames";
-            optional (default is None); when omitted, the frame axes will be 
-            guessed from the image axistags
-            
-        name: str: object name for book keeping
-        
-        analysisOptions: DataBag; optional default is None
-        
-        framesMap: FrameIndexLookup; optional default is None
-
-        triggers: either the string "auto", or None, or a list of TriggerProtocol 
-            objects
-            
-            When "auto", try to "parse" TriggerProtocol from ephys neo.Block data.
-                
-        """
-        self.availableUnitTypes.insert(0, "unknown")
-        self._modified_ = False
+#     @safewrapper
+#     def __post_init__(self, *args, **kwargs):
+#         r"""Constructs a ScanData object.
+#         
+#         """
+#         self.availableUnitTypes.insert(0, "unknown")
+#         self._modified_ = False
+#         
+#         print(f"{self.__class__.__name__}.__post_init__: framesMap = {self.framesMap}")
         
     def _repr_pretty_(self, p, cycle):
         name = self.name if isinstance(self.name, str) else ""
@@ -1928,8 +1925,8 @@ class ScanData(BaseScipyenData):
             p.text("\n")
             p.text("With trigger protocols:")
             p.breakable()
-            if isinstance(self.triggers, (typing.Sequence, typing.Set)) and len(self.triggers):
-                p.pretty(self.triggers)
+            if isinstance(self.triggerProtocols, (typing.Sequence, typing.Set)) and len(self.triggerProtocols):
+                p.pretty(self.triggerProtocols)
             
             p.text("\n")
             p.text("With analysis units:")
@@ -1942,7 +1939,7 @@ class ScanData(BaseScipyenData):
                 p.pretty(self.analysisUnit)
                 
     def __str__(self):
-        """
+        r"""
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
 
@@ -1964,7 +1961,7 @@ class ScanData(BaseScipyenData):
             protocol_names = [p.name for p in self.triggerProtocols]
             result.append(f"Protocols: {(', '.join(protocol_names))}")
             
-        result.append(f"Analysis unit (based on entire data):\n{self.analysisUnit()};")
+        result.append(f"Analysis unit (based on entire data):\n{self.analysisUnit};")
         
         if len(self.analysisUnits):
             analysis_units = [a.__repr__() for a in self.analysisUnits]
@@ -2018,9 +2015,9 @@ class ScanData(BaseScipyenData):
             axcal = getattr(self, f"{what}AxesCalibration")[channel]
             axcal["c"].setChannelName(0, value)
     
-    #@safeWrapper
+    #@safewrapper
     def _parse_image_arrays_(self, scene, scans, sceneFrameAxis=None, scansFrameAxis=None):
-        """Assigns image data to the scene and scans data sets.
+        r"""Assigns image data to the scene and scans data sets.
         CAUTION: Also resets all the data derived or associated with the image
         data:
         * associated: 
@@ -2038,29 +2035,37 @@ class ScanData(BaseScipyenData):
         1) adapt to a new scenario where all scene image data is a single  multi-channel VigraArray
 
         """
-        new_scene, scene_frame_axis, scene_axes_calibrations = self.imageDataLayout(scene, frameAxis=sceneFrameAxis)
+        new_scene, scene_frame_axis, scene_axes_calibrations = self.imageDataLayout(scene, framesAxis=sceneFrameAxis)
         
         #print(new_scene)
-        new_scans, scans_frame_axis, scans_axes_calibrations = self.imageDataLayout(scans, frameAxis=scansFrameAxis)
+        new_scans, scans_frame_axis, scans_axes_calibrations = self.imageDataLayout(scans, framesAxis=scansFrameAxis)
 
         if new_scene is not None:
             self.sceneCursors.clear()
             self.sceneRois.clear()
             self.scanTrajectory = None
             self.scene = new_scene
-            self.sceneFrameAxis = scene_frame_axis
+            self.sceneLayout.framesAxis = scene_frame_axis
             self.sceneAxesCalibration = scene_axes_calibrations
+        else:
+            # NOTE: 2025-07-05 09:40:55 these NEED to be defined
+            self.sceneLayout.framesAxis = None
+            self.sceneAxesCalibration = None
 
         if new_scans is not None:
             self.scansCursors.clear()
             self.scanCursors.clear()
             self.analysisUnits.clear()
             self.scans = new_scans
-            self.scansFrameAxis = scans_frame_axis
+            self.scansLauout.framesAxis = scans_frame_axis
             self.scansAxesCalibrations = scans_axes_calibrations
+        else:
+            # NOTE: see NOTE: 2025-07-05 09:40:55
+            self.scansLayout.framesAxis = None
+            self.scansAxesCalibrations = None
             
     def embedTriggerEvents(self, tp=None, to_imaging=True):
-        """
+        r"""
         # NOTE: 2017-12-20 22:06:48
         # because of imagingDelay, events in the _scans_block_ start at different
         # times from the times recorded for the electrophysiology block
@@ -2113,9 +2118,9 @@ class ScanData(BaseScipyenData):
                 if isinstance(self._scene_block_, neo.Block) and len(self._scene_block_.segments):
                     embed_trigger_protocol(rev_p, self._scene_block_)
                 
-    @safeWrapper
+    @safewrapper
     def validateElectrophysiology(self, value):
-        """Validates new electrophysiology data and proposes frames lookup.
+        r"""Validates new electrophysiology data and proposes frames lookup.
         
         Use case 1: When value is a neo.Block, the assignment is by reference.
         
@@ -2195,7 +2200,7 @@ class ScanData(BaseScipyenData):
         self.adoptTriggerProtocols(self.electrophysiology)
         
     def _concatenate_image_data_(self, other, scene=True, pad_value=None):
-        """
+        r"""
         Concatenates scene or scans images along the frame axis
         
         other: ScanData object
@@ -2299,8 +2304,8 @@ class ScanData(BaseScipyenData):
             channelNames = self.sceneChannelNames
             src_channels = other.sceneChannels
             src_channelNames = other.sceneChannelNames
-            frameAxis = self.sceneFrameAxis
-            src_frameAxis = other.sceneFrameAxis
+            framesAxis = self.sceneFrameAxis
+            src_framesAxis = other.sceneFrameAxis
             frameAxisIndex = self.sceneFrameAxisIndex
             src_frameAxisIndex = other.sceneFrameAxisIndex
             
@@ -2313,8 +2318,8 @@ class ScanData(BaseScipyenData):
             channelNames = self.scansChannelNames
             src_channels = other.scansChannels
             src_channelNames = other.scansChannelNames
-            frameAxis = self.scansFrameAxis
-            src_frameAxis = other.scansFrameAxis
+            framesAxis = self.scansFrameAxis
+            src_framesAxis = other.scansFrameAxis
             frameAxisIndex = self.scansFrameAxisIndex
             src_frameAxisIndex = other.scansFrameAxisIndex
             
@@ -2329,7 +2334,7 @@ class ScanData(BaseScipyenData):
         if channelNames != src_channelNames:
             raise ValueError("Different channel names in %s" % which_data)
         
-        if frameAxis != src_frameAxis:
+        if framesAxis != src_framesAxis:
             raise ValueError("Different frame axis in %s" % which_data)
         
         if frameAxisIndex != src_frameAxisIndex:
@@ -2339,7 +2344,7 @@ class ScanData(BaseScipyenData):
         
         if scene:
             for k, img in enumerate(own):
-                result.append(concatenateImages(img, tgt[k], axis=frameAxis, ignore=["origin", "resolution"]))
+                result.append(concatenateImages(img, tgt[k], axis=framesAxis, ignore=["origin", "resolution"]))
             
             
         else:
@@ -2414,7 +2419,7 @@ class ScanData(BaseScipyenData):
                     else:
                         raise ValueError("invalid pad_value %s" % pad_value)
                         
-                result.append(concatenateImages(img0, img1, axis = frameAxis, ignore=["origin", "resolution"]))
+                result.append(concatenateImages(img0, img1, axis = framesAxis, ignore=["origin", "resolution"]))
                 
         return result
     
@@ -2422,9 +2427,9 @@ class ScanData(BaseScipyenData):
         # public functions
         # ###
         
-    @safeWrapper
+    @safewrapper
     def copy(self):
-        """
+        r"""
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         
@@ -2610,7 +2615,7 @@ class ScanData(BaseScipyenData):
         return result
     
     def hasImageData(self, image_section):
-        """Checks if this objects contains image data for the specified section.
+        r"""Checks if this objects contains image data for the specified section.
         
         Parameters:
         ===========
@@ -2642,7 +2647,7 @@ class ScanData(BaseScipyenData):
         return ret
     
     def hasSignalData(self, data_section):
-        """Checks if this object contains signals in the specified data section.
+        r"""Checks if this object contains signals in the specified data section.
         
         Parameters:
         ===========
@@ -2693,7 +2698,7 @@ class ScanData(BaseScipyenData):
         return ret
     
     def hasLandmark(self, landmark):
-        """Returns False if self.locateLandmark(landmark) is None
+        r"""Returns False if self.locateLandmark(landmark) is None
         """
         from gui import pictgui as pgui
 
@@ -2703,7 +2708,7 @@ class ScanData(BaseScipyenData):
         return (self.locateLandmark(landmark)) is not None
     
     def hasSceneLandmark(self, landmark):
-        """Checks that landmark in self.sceneCursors or self.sceneRois.
+        r"""Checks that landmark in self.sceneCursors or self.sceneRois.
         Landmark lookup is performed by name and type.
         
         See self.locateLandmark for details.
@@ -2733,7 +2738,7 @@ class ScanData(BaseScipyenData):
             return landmark.name in self.scansRois and self.scansRois[landmark.name] == landmark.type
         
     def locateLandmark(self, landmark):
-        """Returns the dictionary it belongs to).
+        r"""Returns the dictionary it belongs to).
         
         This concerns the landmarks set up in the scene and scans data subsets,
         regardless of the existence of a scanRegion.
@@ -2790,9 +2795,9 @@ class ScanData(BaseScipyenData):
         
         return result
         
-    @safeWrapper
+    @safewrapper
     def resampleSceneData(self, resolution, axis=0, down=1000):
-        """Resamples Scene data along a specified axis.
+        r"""Resamples Scene data along a specified axis.
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
@@ -2805,9 +2810,9 @@ class ScanData(BaseScipyenData):
         """
         self.scene = [resampleImageAxis(img, resolution, axis=axis, p=down) for img in self.scene]
     
-    @safeWrapper
+    @safewrapper
     def resampleScansData(self, resolution, axis=0, down=1000):
-        """
+        r"""
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         
@@ -2815,7 +2820,7 @@ class ScanData(BaseScipyenData):
         self.scans = [resampleImageAxis(img, resolution, axis=axis, p=down) for img in self.scans]
     
     def updateAxesCalibrations(self):
-        """Call this to keep axis calibration in sync with the image array data.
+        r"""Call this to keep axis calibration in sync with the image array data.
         """
         if isinstance(self.scene, vigra.VigraArray):
             self._scene_axes_calibrations_ = [AxesCalibration(self.scene)]
@@ -2829,9 +2834,9 @@ class ScanData(BaseScipyenData):
         elif isinstance(self.scans, (tuple, list)) and len(self.scans) > 0:
             self._scans_axes_calibrations_ = [AxesCalibration(img) for img in self.scans]
             
-    #@safeWrapper
+    #@safewrapper
     def concatenate(self, source, strict = False, pad_value = None, scanregions=False):#, resample=False, alignment=0):#, src_slice = None, other_slice = None, axis=None):
-        """Concatenates "source" to this object (the "receiver").
+        r"""Concatenates "source" to this object (the "receiver").
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
@@ -3702,9 +3707,9 @@ class ScanData(BaseScipyenData):
     def addAnalysisUnit(self, *args):
         self.defineAnalysisUnit(*args)
     
-    @safeWrapper
+    @safewrapper
     def defineAnalysisUnit(self, landmark, scene=False, protocols=None):
-        """
+        r"""
         Defines an AnalysisUnit object on a landmark in this ScanData.
         
         landmark: a pictgui.PlanarGraphics object or None.
@@ -3847,9 +3852,9 @@ class ScanData(BaseScipyenData):
             raise TypeError("landmark expected to be a pictgui.PlanarGraphics, or None; got %s instead" % type(landmark).__name__)
         
 
-    @safeWrapper
+    @safewrapper
     def hasAnalysisUnit(self, obj):
-        """ Checks for the existence of an analysis unit defined on a landmark.
+        r""" Checks for the existence of an analysis unit defined on a landmark.
         
         Parameter:
         =========
@@ -3873,9 +3878,9 @@ class ScanData(BaseScipyenData):
             return False
             
         
-    @safeWrapper
+    @safewrapper
     def setAnalysisUnitDescriptor(self, obj, name, value):
-        """
+        r"""
         Obj : either None, a string or an AnalysisUnit object
             when None, then set a descriptor to the AnalysisUnit defined on this
                 ScanData as a whole
@@ -3906,9 +3911,9 @@ class ScanData(BaseScipyenData):
         
         
         
-    @safeWrapper
+    @safewrapper
     def getAnalysisUnitDescriptor(self, obj, name):
-        """
+        r"""
         Obj : either None, a string or an AnalysisUnit object
             when None, then set a descriptor to the AnalysisUnit defined on this
                 ScanData as a whole
@@ -3937,9 +3942,9 @@ class ScanData(BaseScipyenData):
             else:
                 raise ValueError("AnalysisUnit %s not found" % obj)
             
-    @safeWrapper
+    @safewrapper
     def removeAnalysisUnit(self, unitOrName, removeLandmark=True):
-        """Removes a landmark-based analysis unit.
+        r"""Removes a landmark-based analysis unit.
         
         Also removes all derived analysis data associated with the unit.
         
@@ -4020,7 +4025,7 @@ class ScanData(BaseScipyenData):
         
     
     def _select_protocol_frames_(self, event_frames, exclude_failures, test_comp, unit_name, self_name):
-        """
+        r"""
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
 
@@ -4195,9 +4200,9 @@ class ScanData(BaseScipyenData):
         
         return obj
         
-    @safeWrapper
+    @safewrapper
     def clearAnalysis(self, name=None):
-        """Removes the analysis data signal associated with the named analysis unit, from the analysis data blocks.
+        r"""Removes the analysis data signal associated with the named analysis unit, from the analysis data blocks.
         
         The analysis data blocks are self.scansBlock and self.sceneBlock
         
@@ -4234,9 +4239,9 @@ class ScanData(BaseScipyenData):
                 self._remove_data_signal_from_block_(self.scansBlock, name)
                 self._remove_data_signal_from_block_(self.sceneBlock, name)
             
-    @safeWrapper
+    @safewrapper
     def clearAnalysisUnits(self, removeLandmarks=False):
-        """Removes all defined analysis units, optionally the planar graphics associated with them
+        r"""Removes all defined analysis units, optionally the planar graphics associated with them
         """
         if len(self._analysis_units_) == 0:
             return
@@ -4254,7 +4259,7 @@ class ScanData(BaseScipyenData):
     def defaultAnalysisUnit(self):
         return self.getAnalysisUnit()
     
-    @safeWrapper
+    @safewrapper
     def analysisUnitSignal(self, landmark=None):
         # TODO: get the signal computed on this analysis unit; the analysis results
         # if present, are embedded in the signal's annotations attribute
@@ -4274,10 +4279,10 @@ class ScanData(BaseScipyenData):
         #
         pass
             
-    @safeWrapper
+    @safewrapper
     
     def getAnalysisUnit(self, landmark=None):
-        """Access an AnalysisUnit object defined in this ScanData object.
+        r"""Access an AnalysisUnit object defined in this ScanData object.
         
         This can be an AnalysisUnit object associated with a specified landmark,
         or the AnalysisUnit associated with the entire data.
@@ -4345,14 +4350,14 @@ class ScanData(BaseScipyenData):
             raise TypeError("landmark expected to be a string, a pictgui.PlanarGraphics, or None; got %s instead" % type(landmark).__name__)
             
             
-    #@safeWrapper
+    #@safewrapper
     def extractAnalysisUnit(self, analysis_unit, average=False, 
                                 exclude_failures=False, 
                                 test_component="any", 
                                 name=None,
                                 progressSignal = None,
                                 progressValue = None):
-        """Outputs a defined analysis unit as a ScanData object.
+        r"""Outputs a defined analysis unit as a ScanData object.
         
         FIXME/TODO 2022-01-04 17:13:13
         1) break up dependency on _parse_image_arrays_
@@ -5668,7 +5673,7 @@ class ScanData(BaseScipyenData):
                                     exclude_failures=False, test_component="any", 
                                     simple_name=False,
                                     progressSignal = None):
-        """Extract all individual analysis units from the scans data set.
+        r"""Extract all individual analysis units from the scans data set.
         
         Delegates to self.extractAnalysisUnit called on individual landmark-based
         analysis units, or on the (default) analysis unit based on the entire data
@@ -5751,7 +5756,7 @@ class ScanData(BaseScipyenData):
         #print("extract analysis units", result.name)
         return result
             
-    #@safeWrapper
+    #@safewrapper
     def adoptAnalysisOptions(self, source):
         if not isinstance(source, ScanData):
             raise TypeError("Expecting a ScanData object; got %s instead" % type(source).__name__)
@@ -5759,9 +5764,9 @@ class ScanData(BaseScipyenData):
         # NOTE: a local copy is made by the property setter
         self.analysisOptions = source.analysisOptions 
         
-    #@safeWrapper
+    #@safewrapper
     def adoptAnalysisUnits(self, source):
-        """Imports copies of the landmark-based analysis units from the ScanData object "source".
+        r"""Imports copies of the landmark-based analysis units from the ScanData object "source".
         
         The landmark-based units in the source must have the same values for their
         "cell" and "field" attributes as this ScanData object.
@@ -5854,9 +5859,9 @@ class ScanData(BaseScipyenData):
                 
                 self._analysis_units_.add(new_unit)
         
-    @safeWrapper
+    @safewrapper
     def adoptScansCursors(self, source):
-        """Adopts scan cursors from "source" ScanData object.
+        r"""Adopts scan cursors from "source" ScanData object.
         
         Does nothing if source has no scans cursors defined.
         
@@ -5945,7 +5950,7 @@ class ScanData(BaseScipyenData):
             self.scansCursors.clear()
             self.scansCursors.update(new_objects)
             
-    @safeWrapper
+    @safewrapper
     def adoptLandmark(self, source, name):
         import gui.pictgui as pgui
         from functools import partial as partial
@@ -6049,9 +6054,9 @@ class ScanData(BaseScipyenData):
             
         return new_obj
             
-    @safeWrapper
+    @safewrapper
     def adoptLandmarks(self, source, data = "all", landmark_type="all", clear=False):
-        """Adopts landmarks from source.
+        r"""Adopts landmarks from source.
         
         Imports landmarks defined in source.
         
@@ -6202,9 +6207,9 @@ class ScanData(BaseScipyenData):
             _landmarks_adopt_inner_(cursors, cursorstarget, clear)
 
         
-    @safeWrapper
+    @safewrapper
     def adoptSceneCursors(self, source, clear=False):
-        """Adopts scene cursors from "source" ScanData object.
+        r"""Adopts scene cursors from "source" ScanData object.
         
         Does nothing if source has no scene cursors defined.
         
@@ -6277,9 +6282,9 @@ class ScanData(BaseScipyenData):
             self.sceneCursors.update(new_objects)
             
             
-    @safeWrapper
+    @safewrapper
     def adoptScansRois(self, source):
-        """Adopts scan rois from "source" ScanData object.
+        r"""Adopts scan rois from "source" ScanData object.
         
         Does nothing if source has no scans rois defined.
         
@@ -6346,9 +6351,9 @@ class ScanData(BaseScipyenData):
             self.scansRois.clear()
             self.scansRois.update(new_objects)
             
-    @safeWrapper
+    @safewrapper
     def adoptSceneRois(self, source):
-        """Adopts scene rois from "source" ScanData object.
+        r"""Adopts scene rois from "source" ScanData object.
         
         Overwrites existing ROIs with same name.
         
@@ -6403,9 +6408,9 @@ class ScanData(BaseScipyenData):
             self.sceneRois.clear()
             self.sceneRois.update(new_objects)
             
-    @safeWrapper
+    @safewrapper
     def adoptGraphicsObjects(self, source):
-        """Adopts _ALL_ graphics objects (cursors, rois) defined in source.
+        r"""Adopts _ALL_ graphics objects (cursors, rois) defined in source.
         
         CAUTION: Overwrites existing objects, including the scanline ROI!!!
         
@@ -6464,9 +6469,9 @@ class ScanData(BaseScipyenData):
                 target.clear()
                 target.update(new_objects)
 
-    @safeWrapper
+    @safewrapper
     def adoptTriggerProtocols(self, src, imaging_source=False):
-        """Parses trigger and adopts trigger protocols from the neo.Block object "src".
+        r"""Parses trigger and adopts trigger protocols from the neo.Block object "src".
 
         Named parameters:
         =================
@@ -6623,7 +6628,7 @@ class ScanData(BaseScipyenData):
             if len(self._trigger_protocols_):
                 self._trigger_protocols_.sort(key=lambda x:x.segmentIndices()[0])
             
-    @safeWrapper
+    @safewrapper
     def clearTriggerProtocols(self):
         self._trigger_protocols_.clear()
         
@@ -6631,9 +6636,9 @@ class ScanData(BaseScipyenData):
         clear_events(self._scans_block_,         triggersOnly = True)
         clear_events(self._scene_block_,         triggersOnly = True)
         
-    @safeWrapper
+    @safewrapper
     def addTriggerProtocol(self, protocol, sort=False):
-        """Adds a trigger protocol.
+        r"""Adds a trigger protocol.
         
         Parameters:
         ============
@@ -6749,62 +6754,51 @@ class ScanData(BaseScipyenData):
         for u in self.analysisUnits:
             ndx = u.protocols.index(protocol)
             del u.protocols[ndx]
+            
+    @property
+    def triggers(self):
+        return self.triggerProtocols
         
     def protocol(self, index):
-        """Alias to self.triggerProtocol(index)
+        r"""Alias to self.triggerProtocol(index)
         """
-        return self.triggerProtocol(index)
+        return self.triggerProtocolForFrame(index)
     
-    @safeWrapper
-    def triggerProtocol(self, nameOrSegmentIndex):
-        """Accesses a trigger protocol in this ScanData, specified by name or frame.
+    @safewrapper
+    def triggerProtocolForFrame(self, frameIndex:int):
+        r"""Accesses a trigger protocol associated with a specific scanning frame.
+        The data frame is specified by an integer index. Indexing starts with 0
+        and negative indices are used for 'reversed' indexing (i.e. starting with
+        the highest index and going backwards).
+        
+        To lookup a TriggerProtocol by its name, use self.getNamedTriggerProtocols(…)
         
         Parameters:
         ==========
         
-        nameOrSegmentIndex: a str (protocol name) or an int (frame index) which must be found
-            in the segmentIndices attrbute of the exising protocols
+        frameIndex: must be found in the 'segmentIndices' attribute of the exising protocols
             
-            NOTE  when an int this is NOT the index of the protocol in 
-            triggerProtocols list!
+            CAUTION:  This is NOT the index of the protocol in self.triggerProtocols
         
         Returns:
         ========
         
-        When nameOrSegmentIndex is a str: a trigger protocol with the name specified by "nameOrSegmentIndex"
-        
-            Raises an Exception if no such protocol exists.
-            
-        When nameOrSegmentIndex is an int: a trigger protocol associated attached to the
-            scans frame with the given nameOrSegmentIndex.
+        A trigger protocol associated attached to the scans frame with the given frameIndex.
             
             Returns None if the specified frame index does not associate a protocol.
             
             Raises an Exception if frame index is outside the semi-open interval [0, self.scansFrames)
             or if the frame index associated more than one protocols.
             
-        Returns None if there are not trigger protocols defined.
+        Returns None if there are no trigger protocols defined.
         
         """
         
         if len(self.triggerProtocols) == 0:
             return None
         
-        if isinstance(nameOrSegmentIndex, str):
-            if nameOrSegmentIndex in [p.name for p in self._trigger_protocols_]:
-                
-                protocols = [p for p in self._trigger_protocols_ if p.name == nameOrSegmentIndex]
-                
-                if len(protocols) > 1:
-                    raise RuntimeError("There appears to be %d protocols named '%s' in %s" % (len(protocols), nameOrSegmentIndex, self.name))
-                
-                return protocols[0]
-            
-            else:
-                raise ValueError("data does not contain a protocol named %s" % nameOrSegmentIndex)
-            
-        elif isinstance(nameOrSegmentIndex, int):
-            if nameOrSegmentIndex < 0 or nameOrSegmentIndex >= self.scansFrames:
+        if isinstance(frameIndex, int):
+            if frameIndex < 0 or nameOrSegmentIndex >= self.scansFrames:
                 raise ValueError("Invalid frame nameOrSegmentIndex %d); expected to be a value on the semi-open interval [0, %d) in %s" % (nameOrSegmentIndex, self.scansFrames, self.name))
         
             protocols = [p for p in self.triggerProtocols if nameOrSegmentIndex in p.segmentIndices()]
@@ -6820,7 +6814,7 @@ class ScanData(BaseScipyenData):
         else:
             raise TypeError("expecting a string or an int; got %s instead" % type(nameOrSegmentIndex).__name__)
         
-    #@safeWrapper
+    #@safewrapper
     def getNamedTriggerProtocols(self, names):
         if isinstance(names, (tuple, list)) and all([isinstance(n, str) for n in names]):
             pr_names = [p.name for p in self._trigger_protocols_]
@@ -6840,9 +6834,9 @@ class ScanData(BaseScipyenData):
         else:
             raise TypeError("A str or a sequence of str was expected")
         
-    @safeWrapper
+    @safewrapper
     def addLandmark(self, obj, scans=True):
-        """Adds a landmark (pictgui.PlanarGraphics object: cursor or ROI) to the image data.
+        r"""Adds a landmark (pictgui.PlanarGraphics object: cursor or ROI) to the image data.
         
         To generate an AnalysisUnit object, call self.defineAnalysisUnit(...)
         AFTER the landmark has been added.
@@ -6868,9 +6862,9 @@ class ScanData(BaseScipyenData):
             for o in obj.linkedObjects:
                 self.addLandmark(o)
                 
-    @safeWrapper
+    @safewrapper
     def renameAnalysisUnit(self, value, analysis_unit=None):
-        """Rename the analysis unit to the string in 'value'
+        r"""Rename the analysis unit to the string in 'value'
         
         Parameters:
         ===========
@@ -6993,9 +6987,9 @@ class ScanData(BaseScipyenData):
             
         return analysis_unit
         
-    @safeWrapper
+    @safewrapper
     def renameLandmark(self, landmark, name):
-        """Changes the name of the landmark.
+        r"""Changes the name of the landmark.
         If the landmark is used for an analysis unit, and its name differs from
         the new name of the landmark, the unit is also renamed
         
@@ -7065,9 +7059,9 @@ class ScanData(BaseScipyenData):
             return landmark
         
 
-    @safeWrapper
+    @safewrapper
     def removeLandmark(self, landmark, scans=True, cursor=True):
-        """Removes a landmark
+        r"""Removes a landmark
         
         If the landmark is associated with an analysis unit, it also removes 
         that analysis unit (together with the data derived from it)
@@ -7172,9 +7166,9 @@ class ScanData(BaseScipyenData):
         
         return landmark
         
-    @safeWrapper
+    @safewrapper
     def addCursor(self, cursor, scans=True):
-        """Appends a cursor to the specified frame of the specified data subset.
+        r"""Appends a cursor to the specified frame of the specified data subset.
         
         To remove a cursor use removeCursor(...); to modify a cursor, use setCursor(...)
         
@@ -7206,13 +7200,13 @@ class ScanData(BaseScipyenData):
         """
         self.setCursor(cursor, scans, True)
         
-    @safeWrapper
+    @safewrapper
     def addRoi(self, obj, scans=True):
         self.setRoi(obj, scans, True)
         
-    @safeWrapper
+    @safewrapper
     def getCursor(self, name, scans=True):
-        """Returns a reference to a cursor, or None.
+        r"""Returns a reference to a cursor, or None.
         
         A cursor is a pictgui.Cursor that is displayed in an image window through
         a linked GraphicsObject (an entity distinct from pictgui.Cursor;
@@ -7242,43 +7236,43 @@ class ScanData(BaseScipyenData):
         except:
             traceback.print_exc()
             
-    @safeWrapper
+    @safewrapper
     def sceneCursor(self, name):
         if name in self.sceneCursors.keys():
             return self.sceneCursors[name]
         
-    @safeWrapper
+    @safewrapper
     def sceneRoi(self, name):
         if name in self.sceneRois.keys():
             return self.sceneRois[name]
         
-    @safeWrapper
+    @safewrapper
     def scansCursor(self, name):
         if name in self.scansCursors.keys():
             return self.scansCursors[name]
         
-    @safeWrapper
+    @safewrapper
     def scanCursor(self, name):
-        """Same as scansCursor
+        r"""Same as scansCursor
         """
         if name in self.scanCursors.keys():
             return self.scanCursors[name]
         
-    @safeWrapper
+    @safewrapper
     def scansRoi(self, name):
         if name in self.scansRois.keys():
             return self.scansRois[name]
         
-    @safeWrapper
+    @safewrapper
     def scanRoi(self, name):
-        """Same as scansRoi
+        r"""Same as scansRoi
         """
         if name in self.scanRois.keys():
             return self.scanRois[name]
         
-    @safeWrapper
+    @safewrapper
     def setCursor(self, cursor, scans=True, append=False):
-        """Sets or appends a cursor to the specified frame in a specified data subset.
+        r"""Sets or appends a cursor to the specified frame in a specified data subset.
         
         To remove a cursor use removeCursor()
         
@@ -7348,7 +7342,7 @@ class ScanData(BaseScipyenData):
             
         return cursor.name
     
-    @safeWrapper
+    @safewrapper
     def removeChannel(self, name_or_index):
         try:
             self.removeScansChannel(name_or_index)
@@ -7364,7 +7358,7 @@ class ScanData(BaseScipyenData):
             traceback.print_exc()
             warnings.warn("Channel name %s not found in scene" % name_or_index, RuntimeWarning)
     
-    @safeWrapper
+    @safewrapper
     def removeScansChannel(self, name_or_index):
         if isinstance(name_or_index, str):
             if name_or_index not in self.scansChannelNames:
@@ -7381,7 +7375,7 @@ class ScanData(BaseScipyenData):
         del self._scans_[ch_index]
         self._scans_axes_calibrations_[:] = [AxesCalibration(img) for img in self._scans_]
             
-    @safeWrapper
+    @safewrapper
     def removeSceneChannel(self, name_or_index):
         if isinstance(name_or_index, str):
             if name_or_index not in self.sceneChannelNames:
@@ -7399,7 +7393,7 @@ class ScanData(BaseScipyenData):
         self._scene_axes_calibrations_[:] = [AxesCalibration(img) for img in self._scene_]
         
     def trimScans(self, interval, axis):
-        """Removes image data OUTSIDE the specified interval along the specified axis .
+        r"""Removes image data OUTSIDE the specified interval along the specified axis .
         
         Axis cannot be a channel axis!
         """
@@ -7428,7 +7422,7 @@ class ScanData(BaseScipyenData):
         self.scans[:] = [s[slicing] for s in self.scans]
     
     def removeFrame(self, ndx):
-        """
+        r"""
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         
@@ -7692,9 +7686,9 @@ class ScanData(BaseScipyenData):
         
         return self
     
-    #@safeWrapper
+    #@safewrapper
     def removeCursor(self, obj, scans=True):
-        """Removes cursor obj from the data subset
+        r"""Removes cursor obj from the data subset
         
         Parameters:
         ===========
@@ -7741,7 +7735,7 @@ class ScanData(BaseScipyenData):
             
         return obj
     
-    @safeWrapper
+    @safewrapper
     def removeCursors(self, scans=True):
         if scans:
             cursordict = self._scanscursors_
@@ -7760,9 +7754,9 @@ class ScanData(BaseScipyenData):
                 
         cursordict.clear()
             
-    @safeWrapper
+    @safewrapper
     def setCursors(self, *values, scans=True):
-        """Constructs a nested dictionary of cursors.
+        r"""Constructs a nested dictionary of cursors.
         
         See getCursor() for details on cursors.
         
@@ -7834,9 +7828,9 @@ class ScanData(BaseScipyenData):
                                                
             cursordict.clear()
             
-    @safeWrapper
+    @safewrapper
     def getRoi(self, name, scans=True):
-        """Returns a reference to a roi, or None 
+        r"""Returns a reference to a roi, or None 
         
         A roi is a pictgui.PlanarGraphics object that is displayed in an image
         window by way of a pictgui.GraphicsObject "frontend". The PlanarGraphics
@@ -7868,9 +7862,9 @@ class ScanData(BaseScipyenData):
         except:
             traceback.print_exc()
     
-    @safeWrapper
+    @safewrapper
     def setRoi(self, roi, scans=True, append=False):
-        """Sets or appends a roi to the specified frame in a specified data subset.
+        r"""Sets or appends a roi to the specified frame in a specified data subset.
         
         To remove a roi use removeRoi()
         
@@ -7931,9 +7925,9 @@ class ScanData(BaseScipyenData):
             
         return roi.name # why ? - answer to be used by the caller -- ?
         
-    @safeWrapper
+    @safewrapper
     def removeRoi(self, obj, scans=True):
-        """Removes roi with roi ID (obj) "obj" from the data subset
+        r"""Removes roi with roi ID (obj) "obj" from the data subset
 
         Parameters:
         ===========
@@ -7977,7 +7971,7 @@ class ScanData(BaseScipyenData):
         
         return obj
             
-    @safeWrapper
+    @safewrapper
     def removeRois(self, scans=True):
         if scans:
             roidict = self._scansrois_
@@ -7996,9 +7990,9 @@ class ScanData(BaseScipyenData):
                 
         roidict.clear()
             
-    @safeWrapper
+    @safewrapper
     def setRois(self, *values, scans=True):
-        """Constructs a nested dictionary of rois.
+        r"""Constructs a nested dictionary of rois.
         
         See getRoi() for details on ROIs.
         
@@ -8080,7 +8074,7 @@ class ScanData(BaseScipyenData):
             roidict.clear()
             
     def getSceneAxesCalibration(self, channel=0):
-        """
+        r"""
         Gets the AxesCalibration for the specified scene channel (default 0)
         
         For multi-channel data, returns the AxesCalibration of the whole image;
@@ -8119,7 +8113,7 @@ class ScanData(BaseScipyenData):
             
         
     def getScansAxesCalibration(self, channel=0):
-        """
+        r"""
         Gets the AxesCalibration for the specified scans channel (default 0)
         
         For multi-channel data, returns the AxesCalibration of the whole image;
@@ -8159,9 +8153,9 @@ class ScanData(BaseScipyenData):
         
         
             
-    #@safeWrapper
+    #@safewrapper
     def averageFrames(self, frame_index=None, protocol=None):
-        """Returns a new ScanData containing frame-average of data from 
+        r"""Returns a new ScanData containing frame-average of data from 
         specified frames, or all data if frame_index is None
         
         FIXME
@@ -8293,7 +8287,7 @@ class ScanData(BaseScipyenData):
         
     @property
     def unitType(self):
-        """Returns/sets the value of the type attribute of THIS ScanData object's analysis unit.
+        r"""Returns/sets the value of the type attribute of THIS ScanData object's analysis unit.
         """
         return self.analysisUnit.unit_type if isinstance(self.analysisUnit, AnalysisUnit) else "NA"
     
@@ -8326,7 +8320,7 @@ class ScanData(BaseScipyenData):
     
     @property
 #     def analysisUnits(self):
-#         """Returns the set of analysis units nested in this data, as a sorted list.
+#         r"""Returns the set of analysis units nested in this data, as a sorted list.
 #         These are/must be defined on landmarks (cursors or ROIs).
 #         The list is sorted by the names of the analysis units; it may be empty.
 #         
@@ -8342,7 +8336,7 @@ class ScanData(BaseScipyenData):
     
     @property
     def analysisUnitNames(self):
-        """Returns the name of set of analysis units defined on landmarks in this Data.
+        r"""Returns the name of set of analysis units defined on landmarks in this Data.
         
         NOTE: This set does not contain the default analysis unit defined on the 
         entire data. The latter is obtained by calling ScanData.analysisUnit() 
@@ -8355,7 +8349,7 @@ class ScanData(BaseScipyenData):
         
     #@property
     #def sceneCursors(self):
-        #"""Dictionary with str keys (cursor name) mapped to pictgui.Cursor objects
+        #r"""Dictionary with str keys (cursor name) mapped to pictgui.Cursor objects
         
         
         #e.g.:
@@ -8374,7 +8368,7 @@ class ScanData(BaseScipyenData):
     
     #@property
     #def scansCursors(self):
-        #"""Dictionary with str keys (cursor name) mapped to pictgui.Cursor objects
+        #r"""Dictionary with str keys (cursor name) mapped to pictgui.Cursor objects
         
         
         #e.g.:
@@ -8386,14 +8380,14 @@ class ScanData(BaseScipyenData):
     
     #@property
     #def scanCursors(self):
-        #"""Same as scansCursors
+        #r"""Same as scansCursors
         #"""
         #return self._scanscursors_
         
         
     #@property
     #def sceneRois(self):
-        #""" A mapping of roi names to non-cursor PlanarGraphics
+        #r""" A mapping of roi names to non-cursor PlanarGraphics
         
         #e.g.:
         
@@ -8407,7 +8401,7 @@ class ScanData(BaseScipyenData):
     
     #@property
     #def scansRois(self):
-        #"""Read-only
+        #r"""Read-only
         
         #scansRois is a dict with str keys (roi name) mapped to
         #pictgui.Path or pictgui.PathElements object
@@ -8421,13 +8415,13 @@ class ScanData(BaseScipyenData):
     
     #@property
     #def scanRois(self):
-        #"""Same as scansRois
+        #r"""Same as scansRois
         #"""
         #return self._scansrois_
     
     @property
     def scansLandmarks(self):
-        """
+        r"""
         A list of landmarks defined in the scans images.
         
         The list is sorted by landmark name
@@ -8436,13 +8430,13 @@ class ScanData(BaseScipyenData):
     
     @property
     def scanLandmarks(self):
-        """Same as scansLandmarks
+        r"""Same as scansLandmarks
         """
         return sorted([l for l in self.scansCursors.values()], key=lambda x:x.name)
     
     @property
     def sortedScansLandmarks(self):
-        """
+        r"""
         A list of landmarks defined in the scans images.
         
         The list is sorted by the (X,Y) coordinates
@@ -8451,7 +8445,7 @@ class ScanData(BaseScipyenData):
     
     @property
     def sceneLandmarks(self):
-        """
+        r"""
         A list of landmarks defined in the scene images EXCLUDING the scanning landmark/trajectory/region.
         
         The list is sorted by landmark name
@@ -8460,7 +8454,7 @@ class ScanData(BaseScipyenData):
     
     @property
     def sortedSceneLandmarks(self):
-        """
+        r"""
         A list of landmarks defined in the scene images EXCLUDING the scanning landmark/trajectory/region.
         
         The list is sorted by the (X,Y) coordinates
@@ -8469,14 +8463,14 @@ class ScanData(BaseScipyenData):
     
     @property
     def landmarks(self):
-        """A list of all the landmarks, EXCLUDING the scanning landmark/trajectory/region..
+        r"""A list of all the landmarks, EXCLUDING the scanning landmark/trajectory/region..
         """
         return [l for l in self.sceneCursors.values()]  + [l for l in self.sceneRois.values()] + \
                [l for l in self.scansCursors.values()] + [l for l in self.scansRois.values()]
     
     @property
     def landmarksDictionary(self):
-        """A dict of all PlanarGraphics landmarks defined in this ScanData object.
+        r"""A dict of all PlanarGraphics landmarks defined in this ScanData object.
         This EXCLUDES the scanRegion PlanarGraphics.
         
         The dict maps keywords to the PlanarGraphics dictionaries defined here:
@@ -8502,13 +8496,13 @@ class ScanData(BaseScipyenData):
         
     # @property
     # def processed(self):
-    #     """True if image data has been processed in any way (i.e. filtered)
+    #     r"""True if image data has been processed in any way (i.e. filtered)
     #     """
     #     return self._processed_
     
     @property
     def scanRegion(self):
-        """Alias to the self.scanTrajectory descriptor.
+        r"""Alias to the self.scanTrajectory descriptor.
         Kept for backwards compatibility
         """
         return self.scanTrajectory
@@ -8525,28 +8519,28 @@ class ScanData(BaseScipyenData):
         
     @property
     def electrophysiologySweeps(self):
-        """Read-only.
+        r"""Read-only.
         """
         
         return self.nFrames("electrophysiology")
     
     @property
     def electrophysiologySegments(self):
-        """Read-only. Alias to self.electrophysiologySweeps
+        r"""Read-only. Alias to self.electrophysiologySweeps
         """
         
         return self.electrophysiologySweeps
     
     @property
     def electrophysiologyFrames(self):
-        """Read-only. Alias to self.electrophysiologySweeps
+        r"""Read-only. Alias to self.electrophysiologySweeps
         """
         
         return self.electrophysiologySweeps
     
     @property
     def sceneFrames(self) -> int:
-        """Read-only.
+        r"""Read-only.
         
         Can only be changed indirectly, by either:
         1) changing the sceneFrameAxis
@@ -8562,8 +8556,20 @@ class ScanData(BaseScipyenData):
         return self.sceneLayout.framesAxis
     
     @property
+    def sceneHorizontalAxis(self):
+        return self.sceneLayout.horizontalAxis
+    
+    @property
+    def sceneVerticalAxis(self):
+        return self.sceneLayout.verticalAxis
+    
+    @property
+    def sceneChannelsAxis(self):
+        return self.sceneLayout.channelsAxis
+    
+    @property
     def sceneChannels(self) -> int:
-        """Read-only. 
+        r"""Read-only. 
         The number of channels in the scene data or 0 if no scene data exists.
          
         FIXME/TODO adapt to a new scenario where all scene image data is a single
@@ -8582,8 +8588,8 @@ class ScanData(BaseScipyenData):
             return len(self.scene)
 
     @property
-    def sceneChannelNames(self):
-        """
+    def sceneChannelNames(self) -> tuple:
+        r"""
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         
@@ -8601,7 +8607,7 @@ class ScanData(BaseScipyenData):
         
     @sceneChannelNames.setter
     def sceneChannelNames(self, value:typing.Union[tuple, list, str]):
-        """
+        r"""
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
         
@@ -8638,7 +8644,7 @@ class ScanData(BaseScipyenData):
             
     @property
     def scansFrames(self):
-        """Read-only.
+        r"""Read-only.
         
         Can only be modifier indirectly by either:
         1) changing self.scansFrameAxis
@@ -8655,8 +8661,20 @@ class ScanData(BaseScipyenData):
         return self.scansLayout.framesAxis
     
     @property
-    def scansChannels(self):
-        """The number of channels; read-only
+    def scansHorizontalAxis(self):
+        return self.scansLayout.horizontalAxis
+    
+    @property
+    def scansVerticalAxis(self):
+        return self.scansLayout.verticalAxis
+    
+    @property
+    def scansChannelsAxis(self):
+        return self.scansLayout.channelsAxis
+    
+    @property
+    def scansChannels(self) -> int:
+        r"""The number of channels; read-only
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
@@ -8676,7 +8694,7 @@ class ScanData(BaseScipyenData):
     
     @property
     def scansChannelNames(self):
-        """
+        r"""
         """
         if self.scans is None:
             return tuple()
@@ -8690,8 +8708,8 @@ class ScanData(BaseScipyenData):
         return tuple(itertools.chain.from_iterable((AxesCalibration(self.scans[k])["c"].channelNames for k in range(len(self.scans)))))
         
     @scansChannelNames.setter
-    def scansChannelNames(self, value):
-        """
+    def scansChannelNames(self, value) -> tuple:
+        r"""
         
         FIXME/TODO adapt to a new scenario where all scene image data is a single
         multi-channel VigraArray
@@ -8727,7 +8745,7 @@ class ScanData(BaseScipyenData):
             raise ValueError("Expecting a str list with as many elements as channels (%d); got %d elements instead" % (self.scansChannels, len(value)))
         
     def nFrames(self, component:typing.Optional[str] = None) -> int:
-        """Returns the number of frames in the data, or a specific data component.
+        r"""Returns the number of frames in the data, or a specific data component.
         
         For data components containing 1D signals a 'frame' (a.k.a 'sweep') 
         corresponds to a neo.Segment; for image data, a 'frame' is a 2D slice 
@@ -8817,7 +8835,7 @@ class ScanData(BaseScipyenData):
         # 
         
     def setFramesRelationship(self, *args, **kwargs):
-        """TODO: 2021-12-05 23:11:07
+        r"""TODO: 2021-12-05 23:11:07
         """
         pass
     
@@ -8910,7 +8928,7 @@ def check_apiversion(data):
     return True
 
 
-@safeWrapper
+@safewrapper
 def scanDataOptions(detection_predicate=1.3, roi_width = 10, 
                   reference="Ch1", indicator="Ch2", 
                   bleed_ref_ind = 0, bleed_ind_ref = 0, 
@@ -8919,7 +8937,7 @@ def scanDataOptions(detection_predicate=1.3, roi_width = 10,
                   int_begin = 0 * pq.s, int_end = 0.5 * pq.s,
                   peak_begin = 0.15 * pq.s, peak_end = 0.3 * pq.s,
                   initial=[], lower=[], upper=[]):
-    """
+    r"""
     TODO: Customize all parameters on function signature; also write a GUI for this
     TODO: change API to use ScanDataOptions
     """
@@ -9106,11 +9124,11 @@ def scanDataOptions(detection_predicate=1.3, roi_width = 10,
     #
     # NOTE: the EPSCaT fit model is a linear sum of several delayed waveforms, 
     # each with a single exponential rise + multiple exponential decays
-    # (see core.models.compound_exp_rise_multi_decay()).
+    # (see core.models.compound_exponential_rise_decays_product_biased_shifted()).
     #
     # A single Ca2+ transient event (single-component EPSCaT) is fitted by one such
     # waveform which takes at least five parameters
-    # (see core.models.exp_rise_multi_decays() function):
+    # (see core.models.exponential_rise_decays_product_biased_shifteds() function):
     #
     #   x0              = onset (delay) of the transient; only makes sense when x0 >= 0
     #   r               = rising phase time constant; 

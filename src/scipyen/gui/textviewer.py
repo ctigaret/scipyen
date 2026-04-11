@@ -11,15 +11,38 @@ import os
 #### END core python modules
 
 #### BEGIN 3rd party modules
-from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-# from PyQt5 import QtCore, QtGui, QtWidgets
-# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
 import core.xmlutils as xmlutils
+import core.strutils as strutils
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
@@ -39,7 +62,7 @@ __scipyen_plugin__ = None
 # TODO: 2019-11-10 13:12:40
 # configure text syntax highlighting
 class TextViewer(ScipyenViewer):
-    """No-frills text viewer/editor with the simplest text editing functionality.
+    r"""No-frills text viewer/editor with the simplest text editing functionality.
     • syntax highlighting (XML, HTML, Markdown)
     • support for ODF format (save only)
     • no formatting of characters or font
@@ -51,7 +74,7 @@ class TextViewer(ScipyenViewer):
     # signal_window_will_close = Signal()
     sig_textChanged = Signal(name = "sig_textChanged")
     
-    viewer_for_types = {str: 99, QtGui.QTextDocument: 99}
+    viewer_for_types = {str: 99, QtGui.QTextDocument: 99, strutils.is_html:99}
     # view_action_name = "Text"
     
     # FIXME/TODO: 2019-11-10 13:16:56
@@ -75,12 +98,21 @@ class TextViewer(ScipyenViewer):
             
     def _configureUI_(self):
         self.fileMenu = self.menuBar().addMenu("&File")
-        self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-open"), "&Open...", self.openFile, "Ctrl+Shift+O")
-        self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-save-as"), "&Save As...", self.saveAsFile, "Ctrl+Shift+S")
-        self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-export"), "Export to workspace...", self._slot_exportDataToWorkspace, "Ctrl+Shift+E")
+        if __has_PyQt6__ or __has_PySide6__:
+            self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-open"), "&Open...", self.openFile)
+            self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-save-as"), "&Save As...", self.saveAsFile)
+            self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-export"), "Export to workspace...", self._slot_exportDataToWorkspace)
+        else:
+            self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-open"), "&Open...", self.openFile, "Ctrl+Shift+O")
+            self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-save-as"), "&Save As...", self.saveAsFile, "Ctrl+Shift+S")
+            self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-export"), "Export to workspace...", self._slot_exportDataToWorkspace, "Ctrl+Shift+E")
         self.editMenu = self.menuBar().addMenu("&Edit")
-        self.editMenu.addAction(QtGui.QIcon.fromTheme("edit-undo"), "&Undo", self.undo, "Ctrl+z")
-        self.editMenu.addAction(QtGui.QIcon.fromTheme("edit-redo"), "&Redo", self.undo, "Ctrl+Shift+z")
+        if __has_PyQt6__ or __has_PySide6__:
+            self.editMenu.addAction(QtGui.QIcon.fromTheme("edit-undo"), "&Undo", self.undo)
+            self.editMenu.addAction(QtGui.QIcon.fromTheme("edit-redo"), "&Redo", self.undo)
+        else:
+            self.editMenu.addAction(QtGui.QIcon.fromTheme("edit-undo"), "&Undo", self.undo, "Ctrl+z")
+            self.editMenu.addAction(QtGui.QIcon.fromTheme("edit-redo"), "&Redo", self.undo, "Ctrl+Shift+z")
         
         self._docViewer_ = QtWidgets.QTextEdit(self)
         self._docViewer_.setReadOnly(self._readOnly)
@@ -127,6 +159,8 @@ class TextViewer(ScipyenViewer):
         else:
             raise TypeError("Expecting a QTextDdocument or a str; got %s instead" % type(data).__name__)
         
+        self._data_ = data
+        
         if kwargs.get("show", True):
             self.activateWindow()
             
@@ -141,7 +175,7 @@ class TextViewer(ScipyenViewer):
             return self._docViewer_.document().toHtml()
         
     def setText(self, data):
-        self.setData(data) # inherited
+        super().setData(data) # inherited
     
     @property
     def isMarkdown(self):
@@ -160,6 +194,7 @@ class TextViewer(ScipyenViewer):
         self._set_data_("")
         self._docViewer_.document().clear()
         
+    @Slot()
     def openFile(self):
         fileFilter = "All files (*.*);;Text files (*.txt);;HTML (*.html, *.htm);;XML (*.xml);;Markdown (*.md)"
         
@@ -201,6 +236,7 @@ class TextViewer(ScipyenViewer):
     def redo(self):
         self._docViewer_.redo()
     
+    @Slot()
     def saveAsFile(self):
         if self._docViewer_.document().isEmpty():
             #print("Nothing to save")

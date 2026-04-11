@@ -13,21 +13,41 @@ from pprint import pprint
 #### BEGIN Configurable objects with traitlets.config
 from traitlets import (config, Bunch)
 #### END Configurable objects with traitlets.config
-import matplotlib as mpl
-from qtpy import (QtCore, QtWidgets, QtGui)
-from qtpy.QtCore import (Signal, Slot, Property)
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ =False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
 
-from core.utilities import safeWrapper
+import matplotlib as mpl
+
+from core.utilities import safewrapper
 from core.workspacefunctions import (user_workspace, validate_varname, get_symbol_in_namespace)
-from core.scipyen_config import (ScipyenConfigurable, 
-                                 syncQtSettings, 
-                                 markConfigurable, 
+from core.scipyen_config import (ScipyenConfigurable,
+                                 syncQtSettings,
+                                 markConfigurable,
                                  loadWindowSettings,
                                  saveWindowSettings,
                                  confuse)
 from core import strutils, sysutils
 from core.strutils import InflectEngine
-from core.prog import (printStyled, scipywarn)
+from core.prog import (print_styled, scipywarn)
 import gui.quickdialog as qd
 from gui.itemslistdialog import ItemsListDialog
 import gui.pictgui as pgui
@@ -35,32 +55,32 @@ import gui.pictgui as pgui
 SESSION_TYPE = os.getenv("XDG_SESSION_TYPE")
 
 class DirectoryFileWatcher(QtCore.QObject):
-    """Signal dispatcher between a file system directory monitor and an observer.
-    Binds signals emitted by the monitor to bound methods (callbacks) in the 
+    r"""Signal dispatcher between a file system directory monitor and an observer.
+    Binds signals emitted by the monitor to bound methods (callbacks) in the
     observer.
-    
+
     The monitor must emit the following signals:
         "sig_newItemsInMonitoredDir",
         "sig_itemsRemovedFromMonitoredDir",
         "sig_itemsChangedInMonitoredDir"
-        
+
     The observer must have the following methods:
         "changedFiles",
         "removedFiles",
         "filesChanged"
-        
+
     Currently, the monitor interface is implemented in Scipyen's MainWindow.
     Current implementations of the observer interface are:
         ephys.ltp._LTPOnlineSupplier_
     """
     emitter_sigs = ("sig_newItemsInMonitoredDir",
                     "sig_itemsRemovedFromMonitoredDir",
-                    "sig_itemsChangedInMonitoredDir", 
+                    "sig_itemsChangedInMonitoredDir",
                     "sig_changedDirectory")
-    
-    emitter_interface = ("currentDir", "enableDirectoryMonitor", 
+
+    emitter_interface = ("currentDir", "enableDirectoryMonitor",
                          "monitoredDirectories", "isDirectoryMonitored", )
-    
+
     emitter_attrs = ("_monitoredDirsCache_", )
 
     observer_interface = ("newFiles",
@@ -78,20 +98,20 @@ class DirectoryFileWatcher(QtCore.QObject):
         self._source_       = None
         self._observer_     = None
         self._watchedDir_   = None
-        
+
         if all(hasattr(observer, x) and (inspect.isfunction(inspect.getattr_static(observer, x)) and inspect.ismethod(getattr(observer, x))) for x in self.observer_interface):
             self._observer_ = observer
-            
+
         # print(f"{self.__class__.__name__}.__init__: emitter = {emitter}")
 
         if not self._check_emitter_(emitter):
             raise TypeError(f"Invalid 'emitter' was provided")
-        
+
         self._source_ = emitter
         self._source_.sig_newItemsInMonitoredDir.connect(self.slot_newFiles, type=QtCore.Qt.QueuedConnection)
         self._source_.sig_itemsRemovedFromMonitoredDir.connect(self.slot_filesRemoved, type=QtCore.Qt.QueuedConnection)
         self._source_.sig_itemsChangedInMonitoredDir.connect(self.slot_filesChanged, type=QtCore.Qt.QueuedConnection)
-        
+
         self.directory = directory
 
         # if isinstance(emitter, QtCore.QObject):
@@ -106,16 +126,16 @@ class DirectoryFileWatcher(QtCore.QObject):
         #     if isinstance(self._source_, QtCore.QObject) and hasattr(self._source_, "currentDir"):
         #         if isinstance(self._source_.currentDir, str) and pathlib.Path(self._source_.currentDir).absolute().is_dir():
         #             self._watchedDir_ = pathlib.Path(self._source_.currentDir).absolute()
-        # 
+        #
         # elif isinstance(directory, str):
         #     self._watchedDir_ = pathlib.Path(directory)
-        # 
+        #
         # elif isinstance(directory, pathlib.Path):
         #     self._watchedDir_ = directory
-        # 
+        #
         # else:
         #     raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
-        
+
     def _check_emitter_(self, obj:QtCore.QObject) -> bool:
         # print(f"{self.__class__.__name__}._check_emitter_(obj):")
         ret = isinstance(obj, QtCore.QObject)
@@ -123,15 +143,15 @@ class DirectoryFileWatcher(QtCore.QObject):
         if ret:
             ret &= all(hasattr(obj, x) and isinstance(inspect.getattr_static(obj, x), QtCore.Signal) for x in self.emitter_sigs)
             # print(f"\tobj has emitter signals: {ret}")
-            
-        if ret: 
+
+        if ret:
             ret &= all(hasattr(obj, x) and isinstance(inspect.getattr_static(obj, x), (property, types.FunctionType)) for x in self.emitter_interface)
             # print(f"\tobj has emitter interface: {ret}")
-            
+
         if ret:
             ret &= all(hasattr(obj, x) for x in self.emitter_attrs)
             # print(f"\tobj has emitter attrs: {ret}")
-            
+
         return ret
 
     @property
@@ -143,7 +163,7 @@ class DirectoryFileWatcher(QtCore.QObject):
         # if not (isinstance(self._source_, QtCore.QObject) and all(hasattr(self._source_, v) for v in ("currentDir", "enableDirectoryMonitor", "monitoredDirectories"))):
         #     scipywarn("Cannot monitor directories as we don't have a valid signal emitter")
         #     return
-                    
+
         if val is None:
             if isinstance(self._source_.currentDir, str) and pathlib.Path(self._source_.currentDir).absolute().is_dir():
                 dirToWatch = pathlib.Path(self._source_.currentDir).absolute()
@@ -156,19 +176,19 @@ class DirectoryFileWatcher(QtCore.QObject):
 
         else:
             raise TypeError(f"Expecting a str, a pathlib.Path, or None; instead, got {type(val).__name__}")
-        
+
         if self._source_.isDirectoryMonitored(dirToWatch):
             # reset the monitored directory cache
             self._source_._monitoredDirsCache_[dirToWatch].clear()
-            
+
         else:
             watchedDirectories = self._source_.monitoredDirectories
             for d in watchedDirectories:
                 self._source_.enableDirectoryMonitor(d, False)
             self._source_.enableDirectoryMonitor(dirToWatch)
-        
+
         self._watchedDir_ = dirToWatch
-        
+
         # print(f"{self.__class__.__name__}.directory.setter changed to {self._watchedDir_}")
 
 
@@ -198,10 +218,6 @@ class DirectoryFileWatcher(QtCore.QObject):
         # NOTE: is_file() would return False here because file was removed !
         # files = [v for v in value if v.is_file() and v.parent == self._watchedDir_]
         self._removedFiles_[:] = files[:] # may clear this; below we only send if not empty
-
-        # if hasattr(self._source_, "console"):
-        #     txt = f"{self.__class__.__name__}.slot_filesRemoved {self._removedFiles_}\n"
-        #     self._source_.console.writeText(txt)
 
         if len(files):
             if self.observer is not None :
@@ -233,7 +249,7 @@ class DirectoryFileWatcher(QtCore.QObject):
 
     @Slot(tuple)
     def slot_newFiles(self, value):
-        """"""
+        r""""""
         # Check all items in value are files and are in the same parent directory
         if not all(isinstance(v, pathlib.Path) for v in value):
             warnings.warn(f"Should have received a tuple of pathlib.Path objects only!")
@@ -254,8 +270,8 @@ class DirectoryFileWatcher(QtCore.QObject):
         if len(files):
             if self.observer is not None :
                 self.observer.newFiles(self._newFiles_)
-                
-                
+
+
     def monitorFile(self, filepath:pathlib.Path, on:bool=True):
         if filepath.is_file() and filepath.parent == self._watchedDir_:
             if hasattr(self._source_, "dirFileMonitor") and isinstance(self._source_.dirFileMonitor, QtCore.QFileSystemWatcher):
@@ -265,26 +281,25 @@ class DirectoryFileWatcher(QtCore.QObject):
                 else:
                     if str(filepath) in self._source_.dirFileMonitor.files():
                         self._source_.dirFileMonitor.removePath(str(filepath))
-        
-    @safeWrapper
+
+    @safewrapper
     @Slot()
     def slot_monitoredFileChanged(self, *args, **kwargs):
         # print(f"{self.__class__.__name__}._slot_monitoredFileChanged:\n\targs = {args}\n\t kwargs = {kwargs}\n\n")
         self._observer_.filesChanged(self._source_.dirFileMonitor.files())
-        
-    
+
 
 class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
     sig_wm_inspect_done = Signal(name="sig_wm_inspect_done")
-    
+
     def __init__(self, parent=None):
         # NOTE: 2023-01-08 13:19:59
-        # these below are from 
+        # these below are from
         # https://stackoverflow.com/questions/65816656/how-to-detect-when-a-foreign-window-embedded-with-qwidget-createwindowcontainer
         # used here to get the window manager's ID of this window
         self.wmctrl = None
         self.timer=None
-        
+
         # NOTE: 2023-01-08 16:09:33
         # maps windowID to window instance;
         # for now, used specifically for managing global app menu on Linux desktops
@@ -299,7 +314,7 @@ class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
             self.timer.setSingleShot(True)
             self.timer.setInterval(25)
             self.timer.timeout.connect(self.wmctrl.start)
-            
+
     @Slot()
     def _slot_parseWindowsList(self):
         if not isinstance(self.wmctrl, QtCore.QProcess):
@@ -316,7 +331,7 @@ class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
         # 0 → window identity
         #
         # 1 → virtual desktop number (-1 is a `sticky` window i.e. on all desktops)
-        #                   WARNING: virtual desktop numbers start at 0, which may 
+        #                   WARNING: virtual desktop numbers start at 0, which may
         #                   not be obvious, depending on how they are labeled
         #
         # 2 → the PID for the window (int) - this is the PID of the process that
@@ -327,65 +342,81 @@ class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
         # 4 → the client machine name
         #
         # 5 → the window title (with spaces)
-        
+
         scipyen_window_lines = list(map(lambda x: x.split(maxsplit=5), filter(lambda x: f"{os.getpid()}" in x, bytes(self.wmctrl.readAll()).decode().splitlines())))
-        
+
         for line in scipyen_window_lines:
             # print(f"line = {line}")
             wm_winid = int(line[0], 16)
             # print(f"wm_winid = {wm_winid}")
             # print(f"window title = {line[-1]}")
             self.windows[line[-1]] = wm_winid
-            
+
         self.sig_wm_inspect_done.emit()
-                
+
     def inspect_wm(self):
         if isinstance(self.timer, QtCore.QTimer):
             self.timer.start()
-            
+
 
 class GuiMessages(object):
-    @safeWrapper
-    def errorMessage(self, title, text):
+    @safewrapper
+    def errorMessage(self, title:str, text:str):
         errMsgDlg = QtWidgets.QErrorMessage(self)
         errMsgDlg.setWindowTitle(title)
         errMsgDlg.showMessage(text)
-        
-    @safeWrapper
+
+    @staticmethod
+    def errorMessage_static(parent:typing.Optional[QtWidgets.QWidget]=None, title:str="Error Message", text:str="Error"):
+        errMsgDlg = QtWidgets.QErrorMessage(parent)
+        errMsgDlg.setWindowTitle(title)
+        errMsgDlg.showMessage(text)
+
+    @safewrapper
     def criticalMessage(self, title, text, default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.critical(self, title, text)
-    
-    @staticmethod    
-    def criticalMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Critical", text:str="A critical error has occurred", default=QtWidgets.QMessageBox.No):
-        return QtWidgets.QMessageBox.critical(obj, title, text)
-        
-    @safeWrapper
-    def informationMessage(self, title, text, default=QtWidgets.QMessageBox.No):
+
+    @staticmethod
+    def criticalMessage_static(parent:typing.Optional[QtWidgets.QWidget]=None, title:str="Critical", text:str="A critical error has occurred", default=QtWidgets.QMessageBox.No):
+        return QtWidgets.QMessageBox.critical(parent, title, text)
+
+    @safewrapper
+    def informationMessage(self, title, text,
+                           default=QtWidgets.QMessageBox.NoButton):
         return QtWidgets.QMessageBox.information(self, title, text)
 
     @staticmethod
-    def informationMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Information", text:str="", default=QtWidgets.QMessageBox.No):
-        return QtWidgets.QMessageBox.information(obj, title, text)
-        
-    @safeWrapper
+    def informationMessage_static(
+        parent: typing.Optional[QtWidgets.QWidget] = None,
+        title: str = "Information", text: str = "",
+        default = QtWidgets.QMessageBox.NoButton):
+        return QtWidgets.QMessageBox.information(parent, title, text)
+
+    @safewrapper
     def questionMessage(self, title, text, default=QtWidgets.QMessageBox.No):
-        return QtWidgets.QMessageBox.question(self, title, text)
+        return QtWidgets.QMessageBox.question(self, title, text, defaultButton=default)
 
     @staticmethod
-    def questionMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Question", text:str="", default=QtWidgets.QMessageBox.No):
-        return QtWidgets.QMessageBox.question(obj, title, text, defaultButton=default)
-        
-    @safeWrapper
+    def questionMessage_static(parent:typing.Optional[QtWidgets.QWidget]=None, title:str="Question", text:str="", default=QtWidgets.QMessageBox.No):
+        r"""Check the return value for equality to QtWidgets.QMessageBox.Yes"""
+        return QtWidgets.QMessageBox.question(parent, title, text, defaultButton=default)
+
+    @safewrapper
     def warningMessage(self, title, text, default=QtWidgets.QMessageBox.No):
         return QtWidgets.QMessageBox.warning(self, title, text, defaultButton=default)
-    
+
     @staticmethod
-    def warningMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, title:str="Warning", text:str="", default=QtWidgets.QMessageBox.No):
-        return QtWidgets.QMessageBox.warning(obj, title, text, defaultButton=default)
-        
-    @safeWrapper
-    def detailedMessage(self, title:str, text:str, info:typing.Optional[str]="", detail:typing.Optional[str]="", msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
-        """Detailed generic message dialog box
+    def warningMessage_static(parent:typing.Optional[QtWidgets.QWidget]=None, title:str="Warning", text:str="", default=QtWidgets.QMessageBox.No):
+        return QtWidgets.QMessageBox.warning(parent, title, text, defaultButton=default)
+
+
+    @safewrapper
+    def detailedMessage(self, title:str, text:str, info:typing.Optional[str]="", detail:typing.Optional[str]="",
+                        msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical",
+                        buttons:typing.Optional[QtWidgets.QMessageBox.StandardButton]=QtWidgets.QMessageBox.Ok,
+                        defaultButton:typing.Optional[QtWidgets.QMessageBox.StandardButton]=None,
+                        highlightText:bool=False, highlightInfo:bool=False):#, highlightDetail:bool=False):
+        r"""Detailed generic message dialog box
         title: str  = dialog title
         text:str =  main message
         info:str (optional, default is None) informative text
@@ -395,8 +426,12 @@ class GuiMessages(object):
             Allowed values are:
             "NoIcon", "Question", "Information", "Warning", "Critical", a valid
             pixmap file name, or a valid theme icon name.
-            
+
         """
+        # from core.strutils import (is_html, is_markdown)
+        from gui import guiutils
+        from helpsystem import helputils # TODO 2026-01-21 09:03:35 transfer code from the following, to strutils: mypylight
+        lexer = None
         if isinstance(msgType, str) and len(msgType.strip()):
             if getattr(QtWidgets.QMessageBox.Icon, msgType, None) is not None:
                 icon = getattr(QtWidgets.QMessageBox.Icon, msgType, QtWidgets.QMessageBox.NoIcon)
@@ -407,38 +442,62 @@ class GuiMessages(object):
                     else:
                         pix = QtGui.Icon.fromTheme(msgType).pixmap(QtWidgets.QStyle.PM_MessageBoxIconSize)
                         msgBox.setIconPixmap(pix)
-                        
+
                 except:
                     icon = QtWidgets.QMessageBox.NoIcon
-        
+
         msgbox = QtWidgets.QMessageBox(parent=self)
-        msgbox.addButton(QtWidgets.QMessageBox.Ok)
+        msgbox.setStandardButtons(buttons)
+        if isinstance(defaultButton, QtWidgets.QMessageBox.StandardButton):
+            msgbox.setDefaultButton(defaultButton)
         if isinstance(icon, QtGui.QPixmap):
             msgbox.setIconPixmap(icon)
         elif isinstance(icon, QtWidgets.QMessageBox.Icon):
             msgbox.setIcon(icon)
         else:
             msgbox.setIcon(QtWidgets,QMessageBox.NoIcon)
-            
+
         msgbox.setSizeGripEnabled(True)
         msgbox.setWindowTitle(title)
+        msgbox.setTextFormat(QtCore.Qt.RichText)
+
+        if any([highlightInfo, highlightText]):
+            lexer = helputils.get_lexer_by_name("python", stripall=True)
+            style = "KeplerDark" if guiutils.isDarkGui() else "default"
+            if highlightText:
+                text = helputils.highlight(text, lexer, helputils.HtmlFormatter(noclasses=True, nobackground=True, style=style))
+            if highlightInfo:
+                if isinstance(info, str) and len(info.strip()):
+                    info = helputils.highlight(info, lexer, helputils.HtmlFormatter(noclasses=True, nobackground=True, style=style))
+            # if highlightDetail:
+            #     if isinstance(detail, str) and len(detail.strip()):
+            #         detail = helputils.highlight(detail, lexer, helputils.HtmlFormatter(noclasses=True, nobackground=True, style=style))
+
         msgbox.setText(text)
-        
         if isinstance(info, str) and len(info.strip()):
             msgbox.setInformativeText(info)
-            
         if isinstance(detail, str) and len(detail.strip()):
             msgbox.setDetailedText(detail)
-            
+
         return msgbox.exec()
-       
+
+    @safewrapper
+    def selectFont(self, default:typing.Optional[QtGui.QFont] = QtWidgets.QApplication.font()) -> QtGui.QFont | None:
+        if __has_PySide6__:
+            ok, selectedFont = QtWidgets.QFontDialog.getFont(default, self)
+        else:
+            selectedFont, ok = QtWidgets.QFontDialog.getFont(default, self)
+
+        if ok:
+            return selectedFont
+
     @staticmethod
-    def detailedMessage_static(obj:typing.Optional[QtWidgets.QWidget]=None, 
-                               title:str="Message", text:str="", 
-                               info:typing.Optional[str]="", 
-                               detail:typing.Optional[str]="", 
+    def detailedMessage_static(parent:typing.Optional[QtWidgets.QWidget]=None,
+                               title:str="Message", text:str="",
+                               info:typing.Optional[str]="",
+                               detail:typing.Optional[str]="",
                                msgType:typing.Optional[typing.Union[str, QtGui.QPixmap]]="Critical"):
-        """Detailed generic message dialog box
+        r"""Detailed generic message dialog box
         title: str  = dialog title
         text:str =  main message
         info:str (optional, default is None) informative text
@@ -448,7 +507,7 @@ class GuiMessages(object):
             Allowed values are:
             "NoIcon", "Question", "Information", "Warning", "Critical", a valid
             pixmap file name, or a valid theme icon name.
-            
+
         """
         if isinstance(msgType, str) and len(msgType.strip()):
             if getattr(QtWidgets.QMessageBox.Icon, msgType, None) is not None:
@@ -460,11 +519,11 @@ class GuiMessages(object):
                     else:
                         pix = QtGui.Icon.fromTheme(msgType).pixmap(QtWidgets.QStyle.PM_MessageBoxIconSize)
                         msgBox.setIconPixmap(pix)
-                        
+
                 except:
                     icon = QtWidgets.QMessageBox.NoIcon
-        
-        msgbox = QtWidgets.QMessageBox(parent=obj)
+
+        msgbox = QtWidgets.QMessageBox(parent=parent)
         msgbox.addButton(QtWidgets.QMessageBox.Ok)
         if isinstance(icon, QtGui.QPixmap):
             msgbox.setIconPixmap(icon)
@@ -472,21 +531,54 @@ class GuiMessages(object):
             msgbox.setIcon(icon)
         else:
             msgbox.setIcon(QtWidgets,QMessageBox.NoIcon)
-            
+
         msgbox.setSizeGripEnabled(True)
         msgbox.setWindowTitle(title)
         msgbox.setText(text)
-        
+
         if isinstance(info, str) and len(info.strip()):
             msgbox.setInformativeText(info)
-            
+
         if isinstance(detail, str) and len(detail.strip()):
             msgbox.setDetailedText(detail)
-            
+
         return msgbox.exec()
-    
+
+    @safewrapper
+    def unpackWarnings(self, wrn:typing.Sequence[warnings.WarningMessage]) -> str|None:
+        from gui import guiutils
+        if all(isinstance(wm, warnings.WarningMessage) for wm in wrn):
+            ret = list()
+            for k, wm in enumerate(wrn):
+                if os.path.isfile(wm.filename) and isinstance(wm.lineno, int) and wm.lineno > 0:
+                    f = open(wm.filename, "r", encoding="utf-8")
+                    text = f.readlines()
+                    f.close()
+
+                    c1 = "#ffaa00" if guiutils.isDarkGui() else "#ff5500"
+                    c2 = "#00ffff" if guiutils.isDarkGui() else "#008080"
+                    c3 = "#aaaa7f" if guiutils.isDarkGui() else "#4d4716"
+                    category = f"<b><font color='{c1}'>{wm.category.__name__}:</font></b>"
+                    # print(category)
+                    # print(wm.message.args)
+                    if len(wm.message.args) > 1:
+                        msg = "<br>".join(list(wm.message.args))
+                    else:
+                        msg = wm.message.args[0]
+                    # print(msg)
+
+                    offendingLine = f"<font color='{c2}'>{text[wm.lineno-1]}</font>"
+
+                    ret.append("<br>".join([f"{category}", f"{msg}", offendingLine.strip(), f" in file <font color={c3}>{wm.filename}</font>"]))
+
+            return "<p>".join(ret)
+            # return "<html>" + "<p>".join(ret) + "</html>"
+
+
+
+
 class DirectoryObserver(QtCore.QObject):
-    # NOTE: 2024-05-19 10:58:13 TODO 
+    # NOTE: 2024-05-19 10:58:13 TODO
     # finalize this class: move all relevant API from ScipyenWindow here then
     # make ScipyenWindow inherit this class
     sig_newItemsInMonitoredDir = Signal(tuple, name="sig_newItemsInMonitoredDir")
@@ -496,243 +588,355 @@ class DirectoryObserver(QtCore.QObject):
     def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
         super().__init__(parent=parent)
         self._monitoredDirsCache_ = dict()
-    
-        
+
+
 class FileIOGui(object):
-    @safeWrapper
-    def chooseFile(self, caption:typing.Optional[str]=None, fileFilter:typing.Optional[str]=None, single:typing.Optional[bool]=True, save:bool=False, targetDir:typing.Optional[str]=None):
-        """Launcher of file open dialog
-        
+    @safewrapper
+    def chooseFile(self, caption:typing.Optional[str] = None,
+                   fileFilter:typing.Optional[str] = None,
+                   single:typing.Optional[bool] = True,
+                   save:bool = False,
+                   targetDir:typing.Optional[
+                       typing.Union[str,pathlib.Path]] = None,
+                   asPath: bool = False,
+                   **kwargs) -> tuple:
+        r"""Launcher of file open dialog
+
         Parameters:
         ----------
         caption: str, optional default is None - The caption of the file chooser dialog
-        
+
         fileFilter: str, optional, default is None - The file filter for choosing
-            from a specific subset of tile types. When present, it must have a 
+            from a specific subset of tile types. When present, it must have a
             specific format, e.g. "Pickle Files (*.pkl);;Text Files (*.txt)"
-            
+
             See QtWidget.QDialog.getOpenFileName for details about fileFilter
-            
+
         single:bool, optional (default: True)
            When False, the file chooser dialog will allow opening several files
-           
+
            Ignored when 'save' is True (see below)
-           
+
         save:bool, default False
-            When True, signals the intention to SAVE to the selected file name, 
+            When True, signals the intention to SAVE to the selected file name,
             and 'single' will eb ignored
             In this case it will ask for confirmation to overwrite the file.
-           
-        targetDir:str, optional (default is None) Target directory from where 
+
+        targetDir:str, optional (default is None) Target directory from where
             files are chosen.
-            
+
             When None, an empty string or a string that does NOT resolve to a
-            directory, target 
-            
+            directory, target
+
         Returns:
         -------
         fn: str or list of str The selected file name (or file names, if "single"
             is False)
-            
+
         fl: str The string containing the selected file filter (defaults to
             "All files (*.*)")
-        
+
         """
         from functools import partial
-        
+
+        suggestedName = kwargs.pop("fileName", None)
+
         if targetDir is None:
             targetDir = os.getcwd()
-            
+
         if isinstance(targetDir, str):
             if len(targetDir.strip()) == 0 or not os.path.isdir(targetDir):
-                targetDir = os.getcwd()
-                
-        if sys.platform == "win32":
+                targetDir = pathlib.Path(os.getcwd())
+
+            else:
+                targetDir = pathlib.Path(targetDir)
+
+        elif isinstance(targetDir, pathlib.Path):
+            if not targetDir.exists():
+                targetDir = pathlib.Path(os.getcwd())
+
+        if isinstance(suggestedName, str):
+            path = pathlib.Path(suggestedName)
+            targetDir = targetDir / path
+
+        elif isinstance(suggestedName, pathlib.Path):
+            targetDir = targetDir.join(suggestedName)
+
+
+        if sys.platform.startswith("win32"):
+            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+            kw = {"options":options}
+        else:
+            kw = {}
+
+        kw.update(kwargs)
+
+        opener = QtWidgets.QFileDialog.getSaveFileName if save is True else QtWidgets.QFileDialog.getOpenFileName if single else QtWidgets.QFileDialog.getOpenFileNames
+
+        if isinstance(caption, str) and len(caption.strip()):
+            opener = partial(opener, caption=caption)
+
+        if isinstance(fileFilter, str) and len(fileFilter.strip()):
+            opener = partial(opener, filter=fileFilter)
+
+        fn, fl = opener(parent=self, directory=targetDir.as_posix(), **kw)
+
+        if asPath:
+            if len(fn.strip()):
+                fn = pathlib.Path(fn)
+            else:
+                fn = None
+
+        return fn, fl
+
+    @staticmethod
+    def chooseFile_static(parent: typing.Optional[QtWidgets.QWidget] = None,
+                          caption: typing.Optional[str] = None,
+                          fileFilter: typing.Optional[str] = None,
+                          single: typing.Optional[bool] = True,
+                          save: bool = False,
+                          targetDir:typing.Optional[
+                              typing.Union[
+                                  str, pathlib.Path
+                                  ]
+                              ] = None,
+                              asPath: bool = False,
+                              **kwargs) -> tuple:
+        r"""Launcher of file open dialog (static version)
+
+        Parameters:
+        ----------
+        caption: str, optional default is None - The caption of the file chooser dialog
+
+        fileFilter: str, optional, default is None - The file filter for choosing
+            from a specific subset of tile types. When present, it must have a
+            specific format, e.g. "Pickle Files (*.pkl);;Text Files (*.txt)"
+
+            See QtWidget.QDialog.getOpenFileName for details about fileFilter
+
+        single:bool, optional (default: True)
+           When False, the file chooser dialog will allow opening several files
+
+           Ignored when 'save' is True (see below)
+
+        save:bool, default False
+            When True, signals the intention to SAVE to the selected file name,
+            and 'single' will eb ignored
+            In this case it will ask for confirmation to overwrite the file.
+
+        targetDir:str, optional (default is None) Target directory from where
+            files are chosen.
+
+            When None, an empty string or a string that does NOT resolve to a
+            directory, target
+
+        Returns:
+        -------
+        fn: str or list of str The selected file name (or file names, if "single"
+            is False)
+
+        fl: str The string containing the selected file filter (defaults to
+            "All files (*.*)")
+
+        """
+        from functools import partial
+
+        if targetDir is None:
+            targetDir = os.getcwd()
+
+        if (
+            isinstance(targetDir, pathlib.Path)
+            and targetDir.exists()
+            and targetDir.is_dir()
+            ):
+            targetDir = targetDir.as_posix()
+
+        elif (
+            not isinstance(targetDir, str)
+            or len(targetDir.strip()) == 0
+            or not os.path.isdir(targetDir)
+            ):
+            targetDir = os.getcwd()
+        # else:
+        #     targetDir = os.getcwd()
+
+        # suggestedName = kwargs.pop("fileName", None)
+
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
             kw = {}
 
         opener = QtWidgets.QFileDialog.getSaveFileName if save is True else QtWidgets.QFileDialog.getOpenFileName if single else QtWidgets.QFileDialog.getOpenFileNames
-        
+
         if isinstance(caption, str) and len(caption.strip()):
             opener = partial(opener, caption=caption)
-            
+
         if isinstance(fileFilter, str) and len(fileFilter.strip()):
             opener = partial(opener, filter=fileFilter)
-        
-        fn, fl = opener(parent=self, directory=targetDir, **kw)
-        
+
+        fn, fl = opener(parent=parent, directory=targetDir, **kw)
+
+        if asPath:
+            if len(fn.strip()):
+                fn = pathlib.Path(fn)
+            else:
+                fn = None
+
         return fn, fl
-    
-    @staticmethod
-    def chooseFile_static(obj:typing.Optional[QtWidgets.QWidget]=None, caption:typing.Optional[str]=None, fileFilter:typing.Optional[str]=None, single:typing.Optional[bool]=True, save:bool=False, targetDir:typing.Optional[str]=None):
-        """Launcher of file open dialog (static version)
-        
-        Parameters:
-        ----------
-        caption: str, optional default is None - The caption of the file chooser dialog
-        
-        fileFilter: str, optional, default is None - The file filter for choosing
-            from a specific subset of tile types. When present, it must have a 
-            specific format, e.g. "Pickle Files (*.pkl);;Text Files (*.txt)"
-            
-            See QtWidget.QDialog.getOpenFileName for details about fileFilter
-            
-        single:bool, optional (default: True)
-           When False, the file chooser dialog will allow opening several files
-           
-           Ignored when 'save' is True (see below)
-           
-        save:bool, default False
-            When True, signals the intention to SAVE to the selected file name, 
-            and 'single' will eb ignored
-            In this case it will ask for confirmation to overwrite the file.
-           
-        targetDir:str, optional (default is None) Target directory from where 
-            files are chosen.
-            
-            When None, an empty string or a string that does NOT resolve to a
-            directory, target 
-            
-        Returns:
-        -------
-        fn: str or list of str The selected file name (or file names, if "single"
-            is False)
-            
-        fl: str The string containing the selected file filter (defaults to
-            "All files (*.*)")
-        
-        """
-        from functools import partial
-        
-        if targetDir is None:
-            targetDir = os.getcwd()
-            
-        if isinstance(targetDir, str):
-            if len(targetDir.strip()) == 0 or not os.path.isdir(targetDir):
-                targetDir = os.getcwd()
-                
-        if sys.platform == "win32":
+
+    @safewrapper
+    def chooseDirectory(self, caption: typing.Optional[str] = None,
+                        targetDir: typing.Optional[
+                            typing.Union[str, pathlib.Path]] = None,
+                        asPath: bool = False) -> typing.Optional[typing.Union[str|pathlib.Path]]:
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
             kw = {}
 
-        opener = QtWidgets.QFileDialog.getSaveFileName if save is True else QtWidgets.QFileDialog.getOpenFileName if single else QtWidgets.QFileDialog.getOpenFileNames
-        
-        if isinstance(caption, str) and len(caption.strip()):
-            opener = partial(opener, caption=caption)
-            
-        if isinstance(fileFilter, str) and len(fileFilter.strip()):
-            opener = partial(opener, filter=fileFilter)
-        
-        fn, fl = opener(parent=obj, directory=targetDir, **kw)
-        
-        return fn, fl
-    
-    @safeWrapper
-    def chooseDirectory(self, caption:typing.Optional[str]=None,targetDir:typing.Optional[str]=None):
-        if sys.platform == "win32":
-            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
-            kw = {"options":options}
-        else:
-            kw = {}
+        if ((isinstance(targetDir, str)
+                and len(targetDir.strip())
+                and os.path.exists(targetDir)
+                and os.path.isdir(targetDir)
+                )
+            or (isinstance(targetDir, pathlib.Path)
+                and targetDir.exists()
+                and targetDir.isdir()
+                )
+            ):
+            if isinstance(targetDir, pathlib.Path):
+                targetDir = targetDir.as_posix()
 
-        if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
-            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(self, caption=caption, directory=targetDir, **kw))
+            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(
+                parent, caption=caption, directory=targetDir, **kw))
         else:
-            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(self, caption=caption, **kw))
+            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(
+                self, caption=caption, **kw))
+
+        if asPath:
+            if not isinstance(dirName, str) or len(dirName.strip()) == 0:
+                return None
+            return pathlib.Path(dirName)
 
         return dirName
 
     @staticmethod
-    def chooseDirectory_static(obj:typing.Optional[QtWidgets.QWidget]=None, caption:typing.Optional[str]=None,targetDir:typing.Optional[str]=None):
-        if sys.platform == "win32":
+    def chooseDirectory_static(parent: typing.Optional[QtWidgets.QWidget] = None,
+                               caption: typing.Optional[str] = None,
+                               targetDir: typing.Optional[
+                                   typing.Union[
+                                       str, pathlib.Path
+                                       ]
+                                   ] = None,
+                                   asPath: bool = False) -> typing.Optional[typing.Union[str|pathlib.Path]]:
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
-            kw = {"options":options}
+            kw = {"options": options}
         else:
             kw = {}
 
-        if targetDir is not None and targetDir != "" and os.path.exists(targetDir):
-            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(obj, caption=caption, directory=targetDir, **kw))
+        if ((isinstance(targetDir, str)
+                and len(targetDir.strip())
+                and os.path.exists(targetDir)
+                and os.path.isdir(targetDir)
+                )
+            or (isinstance(targetDir, pathlib.Path)
+                and targetDir.exists()
+                and targetDir.is_dir()
+                )
+            ):
+            if isinstance(targetDir, pathlib.Path):
+                targetDir = targetDir.as_posix()
+
+            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(
+                parent, caption=caption, directory=targetDir, **kw))
         else:
-            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(obj, caption=caption, **kw))
-            
+            dirName = str(QtWidgets.QFileDialog.getExistingDirectory(
+                parent, caption=caption, **kw))
+
+        if asPath:
+            if not isinstance(dirName, str) or len(dirName.strip()) == 0:
+                return None
+            return pathlib.Path(dirName)
         return dirName
-    
+
 class FileStatChecker(QtCore.QObject):
-    """Monitors changes ot a file system file object"""
+    r"""Monitors changes ot a file system file object.
+        WARNING: The user needs to have read access
+    """
     okToProcess = Signal(pathlib.Path, name="okToProcess")
-    
-    def __init__(self, filePath:typing.Optional[pathlib.Path] = None, 
+
+    def __init__(self, filePath:typing.Optional[pathlib.Path] = None,
                  interval:typing.Optional[int] = None,
                  maxUnchangedIntervals:typing.Optional[int] = None,
                  callback:typing.Optional[typing.Callable] = None,
                  parent:typing.Optional[QtCore.QObject] = None):
         super().__init__(parent=parent)
-        
+
         self._filePath_ = filePath
-        
+
         if isinstance(callback, typing.Callable):
             self._callback_ = callback
         else:
             self._callback_ = None
-        
+
         if not isinstance(interval, int) or interval <= 0:
             interval = 10 # default
-            
+
         if not isinstance(maxUnchangedIntervals, int) or maxUnchangedIntervals < 1:
             maxUnchangedIntervals = 1
-            
+
         self._maxUnchangedIntervals_ = maxUnchangedIntervals # number of intervals
-        
+
         self._intervals_since_last_change_ = 0 # ms
-        
+
         self._timer_ = QtCore.QTimer(self)
         self._timer_.timeout.connect(self._slot_checkFile)
         self._timer_.setInterval(interval) #  ms interval
-        
+
         if isinstance(filePath, pathlib.Path) and filePath.is_file():
             self._currentStat_ = self._filePath_.stat()
             self._timer_.start()
-        
+
     @property
     def timer(self) -> QtCore.QTimer:
         return self._timer_
-    
+
     @property
     def interval(self) -> int:
         return self.timer.interval()
-    
+
     @interval.setter
     def interval(self, val:int):
         if not isinstance(val, int) or val <= 0:
             val = 10 #ms, default
-            
+
         self.timer.setInterval(val) #  this will also stop the timer ?!?
         # if not self.timer.isActive():
         #     self.timer.start()
-        
+
     @property
     def active(self) -> bool:
         return self.timer.isActive()
-        
+
     @property
     def maxIntervalsQuiet(self) -> int:
         return self._maxUnchangedIntervals_
-    
+
     @maxIntervalsQuiet.setter
     def maxIntervalsQuiet(self, val:int):
         if not isinstance(val, int) or val < 1:
             val = 1
-            
+
         self._maxUnchangedIntervals_ = val
 
     @property
     def monitoredFile(self) -> pathlib.Path:
         return self._filePath_
-    
+
     @monitoredFile.setter
     def monitoredFile(self, f:pathlib.Path):
         if not isinstance(f, pathlib.Path) or not f.exists() or not f.is_file():
@@ -744,174 +948,173 @@ class FileStatChecker(QtCore.QObject):
             self._filePath_ = f
         except:
             traceback.print_exc()
-        
+
     @property
     def callback(self) -> typing.Optional[typing.Callable]:
         return self._callback_
-    
+
     @callback.setter
     def callback(self, val:typing.Optional[typing.Callable] = None):
         if not isinstance(val, (typing.Callable, type(None))):
             warnings.warn(f"Expecting a callable or None; instead, got {type(val).__name__}")
-            return 
+            return
         self.reset()
         self._callback_ = val
-        
+
     def reset(self):
         self.stop()
         self._intervals_since_last_change_ = 0
-        
+
     def stop(self):
         self.timer.stop()
-        
+
     def start(self):
         if isinstance(self._filePath_, pathlib.Path) and self._filePath_.is_file():
             self.timer.start()
         else:
             warnings.warn(f"{self.__class__.__name__}.start: {self._filePath_} is not a valid file path")
-        
+
     def _slot_checkFile(self):
         if isinstance(self._filePath_, pathlib.Path) and self._filePath_.is_file():
             stat = self._filePath_.stat()
-            
+
             if stat == self._currentStat_:
                 # print(f"{self.__class__.__name__} file {self._filePath_.name} has not changed in the last {self.timer.interval()} ms")
                 self._intervals_since_last_change_ += 1 # count up
-                
+
             else:
                 # print(f"{self.__class__.__name__} file {self._filePath_.name} has changed in the last {self.timer.interval()} ms")
                 self._currentStat_ = stat
                 self._intervals_since_last_change_  = 0 # reset this
-                
+
             # print(f"{self.__class__.__name__} file {self._filePath_.name} long unchanged {self._intervals_since_last_change_ >= self._maxUnchangedIntervals_}")
             if self._intervals_since_last_change_ >= self._maxUnchangedIntervals_:
                 self.okToProcess.emit(self._filePath_)
                 if inspect.isfunction(self._callback_) or inspect.ismethod(self._callback_):
                     self._callback_(self._filePath_)
-            
-    
+
 class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
-    """Mixin type for windows that need to be aware of Scipyen's main workspace.
-    
+    r"""Mixin type for windows that need to be aware of Scipyen's main workspace.
+
     Provides:
     1) Common functionality needed in Scipyen's windows:
-        1.1) Standard dialogs for importing data from the workspace, file open 
+        1.1) Standard dialogs for importing data from the workspace, file open
         & save operations
-        
+
         1.2) Message dialogs
-    
+
     2) Management of Qt and non-Qt configurables
-        
+
         2.1) Auguments ScipyenConfigurable with standard Qt configurables for
-        :classes: derived from Qt QMainWindow and QWidget: size, position, 
+        :classes: derived from Qt QMainWindow and QWidget: size, position,
         geometry and state (for QMainWindow-based :classes: only)
-        
+
     3) Distinction between QMainWindow objects that are direct children of Scipyen's
-    main window (so-called "top-level" windows) and those that are children of 
+    main window (so-called "top-level" windows) and those that are children of
     one of Scipyen's 'apps'.
         Top-level windows include viewers launched directly by double-clicking
         on variables in the workspace, Scipyens consoles, and the main windows
         for the so-called Scipyen 'apps'.
-        
+
         The latter run code which requires a customized GUI (provided by their
         own main window) including children windows of data viewers.
-        
+
     About configurables.
     ====================
-        
+
     Scipyen deals with two groups of configuration variables ("configurables",
     or "settings"):
-        
+
     • Qt configurables: variables related to the appearance of Qt widgets and
         windows (e.g. position on screen, size, state)
-        
+
     • non-Qt configurables (e.g. properties of cursors such as colors,
         and various preferences for non-gui objects). These are also called
-        ":class:-configurables" because they contain preferences applied to a 
+        ":class:-configurables" because they contain preferences applied to a
         non-gui object type
-    
-    WorkspaceGuiMixin manages both Qt and non-Qt settings and via its 
+
+    WorkspaceGuiMixin manages both Qt and non-Qt settings and via its
     ScipyenConfigurable ancestor type.
-    
+
     Classes that inherit from WorkspaceGuiMixin also inherit the following
     from ScipyenConfigurable:
-    
+
     • the methods 'self.loadSettings' and 'self.saveSettings' that load/save the
         Qt configurables from/to the Scipyen.conf file.
-        
+
     • the attribute 'configurable_traits' - a DataBag that observes changes to
         non-Qt configurable instance attributes (treated as 'traits')
-        
+
     • the (private) method _observe_configurables_() which is notified by the
-        'configurable_traits' of attribute changes and synchronizes their value 
+        'configurable_traits' of attribute changes and synchronizes their value
         with the config.yaml file.
-    
-    In order to save/load persistent configurations from/to Scipyen's 
+
+    In order to save/load persistent configurations from/to Scipyen's
     configuration files, a GUI :class: that inherits from WorkspaceGuiMixin
     needs to:
-    
-    1) Define python property setter, as well as the getter & setter methods for 
+
+    1) Define python property setter, as well as the getter & setter methods for
     the relevant attributes DECORATED with the `markConfigurable` decorator
     (defined in core.scipyen_config module). This decorator 'flags' the
     instance attributes as either Qt or non-Qt configurables.
-    
+
     2) Call self.loadSettings() in its own __init__ method body.
         This is required for BOTH Qt and non-Qt configurables.
-        
-        For this to work with Qt configurables, loadSettings() needs to be 
-        executed AFTER the GUI components have been defined and added to the 
-        :class: attributes. In classes generated with Qt Designer, this is 
-        not before calling self.setupUi(self) which initializes the GUI 
-        components basd on a designer *.ui file, and certainly AFTER further 
+
+        For this to work with Qt configurables, loadSettings() needs to be
+        executed AFTER the GUI components have been defined and added to the
+        :class: attributes. In classes generated with Qt Designer, this is
+        not before calling self.setupUi(self) which initializes the GUI
+        components basd on a designer *.ui file, and certainly AFTER further
         UI components are added manually.
-        
+
         NOTE: By inheriting from WorkspaceGuiMixin (and, thus from
         ScipyenConfigurable) loadSettings() is called automatically. Nevertheless,
         this method may be reimplemented in the derived :class:.
-        
-    3) Call self.saveSetting() at an appropriate point during the life-time of 
-        the instance of the :class:. 
-        
+
+    3) Call self.saveSetting() at an appropriate point during the life-time of
+        the instance of the :class:.
+
         For Qt-based settings ('qtconfigurables') this is typically called upon
-        closing the window or widget. A convenient way is to reimplement the 
+        closing the window or widget. A convenient way is to reimplement the
         'closeEvent' method of the Qt base :class: to call saveSettings from
         within the new closeEvent body.
-        
+
         The non-Qt configurables are synchronized with the config.yaml file
         whenever the configurable_traits notifies their change.
-        
-        However, saveSettings ensures that all changes in the 
+
+        However, saveSettings ensures that all changes in the
         non-Qt configurables are saved to the config.yaml file.
-        
-        NOTE: As the loadSettings() method, the saveSetting() method is also 
+
+        NOTE: As the loadSettings() method, the saveSetting() method is also
         inherited from ScipyenConfigurable, but it may be reimplemented in the
         derived :class:
-        
+
     """
     #In addition, further settings can be defined by either
-    
+
     #1) populating the '_qtcfg' attribute of the derived window type with new
     #entries (see self.qtconfigurables for details),  - this will be updated with
     #WorkspaceGuiMixin._qtcfg contents upon initialization of the derived type,
-    
+
     #or
-    
-    #2) creating in the derievd type an attribute named '_ownqtcfg' - a mapping 
+
+    #2) creating in the derievd type an attribute named '_ownqtcfg' - a mapping
     #of a similar structure to '_qtcfg'.
-    
+
     #NOTE: this only needs to be done in the most derived type in a long
-    #inheritance chain. This is done. e.g. in SignalViewer where the inheritance 
+    #inheritance chain. This is done. e.g. in SignalViewer where the inheritance
     #chains is:
-    
+
     #SignalViewer <- ScipyenFrameViewer <- ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
-    
+
     #or
-    
-    #3) by decorating the desired property in the derived type with the 
+
+    #3) by decorating the desired property in the derived type with the
     #@markConfigurable  decorator
     # NOTE: 2021-08-26 11:32:25
     # key:str = QSettings key
-    # value: 
+    # value:
     #   EITHER: tuple (str, str) = getter method name, setter method name
     #           where:
     #               getter method name: name of instance or :class: method that
@@ -936,101 +1139,100 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                     "WindowGeometry":   Bunch({"getter":"geometry",    "setter":"setGeometry"}),
                     "WindowState":      Bunch({"getter":"saveState",   "setter":"restoreState"}),
                     })
-    
+
     _ownqtcfg = Bunch()
-    
+
     _cfg = Bunch()
-    
+
     _owncfg = Bunch()
-    
+
     def workspaceSymbolForData(self, data):
         ws = self.appWindow.workspace
-        return get_symbol_in_namespace(data, ws)        
-    
-    def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None, 
+        return get_symbol_in_namespace(data, ws)
+
+    def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
                  title="", *args, **kwargs):
-        """WorkspaceGuiMixin initializer
+        r"""WorkspaceGuiMixin initializer
     NOTE: 2023-08-26 22:23:33 - new supported keyword: 'scipyenWindow'
     to specify the Scipyen's main window
     when this parameter is missing, the 'classical behaviour' applies, i.e.
     the 'parent' parameter is checked to see whether itselt is Scipyen main window
     """
         self._scipyenWindow_ = None
-        
-        self._fileLoadWorker_ = None
-        self._fileLoadController_ = None
-        
+
+        # self._fileLoadWorker_ = None
+        # self._fileLoadController_ = None
+
         # NOTE: 2023-05-27 13:46:40
         # mutable control data for the worker loops, to communicate with the
         # worker thread
         self.loopControl = {"break":False}
         self.updateUiWithFileLoad = True
-        
+
+
         scipyenWindow = kwargs.pop("scipyenWindow", None)
-        
+
         appWindow = kwargs.pop("appWindow", None)
-        
+
         parent_obj = parent
-        
-        
+
         if isinstance(scipyenWindow, QtWidgets.QMainWindow) and type(scipyenWindow).__name__ == "ScipyenWindow":
             self._scipyenWindow_ = scipyenWindow
-            
-        # elif isinstance(parent, QtWidgets.QMainWindow) and type(parent).__name__ == "ScipyenWindow":
-        #     self._scipyenWindow_   = parent
-            
+
         elif isinstance(parent_obj, QtWidgets.QMainWindow) and type(parent_obj).__name__ == "ScipyenWindow":
             self._scipyenWindow_   = parent_obj
-            
+
         else:
             # NOTE: 2020-12-05 21:24:45 CAUTION FIXME/TODO
-            # this successfully returns the user workspace ONLY when the 
+            # this successfully returns the user workspace ONLY when the
             # constructor is invoked (directly or indirectly) from within
             # the console; otherwise, it is None
             ws = user_workspace()
-            
+
             if ws is not None:
                 self._scipyenWindow_ = ws["mainWindow"]
-                
+
             else:
                 frame_records = inspect.getouterframes(inspect.currentframe())
                 for (n,f) in enumerate(frame_records):
                     if "ScipyenWindow" in f[0].f_globals:
+                        # if __has_PyQt6__:
+                        #     self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"]
+                        # else:
+                        #     self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
                         self._scipyenWindow_ = f[0].f_globals["ScipyenWindow"].instance()
                         break
-                    
+
         self._appWindow_ = None
-        
+
         if isinstance(appWindow, QtWidgets.QMainWindow) and type(appWindow).__name__ != "ScipyenWindow":
             self._appWindow_ = appWindow
-            
+
         elif self._appWindow_ is None:
-            # if isinstance(parent, QtWidgets.QMainWindow):
-            #     self._appWindow_ = parent
             if isinstance(parent_obj, QtWidgets.QMainWindow):
                 self._appWindow_ = parent_obj
-                
+
             else:
                 self._appWindow_ = self._scipyenWindow_
-                    
+
         if isinstance(title, str) and len(title.strip()):
-            self.setWindowTitle(title)  
-            
+            self.setWindowTitle(title)
+
         ScipyenConfigurable.__init__(self, *args, **kwargs)
-        
+
     @property
     def scipyenWindow(self):
-        """Returns a reference to the main Scipyen window.
-    
+        r"""Returns a reference to the main Scipyen window.
+
         For windows that are "top level", this is the same as the `appWindow`
         property.
-    
+
         For windows that are not "top level", this is a reference to the main
         Scipyen window ONLY IF the main Scipyen window is found in their parents
         hierarchy (e.g., windows managed by a Scipyen "application").
-    
+
         Otherwise, this property returns None.
-           
+
         """
         # return self._scipyenWindow_
         if self.isTopLevel:
@@ -1045,93 +1247,93 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                 else:
                     p = p.parent()
             return sciwin
-            
+
     @property
     def isTopLevel(self):
         """Returns True when this window is a top level window in Scipyen.
-        In Scipyen, a window is "top level" when it is a direct child of the 
+        In Scipyen, a window is "top level" when it is a direct child of the
         Scipyen's main window.
-        
+
         For example, any viewer created upon double-clicking on a variable in
-        the workspace viewer ("User Variables"), or via a Scipyen menu or tool 
+        the workspace viewer ("User Variables"), or via a Scipyen menu or tool
         bar action, is a "top level" window.
-        
+
         In contrast, viewers created from within a Scipyen "application" are
         members of the application and thus are not "top level". The application
         is responsible for managng these viewers.
-        
+
         A Scipyen "application" is any facility that runs its own GUI inside
-        Scipyen (e.g., LSCaT) - this is NOT a stand-alone PyQt5 application with
+        Scipyen (e.g., LSCaT) - this is NOT a stand-alone Qt application with
         which Scipyen communicates.
-        
+
         """
         return self.appWindow is self._scipyenWindow_
         # return self._scipyenWindow_.__class__.__name__ == "ScipyenWindow"
         # return self.appWindow is not None and self.appWindow is self._scipyenWindow_
-                
+
     @property
     def appWindow(self):
-        """The parent application window of this window.
-        
+        r"""The parent application window of this window.
+
         This property has one of following possible values:
-        
+
         1) A reference to Scipyen's main window.
-            
-            This happens when the window is a direct child of Scipyen's main 
-            window (i.e., it is a "top level" window in Scipyen's framework). 
-    
+
+            This happens when the window is a direct child of Scipyen's main
+            window (i.e., it is a "top level" window in Scipyen's framework).
+
             This is the case of Scipyen viewers created via menu and/or tool bar
         actions in the Scipyen's main window, or by double-clicking on a variable
         name in Scipyen's workspace table ("User Variables").
-        
-        2) A reference to a Scipyen 'app' window (e.g LSCaT, mPSC detection, 
+
+        2) A reference to a Scipyen 'app' window (e.g LSCaT, mPSC detection,
         etc.), which also manages this window.
-        
+
             In this case, this window is NOT a "top level" window, but has access
         to Scipyen's user workspace via its parent appWindow.
-        
+
             This is the case of various Scipyen viewers managed by LSCaT, etc.
-        
+
             NOTE: In this case, appWindow is itself a "top level" window.
-        
+
             Access to the Scipyen's main window is provided by the `scipyenWindow`
         property.
-        
+
         3) A reference to any QMainWindow which is NEITHER Scipyen's main window
         NOR one of its apps.
-        
-            This is the case with Scipyen viewer instances created by calling 
+
+            This is the case with Scipyen viewer instances created by calling
         their constructor at Scipyen's console (command line) WITHOUT explicitly
-        passing Scipyen's main window or a Sciopyen app window as `parent` to 
+        passing Scipyen's main window or a Sciopyen app window as `parent` to
         the constructor.
-        
+
             In this case, this window DOES NOT have access to Scipyen's workspace,
         unless its parent window somehow provides this access.
-        
+
         4) None.
-            This is the case when this window is a child of a QWidget (e.g., 
+            This is the case when this window is a child of a QWidget (e.g.,
         this could be embedded inside another window, as a widget)
-        
+
             In this case, this window DOES NOT have access to Scipyen's workspace.
-        
+
             NOTE: One can always access this window `parent` directly, by calling
         the `parent()` method.
-        
-        
+
+
         """
         return self._appWindow_
 #         if isinstance(self._scipyenWindow_, QtWidgets.QMainWindow) and type(self._scipyenWindow_).__name__ == "ScipyenWindow":
 #             return self._scipyenWindow_
-#         
+#
 #         p = self.parent()
-#         
+#
 #         if isinstance(p, QtWidgets.QMainWindow):
 #             return p
-    
-    @safeWrapper
+
+    @safewrapper
     def importWorkspaceData(self, dataTypes:typing.Union[typing.Type[typing.Any], typing.Sequence[typing.Type[typing.Any]]], title:str="Import from workspace", single:bool=True, preSelected:typing.Optional[str]=None, with_varName:bool=False):
-        """Launches ItemsListDialog to import on or several workspace variables.
-        
+        r"""Launches ItemsListDialog to import on or several workspace variables.
+
         Parameters:
         -----------
         dataTypes: type, or sequence of types
@@ -1147,38 +1349,40 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             else:
                 return
 
-        
+
         user_ns_visible = dict([(k,v) for k,v in scipyenWindow.workspace.items() if k not in scipyenWindow.workspaceModel.user_ns_hidden])
-        
+
         name_vars = getvarsbytype(dataTypes, ws = user_ns_visible)
-        
+
         if len(name_vars) == 0:
             return list()
-        
+
         name_list = sorted([name for name in name_vars])
-        
+
         #selectionMode = QtWidgets.QAbstractItemView.SingleSelection if single else QtWidgets.QAbstractItemView.MultiSelection
         selectionMode = QtWidgets.QAbstractItemView.SingleSelection if single else QtWidgets.QAbstractItemView.ExtendedSelection
-        
+
         if isinstance(preSelected, str) and len(preSelected.strip()) and preSelected in name_list:
             dialog = ItemsListDialog(parent=self, title=title, itemsList = name_list,
                                     selectmode = selectionMode, preSelected=preSelected)
         else:
             dialog = ItemsListDialog(parent=self, title=title, itemsList = name_list,
                                     selectmode = selectionMode)
-        
+
         ans = dialog.exec()
-        
+
         if ans == QtWidgets.QDialog.Accepted:
             if with_varName:
                 return [(i, scipyenWindow.workspace[i]) for i in dialog.selectedItemsText]
             else:
                 return [scipyenWindow.workspace[i] for i in dialog.selectedItemsText]
-            
+
         return list()
-    
-    @safeWrapper
-    def exportDataToWorkspace(self, data:typing.Any, var_name:str, title:str="Export data to workspace"):
+
+    @safewrapper
+    def exportDataToWorkspace(self, data:typing.Any, var_name:str,
+                              title:str="Export data to workspace",
+                              dialog:bool=True):
         newVarName = strutils.str2symbol(var_name)
         if self.isTopLevel and self.appWindow:
             scipyenWindow = self.appWindow
@@ -1191,37 +1395,43 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
         if not isinstance(title, str) or len(title.strip()) == 0:
             title = "Export data to workspace"
-            
+
         newVarName = validate_varname(newVarName, ws = scipyenWindow.workspace)
-        
-        dlg = qd.QuickDialog(self, title)
-        namePrompt = qd.StringInput(dlg, "Export data as:")
-        
-        namePrompt.variable.setClearButtonEnabled(True)
-        namePrompt.variable.redoAvailable=True
-        namePrompt.variable.undoAvailable=True
-        
-        namePrompt.setText(newVarName)
-        
-        if dlg.exec() == QtWidgets.QDialog.Accepted:
-            newVarName = namePrompt.text()
-            # newVarName = validate_varname(namePrompt.text(), scipyenWindow.workspace)
-            if newVarName in scipyenWindow.workspace:
-                accept = self.questionMessage(title, f"A variable named {newVarName} exists in the workspace. Overwrite?")
-                # accept = self.questionMessage("Export to workspace", f"A variable named {newVarName} exists in the workspace. Overwrite?")
-                if accept not in (QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Yes):
-                    return
-                
+
+        if dialog:
+            dlg = qd.QuickDialog(self, title)
+            namePrompt = qd.StringInput(dlg, "Export data as:")
+
+            namePrompt.variable.setClearButtonEnabled(True)
+            namePrompt.variable.redoAvailable=True
+            namePrompt.variable.undoAvailable=True
+
+            namePrompt.setText(newVarName)
+            dlg.adjustSize()
+
+            if dlg.exec() == QtWidgets.QDialog.Accepted:
+                newVarName = namePrompt.text()
+                # newVarName = validate_varname(namePrompt.text(), scipyenWindow.workspace)
+                if newVarName in scipyenWindow.workspace:
+                    accept = self.questionMessage(title, f"A variable named {newVarName} exists in the workspace. Overwrite?")
+                    # accept = self.questionMessage("Export to workspace", f"A variable named {newVarName} exists in the workspace. Overwrite?")
+                    if accept not in (QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Yes):
+                        return
+
+                scipyenWindow.assignToWorkspace(newVarName, data)
+
+                if hasattr(data, "modified") and isinstance(data.modified, bool):
+                    data.modified=False
+
+                self.statusBar().showMessage("Done!")
+        else:
             scipyenWindow.assignToWorkspace(newVarName, data)
-            
+
             if hasattr(data, "modified") and isinstance(data.modified, bool):
                 data.modified=False
-            # self.displayFrame()
-            
-            self.statusBar().showMessage("Done!")
-        
+
     def getDataSymbolInWorkspace_(self, data=None):
-        """Calls workspacefunctions.get_symbol_in_namespace for the data.
+        r"""Calls workspacefunctions.get_symbol_in_namespace for the data.
         """
         if self.isTopLevel and self.appWindow:
             scipyenWindow = self.appWindow
@@ -1231,15 +1441,15 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                 scipyenWindow = parent.appWindow
             else:
                 return
-            
+
         if data is None:
             data = self._data_
-            
+
         if data is not None and isinstance(scipyenWindow, QtWidgets.QMainWindow) and scipyenWindow.__class__.__name__.startswith("ScipyenWindow"):
             return get_symbol_in_namespace(data, scipyenWindow.workspace)
-    
+
     def saveOptionsToUserFile(self):
-        """
+        r"""
         Save non-Qt configurables to a user-defined file.
         Not to be confused with self.saveSettings method
         """
@@ -1247,19 +1457,19 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         cfg = self.clsconfigurables
         if len(cfg) == 0 or len(self.configurable_traits) == 0:
             return
-        
+
         # NOTE: 2023-01-22 16:22:18
         # these are kept in sync with clsconfigurables by the ScipyenConfigurable superclass
-        configData = dict((k, self.get_configurable_attribute(k, cfg)) for k in cfg) 
-        
+        configData = dict((k, self.get_configurable_attribute(k, cfg)) for k in cfg)
+
         if len(configData):
             fileFilters = ["JSON files (*.json)", "Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]
-            
+
             fileName, fileFilter = self.chooseFile(caption="Save options",
                                                     single=True,
                                                     save=True,
                                                     fileFilter = ";;".join(fileFilters))
-            
+
             if isinstance(fileName,str) and len(fileName.strip()):
                 if "JSON" in fileFilter:
                     pio.saveJSON(configData, fileName)
@@ -1267,16 +1477,16 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                     pio.saveHDF5(configData, fileName)
                 else:
                     pio.savePickleFile(configData, fileName)
-        
+
     def loadOptionsFromUserFile(self):
         from iolib import pictio as pio
         fileFilters = ["JSON files (*.json)", "Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]
-        
+
         fileName, fileFilter = self.chooseFile(caption="Save options",
                                                 single=True,
                                                 save=False,
                                                 fileFilter = ";;".join(fileFilters))
-            
+
         if isinstance(fileName,str) and len(fileName.strip()):
             if "JSON" in fileFilter:
                 configData = pio.loadJSON(fileName)
@@ -1284,7 +1494,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                 configData = pio.loadHDF5File(fileName)
             else:
                 configData = pio.loadPickleFile(fileName)
-                
+
             cfg = self.clsconfigurables
             if len(cfg):
                 if isinstance(configData, dict) and len(configData):
@@ -1292,23 +1502,23 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                         self.set_configurable_attribute(k,v,cfg)
     @Slot()
     def _slot_breakLoop(self):
-        """To be connected to the `canceled` signal of a progress dialog.
+        r"""To be connected to the `canceled` signal of a progress dialog.
         Modifies the loopControl variable to interrupt a worker loop gracefully.
         """
         # print(f"{self.__class__.__name__}._slot_breakLoop")
         self.loopControl["break"] = True
-        
-    @safeWrapper
+
+    @safewrapper
     def loadFiles(self, filePaths:typing.Sequence[typing.Union[str, pathlib.Path]],
-                       fileLoaderFn:typing.Callable, 
+                       fileLoaderFn:typing.Callable,
                        ioReaderFn:typing.Optional[typing.Callable]=None,
                        updateUi:bool=True):
         if len(filePaths) == 0:
             return
-        
+
         nItems = len(filePaths)
-        
-        progressDlg = QtWidgets.QProgressDialog("Loading data...", "Abort", 0, 
+
+        progressDlg = QtWidgets.QProgressDialog("Loading data...", "Abort", 0,
                                                 nItems, self)
         progressDlg.setMinimumDuration(1000)
         progressDlg.canceled.connect(self._slot_breakLoop)
@@ -1318,17 +1528,17 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         workerThread.signals.signal_Result[object].connect(self.workerReady)
         workerThread.signals.signal_Finished.connect(progressDlg.reset)
         workerThread.start()
-        
-    @safeWrapper
+
+    @safewrapper
     def saveObjects(self, objects:typing.Union[tuple, list],
                     saver:typing.Callable):
-        
+
         if any(not isinstance(o, (tuple, list)) or len(o) != 2 or not isinstance(o[0], str)):
             raise ValueError("'objects' expected to be a sequnce of (name, object) tuples")
-        
+
         # TODO replicate the logic in loadFiles -> mainWindow._saveSelectedObjectsThreaded
-        
-        
+
+
     @Slot(object)
     def workerReady(self, obj):
         # print(f"{self.__class__.__name__}.workerReady: obj = {obj}; self.updateUiWithFileLoad = {self.updateUiWithFileLoad }")
@@ -1343,10 +1553,10 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             # WARNING: 2023-05-28 23:42:57
             #  DO NOT USE - STILL NEEDS WORK
             try:
-                self.workspaceModel.update() 
-                # self.workspaceModel.update() 
+                self.workspaceModel.update()
+                # self.workspaceModel.update()
                 # with self.workspaceModel.holdUIUpdate():
                 #     self.workspaceModel.update2()
             except:
                 traceback.print_exc()
-            
+

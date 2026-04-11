@@ -13,12 +13,19 @@ import quantities as pq
 import neo
 from core.vigra_patches import vigra
 from traitlets.utils.importstring import import_item
-from core import quantities as cq
+from core import scipyen_quantities as cq
 from core.triggerprotocols import TriggerProtocol
-from core.quantities import units_convertible
+from core.scipyen_quantities import unitsConvertible
 
 class ScipyenResults(BaseScipyenData):
-    """TODO: 2022-11-18 14:46:04"""
+    r"""TODO: 2022-11-18 14:46:04
+    NOTE: 2025-05-29 12:40:11 currently, many analysis functions generate instances 
+    of types.SimpleNamespace
+    
+    I am still to decide if subclassing BaseScipyenData (a dataclass) is something
+    needed and what are the benefits in doing so...
+    
+"""
     _data_attributes_ = ("result", dict)
     
     _analysis_attributes_ = ("options", dict,

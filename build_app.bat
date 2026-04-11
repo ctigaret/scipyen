@@ -1,3 +1,4 @@
+@echo OFF
 rem  # -*- coding: utf-8 -*-
 rem  # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 rem  # SPDX-License-Identifier: GPL-3.0-or-later

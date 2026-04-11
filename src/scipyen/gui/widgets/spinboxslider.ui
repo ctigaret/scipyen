@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>477</width>
+    <width>360</width>
     <height>42</height>
    </rect>
   </property>
@@ -37,7 +37,7 @@
    <item>
     <widget class="QSlider" name="framesQSlider">
      <property name="orientation">
-      <enum>Qt::Horizontal</enum>
+      <enum>Qt::Orientation::Horizontal</enum>
      </property>
     </widget>
    </item>

@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
-# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-FileCopyrightText: 2017 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-'''
+r'''
 Image viewer: designed for viewing vigra arrays (primarily)
 Based on GraphicsView Qt framework
 Supports cursors defined in pictgui module.
 Dependencies:
 python >= 3.4
-PyQt5
 vigra built python 3)
 boost C++ libraries built against python 3 (for building vigra against python3)
 numpy (for python 3)
@@ -61,29 +60,56 @@ from dataclasses import MISSING
 from traitlets import Bunch
 import numpy as np
 import quantities as pq
-from gui.pyqtgraph_patch import pyqtgraph as pgraph
 import neo
+import PIL
+PILImage = PIL.Image.Image
 from core.vigra_patches import vigra
 from pandas import NA
 #from core.vigra_patches import vigra.pyqt 
-import matplotlib as mpl
 
-from qtpy import QtCore, QtGui, QtWidgets, QtSvg
-from qtpy.QtCore import Signal, Slot, Property
-from qtpy.uic import loadUiType as __loadUiType__
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+from core.pyqtgraph_patch import pyqtgraph as pgraph
+import matplotlib as mpl
 
 #### END 3rd party modules
 
 #### BEGIN scipyen core modules
 from core import utilities
-from core.prog import (safeWrapper, deprecation, iter_attribute,
+from core.prog import (safewrapper, deprecation, iter_attribute,
                        filter_type, filterfalse_type, 
                        filter_attribute, filterfalse_attribute,
-                       filter_attr, filterfalse_attr)
+                       filter_attr, filterfalse_attr,
+                       scipywarn)
 
 from core import strutils as strutils
-from core import datatypes  
-from core.quantities import quantity2str
+from core import datatypes 
+from core import scipyen_quantities as scq
+from core.scipyen_quantities import quantity2str
 from core.traitcontainers import DataBag
 from core.scipyen_config import markConfigurable
 from core.sysutils import adapt_ui_path
@@ -126,7 +152,7 @@ from gui.itemslistdialog import ItemsListDialog
 # needed for the new plugins framework
 __scipyen_plugin__ = None
 
-mpl.rcParams['backend']='Qt5Agg'
+# mpl.rcParams['backend']='Qt5Agg'
 
 #__viewer_info__ = {"alias": "iv", "class": "ImageViewer"}
 
@@ -140,17 +166,16 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 import qimage2ndarray 
 from qimage2ndarray import gray2qimage, array2qimage, alpha_view, rgb_view, byte_view
 
-#Ui_ItemsListDialog, QDialog = __loadUiType__(os.path.join(__module_path__,'itemslistdialog.ui'))
-
 # used for ImageWindow below
-Ui_ImageViewerWindow, QMainWindow = __loadUiType__(adapt_ui_path(__module_path__, 'imageviewer.ui'))
+Ui_ImageViewerWindow, QMainWindow = loadUiType(adapt_ui_path(__module_path__, 'imageviewer.ui'))
 
-Ui_AxesCalibrationDialog, QDialog = __loadUiType__(adapt_ui_path(__module_path__, "axescalibrationdialog.ui"))
+Ui_AxesCalibrationDialog, QDialog = loadUiType(adapt_ui_path(__module_path__, "axescalibrationdialog.ui"))
+Ui_AxesCalibrationDialog2, QDialog = loadUiType(adapt_ui_path(__module_path__, "axescalibrationdialog2.ui"))
 
-Ui_TransformImageValueDialog, QDialog = __loadUiType__(adapt_ui_path(__module_path__,"transformimagevaluedialog.ui"))
+Ui_TransformImageValueDialog, QDialog = loadUiType(adapt_ui_path(__module_path__,"transformimagevaluedialog.ui"))
 
 class ComplexDisplay(Enum):
-    """TODO
+    r"""
     """
     real  = 1
     imag  = 2
@@ -251,9 +276,322 @@ class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
         self.rangeMaxSpinBox.setValue(val)
         
 
-class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
-    def __init__(self, image, pWin=None, parent=None):
-        super(AxesCalibrationDialog, self).__init__(parent)
+# class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
+#     DefaultResolution = 1.0
+#     DefaultOrigin = 0.0
+#     DefaultUnits = scq.pixel_unit
+#     
+#     def __init__(self, image:typing.Union[vigra.AxisTags, vigra.VigraArray], 
+#                  calibration:typing.Optional[AxesCalibration] = None,
+#                  pWin=None, parent=None):
+#         super(AxesCalibrationDialog, self).__init__(parent)
+#         
+#         self.arrayshape=None
+#         self._data_=None
+#         
+#         if isinstance(image, vigra.AxisTags):
+#             self.axistags = image
+#             self._data_ = None
+#             self.calibration = AxesCalibration(self.axistags)
+#             
+#         elif isinstance(image, vigra.VigraArray):
+#             self.axistags = image.axistags
+#             self.arrayshape = image.shape
+#             self._data_ = image
+#             self.calibration = AxesCalibration(self.axistags)
+#             
+#         elif isinstance(image, AxesCalibration):
+#             self.calibration = image
+#             self._data_ = None
+#             self.axistags = self.calibration.axistags
+#             
+#         elif isinstance(image, ((QtGui.QImage, QtGui.QPixmap))):
+#             self._data_ = image
+#             self.arrayshape = (image.width(), image.height())
+#             if not isinstance(calibration, AxesCalibration):
+#                 self.calibration = AxesCalibration(vigra.VigraArray.defaultAxistags(2, noChannels=True))
+#             else:
+#                 assert len(calibration.keys()) == 2, f"Unexpected number of axes in the calibration ({len(calibration.keys())}) for 2D data"
+#                 self.calibration = calibration
+#             self.axistags = self.calibration.axistags
+#             
+#         elif isinstance(image, np.ndarray):
+#             self._data_ = image
+#             self.arrayshape = image.shape
+#             if not isinstance(calibration, AxesCalibration):
+#                 self.calibration = AxesCalibration(vigra.VigraArray.defaultAxistags(image.ndim, noChannels=True))
+#             else:
+#                 assert len(calibration.keys()) == image.ndim, f"Unexpected number of axes in the calibration ({len(calibration.keys())}) for an array with {image.ndim} axes"
+#                 self.calibration = calibration
+#             self.axistags = self.calibration.axistags
+#             
+#         else:
+#             raise TypeError(f"A {type(image).__name__} object is not an image")
+#         
+#         self.resolution = self.DefaultResolution
+#         self.origin = self.DefaultOrigin
+#         self.units =  self.DefaultUnits
+#         
+#         self.selectedAxisIndex = 0
+#         
+#         self.calibration = AxesCalibration(self.axistags)
+#         
+#         self.axesMetaData = dict()
+#         
+#         for axisInfo in self.axistags:
+#             self.axesMetaData[axisInfo.key]=dict()
+#             self.axesMetaData[axisInfo.key]["calibration"] = self.calibration[axisInfo.key]
+#             self.axesMetaData[axisInfo.key]["description"] = axisInfo.description
+#             if isinstance(self.arrayshape, tuple):
+#                 self.axesMetaData[axisInfo.key]["length"] = self.arrayshape[self.axistags.index(axisInfo.key)]
+#             else:
+#                 self.axesMetaData[axisInfo.key]["length"] = 0
+#             
+#         self.units          = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
+#         self.origin         = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
+#         self.resolution     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
+#         self.description    = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
+#         self.axislength     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
+#         
+#         self._configureUI_()
+#         
+#     def _configureUI_(self):
+#         self.setupUi(self)
+#         
+#         self.setWindowTitle("Calibrate axes")
+#         
+#         self.axisIndexSpinBox.setMaximum(len(self.axistags) -1)
+#         
+#         self.axisIndexSpinBox.setValue(self.selectedAxisIndex)
+#         
+#         if self.arrayshape is None:
+#             self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
+#         else:
+#             self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
+#             
+#         self.unitsLineEdit.setClearButtonEnabled(True)
+#         
+#         self.unitsLineEdit.undoAvailable = True
+#         
+#         self.unitsLineEdit.redoAvailable = True
+#         
+#         self.unitsLineEdit.setText(self.units.__str__().split()[1])
+#         
+#         #self.unitsLineEdit.setValidator( datatypes.UnitsStringValidator())
+#         
+#         self.unitsLineEdit.editingFinished.connect(self.slot_unitsChanged)
+#         
+#         #self.unitsLineEdit.returnPressed.connect(self.slot_unitsChanged)
+#         
+#         self.axisIndexSpinBox.valueChanged[int].connect(self.slot_axisIndexChanged)
+#         
+#         self.axisOriginSpinBox.setValue(self.origin)
+#         
+#         self.axisOriginSpinBox.valueChanged[float].connect(self.slot_originChanged)
+#         
+#         self.axisResolutionRadioButton.setDown(True)
+#         
+#         self.axisResolutionRadioButton.toggled[bool].connect(self.slot_resolutionChecked)
+#         
+#         self.axisResolutionSpinBox.setValue(self.resolution)
+#         
+#         self.axisResolutionSpinBox.setReadOnly(True)
+#         
+#         self.axisSampleDistanceRadioButton.toggled[bool].connect(self.slot_pixelsDistanceChecked)
+#         
+#         self.axisCalibratedDistanceRadioButton.toggled[bool].connect(self.slot_calibratedDistanceChecked)
+#         
+#         self.axisResolutionSpinBox.valueChanged[float].connect(self.slot_resolutionChanged)
+#         
+#         self.axisSampleDistanceSpinBox.setValue(self.axislength)
+#         
+#         self.axisSampleDistanceSpinBox.valueChanged[int].connect(self.slot_pixelDistanceChanged)
+#         
+#         self.axisCalibratedDistanceSpinBox.valueChanged[float].connect(self.slot_calibratedDistanceChanged)
+#         
+#         #self.axisDescriptionEdit.setUndoRedoEnabled(True)
+#         
+#         self.axisDescriptionEdit.plainText = self.description
+#         
+#         self.axisDescriptionEdit.textChanged.connect(self.slot_descriptionChanged)
+#         
+#         # NOTE 2025-04-05 22:00:05
+#         # Actually DO allow editing even if the distance in pixel might be taken 
+#         # from image dimensions. 
+#         # One may already know how may physicat units a certian distance in pixels
+#         # takes, even if this distance is different from the image size along the 
+#         # selected axis. When imaging a calibration microscope scale, one can
+#         # determine the distance in pixels between two bars on the scale, whereas
+#         # read the calibrated distance between the two bars on the scale is already
+#         # known; these two quantities are enough to calculate the resolution along
+#         # the selected axis.
+#         # if isinstance(self._data_, (np.ndarray, QtGui.QImage, QtGui.QPixmap)):
+#             # disable these, because the axis length in pixels is fixed by the data
+#             # self.axisSampleDistanceSpinBox.setEnabled(False) 
+#             # self.axisSampleDistanceRadioButton.setEnabled(False)
+#         
+#     def updateFieldsFromAxis(self):
+#         self.units          = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
+#         self.origin         = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
+#         self.resolution     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
+#         self.description    = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
+#         self.axislength     = self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["length"]
+# 
+#         if self.arrayshape is None:
+#             self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
+#         else:
+#             self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
+#             
+#         self.unitsLineEdit.setText(self.units.__str__().split()[1])
+#         self.axisOriginSpinBox.setValue(self.origin)
+#         self.axisResolutionSpinBox.setValue(self.resolution)
+#         self.axisSampleDistanceSpinBox.setValue(self.axislength)
+#         self.axisCalibratedDistanceSpinBox.setValue(self.resolution * self.axisSampleDistanceSpinBox.value())
+#         
+#         if not self.axisResolutionRadioButton.isChecked():
+#             self.slot_resolutionChanged(self.resolution)
+#             # self.axisCalibratedDistanceSpinBox.setValue(self.resolution * self.axisSampleDistanceSpinBox.value())
+#         # else:
+#             # self.slot_resolutionChanged(self.resolution)
+#     
+#         self.axisDescriptionEdit.clear()
+#         self.axisDescriptionEdit.plainText = self.description
+#         
+#     @Slot(int)
+#     @safewrapper
+#     def slot_axisIndexChanged(self, value):
+#         self.selectedAxisIndex = value
+#         self.updateFieldsFromAxis()
+#         #self.slot_updateAxesMetaData()
+#         
+#     @Slot()
+#     @safewrapper
+#     def slot_unitsChanged(self):
+#         try:
+#             self.units = eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
+#             #print("%s --> %s" % (self.unitsLineEdit.text(),self.units))
+#         except:
+#             pass
+#             #print("Try again!")
+#         
+#         self.slot_updateAxesMetaData()
+# 
+#     @Slot(bool)
+#     @safewrapper
+#     def slot_resolutionChecked(self, value):
+#         self.axisResolutionSpinBox.setReadOnly(value)
+#         self.axisSampleDistanceSpinBox.setReadOnly(not value)
+#         self.axisCalibratedDistanceSpinBox.setReadOnly(not value)
+#     
+#     @Slot(bool)
+#     @safewrapper
+#     def slot_pixelsDistanceChecked(self, value):
+#         self.axisSampleDistanceSpinBox.setReadOnly(value)
+#         self.axisResolutionSpinBox.setReadOnly(not value)
+#         self.axisCalibratedDistanceSpinBox.setReadOnly(not value)
+#         
+#     @Slot(bool)
+#     @safewrapper
+#     def slot_calibratedDistanceChecked(self, value):
+#         self.axisCalibratedDistanceSpinBox.setReadOnly(value)
+#         self.axisSampleDistanceSpinBox.setReadOnly(not value)
+#         self.axisResolutionSpinBox.setReadOnly(not value)
+#     
+#     @Slot()
+#     @safewrapper
+#     def slot_updateAxesMetaData(self):
+#         calibration = self.calibration[self.axistags[self.selectedAxisIndex].key]
+#         axTypeFlags = self.axistags[self.selectedAxisIndex].typeFlags
+#         assert axTypeFlags == calibration.type, f"Mismatch between axis info type flags {axTypeFlags} and calibation type {calibration.type} for axis with key '{self.axistags[self.selectedAxisIndex].key}'"
+#         self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units = \
+#             eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
+#         
+#         self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin = \
+#             self.origin
+#         
+#         self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution = \
+#             self.resolution
+#         
+#         self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["description"] = \
+#             self.description
+#     
+#     @Slot(float)
+#     @safewrapper
+#     def slot_originChanged(self, value):
+#         self.origin = value
+#         
+#         self.slot_updateAxesMetaData()
+# 
+#     @Slot(float)
+#     @safewrapper
+#     def slot_resolutionChanged(self, value):
+#         if self.axisSampleDistanceRadioButton.isChecked(): # calculate distance in pixels
+#             self.axisSampleDistanceSpinBox.setValue(int(self.axisCalibratedDistanceSpinBox.value() // value))
+#             
+#         elif self.axisCalibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
+#             self.axisCalibratedDistanceSpinBox.setValue(value * self.axisSampleDistanceSpinBox.value())
+#             
+#         self.resolution = value
+#         
+#         self.slot_updateAxesMetaData()
+# 
+#     @Slot(int)
+#     @safewrapper
+#     def slot_pixelDistanceChanged(self, value):
+#         if self.axisResolutionRadioButton.isChecked(): # calculate resolution
+#             self.axisResolutionSpinBox.setValue(self.axisCalibratedDistanceSpinBox.value() / value)
+#             
+#             self.resolution = self.axisResolutionSpinBox.value()
+#             
+#         elif self.axisCalibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
+#             self.axisCalibratedDistanceSpinBox.setValue(self.axisResolutionSpinBox.value() * value)
+#     
+#         self.slot_updateAxesMetaData()
+#         
+#     @Slot(float)
+#     @safewrapper
+#     def slot_calibratedDistanceChanged(self, value):
+#         if self.axisResolutionRadioButton.isChecked(): # calculate resolution
+#             self.axisResolutionSpinBox.setValue(value / self.axisSampleDistanceSpinBox.value())
+#             
+#             self.resolution = self.axisResolutionSpinBox.value()
+#             
+#         elif self.axisSampleDistanceRadioButton.isChecked(): # calculate pixels distance
+#             self.axisSampleDistanceSpinBox.setValue(int(value // self.axisResolutionSpinBox.value()))
+#         
+#         self.slot_updateAxesMetaData()
+#         
+#     @Slot()
+#     @safewrapper
+#     def slot_descriptionChanged(self):
+#         self.description = self.axisDescriptionEdit.toPlainText()
+#         self.slot_updateAxesMetaData()
+# 
+#     def calculateResolution(self, pixels=None, distance=None):
+#         if pixels is None:
+#             pixels = self.axisSampleDistanceSpinBox.value()
+#             
+#         if distance is None:
+#             distance = self.axisCalibratedDistanceSpinBox.value()
+#             
+#         self.resolution = distance / pixels
+#         
+#         self.axisResolutionSpinBox.setValue(self.resolution)
+# 
+#         self.slot_updateAxesMetaData()
+#         
+class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
+    DefaultResolution = 1.0
+    DefaultOrigin = 0.0
+    DefaultUnits = scq.pixel_unit
+    DefaultChannelResolution = 1.0 
+    DefaultChannelOrigin = 0.0 
+    DefaultChannelUnits = pq.arbitrary_unit
+    
+    def __init__(self, image:typing.Union[vigra.AxisTags, vigra.VigraArray], 
+                 calibration:typing.Optional[AxesCalibration] = None,
+                 pWin=None, parent=None):
+        super(AxesCalibrationDialog2, self).__init__(parent)
         
         self.arrayshape=None
         self._data_=None
@@ -261,36 +599,83 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         if isinstance(image, vigra.AxisTags):
             self.axistags = image
             self._data_ = None
+            if isinstance(calibration, AxesCalibration):
+                self.calibration = calibration
+            else:
+                self.calibration = AxesCalibration(self.axistags)
             
         elif isinstance(image, vigra.VigraArray):
             self.axistags = image.axistags
             self.arrayshape = image.shape
             self._data_ = image
+            if isinstance(calibration, AxesCalibration):
+                self.calibration = calibration
+            else:
+                self.calibration = AxesCalibration(image)
+            
+        elif isinstance(image, AxesCalibration):
+            self.calibration = image
+            self._data_ = None
+            self.axistags = self.calibration.axistags
+            
+        elif isinstance(image, ((QtGui.QImage, QtGui.QPixmap))):
+            self._data_ = image
+            self.arrayshape = (image.width(), image.height())
+            if isinstance(calibration, AxesCalibration):
+                assert len(calibration.keys()) == 2, f"Unexpected number of axes in the calibration ({len(calibration.keys())}) for 2D data"
+                self.calibration = calibration
+            else:
+                self.calibration = AxesCalibration(vigra.VigraArray.defaultAxistags(2, noChannels=True))
+                
+            self.axistags = self.calibration.axistags
+            
+        elif isinstance(image, np.ndarray):
+            self._data_ = image
+            self.arrayshape = image.shape
+            if isinstance(calibration, AxesCalibration):
+                assert len(calibration.keys()) == image.ndim, f"Unexpected number of axes in the calibration ({len(calibration.keys())}) for an array with {image.ndim} axes"
+                self.calibration = calibration
+            else:
+                self.calibration = AxesCalibration(vigra.VigraArray.defaultAxistags(image.ndim, noChannels=True))
+            self.axistags = self.calibration.axistags
             
         else:
-            raise TypeError("A VigraArray instance was expected; got %d instead" % (type(image).__name__))
+            raise TypeError(f"Unexpected type for 'image' parameter: {type(image).__name__}")
         
-        #self._data_ = image
-        
-        self.resolution = 1.0
-        self.origin = 0.0
-        self.units =  datatypes.pixel_unit
+        self.resolution = self.DefaultResolution
+        self.origin = self.DefaultOrigin
+        self.units =  self.DefaultUnits
         
         self.selectedAxisIndex = 0
         
-        #self.axesCalibration = AxesCalibration(img)
-        
-        self.axisMetaData = dict()
+        self.axesMetaData = dict()
         
         for axisInfo in self.axistags:
-            self.axisMetaData[axisInfo.key]["calibration"] = axiscalibration.AxesCalibration(axisInfo)
-                
-            self.axisMetaData[axisInfo.key]["description"] = axiscalibration.AxesCalibration.removeCalibrationFromString(axisInfo.description)
-
-        self.units          = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
-        self.origin         = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
-        self.resolution     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
-        self.description    = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
+            self.axesMetaData[axisInfo.key]=dict()
+            self.axesMetaData[axisInfo.key]["calibration"] = self.calibration[axisInfo.key]
+            self.axesMetaData[axisInfo.key]["name"] = self.calibration[axisInfo.key].name
+            self.axesMetaData[axisInfo.key]["description"] = AxisCalibrationData.getOriginalDescription(axisInfo)
+            if isinstance(self.arrayshape, tuple):
+                self.axesMetaData[axisInfo.key]["length"] = self.arrayshape[self.axistags.index(axisInfo.key)]
+            else:
+                self.axesMetaData[axisInfo.key]["length"] = 0
+            
+        self.selectedAxisInfo:vigra.AxisInfo   = self.axistags[self.selectedAxisIndex]
+        self.selectedChannel:int = 0
+        
+        # TODO 2025-04-07 21:41:08 FIXME
+        # channel intensity calibration
+        self.description        = self.axesMetaData[self.selectedAxisInfo.key]["description"]
+        self.axislength         = self.axesMetaData[self.selectedAxisInfo.key]["length"] # constant, given the shape of the data array
+        
+        if self.selectedAxisInfo.typeFlags & vigra.AxisType.Channels:
+            self.units              = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].channels[self.selectedChannel].units
+            self.origin             = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].channels[self.selectedChannel].origin
+            self.resolution         = 0.0
+        else:
+            self.units              = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].units
+            self.origin             = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].origin
+            self.resolution         = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].resolution
         
         self._configureUI_()
         
@@ -299,52 +684,64 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         
         self.setWindowTitle("Calibrate axes")
         
+        self.axisIndexSpinBox.setMinimum(0)
         self.axisIndexSpinBox.setMaximum(len(self.axistags) -1)
-        
         self.axisIndexSpinBox.setValue(self.selectedAxisIndex)
+        self.axisIndexSpinBox.valueChanged[int].connect(self.slot_axisIndexChanged)
         
         if self.arrayshape is None:
             self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
         else:
             self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
             
-        self.unitsLineEdit.setClearButtonEnabled(True)
+        self.channelIndexSpinBox.setMinimum(0)
+        if "c" in self.calibration:
+            self.channelIndexSpinBox.setMaximum(len(self.calibration["c"].channels))
+            
+        self.channelIndexSpinBox.setEnabled(self.selectedAxisInfo.typeFlags & vigra.AxisType.Channels)
+        self.channelIndexSpinBox.valueChanged[int].connect(self.slot_channelIndexChanged)
+            
+        # self.unitsLineEdit.setClearButtonEnabled(True)
         
-        self.unitsLineEdit.undoAvailable = True
+        # self.unitsLineEdit.undoAvailable = True
         
-        self.unitsLineEdit.redoAvailable = True
+        # self.unitsLineEdit.redoAvailable = True
         
-        self.unitsLineEdit.setText(self.units.__str__().split()[1])
+        # self.unitsLineEdit.setText(self.units.__str__().split()[1])
         
-        #self.unitsLineEdit.setValidator( datatypes.UnitsStringValidator())
+        # #self.unitsLineEdit.setValidator( datatypes.UnitsStringValidator())
         
-        self.unitsLineEdit.editingFinished.connect(self.slot_unitsChanged)
+        # self.unitsLineEdit.editingFinished.connect(self.slot_unitsChanged)
         
-        #self.unitsLineEdit.returnPressed.connect(self.slot_unitsChanged)
+        # #self.unitsLineEdit.returnPressed.connect(self.slot_unitsChanged)
         
-        self.axisIndexSpinBox.valueChanged[int].connect(self.slot_axisIndexChanged)
+        self.axisUnitSelectionWidget.setValue(self.units)
+        self.axisUnitSelectionWidget.unitChanged[object].connect(self.slot_unitsChanged)
         
-        self.originSpinBox.setValue(self.origin)
         
-        self.originSpinBox.valueChanged[float].connect(self.slot_originChanged)
+        self.axisOriginSpinBox.setValue(self.origin)
         
-        self.resolutionRadioButton.setDown(True)
+        self.axisOriginSpinBox.valueChanged[float].connect(self.slot_originChanged)
         
-        self.resolutionRadioButton.toggled[bool].connect(self.slot_resolutionChecked)
+        self.axisResolutionRadioButton.setDown(True)
         
-        self.resolutionSpinBox.setValue(self.resolution)
+        self.axisResolutionRadioButton.toggled[bool].connect(self.slot_resolutionChecked)
         
-        self.resolutionSpinBox.setReadOnly(True)
+        self.axisResolutionSpinBox.setValue(self.resolution)
         
-        self.pixelsDistanceRadioButton.toggled[bool].connect(self.slot_pixelsDistanceChecked)
+        self.axisResolutionSpinBox.setReadOnly(True)
         
-        self.calibratedDistanceRadioButton.toggled[bool].connect(self.slot_calibratedDistanceChecked)
+        self.axisSampleDistanceRadioButton.toggled[bool].connect(self.slot_pixelsDistanceChecked)
         
-        self.resolutionSpinBox.valueChanged[float].connect(self.slot_resolutionChanged)
+        self.axisCalibratedDistanceRadioButton.toggled[bool].connect(self.slot_calibratedDistanceChecked)
         
-        self.pixelsDistanceSpinBox.valueChanged[int].connect(self.slot_pixelDistanceChanged)
+        self.axisResolutionSpinBox.valueChanged[float].connect(self.slot_resolutionChanged)
         
-        self.calibratedDistanceSpinBox.valueChanged[float].connect(self.slot_calibratedDistanceChanged)
+        self.axisSampleDistanceSpinBox.setValue(self.axislength)
+        
+        self.axisSampleDistanceSpinBox.valueChanged[int].connect(self.slot_pixelDistanceChanged)
+        
+        self.axisCalibratedDistanceSpinBox.valueChanged[float].connect(self.slot_calibratedDistanceChanged)
         
         #self.axisDescriptionEdit.setUndoRedoEnabled(True)
         
@@ -352,154 +749,223 @@ class AxesCalibrationDialog(QDialog, Ui_AxesCalibrationDialog):
         
         self.axisDescriptionEdit.textChanged.connect(self.slot_descriptionChanged)
         
+        # NOTE 2025-04-05 22:00:05
+        # Actually DO allow editing even if the distance in pixel might be taken 
+        # from image dimensions. 
+        # One may already know how may physicat units a certian distance in pixels
+        # takes, even if this distance is different from the image size along the 
+        # selected axis. When imaging a calibration microscope scale, one can
+        # determine the distance in pixels between two bars on the scale, whereas
+        # read the calibrated distance between the two bars on the scale is already
+        # known; these two quantities are enough to calculate the resolution along
+        # the selected axis.
+        # if isinstance(self._data_, (np.ndarray, QtGui.QImage, QtGui.QPixmap)):
+            # disable these, because the axis length in pixels is fixed by the data
+            # self.axisSampleDistanceSpinBox.setEnabled(False) 
+            # self.axisSampleDistanceRadioButton.setEnabled(False)
+    
     def updateFieldsFromAxis(self):
-        self.units          = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units
-        self.origin         = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin
-        self.resolution     = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution
-        self.description    = self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"]
-
+        print(f"{self.__class__.__name__}.updateFieldsFromAxis: selected axis = {self.selectedAxisInfo.key}")
         if self.arrayshape is None:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex])))
+            self.axisInfoLabel.setText("Axis key: %s, type: %s" % (self.selectedAxisInfo.key, axisTypeName(self.selectedAxisInfo)))
         else:
-            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.axistags[self.selectedAxisIndex].key, axisTypeName(self.axistags[self.selectedAxisIndex]), self.arrayshape[self.selectedAxisIndex]))
+            self.axisInfoLabel.setText("Axis key: %s, type: %s, length: %d" % (self.selectedAxisInfo.key, axisTypeName(self.selectedAxisInfo), self.arrayshape[self.selectedAxisIndex]))
             
-        self.unitsLineEdit.setText(self.units.__str__().split()[1])
-        self.originSpinBox.setValue(self.origin)
-        self.resolutionSpinBox.setValue(self.resolution)
+        sigBlock = list(map(lambda w: QtCore.QSignalBlocker(w), (self.axisUnitSelectionWidget,
+                                                                 self.axisOriginSpinBox,
+                                                                 self.axisResolutionSpinBox,
+                                                                 self.axisSampleDistanceSpinBox,
+                                                                 self.axisCalibratedDistanceSpinBox,
+                                                                 self.axisResolutionRadioButton,
+                                                                 self.axisSampleDistanceRadioButton,
+                                                                 self.axisCalibratedDistanceRadioButton,
+                                                                 self.axisDescriptionEdit.
+                                                                 self.channelUnitSelectionWidget,
+                                                                 self.channelOriginSpinBox,
+                                                                 self.channelCalibrationFunctionTextEdit)))
+        # TODO 2025-04-07 21:41:08 FIXME
+        # channel intensity calibration
+        if self.selectedAxisInfo.typeFlags & vigra.AxisType.Channels:
+            self.axisUnitSelectionWidget.setEnabled(True)
+            self.axisOriginSpinBox.setEnabled(True)
+            self.axisResolutionSpinBox.setEnabled(False)
+            self.axisSampleDistanceSpinBox.setEnabled(False)
+            self.axisCalibratedDistanceSpinBox.setEnabled(False)
+            self.axisResolutionRadioButton.setEnabled(False)
+            self.axisSampleDistanceRadioButton.setEnabled(False)
+            self.axisCalibratedDistanceRadioButton.setEnabled(False)
+            
+            self.units          = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].channels[self.selectedChannel].units
+            self.origin         = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].channels[self.selectedChannel].origin
+        else:
+            self.axisUnitSelectionWidget.setEnabled(True)
+            self.axisOriginSpinBox.setEnabled(True)
+            self.axisResolutionSpinBox.setEnabled(True)
+            self.axisSampleDistanceSpinBox.setEnabled(True)
+            self.axisCalibratedDistanceSpinBox.setEnabled(True)
+            self.axisResolutionRadioButton.setEnabled(True)
+            self.axisSampleDistanceRadioButton.setEnabled(True)
+            self.axisCalibratedDistanceRadioButton.setEnabled(True)
+            
+            self.units          = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].units
+            self.origin         = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].origin
+            self.resolution     = self.axesMetaData[self.selectedAxisInfo.key]["calibration"].resolution
+            
+        self.description    = self.axesMetaData[self.selectedAxisInfo.key]["description"]
+        self.axislength     = self.axesMetaData[self.selectedAxisInfo.key]["length"]
+
+        self.axisUnitSelectionWidget.setValue(self.units)
+        self.axisOriginSpinBox.setValue(self.origin)
+        self.axisResolutionSpinBox.setValue(self.resolution)
+        self.axisSampleDistanceSpinBox.setValue(self.axislength)
+        self.axisCalibratedDistanceSpinBox.setValue(self.resolution * self.axisSampleDistanceSpinBox.value())
         
-        if self.resolutionRadioButton.isChecked():
-            self.calibratedDistanceSpinBox.setValue(self.resolution * self.pixelsDistanceSpinBox.value())
-            
-        else:
+        if not self.axisResolutionRadioButton.isChecked():
             self.slot_resolutionChanged(self.resolution)
     
         self.axisDescriptionEdit.clear()
         self.axisDescriptionEdit.plainText = self.description
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_axisIndexChanged(self, value):
         self.selectedAxisIndex = value
+        self.selectedAxisInfo = self.axistags[self.selectedAxisIndex]
+        if self.selectedAxisInfo.typeFlags & vigra.AxisType.Channels and "c" in self.calibration:
+            sigBlock = QtCore.QSignalBlocker(self.channelIndexSpinBox)
+            self.channelIndexSpinBox.setMaximum(len(self.calibration["c"].channels)-1)
+            self.channelIndexSpinBox.setEnabled(True)
+        self.slot_updateAxesMetaData()
         self.updateFieldsFromAxis()
-        #self.slot_generateCalibration()
         
-    @Slot()
-    @safeWrapper
-    def slot_unitsChanged(self):
-        try:
-            self.units = eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
-            #print("%s --> %s" % (self.unitsLineEdit.text(),self.units))
-        except:
-            pass
-            #print("Try again!")
+    @Slot(int)
+    @safewrapper
+    def slot_channelIndexChanged(self, value):
+        self.selectedChannel = value
+        self.slot_updateAxesMetaData()
+        self.updateFieldsFromAxis()
         
-        self.slot_generateCalibration()
+    @Slot(object)
+    @safewrapper
+    def slot_unitsChanged(self, value):
+        print(f"{self.__class__.__name__}.slot_unitsChanged: value = {value}")
+        self.units = value
+        
+        self.slot_updateAxesMetaData()
 
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def slot_resolutionChecked(self, value):
-        self.resolutionSpinBox.setReadOnly(value)
-        self.pixelsDistanceSpinBox.setReadOnly(not value)
-        self.calibratedDistanceSpinBox.setReadOnly(not value)
+        self.axisResolutionSpinBox.setReadOnly(value)
+        self.axisSampleDistanceSpinBox.setReadOnly(not value)
+        self.axisCalibratedDistanceSpinBox.setReadOnly(not value)
     
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def slot_pixelsDistanceChecked(self, value):
-        self.pixelsDistanceSpinBox.setReadOnly(value)
-        self.resolutionSpinBox.setReadOnly(not value)
-        self.calibratedDistanceSpinBox.setReadOnly(not value)
+        self.axisSampleDistanceSpinBox.setReadOnly(value)
+        self.axisResolutionSpinBox.setReadOnly(not value)
+        self.axisCalibratedDistanceSpinBox.setReadOnly(not value)
         
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def slot_calibratedDistanceChecked(self, value):
-        self.calibratedDistanceSpinBox.setReadOnly(value)
-        self.pixelsDistanceSpinBox.setReadOnly(not value)
-        self.resolutionSpinBox.setReadOnly(value)
+        self.axisCalibratedDistanceSpinBox.setReadOnly(value)
+        self.axisSampleDistanceSpinBox.setReadOnly(not value)
+        self.axisResolutionSpinBox.setReadOnly(not value)
     
     @Slot()
-    @safeWrapper
-    def slot_generateCalibration(self):
-        self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units = \
-            eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
+    @safewrapper
+    def slot_updateAxesMetaData(self):
+        # units = self.axisUnitSelectionWidget.value()
+        print(f"{self.__class__.__name__}.slot_updateAxesMetaData for {self.axistags[self.selectedAxisIndex].key}")
+        # self.axesMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].units = \
+        #     eval("1*%s" % (self.unitsLineEdit.text()), pq.__dict__)
         
-        self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].origin = \
-            self.origin
+        # TODO 2025-04-07 21:41:08 FIXME
+        # channel intensity calibration
+            # return
+            
+        calibration = self.calibration[self.selectedAxisInfo.key]
         
-        self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["calibration"].resolution = \
-            self.resolution
+        self.axesMetaData[self.selectedAxisInfo.key]["description"] = self.description
         
-        self.axisMetaData[self.axistags[self.selectedAxisIndex].key]["description"] = \
-            self.description
+        if self.selectedAxisInfo.typeFlags & vigra.AxisType.Channels:
+            self.axesMetaData[self.selectedAxisInfo.key]["calibration"].channels[self.selectedChannel].units = self.units
+            self.axesMetaData[self.selectedAxisInfo.key]["calibration"].channels[self.selectedChannel].origin = self.origin
+        else:
+            self.axesMetaData[self.selectedAxisInfo.key]["calibration"].units = self.units
+            self.axesMetaData[self.selectedAxisInfo.key]["calibration"].origin = self.origin
+            self.axesMetaData[self.selectedAxisInfo.key]["calibration"].resolution = self.resolution
         
-        
-    
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_originChanged(self, value):
         self.origin = value
-        
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
 
 
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_resolutionChanged(self, value):
-        if self.pixelsDistanceRadioButton.isChecked(): # calculate distance in pixels
-            self.pixelsDistanceSpinBox.setValue(int(self.calibratedDistanceSpinBox.value() // value))
+        if self.axisSampleDistanceRadioButton.isChecked(): # calculate distance in pixels
+            self.axisSampleDistanceSpinBox.setValue(int(self.axisCalibratedDistanceSpinBox.value() // value))
             
-        elif self.calibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
-            self.calibratedDistanceSpinBox.setValue(value * self.pixelsDistanceSpinBox.value())
+        elif self.axisCalibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
+            self.axisCalibratedDistanceSpinBox.setValue(value * self.axisSampleDistanceSpinBox.value())
             
         self.resolution = value
-        
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
 
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slot_pixelDistanceChanged(self, value):
-        if self.resolutionRadioButton.isChecked(): # calculate resolution
-            self.resolutionSpinBox.setValue(self.calibratedDistanceSpinBox.value() / value)
+        if self.axisResolutionRadioButton.isChecked(): # calculate resolution
+            self.axisResolutionSpinBox.setValue(self.axisCalibratedDistanceSpinBox.value() / value)
             
-            self.resolution = self.resolutionSpinBox.value()
+            self.resolution = self.axisResolutionSpinBox.value()
             
-        elif self.calibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
-            self.calibratedDistanceSpinBox.setValue(self.resolutionSpinBox.value() * value)
+        elif self.axisCalibratedDistanceRadioButton.isChecked(): # calculate calibrated distance
+            self.axisCalibratedDistanceSpinBox.setValue(self.axisResolutionSpinBox.value() * value)
     
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_calibratedDistanceChanged(self, value):
-        if self.resolutionRadioButton.isChecked(): # calculate resolution
-            self.resolutionSpinBox.setValue(value / self.pixelsDistanceSpinBox.value())
+        if self.axisResolutionRadioButton.isChecked(): # calculate resolution
+            self.axisResolutionSpinBox.setValue(value / self.axisSampleDistanceSpinBox.value())
             
-            self.resolution = self.resolutionSpinBox.value()
+            self.resolution = self.axisResolutionSpinBox.value()
             
-        elif self.pixelsDistanceSpinBox.isChecked(): # calculate pixels distance
-            self.pixelsDistanceSpinBox.setValue(int(value // self.resolutionSpinBox.value()))
+        elif self.axisSampleDistanceRadioButton.isChecked(): # calculate pixels distance
+            self.axisSampleDistanceSpinBox.setValue(int(value // self.axisResolutionSpinBox.value()))
         
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_descriptionChanged(self):
         self.description = self.axisDescriptionEdit.toPlainText()
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
 
     def calculateResolution(self, pixels=None, distance=None):
         if pixels is None:
-            pixels = self.pixelsDistanceSpinBox.value()
+            pixels = self.axisSampleDistanceSpinBox.value()
             
         if distance is None:
-            distance = self.calibratedDistanceSpinBox.value()
+            distance = self.axisCalibratedDistanceSpinBox.value()
             
         self.resolution = distance / pixels
         
-        self.resolutionSpinBox.setValue(self.resolution)
+        self.axisResolutionSpinBox.setValue(self.resolution)
 
-        self.slot_generateCalibration()
+        self.slot_updateAxesMetaData()
         
 class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
+    r"""Scipyen's image viewer.
+    Use with VIGRA arrays, numpy arrays, PILImage, QImage & QPixmap objects.
+ """
     closeMe                 = Signal(int)
     
     signal_graphicsObjectAdded      = Signal(object, name="signal_graphicsObjectAdded")
@@ -516,6 +982,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         np.ndarray:0, 
                         QtGui.QImage:99, 
                         QtGui.QPixmap:99, 
+                        PILImage:99,
                         tuple:0, 
                         list:0}
     
@@ -575,8 +1042,27 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     defaultGraphicsHoverColor = "red"
 
-    def __init__(self, data: (vigra.VigraArray, vigra.filters.Kernel2D, np.ndarray, QtGui.QImage, QtGui.QPixmap, tuple, list) = None, parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, frame:(int, type(None)) = None, displayChannel = None, normalize: (bool, ) = False, gamma: (float, ) = 1.0, *args, **kwargs):
-
+    def __init__(self, data: (vigra.VigraArray, vigra.filters.Kernel2D, np.ndarray, QtGui.QImage, QtGui.QPixmap, tuple, list) = None, 
+                 parent: (QtWidgets.QMainWindow, type(None)) = None, ID:(int, type(None)) = None, 
+                 win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None, 
+                 frame:(int, type(None)) = None, 
+                 displayChannel = None, normalize: (bool, ) = False, gamma: (float, ) = 1.0, *args, **kwargs):
+        r"""ImageViewer constructor
+     """
+        # print(f"{self.__class__.__name__}.__init__: data: {type(data).__name__}")
+        # # NOTE: 2021-08-25 09:42:54
+        # # ScipyenFrameViewer initialization - also does the following:
+        # # 1) calls self._configureUI_() overridden here:
+        # #   1.1) sets up the UI defined in the .ui file (setupUi)
+        # #
+        # # 2) calls self.loadSettings() inherited from 
+        # # ScipyenViewer <- WorkspaceGuiMixin <- ScipyenConfigurable
+        # #
+        # # NOTE: 2022-01-17 16:27:30
+        # # pass None for data to prevent super().__init__ from calling setData
+        # # next call our own setData
+        # super().__init__(data=None, parent=parent, ID=ID, win_title=win_title, 
+        #                  doc_title=doc_title, frameIndex=frame, **kwargs)
         self._image_width_ = 0
         self._image_height_ = 0
         self._imageNormalize             = None
@@ -628,45 +1114,54 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         #self.nChannels                 = 1
         #self._current_frame_index_      = 0
         #self._number_of_frames_         = 1
-        self.tStride                    = 0
-        self.zStride                    = 0
-        self.userFrameAxisInfo          = None
+        self.tStride                        = 0
+        self.zStride                        = 0
+        self.userFrameAxisInfo              = None
         # NOTE: 2021-12-02 10:50:17
         # the 3 beow are int see NOTE: 2021-12-02 10:39:54
-        self.frameAxis                  = None
-        self.widthAxis                  = None # this is "visual" width which may not be on a spatial axis "x"
-        self.heightAxis                 = None # this is "visual" height which may not be on a spatial axis "y"
+        self.frameAxis                      = None
+        self.widthAxis                      = None # this is "visual" width which may not be on a spatial axis "x"
+        self.heightAxis                     = None # this is "visual" height which may not be on a spatial axis "y"
         #self.frameIterator              = None # ??? FIXME what's this for ???
-        self._currentZoom_              = 0
+        self._currentZoom_                  = 0
         #self.complexDisplay            = ComplexDisplay.real # one of "real", "imag", "dual" "abs", "phase" (cmath.phase), "arg"
-        self._currentFrameData_         = None
+        self._currentFrameData_             = None
         
         # QGraphicsLineItems -- outside the roi/cursor GraphicsObject framework!
-        self._scaleBarColor_             = QtGui.QColor(255, 255, 255)
-        self._xScaleBar_                 = None
-        self._xScaleBarTextItem_         = None
-        self._yScaleBar_                 = None
-        self._yScaleBarTextItem_         = None
-        self._scaleBarTextPen_           = QtGui.QPen(QtCore.Qt.SolidLine)
-        self._scaleBarPen_               = QtGui.QPen(QtGui.QBrush(self._scaleBarColor_, 
-                                                                  QtCore.Qt.SolidPattern),
-                                                     2.0,
-                                                     cap = QtCore.Qt.RoundCap,
-                                                     join = QtCore.Qt.RoundJoin)
+        self._scaleBarColor_                = QtGui.QColor(255, 255, 255)
+        self._xScaleBar_                    = None
+        self._xScaleBarTextItem_            = None
+        self._yScaleBar_                    = None
+        self._yScaleBarTextItem_            = None
+        self._scaleBarTextPen_              = QtGui.QPen(QtCore.Qt.SolidLine)
+        if __has_PySide6__:
+            self._scaleBarPen_ = QtGui.QPen(QtGui.QBrush(self._scaleBarColor_,
+                                                         QtCore.Qt.SolidPattern),
+                                            2.0, 
+                                            c = QtCore.Qt.RoundCap,
+                                            j = QtCore.Qt.RoundJoin)
+        else:
+            self._scaleBarPen_                  = QtGui.QPen(QtGui.QBrush(self._scaleBarColor_, 
+                                                                    QtCore.Qt.SolidPattern),
+                                                        2.0,
+                                                        cap = QtCore.Qt.RoundCap,
+                                                        join = QtCore.Qt.RoundJoin)
         
         #self.qsettings                   = QtCore.QSettings()
         
-        self._display_horizontal_scalebar_ = True
-        self._display_vertical_scalebar_   = True
+        self._display_horizontal_scalebar_  = True
+        self._display_vertical_scalebar_    = True
         
-        self._display_time_vertical_           = True
+        self._display_time_vertical_        = True
         
-        self._showsScaleBars_            = True
+        self._showsScaleBars_               = True
         
-        self._showsIntensityCalibration_ = False
+        self._showsIntensityCalibration_    = False
         
-        self._scaleBarOrigin_            = (0, 0)
-        self._scaleBarLength_            = (10,10)
+        self._scaleBarOrigin_               = (0, 0)
+        self._scaleBarLength_               = (10,10)
+        
+        self._asAlphaChannel_:bool          = False
         
         # NOTE: 2021-08-25 09:42:54
         # ScipyenFrameViewer initialization - also does the following:
@@ -679,7 +1174,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         # NOTE: 2022-01-17 16:27:30
         # pass None for data to prevent super().__init__ from calling setData
         # next call our own setData
-        super().__init__(data=None, parent=parent, ID=ID, win_title=win_title, 
+        ScipyenFrameViewer.__init__(self, data=None, parent=parent, ID=ID, win_title=win_title, 
                          doc_title=doc_title, frameIndex=frame, **kwargs)
         
         self.observed_vars = DataBag(allow_none=True, mutable_types=True)
@@ -701,7 +1196,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @property
     def colorMapObj(self):
-        """The colormap used as default for displaying gray-scale images
+        r"""The colormap used as default for displaying gray-scale images
         This is not a configurable property; however, changing it will result in
         a new value of the colorMap property
         """
@@ -720,7 +1215,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
     @property
     def colorMap(self):
-        """Name of the colormap used as default for displaying gray-scale images.
+        r"""Name of the colormap used as default for displaying gray-scale images.
         This is the 'name' attribute (str) of a matplotlib.colors.Colormap object.
         This is so that the name can be safely stored in QSettings.
         
@@ -733,14 +1228,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 self._colorMap = self._prevColorMap
             else:
                 self._colorMap = colormaps.get("grey")
-            #self.displayFrame()
             
         return self._colorMap.name
     
     @markConfigurable("ColorMap")
     @colorMap.setter
     def colorMap(self, val:typing.Union[str, colormaps.mpl.colors.Colormap]):
-        """Setter for colorMap
+        r"""Setter for colorMap
         """
         if isinstance(val, colormaps.mpl.colors.Colormap):
             cmap_name = val.name
@@ -759,34 +1253,56 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self._prevColorMap = self._colorMap
         
         self._colorMap = cmap
-        #self._colorMap = val
         if isinstance(getattr(self, "configurable_traits", None), DataBag):
             self.configurable_traits["ColorMap"] = cmap_name
         
-        self.displayFrame()
+        if self._data_ is not None:
+            self.displayFrame()
         
     @property
-    def frameIndexBinding(self):
+    def frameIndexBinding(self) -> tuple:
+        r"""A tuple of tuples (frame_axis_index:int, bind_index:int).
+        Useful to bind the underlying vigra arry data at the bind_index along
+        the frame axis.
+        See documentation of vigra.VigraArray.bindAxis(…) for details.
+        For other types of underlying data this is (None, 0).
+        """
         if not isinstance(self._data_, vigra.VigraArray):
             return (None, 0)
         
         # NOTE when a frame axis index equals data.ndim this means there is no
         # frame axis there!
         
-        #print("in frameIndexBinding: self.frameAxis", self.frameAxis)
-        #print("in frameIndexBinding: self._number_of_frames_", self._number_of_frames_)
         if isinstance(self._number_of_frames_, int):
             return tuple((self.frameAxis if self.frameAxis < self._data_.ndim else None, k) for k in range(self._number_of_frames_))
         
         else:
             traversal = tuple(tuple((ax,i) for i in range(axSize)) for ax, axSize in zip(reversed(self.frameAxis), reversed(self._number_of_frames_)))
-            #traversal = tuple(tuple((ax,i) for i in range(axSize)) for ax, axSize in zip(self.frameAxis, self._number_of_frames_))
             return tuple(itertools.product(*traversal))
             
+    @property
+    def data(self) -> vigra.VigraArray | None:
+        r"""Reference to the underlying data. 
+        This does not include calibration data. Use self.dataWithCalibratedAxes
+        for this purpose.
+        """
+        return self._data_
+    
+    @property
+    def dataWithCalibratedAxes(self):
+        """Underlying array with axes containing calibration data"""
+        if self._data_ is None:
+            return
         
+        if self.axesCalibration:
+            return self.axesCalibration.calibrateImage(self._data_)
+
+        return self._data_
+            
+    
     @property
     def temporaryColorMap(self):
-        """Name of a temporary colormap or None.
+        r"""Name of a temporary colormap or None.
         A temporary colormap is to be used for displaying 'channel' images (e.g.,
         2D Vigra arrays representing an image 'channel').
         In order to be used, the temporary colormap needs to be passed as the
@@ -834,7 +1350,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @currentFrame.setter
     def currentFrame(self, val):
-        """
+        r"""
         Emits self.frameChanged signal
         """
         missing = (isinstance(self._missing_frame_value_, (int, float)) and val == self._missing_frame_value_) or \
@@ -896,14 +1412,14 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @property
     def graphicsCursors(self):
-        """List of Cursor planar graphics.
+        r"""List of Cursor planar graphics.
         This is the list of unique planar graphics cursor backends for the 
         displayed cursors
         """
         return list(self.viewerWidget.graphicsCursors)
     
     def getGraphicsCursors(self, **kwargs):
-        """List with a specific subset of Cursor planar graphics objects.
+        r"""List with a specific subset of Cursor planar graphics objects.
         
         Var-keyword parameters
         ======================
@@ -920,9 +1436,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         return self.graphicsCursors
     
-    @safeWrapper
+    @safewrapper
     def imageCursor(self, value:typing.Optional[typing.Any]=None, *args, **kwargs):
-        """Returns a list of pictgui.Cursor selected by one or more attributes.
+        r"""Returns a list of pictgui.Cursor selected by one or more attributes.
         
         By default, compares the value of the 'name' attribute of the 
         PlanarGraphics Cursor object to the 'value' parameter.
@@ -955,9 +1471,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         """
         return list(self.viewerWidget.imageCursor(value, *args, **kwargs))
 
-    @safeWrapper
+    @safewrapper
     def hasCursor(self, *args, **kwargs):
-        """Tests for existence of a GraphicsObject cursor with specified ID or name (label).
+        r"""Tests for existence of a GraphicsObject cursor with specified ID or name (label).
         
         Delegates to self.imageCursor(...)
         """
@@ -965,15 +1481,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @property
     def rois(self):
-        """List of non-Cursor planargraphics
+        r"""List of non-Cursor planargraphics
         This is the list of unique planar graphics cursor backends for the 
         displayed cursors
         """
         return list(set(self.viewerWidget.rois))
     
-    @safeWrapper
+    @safewrapper
     def roi(self, value:typing.Optional[typing.Any]=None, *args, **kwargs):
-        """Returns a list of PlanarGraphics ROI roi with a specific attribute value.
+        r"""Returns a list of PlanarGraphics ROI roi with a specific attribute value.
         
         Delegates to GraphicsImageViewerWidget.roi(...); by default, compares
         the value of the 'name' attribute of the PlanarGraphics to the 'value'
@@ -1006,9 +1522,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         """
         return list(set(self.viewerWidget.roi(value, *args, **kwargs)))
         
-    @safeWrapper
+    @safewrapper
     def hasRoi(self, *args, **kwargs):
-        """Tests for existence of a PlanarGraphics ROI roi with a given attribute.
+        r"""Tests for existence of a PlanarGraphics ROI roi with a given attribute.
         
         Delegates to self.roi(...)
         
@@ -1039,36 +1555,38 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     @property
     def scene(self):
-        """A reference to viewerWidget's QGraphicsScene.
+        r"""A reference to viewerWidget's QGraphicsScene.
         """
         return self.viewer.scene
     
     
     @property
     def selectedRoi(self):
-        """A reference to the selected ROI
+        r"""A reference to the selected ROI
         """
         return self.viewer.selectedRoi
     
     @property
     def selectedCursor(self):
-        """A reference to the selected cursor
+        r"""A reference to the selected cursor
         """
         return self.viewer.selectedCursor
     
     @property
     def imageWidth(self):
-        """Width of the displayed image (in pixels); read-only; 0 if no image
+        r"""Width of the displayed image (in pixels); read-only; 0 if no image
         """
         return self._image_width_
     
     @property
     def imageHeight(self):
-        """Height of the displayed image (in pixels); read-only; 0 if no image
+        r"""Height of the displayed image (in pixels); read-only; 0 if no image
         """
         return self._image_height_
     
-    
+    @property
+    def axesCalibration(self):
+        return self._axes_calibration_
     
     ####
     # slots
@@ -1076,54 +1594,33 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
     # helper for export slots
     
-    def _export_scene_helper_(self, file_format):
-        if not isinstance(file_format, str) or file_format.strip().lower() not in ("svg", "tiff", "png"):
-            raise ValueError("Unsupported export file format %s" % file_format)
-        
-        if file_format.strip().lower() == "svg":
-            file_filter = "Scalable Vector Graphics Files (*.svg)"
-            caption_suffix = "SVG"
-            
-        elif file_format.strip().lower() == "tiff":
-            file_filter = "TIFF Files (*.tif)"
-            caption_suffix = "TIFF"
-            qimg_format = QtGui.QImage.Format_ARGB32
-            
-        elif file_format.strip().lower() == "png":
-            file_filter = "Portable Network Graphics Files (*.png)"
-            caption_suffix = "PNG"
-            qimg_format = QtGui.QImage.Format_ARGB32
-            
-        else:
-            raise ValueError("Unsupported export file format %s" % file_format)
-
-        if sys.platform == "win32":
-            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
-            kw = {"options":options}
-        else:
-            kw = {}
-
-        if self._scipyenWindow_ is not None:
-            targetDir = self._scipyenWindow_.currentDir
-            
-            fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self,
-                                                                caption="Export figure as %s" % caption_suffix,
-                                                                filter = file_filter,
-                                                                directory = targetDir,
-                                                                **kw)
-            
-        else:
-            fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self,
-                                                                caption="Export figure as %s" % caption_suffix,
-                                                                filter = file_filter,
-                                                                **kw)
-            
-        if len(fileName) == 0:
+    def _export_scene_helper_(self, to_workspace:bool=False):
+        if to_workspace:
+            img = self.frameData
+            if self.axesCalibration:
+                img = self.axesCalibration.calibrateImage(img)
+            self.exportDataToWorkspace(img, f"frame_image_data_{self.currentFrame}")
             return
         
-        if file_format.strip().lower() == "svg":
+        # elif not isinstance(file_format, str) or file_format.strip().lower() not in ("svg", "tiff", "png", "hdf5", "pickle"):
+        #     scipywarn("Unsupported export file format %s" % file_format)
+        #     return
+        
+        fileFilter = "TIFF (*.tif);; Scalable Vector Graphics files (*.svg);;Portable Network Graphics (*.png);;Pickle (*.pkl);;HDF5 (*.h5)"
+        if self._scipyenWindow_ is not None:
+            targetDir = self._scipyenWindow_.currentDir
+            fn, fl = self.chooseFile("Export Image Frame As", fileFilter=fileFilter, single=True,
+                                    save=True, targetDir=targetDir)
+        else:
+            fn, fl = self.chooseFile("Export Image Frame As", fileFilter=fileFilter, single=True,
+                                    save=True)
+            
+        if len(fn) == 0:
+            return
+        
+        if "svg" in fl.strip().lower():
             generator = QtSvg.QSvgGenerator()
-            generator.setFileName(fileName)
+            generator.setFileName(fn)
             
             generator.setSize(QtCore.QSize(int(self.viewerWidget.scene.width()), 
                                            int(self.viewerWidget.scene.height())))
@@ -1143,147 +1640,257 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.viewerWidget.scene.render(painter)
             painter.end()
         
-        else:
+        elif any(v in fl.strip().lower() for v in ("png", "tif")):
+            # qimg_format = QtGui.QImage.Format_ARGB32
             out = QtGui.QImage(int(self.viewerWidget.scene.width()), 
                                int(self.viewerWidget.scene.height()),
-                               qimg_format)
+                               QtGui.QImage.Format_ARGB32)
             
             out.fill(QtCore.Qt.black)
             
             painter = QtGui.QPainter(out)
             self.viewerWidget.scene.render(painter)
             painter.end()
-            out.save(fileName, file_format.strip().lower(), 100)
+            out.save(fn, file_format.strip().lower(), 100)
+            
+        elif any(v in fl.strip().lower() for v in ("hdf5", "pkl")):
+            img = self.frameData
+            if self.axesCalibration:
+                img = self.axesCalibration.calibrateImage(img)
+                
+            if file_format.strip().lower() == "hdf5":
+                pio.saveHDF5(img, fileName)
+            else:
+                pio.savePickleFile(img, fileName)
     
     @Slot()
-    @safeWrapper
-    def slot_exportSceneAsPNG(self):
+    @safewrapper
+    def slot_exportSceneToFile(self):
+        r"""Exports the image in the current frame as a portable network graphics file.
+        The result includes rendered ROIs and cursors."""
         if self._data_ is None:
             return
         
-        self._export_scene_helper_("png")
+        self._export_scene_helper_()
         
     @Slot()
-    @safeWrapper
-    def slot_exportSceneAsSVG(self):
+    @safewrapper
+    def slot_exportSceneToWorkspace(self):
+        r"""Exports the image of the current frame as a VigraArray in the workspace.
+        Ithe array axes will include calibration data"""
         if self._data_ is None:
             return
+        self._export_scene_helper_(True)
         
-        self._export_scene_helper_("svg")
-        
+#     def _getSaveFileName_(self, captionPrefix:str = "Save data", fileType:str = "TIFF"):
+#         if sys.platform.startswith("win32"):
+#             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
+#             kw = {"options":options}
+#         else:
+#             kw = {}
+#             
+#         if not isinstance(fileType, str) or len(fileType.strip()) == 0:
+#             return
+#         
+#         caption = ""
+#         flt = ""
+#         if fileType.strip().lower() == "tiff":
+#             caption = f"{captionPrefix} as TIFF"
+#             flt = "TIFF Files (*.tif)"
+#             
+#         elif fileType.strip().lower() == "hdf5":
+#             caption = f"{captionPrefix} as HDF5"
+#             flt = "HDF5 Files (*.h5)"
+#             
+#         elif fileType.strip().lower() == "png":
+#             caption = f"{captionPrefix} as PNG"
+#             flt = "PNG Files (*.png)"
+# 
+#         elif fileType.strip().lower() == "pickle":
+#             caption = f"{captionPrefix} as Python Pickle"
+#             flt = "Pickle Files (*.pkl)"
+#             
+#         elif fileType.strip().lower() == "svg":
+#             caption = f"{captionPrefix} as Scalable Vector Graphics"
+#             flt = "Scalable Vector Graphics Files (*.svg)"
+#             
+#         else:
+#             scipywarn(f"Unsupported export file format: {fileType}")
+#             return
+#         
+#         if self._scipyenWindow_ is not None:
+#             targetDir = self._scipyenWindow_.currentDir
+#             fn, fl = self.chooseFile(caption=caption, fileFilter = flt, single=True, save=True,
+#                                      targetDir=targetDir)
+#             
+#         else:
+#             fn, fl = self.chooseFile(caption=caption, fileFilter = flt, single=True, save=True)
+# 
+#         return fn
+#         # if self._scipyenWindow_ is not None:
+#         #     targetDir = self._scipyenWindow_.currentDir
+#         #     fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
+#         #                                                         caption=caption, 
+#         #                                                         filter=flt,
+#         #                                                         directory=targetDir, **kw)
+#         # else:
+#         #     fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
+#         #                                                         caption=caption, 
+#         #                                                         filter=flt, **kw)
+#         # return fileName
+#         
     @Slot()
-    @safeWrapper
-    def slot_exportSceneAsTIFF(self):
+    @safewrapper
+    def slot_saveToFile(self):
         if self._data_ is None:
             return
         
-        self._export_scene_helper_("tiff")
-        
-    @Slot()
-    @safeWrapper
-    def slot_saveTIFF(self):
-        if self._data_ is None:
-            return
-        
-        if sys.platform == "win32":
-            options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
-            kw = {"options":options}
-        else:
-            kw = {}
-
+        fileFilter = "TIFF (*.tif);; Scalable Vector Graphics files (*.svg);;Portable Network Graphics (*.png);;Pickle (*.pkl);;HDF5 (*.h5)"
         if self._scipyenWindow_ is not None:
             targetDir = self._scipyenWindow_.currentDir
-            fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
-                                                                caption="Save image data as TIFF", 
-                                                                filter="TIFF Files (*.tif)",
-                                                                directory=targetDir, **kw)
+            fn, fl = self.chooseFile("Export Image Frame As", fileFilter=fileFilter, single=True,
+                                    save=True, targetDir=targetDir)
         else:
-            fileName, _ = QtWidgets.QFileDialog.getSaveFileName(self, 
-                                                                caption="Save image data as TIFF", 
-                                                                filter="TIFF Files (*.tif)", **kw)
+            fn, fl = self.chooseFile("Export Image Frame As", fileFilter=fileFilter, single=True,
+                                    save=True)
+            
+        if len(fn) == 0:
+            return
+        
+        pio.saveImageFile(self._data_, fn)
+        
+    @Slot()
+    @safewrapper
+    def slot_saveHDF5(self):
+        r"""Saves the underlying data array as a HDF5 file.
+        The axes of the array will include calibration data.
+        """
+        if self._data_ is None:
+            return
+        
+        if self.axesCalibration:
+            data = self.axesCalibration.calibrateImage(self._data_)
+        else:
+            data = self._data_
+
+        fileName = self._getSaveFileName_("HDF5")
         
         if len(fileName) == 0:
             return
         
-        #if image
+        pio.saveHDF5(data, fileName)
         
-        pio.saveImageFile(self._data_, fileName)
+    @Slot()
+    @safewrapper
+    def slot_savePickle(self):
+        r"""Saves the underlying data array as a Python pickle file.
+        The axes of the array will include calibration data.
+        """
+        if self._data_ is None:
+            return
         
+        if self.axesCalibration:
+            data = self.axesCalibration.calibrateImage(self._data_)
+        else:
+            data = self._data_
+
+        fileName = self._getSaveFileName_("HDF5")
+        
+        if len(fileName) == 0:
+            return
+        
+        pio.savePickleFile(data, fileName)
+        
+    @Slot()
+    @safewrapper
+    def slot_dataToWorkspace(self):
+        r"""Exports underlying data array as a VigraArray to the workspace.
+        The array axes willl include calibration data
+        """
+        if self._data_ is None:
+            return
+        
+        if self.axesCalibration:
+            data = self.axesCalibration.calibrateImage(self._data_)
+        else:
+            data = self._data_
+            
+        self.exportDataToWorkspace(data, "data")
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editCursor(self):
         self.viewerWidget.slot_editAnyCursor()
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editSelectedCursor(self):
         self.viewerWidget.slot_editSelectedCursor()
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeAllCursors(self):
         self.viewerWidget.slot_removeAllCursors()
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeSelectedCursor(self):
         self.viewerWidget._removeSelectedPlanarGraphics(True)
         # self.viewerWidget.slot_removeSelectedCursor()
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeAllRois(self):
         self.viewerWidget.slot_removeAllRois()
         
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_removeRoi(self, roiId):
         self.removeRoi(roiId)
         # self.viewerWidget.slot_removeRoiByName(roiId)
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeSelectedRoi(self):
         self.viewerWidget._removeSelectedPlanarGraphics(False)
         # self.viewerWidget.slot_removeSelectedRoi()
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_zoomIn(self):
         self._currentZoom_ +=1
         self.viewerWidget.slot_zoom(2**self._currentZoom_)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_zoomOriginal(self):
         self._currentZoom_ = 0
         self.viewerWidget.slot_zoom(2**self._currentZoom_)
         
     @Slot(object)
     def slot_varModified(self, obj):
-        """Connected to _scipyenWindow_.workspaceModel.varModified signal
+        r"""Connected to _scipyenWindow_.workspaceModel.varModified signal
         """
         self.displayFrame()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_refreshDataDisplay(self):
         self.displayFrame()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_zoomOut(self):
         self._currentZoom_ -=1
         self.viewerWidget.slot_zoom(2**self._currentZoom_)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_selectZoom(self):
         self.viewerWidget.interactiveZoom()
         
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def slot_displayColorBar(self, value):
         if value:
             self._setup_color_bar_()
@@ -1301,7 +1908,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         
         if isinstance(self._data_, vigra.VigraArray):
-            self._currentFrameData_, _ = self._frameView_(self._displayedChannel_)
+            self._currentFrameData_, _ = self.frameView(self._displayedChannel_)
             
             imax = self._currentFrameData_.max()
             imin = self._currentFrameData_.min()
@@ -1491,9 +2098,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def slot_displayScaleBar(self, value):
-        """
+        r"""
         """
         if value:
             if self._data_ is None:
@@ -1590,6 +2197,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             y_len_prompt.variable.redoAvailable = True
             y_len_prompt.variable.undoAvailable = True
             y_len_prompt.setValue(def_y_len)
+            
+            dlg.adjustSize()
             
             if dlg.exec() == QtWidgets.QDialog.Accepted:
                 self._display_horizontal_scalebar_ = show_x.selection()
@@ -1712,37 +2321,37 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     # be aware that here the coordinates are a list
     # which may contain cursor window size as well
     @Slot(str, list)
-    @safeWrapper
+    @safewrapper
     def slot_displayCursorPos(self, value, coords):
         self._displayValueAtCoordinates(coords, value)
 
     @Slot(int,int)
-    @safeWrapper
+    @safewrapper
     def slot_displayMousePos(self, x, y):
         self._displayValueAtCoordinates((x,y))
         
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_graphicsObjectAdded(self, obj):
         self.signal_graphicsObjectAdded.emit(obj)
         
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_graphicsObjectChanged(self, obj):
         self.signal_graphicsObjectChanged.emit(obj)
         
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_graphicsObjectRemoved(self, obj):
         self.signal_graphicsObjectRemoved.emit(obj)
         
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_graphicsObjectSelected(self, obj):
         self.signal_graphicsObjectSelected.emit(obj)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_graphicsObjectDeselected(self):
         self.signal_graphicsObjectDeselected.emit()
         
@@ -1751,7 +2360,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     ####
     
     def _parseVigraArrayData_(self, img:vigra.VigraArray):
-        """ Extract information about image axes to figure out how to display it.
+        r""" Extract information about image axes to figure out how to display it.
         
         For now ImageViewer only accepts images with up to three dimensions.
         
@@ -1767,6 +2376,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         # NOTE: 2021-12-02 10:39:54
         # use axis indices instead of AxisInfo, in proposeLayout
         import io
+        
+        # print(f"{self.__class__.__name__}._parseVigraArrayData_; img ndim = {img.ndim}, channels = {img.channels}, channelIndex = {img.channelIndex}")
         
         if img is None:
             return False
@@ -1789,7 +2400,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         try:
             # there may be a previous image stored here
-            if self._data_ is not None and len(self.graphicsCursors) > 0: # parse width/height of previos image if any, to check against existing cursors
+            if self._data_ is not None and len(self.graphicsCursors) > 0: # parse width/height of previous image if any, to check against existing cursors
                 if self._data_.shape[layout.horizontalAxis] != img.shape[layout.horizontalAxis] or \
                     self._data_.shape[layout.verticalAxis] != img.shape[layout.verticalAxis]:
                     self.questionMessage("Imageviewer:", "New image geometry will invalidate existing cursors.\nLoad image and bring all cursors to center?")
@@ -1818,8 +2429,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.widthAxis  = layout.horizontalAxis
             self.heightAxis = layout.verticalAxis
             
-            with self.observed_vars.observer.hold_trait_notifications():
-                self.observed_vars["data"] = self._data_
+            # NOTE: 2025-04-20 11:50:31
+            # do NOT assign data to observables here!
+            # Instead, do it inset _data_ AFTER everything else is set up
+            # by _parseVigraArrayData_
+            # with self.observed_vars.observer.hold_trait_notifications():
+            #     self.observed_vars["data"] = self._data_
             
             return True
                 
@@ -1831,8 +2446,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             #traceback.print_exc()
             return False
         
+    @safewrapper
     def _applyColorTable_(self, image: vigra.VigraArray, colorMap:typing.Optional[colormaps.colors.Colormap]=None):
-        """Applies the internal color table to the 2D array.
+        r"""Applies the internal color table to the 2D array.
         
         Parameters:
         -----------
@@ -1855,6 +2471,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             colorMap  = self._colorMap
             
         if isinstance(image, vigra.VigraArray):
+            # print(f"{self.__class__.__name__}._applyColorTable_: image ndim = {image.ndim}, channels = {image.channels}, channelIndex = {image.channelIndex}, dtype = {image.dtype}")
+            
             if not isinstance(colorMap, colormaps.colors.Colormap):
                 return image
             
@@ -1872,16 +2490,18 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             sMap.set_array(range(256))
             cTable = sMap.to_rgba(range(256), bytes=True)
-            #cFrame = vigra.colors.applyColortable(image.astype('uint32'), cTable)
+            
             if image.ndim > 2:
                 if image.channelIndex < image.ndim and image.channels > 1: # TODO FIXME
                     # NOTE 2017-10-05 14:17:00
                     # do NOT apply colormap to multi-band image
-                    #cFrame = lrMapImage.copy()
                     return image
                 else:
-                    cFrame = vigra.colors.applyColortable(lrMapImage.astype('uint32'), cTable)
-                    
+                    if image.channels == 1:
+                        lmi = lrMapImage.dropChannelAxis().astype('uint32')[:,:,0] 
+                    else:
+                        lmi = lrMapImage.bindAxis("c", 0).astype('uint32')[:,:,0] 
+                    cFrame = vigra.colors.applyColortable(lmi.astype('uint32'), cTable)
             else:
                 cFrame = vigra.colors.applyColortable(lrMapImage.astype('uint32'), cTable)
                 
@@ -1891,21 +2511,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             return image
             # FIXME/TODO 2019-11-13 13:58:31
             # figure out how to apply color table to a QImage/QPixmap!
-            #if isinstance(image, QtGui.QPixmap):
-                #qimg = image.toImage()
-                
-            #else:
-                #qimg = image
-                
-            #if qimg.isGrayScale():
-                #q
     
-    def _frameView_(self, channel):
-        """Returns a slice (frame) of self._data_ along the self.frameAxis
+    def frameView(self, channel:typing.Optional[typing.Union[int, str]] = None):
+        r"""Returns a slice (frame) of self._data_ along the self.frameAxis
         
-        If the slice contains np.nan returns a copy of the image slice.
+        If the slice contains np.nan returns a copy of the image slice, for 
+        display purposes.
         
         Otherwise, returns a REFERENCE to the image slice.
+        
+        Raises exception if self._data_is not a VigraArray.
         
         """
         if not isinstance(self._data_, vigra.VigraArray):
@@ -1916,7 +2531,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         if self.frameAxis is not None:
             # NOTE: 2019-11-13 13:52:46
-            # frameAxis is None only for 2D data arrays or 3D arrays with channel axis
+            # frameAxis is None only for 2D data arrays or 3D arrays with a 
+            # real channel axis
             index = self.frameIndexBinding[self._current_frame_index_]
             dimindices = [index]
         
@@ -1926,22 +2542,25 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     # axis infos are now axis indices (ints)
                     # see  NOTE: 2021-12-02 10:39:54
                     img_view = img_view.bindAxis(ndx[0], ndx[1])
-                    #img_view = img_view.bindAxis(img_view.axistags.index(ndx[0].key), ndx[1])
                     
             else:
-                #print("in self._frameView_: index", index)
+                #print("in self.frameView: index", index)
                 img_view = img_view.bindAxis(index[0], index[1])
-                #img_view = img_view.bindAxis(img_view.axistags.index(index[0].key), index[1])
-            
-        #else:
-            #img_view = self._data_
             
         # up to now, img_view is a 2D slice view of self._data_, will _ALL_ available channels
             
         # get a channel view on the 2D slice view of self._data_
-        if isinstance(channel, int) and "c" in self._currentFrameData_.axistags and channel_index in range(self._currentFrameData_.channels):
-            img_view = img_view.bindAxis("c", channel)
-            
+        # if "c" in self._currentFrameData_.axistags:
+        if "c" in img_view.axistags:
+            if channel is None:
+                channel = 0
+                
+            if isinstance(channel, int) and channel in range(img_view.channels):
+                img_view = img_view.bindAxis("c", channel)
+                
+            elif not (isinstance(channel, str) and channel == "all"):
+                raise ValueError(f"'channel' must be an int or None; instead, got {channel}")
+                
         # check for NaNs
         if np.isnan(img_view).any():             # if there are nans
             img_view = img.view.copy()           # make a copy
@@ -1949,9 +2568,35 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             
         return img_view, dimindices
+    
+    @property
+    def frameData(self):
+        r"""Reference to the current frame image data.
+        This does NOT include axes calibration data. 
+        Instead, use self.frameDataWithCalibratedAxes"""
+        return self._currentFrameData_
+    
+    @property
+    def frameDataWithCalibratedAxes(self):
+        r"""Current frame image as an array with calibrated axes"""
+        if self._currentFrameData_ is None:
+            return
         
-    @safeWrapper
-    def displayFrame(self, channel_index = None, colorMap:typing.Optional[colormaps.colors.Colormap] = None, asAlphaChannel:bool=False):
+        if self.axesCalibration:
+            return self.axesCalibration.calibrateImage(self._currentFrameData_)
+        
+        return self._currentFrameData_
+        
+    @safewrapper
+    def displayFrame(self, channel_index = None,
+                     colorMap:typing.Optional[colormaps.colors.Colormap] = None, 
+                     asAlphaChannel:typing.Optional[bool]=None):
+        # print(f"\n{self.__class__.__name__}.displayFrame call stack:")
+        # traceback.print_stack()
+        
+        if not isinstance(asAlphaChannel, bool):
+            asAlphaChannel = self._asAlphaChannel_
+        
         if channel_index is None:
             channel_index = self._displayedChannel_
             
@@ -1973,8 +2618,11 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if channel_index is not self._displayedChannel_:
             self._displayedChannel_ = channel_index
         
+        # print(f"\n{self.__class__.__name__}.displayFrame (channel_index = {channel_index}, colorMap = {colorMap}, asAlphaChannel = {asAlphaChannel})")
+        
         if isinstance(self._data_, vigra.VigraArray):
-            self._currentFrameData_, _ = self._frameView_(channel_index) # this is an array view !
+            self._currentFrameData_, _ = self.frameView(channel_index) # this is an array view !
+            # print(f"\t{self.__class__.__name__}.displayFrame currentFrameData ndim = {self._currentFrameData_.ndim}, channels = {self._currentFrameData_.channels}, channelIndex = {self._currentFrameData_.channelIndex}")
             
             if asAlphaChannel:
                 if self._currentFrameData_.channels == 1:
@@ -1996,14 +2644,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                                              self._currentFrameData_[Ellipsis,np.newaxis]),
                                                             axis=2),
                                             axistags = vigra.VigraArray.defaultAxistags('xyc'))
-                    
+                    # print(f"{self.__class__.__name__}.displayFrame asAlphaChannel, frame ndim = {frame.ndim}, channels = {frame.channels}, channelIndex = {franme.channelIndex}")
                     self.viewerWidget.view(frame.qimage(normalize=False))
-                    #if frame.min() == frame.max():
-                        #self.viewerWidget.view(frame.qimage(normalize=False))
-                    #else:
-                        #self.viewerWidget.view(frame.qimage(normalize=self._imageNormalize))
                     
-            else:
+            else: 
                 if isinstance(colorMap, colormaps.colors.Colormap):
                     if self._currentFrameData_.channels == 1:
                         if self._currentFrameData_.channelIndex < self._currentFrameData_.ndim:
@@ -2057,10 +2701,17 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         elif isinstance(self._data_, (QtGui.QImage, QtGui.QPixmap)):
             # NOTE 2018-09-14 11:45:13
             # TODO/FIXME adapt code to select channels from a Qimage is not allGray() or not isGrayscale()
+            
             self.viewerWidget.view(self._data_)
             
             w = self._data_.width()
             h = self._data_.height()
+            shapeTxt = "W x H: %d x %d " % (w, h)
+            
+        elif isinstance(self._data_, PILImage):
+            self.viewerWidget.view(self._data_.toqpixmap())
+            w = self._data_.width
+            h = self._data_.height
             shapeTxt = "W x H: %d x %d " % (w, h)
             
         elif isinstance(self._data_, np.ndarray):
@@ -2138,10 +2789,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.actionView.triggered.connect(self.slot_loadImageFromWorkspace)
         self.actionRefresh.triggered.connect(self.slot_refreshDataDisplay)
         
-        self.actionExportAsPNG.triggered.connect(self.slot_exportSceneAsPNG)
-        self.actionExportAsSVG.triggered.connect(self.slot_exportSceneAsSVG)
-        self.actionExportAsTIFF.triggered.connect(self.slot_exportSceneAsTIFF)
-        self.actionSaveTIFF.triggered.connect(self.slot_saveTIFF)
+        self.actionExportSceneAsFile.triggered.connect(self.slot_exportSceneToFile)
+        # self.actionExportAsSVG.triggered.connect(self.slot_exportSceneAsSVG)
+        # self.actionExportAsTIFF.triggered.connect(self.slot_exportSceneAsTIFF)
+        # self.actionExportAsHDF5.triggered.connect(self.slot_exportFrameAsHDF5)
+        # self.actionExportAsPickle.triggered.connect(self.slot_exportFrameAsPickle)
+        self.actionExportSceneToWorkspace.triggered.connect(self.slot_exportSceneToWorkspace)
+        self.actionSaveToFile.triggered.connect(self.slot_saveToFile)
+        # self.actionHDF5.triggered.connect(self.slot_saveHDF5)
+        # self.actionPickle.triggered.connect(self.slot_savePickle)
+        self.actionExportToWorkspace.triggered.connect(self.slot_dataToWorkspace)
         
         self.displayMenu = QtWidgets.QMenu("Display", self)
         self.menubar.addMenu(self.displayMenu)
@@ -2333,14 +2990,26 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         
         self.toolBar = QtWidgets.QToolBar("Main", self)
         self.toolBar.setObjectName("%s_Main_Toolbar" % self.__class__.__name__)
+        self.toolBar.setMovable(False)
         
         refreshAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh")
         refreshAction.triggered.connect(self.slot_refreshDataDisplay)
         
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
         
+        self.imageToolBar = QtWidgets.QToolBar("Image Toolbar", self)
+        self.imageToolBar.setObjectName("ImageViewerImageToolBar")
+        self.imageToolBar.setMovable(False)
+        self.setAxesScalesAction = self.imageToolBar.addAction(QtGui.QIcon.fromTheme("measure-symbolic"), "Axes scales")
+        self.setAxesScalesAction.triggered.connect(self.slot_editAxesScales)
+        self.chooseColorMapAction = self.imageToolBar.addAction(QtGui.QIcon.fromTheme("colormanagement-symbolic"), "Color map")
+        self.chooseColorMapAction.triggered.connect(self.slot_chooseColorMap)
+        
+        self.addToolBar(QtCore.Qt.TopToolBarArea, self.imageToolBar)
+        
         self.zoomToolBar = QtWidgets.QToolBar("Zoom Toolbar", self)
         self.zoomToolBar.setObjectName("ImageViewerZoomToolBar")
+        self.zoomToolBar.setMovable(False)
         
         self.zoomOutAction = self.zoomToolBar.addAction(QtGui.QIcon.fromTheme("zoom-out"), "Zoom Out")
         self.zoomOriginalAction = self.zoomToolBar.addAction(QtGui.QIcon.fromTheme("zoom-original"), "Original Zoom")
@@ -2351,14 +3020,34 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.zoomOriginalAction.triggered.connect(self.slot_zoomOriginal)
         self.zoomInAction.triggered.connect(self.slot_zoomIn)
         self.zoomAction.triggered.connect(self.slot_selectZoom)
+        
 
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.zoomToolBar)
         
     def _editColorMap(self):
         pass
     
+    @Slot()
+    def slot_editAxesScales(self):
+        if isinstance(self._data_, (vigra.VigraArray, np.ndarray, QtGui.QImage, QtGui.QPixmap)):
+            # dlg = AxesCalibrationDialog(self._data_)
+            dlg = AxesCalibrationDialog2(self._data_)
+        else:
+            # dlg = AxesCalibrationDialog(self._axes_calibration_)
+            dlg = AxesCalibrationDialog2(self._axes_calibration_)
+            
+        # dlg.setModal(False)
+        dlg.adjustSize()
+            
+        if dlg.exec() > 0:
+            # print(f"{self.__class__.__name__}.slot_editAxesScales: dlg.calibration = {dlg.calibration}")
+            self._axes_calibration_ = dlg.calibration
+            # if isinstance(self._data_, vigra.VigraArray):
+            #     self._axes_calibration_.calibrateAxes()
+            self.displayFrame()
+    
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_testColorMap(self, item:str):
         # NOTE 2020-11-28 10:19:07
         # upgrade to matplotlib 3.x
@@ -2367,7 +3056,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self.displayFrame(colorMap=colorMap)
           
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseColorMap(self, *args):
         if self._data_ is None:
             return
@@ -2400,15 +3089,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             selItems = d.selectedItemsText
             if len(selItems):
                 self.colorMap = selItems[0]
-            self.displayFrame()
+            # self.displayFrame()
             
         else:
             self.colorMap = self._prevColorMap
-            self.displayFrame()
+        
+        self.displayFrame()
 
     def _editImageBrightness(self):
         dlg = ImageBrightnessDialog(self)
-        # dlg = pgui.ImageBrightnessDialog(self)
+        dlg.adjustSize()
         dlg.show()
         
     def _editImageGamma(self):
@@ -2416,7 +3106,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     
 
     def _displayValueAtCoordinates(self, coords, crsId=None):
-        """
+        r"""
         coords: a list or tuple with 2 -- 4 elements:
                 (x,y), (x,y,wx), (x,y,wx,wy) where any can be None
                 x,y = coordinates in the displayed frame
@@ -2428,9 +3118,6 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if self._data_ is None:
             return
         
-        #if self._currentFrameData_ is None:
-            #return
-            
         # NOTE: 2021-12-03 09:40:11 because self.frameAxis is now an int or a 
         # tuple of ints we need tpo convert these back to axisinfo
         
@@ -2455,45 +3142,43 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             wy = None
             
         if isinstance(self._data_, vigra.VigraArray):
-            # this can also be a PictArray! 
-            # NOTE: 2020-09-04 08:51:38 PictArray is defunct and removed from the API
-            # NOTE: 2017-07-24 09:03:38
             # w and h are a convention here
-            #w = self._data_.shape[0]
-            #h = self._data_.shape[1]
-            
-            #widthAxisIndex = self._data_.axistags.index(self.widthAxis.key)
-            #heightAxisIndex = self._data_.axistags.index(self.heightAxis.key)
-            
             w = self._data_.shape[self.widthAxis]
             h = self._data_.shape[self.heightAxis]
+            
             
             # NOTE: 2021-12-02 10:57:24
             # this is now requires because of NOTE: 2021-12-02 10:39:54
             wAxInfo = self._data_.axistags[self.widthAxis]
             hAxInfo = self._data_.axistags[self.heightAxis]
             
-            #
             # below, img is a view NOT a copy !
             #
+            #  NOTE: 2025-04-20 17:54:31 
+            # img is actually self._currentFrameData_
+            # img, _ = self.frameView(self._displayedChannel_) 
+            img = self.frameData
+            # print(f"{self.__class__.__name__}._displayValueAtCoordinates: img axistags: {img.axistags}")
             
-            img, _ = self._frameView_(self._displayedChannel_)
-            
-            viewWidthAxisIndex = img.axistags.index(wAxInfo.key)
+            # NOTE: 2025-07-04 09:27:37
+            # indexes of the with ("X") axis and height ("Y") axis
+            viewWidthAxisIndex  = img.axistags.index(wAxInfo.key)
             viewHeightAxisIndex = img.axistags.index(hAxInfo.key)
             
+            # NOTE: 2025-07-04 09:28:11
+            # image width and height
             viewW = img.shape[viewWidthAxisIndex]
             viewH = img.shape[viewHeightAxisIndex]
             
+            # ### BEGIN data cursor information
             # NOTE: 2021-10-25 22:26:53
             # when given, wx and wy below are, horizontal & vertical cursor
             # windows, respectively
-            
+            #
             if wx is not None:
                 if self._axes_calibration_:
                     cwx = self._axes_calibration_[viewWidthAxisIndex].calibratedDistance(wx)
                     swx = " +/- %d (%s) " % (wx//2, quantity2str(cwx/2))
-                    
             else:
                 swx = ""
                 
@@ -2501,16 +3186,17 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 if self._axes_calibration_:
                     cwy = self._axes_calibration_[viewHeightAxisIndex].calibratedDistance(wy)
                     swy = " +/- %d (%s) " % (wy//2, quantity2str(cwy/2))
-                    
             else:
                 swy = ""
             
             if crsId is not None:
                 crstxt = "%s " % (crsId)
-                
             else:
                 crstxt = ""
+            # ### END   data cursor information
                 
+            # NOTE: 2025-07-04 09:29:52
+            # ### BEGIN adjust x and y if they are beyond the boundaries of the image plane
             if x is not None and x >= w:
                 x = w-1
                 
@@ -2522,12 +3208,15 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 
             if y is not None and y < 0:
                 y = 0
+            # ### END   adjust x and y if they are beyond the boundaries of the image plane
 
             #print("w: %f, x: %f, h: %f, y: %f" % (w, x, h, y))
             
             if all([v_ is not None for v_ in (x,y)]):
                 if img.ndim >= 2: # there may be a channel axis
                     if self._axes_calibration_:
+                        # NOTE: 2025-07-04 09:30:31
+                        # get calibrated coordinates (x -> cx and y -> cy)
                         cx = self._axes_calibration_[viewWidthAxisIndex].calibratedMeasure(x)
                         cy = self._axes_calibration_[viewHeightAxisIndex].calibratedMeasure(y)
                         scx = quantity2str(cx)
@@ -2539,36 +3228,30 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     widthAxisKey = img.axistags[viewWidthAxisIndex].key 
                     heightAxisKey = img.axistags[viewHeightAxisIndex].key
                     
-                    if img.ndim > 2: # this is possible only when there is a channel axis!
+                    # if img.ndim > 2: # ATTENTION: img is a slice view of the data !!!
+                    if self._data_.ndim > 2: # ATTENTION: img is a slice view of the data !!!
+                        # WARNING: there may not be a real channel axis, here
                         if img.channels > 1:
                             val = [float(img.bindAxis("c", k)[x,y,...]) for k in range(img.channels)]
                             
                             if self._axes_calibration_:
                                 channelNdx = self._axes_calibration_["c"].channelIndices
-                                cval = [self._axes_calibration_["c"].getChannelCalibration(channelNdx[k])[1].calibratedMeasure(val[k]) for k in range(img.channels)]
-                                sval = "(%s)" % "; ".join(["%s" % quantity2str(v) for v in cval])
+                                cval = [self._axes_calibration_["c"].getChannelCalibration(channelNdx[k]).calibratedMeasure(val[k]) for k in range(img.channels)]
+                                sval = "(%s)" % "; ".join([quantity2str(v) for v in cval])
                                 
                             else:
                                 sval = "(%s)" % "; ".join(["%.2f" % v for v in val])
                         
                         else: 
-                            # NOITE: 2022-10-06 17:15:22
-                            # single channel => channelCalibration only has ONE channel
-                            # but WARNING: if calling with index argument, one MUST specify
-                            # the value of the channel's property, which is not always
-                            # what you expect.
-                            #
-                            # If in doubt, then just call without specifying the index
+                            # print(f"{self.__class__.__name__}._displayValueAtCoordinates: img axistags: {img.axistags}")
                             val = float(img[x,y])
                             if self._axes_calibration_:
                                 cval = self._axes_calibration_["c"].getChannelCalibration().calibratedMeasure(val)
-                                # cval = self._axes_calibration_["c"].getChannelCalibration()[1].calibratedMeasure(val)
-                                sval = "(%s)" % quantity2str(cval)
+                                sval = quantity2str(cval)
                             else:
                                 sval = "(%.2f)" % val
                             
                         if self.frameAxis is not None:
-                            #if isinstance(self.frameAxis, vigra.AxisInfo):
                             if isinstance(self.frameAxis, int):
                                 if self.frameAxis >= self._data_.ndim:
                                     raise RuntimeError(f"frame axis {self.frameAxis} not found in the image")
@@ -2576,8 +3259,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                 zAxisKey = frameAxis.key
                                 
                                 if self._axes_calibration_:
-                                    cz = self._axes_calibration_[frameAxis.key].calibratedMeasure(self._current_frame_index_)
-                                    scz = quantity2str(cz)
+                                    frameAxisCal = self._axes_calibration_[frameAxis.key]
+                                    if frameAxisCal.isChannels:
+                                        scz = frameAxisCal.channels[self._current_frame_index_].name
+                                    else:
+                                        cz = self._axes_calibration_[frameAxis.key].calibratedMeasure(self._current_frame_index_)
+                                        scz = quantity2str(cz)
                                 else:
                                     scz = ""
                                 
@@ -2589,16 +3276,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                     sval)
                             
                             else: # self.frameAxis is a tuple
-                                #frameAxis = tuple(self._data_.axistags.index(ax) for ax in self.frameAxis)
                                 if self._axes_calibration_:
                                     sz_cz = ", ".join([f"{ndx[0]}: {ndx[1]} ({quantity2str(self._axes_calibration_[self._data_.axistags[ndx[0]]].calibratedDistance(ndx[1]))})" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
                                 else:
                                     sz_cz = ", ".join([f"{ndx[0]}: {ndx[1]}" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
-                                
-                                #if self._axes_calibration_:
-                                    #sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]} ({quantity2str(self._axes_calibration_[ndx[0].key].calibratedDistance(ndx[1]))})" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
-                                #else:
-                                    #sz_cz = ", ".join([f"{ndx[0].key}: {ndx[1]}" for ndx in reversed(self.frameIndexBinding[self._current_frame_index_])])
                                 
                                 coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s, Z: %d (%s)> %s" % \
                                     (crstxt, \
@@ -2609,11 +3290,16 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                                     
                         else:
                             if isinstance(val, float):
+                                if self._axes_calibration_:
+                                    cval = self._axes_calibration_["c"].getChannelCalibration().calibratedMeasure(val)
+                                    sval = quantity2str(cval)
+                                else:
+                                    sval = "(%.2f)" % val
                                 coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %s" % \
                                     (crstxt, \
                                     x, widthAxisKey, scx, swx, \
                                     y, heightAxisKey, scy, swy, \
-                                    val)
+                                    sval)
                                 
                             elif isinstance(val, (tuple, list)):
                                 valstr = "(" + " ".join(["%.2f" % v for v in val]) + ")"
@@ -2628,11 +3314,19 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     else: # ndim == 2
                         val = float(np.squeeze(img[x,y]))
                         
-                        coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %.2f" % \
+                        # sval = "%.2f" % val
+                        if self._axes_calibration_:
+                            cval = self._axes_calibration_["c"].getChannelCalibration().calibratedMeasure(val)
+                            sval = quantity2str(cval)
+                            
+                        else:
+                            sval = "(%.2f)" % val
+
+                        coordTxt = "%s<X: %d (%s: %s)%s, Y: %d (%s: %s)%s> %s" % \
                             (crstxt, \
                             x, widthAxisKey, scx, swx, \
                             y, heightAxisKey, scy, swy, \
-                            val)
+                            sval)
                     
                 else: # ndim < 2 shouldn't realy get here, should we ?!?
                     val = float(img[x])
@@ -2648,7 +3342,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                     coordTxt = "%s<X: %d (%s: %s)%s> %.2f" % \
                         (crstxt, x, widthAxisKey, scx, swx, val)
                     
-            else:
+            else: # one of the coordinate is missing
                 c_list = list()
                 
                 if y is None:
@@ -2729,32 +3423,37 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 crstxt = ""
 
             if isinstance(self._data_, QtGui.QImage):
-                #val = self._data_.pixel(x,y)
-                if self._data_.isGrayscale():
-                    val = self._data_.pixel(x,y)
-                    
+                if x < 0 or x >= w or y < 0 or y >= h:
+                    val = ""
                 else:
-                    pval = self._data_.pixelColor(x,y)
-                    val = "R: %d, G: %d, B: %d, A: %d" % (pval.red(), pval.green(), pval.blue(), pval.alpha())
-                    
+                    if self._data_.isGrayscale():
+                        val = self._data_.pixel(x,y)
+                        
+                    else:
+                        pval = self._data_.pixelColor(x,y)
+                        val = "R: %d, G: %d, B: %d, A: %d" % (pval.red(), pval.green(), pval.blue(), pval.alpha())
                     
                 msg = "%s<X %d%s, Y %d%s> : %s" % \
                     (crstxt, x, swx, y, swy, val)
 
             elif isinstance(self._data_, QtGui.QPixmap):
                 pix = self._data_.toImage()
-                if pix.isGrayscale():
-                    val = pix.pixel(x,y)
-                    
+                if x < 0 or x >= w or y < 0 or y >= h:
+                    val = ""
                 else:
-                    pval = pix.pixelColor(x,y)
-                    val = "R: %d, G: %d, B: %d, A: %d" % (pval.red(), pval.green(), pval.blue(), pval.alpha())
+                    if pix.isGrayscale():
+                        val = pix.pixel(x,y)
+                        
+                    else:
+                        pval = pix.pixelColor(x,y)
+                        val = "R: %d, G: %d, B: %d, A: %d" % (pval.red(), pval.green(), pval.blue(), pval.alpha())
                 
                 msg = "%s<X %d%s, Y %d%s> : %s" % \
                     (crstxt, x, swx, y, swy, val)
 
             else:
                 val = None
+                msg = ""
 
             self.statusBar().showMessage(msg)
             
@@ -2785,17 +3484,17 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     # public methods
     ####
     
-    @safeWrapper
+    @safewrapper
     def slot_removeCursorByName(self, crsId):
         self.removeCursor(crsId)
         
-    @safeWrapper
+    @safewrapper
     def slot_removeRoiByName(self, crsId):
         self.removeGraphicsObject(crsId)
         
-    @safeWrapper
+    @safewrapper
     def removeGraphicsObject(self, item:typing.Union[str, pgui.GraphicsObject]):
-        """Removes a GraphicsObject from the viewer's scene.
+        r"""Removes a GraphicsObject from the viewer's scene.
         A GraphicsObject is a Qt graphics object used as frontend for a PlanarGraphics.
         WARNING: This only removes the object from the viewer scene; the viewer and
         the PlanarGraphics backend still retain a reference to the GraphicsObject!
@@ -2822,9 +3521,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         elif isinstance(item, pgui.GraphicsObject) and item in objects:
             self.viewerWidget.slot_removeGraphicObject(item)
             
-    @safeWrapper
+    @safewrapper
     def removePlanarGraphics(self, item:typing.Union[str, pgui.PlanarGraphics]):
-        """Removes a planar graphics from the viewer's scene.
+        r"""Removes a planar graphics from the viewer's scene.
         Parameters:
         ===========
         item: a str (PlanarGraphics 'name' attribute) or a PlanarGraphics. If the
@@ -2844,7 +3543,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         if name in [o.name for o in objects]:
             self.viewerWidget._removePlanarGraphics(name)
                 
-    @safeWrapper
+    @safewrapper
     def removeCursor(self, item:typing.Union[str, pgui.Cursor]):
         objects = self.graphicsCursors
         if len(objects) == 0:
@@ -2989,6 +3688,14 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.displayFrame(channel_index)
         self._displayedChannel_ = channel_index
         
+    @property
+    def displayedchannel(self) -> int | str:
+        r"""Index of the displayed channel (int) or the string 'all'.
+        Rwead-only. To display a given channel, or all channels, use
+        self.displayChannel()
+        """
+        return self._displayedChannel_
+        
     def displayAllChannels(self):
         # see NOTE: 2018-09-25 23:06:55
         signalBlockers = [QtCore.QSignalBlocker(widget) for widget in self.displayIndividualChannelActions]
@@ -3010,8 +3717,13 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                      frameAxis=frameAxis, frameIndex=None, displayChannel=displayChannel, 
                      asAlphaChannel=asAlphaChannel, get_focus=get_focus)
         
-    def _set_data_(self, data, normalize=True, colormap = None, gamma = None, tempColorMap = None, frameAxis=None, frameIndex=None, arrayAxes:(type(None), vigra.AxisTags) = None, displayChannel = None, doc_title:(str, type(None)) = None, asAlphaChannel:bool=False, *args, **kwargs):
-        '''
+    def _set_data_(self, data, normalize=True, colormap = None, gamma = None, 
+                   tempColorMap = None, frameAxis=None, frameIndex=None, 
+                   arrayAxes:typing.Optional[vigra.AxisTags] = None, 
+                   displayChannel = None, doc_title:(str, type(None)) = None, 
+                   asAlphaChannel:bool=False,
+                   *args, **kwargs):
+        r'''
         SYNTAX: self.view(image, title = None, normalize = True, colormap = None, gamma = None, separateChannels = False, frameAxis = None)
     
         Parameters:
@@ -3032,7 +3744,9 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
             displaychannel: int, "all", or None (default)
         '''
-        
+        # BUG: 2025-04-19 09:18:29 TODO/FIXME
+        # when loading a 2D image in a viewer previously used to view a 3D volume
+        # there are issues with the _applyColorTable_
         self._imageNormalize     = normalize
         self._imageGamma         = gamma
         
@@ -3060,7 +3774,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         self._colorBar = None
         
-        self._axes_calibration_ = None
+        # force rebuilding an AxesCalibration object
+        self._axes_calibration_ = None 
                 
         if displayChannel is None:
             self._displayedChannel_      = "all"
@@ -3077,6 +3792,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             self._displayedChannel_ = displayChannel
 
         if isinstance(data, vigra.VigraArray):
+            # print(f"{self.__class__.__name__}._set_data_: data ndim: {data.ndim}, channels: {data.channels}, channelIndex: {data.channelIndex}")
             if isinstance(frameAxis, (int, str, vigra.AxisInfo)):
                 self.userFrameAxisInfo  = frameAxis
                 
@@ -3087,9 +3803,19 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 self._data_  = data
                 self.frameIndex = frameIndex or range(self._data_frames_) # set by _parseVigraArrayData_
                 self._number_of_frames_ = len(self.frameIndex)
-                self._axes_calibration_ = AxesCalibration(data)
+                try:
+                    self._axes_calibration_ = AxesCalibration(data)
+                except:
+                    self._axes_calibration_ = None
+                    traceback.print_exc()
                 self._setup_channels_display_actions_()
-                self.displayFrame(asAlphaChannel=asAlphaChannel)
+                self._asAlphaChannel_ = asAlphaChannel
+                
+                # NOTE: 2025-04-20 11:51:40
+                # do NOT call this directly; instead, set up everything else in
+                # the UI, THEN assign data to observables, which will trigger a
+                # call to self.displayFrame(), see NOTE: 2025-04-20 11:51:18
+                # self.displayFrame(asAlphaChannel=asAlphaChannel)
                 
                 #totalFrames = self._number_of_frames_ if isinstance(self._number_of_frames_, int) else np.prod(self._number_of_frames_)
         
@@ -3100,11 +3826,40 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                 self.framesQSpinBox.setToolTip("Select frame.")
                 self.nFramesLabel.setText("of %d" % self._number_of_frames_)
                 
+                # NOTE: 2025-04-20 11:51:18, see NOTE: 2025-04-20 11:51:40
+                # this will trigger a call to self.displayFrame
+                #
+                # Like this, displayFrame gets called only ONCE when other 
+                # varables have been properly set up
+                self.observed_vars["data"] = self._data_
+                
   
         elif isinstance(data, (QtGui.QImage, QtGui.QPixmap)):
+            # NOTE 2025-04-03 23:30:10
+            # cannot associate axes calibrations to these objects;
+            # HOWEVER (TODO/FIXME) we CAN create axes calibrations for the purpose
+            # of display, which we can then associate with a VigraArray created by
+            # exporting this data to a VigraArray (TODO)
             self._number_of_frames_ = 1
             self.frameIndex = range(self._number_of_frames_)
             self._data_  = data
+            if isinstance(arrayAxes, vigra.AxisTags):
+                if len(arrayAxes) != 2:
+                    raise ValueError(f"For QImage or QPixmap, arrayAxes — if specified — must have exactly two elements, not {len(arrayAxes)}")
+            else:
+                arrayAxes = vigra.VigraArray.defaultAxistags(2, noChannels=True)
+            self._axes_calibration_ = AxesCalibration(arrayAxes)
+            self.frameAxis = None
+            self.displayFrame()
+            
+        elif isinstance(data, PILImage):
+            # TODO: 2025-12-24 15:05:24
+            # chgeckout channel organization of the PIL image
+            self._number_of_frames_ = 1
+            self.frameIndex = range(self._number_of_frames_)
+            self._data_  = data
+            arrayAxes = vigra.VigraArray.defaultAxistags(2, noChannels=True)
+            self._axes_calibration_ = AxesCalibration(arrayAxes)
             self.frameAxis = None
             self.displayFrame()
             
@@ -3126,6 +3881,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             # For display purposes only, we construct a VigraArray on the numpy
             # ndarray passed as 'image'
             
+            # NOTE: 2025-04-03 23:28:39
+            # in this case as in the case of Qt raster image types we CANNOT
+            # associate axes calibration, but see above (NOTE 2025-04-03 23:30:10)
+            
             array_data = vigra.VigraArray(data, axistags=arrayAxes)
             if self._parseVigraArrayData_(array_data):
                 self._data_  = array_data
@@ -3138,7 +3897,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             raise TypeError("First argument must be a VigraArray, a numpy.ndarray, a QtGui.QImage or a QtGui.QPixmap")
         
     def clear(self):
-        """Clears all image data cursors and rois from this window
+        r"""Clears all image data cursors and rois from this window
         """
         self._number_of_frames_ = 0
         self._current_frame_index_ = 0
@@ -3174,7 +3933,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.viewerWidget.clear()
         
     def showScaleBars(self, origin=None, length=None, calibrated_length=None, pen=None, units=None):
-        """Shows a scale bar for both axes in the display
+        r"""Shows a scale bar for both axes in the display
         origin: tuple or list with (x,y) coordinates of scale bars origin
         length: tuple or list with the length of the respective scale bars (x and y)
         
@@ -3304,7 +4063,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self._scaleBarOrigin_ = origin
         
     def addCursors(self, **kwargs):
-        """Programmatically creates a set of cursors from cursor parameters.
+        r"""Programmatically creates a set of cursors from cursor parameters.
         
         Creates gui.planargraphics.Cursor objects and their 
         gui.planargraphics.GraphicsObject frontends.
@@ -3396,7 +4155,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         return objects
         
     def addPlanarGraphics(self, item:pgui.PlanarGraphics, movable:bool = True, editable:bool = True, showLabel:bool = True, labelShowsPosition:bool = True, autoSelect:bool = True, transparentLabel:bool = False, returnGraphics:bool=False):
-        """Add a roi or a cursor to the underlying scene.
+        r"""Add a roi or a cursor to the underlying scene.
         
         The function generates a gui.planargraphics.GraphicsObject as a frontend
         to a gui.plarangraphics.PlanarGraphics object.
@@ -3420,7 +4179,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         ==================
         returnGraphics:bool, optional, default is False
             When True, returns the newly-created gui.planargraphics.GraphicsObject
-            ( a PyQt5.QtWidgets.QGraphicsItem); otherwise, returns the 
+            ( a Qt5 QtWidgets.QGraphicsItem); otherwise, returns the 
             PlanarGraphics objects passed as 'item'
         
         The following are optional (default values shownn in parantheses) and
@@ -3463,7 +4222,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         return obj if returnGraphics else obj.backend
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseCursorsColor(self):
         if isinstance(self.cursorsColor, QtGui.QColor):
             initial = self.cursorsColor
@@ -3478,7 +4237,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "cursor")
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseLinkedCursorsColor(self):
         if isinstance(self.cursorsColor, QtGui.QColor):
             initial = self.cursorsColor
@@ -3491,7 +4250,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "linkedcursor")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseCursorLabelTextColor(self):
         if isinstance(self.cursorLabelTextColor, QtGui.QColor):
             initial = self.cursorLabelTextColor
@@ -3503,7 +4262,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "cursorLabelText")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseLinkedCursorLabelTextColor(self):
         if isinstance(self.linkedCursorLabelTextColor, QtGui.QColor):
             initial = self.linkedCursorLabelTextColor
@@ -3515,7 +4274,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "linkedcursorlabeltext")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseCursorLabelBGColor(self):
         # TODO/FIXME: 2021-05-12 09:33:30
         # not used yet
@@ -3530,7 +4289,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "cursorLabelBackground")
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseLinkedCursorBGColor(self):
         # TODO/FIXME: 2021-05-12 09:33:30
         # not used yet
@@ -3545,7 +4304,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "cursorLabelBackground")
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseRoisColor(self):
         if isinstance(self.roisColor, QtGui.QColor):
             initial = self.roisColor
@@ -3559,7 +4318,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
             
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseLinkedRoisColor(self):
         if isinstance(self.linkedROIsColor, QtGui.QColor):
             initial = self.linkedROIsColor
@@ -3572,7 +4331,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "linkedroi")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseRoisLabelTextColor(self):
         if isinstance(self.roiLabelTextColor, QtGui.QColor):
             initial = self.roiLabelTextColor
@@ -3585,7 +4344,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "roilabeltext")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseLinkedRoisLabelTextColor(self):
         if isinstance(self.linkedROILabelTextColor, QtGui.QColor):
             initial = self.linkedROILabelTextColor
@@ -3598,7 +4357,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "linkedroilabeltext")
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_chooseROILabelBGColor(self):
         # TODO/FIXME: 2021-05-12 09:33:30
         # not used yet
@@ -3613,12 +4372,12 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         self.setGraphicsObjectColor(color, "roilabelbackground")
         
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def slot_setOpaqueCursorLabels(self, value):
         self.setOpaqueGraphicsLabel(cursors=True, opaque=value)
             
     @Slot(bool)
-    @safeWrapper
+    @safewrapper
     def slot_setOpaqueROILabels(self, value):
         self.setOpaqueGraphicsLabel(cursors=False, opaque=value)
             

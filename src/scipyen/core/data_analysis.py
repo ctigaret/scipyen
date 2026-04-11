@@ -16,7 +16,7 @@ def normalizeDataFrameVariables(data, parameter,
                                 normalising_reference_category,
                                 normlaised_target_categories,
                                 return_columns,inplace=True):
-    """
+    r"""
     TODO
     """
     if not isinstance(data, pd.DataFrame):
@@ -40,7 +40,7 @@ def normalizeDataFrameVariables(data, parameter,
     
     
 def anova_table(aov):
-    """Auguments ANOVA table produced by statsmodels.stats.anova_lm.
+    r"""Auguments ANOVA table produced by statsmodels.stats.anova_lm.
     
     Includes meas squares and effect sizes (eta squared and omega squared)
     """

@@ -4,23 +4,54 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""Some common-use dialogs for metadata in Scipyen
+r"""Some common-use dialogs for metadata in Scipyen
 """
 
 import os, math, typing
 import numpy as np
 import quantities as pq
-from core import quantities as scq
+from core import scipyen_quantities as scq
 from core import strutils
 import pandas as pd
 
-from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-from qtpy.uic import loadUiType
-# from PyQt5 import QtCore, QtGui, QtWidgets
-# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
-# from PyQt5.uic import loadUiType
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+
+# import qtpy
+# qtpy.API = os.environ["QT_API"]
+# if os.environ["QT_API"] == "pyside6":
+#     import PySide6
+#     from PySide6 import QtCore, QtGui, QtWidgets
+#     from PySide6.QtCore import Signal, Slot, Property
+#     from PySide6.QtUiTools import loadUiType
+# else:
+#     from qtpy import QtCore, QtGui, QtWidgets
+#     from qtpy.QtCore import Signal, Slot, Property
+#     from qtpy.uic import loadUiType
 
 from gui import quickdialog as qd
 from gui.workspacegui import (GuiMessages, WorkspaceGuiMixin)
@@ -29,7 +60,7 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
     _supported_value_types_ = (str, int, float, complex)
     
     def __init__(self, mapping:typing.Optional[dict] = None, title:typing.Optional[str]="Mapping Editor", parent:typing.Optional[QtWidgets.QWidget]=None):
-        """The key parameter is 'mapping', which is a Python dict object
+        r"""The key parameter is 'mapping', which is a Python dict object
         with str keys and basic python data types (number.Numbers, str).
 
             Each key/value pair will results in a QuickDialog custom widget (see gui.quickdialog)
@@ -73,7 +104,8 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
         self.buttons.layout.addWidget(removeEntryPushButton)
         removeEntryPushButton.clicked.connect(self._slot_removeEntry)
         
-        self.resize(-1,-1)
+        # self.resize(-1,-1)
+        self.adjustSize()
         
     @Slot()
     def _slot_entryValueChanged(self):
@@ -120,7 +152,8 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
             del(self.widgets[self.widgets.index(w)])
             
         self.update()
-        self.resize(-1,-1)
+        # self.resize(-1,-1)
+        self.adjustSize()
         
     def _slot_addEntry(self):
         valid_types = [t.__name__ for t in self._supported_value_types_]
@@ -131,6 +164,8 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
         etype.setCurrentIndex(0)
         dlg.addWidget(ename)
         dlg.addWidget(etype)
+        dlg.adjustSize()
+        
         if dlg.exec():
             factory = None
             val_factory = None
@@ -168,13 +203,15 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
             #     self.addWidget(w)
                 
             self.update()
-            self.resize(-1,-1)
+            # self.resize(-1,-1)
+            self.adjustSize()
     
     def _slot_removeEntry(self):
         dlg = qd.QuickDialog(parent=self, title="Remove Entry")
         entriesCombo = qd.QuickDialogComboBox(parent=dlg,label="Entry name:")
         entriesCombo.setItems([k for k in self._mapping_])
         dlg.addWidget(entriesCombo)
+        dlg.adjustSize()
         
         if dlg.exec():
             entry = entriesCombo.text()
@@ -191,7 +228,8 @@ class GenericMappingDialog(qd.QuickDialog, WorkspaceGuiMixin):
             #     self.addWidget(w)
                 
             self.update()
-            self.resize(-1,-1)
+            # self.resize(-1,-1)
+            self.adjustSize()
             
     def value(self):
         return self._mapping_

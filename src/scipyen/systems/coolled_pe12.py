@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""CoolLED pE 1&2 device
+r"""CoolLED pE 1&2 device
 Device connected to PC via USB ↦ port:
     On Windows PC ↦ COM3
         might need the CoolLED pE device?
@@ -64,13 +64,14 @@ as a group may be justified as these devices usually are communication devices
 """
 
 import io, sys, os, typing
-from dataclasses import (dataclass, KW_ONLY, MISSING, field)
+import dataclasses
+from dataclasses import dataclass
 import serial
 import serial.tools.list_ports as port_list
 import numpy as np
 
 import core.signalprocessing as sigp
-from core.prog import (scipywarn, printStyled)
+from core.prog import (scipywarn, print_styled)
 from core.datatypes import TypeEnum
 
 TriggerLabels = ["Off","RisingEdges","FallingEdges","BothEdges","FollowPulse"]
@@ -116,7 +117,7 @@ class TriggerType(TypeEnum):
         return TriggerCmd[self.value]
 
 class CoolLEDpE12():
-    """Looks like the device cannot emit on more than one LAM at any time.
+    r"""Looks like the device cannot emit on more than one LAM at any time.
     ***
     NOTE: 2024-02-26 08:31:57
     Actually the statement above is False: using the pE console one can switch to
@@ -136,14 +137,14 @@ class CoolLEDpE12():
     # A? queries trigger mode: sending A? gets trigger mode in response; one of AZ, A+ A- A* AX
     # C? queries LAM channels status (all channels if you wait long enough)
 
-    def __init__(self, port:str = "COM3" if sys.platform == "win32" else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00", 
+    def __init__(self, port:str = "COM3" if sys.platform.startswith("win32") else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00", 
                  baudrate:int = 9600, parity:str = serial.PARITY_NONE, stopbits:int = 1, 
                  timeout:float = 1e-4, xonxoff:int = 0, verbose:int = 1,
                  inter_byte_timeout:float = 0.0):
-        """
+        r"""
         Default parameter values are:
 
-            port:str = "COM3" if sys.platform == "win32" else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00"
+            port:str = "COM3" if sys.platform.startswith("win32") else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00"
             baudrate:int = 9600
             xonxoff: int = 0
             parity:str = serial.PARITY_NONE
@@ -221,7 +222,7 @@ class CoolLEDpE12():
     def sendCommand(self, cmd: str, verbose:bool=True, collapse:bool=True):
         if not self.__serial_port__.is_open:
             scipywarn("The underlying serial port is closed; call method openPort() then call this method again.")
-            # printStyled("The underlying serial port is closed; call method openPort() then call this method again.", "red")
+            # print_styled("The underlying serial port is closed; call method openPort() then call this method again.", "red")
             return
         
         if not cmd.endswith("\n"):
@@ -256,7 +257,7 @@ class CoolLEDpE12():
         self._xlam_labels_ = sorted([s[5] for s in msg if len(s) >=6 and s.startswith("XLAM:")])
         
     def _initChannels_(self):
-        """Reads the channel labels, sets up a default trigger sequence and initializes channel states"""
+        r"""Reads the channel labels, sets up a default trigger sequence and initializes channel states"""
         msg = list(filter(lambda x: x not in self._greeting_msg_, self.sendCommand("LAMS", verbose=False, collapse=False)))
         self._lam_labels_ = sorted([s[4] for s in msg if len(s) >= 4 and s.startswith("LAM:")])
         self._xlam_labels_ = sorted([s[5] for s in msg if len(s) >=6 and s.startswith("XLAM:")])
@@ -371,7 +372,7 @@ class CoolLEDpE12():
 
     @property
     def channelStates(self) -> dict:
-        """Read-only property.
+        r"""Read-only property.
         A channel state can be changed only by commands to switch it ON/OFF or
         alter its intensity
         """
@@ -664,7 +665,7 @@ class CoolLEDpE12():
     
     @property
     def triggerMode(self) -> TriggerType:
-        """The trigger type.
+        r"""The trigger type.
         This property can be set usin:
         • an int (0 ⋯ 4),
         • a string (case-sensitive) in ["Off","RisingEdges","FallingEdges","BothEdges","FollowPulse"]
@@ -694,7 +695,7 @@ class CoolLEDpE12():
         
     @property
     def currentChannel(self)->int:
-        """The index of the LAM where commands are currently sent.
+        r"""The index of the LAM where commands are currently sent.
         The setter accepts an int or a str.
         See also currentLAM.
         """
@@ -718,7 +719,7 @@ class CoolLEDpE12():
         
     @property
     def currentLAM(self)-> str:
-        """Label of the current LAM channel.
+        r"""Label of the current LAM channel.
         The setter accepts an int or a str.
         See also currentChannel.
         """
@@ -729,7 +730,7 @@ class CoolLEDpE12():
         self.currentChannel = val
     
         
-def device(port:str = "COM3" if sys.platform == "win32" else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00",
+def device(port:str = "COM3" if sys.platform.startswith("win32") else "/dev/serial/by-id/usb-CoolLED_precisExcite_1154-if00",
                  baudrate:int = 9600, parity:str = serial.PARITY_NONE, stopbits:int = 1,
                  timeout:float = 1e-4, xonxoff:int = 0, verbose:int = 1,
                  inter_byte_timeout:float = 0.0):

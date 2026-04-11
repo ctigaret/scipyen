@@ -2,17 +2,92 @@
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""
+r"""
 NOTE: 2023-06-26 17:25:32
-This is for the developer, NOT the final user:
+Spec file for bundling Scipyen as a Python executable, using PyInstaller.
+
+This file is for the developer/maintainer of Scipyen, NOT the final user.
+
+If you are interested in maintaining/ditributing Scipyen then please read on
+(and expect that some information below may be slightly outdated or incomplete).
+
+Otherwise, feel free to skip this file.
+
 To create a distributable scipyen application, you need to:
 
-1) clone the scipyen git repo locally (e.g. to $HOME/scipyen)- NOTE: this is assumed to be the case from here onwards
+1) clone the scipyen git repo locally (e.g. to $HOME/scipyen) - 
+NOTE: this is assumed to be the case from here onwards, on GNU/linux and MacOS
 
-2) use the install.sh script to create a local virtual environment with all the 
-  binaries needed for Scipyen (this includes building PyQt5, VIGRA and - -optionally - NEURON)
+ATTENTION: Linux platforms - python binary compatibility(ies) ATTENTION
 
-3) activate the new environment, then buld the distributable app:
+A bundle built on a machine might not run on a second machine even if both machines
+run the same OS (and APPEAR to have the same software installation, etc); the 
+the reverse may be possible: a bundle built on the 'second' machine might run OK
+on the 'first' machine.
+
+It seems this issue is caused by the system python libraries used while building the
+virtual python environment for Scipyen (i.e. locally building Python bindings for
+Qt libaries, and locally building the VIGRA libaries): there may be subtle differences
+betwen seemingly identical machines (e.g. the use of x64-64 optimized libraries 
+on one machine and not on the other, etc).
+
+While I'm trying to get my head around this — and make the bundles fully portable
+— I recommend the following approach to enable ALL user accounts on a given machine 
+to run Scipyen without building their own virtual python environments in their own
+account (thus saving time & disk space):
+
+1.1) build a scipyen environment in your own (regular) user account, then
+1.2) build a PyInstaller bundle and installing it (AS ADMINSTRATOR) on the 
+same machine where the bundle was created.
+
+1.3) NOTE: you MAY try to copy the bundle to another machine (thus avoiding 
+spending time on building a Scipyen environment & PyInstaller bundle there, but
+(WARNING) IT MAY NOT WORK, due to the issue described above. If the bundle does 
+not work, it will have to be built locally on the specific machine, using a locally
+built Scipyen environment.
+
+The steps 1.1 & 1.2 almost surely will have to be used if the machines run different
+Linux distributions.
+
+2) use on of the installation scripts in the top directory of the cloned
+    repository to create the local virtual environment required to run Scipyen:
+    
+    • linux — choose between:
+        ∘ virtualenv_build_linux.sh → builds a virtualenv environment; pass --help for options
+            ⋆ can be used to build PyQt5 locally (for better look & feel integration with KDE desktops)
+                (NOTE: currently this 'integration' refers to the GUI widget styles;
+                no KDE/Plasma libraries are used in Scipyen.
+                The only reason to build Pyqt5 locally is the lack of Qt styles
+                otherwise present in your desktop e.g. breeze, etc — more often
+                the Qt plugins on your platform are NOT binary compatible with
+                the stock Pyqt5 from PyPI or conda channels)
+                
+            ⋆ builds vigra locally — can be customized (to some extent) e.g. to
+                use OpenEXR and other optional libraries including versions of 
+                boost for MPI; if you are a tinkerer, then this is the way to go;
+                otherwise I suggest running Scipyen in a conda environment, see below
+                for how to build it.
+            
+        ∘ mamba_env_install_linux.sh → builds a conda environment
+            (see scipyen.yml file for what dependencies are installed)
+            
+            ⋆ installs a 'stock' PyQt5 package from conda-forge — see above for
+                limitations arising from using this
+                
+            ⋆ installs a 'stock' vigra — useful to day-to-day work and likely 
+                what mst users need; 
+                
+    • Windows platforms (>= 10): install mambaforge, then execute mamba_env_install_windows.bat
+        ∘ installs PyQt5 and vigra from conda-forge (and others); some packages come from pip
+        (see scipyen.yml file for what dependencies are installed)
+        
+    • MacOS: install mambaforge then execute mamba_env_install_macos.sh
+        WARNING - as of 2025-03-14 09:43:03 this has NOT been tested yet
+        ∘ installs PyQt5 and vigra from conda-forge (and others); some packages come from pip
+        (see scipyen.yml file for what dependencies are installed)
+    
+
+3) activate the new environment, make sure Scipyen runs, then buld the distributable app:
   in a bash shell do something like (NOTE: 'user@host:>'is your terminal prompt
   and it may look different on your machine, make sure you understand this):
 
@@ -52,9 +127,37 @@ bash script
 import io, os, sys, subprocess, shutil, tempfile, typing, pathlib, traceback
 import argparse
 import string, datetime, importlib, inspect, itertools, time
+import colorama
 from PyInstaller.utils.hooks import (collect_data_files, collect_submodules, 
-                                     collect_all)
+                                     collect_all, copy_metadata, collect_entry_point)
 from PyInstaller.building.datastruct import Tree
+
+if sys.platform == "linux":
+    sys.setrecursionlimit(sys.getrecursionlimit() * 5)
+
+
+def print_styled(s:str, color:str='yellow', bright:bool=True):
+    c = getattr(colorama.Fore, color.upper())
+    pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
+    return f"{pre}{s}{colorama.Style.RESET_ALL}"
+
+def getUnbuiltVersion(path:pathlib.Path) -> str:
+    proc = subprocess.run([sys.executable, "-m", "setuptools_scm"], capture_output=True, cwd=path.as_posix())
+    if proc.returncode == 0:
+        return proc.stdout.decode().replace("\n", "")
+
+def checkGitRepo(path:pathlib.Path) -> bool:
+    gitTest = subprocess.run(["git", "-C", path.as_posix(), "status", "--short", "--branch"], capture_output=True)
+    return gitTest.returncode == 0
+
+def getVersion(src:pathlib.Path):
+    repoDir = src.parent
+    if checkGitRepo(repoDir):
+        ret = getUnbuiltVersion(repoDir)
+    else:
+        ret = Path(src/'scipyen/VERSION').read_text(encoding="utf-8").strip("\n").strip()
+    return ret
+
 
 start_time = time.perf_counter()
 
@@ -72,13 +175,90 @@ try:
     hasNeuron = True
 except:
     hasNeuron = False
+    
+hasTaxoniq = False
+hasNCBITaxonDB=False
+hasNCBIGenbankAccession=False
+hasNCBIRefseqAccession=False
+hasNCBIGenbankAccessionLengths=False
+hasNCBIRefseqAccessionLengths=False
+hasNCBIGenbankAccessionOffsets=False
+hasNCBIRefseqAccessionOffsets=False
+    
+try: 
+    import taxoniq
+    hasTaxoniq = True
+except:
+    hasTaxoniq = False
 
+ncbi_taxon_db_files = list()
+ncbi_accession_db_file = list()
+ncbi_accession_lengths_file = list()
+ncbi_accession_offsets_file = list()
+
+if hasTaxoniq:
+    try:
+        import ncbi_taxon_db
+        hasNCBITaxonDB=True
+    except:
+        hasNCBITaxonDB=False
+
+    if hasNCBITaxonDB:
+        ncbi_taxon_db_dir_path = pathlib.Path(ncbi_taxon_db.db_dir)
+
+        ncbi_taxon_db_files = list(map(lambda x: (x.as_posix(), "ncbi_taxon_db"),
+                                       itertools.chain(ncbi_taxon_db_dir_path.glob("*marisa"),
+                                                       ncbi_taxon_db_dir_path.glob("*zstd"),)))
+    try:
+        import ncbi_genbank_accession_db as accession_db
+        hasNCBIGenbankAccession=True
+        hasNCBIRefseqAccession=False
+    except ImportError:
+        import ncbi_refseq_accession_db as accession_db
+        hasNCBIGenbankAccession=False
+        hasNCBIRefseqAccession=True
+
+    if hasNCBIGenbankAccession:
+        ncbi_accession_db_file = [(pathlib.Path(accession_db.db).as_posix(), "ncbi_genbank_accession_db")]
+    elif hasNCBIRefseqAccession:
+        ncbi_accession_db_file = [(pathlib.Path(accession_db.db).as_posix(), "ncbi_refseq_accession_db")]
+
+    try:
+        import ncbi_genbank_accession_lengths as accession_lengths
+        hasNCBIGenbankAccessionLengths=True
+        hasNCBIRefseqAccessionLengths=False
+    except ImportError:
+        import ncbi_refseq_accession_lengths as accession_lengths
+        hasNCBIGenbankAccessionLengths=False
+        hasNCBIRefseqAccessionLengths=True
+
+    if hasNCBIGenbankAccessionLengths:
+        ncbi_accession_lengths_file = [(pathlib.Path(accession_lengths.db).as_posix(), "ncbi_genbank_accession_lengths")]
+    elif hasNCBIRefseqAccessionLengths:
+        ncbi_accession_lengths_file = [(pathlib.Path(accession_lengths.db).as_posix(), "ncbi_refseq_accession_lengths")]
+
+    try:
+        import ncbi_genbank_accession_offsets as accession_offsets
+        hasNCBIGenbankAccessionOffsets=True
+        hasNCBIRefseqAccessionOffsets=False
+    except ImportError:
+        import ncbi_refseq_accession_offsets as accession_offsets
+        hasNCBIGenbankAccessionOffsets=False
+        hasNCBIRefseqAccessionOffsets=True
+
+    if hasNCBIGenbankAccessionOffsets:
+        ncbi_accession_offsets_file = [(pathlib.Path(accession_offsets.db).as_posix(), "ncbi_genbank_accession_offsets")]
+    elif hasNCBIRefseqAccessionOffsets:
+        ncbi_accession_offsets_file = [(pathlib.Path(accession_offsets.db).as_posix(), "ncbi_refseq_accession_offsets")]
+        
 # print(f"argv: {sys.argv}")
 # print(f"orig_argv: {sys.orig_argv}")
 
 myfile = sys.argv[-1] # the spec file ; this is THE LAST argument in the argument list to pyinstaller
 myfile = pathlib.Path(myfile).absolute()
 scipyen_dir = os.fspath(myfile.parent)
+# version_file = pathlib.Path(scipyen_dir)/"src"/"scipyen"/"VERSION"
+VERSION = getVersion(pathlib.Path(scipyen_dir)/"src")
 
 # print(f"scipyen_dir = {scipyen_dir}")
 
@@ -114,7 +294,7 @@ if not myfile.is_absolute():
 # we are bundling from, and what is the local status of that branch
 mydir = myfile.parents[0]
 
-print(f"\nWARNING: External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen\n\n")
+print(f"\n{print_styled('WARNING:', color='yellow')} External IPython consoles - including NEURON - are NOT yet supported by the bundled Scipyen\n\n")
 
 #def datafile(path, strip_path=True):
     #parts = path.split('/')
@@ -152,7 +332,7 @@ def file2TOCEntry(src_path:str, topdirparts:list, file_category:str="DATA"):
     return target_path, os.fspath(src_path), file_category
 
 def file2entry(src_path:str, topdirparts:list, strip_path:bool=True) -> tuple:
-    """Returns a 2-tuple (source_full_path, target_dir)
+    r"""Returns a 2-tuple (source_full_path, target_dir)
     To be used in the Analysis constructor, below
     
     Parameters:
@@ -227,7 +407,7 @@ def DataFiles(topdir, ext, **kw):
 
 def getQt5PluginsDir():
     # NOTE: on windows this is qtpaths; on SuSE this is qtpaths-qt5
-    if sys.platform == "win32":
+    if sys.platform.startswith("win32"):
         qtpaths_exec = "qtpaths"
     else:
         qtpaths_exec = "qtpaths-qt5"
@@ -243,6 +423,30 @@ def getQt5PluginsDir():
 
 def getQt5Plugins(path):
     return Tree(root=path, prefix="PyQt5/Qt5/plugins", typecode="BINARY")
+
+def getQt6PluginsDir():
+    # not sure I can use this ...
+    # NOTE: on windows this is qtpaths; on SuSE this is qtpaths6
+    if sys.platform.startswith("win32"):
+        qtpaths_exec = "qtpaths"
+    else:
+        qtpaths_exec = "qtpaths6"
+    pout = subprocess.run([qtpaths_exec, "--plugin-dir"],
+                          encoding="utf-8", capture_output=True)
+    
+    if pout.returncode != 0:
+        raise RuntimeError(f"The subprocess for qtpaths6 returned {pout.returncode}")
+    
+    plugins_dir = pout.stdout.strip("\n")
+    
+    return plugins_dir
+
+def getQt6Plugins(path):
+    # not sure I can use this ...
+    if qtapi.lower() == "pyqt6":
+        return Tree(root=path, prefix="PyQt6/Qt6/plugins", typecode="BINARY")
+    else:
+        return Tree(root=path, prefix="PySide6/Qt6/plugins", typecode="BINARY")
 
 def check_plugin_module(file_name) -> bool:
     with open(file_name, "rt", encoding="utf-8") as module_file:
@@ -433,94 +637,52 @@ if os.path.isdir(os.path.join(mydir, ".git")):
                         
 host_name=""
 platform = sys.platform
-if platform == "win32":
-    datas.append((os.path.join(scipyen_dir, "install", "make_app_link.ps1"), "."))
-    datas.append((os.path.join(scipyen_dir, "install", "pythonbackend.ico"), "."))
-else:
-    uname = subprocess.run(["uname", "-ms"], encoding="utf-8", capture_output=True)
-    if uname.returncode==0:
-        platform = uname.stdout.strip("\n").replace(" ", "_")
+platstr = platform
+if platform.startswith("win32"):
+    datas.append((os.path.join(scipyen_dir, "setup_env", "make_app_link.ps1"), "."))
+    datas.append((os.path.join(scipyen_dir, "setup_env", "pythonbackend.ico"), "."))
     pout = subprocess.run(["hostname"], encoding="utf-8", capture_output=True)
     if pout.returncode == 0:
         host_name = pout.stdout.strip("\n")
+else:
+    uname = subprocess.run(["uname", "-ms"], encoding="utf-8", capture_output=True)
+    if uname.returncode==0:
+        platstr = uname.stdout.strip("\n")
+        platform = platform.replace(" ", "_")
+    pout = subprocess.run(["hostname"], encoding="utf-8", capture_output=True)
+    if pout.returncode == 0:
+        host_name = pout.stdout.strip("\n")
+
+datas.append((os.path.join(scipyen_dir, "src", "scipyen", "core", "unicode_input_table.py"), "core"))
+datas.extend(ncbi_taxon_db_files)
+datas.extend(ncbi_accession_db_file)
+datas.extend(ncbi_accession_lengths_file)
+datas.extend(ncbi_accession_offsets_file)
+pygments_styles_data, pygments_styles_hiddenimports = collect_entry_point("pygments.styles")
+datas.extend(copy_metadata("scipyen_console_styles"))
+datas.extend(pygments_styles_data)
+hiddenimports.extend(pygments_styles_hiddenimports)
+
 
 # print(f"host_name = {host_name}; platform = {platform}")
 
 now = datetime.datetime.now()
 year = f"{now.year}"[-2:]
-month = f"{string.ascii_lowercase[now.month-1]}"
+month = now.month
+month_letter = f"{string.ascii_lowercase[now.month-1]}"
 day = f"{now.day}"
 hr = f"{now.hour}"
 mn = f"{now.minute}"
 sc = f"{now.second}"
-build_sfx = f"{year}{month}{day}_{hr}_{mn}_{sc}"
+build_sfx = f"{year}{month_letter}{day}_{hr}_{mn}_{sc}"
+build_str = f"{host_name} ({platstr}) {year}/{month}/{day} {hr}:{mn}:{sc}"
+pyver_sfx = "_".join(["python", f"{sys.version_info.major}", f"{sys.version_info.minor}", f"{sys.version_info.micro}"])
+# debug_sfx = "debug" if compile_options.debug else ""
 
-debug_sfx = "debug" if compile_options.debug else "_"
-
-product = "_".join(["scipyen", gitsfx, platform, host_name, debug_sfx, build_sfx])
-# product = f"scipyen{gitsfx}_{platform}_{host_name}{debug_sfx}"
-# product = f"scipyen{gitsfx}_{platform}_{hr}_{mn}_{sc}_{year}{month}{day}"
-
+product = "_".join(["scipyen", VERSION, gitsfx, platform, host_name, pyver_sfx, build_sfx])
+if compile_options.debug:
+    product += "_debug"
 bundlepath = os.path.join(distpath, product)
-
-# print(f"bundlepath = {bundlepath}")
-# NOTE: 2024-05-31 09:31:43 FIXME/TODO
-# ------------------------------------
-# this needs more work + adapt for the install script (i.e. when the user wants
-# to install the bundled app directory system-wide, e.g. in /usr/local)
-# ------------------------------------
-#
-
-# if sys.platform == "linux":
-#     # add a system-wide installation script
-#     desktoptempdir = tempfile.mkdtemp()
-#     desktop_file_name = os.path.join(desktoptempdir, f"Scipyen_app{gitsfx}.desktop")
-#     # desktop_icon_file = os.path.join(bundlepath,"gui/resources/images/pythonbackend.svg")
-#     desktop_icon_file = "pythonbackend.svg"
-#     exec_file = os.path.join(bundlepath, "scipyen")
-#     desktop_file_contents = ["[Desktop Entry]",
-#     "Type=Application",
-#     "Name[en_GB]=Scipyen",
-#     "Name=Scipyen",
-#     "Comment[en_GB]=Scientific Python Environment for Neurophysiology",
-#     "Comment=Scientific Python Environment for Neurophysiology",
-#     "GenericName[en_GB]=Scientific Python Environment for Neurophysiology",
-#     "GenericName=Scientific Python Environment for Neurophysiology",
-#     f"Icon={desktop_icon_file}",
-#     "Categories=Science;Utilities;",
-#     "Exec=%k/scipyen",
-#     "MimeType=",
-#     "Path=",
-#     "StartupNotify=true",
-#     "Terminal=true",
-#     "TerminalOptions=\s--noclose",
-#     "X-DBUS-ServiceName=",
-#     "X-DBUS-StartupType=",
-#     "X-KDE-SubstituteUID=false",
-#     "X-KDE-Username=",
-#     ]
-#     with open(desktop_file_name, "wt") as desktop_file:
-#         for line in desktop_file_contents:
-#             desktop_file.write(f"{line}\n")
-# 
-#     dist_install_script = ["#!/bin/bash",
-#                         "mydir=`dirname $0`",
-#                         "whereami=`realpath ${mydir}`",
-#                         # "chown -R root:root ${whereami}",
-#                         "sudo ln -s -b ${whereami}/scipyen /usr/local/bin/",
-#                         "sudo ln -s -b ${whereami}/Scipyen_app" + f"{gitsfx}.desktop /usr/share/applications/"]
-# 
-#     install_script_tempdir = tempfile.mkdtemp()
-#     dist_install_script_name = os.path.join(install_script_tempdir, "dist_install.sh")
-# 
-#     with open(dist_install_script_name, "wt") as dist_install:
-#         for line in dist_install_script:
-#             dist_install.write(f"{line}\n")
-#             
-#     datas.append((f"{os.path.join(scipyen_dir, 'src/scipyen/gui/resources/images', desktop_icon_file)}", '.'))
-#     # datas.append(("/home/cezar/scipyen/src/scipyen/gui/resources/images/pythonbackend.svg", '.'))
-#     datas.append((desktop_file_name, '.'))
-#     datas.append((dist_install_script_name, '.'))
 
 # NOTE: 2023-06-28 11:06:50 This WORKS!!! 
 # see NOTE: 2023-06-28 11:07:31 and NOTE: 2023-06-28 11:08:08
@@ -551,6 +713,11 @@ datas.extend(jqc_datas)
 binaries.extend(jqc_binaries)
 hiddenimports.extend(jqc_hiddenimports)
 
+# scs_datas, scs_binaries, scs_hiddenimports = collect_all("scipyen_console_styles")
+# datas.extend(scs_datas)
+# binaries.extend(scs_binaries)
+# hiddenimports.extend(scs_hiddenimports)
+
 # NOTE: 2023-06-29 08:32:55
 # try as above for jupyter_client (needed because "local-provisioner" issues 
 # when starting external IPython console in Scipyen)
@@ -567,9 +734,7 @@ datas.extend(zmq_datas)
 binaries.extend(zmq_binaries)
 hiddenimports.extend(zmq_hiddenimports)
 
-qt5plugins_dir = getQt5PluginsDir()
 
-qt5plugins_toc = getQt5Plugins(qt5plugins_dir)
 
 # print(f"qt5plugins_toc = {qt5plugins_toc}")
 
@@ -590,8 +755,10 @@ qt5plugins_toc = getQt5Plugins(qt5plugins_dir)
 # print(f"\ndatas = {datas}\n")
 
 hiddenimports.extend(['gui.widgets',
+                      'gui.widgets.basescipyendatawidget',
                       'gui.widgets.metadatawidget',
-                      'gui.widgets.modelfitting_ui'])
+                      'gui.widgets.modelfitting_ui',
+                      ])
 
 plugin_hidden_imports, plugin_toc = collect_internal_scipyen_plugins(scipyen_dir)
 # pt_txt = '\n'.join([f"{k}: {i}" for k,i in enumerate(plugin_toc)])
@@ -608,6 +775,21 @@ datas.extend(plugin_toc)
 # NOTE: 2023-07-14 15:22:26
 # hookspath contains code for pyinstaller hooks called ONLY when the Analyser
 # detects an import in Scipyen code; these won't work for NEURON stuff....
+excludeQt = ["PySide2"]
+qtapi = os.environ["QT_API"]
+
+print(f"Building Scipyen version {VERSION} with QT API: {qtapi}")
+
+if qtapi.lower() == "pyqt5":
+    excludeQt += ["PySide6", "PyQt6"]
+elif qtapi.lower() == "pyqt6":
+    excludeQt += ["PySide6", "PyQt5"]
+elif qtapi.lower() == "pyside6":
+    excludeQt += ["PyQt5", "PyQt6"]
+else:
+    raise ValueError(f"Unsupported QT API {qtapi}")
+
+excludes = ["OpenGL", "torch", "nuitka"] + excludeQt
 
 a = Analysis(
     [os.path.join(scipyen_dir, 'src','scipyen','scipyen.py')],
@@ -632,12 +814,23 @@ a = Analysis(
     runtime_hooks=[os.path.join(scipyen_dir, 'src','scipyen','__pyinstaller', 'rthooks','pyi_rth_typeguard.py'),
                    # os.path.join(scipyen_dir, 'src','scipyen','__pyinstaller', 'rthooks','pyi_rth_gui.py'), # these just added manually to hiddenimports, above
                    ],
-    excludes=["OpenGL", "torch", "nuitka"],
+    excludes=excludes,
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
     noarchive=False,
 )
+    
+if qtapi.lower() == "pyqt5":
+    # add qt5 plugins to the binaries !
+    qt5plugins_dir = getQt5PluginsDir()
+    qt5plugins_toc = getQt5Plugins(qt5plugins_dir)
+    a.binaries += qt5plugins_toc 
+elif qtapi.lower() in ("pyqt6", "pyside6"):
+    qt6plugins_dir = getQt6PluginsDir()
+    qt6plugins_toc = getQt6Plugins(qt6plugins_dir)
+    a.binaries += qt6plugins_toc 
+    
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 options = [
@@ -645,7 +838,7 @@ options = [
     ('O', None, 'OPTION')
     ]
 
-if sys.platform == "win32":
+if sys.platform.startswith("win32"):
     exe = EXE(
         pyz,
         a.scripts,
@@ -662,7 +855,7 @@ if sys.platform == "win32":
         target_arch=None,
         codesign_identity=None,
         entitlements_file=None,
-        icon=os.path.join(scipyen_dir, "install","pythonbackend.ico"),
+        icon=os.path.join(scipyen_dir, "setup_env","pythonbackend.ico"),
         options = options
     )
 else:
@@ -687,7 +880,7 @@ else:
     
 coll = COLLECT(
     exe,
-    a.binaries + qt5plugins_toc, # add qt5 plugins to the binaries !
+    a.binaries,
     a.zipfiles,
     a.datas,
     strip=False,
@@ -695,6 +888,116 @@ coll = COLLECT(
     upx_exclude=[],
     name=product, # name of distribution directory (e.g, 'scipyen_dev' etc)
 )
+
+# print(f"bundlepath = {bundlepath}")
+# NOTE: 2024-05-31 09:31:43 FIXME/TODO
+# ------------------------------------
+# this needs more work + adapt for the install script (i.e. when the user wants
+# to install the bundled app directory system-wide, e.g. in /usr/local)
+# ------------------------------------
+#
+
+if sys.platform.startswith("linux"):
+    # add a system-wide installation script
+    desktoptempdir = tempfile.mkdtemp()
+    desktop_file_name = os.path.join(desktoptempdir, f"org.scipyen.desktop")
+    desktop_icon_file = "pythonbackend.svg"
+    # exec_file = os.path.join(bundlepath, "scipyen.app")
+    # exec_file = final_exe_file_name
+    desktop_file_contents = [
+        "[Desktop Entry]",
+        "Type=Application",
+        "Name[en_GB]=Scipyen",
+        "Name=Scipyen",
+        "Comment[en_GB]=Scientific Python Environment for Neurophysiology - PyInstaller frozen application",
+        "Comment=Scientific Python Environment for Neurophysiology - PyInstaller frozen application",
+        "GenericName[en_GB]=Scipyen",
+        "GenericName=Scipyen",
+        "Icon=_internal/Logo.png",
+        # f"Icon={desktop_icon_file}",
+        "Categories=Science;Education",
+        f"Exec={final_exe_file_name}",
+        "MimeType=",
+        "Path=",
+        "StartupNotify=true",
+        "Terminal=true",
+        "TerminalOptions=\\s--noclose",
+        "X-DBUS-ServiceName=",
+        "X-DBUS-StartupType=",
+        "X-KDE-SubstituteUID=false",
+        "X-KDE-Username=",
+    ]
+    with open(desktop_file_name, "wt") as desktop_file:
+        for line in desktop_file_contents:
+            desktop_file.write(f"{line}\n")
+            
+    shutil.copyfile(pathlib.Path(desktop_file_name), pathlib.Path(bundlepath) / "org.scipyen.desktop")
+    shutil.rmtree(desktoptempdir)
+    
+with tempfile.NamedTemporaryFile(delete_on_close=False) as fp:
+    fp.write(VERSION.encode())
+    fp.close()
+    shutil.copyfile(pathlib.Path(fp.name), pathlib.Path(bundlepath) / "VERSION")
+    
+with tempfile.NamedTemporaryFile(delete_on_close=False) as fp:
+    fp.write(build_str.encode())
+    fp.close()
+    shutil.copyfile(pathlib.Path(fp.name), pathlib.Path(bundlepath) / "BUILD")
+    
+install_script_contents = [
+    "#! /bin/bash\n",
+    "if [[ `id -u` -ne 0 ]] ; then\n",
+    "echo -e \"This script must be run as administrator\"\n",
+    "exit 1\n",
+    "fi\n",
+    "target_dir=/usr/local\n",
+    "mydir=`pwd`\n",
+    "realscript=`realpath $0`\n",
+    "bundle=`dirname ${realscript}`\n",
+    "package=`basename ${bundle}`\n",
+    "destination=${target_dir}/scipyen_app\n",
+    "if [ -d ${destination}/${package} ]; then\n",
+    "xdg-desktop-menu uninstall ${destination}/${package}/org.scipyen.desktop\n",
+    "rm -fr ${destination}/${package}\n",
+    "fi\n",
+    "mkdir -p ${destination} && cp -r -t ${destination} ${bundle} && ln -s -f -t ${target_dir}/bin/ ${destination}/${package}/scipyen.app && xdg-desktop-menu install --novendor ${destination}/${package}/org.scipyen.desktop\n",
+#     "if [[ $? -eq 0 ]] ; then",
+#     
+#     "fi"
+    ]
+
+uninstall_script_contents = [
+    "#! /bin/bash\n",
+    "if [[ `id -u` -ne 0 ]] ; then\n",
+    "echo -e \"This script must be run as administrator\"\n",
+    "exit 1\n",
+    "fi\n",
+    "target_dir=/usr/local\n",
+    "mydir=`pwd`\n",
+    "realscript=`realpath $0`\n",
+    "bundle=`dirname ${realscript}`\n",
+    "package=`basename ${bundle}`\n",
+    "destination=${target_dir}/scipyen_app\n",
+    "if [ -d ${destination}/${package} ]; then\n",
+    "if [ -L ${target_dir}/bin/scipyen.app ] ; then\n",
+    "rm -f ${target_dir}/bin/scipyen.app\n",
+    "fi\n",
+    "xdg-desktop-menu uninstall ${destination}/${package}/org.scipyen.desktop\n",
+    "rm -fr ${destination}/${package}\n",
+    "fi\n",
+    ]
+
+with tempfile.NamedTemporaryFile(delete_on_close=False) as fp:
+    for line in install_script_contents:
+        fp.write(line.encode())
+    fp.close()
+    shutil.copyfile(pathlib.Path(fp.name), pathlib.Path(bundlepath) / "install_scipyen_app.sh")
+
+with tempfile.NamedTemporaryFile(delete_on_close=False) as fp:
+    for line in uninstall_script_contents:
+        fp.write(line.encode())
+    fp.close()
+    shutil.copyfile(pathlib.Path(fp.name), pathlib.Path(bundlepath) / "uninstall_scipyen_app.sh")
 
 stop_time = time.perf_counter()
 dt = stop_time - start_time
@@ -705,18 +1008,8 @@ dt = dt % 3600
 mm = int(dt//60)
 dt = dt % 60
 
+
+
 print(f"\n\nDuration: {dd} days, {hh} hours, {mm} minutes and {dt} seconds")
 
-# NOTE: 2024-05-31 09:36:11 FIXME/TODO
-# ------------------------------------
-# see NOTE: 2024-05-31 09:31:43 FIXME/TODO
-# ------------------------------------
-# if isinstance(tempdir, str) and os.path.isdir(tempdir):
-#     shutil.rmtree(tempdir)
-#     
-# if isinstance(desktoptempdir, str) and os.path.isdir(desktoptempdir):
-#     shutil.rmtree(desktoptempdir)
-#     
-# # app_location =
-# if sys.platform == "linux":
-#     print(f"To install system-wide, run {os.path.join(product, '_internal', 'dist_install.sh')}.")
+print(f"\n\nTo install system-wide:\n\nrun 'sh ./install_scipyen_app.sh' inside the newly created sub-directory of 'dist' (see below), as adminstrator\n\n.")

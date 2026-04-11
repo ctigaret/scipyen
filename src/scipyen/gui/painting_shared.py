@@ -10,30 +10,40 @@ from pprint import pprint
 from traitlets import Bunch
 
 import numpy as np
-
-from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
-from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-# from qtpy.uic import loadUiType as __loadUiType__
-# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
-# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
-# # from PyQt5.uic import loadUiType as __loadUiType__
-
-# for sip.cast:
-has_sip = False
-# if os.environ["QT_API"] in ("pyqt5", "pyqt6"):
-try:
+# import qtpy
+# print(os.environ["QT_API"])
+__has_PySide6__ = False
+__has_PyQt6__ = False
+if os.environ["QT_API"] == "pyside6":
+    import PySide6
+    from PySide6 import QtCore, QtGui, QtWidgets, QtXml, QtSvg
+    from PySide6.QtCore import Signal, Slot, Property
+    __has_sip__ = False
+    __has_PySide6__ = True
+elif os.environ["QT_API"] == "pyqt6":
+    from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
+    from qtpy.QtCore import Signal, Slot, Property
     from qtpy import sip as sip
-    has_sip = True
-except:
-    has_sip = False
+    __has_PyQt6__ = True
+    
+else:
+    from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
+    from qtpy.QtCore import Signal, Slot, Property
+    from qtpy import sip as sip
+    __has_sip__ = True
+
+# # for sip.cast:
+# __has_sip__ = False
+# # if os.environ["QT_API"] in ("pyqt5", "pyqt6"):
+# try:
+# except:
     
 # else:
 #     sip = None
 # from qtpy import sip as sip  
 # import sip # for sip.cast
 
-from core.prog import safeWrapper
+from core.prog import safewrapper
 from core.traitcontainers import DataBag
 
 from .scipyen_colormaps import (qtGlobalColors, standardPalette,
@@ -60,10 +70,6 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 #
 # BrushStyleType._subs_tree():
 # (typing.Union, 
-#  int,
-#  PyQt5.QtGui.QGradient,
-#  PyQt5.QtGui.QPixmap,
-#  PyQt5.QtGui.QImage)
 #
 # PenStyleType._subs_tree():
 #  (typing.Union, tuple, list, int)
@@ -81,11 +87,46 @@ FontWeightType = typing.Union[int, QtGui.QFont.Weight]
 #
 #
 #
-if os.environ["QT_API"] in ("pyqt5", "pyside2"):
-    standardQtFontStyles = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Style)), key = lambda x: x[1]))
-    standardQtFontWeights = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Weight)), key = lambda x: x[1]))
-    
+# print(f"In module: {__name__}: QT_API = {os.environ['QT_API']}, QtAPI.API = {QtAPI.API}, QtAPI.API_NAME = {QtAPI.API_NAME}")
+standardQtFontStyles = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Style)), 
+                                    key = lambda x: x[0]))
+standardQtFontWeights = Bunch(sorted(((name, val) for name, val in vars(QtGui.QFont).items() if isinstance(val, QtGui.QFont.Weight)), 
+                                     key = lambda x: x[0]))
 
+if __has_PyQt6__:
+    standardQtPenStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenStyle) and val.value < 10),
+                            key = lambda x: x[1].value))
+    standardQtPenJoinStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenJoinStyle) and val.value <= 256),
+                            key = lambda x: x[1].value))
+    standardQtPenCapStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenCapStyle) and val.value <= 32),
+                            key = lambda x: x[1].value))
+    validQtGradientTypes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type) and value.value < 3),
+                                        key = lambda x: x[1].value))
+    
+    standardQtGradientTypes = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type)),
+                                        key = lambda x: x[1].value))
+    standardQtBrushStyles = Bunch(sorted(((name, value) for name, value in vars(QtCore.Qt).items() if isinstance(value, QtCore.Qt.BrushStyle)),
+                                            key = lambda x: x[1].value))
+
+    standardQtBrushPatterns = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if all((s not in name for s in ("Gradient", "Texture")))),
+                                            key = lambda x: x[1].value))
+
+    standardQtBrushGradients = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Gradient" in name),
+                                            key = lambda x: x[1].value))
+
+    standardQtBrushTextures = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Texture" in name),
+                                            key = lambda x: x[1].value))
+
+    qPainterCompositionModes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QPainter).items() if isinstance(value, QtGui.QPainter.CompositionMode)), 
+                                            key = lambda x: x[1].value))
+
+    standardQtGradientPresets = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset) and name != "NumPresets"),
+                                             key = lambda x: x[1].value))
+
+    standardQtGradientSpreads = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread) ),
+                                             key = lambda x: x[1].value))
+
+else:
     standardQtPenStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenStyle) and val < 10),
                             key = lambda x: x[1]))
 
@@ -94,16 +135,13 @@ if os.environ["QT_API"] in ("pyqt5", "pyside2"):
 
     standardQtPenCapStyles = Bunch(sorted(((name,val) for name, val in vars(QtCore.Qt).items() if isinstance(val, QtCore.Qt.PenCapStyle) and val <= 32),
                             key = lambda x: x[1]))
-    
-    standardQtGradientPresets = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset) and name != "NumPresets")))
 
-    standardQtGradientSpreads = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread) )))
-
-    standardQtGradientTypes = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type)),
-                                        key = lambda x: x[1]))
     validQtGradientTypes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type) and value < 3),
                                         key = lambda x: x[1]))
-
+    
+    standardQtGradientTypes = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Type)),
+                                        key = lambda x: x[1]))
+    
     standardQtBrushStyles = Bunch(sorted(((name, value) for name, value in vars(QtCore.Qt).items() if isinstance(value, QtCore.Qt.BrushStyle)),
                                             key = lambda x: x[1]))
 
@@ -118,49 +156,10 @@ if os.environ["QT_API"] in ("pyqt5", "pyside2"):
 
     qPainterCompositionModes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QPainter).items() if isinstance(value, QtGui.QPainter.CompositionMode)), 
                                             key = lambda x: x[1]))
-else:
-    # NOTE: 2024-05-02 11:33:12 
-    # the various Qt namespace enums below are more like regular Python enums in PyQt6 (via qtpy)
-    standardQtFontStyles = Bunch(sorted(((name, val) for name, val in QtGui.QFont.Style._member_map_.items()), 
-                                        key = lambda x: x[1].value)) 
 
-    standardQtFontWeights = Bunch(sorted(((name, val) for name, val in QtGui.QFont.Weight._member_map_.items()), 
-                                        key = lambda x: x[1].value))
+    standardQtGradientPresets = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Preset) and name != "NumPresets")))
 
-    standardQtPenStyles = Bunch(sorted(((name,val) for name, val in QtCore.Qt.PenStyle._member_map_.items() if val.value < 10),
-                            key = lambda x: x[1].value))
-
-    standardQtPenJoinStyles = Bunch(sorted(((name,val) for name, val in QtCore.Qt.PenJoinStyle._member_map_.items() if val.value <= 256),
-                            key = lambda x: x[1].value))
-
-    standardQtPenCapStyles = Bunch(sorted(((name,val) for name, val in QtCore.Qt.PenCapStyle._member_map_.items() if val.value <= 32),
-                            key = lambda x: x[1].value))
-    
-    standardQtGradientPresets = Bunch(sorted(( (name, value) for name, value in QtGui.QGradient.Preset._member_map_.items() if name != "NumPresets")))
-
-    standardQtGradientSpreads = Bunch(sorted(( (name, value) for name, value in QtGui.QGradient.Spread._member_map_.items())))
-
-    standardQtGradientTypes = Bunch(sorted(( (name, value) for name, value in QtGui.QGradient.Type._member_map_.items()),
-                                        key = lambda x: x[1].value))
-    
-    validQtGradientTypes = Bunch(sorted(((name, value) for name, value in QtGui.QGradient.Type._member_map_.items() if value.value < 3),
-                                        key = lambda x: x[1].value))
-
-    standardQtBrushStyles = Bunch(sorted(((name, value) for name, value in QtCore.Qt.BrushStyle._member_map_.items()),
-                                            key = lambda x: x[1].value))
-
-    standardQtBrushPatterns = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if all((s not in name for s in ("Gradient", "Texture")))),
-                                            key = lambda x: x[1].value))
-
-    standardQtBrushGradients = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Gradient" in name),
-                                            key = lambda x: x[1].value))
-
-    standardQtBrushTextures = Bunch(sorted(((name, value) for name, value in standardQtBrushStyles.items() if "Texture" in name),
-                                            key = lambda x: x[1].value))
-
-    qPainterCompositionModes = Bunch(sorted(((name, value) for name, value in vars(QtGui.QPainter).items() if isinstance(value, QtGui.QPainter.CompositionMode)), 
-                                            key = lambda x: x[1].value))
-
+    standardQtGradientSpreads = Bunch(sorted(( (name, value) for name, value in vars(QtGui.QGradient).items() if isinstance(value, QtGui.QGradient.Spread) )))
 
 customDashStyles = {"Custom": [10., 5., 10., 5., 10., 5., 1., 5., 1., 5., 1., 5.]}
 
@@ -227,7 +226,7 @@ def canDecode(mimeData:QtCore.QMimeData) -> bool:
     return False
 
 def fromMimeData(mimeData:QtCore.QMimeData) -> QtGui.QColor:
-    if has_sip:
+    if __has_sip__:
         from core import sip_compat
         return sip_compat.fromMimeData(mimeData)
     
@@ -238,7 +237,7 @@ def fromMimeData(mimeData:QtCore.QMimeData) -> QtGui.QColor:
         return QtGui.QColor(mimeData.text())
     return QtGui.QColor()
 
-@safeWrapper
+@safewrapper
 def createDrag(color:QtGui.QColor, dragSource:QtCore.QObject) -> QtGui.QDrag:
     drag = QtGui.QDrag(dragSource)
     mime = QtCore.QMimeData()
@@ -269,7 +268,7 @@ def make_transparent_bg(strong:bool=False, size:int=16) -> QtGui.QPixmap:
 def make_checkers(color0:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor], 
                   color1:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor],
                   size:int=16) -> QtGui.QPixmap:
-    """Makes square checkers pattern as background for transparent graphics.
+    r"""Makes square checkers pattern as background for transparent graphics.
     
     The checkers pattern is: ▄▀  with color0 at the top left. The color roles
     can be inverted by swapping color0 and color1: ▀▄
@@ -308,7 +307,7 @@ def make_checkers(color0:typing.Union[QtGui.QColor, QtCore.Qt.GlobalColor],
 def x_less_than(p1:QtCore.QPointF, p2:QtCore.QPointF) -> bool:
     return p1.x() < p2.x()
 
-@safeWrapper
+@safewrapper
 def makeCustomPathStroke(path:QtGui.QPainterPath,
                      dashes:list, width:numbers.Real=1.,
                      join:QtCore.Qt.PenJoinStyle=QtCore.Qt.MiterJoin,
@@ -327,7 +326,7 @@ def makeCustomPathStroke(path:QtGui.QPainterPath,
     
     return path
 
-@safeWrapper
+@safewrapper
 def gradient2radial(gradient:QtGui.QGradient, 
                    centerRadius:float = 1., 
                    focalRadius:float = 0.,
@@ -349,7 +348,7 @@ def gradient2radial(gradient:QtGui.QGradient,
     elif isinstance(gradient, QtGui.QGradient):
         # see NOTE: 2021-09-16 17:55:08
         if gradient.type() == QtGui.QGradient.RadialGradient:
-            if has_sip:
+            if __has_sip__:
                 ret = sip.cast(gradient, QtGui.QRadialGradient)
             else:
                 ret = gradient
@@ -357,7 +356,7 @@ def gradient2radial(gradient:QtGui.QGradient,
             ret.setFocalRadius(focalRadius)
         
         if gradient.type() == QtGui.QGradient.LinearGradient:
-            if has_sip:
+            if __has_sip__:
                 g = sip.cast(gradient, QtGui.QLinearGradient)
             else:
                 g = gradient
@@ -371,7 +370,7 @@ def gradient2radial(gradient:QtGui.QGradient,
             #ret = QtGui.QRadialGradient(l.p1(), centerRadius, l.p2(), focalRadius)
             
         elif gradient.type() == QtGui.QGradient.ConicalGradient:
-            if has_sip:
+            if __has_sip__:
                 g = sip.cast(gradient, QtGui.QConicalGradient)
             else:
                 g = gradient
@@ -394,7 +393,7 @@ def gradient2radial(gradient:QtGui.QGradient,
 
 g2r = gradient2radial
     
-@safeWrapper
+@safewrapper
 def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
     if isinstance(gradient, QtGui.QLinearGradient):
         return gradient
@@ -411,12 +410,12 @@ def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
         # NOTE: 2021-09-16 17:55:08
         # type() for a generic QGradient by default returns QtGui.QGradient.LinearGradient
         if gradient.type() == QtGui.QGradient.LinearGradient:
-            if has_sip:
+            if __has_sip__:
                 return sip.cast(gradient, QtGui.QLinearGradient)
             return gradient
         
         if gradient.type() == QtGui.QGradient.RadialGradient:
-            if has_sip:
+            if __has_sip__:
                 g = sip.cast(gradient, QtGui.QRadialGradient)
             else:
                 g = gradient
@@ -424,7 +423,7 @@ def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
             
             
         elif gradient.type() == QtGui.QGradient.ConicalGradient:
-            if has_sip:
+            if __has_sip__:
                 g = sip.cast(gradient, QtGui.QConicalGradient)
             else:
                 g = gradient
@@ -445,7 +444,7 @@ def gradient2linear(gradient:QtGui.QGradient) -> QtGui.QLinearGradient:
     
 g2l = gradient2linear
 
-@safeWrapper
+@safewrapper
 def gradient2conical(gradient:QtGui.QGradient) -> QtGui.QConicalGradient:
     if isinstance(gradient, QtGui.QConicalGradient):
         return gradient
@@ -461,13 +460,13 @@ def gradient2conical(gradient:QtGui.QGradient) -> QtGui.QConicalGradient:
     elif isinstance(gradient, QtGui.QGradient):
         # see NOTE: 2021-09-16 17:55:08
         if gradient.type() == QtGui.QGradient.ConicalGradient:
-            if has_sip:
+            if __has_sip__:
                 return sip.cast(gradient, QtGui.QConicalGradient)
             return gradient
         
         if gradient.type() == QtGui.QGradient.LinearGradient:
             # g = QtGui.QLinearGradient
-            if has_sip:
+            if __has_sip__:
                 g = sip.cast(gradient, QtGui.QLinearGradient)
             else:
                 g = gradient
@@ -475,7 +474,7 @@ def gradient2conical(gradient:QtGui.QGradient) -> QtGui.QConicalGradient:
             ret = QtGui.QConicalGradient(l.p1(), l.angle())
             
         elif gradient.type() == QtGui.QGradient.RadialGradient:
-            if has_sip:
+            if __has_sip__:
                 g = sip.cast(gradient, QtGui.QRadialGradient)
             else:
                 g = gradient
@@ -530,19 +529,19 @@ def gradientCoordinates(x:QtGui.QGradient, precision:typing.Optional[int]=None) 
     
     elif isinstance(x, QtGui.QGradient):
         if x.type() & QtGui.QGradient.LinearGradient:
-            if has_sip:
+            if __has_sip__:
                 x_ = sip.cast(x, QtGui.QLinearGradient)
             else:
                 x_ = x
             return linearcoords(x_, precision)
         elif x.type() & QtGui.QGradient.RadialGradient:
-            if has_sip:
+            if __has_sip__:
                 x_ = sip.cast(x, QtGui.QRadialGradient)
             else:
                 x_ = x
             return radialcoords(x_, precision)
         elif x.type() & QtGui.QGradient.ConicalGradient:
-            if has_sip:
+            if __has_sip__:
                 x_ = sip.cast(x, QtGui.QConicalGradient)
             else:
                 x_ = x
@@ -621,7 +620,7 @@ def rescaleGradient(gradient:QtGui.QGradient, src_rect:typing.Union[QtCore.QRect
     return scaleGradient(g, dest_rect)
         
 def scaleGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, QtCore.QRectF]) -> QtGui.QGradient:
-    """ATTENTION/WARNING gradient must have normalized coordinates!
+    r"""ATTENTION/WARNING gradient must have normalized coordinates!
     
     """
     x = rect.x()
@@ -681,7 +680,7 @@ def scaleGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, QtCo
         #raise TypeError("Expecting a concrete QGradient subtype; got %s instead" % type(g).__name__)
 
 def normalizeGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, QtCore.QRectF]) -> QtGui.QGradient:
-    """
+    r"""
     """
     x = rect.x()
     y = rect.y()
@@ -729,7 +728,7 @@ def normalizeGradient(gradient:QtGui.QGradient, rect:typing.Union[QtCore.QRect, 
         raise TypeError("Expecting a concrete QGradient subtype; got %s instead" % type(g).__name__)
         
 def comboDelegateBrush(index:QtCore.QModelIndex, role:int) -> QtGui.QBrush:
-    if has_sip:
+    if __has_sip__:
         from core import sip_compat
         return sip_compat.comboDelegateBrush(index, role)
     
@@ -773,7 +772,7 @@ class HoverPoints(QtCore.QObject):
     def __init__(self, widget:QtWidgets.QWidget, shape:PointShape=PointShape.CircleShape,
                  size:typing.Union[int, typing.Tuple[int]]=11,
                  compositionMode:typing.Optional[typing.Union[QtGui.QPainter.CompositionMode, str, int]] = None):
-        """HoverPoints constructor
+        r"""HoverPoints constructor
         
         Parameters:
         -----------
@@ -1000,7 +999,7 @@ class HoverPoints(QtCore.QObject):
     def setPointLock(self, pos:int, lock:LockType) -> None:
         self._locks[pos] = lock
        
-    @safeWrapper
+    @safewrapper
     def eventFilter(self, obj:QtCore.QObject, ev:QtCore.QEvent) -> bool:
         try:
             if obj == self._widget and self._enabled:
@@ -1008,7 +1007,7 @@ class HoverPoints(QtCore.QObject):
                     #if len(self._fingerPointMapping) == 0: # see # NOTE 2021-05-21 21:29:33 touchscreens
                         #return True
                     
-                    if has_sip:
+                    if __has_sip__:
                         me = sip.cast(ev, QtGui.QMouseEvent)
                     else:
                         me = ev
@@ -1115,7 +1114,7 @@ class HoverPoints(QtCore.QObject):
                         #return True
                     pos = QtCore.QPointF(ev.pos())
                     
-                    if has_sip:
+                    if __has_sip__:
                         me = sip.cast(ev, QtGui.QMouseEvent)
                     else:
                         me = ev
@@ -1179,7 +1178,7 @@ class HoverPoints(QtCore.QObject):
                     #pass # see NOTE 2021-05-21 21:29:33 skipped code for touchscreens
                     
                 elif ev.type() == QtCore.QEvent.Resize:
-                    if has_sip:
+                    if __has_sip__:
                         e = sip.cast(ev, QtGui.QResizeEvent)
                     else:
                         e = ev
@@ -1208,7 +1207,7 @@ class HoverPoints(QtCore.QObject):
             traceback.print_exc()
             return False
         
-    @safeWrapper
+    @safewrapper
     def _paintPoints(self) -> None:
         p = QtGui.QPainter()
         p.begin(self._widget)
@@ -1321,7 +1320,7 @@ def printGradientStops(g:typing.Union[QtGui.QGradient, typing.Sequence[typing.Tu
                        caller:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=None,
                        prefix:str = "",
                        suffix:str = "") -> typing.Optional[str]:
-    """Prints out gradient stops in an uniform fashion.
+    r"""Prints out gradient stops in an uniform fashion.
     Particularly helpful for debugging
     
     Parameters:
@@ -1409,7 +1408,7 @@ def printPoints(points:typing.Union[QtGui.QPolygonF, QtGui.QPolygon, typing.Sequ
                 caller:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=None,
                 prefix:str="",
                 suffix:str="") -> typing.Optional[str]:
-    """Prints out the x,y coordinates of a sequence of QPoint or QPointF objects
+    r"""Prints out the x,y coordinates of a sequence of QPoint or QPointF objects
     Particularly helpful for debugging.
     
     Parameters:
@@ -1479,7 +1478,7 @@ def qPathElementCoordinates(x:QtGui.QPainterPath):
     return ((x.elementAt(k).x, x.elementAt(k).y) for k in range(x.elementCount()))
         
 class ColorGradient():
-    """Encapsulates the appearance of a conical, linear or radial Qt gradient.
+    r"""Encapsulates the appearance of a conical, linear or radial Qt gradient.
     
     It is a callable, therefore it can be used as a factory for one of the Qt 
     gradient :classes:: QtGui.QConicalGradient, QtGui.QLinearGradient, and
@@ -1490,7 +1489,7 @@ class ColorGradient():
     _required_attributes_ = ("_ID_","coordinates", "coordinateMode", "spreadMode", "stops", "type", )
     _qtclass_ = QtGui.QGradient
     
-    @safeWrapper
+    @safewrapper
     def _importQGradient_(self, g) -> typing.Union[QtGui.QLinearGradient,QtGui.QRadialGradient,QtGui.QConicalGradient]:
         # NOTE: 2021-06-24 12:05:00
         # below, if g is of a conforming type, no conversion occurs
@@ -1538,7 +1537,7 @@ class ColorGradient():
             self._ID_ = type(self).__name__
             
     def __init__(self, *args, **kwargs):
-        """ColorGradient constructor:
+        r"""ColorGradient constructor:
         
         Variadic parameters:
         --------------------
@@ -1934,7 +1933,7 @@ class ColorGradient():
         return self.stops[k][1]
     
     def setColorAt(self, x:typing.Union[int, float], color:QtGui.QColor):
-        """Set the color at a gradient stop.
+        r"""Set the color at a gradient stop.
         
         Parameters:
         -----------
@@ -2095,7 +2094,7 @@ class ColorGradient():
         self.scale(dest_rect)
             
     def __call__(self) -> typing.Union[QtGui.QGradient, QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient]:
-        """Factory for a concrete QGradient object based on this object's attributes
+        r"""Factory for a concrete QGradient object based on this object's attributes
         
         A 'concrete' QGradient is a QLinearGradient, QRadialGradient, or a 
         QConicalGradient object.
@@ -2109,7 +2108,7 @@ class ColorGradient():
     
     @property
     def valid(self):
-        """Read-only.
+        r"""Read-only.
         This is always False for ColorGradient objects and True for ColorGradient
         subclass instances (LinearColorGradient, RadialColorGradient, ConicalColorGradient)
         """
@@ -2144,7 +2143,7 @@ class ConicalColorGradient(ColorGradient):
         self._valid = True
 
 def colorGradient(*args, **kwargs) -> ColorGradient:
-    """Factory for Linear, Radial and Conical color gradient objects
+    r"""Factory for Linear, Radial and Conical color gradient objects
     
     Originally indended to be used in order to avoid generating instances of the 
     more generic ColorGradient :class:.
@@ -2228,7 +2227,7 @@ def colorGradient(*args, **kwargs) -> ColorGradient:
     return ColorGradient(**kwargs)
 
 class Brush(Bunch):
-    """Encapsulates the appearance atribute of a QtGui.QBrush.
+    r"""Encapsulates the appearance atribute of a QtGui.QBrush.
     
     It is a callable, therefore it can be used as a QBrush factory.
     
@@ -2293,7 +2292,7 @@ class Brush(Bunch):
         return QtGui.QBrush(qcolor(self.color), self.style)
         
 class Pen(Bunch):
-    """Encapsulatesthe appearance attribute of a QtGui.QPen.
+    r"""Encapsulatesthe appearance attribute of a QtGui.QPen.
     
     It is a callable, therefore it can be used as a QPen factory.
     
@@ -2304,7 +2303,7 @@ class Pen(Bunch):
                  cap:str="SquareCap", join:str="BevelJoin", cosmetic:bool=True,
                  brush:typing.Optional[typing.Optional[Brush]]=None,
                  name:typing.Optional[str]=None) -> None:
-        """Default constructor mimics the default behaviour of the QtGui.QPen
+        r"""Default constructor mimics the default behaviour of the QtGui.QPen
         constructor
         """
         if not isinstance(name, str) or len(name.strip()) == 0:

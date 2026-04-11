@@ -7,7 +7,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1159</width>
+    <width>898</width>
     <height>843</height>
    </rect>
   </property>
@@ -24,8 +24,10 @@
    <string>Scipyen</string>
   </property>
   <property name="windowIcon">
-   <iconset theme="python">
-    <normaloff>.</normaloff>.</iconset>
+   <iconset theme="python"/>
+  </property>
+  <property name="tabShape">
+   <enum>QTabWidget::TabShape::Rounded</enum>
   </property>
   <widget class="QWidget" name="centralwidget">
    <property name="sizePolicy">
@@ -46,7 +48,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1159</width>
+     <width>898</width>
      <height>28</height>
     </rect>
    </property>
@@ -60,13 +62,15 @@
     <property name="title">
      <string>Fi&amp;le</string>
     </property>
+    <property name="icon">
+     <iconset theme="system-file-manager-symbolic"/>
+    </property>
     <widget class="QMenu" name="menuImport">
      <property name="title">
       <string>&amp;Import</string>
      </property>
      <property name="icon">
-      <iconset theme="document-import">
-       <normaloff>.</normaloff>.</iconset>
+      <iconset theme="document-import"/>
      </property>
      <addaction name="actionImport_PrairieView_data"/>
     </widget>
@@ -82,22 +86,33 @@
     <property name="title">
      <string>Hel&amp;p</string>
     </property>
+    <property name="icon">
+     <iconset theme="help-contents"/>
+    </property>
+    <addaction name="actionPython_help"/>
     <addaction name="actionHelp_On_Console"/>
+    <addaction name="actionAbout"/>
+    <addaction name="actionAbout_Qt"/>
+    <addaction name="actionAbout_Components"/>
+    <addaction name="actionLicense"/>
    </widget>
    <widget class="QMenu" name="menuView">
     <property name="title">
      <string>View</string>
+    </property>
+    <property name="icon">
+     <iconset theme="quickview"/>
     </property>
     <widget class="QMenu" name="menuSelected_Image_or_Volume">
      <property name="title">
       <string>&amp;Selected Variable</string>
      </property>
      <property name="icon">
-      <iconset theme="object">
-       <normaloff>.</normaloff>.</iconset>
+      <iconset theme="x-shape-image"/>
      </property>
      <addaction name="actionView_Data_New_Window"/>
      <addaction name="actionView_Data"/>
+     <addaction name="actionDisplay_In_Console"/>
     </widget>
     <addaction name="menuSelected_Image_or_Volume"/>
    </widget>
@@ -105,38 +120,114 @@
     <property name="title">
      <string>Windows</string>
     </property>
+    <property name="icon">
+     <iconset theme="window-new"/>
+    </property>
    </widget>
    <widget class="QMenu" name="menuSettings">
     <property name="title">
      <string>Settings</string>
+    </property>
+    <property name="icon">
+     <iconset theme="settings-configure"/>
     </property>
     <widget class="QMenu" name="menuCode_editor">
      <property name="title">
       <string>Code editor</string>
      </property>
      <property name="icon">
-      <iconset theme="editor">
-       <normaloff>.</normaloff>.</iconset>
+      <iconset theme="editor"/>
      </property>
      <addaction name="actionChoose_code_editor"/>
      <addaction name="actionUse_system_s_default_code_editor"/>
     </widget>
-    <addaction name="actionGUI_Style"/>
+    <widget class="QMenu" name="menuFileNavigation">
+     <property name="title">
+      <string>File System Navigation</string>
+     </property>
+     <property name="icon">
+      <iconset theme="file-catalog-symbolic"/>
+     </property>
+     <addaction name="actionUse_Native_Menu_Bar"/>
+     <addaction name="actionUse_New_Navigator_Look"/>
+     <addaction name="actionHide_Filtered_out_File_Names"/>
+     <addaction name="actionOpeningARecentFileNavigatesToItsDirectory"/>
+    </widget>
+    <widget class="QMenu" name="menuAppearance">
+     <property name="title">
+      <string>Appearance</string>
+     </property>
+     <property name="icon">
+      <iconset theme="edit-paste-style"/>
+     </property>
+     <widget class="QMenu" name="menuFonts">
+      <property name="title">
+       <string>Fonts...</string>
+      </property>
+      <property name="icon">
+       <iconset theme="font-face"/>
+      </property>
+      <addaction name="actionUse_system_default_font"/>
+      <addaction name="actionCommandHistoryFont"/>
+      <addaction name="actionWorkplaceFont"/>
+     </widget>
+     <widget class="QMenu" name="menuIcon_Sizes">
+      <property name="title">
+       <string>Icon Sizes</string>
+      </property>
+      <property name="icon">
+       <iconset theme="image-resize-symbolic"/>
+      </property>
+      <addaction name="actionSet_Icon_Size"/>
+      <addaction name="actionWorkspaceIconSize"/>
+      <addaction name="actionFile_SystemIconSize"/>
+     </widget>
+     <addaction name="actionGUI_Style"/>
+     <addaction name="actionTool_Button_Style"/>
+     <addaction name="menuFonts"/>
+     <addaction name="menuIcon_Sizes"/>
+    </widget>
     <addaction name="actionAuto_launch_Script_Manager"/>
     <addaction name="menuCode_editor"/>
     <addaction name="actionAuto_delete_viewer"/>
     <addaction name="actionSet_user_plugins_directory"/>
+    <addaction name="actionConfigure_external_HDF_viewer"/>
+    <addaction name="useLastHistoryCommandSearchAction"/>
+    <addaction name="actionUseShellAutomagic"/>
+    <addaction name="separator"/>
+    <addaction name="menuAppearance"/>
+    <addaction name="menuFileNavigation"/>
    </widget>
    <widget class="QMenu" name="menuConsoles">
     <property name="title">
      <string>Consoles</string>
     </property>
-    <addaction name="actionOpen_System_Terminal"/>
+    <property name="icon">
+     <iconset theme="akonadiconsole"/>
+    </property>
+   </widget>
+   <widget class="QMenu" name="menuScripts">
+    <property name="title">
+     <string>Scripts</string>
+    </property>
+    <property name="icon">
+     <iconset theme="automated-tasks"/>
+    </property>
+   </widget>
+   <widget class="QMenu" name="menuApplications">
+    <property name="title">
+     <string>Applications</string>
+    </property>
+    <property name="icon">
+     <iconset theme="homerun"/>
+    </property>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuView"/>
    <addaction name="menuViewers"/>
    <addaction name="menuConsoles"/>
+   <addaction name="menuScripts"/>
+   <addaction name="menuApplications"/>
    <addaction name="menuSettings"/>
    <addaction name="menuHelp"/>
   </widget>
@@ -149,11 +240,19 @@
     </sizepolicy>
    </property>
    <property name="windowIcon">
-    <iconset theme="user-home">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="view-multiple-objects"/>
+   </property>
+   <property name="toolTip">
+    <string>Scipyen's workspace table</string>
+   </property>
+   <property name="statusTip">
+    <string>Scipyen's workspace table</string>
+   </property>
+   <property name="whatsThis">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;A table view with user's variables in Scipyen's workspace.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:600;&quot;&gt;CAUTION:&lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;Not all variables are visible. Notable hidden variables are: `_`, `__`, and objects created at start up (imported modules, functions and variables which are NOT necessarily global). &lt;/span&gt;&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:400;&quot;&gt;To see all the contents of the workspace at any time, execute `dir()` in Scipyen's console.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="features">
-    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+    <set>QDockWidget::DockWidgetFeature::DockWidgetFloatable|QDockWidget::DockWidgetFeature::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
     <string>&amp;User Variables</string>
@@ -162,17 +261,200 @@
     <number>8</number>
    </attribute>
    <widget class="QWidget" name="dockWidgetWorkspaceContents">
-    <layout class="QVBoxLayout" name="verticalLayout_3">
+    <layout class="QVBoxLayout" name="verticalLayout_2">
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_3">
+       <property name="spacing">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QToolButton" name="copyVarnameToolBtn">
+         <property name="toolTip">
+          <string>Copy name</string>
+         </property>
+         <property name="statusTip">
+          <string>Copy name</string>
+         </property>
+         <property name="whatsThis">
+          <string>Copy name</string>
+         </property>
+         <property name="text">
+          <string>Copy name</string>
+         </property>
+         <property name="icon">
+          <iconset theme="edit-copy"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="sendVarnameToConsoleToolBtn">
+         <property name="toolTip">
+          <string>Send name to console</string>
+         </property>
+         <property name="statusTip">
+          <string>Send name to console</string>
+         </property>
+         <property name="whatsThis">
+          <string>Send name to console</string>
+         </property>
+         <property name="text">
+          <string>Copy to console</string>
+         </property>
+         <property name="icon">
+          <iconset theme="edit-paste-symbolic"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="renameVarnameToolBtn">
+         <property name="toolTip">
+          <string>Rename</string>
+         </property>
+         <property name="statusTip">
+          <string>Rename</string>
+         </property>
+         <property name="whatsThis">
+          <string>Rename</string>
+         </property>
+         <property name="text">
+          <string>Rename</string>
+         </property>
+         <property name="icon">
+          <iconset theme="edit-rename-symbolic"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="displayVariableToolBtn">
+         <property name="toolTip">
+          <string>Display object in console</string>
+         </property>
+         <property name="statusTip">
+          <string>Display object in console</string>
+         </property>
+         <property name="whatsThis">
+          <string>Display object in console</string>
+         </property>
+         <property name="text">
+          <string>Display in console</string>
+         </property>
+         <property name="icon">
+          <iconset theme="quickview-symbolic"/>
+         </property>
+         <property name="popupMode">
+          <enum>QToolButton::ToolButtonPopupMode::DelayedPopup</enum>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+         <property name="arrowType">
+          <enum>Qt::ArrowType::NoArrow</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="saveVariableToolBtn">
+         <property name="toolTip">
+          <string>Save objects to disk (pickle); press &amp; hold Shift to save as HDF5</string>
+         </property>
+         <property name="statusTip">
+          <string>Save objects to disk</string>
+         </property>
+         <property name="whatsThis">
+          <string>Save objects to disk (pickle); press &amp; hold Shift to save as HDF5</string>
+         </property>
+         <property name="text">
+          <string>Save</string>
+         </property>
+         <property name="icon">
+          <iconset theme="document-save-symbolic"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="removeSelectedVarsToolBtn">
+         <property name="toolTip">
+          <string>Remove selected objects</string>
+         </property>
+         <property name="statusTip">
+          <string>Remove selected objects</string>
+         </property>
+         <property name="whatsThis">
+          <string>Remove selected objects</string>
+         </property>
+         <property name="text">
+          <string>Remove</string>
+         </property>
+         <property name="icon">
+          <iconset theme="edit-delete-symbolic"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer_3">
+         <property name="orientation">
+          <enum>Qt::Orientation::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item>
+        <widget class="QToolButton" name="clearWorkspaceToolBtn">
+         <property name="toolTip">
+          <string>Clear workspace</string>
+         </property>
+         <property name="statusTip">
+          <string>Clear workspace</string>
+         </property>
+         <property name="whatsThis">
+          <string>Clear workspace</string>
+         </property>
+         <property name="accessibleName">
+          <string>Clear workspace</string>
+         </property>
+         <property name="text">
+          <string>Clear workspace</string>
+         </property>
+         <property name="icon">
+          <iconset theme="edit-clear-all-symbolic"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
      <item>
       <widget class="QTableView" name="workspaceView">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Expanding">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
        </property>
        <property name="contextMenuPolicy">
-        <enum>Qt::CustomContextMenu</enum>
+        <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
        </property>
        <property name="acceptDrops">
         <bool>true</bool>
@@ -215,10 +497,10 @@ NOTE: you can click anywhere in the row to select</string>
         <bool>false</bool>
        </property>
        <property name="dragDropMode">
-        <enum>QAbstractItemView::DragOnly</enum>
+        <enum>QAbstractItemView::DragDropMode::DragOnly</enum>
        </property>
        <property name="defaultDropAction">
-        <enum>Qt::IgnoreAction</enum>
+        <enum>Qt::DropAction::IgnoreAction</enum>
        </property>
        <property name="alternatingRowColors">
         <bool>true</bool>
@@ -227,7 +509,7 @@ NOTE: you can click anywhere in the row to select</string>
         <bool>false</bool>
        </property>
        <property name="gridStyle">
-        <enum>Qt::DotLine</enum>
+        <enum>Qt::PenStyle::DotLine</enum>
        </property>
        <property name="sortingEnabled">
         <bool>true</bool>
@@ -282,11 +564,19 @@ NOTE: you can click anywhere in the row to select</string>
     </sizepolicy>
    </property>
    <property name="windowIcon">
-    <iconset theme="folder-recent">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="folder-recent"/>
+   </property>
+   <property name="toolTip">
+    <string>History of console commands &amp; statements</string>
+   </property>
+   <property name="statusTip">
+    <string>History of console commands &amp; statements</string>
+   </property>
+   <property name="whatsThis">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The history of commands and statements executed at Scipyen's console, and grouped by session, (start and end times shown).&lt;/p&gt;&lt;p&gt;Sessions without an end time are those where Scipyen was suddenly aborted.&lt;/p&gt;&lt;p&gt;You can copy these lines to a file, to the Scipyen's console, or execute them again (directly) by double-clicking.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="features">
-    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+    <set>QDockWidget::DockWidgetFeature::DockWidgetFloatable|QDockWidget::DockWidgetFeature::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
     <string>&amp;Command History</string>
@@ -295,23 +585,137 @@ NOTE: you can click anywhere in the row to select</string>
     <number>8</number>
    </attribute>
    <widget class="QWidget" name="dockWidgetHistoryContents">
-    <layout class="QVBoxLayout" name="verticalLayout_4">
-     <item>
+    <layout class="QGridLayout" name="gridLayout_2">
+     <item row="0" column="0">
+      <layout class="QHBoxLayout" name="horizontalLayout_4">
+       <property name="spacing">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QToolButton" name="historyCommandsExecuteToolButton">
+         <property name="toolTip">
+          <string>Execute selected commands</string>
+         </property>
+         <property name="statusTip">
+          <string>Execute selected commands</string>
+         </property>
+         <property name="whatsThis">
+          <string>Execute selected commands</string>
+         </property>
+         <property name="text">
+          <string>...</string>
+         </property>
+         <property name="icon">
+          <iconset theme="run-build"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="historyCommandsToConsoleToolButton">
+         <property name="toolTip">
+          <string>Send commands to console</string>
+         </property>
+         <property name="statusTip">
+          <string>Send commands to console</string>
+         </property>
+         <property name="whatsThis">
+          <string>Send commands to console</string>
+         </property>
+         <property name="accessibleName">
+          <string>Send commands to console</string>
+         </property>
+         <property name="accessibleDescription">
+          <string>Send commands to console</string>
+         </property>
+         <property name="text">
+          <string>...</string>
+         </property>
+         <property name="icon">
+          <iconset theme="scriptnew"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="copyHistoryCommands">
+         <property name="toolTip">
+          <string>Copy selected commands to clipboard</string>
+         </property>
+         <property name="statusTip">
+          <string>Copy selected commands to clipboard</string>
+         </property>
+         <property name="whatsThis">
+          <string>Copy selected commands to clipboard</string>
+         </property>
+         <property name="text">
+          <string>...</string>
+         </property>
+         <property name="icon">
+          <iconset theme="edit-copy"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="saveHistoryToolbutton">
+         <property name="toolTip">
+          <string>Save history to file</string>
+         </property>
+         <property name="statusTip">
+          <string>Save history to file</string>
+         </property>
+         <property name="whatsThis">
+          <string>Save history to file</string>
+         </property>
+         <property name="text">
+          <string>...</string>
+         </property>
+         <property name="icon">
+          <iconset theme="document-save"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer_4">
+         <property name="orientation">
+          <enum>Qt::Orientation::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </item>
+     <item row="1" column="0">
       <widget class="QTreeWidget" name="historyTreeWidget">
        <property name="sizePolicy">
-        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="MinimumExpanding">
          <horstretch>0</horstretch>
          <verstretch>0</verstretch>
         </sizepolicy>
        </property>
        <property name="contextMenuPolicy">
-        <enum>Qt::CustomContextMenu</enum>
+        <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
        </property>
        <property name="verticalScrollBarPolicy">
-        <enum>Qt::ScrollBarAlwaysOn</enum>
+        <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOn</enum>
        </property>
        <property name="horizontalScrollBarPolicy">
-        <enum>Qt::ScrollBarAlwaysOn</enum>
+        <enum>Qt::ScrollBarPolicy::ScrollBarAlwaysOn</enum>
        </property>
        <property name="showDropIndicator" stdset="0">
         <bool>false</bool>
@@ -320,16 +724,16 @@ NOTE: you can click anywhere in the row to select</string>
         <bool>true</bool>
        </property>
        <property name="dragDropMode">
-        <enum>QAbstractItemView::DragOnly</enum>
+        <enum>QAbstractItemView::DragDropMode::DragOnly</enum>
        </property>
        <property name="alternatingRowColors">
         <bool>true</bool>
        </property>
        <property name="selectionMode">
-        <enum>QAbstractItemView::ExtendedSelection</enum>
+        <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
        </property>
        <property name="selectionBehavior">
-        <enum>QAbstractItemView::SelectItems</enum>
+        <enum>QAbstractItemView::SelectionBehavior::SelectItems</enum>
        </property>
        <property name="columnCount">
         <number>2</number>
@@ -367,8 +771,8 @@ NOTE: you can click anywhere in the row to select</string>
        </column>
       </widget>
      </item>
-     <item>
-      <widget class="QComboBox" name="commandFinderComboBox">
+     <item row="2" column="0">
+      <widget class="QComboBox" name="commandHistoryFinderComboBox">
        <property name="sizePolicy">
         <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
          <horstretch>0</horstretch>
@@ -400,11 +804,19 @@ NOTE: you can click anywhere in the row to select</string>
     </sizepolicy>
    </property>
    <property name="windowIcon">
-    <iconset theme="folder">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="folder"/>
+   </property>
+   <property name="toolTip">
+    <string>Scipyen's (limited) file system manager</string>
+   </property>
+   <property name="statusTip">
+    <string>Scipyen's (limited) file system manager</string>
+   </property>
+   <property name="whatsThis">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Scipyen's (limited) file system manager. &lt;/p&gt;&lt;p&gt;For access to archive files, including archiving/extracting etc, please use the desktop's own file manager.&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="features">
-    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+    <set>QDockWidget::DockWidgetFeature::DockWidgetFloatable|QDockWidget::DockWidgetFeature::DockWidgetMovable</set>
    </property>
    <property name="windowTitle">
     <string>File S&amp;ystem</string>
@@ -414,13 +826,28 @@ NOTE: you can click anywhere in the row to select</string>
    </attribute>
    <widget class="QWidget" name="dockWidgetFileSystemContents">
     <layout class="QGridLayout" name="gridLayout">
+     <property name="leftMargin">
+      <number>6</number>
+     </property>
+     <property name="topMargin">
+      <number>6</number>
+     </property>
+     <property name="rightMargin">
+      <number>6</number>
+     </property>
+     <property name="bottomMargin">
+      <number>6</number>
+     </property>
+     <property name="spacing">
+      <number>6</number>
+     </property>
      <item row="0" column="0">
       <layout class="QHBoxLayout" name="horizontalLayout">
        <property name="spacing">
         <number>0</number>
        </property>
        <property name="sizeConstraint">
-        <enum>QLayout::SetNoConstraint</enum>
+        <enum>QLayout::SizeConstraint::SetNoConstraint</enum>
        </property>
        <item>
         <widget class="QToolButton" name="dirHomeBtn">
@@ -431,8 +858,7 @@ NOTE: you can click anywhere in the row to select</string>
           <string>Home</string>
          </property>
          <property name="icon">
-          <iconset theme="go-home">
-           <normaloff>.</normaloff>.</iconset>
+          <iconset theme="go-home"/>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -448,14 +874,13 @@ NOTE: you can click anywhere in the row to select</string>
           <string>Previous directory</string>
          </property>
          <property name="icon">
-          <iconset theme="go-previous">
-           <normaloff>.</normaloff>.</iconset>
+          <iconset theme="go-previous"/>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
          </property>
          <property name="arrowType">
-          <enum>Qt::LeftArrow</enum>
+          <enum>Qt::ArrowType::LeftArrow</enum>
          </property>
         </widget>
        </item>
@@ -468,14 +893,13 @@ NOTE: you can click anywhere in the row to select</string>
           <string>Next directory</string>
          </property>
          <property name="icon">
-          <iconset theme="go-next">
-           <normaloff>.</normaloff>.</iconset>
+          <iconset theme="go-next"/>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
          </property>
          <property name="arrowType">
-          <enum>Qt::RightArrow</enum>
+          <enum>Qt::ArrowType::RightArrow</enum>
          </property>
         </widget>
        </item>
@@ -488,34 +912,13 @@ NOTE: you can click anywhere in the row to select</string>
           <string>Parent directory</string>
          </property>
          <property name="icon">
-          <iconset theme="go-up">
-           <normaloff>.</normaloff>.</iconset>
+          <iconset theme="go-up"/>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
          </property>
          <property name="arrowType">
-          <enum>Qt::UpArrow</enum>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="viewFilesFilterToolBtn">
-         <property name="text">
-          <string>Filter...</string>
-         </property>
-         <property name="icon">
-          <iconset theme="view-filter">
-           <normaloff>.</normaloff>.</iconset>
-         </property>
-         <property name="checkable">
-          <bool>true</bool>
-         </property>
-         <property name="autoRaise">
-          <bool>true</bool>
-         </property>
-         <property name="arrowType">
-          <enum>Qt::NoArrow</enum>
+          <enum>Qt::ArrowType::UpArrow</enum>
          </property>
         </widget>
        </item>
@@ -534,8 +937,7 @@ NOTE: you can click anywhere in the row to select</string>
           <string>&amp;Select working directory</string>
          </property>
          <property name="icon">
-          <iconset theme="document-open-folder">
-           <normaloff>.</normaloff>.</iconset>
+          <iconset theme="document-open-folder"/>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -557,8 +959,7 @@ NOTE: you can click anywhere in the row to select</string>
           <string>Open File Manager</string>
          </property>
          <property name="icon">
-          <iconset theme="document-open-folder">
-           <normaloff>.</normaloff>.</iconset>
+          <iconset theme="document-open-folder"/>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -580,8 +981,7 @@ NOTE: you can click anywhere in the row to select</string>
           <string>Open Parent Folder in File Manager</string>
          </property>
          <property name="icon">
-          <iconset theme="go-parent-folder">
-           <normaloff>.</normaloff>.</iconset>
+          <iconset theme="go-parent-folder"/>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -603,8 +1003,7 @@ NOTE: you can click anywhere in the row to select</string>
           <string>Open System Terminal</string>
          </property>
          <property name="icon">
-          <iconset theme="scriptnew">
-           <normaloff>.</normaloff>.</iconset>
+          <iconset theme="scriptnew"/>
          </property>
          <property name="autoRaise">
           <bool>true</bool>
@@ -614,10 +1013,10 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <spacer name="horizontalSpacer_2">
          <property name="orientation">
-          <enum>Qt::Horizontal</enum>
+          <enum>Qt::Orientation::Horizontal</enum>
          </property>
          <property name="sizeType">
-          <enum>QSizePolicy::MinimumExpanding</enum>
+          <enum>QSizePolicy::Policy::MinimumExpanding</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
@@ -627,38 +1026,56 @@ NOTE: you can click anywhere in the row to select</string>
          </property>
         </spacer>
        </item>
+       <item>
+        <widget class="QToolButton" name="toggleFilesFilterToolBtn">
+         <property name="toolTip">
+          <string>Toggle filter bar</string>
+         </property>
+         <property name="statusTip">
+          <string>Toggle filter bar</string>
+         </property>
+         <property name="whatsThis">
+          <string>Toggle filter bar - to filter files by name</string>
+         </property>
+         <property name="text">
+          <string>Filter...</string>
+         </property>
+         <property name="icon">
+          <iconset theme="view-filter"/>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+         <property name="arrowType">
+          <enum>Qt::ArrowType::NoArrow</enum>
+         </property>
+        </widget>
+       </item>
       </layout>
      </item>
      <item row="1" column="0">
-      <widget class="QComboBox" name="directoryComboBox">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="acceptDrops">
-        <bool>true</bool>
-       </property>
-       <property name="toolTip">
-        <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
-       </property>
-       <property name="statusTip">
-        <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
-       </property>
-       <property name="whatsThis">
-        <string>Type path or drop a directory here or click arrow to select from recent directories.</string>
-       </property>
-       <property name="editable">
-        <bool>true</bool>
-       </property>
-       <property name="sizeAdjustPolicy">
-        <enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum>
-       </property>
-      </widget>
+      <widget class="UrlNavigator" name="navigator" native="true"/>
      </item>
      <item row="2" column="0">
       <layout class="QVBoxLayout" name="verticalLayout">
+       <property name="spacing">
+        <number>3</number>
+       </property>
+       <property name="leftMargin">
+        <number>3</number>
+       </property>
+       <property name="topMargin">
+        <number>3</number>
+       </property>
+       <property name="rightMargin">
+        <number>3</number>
+       </property>
+       <property name="bottomMargin">
+        <number>3</number>
+       </property>
        <item>
         <widget class="QTreeView" name="fileSystemTreeView">
          <property name="sizePolicy">
@@ -668,16 +1085,25 @@ NOTE: you can click anywhere in the row to select</string>
           </sizepolicy>
          </property>
          <property name="contextMenuPolicy">
-          <enum>Qt::CustomContextMenu</enum>
+          <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
          </property>
          <property name="acceptDrops">
           <bool>false</bool>
          </property>
+         <property name="frameShape">
+          <enum>QFrame::Shape::StyledPanel</enum>
+         </property>
+         <property name="frameShadow">
+          <enum>QFrame::Shadow::Sunken</enum>
+         </property>
+         <property name="lineWidth">
+          <number>1</number>
+         </property>
          <property name="sizeAdjustPolicy">
-          <enum>QAbstractScrollArea::AdjustToContentsOnFirstShow</enum>
+          <enum>QAbstractScrollArea::SizeAdjustPolicy::AdjustToContentsOnFirstShow</enum>
          </property>
          <property name="editTriggers">
-          <set>QAbstractItemView::DoubleClicked</set>
+          <set>QAbstractItemView::EditTrigger::DoubleClicked</set>
          </property>
          <property name="tabKeyNavigation">
           <bool>true</bool>
@@ -689,16 +1115,16 @@ NOTE: you can click anywhere in the row to select</string>
           <bool>true</bool>
          </property>
          <property name="dragDropMode">
-          <enum>QAbstractItemView::DragOnly</enum>
+          <enum>QAbstractItemView::DragDropMode::DragOnly</enum>
          </property>
          <property name="alternatingRowColors">
           <bool>true</bool>
          </property>
          <property name="selectionMode">
-          <enum>QAbstractItemView::ExtendedSelection</enum>
+          <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
          </property>
          <property name="selectionBehavior">
-          <enum>QAbstractItemView::SelectItems</enum>
+          <enum>QAbstractItemView::SelectionBehavior::SelectItems</enum>
          </property>
          <property name="iconSize">
           <size>
@@ -729,38 +1155,30 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QFrame" name="filesFilterFrame">
          <property name="frameShape">
-          <enum>QFrame::StyledPanel</enum>
+          <enum>QFrame::Shape::StyledPanel</enum>
          </property>
          <property name="frameShadow">
-          <enum>QFrame::Plain</enum>
+          <enum>QFrame::Shadow::Plain</enum>
          </property>
          <property name="lineWidth">
           <number>0</number>
          </property>
          <layout class="QHBoxLayout" name="horizontalLayout_2">
-          <item>
-           <widget class="QToolButton" name="hideFilesFilterToolBtn">
-            <property name="toolTip">
-             <string>Hide file filter</string>
-            </property>
-            <property name="statusTip">
-             <string>Hide file filter</string>
-            </property>
-            <property name="whatsThis">
-             <string>Hide file filter</string>
-            </property>
-            <property name="text">
-             <string>Hide</string>
-            </property>
-            <property name="icon">
-             <iconset theme="window-close">
-              <normaloff>.</normaloff>.</iconset>
-            </property>
-            <property name="autoRaise">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
+          <property name="spacing">
+           <number>0</number>
+          </property>
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
           <item>
            <widget class="QLabel" name="filesFilterLabel">
             <property name="sizePolicy">
@@ -780,10 +1198,10 @@ NOTE: you can click anywhere in the row to select</string>
           <item>
            <spacer name="horizontalSpacer">
             <property name="orientation">
-             <enum>Qt::Horizontal</enum>
+             <enum>Qt::Orientation::Horizontal</enum>
             </property>
             <property name="sizeType">
-             <enum>QSizePolicy::Preferred</enum>
+             <enum>QSizePolicy::Policy::Preferred</enum>
             </property>
             <property name="sizeHint" stdset="0">
              <size>
@@ -814,7 +1232,54 @@ NOTE: you can click anywhere in the row to select</string>
              <bool>true</bool>
             </property>
             <property name="insertPolicy">
-             <enum>QComboBox::InsertAtTop</enum>
+             <enum>QComboBox::InsertPolicy::InsertAtTop</enum>
+            </property>
+            <property name="placeholderText">
+             <string>Enter file name filter</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="hideFilteredOutnamesToolButton">
+            <property name="toolTip">
+             <string>Hide non-matching file names</string>
+            </property>
+            <property name="text">
+             <string>...</string>
+            </property>
+            <property name="icon">
+             <iconset theme="view-hidden"/>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+            <property name="autoRaise">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="hideFilesFilterToolBtn">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
+            <property name="toolTip">
+             <string>Hide file filter</string>
+            </property>
+            <property name="statusTip">
+             <string>Hide file filter</string>
+            </property>
+            <property name="whatsThis">
+             <string>Hide file filter</string>
+            </property>
+            <property name="text">
+             <string>Hide</string>
+            </property>
+            <property name="icon">
+             <iconset theme="window-close"/>
+            </property>
+            <property name="autoRaise">
+             <bool>true</bool>
             </property>
            </widget>
           </item>
@@ -833,8 +1298,11 @@ NOTE: you can click anywhere in the row to select</string>
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
+   <property name="acceptDrops">
+    <bool>false</bool>
+   </property>
    <property name="windowTitle">
-    <string>toolBar</string>
+    <string>ScipyenMainToolBar</string>
    </property>
    <property name="toolTip">
     <string>Save variables to HDF5 file</string>
@@ -845,8 +1313,14 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="whatsThis">
     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When a single variable is selected in the workspace (User Variables tab), shows a file save dialog to choose among supported file types. &lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;When more than one variable is selected, saves all of them to HDF5 files named after the variable name (symbol) in the workspace.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
+   <property name="iconSize">
+    <size>
+     <width>22</width>
+     <height>22</height>
+    </size>
+   </property>
    <property name="toolButtonStyle">
-    <enum>Qt::ToolButtonFollowStyle</enum>
+    <enum>Qt::ToolButtonStyle::ToolButtonFollowStyle</enum>
    </property>
    <attribute name="toolBarArea">
     <enum>TopToolBarArea</enum>
@@ -861,8 +1335,7 @@ NOTE: you can click anywhere in the row to select</string>
   </widget>
   <action name="actionSave">
    <property name="icon">
-    <iconset theme="document-save">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="document-save"/>
    </property>
    <property name="text">
     <string>&amp;Save ...</string>
@@ -876,20 +1349,27 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="whatsThis">
     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;When several objects are selected in the workspace (User Variables tab) this will save them as HDF5 files named after the object name (symbol) in the workspace.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;p&gt;When only one object is selected in the workspace, will show a dialog for selecting the file name and a file type (where appropriate) for saving the object.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
   </action>
   <action name="actionQuit">
    <property name="icon">
-    <iconset theme="application-exit">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="application-exit"/>
    </property>
    <property name="text">
     <string>&amp;Quit</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::QuitRole</enum>
+   </property>
   </action>
   <action name="action_Console">
    <property name="icon">
-    <iconset theme="scriptnew">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="scriptnew"/>
    </property>
    <property name="text">
     <string>&amp;Console</string>
@@ -902,17 +1382,18 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionHelp_On_Console">
    <property name="icon">
-    <iconset theme="help-contextual">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="help-contextual"/>
    </property>
    <property name="text">
     <string>&amp;On Console</string>
    </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::ApplicationSpecificRole</enum>
+   </property>
   </action>
   <action name="actionImport_PrairieView_data">
    <property name="icon">
-    <iconset theme="document-import">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="document-import"/>
    </property>
    <property name="text">
     <string>PrairieView data</string>
@@ -920,8 +1401,7 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionImport_XY_Raster_Scan_File">
    <property name="icon">
-    <iconset theme="document-open">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="document-open"/>
    </property>
    <property name="text">
     <string>&amp;XY Raster Scan</string>
@@ -944,8 +1424,7 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionView_Data_New_Window">
    <property name="icon">
-    <iconset theme="window-new">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="window-new"/>
    </property>
    <property name="text">
     <string>&amp;In New Window</string>
@@ -953,8 +1432,7 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionView_Data">
    <property name="icon">
-    <iconset theme="quickview">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="fileview-preview-symbolic"/>
    </property>
    <property name="text">
     <string>In &amp;Current Window</string>
@@ -962,8 +1440,7 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionReload_Plugins">
    <property name="icon">
-    <iconset theme="plugins">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="plugins"/>
    </property>
    <property name="text">
     <string>&amp;Reload Plugins</string>
@@ -976,14 +1453,16 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionChange_Working_Directory">
    <property name="icon">
-    <iconset theme="document-open-folder">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="document-open-folder"/>
    </property>
    <property name="text">
     <string>&amp;Select Working Directory</string>
    </property>
    <property name="statusTip">
     <string>Select working directory</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+D</string>
    </property>
   </action>
   <action name="actionNew_Signal_Viewer">
@@ -998,17 +1477,22 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionOpen">
    <property name="icon">
-    <iconset theme="document-open">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="document-open"/>
    </property>
    <property name="text">
     <string>&amp;Open...</string>
+   </property>
+   <property name="toolTip">
+    <string>Open (click on arrow to the right to reveal recently opened files; hold SHIFT to ALSO change to directory of the recent file)</string>
    </property>
    <property name="statusTip">
     <string>Opens selected files in the file system browser or via a dialog</string>
    </property>
    <property name="whatsThis">
     <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Opens the selected file(s) in the File System tab, or presents an file chooser dialog when no files are selected.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
    </property>
   </action>
   <action name="actionOpen_Files">
@@ -1034,6 +1518,9 @@ NOTE: you can click anywhere in the row to select</string>
   <action name="actionConsole_font">
    <property name="text">
     <string>Console font...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
    </property>
   </action>
   <action name="actionEditor">
@@ -1083,11 +1570,13 @@ NOTE: you can click anywhere in the row to select</string>
   </action>
   <action name="actionGUI_Style">
    <property name="icon">
-    <iconset theme="edit-paste-style">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="edit-paste-style"/>
    </property>
    <property name="text">
     <string>GUI Style...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
    </property>
   </action>
   <action name="actionAuto_launch_Script_Manager">
@@ -1095,20 +1584,24 @@ NOTE: you can click anywhere in the row to select</string>
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="dialog-scripts">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="dialog-scripts"/>
    </property>
    <property name="text">
     <string>Auto-launch Script Manager</string>
    </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
+   </property>
   </action>
   <action name="actionChoose_code_editor">
    <property name="icon">
-    <iconset theme="editor">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="editor"/>
    </property>
    <property name="text">
     <string>Choose code editor</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
    </property>
   </action>
   <action name="actionUse_system_s_default_code_editor">
@@ -1116,8 +1609,7 @@ NOTE: you can click anywhere in the row to select</string>
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="editor">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="editor"/>
    </property>
    <property name="text">
     <string>Use system's default code editor</string>
@@ -1128,8 +1620,7 @@ NOTE: you can click anywhere in the row to select</string>
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="window-unpin">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="window-unpin"/>
    </property>
    <property name="text">
     <string>Auto-delete viewers</string>
@@ -1143,29 +1634,39 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="whatsThis">
     <string>When a viewer is closed , also remove it from the user workspace</string>
    </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
+   </property>
   </action>
   <action name="actionOpen_System_Terminal">
+   <property name="enabled">
+    <bool>true</bool>
+   </property>
    <property name="icon">
-    <iconset theme="scriptnew">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="scriptnew"/>
    </property>
    <property name="text">
     <string>Open System Terminal</string>
    </property>
    <property name="toolTip">
-    <string>Open system terminal in current folder</string>
+    <string>Open system terminal</string>
    </property>
    <property name="statusTip">
-    <string>Open system terminal in current folder</string>
+    <string>Open system terminal</string>
    </property>
    <property name="whatsThis">
-    <string>Open system terminal in current folder</string>
+    <string>Open system terminal</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+T</string>
+   </property>
+   <property name="visible">
+    <bool>true</bool>
    </property>
   </action>
   <action name="actionSet_user_plugins_directory">
    <property name="icon">
-    <iconset theme="folder-extension-symbolic">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="folder-extension-symbolic"/>
    </property>
    <property name="text">
     <string>Set user plugins directory</string>
@@ -1181,7 +1682,259 @@ NOTE: you can click anywhere in the row to select</string>
     <string>Recent</string>
    </property>
   </action>
+  <action name="actionAbout">
+   <property name="icon">
+    <iconset theme="help-about"/>
+   </property>
+   <property name="text">
+    <string>About</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+/</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::AboutRole</enum>
+   </property>
+  </action>
+  <action name="actionAbout_Components">
+   <property name="icon">
+    <iconset theme="tools-symbolic"/>
+   </property>
+   <property name="text">
+    <string>About Components</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::ApplicationSpecificRole</enum>
+   </property>
+  </action>
+  <action name="actionLicense">
+   <property name="icon">
+    <iconset theme="license"/>
+   </property>
+   <property name="text">
+    <string>License</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::AboutRole</enum>
+   </property>
+  </action>
+  <action name="actionAbout_Qt">
+   <property name="icon">
+    <iconset theme="help-about"/>
+   </property>
+   <property name="text">
+    <string>About Qt</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::AboutQtRole</enum>
+   </property>
+  </action>
+  <action name="actionSet_Icon_Size">
+   <property name="icon">
+    <iconset theme="image-resize-symbolic"/>
+   </property>
+   <property name="text">
+    <string>Buttons</string>
+   </property>
+   <property name="toolTip">
+    <string>Set Buttons Icon Size</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
+   </property>
+  </action>
+  <action name="actionConfigure_external_HDF_viewer">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Configure external HDF viewer...</string>
+   </property>
+   <property name="visible">
+    <bool>false</bool>
+   </property>
+   <property name="iconVisibleInMenu">
+    <bool>false</bool>
+   </property>
+   <property name="shortcutVisibleInContextMenu">
+    <bool>false</bool>
+   </property>
+  </action>
+  <action name="actionUse_system_default_font">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Use system default</string>
+   </property>
+  </action>
+  <action name="actionWorkplaceFont">
+   <property name="text">
+    <string>Workplace Font...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
+   </property>
+  </action>
+  <action name="actionCommandHistoryFont">
+   <property name="text">
+    <string>Command History Font...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
+   </property>
+  </action>
+  <action name="actionDisplay_In_Console">
+   <property name="icon">
+    <iconset theme="quickview-symbolic"/>
+   </property>
+   <property name="text">
+    <string>Display In Console</string>
+   </property>
+   <property name="statusTip">
+    <string>Display In Console</string>
+   </property>
+   <property name="whatsThis">
+    <string>Display In Console</string>
+   </property>
+  </action>
+  <action name="actionWorkspaceIconSize">
+   <property name="icon">
+    <iconset theme="image-resize-symbolic"/>
+   </property>
+   <property name="text">
+    <string>Workspace</string>
+   </property>
+  </action>
+  <action name="actionFile_SystemIconSize">
+   <property name="icon">
+    <iconset theme="image-resize-symbolic"/>
+   </property>
+   <property name="text">
+    <string>File System</string>
+   </property>
+  </action>
+  <action name="actionUse_Native_Menu_Bar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="application-menu-symbolic"/>
+   </property>
+   <property name="text">
+    <string>Use Native Menu Bar</string>
+   </property>
+  </action>
+  <action name="actionUse_New_Navigator_Look">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="color-fill"/>
+   </property>
+   <property name="text">
+    <string>Use New Navigator Look</string>
+   </property>
+  </action>
+  <action name="actionUseShellAutomagic">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="tools-wizard"/>
+   </property>
+   <property name="text">
+    <string>Use Shell Automagic</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
+   </property>
+  </action>
+  <action name="actionHide_Filtered_out_File_Names">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="view-hidden"/>
+   </property>
+   <property name="text">
+    <string>Hide Filtered-out File Names</string>
+   </property>
+   <property name="toolTip">
+    <string>Hide non-matching file names when file names filter is used in the File System view</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
+   </property>
+  </action>
+  <action name="actionTool_Button_Style">
+   <property name="icon">
+    <iconset theme="edit-paste-style"/>
+   </property>
+   <property name="text">
+    <string>Tool Button Style...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
+   </property>
+  </action>
+  <action name="actionPython_help">
+   <property name="icon">
+    <iconset theme="help-contextual"/>
+   </property>
+   <property name="text">
+    <string>Help</string>
+   </property>
+   <property name="statusTip">
+    <string>Python language help</string>
+   </property>
+   <property name="whatsThis">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Brings up a window to access the help systems of Python and IPython independently of (and in parallel to) the Scipyen's console.&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+   <property name="shortcut">
+    <string>F1</string>
+   </property>
+  </action>
+  <action name="actionOpeningARecentFileNavigatesToItsDirectory">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="dirsync"/>
+   </property>
+   <property name="text">
+    <string>Synchronize working directory when opening a recent file</string>
+   </property>
+   <property name="toolTip">
+    <string>Check this to enable navigating to the directory of a recent file uppon opening it successfully</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::PreferencesRole</enum>
+   </property>
+  </action>
+  <action name="useLastHistoryCommandSearchAction">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="document-open-recent"/>
+   </property>
+   <property name="text">
+    <string>Show Last Command Search at Startup</string>
+   </property>
+  </action>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>UrlNavigator</class>
+   <extends>QWidget</extends>
+   <header location="global">iolib.navigation.navigator</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

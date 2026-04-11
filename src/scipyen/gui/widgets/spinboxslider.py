@@ -1,22 +1,46 @@
 # -*- coding: utf-8 -*-
-import typing, os
-from qtpy import QtCore, QtGui, QtWidgets, QtSvg
-from qtpy.QtCore import Signal, Slot
-from qtpy.uic import loadUiType as __loadUiType__
-# from PyQt5 import QtCore, QtGui, QtWidgets, QtSvg
-# from PyQt5.QtCore import Signal, Slot
-# from PyQt5.uic import loadUiType as __loadUiType__
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
 
+import os
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+
+import typing, os
 from core.sysutils import adapt_ui_path
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __ui_path__ = adapt_ui_path(__module_path__, "spinboxslider.ui")
 
-Ui_SpinBoxSlider, QWidget = __loadUiType__(__ui_path__)
-# Ui_SpinBoxSlider, QWidget = __loadUiType__(os.path.join(__module_path__, "spinboxslider.ui"))
+Ui_SpinBoxSlider, QWidget = loadUiType(__ui_path__)
 
 class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
-    """Compound widget with a QSpinBox and QSlider.
+    r"""Compound widget with a QSpinBox and QSlider.
     The widge is backed by a Python `range` object, meaning that its attributes
     are as follows:
     • minimum       ↦ min(self.range) = self.range.start
@@ -87,7 +111,7 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         
     @property
     def label(self):
-        """A description of what the widget shows.
+        r"""A description of what the widget shows.
         This is the text in the self.descriptionLabel QLabel on the far left.
         Ideally this is one word, followed by a colon (e.g. "Frame:", "Segment:")
         """
@@ -122,7 +146,7 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         
     @property
     def maximum(self):
-        """The maximum value in the spinbox and slider.
+        r"""The maximum value in the spinbox and slider.
         Also sets up the value in the "of..." label.
         """
         return max(self._range_) if len(self._range_) else 0
@@ -162,7 +186,7 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         
     @property
     def range(self):
-        """The Python range for this widget
+        r"""The Python range for this widget
         """
         return self._range_
     
@@ -216,28 +240,28 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
         self.slot_setValue(value)
         
     def setValue(self, value:int):
-        """Convenience setter method - sets the 'value' property to value"""
+        r"""Convenience setter method - sets the 'value' property to value"""
         self.value = value
 
     def setMinimum(self, value:int):
         self.minimum = value
         
     def setMaximum(self, value:int):
-        """Qt compatible:
+        r"""Qt compatible:
         Set the maximum value displayed by this widget.
         This is ≠ self.range.stop.
         """
         self.maximum = value
         
     def setRange(self, minimum:int, maximum:int):
-        """Sets the minimum and maximum values.
+        r"""Sets the minimum and maximum values.
         Compatible with the Qt equivalent methods of QSlider and QSpinBox, 
         meaning that `maximum` is the maximum value the widget can take
         """
         self._range_= range(minimum, maximum + 1, 1)
         
     def getRange(self):
-        """Returns a (self.minimum, self.maximum) tuple.
+        r"""Returns a (self.minimum, self.maximum) tuple.
         """
         return (self.minimum, self.maximum)
         

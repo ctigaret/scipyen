@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""quickdialog module adapted from vigranumpy.pyqt.quickdialog
+r"""quickdialog module adapted from vigranumpy.pyqt.quickdialog
 Useful to have even when vigranumpy is not installed.
 
 """
@@ -46,19 +46,39 @@ Useful to have even when vigranumpy is not installed.
 # Adaptation for use with PyQt5/6
 # Copyright 209-2021 by Cezar M. Tigaret (cezar.tigaret@gmail.com, TigaretC@cardiff.ac.uk)
 #########################################################################
-import os, typing, inspect, math
+import os, typing, inspect, math, types, functools, traceback
 import numpy as np
-import qtpy.QtCore as QtCore
-import qtpy.QtGui as QtGui
-import qtpy.QtWidgets as QtWidgets
-from qtpy.QtCore import QObject, Signal, Slot
-# import numpy as np
-# import PyQt5.QtCore as QtCore
-# import PyQt5.QtGui as QtGui
-# import PyQt5.QtWidgets as QtWidgets
-# from PyQt5.QtCore import QObject, Signal, Slot
+from tribool import Tribool
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 
 from gui.guiutils import(InftyDoubleValidator, ComplexValidator, UnitsStringValidator)
+from core.prog import scipywarn
+import quantities as pq
 
 def alignLabels(*args):
     m = 0
@@ -71,7 +91,10 @@ def alignLabels(*args):
         dialogElement.label.setFixedWidth(m+10)
 
 class FileDialog(QtWidgets.QFrame):
-    def __init__(self, parent, label, filter):
+    r"""A file dialog. 
+NOTE: It is better to use Qt file dialogs directly
+"""
+    def __init__(self, parent:QtWidgets.QWidget, label:str, filter:str):
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
         self.filter = filter
@@ -95,14 +118,14 @@ class FileDialog(QtWidgets.QFrame):
         self.filename.setFocus()
 
 class InputFile(FileDialog):
-    def __init__(self, parent, label, filter):
+    def __init__(self, parent:QtWidgets.QWidget, label:str, filter:str):
         FileDialog.__init__(self, parent, label, filter)
         #self.connect(self.filebrowser, SIGNAL("clicked()"), self.browse)
         self.filebrowser.clicked.connect(self.browse)
         
     def browse(self):
 
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -124,13 +147,13 @@ class InputFile(FileDialog):
             return False
 
 class OutputFile(FileDialog):
-    def __init__(self, parent, label, filter):
+    def __init__(self, parent:QtWidgets.QWidget, label:str, filter:str):
         FileDialog.__init__(self, parent, label, filter)
         #self.connect(self.filebrowser, SIGNAL("clicked()"), self.browse)
         self.filebrowser.clicked.connect(self.browse)
         
     def browse(self):
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:
@@ -152,24 +175,32 @@ class OutputFile(FileDialog):
             return True
 
 class _OptionalValueInput(QtWidgets.QFrame):
-    def __init__(self, parent, label):
+    r"""Widget for entering a value (number or string).
+WARNING: Data is internally represented as a string.
+"""
+    valueChanged = Signal(str, name="valueChanged")
+    def __init__(self, parent:QtWidgets.QWidget, label:str):
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
         self.label = QtWidgets.QLabel(label)
         self.variable = QtWidgets.QLineEdit()
         self.variable.setValidator(self._QValidator(parent=self.variable))
-
+        self.variable.textChanged[str].connect(self._slot_valueChanged)
         self._layout = QtWidgets.QHBoxLayout()
         self._layout.setSpacing(5)
         self._layout.addWidget(self.label)
         self._layout.addWidget(self.variable, 1)
         
         self.setLayout(self._layout)
-                    
+    
+    @Slot(str)
+    def _slot_valueChanged(self, val:str):
+        self.valueChanged.emit(val)
+    
     def setFocus(self):
         self.variable.setFocus()
         
-    def setValue(self, text):
+    def setValue(self, text:str):
         self.variable.setText(str(self._text2Value(text)))
     
     def value(self):
@@ -250,58 +281,289 @@ class FloatInput(OptionalFloatInput):
         return float(self.text())
 
 class OptionalStringInput(QtWidgets.QFrame):
-    def __init__(self, parent, label):
+    r"""Widget for plain text input"""
+    valueChanged = Signal(str, name="valueChanged")
+    def __init__(self, parent:QtWidgets.QWidget, label:str):
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
         self.label = QtWidgets.QLabel(label)
         self.variable = QtWidgets.QLineEdit()
-
         self._layout = QtWidgets.QHBoxLayout()
         self._layout.setSpacing(5)
         self._layout.addWidget(self.label)
         self._layout.addWidget(self.variable, 1)
-        
+        self.variable.textChanged[str].connect(self._slot_textChanged)
         self.setLayout(self._layout)
-                    
+    
+    @Slot(str)
+    def _slot_textChanged(self, val:str):
+        self.valueChanged.emit(val)
+
+    def setToolTip(self, tip:str):
+        self.variable.setToolTip(tip)
+        self.label.setToolTip(tip)
+    
     def setFocus(self):
         self.variable.setFocus()
         
-    def setValue(self, text):
+    def setValue(self, text:str):
         self.variable.setText(text)
-            
-    def setText(self, text):
+
+    def value(self) -> str:
+        return self.text()
+
+    def setText(self, text:str):
         self.variable.setText(text)
-    
+
     def text(self):
         return str(self.variable.text())
-    
+
     def unicode(self):
         return unicode(self.variable.text())
 
 class StringInput(OptionalStringInput):
-    def __init__(self, parent, label):
+    def __init__(self, parent:QtWidgets.QWidget, label:str,
+                 allowEmptyString:bool = False):
         OptionalStringInput.__init__(self, parent, label)
+        self._allowEmptyString_ = allowEmptyString is True
             
     def validate(self):
-        if self.text() == "":
+        if len(self.text().strip()) == 0 and not self._allowEmptyString_:
             QtWidgets.QMessageBox.critical(None, "Error","Field '%s' empty" % (self.label.text()))
             return False
         return True
+
+    @property
+    def allowEmptyString(self) -> bool:
+        return self._allowEmptyString_
+
+    @allowEmptyString.setter
+    def allowEmptyString(self, val: bool):
+        self._allowEmptyString_ = val is True
     
 OutputVariable = StringInput
 InputVariable = StringInput
 OptionalInputVariable = OptionalStringInput
 
 class CheckBox(QtWidgets.QCheckBox):
-    def __init__(self, parent, label):
+    r"""(Tri-)Boolean value input.
+Inherits directly from QCheckBox. Supports tri-state: use the inherited 
+checkState() method returning a QtCore.Qt.CheckState value
+"""
+    def __init__(self, parent: QtWidgets.QWidget, label: str, tristate: bool=False):
         QtWidgets.QCheckBox.__init__(self, label, parent)
+        self.setTristate(tristate)
         parent.addWidget(self)
 
     def selection(self):
         return self.isChecked()
 
+    def setValue(self, val: typing.Union[bool, QtCore.Qt.CheckState, int, Tribool]):
+        if isinstance(val, bool):
+            if self.isTristate():
+                self.setCheckState(QtCore.Qt.Checked) if val else self.setCheckState(QtCore.Qt.Unchecked)
+            else:
+                self.setChecked(val is True)
+
+        elif isinstance(val, QtCore.Qt.CheckState):
+            if self.isTristate():
+                self.setCheckState(val)
+            else:
+                self.setChecked(False) if val in (QtCore.Qt.Unchecked) else self.setChecked(True)
+
+        elif isinstance(val, int):
+            if self.isTristate():
+                self.setCheckState(QtCore.Qt.CheckState(val)) if val in range(3) else self.setCheckState(Qtcore.Qt.Unchecked)
+
+            else:
+                self.setChecked(True) if val in (1,2) else self.setChecked(False)
+
+        elif isinstance(val, Tribool):
+            if self.isTristate():
+                self.setCheckState(QtCore.Qt.Checked) if val.value is True else self.setCheckState(QtCore.Qt.Unchecked) if val.value is False else self.setCheckState(QtCore.Qt.PartiallyChecked)
+            else:
+                self.setChecked(val.value is True)
+
+        else:
+            self.setChecked(False)
+
+    def value(self) -> bool | Tribool:
+        if self.isTristate():
+            state = self.checkState()
+            return Tribool(True) if state == QtCore.Qt.Checked else Tribool(False) if state == QtCore.Qt.Unchecked else Tribool()
+        else:
+            return self.isChecked()
+    
+    def validate(self, *args):
+        return True
+    
+class ComplexSpinBox(QtWidgets.QFrame):
+    r"""Compound widget for editing complex numbers"""
+    def __init__(self, parent:QtWidgets.QWidget, label:str):
+        pass
+    
+class SpinBox(QtWidgets.QFrame):
+    r"""Alternative to IntegerInput and FloatInput, with support for python Quantities.
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+Parameters:
+===========
+
+:parent: Parent widget
+
+:label: Label associated with widget, in the dialog
+
+:vertical: Widget orientation
+
+:widget_type: Value type of widget, one of:
+
+    * "i" ↦ integer spin box
+
+    * "d" ↦ floating point spin box
+
+    * "f" ↦ floating point spin box
+
+    * "c" ↦ complex value spin box
+
+    * "q" ↦ Quantity spin box
+
+Var-keyword parameters:
+=======================
+
+Used for ``gui.widget.small_widgets.QuantitySpinBox`` constructor, ignored when |nbsp|
+``widget_type`` is not "q".
+
+"""
+    def __init__(self, parent:QtWidgets.QWidget, label:str, vertical:int|bool = 0,
+                 widget_type:str="i", **kwargs):
+        from gui.widgets.small_widgets import (QuantitySpinBox, ComplexSpinBox)
+        QtWidgets.QFrame.__init__(self, parent)
+        parent.addWidget(self)
+        if widget_type not in ("i", "d", "f", "q", "c"):
+            widget_type = "i"
+        self._type_ = widget_type
+        self.label = QtWidgets.QLabel(text=label, parent=self)
+        # self.spinBox = QtWidgets.QSpinBox(parent=self) if self._type_ == "i" else QtWidgets.QDoubleSpinBox(parent=self) if self._type_ in ("d", "f") else QuantitySpinBox(parent=self)
+        self.spinBox = QtWidgets.QSpinBox(parent=self) if self._type_ == "i" else ComplexSpinBox(parent=self) if self._type_ == "c" else QtWidgets.QDoubleSpinBox(parent=self) if self._type_ in ("d", "f") else QuantitySpinBox(parent=self, **kwargs)
+        if vertical:
+            self.layout = QtWidgets.QVBoxLayout(self)
+        else:
+            self.layout = QtWidgets.QHBoxLayout(self)
+            
+        self.layout.addWidget(self.label)
+        self.layout.addWidget(self.spinBox)
+        self.layout.addStretch(5)
+        
+    def setValue(self, value:int|float|pq.Quantity):
+        if isinstance(value, pq.Quantity) and value.size != 1:
+            raise TypeError("Cannot set value to a non-scalar quantity")
+        if self._type_ == "i":
+            self.spinBox.setValue(round(value))
+        # elif self._type_ == "q" and isinstance(value, pq.Quantity):
+        #     self.spinBox.setValue(value)
+        else:
+            self.spinBox.setValue(value)
+        
+    def value(self) -> int|float|pq.Quantity:
+        return self.spinBox.value()
+    
+    def minimum(self) -> int|float|pq.Quantity:
+        return self.spinBox.minimum()
+    
+    def setMinimum(self, value:int|float|pq.Quantity):
+        if isinstance(value, pq.Quantity) and value.size != 1:
+            raise TypeError("Cannot set value to a non-scalar quantity")
+        if self._type_ == "i":
+            self.spinBox.setMinimum(round(value))
+        else:
+            self.spinBox.setMinimum(value)
+        
+    def maximum(self) -> int|float|pq.Quantity:
+        return self.spinBox.maximum()
+    
+    def setMaximum(self, value:int|float|pq.Quantity):
+        if isinstance(value, pq.Quantity) and value.size != 1:
+            raise TypeError("Cannot set value to a non-scalar quantity")
+        if self._type_ == "i":
+            self.spinBox.setMaximum(round(value))
+        else:
+            self.spinBox.setMaximum(value)
+        
+    def singleStep(self) -> int|float|pq.Quantity:
+        return self.spinBox.singleStep()
+    
+    def setSingleStep(self, val:int|float|pq.Quantity):
+        if isinstance(value, pq.Quantity) and value.size != 1:
+            raise TypeError("Cannot set value to a non-scalar quantity")
+        if self._type_ == "i":
+            self.spinBox.setSingleStep(round(val))
+        else:
+            self.spinBox.setSingleStep(val)
+        
+    def decimals(self) -> int:
+        if self._type_ == "i":
+            return 0
+        return self.spinBox.decimals()
+    
+    def setDecimals(self, val:int):
+        if self._type_ != "i":
+            if val < 0: 
+                val = 0
+            self.spinBox.setDecimals(val)
+            
+    def stepType(self) -> QtWidgets.QAbstractSpinBox.StepType:
+        return self.spinBox.stepType()
+    
+    def setStepType(self, val: QtWidgets.QAbstractSpinBox.StepType):
+        self.spinBox.setStepType(val)
+        
+    def prefix(self) -> str:
+        return self.spinBox.prefix()
+    
+    def setPrefix(self, val:str):
+        if self._type_ == "q":
+            return
+        self.spinBox.setPrefix(val)
+        
+    def suffix(self) -> str:
+        return self.spinBox.suffix()
+    
+    def setSuffix(self, val:str):
+        if self._type_ == "q":
+            return
+        self.spinBox.setSuffix(val)
+        
+    def displayIntegerBase(self) -> int:
+        return self.spinBox.displayIntegerBase()
+        
+    def setDisplayIntegerBase(self, val:int):
+        self.spinBox.setDisplayIntegerBase(val)
+        
+    def setRange(self, minimum:int|float, maximum:int|float):
+        if self._type_ == "i":
+            self.spinBox.setRange(round(minimum), round(maximum))
+        else:
+            self.spinBox.setRange(float(minimum), float(maximum))
+            
+    def specialValueText(self) -> str:
+        return self.spinBox.specialValueText()
+    
+    def setSpecialValueText(self, val:str):
+        self.spinBox.setSpecialValueText(val)
+        
+class VSpinBox(SpinBox):
+    def __init__(self, parent:QtWidgets.QWidget, label:str, widget_type:str = "i", **kwargs):
+        SpinBox.__init__(self, parent, label, 1, widget_type, **kwargs)
+        
+class HSpinBox(SpinBox):
+    def __init__(self, parent:QtWidgets.QWidget, label:str, widget_type:str = "i", **kwargs):
+        SpinBox.__init__(self, parent, label, 0, widget_type, **kwargs)
+
 class Choice(QtWidgets.QFrame):
-    def __init__(self, parent, label, vertical = 0):
+    r"""Radio buttons"""
+    def __init__(self, parent:QtWidgets.QWidget, label:str, vertical:int|bool = 0):
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
         
@@ -318,16 +580,16 @@ class Choice(QtWidgets.QFrame):
         self.buttons = []
         self.results = []
     
-    def addButton(self, label, result):
+    def addButton(self, label:str, result:typing.Any):
         self.buttons.append(QtWidgets.QRadioButton(label))
         self.buttonBox.layout.addWidget(self.buttons[-1])
         self.results.append(result)
         self.buttons[0].setChecked(True)
         
-    def addSpacing(self, spacing):
+    def addSpacing(self, spacing:int):
         self.buttonBox.addSpace(spacing)
         
-    def selectButton(self, index):
+    def selectButton(self, index:int):
         if index >= 0 and index < len(self.buttons):
             self.buttons[index].setChecked(True)
         
@@ -336,17 +598,17 @@ class Choice(QtWidgets.QFrame):
             if self.buttons[k].isChecked():
                 return self.results[k]
         return None # should never happen
-
+    
 class HChoice(Choice):
-    def __init__(self, parent, label):
+    def __init__(self, parent:QtWidgets.QWidget, label:str):
         Choice.__init__(self, parent, label, 0)
         
 class VChoice(Choice):
-    def __init__(self, parent, label):
+    def __init__(self, parent:QtWidgets.QWidget, label:str):
         Choice.__init__(self, parent, label, 1)
         
 class DialogGroup(QtWidgets.QFrame):
-    def __init__(self, parent, vertical = 0, validate=True):
+    def __init__(self, parent:QtWidgets.QWidget, vertical:bool|int = 0, validate:bool=True):
         QtWidgets.QFrame.__init__(self, parent)
         self.bypassValidation = not validate
         parent.addWidget(self)
@@ -358,19 +620,19 @@ class DialogGroup(QtWidgets.QFrame):
             self.defaultAlignment = QtCore.Qt.AlignTop
         self.widgets = []
                
-    def addWidget(self, widget, stretch = 0, alignment = None):
+    def addWidget(self, widget:QtWidgets.QWidget, stretch:int = 0, alignment:typing.Optional[QtCore.Qt.AlignmentFlag] = None):
         if alignment is None:
             alignment = self.defaultAlignment
         self.layout.addWidget(widget, stretch, alignment)
         self.widgets.append(widget)
         
-    def addSpacing(self, spacing):
+    def addSpacing(self, spacing:int):
         self.layout.addSpacing(spacing)
 
-    def addStretch(self, stretch):
+    def addStretch(self, stretch:int):
         self.layout.addStretch(stretch)
         
-    def addLabel(self, labelString):
+    def addLabel(self, labelString:str):
         label = QtWidgets.QLabel(labelString, self)
         self.addWidget(label, 0, QtCore.Qt.AlignLeft)
         
@@ -390,21 +652,19 @@ class DialogGroup(QtWidgets.QFrame):
         return True
 
 class HDialogGroup(DialogGroup):
-    def __init__(self, parent, validate=True):
-        DialogGroup.__init__(self, parent, 0, validate=validate)
+    def __init__(self, parent:QtWidgets.QWidget, validate:bool=True):
+        DialogGroup.__init__(self, parent, vertical=False, validate=validate)
         
 class VDialogGroup(DialogGroup):
-    def __init__(self, parent, validate=True):
-        DialogGroup.__init__(self, parent, 1, validate=validate)
+    def __init__(self, parent:QtWidgets.QWidget, validate:bool=True):
+        DialogGroup.__init__(self, parent, vertical=True, validate=validate)
         
-
-       
 class QuickDialogComboBox(QtWidgets.QFrame):
-    """A combobox to use with a QuickDialog.
+    r"""A combobox to use with a QuickDialog.
     
-    The combobox is nothing fancy -- only accepts a list of text items
+    The combobox is nothing fancy: it only accepts a list of text items
     """
-    def __init__(self, parent, label):
+    def __init__(self, parent:QtWidgets.QWidget, label:str):
         QtWidgets.QFrame.__init__(self, parent)
         parent.addWidget(self)
         
@@ -421,7 +681,8 @@ class QuickDialogComboBox(QtWidgets.QFrame):
     def setFocus(self):
         self.variable.setFocus()
         
-    def setItems(self, textList):
+    def setItems(self, textList:typing.Sequence[str]):
+        r"""Set the entry list; if empty, all existing entries will be removed"""
         if not isinstance(textList, (tuple, list)):
             raise TypeError("Expecting a sequence; got %s instead" % type(textList).__name__ )
         
@@ -436,11 +697,12 @@ class QuickDialogComboBox(QtWidgets.QFrame):
     def setCurrentIndex(self, value:int):
         self.setValue(value)
             
-    def setValue(self, index):
+    def setValue(self, index:int):
         if isinstance(index, int) and index >= -1 and index < self.variable.model().rowCount():
             self.variable.setCurrentIndex(index)
             
-    def setText(self, text):
+    def setText(self, text:str):
+        r"""Set the current text"""
         if isinstance(text, str):
             self.variable.setCurrentText(text)
             
@@ -450,21 +712,24 @@ class QuickDialogComboBox(QtWidgets.QFrame):
     def text(self):
         return self.variable.currentText()
     
-    def connectTextChanged(self, slot):
-        self.currentTextChanged[str].connect(slot)
+    def connectTextChanged(self, slot:object):
+        self.variable.currentTextChanged[str].connect(slot)
         
-    def connectIndexChanged(self, slot):
-        """Connects the combobox currentIndexChanged signal.
-        NOTE: this is an overlaoded signal, with to versions 
-        (respectively, with a str and int argument).
-        
-        Therefore it is expected that the connected slot is also overloaded
-        to accept a str or an int
+    def connectIndexChanged(self, slot:object):
+        r"""Connects the combobox currentIndexChanged signal.
         """
-        self.variable.currentIndexChanged[str].connect(slot)
+        # NOTE: this is an overloaded signal, with two versions
+        # (respectively, with a str and int argument).
+        # Therefore it is expected that the connected slot is also overloaded
+        # to accept a str or an int
+        # NOTE:2026-01-26 22:39:23
+        # as of Qt6.10 there seems to be NO MORE overloading; only int arguments are used
+
+        self.variable.currentIndexChanged[int].connect(slot)
         
     def disconnect(self):
-        self.variable.currentIndexChanged[str].disconnect()
+        self.variable.currentIndexChanged[int].disconnect()
+        self.variable.currentTextChanged[str].disconnect()
         
 #class DialogStack(qt.QWidgetStack):
 #    def __init__(self, parent, widgetMapping = None):
@@ -492,14 +757,14 @@ class QuickDialogComboBox(QtWidgets.QFrame):
 # TODO FIXME: when using my custom QValidator python (or pyqt5) crashes with
 # TypeError: invalid result from VarNameValidator.validate()
 class VariableNameStringInput(StringInput):
-    """
+    r"""
     Cezar M. Tigaret
     """
     class VarNameValidator(QtGui.QValidator):
-        def __init__(self, parent=None):
+        def __init__(self, parent:typing.Optional[QtCore.QObject]=None):
             super().__init__(parent)
             
-        def validate(self, s, pos):
+        def validate(self, s:str, pos:int):
             if not s.isidentifier() or keyword.iskeyword(s):
                 ret = (QtGui.QValidator.Invalid, s, pos)
                 #if s[0:pos].isidentifier() and not keyword.iskeyword(s[0:pos]):
@@ -513,11 +778,11 @@ class VariableNameStringInput(StringInput):
             return ret 
         
         
-        def fixup(self, s):
+        def fixup(self, s:str):
             return validate_varname(s)
             
             
-    def __init__(self, parent, label, ws):
+    def __init__(self, parent:QtWidgets.QWidget, label:str, ws:object):
         super().__init__(parent, label)
         self.variable.setClearButtonEnabled(True)
         self.variable.undoAvailable = True
@@ -533,8 +798,8 @@ class VariableNameStringInput(StringInput):
         return True
     
 class QuickWidget(QtWidgets.QWidget):
-    """Quick creation of a custom widget
-    TODO: 2022-10-28 11:27:24
+    r"""Quick creation of a custom widget
+    TODO: 2022-10-28 11:27:24 Finalize me
     """
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, layoutType:type=QtWidgets.QVBoxLayout):
         QtWidgets.QWidget.__init__(self, parent)
@@ -575,9 +840,14 @@ class QuickWidget(QtWidgets.QWidget):
         self.addWidget(label, 0, QtCore.Qt.AlignLeft)
     
 class QuickDialog(QtWidgets.QDialog):
-    """From vigranumpy.pyqt.quickdialog"""
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, title:typing.Optional[str]=None, addStretch=True, addSpacing=True):
+    r"""From vigranumpy.pyqt.quickdialog"""
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None, 
+                 title:typing.Optional[str]=None, 
+                 addStretch=True, 
+                 addSpacing=True):
         QtWidgets.QDialog.__init__(self, parent)
+        
+        self._cb_ = list()
 
         self.layout = QtWidgets.QVBoxLayout(self)
         if isinstance(addStretch, bool):
@@ -604,6 +874,38 @@ class QuickDialog(QtWidgets.QDialog):
         #self.setOrientation(QtCore.Qt.Vertical)
         self.resize(500,-1)
         
+    @property
+    def callbacks(self) -> list:
+        return self._cb_
+    
+    def addCallback(self, f:typing.Union[types.FunctionType, types.MethodType, functools.partial]) -> None:
+        if not isinstance(f, (types.FunctionType, types.MethodType, functools.partial)):
+            raise TypeError(f"Expecting a types.FunctionType, types.MethodType, or a functools.partial; got {type(f).__name__} instead")
+        
+        self._cb_.append(f)
+        
+    def removeCallback(self, f:typing.Union[types.FunctionType, types.MethodType, functools.partial]) -> None:
+        if not isinstance(f, (types.FunctionType, types.MethodType, functools.partial)):
+            raise TypeError(f"Expecting a types.FunctionType, types.MethodType, or a functools.partial; got {type(f).__name__} instead")
+        
+        if f in self._cb_:
+            index = self._cb_.index(f)
+            del(self._cb_[index])
+            
+    def clearCallbacks(self):
+        self._cb_.clear()
+        
+    @Slot(str)
+    def _slot_valueChanged(self, val:str):
+        if len(self._cb_):
+            for f in self._cb_:
+                try:
+                    f(val)
+                except:
+                    scipywarn(f"In {self.__class__.__name__}._slot_valueChanged: Bad callback call for {f}")
+                    traceback.print_exc()
+            
+        
     def insertButtons(self):
         self.buttons = QtWidgets.QFrame(self)
         self.buttons.OK = QtWidgets.QPushButton("OK", self.buttons)
@@ -618,21 +920,24 @@ class QuickDialog(QtWidgets.QDialog):
         self.buttons.layout.addWidget(self.buttons.Cancel)
         self.layout.addWidget(self.buttons)
         
-    def addWidget(self, widget, stretch = 0, alignment = None):
+    def addWidget(self,
+                  widget: QtWidgets.QWidget,
+                  stretch: int = 0,
+                  alignment: typing.Optional[QtCore.Qt.AlignmentFlag] = None):
         if alignment is None:
             alignment = QtCore.Qt.AlignTop
         self.layout.insertWidget(len(self.widgets), widget, stretch, alignment)
         self.widgets.append(widget)
         
-    def addSpacing(self, spacing):
+    def addSpacing(self, spacing:int):
         self.layout.insertSpacing(len(self.widgets), spacing)
         self.widgets.append(None)
 
-    def addStretch(self, stretch):
+    def addStretch(self, stretch:int):
         self.layout.insertStretch(len(self.widgets), stretch)
         self.widgets.append(None)
 
-    def addLabel(self, labelString):
+    def addLabel(self, labelString:str):
         label = QtWidgets.QLabel(labelString, self)
         self.addWidget(label, 0, QtCore.Qt.AlignLeft)
         
@@ -665,10 +970,8 @@ class QuickDialog(QtWidgets.QDialog):
             self.help.setReadOnly(1)
             self.help.setWordWrap(QtWidgets.QTextEdit.WidgetWidth)
         else:
-            #self.help = qt.QVBox(self)
             self.help = QtWidgets.QVGroupBox(self)
             self.help.setLayout(QtWidgets.QVBoxLayout())
-            #self.help.text = QtCore.QtextEdit(self.help)
             self.help.text = QtWidgets.QTextEdit(self.help)
             self.help.text.setText(helpString)
             self.help.text.setReadOnly(1)

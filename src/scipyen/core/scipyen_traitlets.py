@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Very much work in progress.
+r"""Very much work in progress.
 FIXME/TODO:2022-01-29 13:29:19
 The issue with collection "traits", I think, is that changes to the contents of
 the collection by using builtin API (e.g. list.append, deque.appendLeft) or 
@@ -29,6 +29,12 @@ import numpy as np
 import quantities as pq
 import pandas as pd
 import neo
+# NOTE: SpikeTrainList is a ObjectList in recent neo versions
+if neo.__version__ >= '0.13.0':
+    from neo.core.objectlist import ObjectList as NeoObjectList
+    
+else:
+    NeoObjectList = list # alias for backward compatibility :(
 
 import six
 
@@ -54,7 +60,7 @@ from .triggerevent import DataMark, TriggerEvent
 
 from .utilities import (gethash, safe_identity_test)
 
-from .prog import timeblock
+from .prog import (timeblock, print_styled)
 
 # NOTE: DataBagTrait <- Instance <- ClassBasedTraitType <- TraitType <- BaseDescriptor
 
@@ -90,7 +96,7 @@ TRAITSMAP = {           # use casting versions
     Enum:       (Any,), # IntEnum inherits from int and Enum
     #EnumMeta:   (UseEnum,),
     #Enum:       (UseEnum,), # IntEnum inherits from int and Enum
-    type:       (Any,),    # e.g., type(type(None))
+    # type:       (Any,),    # e.g., type(type(None))
     #type:       (Instance,),    # e.g., type(type(None)) # Instance requires arguments to instantiate default value
     property:   (Any,),
     #property:   (DottedObjectName,),
@@ -100,7 +106,7 @@ TRAITSMAP = {           # use casting versions
 
 class ScipyenTraitTypeMixin:
     def __delete__(self, obj):
-        """Fails silently when owner is of wrong type"""
+        r"""Fails silently when owner is of wrong type"""
         if hasattr(obj, "remove_trait") and hasattr(obj, "_trait_values") and hasattr(obj, "traits"):
             if self.name in obj.traits():
                 trait_to_remove = obj.traits()[self.name]
@@ -109,6 +115,140 @@ class ScipyenTraitTypeMixin:
                 obj._notify_trait(self.name, old_value, Undefined,
                                   change_type="removed")
                 
+class TypeTrait(Any, ScipyenTraitTypeMixin):
+    info_text = "Traitlet for type; types are considered immutable"
+    default_value = type
+    klass = type
+    _trait = None
+    _valid_defaults = (type,)
+    
+    def __init__(self, args=None, kw=None, **kwargs):
+        super(ScipyenTraitTypeMixin, self).__init__()
+        default_value = kwargs.pop("default_value", None)
+        self.allow_none = kwargs.pop("allow_none", False)
+        if isinstance(args, type):
+            self.default_value = args
+        else:
+            self.default_value = type
+        args = None
+        super().__init__(klass = self.klass, args=args, kw=kw, 
+                         default_value=default_value, **kwargs)
+        
+    def validate(self, obj, value):
+        if isinstance(value, type):
+            return value
+        
+        self.error(obj, value)
+        
+    def set(self, obj, value):
+        # NOTE: 2025-07-06 13:21:31 does NOT make sense to use hashes here
+        new_value = self.validate(obj, value)
+        silent=True
+        change_type="new"
+
+        if self.name and self.name in obj._trait_values and self.name in obj.traits():
+            old_value = obj._trait_values[self.name]
+        else:
+            old_value = self.default_value
+            silent = False
+            change_type = "new"
+            
+        if new_value is None and old_value is None:
+            return
+        
+        if new_value is None or old_value is None:
+            if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
+                change_type = "new"
+            else:
+                change_type = "modified"
+            obj._trait_values[self.name] = new_value
+            obj._notify_trait(self.name, old_value, new_value, 
+                            change_type = change_type)
+            return
+        
+        if silent:
+            silent &= new_value == old_value
+           
+        if not silent:
+            change_type = "new"
+            obj._trait_values[self.name] = new_value
+            obj._notify_trait(self.name, old_value, new_value,
+                              change_type = change_type)
+            
+class DataclassTrait(Any, ScipyenTraitTypeMixin):
+    info_text = "Traitlet for Dataclasses"
+    default_value = None
+    klass = None
+    
+    def __init__(self, args=None, kw=None, **kwargs):
+        super(ScipyenTraitTypeMixin, self).__init__()
+        # default_value = kwargs.pop("default_value", None)
+        self.allow_none = kwargs.pop("allow_none", True)
+        # if dataclasses.is_dataclass(args):
+        #     self.default_value = args
+        #     if isinstance(args, type):
+        #         self.klass = args
+        #     else:
+        #         self.klass = type(args)
+        # else:
+        #     self.default_value = None
+            
+        args = None
+        super().__init__(klass = self.klass, args=args, kw=kw, **kwargs)
+        
+    def validate(self, obj, value):
+        if dataclasses.is_dataclass(value) or value is None:
+            return value
+        
+        self.error(obj, value)
+        
+    def set(self, obj, value):
+        # NOTE: 2025-07-06 13:07:16 - NOT using gethash here
+        from core.utilities import safe_identity_test
+        new_value = self.validate(obj, value)
+        silent=True
+        change_type=""
+        
+        if self.name and self.name in obj._trait_values and self.name in obj.traits():
+            old_value = obj._trait_values[self.name]
+            # print(f"{print_styled(f'{old_value}', color='magenta')}")
+        else:
+            old_value = self.default_value # may be None
+            silent = False
+            change_type = "new"
+            
+        if new_value is None and old_value is None:
+            return
+        
+        if not dataclasses.is_dataclass(new_value) or not dataclasses.is_dataclass(old_value):
+            if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
+                change_type = "new"
+            else:
+                change_type = "modified" 
+            obj._trait_values[self.name] = new_value
+            obj._notify_trait(self.name, old_value, new_value, 
+                            change_type = change_type)
+            return
+        
+        if silent:
+            silent = old_value.__class__ == new_value.__class__
+            
+        if silent:
+            try:
+                fields = tuple(map(lambda f: (f.name, getattr(old_value, f.name), getattr(new_value, f.name)), dataclasses.fields(old_value)))
+                diff_fields = tuple(filter(lambda f: type(f[1]) != type(f[2]) or not safe_identity_test(f[1], f[2]), fields))
+                # print(f"{print_styled(f'{tuple(map(lambda f: f[0], diff_fields))}', color='magenta')}")
+                silent = len(diff_fields) == 0
+            except:
+                silent = False
+            
+        if not silent:
+            change_type = "modified"
+            obj._trait_values[self.name] = new_value
+            obj._notify_trait(self.name, old_value, new_value, 
+                            change_type = change_type)
+        # print(f"{print_styled(f'{self.__class__.__name__}.set -> {change_type}', color='green')}")
+        
 class DictTrait(Dict, ScipyenTraitTypeMixin):
     info_text = "Traitlet for mapping types (dict) that is sensitive to content changes"
     default_value = dict() # default value of the Trait instance
@@ -167,20 +307,6 @@ class DictTrait(Dict, ScipyenTraitTypeMixin):
         super().__init__(value_trait=value_trait, per_key_traits=per_key_traits,key_trait=key_trait,
                          default_value=default_value, **kwargs)
         
-#     def validate(self, obj, value):
-#         # return super().validate(obj, value)
-#         value = super().validate(obj, value)
-#         if value is None:
-#             return value
-#         value = self.validate_elements(obj, value)
-#         return value
-# 
-# #         if isinstance(value, self.klass):
-# #             return value
-# #         
-# #         elif isinstance(value, self._valid_defaults):
-# #             return self.klass(value)
-    
     def validate_elements(self, obj, value):
         value = super(DictTrait, self).validate_elements(obj, value)
         
@@ -192,7 +318,7 @@ class DictTrait(Dict, ScipyenTraitTypeMixin):
         return super().validate_elements(obj, value)
 
     def set(self, obj, value):
-        """
+        r"""
         Additional notifications:
         • change in dict length (i.e. number of keys)
         • change in key types
@@ -203,48 +329,68 @@ class DictTrait(Dict, ScipyenTraitTypeMixin):
         
         """
         new_value = self._validate(obj, value)
+        new_hash = gethash(new_value)
         silent = True 
         change_type = "modified"
         
         if self.name and self.name in obj._trait_values and self.name in obj.traits():
             old_value = obj._trait_values[self.name]
+            if not self.hashed:
+                self.hashed = gethash(old_value)
         else:
-            old_value = self.default_value
-            silent=False
             change_type="new"
+            old_value = self.default_value
+            if not self.hashed:
+                self.hashed = gethash(old_value)
+            silent=False
         
         try:
-            if any(not isinstance(v, self.klass) for v in (new_value, old_value)):
-                silent=False
-                
-            if silent:
-                silent = bool(old_value == new_value)
+            klass = getattr(self, "klass", None)
+            check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False
+            if any(not check_klass(v) for v in (new_value, old_value)):
+                if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
+                    change_type = "new"
+                    self.hashed = new_hash
+                    obj._trait_values[self.name] = new_value
+                    obj._notify_trait(self.name, old_value, new_value, 
+                                    change_type = change_type)
+                    return
+                else:
+                    change_type = "modified"
             
             # NOTE: 2021-08-19 16:17:23
             # check for change in contents
+            # NOTE: 2025-07-17 11:53:04 do it more granular
+            if silent and all(issubclass(type(v), dict) for v in (old_value, new_value)):
+                if len(old_value) != len(new_value):
+                    silent = False
+                    change_type = "modified"
+                    
+                if silent:
+                    if list(old_value.keys()) != list(new_value.keys()):
+                        silent = False
+                        change_type = "modified"
+                
             if silent:
                 new_hash = gethash(new_value)
                 silent = (new_hash == self.hashed)
-                if not silent:
-                    self.hashed = new_hash
-        except:
-            # if there is an error in comparing, default to notify
-            silent = False
+
+            if silent:
+                silent = bool(np.all(old_value == new_value))
             
-        # print(f"{self.__class__.__name__}.set: silent {silent}, hashed {self.hashed}")
-        obj._trait_values[self.name] = new_value
-        
-        # print(f"\n{self.__class__.__name__} object {self.name} .set({obj}, {value}) → old_value = {old_value}; new_value = {new_value}; notify_trait = {not silent}")
+        except:
+            # if there is an error in comparing, default to notify - might penalize, though!
+            # traceback.print_exc()
+            silent = False
 
         if silent is not True:
-            # print(f"{self.__class__.__name__}.set(...) will notify")
-            # obj._notify_trait(self.name, old_value, new_value)
+            self.hashed = new_hash
+            obj._trait_values[self.name] = new_value
             obj._notify_trait(self.name, old_value, new_value, 
                               change_type=change_type)
   
-            
 class ListTrait(List, ScipyenTraitTypeMixin):
-    """TraitType that ideally should notify:
+    r"""TraitType that ideally should notify:
     a) when a list contents has changed (i.e., gained/lost members)
     b) when an element in the list has changed (either a new value, or a new type)
     c) when the order of the elements has changed
@@ -255,9 +401,8 @@ class ListTrait(List, ScipyenTraitTypeMixin):
     _trait = None
     _valid_defaults = (list,tuple)
     
-    
     def __init__(self, trait=None, traits=None, default_value=Undefined, **kwargs):
-        """
+        r"""
         trait: in the super() List traitype, `traits` restricts the type of elements
                 in the container to that TraitType -- i.e. all must be of the same type
     
@@ -287,7 +432,7 @@ class ListTrait(List, ScipyenTraitTypeMixin):
         self._traits = traits # a list of traits, one per element - corresponds to per_key_traits in Dict
         self._length = 0
         
-        self.hashed = 0
+        self.hashed = None
         
         allow_none = kwargs.pop("allow_none", True) # make this True by default
         
@@ -318,9 +463,6 @@ class ListTrait(List, ScipyenTraitTypeMixin):
         default_to = (self._trait or Any())
         validated = []
         
-#         if isinstance(value, self.klass):
-#             self.length = len(value)
-#         
         if not use_list and isinstance(default_to, Any):
             return value
         
@@ -339,58 +481,77 @@ class ListTrait(List, ScipyenTraitTypeMixin):
         return self.klass(validated)
 
     def set(self, obj, value):
-        """Overrides List.set to check for special hash.
+        r"""Overrides List.set to check for special hash.
         This is supposed to also detect changes in the order of elements.
         """
+        # NOTE: 2025-06-29 09:33:07
+        # silent False means that a notification must be sent
         new_value = self._validate(obj, value)
+        new_hash = gethash(new_value)
         silent = True
         change_type = "modified"
         
-        # if self.name in obj._trait_values:
         if self.name and self.name in obj._trait_values and self.name in obj.traits():
             old_value = obj._trait_values[self.name]
+            if not self.hashed:
+                self.hashed = gethash(old_value)
+                silent = False
         else:
-            old_value = self.default_value
-            silent=False
             change_type="new"
-
+            old_value = self.default_value
+            if not self.hashed:
+                self.hashed = gethash(old_value)
+            silent=False
+            
+        # print(f"\n{self.__class__.__name__}.set for {self.name}: old_value = {old_value}, new_value = {new_value}")
+        
         try:
-            if any(not isinstance(v, self.klass) for v in (new_value, old_value)):
-                silent=False
-                
-            # print(f"{self.__class__.__name__}.set: old_value = {old_value}, new_value = {new_value}")
-            if silent:
-                silent = bool(old_value == new_value)
-                # print(f"{self.__class__.__name__}.set: old_value == new_value => silent {silent}")
-            
-            
+            klass = getattr(self, "klass", None)
+            # print(f"{print_styled(f'{self.__class__.__name__}.set: klass = {klass};\n\tnew_value: {new_value}\n\told_value: {old_value}', color='yellow')}")
+            check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False
+            if any(not check_klass(v) for v in (new_value, old_value)):
+                if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
+                    change_type = "new"
+                    # self.hash = new_hash # NOTE: 2025-11-25 13:52:24 I think this is wrong (typo?)
+                    self.hashed = new_hash
+                    obj._trait_values[self.name] = new_value
+                    obj._notify_trait(self.name, old_value, new_value, 
+                                    change_type = change_type)
+                    return
+                else:
+                    change_type = "modified"
+                    
+            # print(f"{self.__class__.__name__}.set: silent before new_hash: {silent}")
             # NOTE: 2021-08-19 16:17:23
             # check for change in contents
             if silent:
+                if isinstance(old_value, typing.Sequence) and any(isinstance(v, np.ndarray) for v in old_value) or \
+                    isinstance(new_value, typing.Sequence) and any(isinstance(v, np.ndarray) for v in new_value):
+                        silent = safe_identity_test(old_value, new_value)
+                else:
+                    silent = bool(old_value == new_value)
+                # print(f"{print_styled(f'{self.__class__.__name__}.set: old_value == new_value -> {silent}', color='yellow')}")
+                
+            if silent:
                 new_hash = gethash(new_value)
                 silent = (new_hash == self.hashed)
-                # print(f"{self.__class__.__name__}.set: new_hash == self.hashed => silent {silent}")
+                # print(f"{print_styled(f'{self.__class__.__name__}.set: new_hash == self.hashed -> {silent}', color='yellow')}")
                 
-                if not silent:
-                    self.hashed = new_hash
+            # print(f"{self.__class__.__name__}.set: old_value = {old_value}, new_value = {new_value}")
+            
         except:
-            # traceback.print_exc()
-            # if there is an error in comparing, default to notify
-            silent = False
+            traceback.print_exc()
+            # if there is an error in comparing, don't notify
+            silent = True
             
-        # print(f"\n{self.__class__.__name__} object {self.name} .set({obj}, {value}) → old_value = {old_value}; new_value = {new_value}; notify_trait = {not silent}")
-            
-        obj._trait_values[self.name] = new_value
-        
-        # print(f"{self.__class__.__name__}.set: silent {silent}, hashed {self.hashed}")
-        
         if not silent:
-            # obj._notify_trait(self.name, old_value, new_value)
+            self.hashed = new_hash
+            obj._trait_values[self.name] = new_value
             obj._notify_trait(self.name, old_value, new_value,
                               change_type=change_type)
             
 class DataFrameTrait(Instance, ScipyenTraitTypeMixin):
-    """Traitlet for pandas.DataFrame
+    r"""Traitlet for pandas.DataFrame
     """
     info_text = "Traitlet for pandas.DataFrame"
     default_value = pd.DataFrame()
@@ -528,24 +689,18 @@ class DataFrameTrait(Instance, ScipyenTraitTypeMixin):
         
     
     def set(self, obj, value):
-        """See traitlets.traitlets.TraitType.set for details
+        r"""See traitlets.traitlets.TraitType.set for details
         """
         # with timeblock(f"{type(value).__name__}"):
         # this one simply checks if value is the appropriate class, or None (if allow_none is True)
         new_value = self._validate(obj, value) 
         new_hash = gethash(new_value)
-            
-        # NOTE: 82021-10-20 09:13:51
-        # to also flag addition of this trait:
-        # when DataBag is empty, its hashed value will be 0 thus not different 
-        # from the default; therefore when an old_value of this trait does not
-        # exist we should be notifying the observer
         silent = True 
-        
         change_type = "modified"
         
         if self.name and self.name in obj._trait_values and self.name in obj.traits():
             old_value = obj._trait_values[self.name]
+            self.hashed = gethash(old_value)
             
         else:
             old_value = self.default_value
@@ -553,18 +708,20 @@ class DataFrameTrait(Instance, ScipyenTraitTypeMixin):
             silent=False
             change_type="new"
         
-        # print(f"\n{self.__class__.__name__} <for object {self.name}>.set(...) → first test silent = {silent}")
-        
         try:
-            # FIXME/TODO: 2023-05-25 22:37:35
-            # there should be a better way than this;
-            # othwerise, this keeps notifying a change when it shouldn't, and 
-            # this can cause bottleneck downstream (e.g. in workspace model a 
-            # Modifed change triggers updating the row - which scales poorly with 
-            # the number of variables in the workspace)
-
-            if any(not isinstance(v, self.klass) for v in (new_value, old_value)):
-                silent=False
+            klass = getattr(self, "klass", None)
+            check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False
+            if any(not check_klass(v) for v in (new_value, old_value)):
+                if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
+                    change_type = "new"
+                else:
+                    change_type = "modified"
+                self.hashed = new_hash
+                obj._trait_values[self.name] = new_value
+                obj._notify_trait(self.name, old_value, new_value, 
+                                change_type = change_type)
+                    
+                return
                 
             if silent:
                 silent = old_value.shape == new_value.shape
@@ -572,49 +729,30 @@ class DataFrameTrait(Instance, ScipyenTraitTypeMixin):
             if silent:
                 silent = self.compare_elements(old_value, new_value)
                 
-            # print(f"\n{self.__class__.__name__}<NeoBaseNeoTrait>[{self.name}] after compare_elements → silent = {silent}")
             if silent:
                 silent = bool(id(old_value) == id(new_value))
                 
-            # 2023-08-24 11:30:24
-            # NOTE: taken care of by compare_elements
-            # if silent:
-            #     silent = bool(np.all(old_value == new_value)) # this must be overwritten for signal traits !
-                
             if silent:
-                silent = (new_hash == self.hashed)
-                # print(f"{self.__class__.__name__}.set: new_hash == self.hashed => silent {silent}")
-                
-#                 if not silent:
-#                     self.hashed = new_hash
-#             
+                silent = bool(new_hash == self.hashed)
+
         except:
             traceback.print_exc()
             silent = False
             
-        # print(f"\n{self.__class__.__name__} <for object {self.name}>.set({value}) → notify_trait = {not silent}")
-                
-        obj._trait_values[self.name] = new_value
-        
         if not silent:
+            change_type = "modified"
             self.hashed = new_hash
-    
-        # print(f"\n{self.__class__.__name__} object {self.name} .set({obj}, {value}) → old_value = {old_value}; new_value = {new_value}; notify_trait = {not silent}")
-        if silent is not True:
-            # print(f"\n{self.__class__.__name__}<NeoBaseNeoTrait>[{self.name}] to notify {change_type}")
-            # obj._notify_trait(self.name, old_value, new_value)
+            obj._trait_values[self.name] = new_value
             obj._notify_trait(self.name, old_value, new_value,
                               change_type=change_type)
-        
 
 class SeriesTrait(Instance, ScipyenTraitTypeMixin):
     info_text = "Trait for pandas.Series"
-    default_value = pd.Series()
+    default_value = pd.Series(dtype="float64")
     klass = pd.Series
     _valid_defaults = (pd.Series,)
     
     def __init__(self, value_trait=None, args=None, kw=None, **kwargs):
-        
         super(ScipyenTraitTypeMixin, self).__init__()
         default_value = kwargs.pop("default_value", None)
         self.allow_none = kwargs.pop("allow_none", False)
@@ -714,48 +852,57 @@ class SeriesTrait(Instance, ScipyenTraitTypeMixin):
         if ret:
             ret = old_value.dtype == new_value.dtype
             
+        # print(f"ret -> {ret}, old_value.dtype -> {old_value.dtype}, new_value.dtype -> {new_value.dtype}")
         if ret:
-            ret = np.all(old_value == new_value)
+            # by now, both old and new have same dtype
+            if isinstance(old_value.dtype, pd.SparseDtype) and old_value.dtype.fill_value is pd.NA:
+                # print(f"ret -> {ret}, old_value.dtype.fill_value -> {old_value.dtype.fill_value}")
+                # by implication dtype.fill_value is also the same in old and new
+                navals_old = np.where(pd.isna(old_value))[0]
+                navals_new = np.where(pd.isna(new_value))[0]
+                ret = np.all(navals_old == navals_new)
+                
+                if ret:
+                    nonavals_old = np.where(~pd.isna(old_value))[0]
+                    nonavals_new = np.where(~pd.isna(new_value))[0]
+                    ret = np.all(np.array(old_value[nonavals_old]) == np.array(new_value[nonavals_new]))
+                        
+            else:
+                ret = np.all(old_value == new_value)
             
         return ret
         
     def set(self, obj, value):
-        """See traitlets.traitlets.TraitType.set for details
+        r"""See traitlets.traitlets.TraitType.set for details
         """
-        # with timeblock(f"{type(value).__name__}"):
-        # this one simply checks if value is the appropriate class, or None (if allow_none is True)
         new_value = self._validate(obj, value) 
         new_hash = gethash(new_value)
-            
-        # NOTE: 82021-10-20 09:13:51
-        # to also flag addition of this trait:
-        # when DataBag is empty, its hashed value will be 0 thus not different 
-        # from the default; therefore when an old_value of this trait does not
-        # exist we should be notifying the observer
         silent = True 
-        
         change_type = "modified"
         
         if self.name and self.name in obj._trait_values and self.name in obj.traits():
             old_value = obj._trait_values[self.name]
+            self.hashed = gethash(old_value)
         else:
             old_value = self.default_value
             self.hashed = gethash(old_value)
             silent=False
             change_type="new"
         
-        # print(f"\n{self.__class__.__name__} <for object {self.name}>.set(...) → first test silent = {silent}")
-        
         try:
-            if any(not isinstance(v, self.klass) for v in (new_value, old_value)):
-                silent=False
-                
-            # FIXME/TODO: 2023-05-25 22:37:35
-            # there should be a better way than this;
-            # othwerise, this keeps notifying a change when it shouldn't, and 
-            # this can cause bottleneck downstream (e.g. in workspace model a 
-            # Modifed change triggers updating the row - which scales poorly with 
-            # the number of variables in the workspace)
+            klass = getattr(self, "klass", None)
+            check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False
+            if any(not check_klass(v) for v in (new_value, old_value)):
+                if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
+                    change_type = "new"
+                else:
+                    change_type = "modified"
+                self.hashed = new_hash
+                obj._trait_values[self.name] = new_value
+                obj._notify_trait(self.name, old_value, new_value, 
+                                change_type = change_type)
+                    
+                return
             
             if silent:
                 silent = old_value.shape == new_value.shape
@@ -767,37 +914,23 @@ class SeriesTrait(Instance, ScipyenTraitTypeMixin):
             if silent:
                 silent = bool(id(old_value) == id(new_value))
                 
-            # 2023-08-24 11:30:24
-            # NOTE: taken care of by compare_elements
-            # if silent:
-            #     silent = bool(np.all(old_value == new_value)) # this must be overwritten for signal traits !
-                
             if silent:
-                silent = (new_hash == self.hashed)
-                # print(f"{self.__class__.__name__}.set: new_hash == self.hashed => silent {silent}")
+                # new_hash = gethash(new_value)
+                silent = bool(new_hash == self.hashed)
                 
-#                 if not silent:
-#                     self.hashed = new_hash
-#             
         except:
             traceback.print_exc()
             silent = False
             
         # print(f"\n{self.__class__.__name__} <for object {self.name}>.set({value}) → notify_trait = {not silent}")
                 
-        obj._trait_values[self.name] = new_value
         
         if not silent:
+            change_type = "modified"
             self.hashed = new_hash
-    
-        # print(f"\n{self.__class__.__name__} object {self.name} .set({obj}, {value}) → old_value = {old_value}; new_value = {new_value}; notify_trait = {not silent}")
-        if silent is not True:
-            # print(f"\n{self.__class__.__name__}<NeoBaseNeoTrait>[{self.name}] to notify {change_type}")
-            # obj._notify_trait(self.name, old_value, new_value)
+            obj._trait_values[self.name] = new_value
             obj._notify_trait(self.name, old_value, new_value,
                               change_type=change_type)
-        
-    
             
 class NdarrayTrait(Instance, ScipyenTraitTypeMixin):
     info_text = "Trait for numpy arrays"
@@ -841,6 +974,8 @@ class NdarrayTrait(Instance, ScipyenTraitTypeMixin):
         return np.array(self.default_value)
  
     def set(self, obj, value):
+        # NOTE: 2025-07-06 13:15:35 - NOT using hashes here as they can be expensive
+        # 
         new_value = self.validate(obj, value)
         silent=True
         change_type="modified"
@@ -856,8 +991,20 @@ class NdarrayTrait(Instance, ScipyenTraitTypeMixin):
             return
     
         try:
-            if any(not isinstance(v, self.klass) for v in (new_value, old_value)):
-                silent=False
+            klass = getattr(self, "klass", None)
+            check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False
+            if any(not check_klass(v) for v in (new_value, old_value)):
+                if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
+                    change_type = "new"
+                else:
+                    change_type = "modified"
+                    
+                obj._trait_values[self.name] = new_value
+                obj._notify_trait(self.name, old_value, new_value, 
+                                change_type = change_type)
+                    
+                return
+                # silent=False
                 
             if silent:
                 if all(hasattr(x, "dtype") for x in (new_value, old_value)):
@@ -878,20 +1025,21 @@ class NdarrayTrait(Instance, ScipyenTraitTypeMixin):
                 except:
                     silent = True
                 
-            obj._trait_values[self.name] = new_value
             
         except:
+            # default to NOT notify
             traceback.print_exc()
-            silent=False
+            silent=True
             
         if not silent:
+            obj._trait_values[self.name] = new_value
             obj._notify_trait(self.name, old_value, new_value,
                             change_type=change_type)
                 
 class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
-    """Traitlet for BaseNeo objects
+    r"""Traitlet for BaseNeo objects
     """
-    info_text = "Trais for neo.baseneo.BaseNeo"
+    info_text = "Traits for neo.baseneo.BaseNeo"
     default_value = neo.baseneo.BaseNeo()
     klass = neo.baseneo.BaseNeo
     _cast_types = tuple()
@@ -901,7 +1049,8 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
     def __init__(self, value_trait=None, default_value = Undefined, **kwargs):
         # print(f"{self.__class__.__name__}.__init__")
         super(ScipyenTraitTypeMixin, self).__init__()
-        self.hashed = 0
+        self.hashed = None
+        self._length = 0 # only use for neo objects with __len__ attribute
         trait = kwargs.pop('trait', None)
         if trait is not None:
             if value_trait is not None:
@@ -929,7 +1078,7 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
             args = (default_value,)
             
         else:
-            raise TypeError(f"default_value expected to be {None} or one of {self._valid_defaults}")
+            raise TypeError(f"default_value expected to be {None} or one of {self._valid_defaults}; got {type(default_value).__name__}")
         
         if is_trait(value_trait):
             self._trait = value_trait() if isinstance(value_trait, type) else value_trait
@@ -937,7 +1086,7 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
         elif trait is not None:
             raise TypeError(f"Expecting 'value_trait to be a Trait or None; got {type(value_trait_.__name__)}")
         
-        super().__init__(klass = self.klass, args=args, **kwargs) # init the Instance
+        super().__init__(klass = self.klass, args=args, **kwargs) # init the Instance class
     
     def info(self):
         if isinstance(self.klass, six.string_types):
@@ -976,7 +1125,7 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
         return result
     
     def compare_elements(self, old_value, new_value):
-        """Returns True if old_value and new_value are identical.
+        r"""Returns True if old_value and new_value are identical.
         Identity can mean anything from them being the same class, or their
         children (up to a certain nesting level) are identical.
         
@@ -1007,18 +1156,8 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
             # NOTE: 2023-05-23 22:24:41
             # can be very expensive
             if result:
-                # check annotations
-                # result = new_value.annotations == old_value.annotations
                 result = safe_identity_test(new_value.annotations, old_value.annotations)
             
-            
-            # if result:
-            #     # so far silent is True when the observed knows about us
-            #     # check it we changed and notify
-            #     new_hash = gethash(new_value)
-            #     silent = (new_hash == self.hashed)
-            #     # result = new_value == old_value
-            #     # result = safe_identity_test(new_value, old_value)
         except:
             traceback.print_exc()
             result = False
@@ -1042,46 +1181,55 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
         raise TraitError(e)
     
     def set(self, obj, value):
-        """See traitlets.traitlets.TraitType.set for details
+        r"""See traitlets.traitlets.TraitType.set for details
         """
-        # with timeblock(f"{type(value).__name__}"):
-        # this one simply checks if value is the appropriate class, or None (if allow_none is True)
         new_value = self._validate(obj, value) 
         new_hash = gethash(new_value)
-            
-        # NOTE: 82021-10-20 09:13:51
-        # to also flag addition of this trait:
-        # when DataBag is empty, its hashed value will be 0 thus not different 
-        # from the default; therefore when an old_value of this trait does not
-        # exist we should be notifying the observer
         silent = True 
-        
         change_type = "modified"
         
         if self.name and self.name in obj._trait_values and self.name in obj.traits():
             old_value = obj._trait_values[self.name]
+            if not self.hashed:
+                self.hashed = gethash(old_value)
+                silent=False
+                
+            if hasattr(old_value, "__len__") and len(old_value) != self._length:
+                silent=False
         else:
             old_value = self.default_value
-            self.hashed = gethash(old_value)
+            if not self.hashed:
+                self.hashed = gethash(old_value)
             silent=False
             change_type="new"
         
-        # print(f"\n{self.__class__.__name__} <for object {self.name}>.set(...) → first test silent = {silent}")
+        # print(f"\n{self.__class__.__name__}.set for {self.name}: old_value = {old_value}, new_value = {new_value}")
         
         try:
-            if any(not isinstance(v, self.klass) for v in (new_value, old_value)):
-                silent=False
-                
-            # FIXME/TODO: 2023-05-25 22:37:35
-            # there should be a better way than this;
-            # othwerise, this keeps notifying a change when it shouldn't, and 
-            # this can cause bottleneck downstream (e.g. in workspace model a 
-            # Modifed change triggers updating the row - which scales poorly with 
-            # the number of variables in the workspace)
+            klass = getattr(self, "klass", None)
+            check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False
+            if any(not check_klass(v) for v in (new_value, old_value)):
+                if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
+                    change_type = "new"
+                    self.hashed = new_hash
+                    obj._trait_values[self.name] = new_value
+                    obj._notify_trait(self.name, old_value, new_value, 
+                                    change_type = change_type)
+                    return
+                else:
+                    change_type = "modified"
+                    
+            if silent:
+                haslen = tuple(map(lambda v: hasattr(v, "__len__"), (old_value, new_value)))
+                if any(haslen):
+                    if not all(haslen):
+                        silent = False
+                    else:
+                        silent = len(old_value) == len(new_value)
+                    
             if silent:
                 silent = self.compare_elements(old_value, new_value)
                 
-            # print(f"\n{self.__class__.__name__}<NeoBaseNeoTrait>[{self.name}] after compare_elements → silent = {silent}")
             if silent:
                 silent = bool(id(old_value) == id(new_value))
                 
@@ -1089,27 +1237,25 @@ class NeoBaseNeoTrait(Instance, ScipyenTraitTypeMixin):
                 silent = bool(old_value == new_value) # this must be overwritten for signal traits !
                 
             if silent:
-                silent = (new_hash == self.hashed)
-                # print(f"{self.__class__.__name__}.set: new_hash == self.hashed => silent {silent}")
-                
-#                 if not silent:
-#                     self.hashed = new_hash
-#             
+                new_hash = gethash(new_value)
+                silent = bool(new_hash == self.hashed)
+                if not silent:
+                    change_type = "modified"
+                    self.hashed = new_hash
+                    obj._trait_values[self.name] = new_value
+                    obj._notify_trait(self.name, old_value, new_value, 
+                                    change_type = change_type)
+                    return
+
         except:
             traceback.print_exc()
             silent = False
             
-        # print(f"\n{self.__class__.__name__} <for object {self.name}>.set({value}) → notify_trait = {not silent}")
-                
-        obj._trait_values[self.name] = new_value
-        
+        # print(f"\n{self.__class__.__name__}({self.name}).set -> silent = {silent}")
+            
         if not silent:
             self.hashed = new_hash
-    
-        # print(f"\n{self.__class__.__name__} object {self.name} .set({obj}, {value}) → old_value = {old_value}; new_value = {new_value}; notify_trait = {not silent}")
-        if silent is not True:
-            # print(f"\n{self.__class__.__name__}<NeoBaseNeoTrait>[{self.name}] to notify {change_type}")
-            # obj._notify_trait(self.name, old_value, new_value)
+            obj._trait_values[self.name] = new_value
             obj._notify_trait(self.name, old_value, new_value,
                               change_type=change_type)
         
@@ -1155,11 +1301,6 @@ class NeoContainerTrait(NeoBaseNeoTrait):
                     # check data children count
                     result = len(new_value.data_children_recur) == len(old_value.data_children_recur)
                     
-                    # NOTE: 2023-05-23 15:24:45
-                    # potential bottleneck
-                    # if result:
-                    #     # check data children
-                    #     result = all(np.all(c_new == c_old) for (c_new, c_old) in zip(new_value.data_children_recur, old_value.data_children_recur))
         except:
             traceback.print_exc()
             result = False
@@ -1168,48 +1309,44 @@ class NeoContainerTrait(NeoBaseNeoTrait):
         return result
     
     def set(self, obj, value):
+        # NOTE: 2025-07-06 13:18:18 NOT using hashed here as they are expensive
         new_value = self._validate(obj,value)
         new_characteristics = self.get_characteristics(new_value)
-        # new_container_child_container_lengths, new_data_child_container_lengths = self.get_container_lengths(new_value)
         silent = True
         change_type = "modified"
         
         if self.name and self.name in obj._trait_values and self.name in obj.traits():
             old_value = obj._trait_values[self.name]
         else:
-            # print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}].set() for the first time")
             old_value = self.default_value
-            # self.hashed = gethash(old_value)
             self.characteristics = self.get_characteristics(obj)
-            # print(f"\n\told characteristics:\n\t{self.characteristics}")
                 
             silent=False
             change_type="new"
             
         try:
+            klass = getattr(self, "klass", None)
+            check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False
+            if any(not check_klass(v) for v in (new_value, old_value)):
+                if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
+                    change_type = "new"
+                else:
+                    change_type = "modified"
+                    
+                obj._trait_values[self.name] = new_value
+                obj._notify_trait(self.name, old_value, new_value, 
+                                change_type = change_type)
+                    
+                return
+
             if silent:
                 silent = self.compare_elements(old_value, new_value)
-                # print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}].set(): compare_elements → {silent}")
                 
             if silent:
-#                 print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}]:")
-#                 print(f"\n\tcontainer children container lengths new:\n\t{new_container_child_container_lengths}")
-#                 print(f"\n\tcontainer children container lengths old:\n\t{self.container_child_containers_lenghts}")
-#         
-#                 print(f"\n\tdata children container lengths new:\n\t{new_data_child_container_lengths}")
-#                 print(f"\n\tdata children container lengths old:\n\t{self.data_child_containers_lenghts}")
-        
                 if hasattr(self, "characteristics"):
                     silent = new_characteristics == self.characteristics
                 else:
                     silent=False
-                # print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}].set(): compare characteristics → {silent}")
-                # silent = new_container_child_container_lengths == self.container_child_containers_lenghts and new_data_child_container_lengths == self.data_child_containers_lenghts
-                # print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}].set(): compare container lengths → {silent}")
-                
-                # if not silent:
-                #     self.container_child_containers_lenghts = new_container_child_container_lengths
-                #     self.data_child_containers_lenghts = new_data_child_container_lengths
                 
         except:
             traceback.print_exc()
@@ -1219,16 +1356,10 @@ class NeoContainerTrait(NeoBaseNeoTrait):
         
         if not silent:
             self.characteristics = new_characteristics
-            # self.container_child_containers_lenghts = new_container_child_container_lengths
-            # self.data_child_containers_lenghts = new_data_child_container_lengths
         
         if silent is not True:
-            # print(f"\n{self.__class__.__name__}<NeoContainerTrait>[{self.name}].set(): to notify {change_type}")
-            # obj._notify_trait(self.name, old_value, new_value)
             obj._notify_trait(self.name, old_value, new_value,
                               change_type=change_type)
-        
-        
     
 class NeoBlockTrait(NeoContainerTrait):
     klass = neo.Block
@@ -1259,25 +1390,29 @@ class NeoChannelViewTrait(NeoBaseNeoTrait):
     _valid_defaults = (klass,)
     
 class NeoDataObjectTrait(NeoBaseNeoTrait):
-    klass = neo.dataobject.DataObject
+    klass = neo.core.dataobject.DataObject
     info_text = f"Traitlet for {klass}"
     default_value = Undefined
     _cast_types = tuple()
-    _valid_defaults = (klass,)
+    _valid_defaults = (klass,type(Undefined))
     
     def compare_elements(self, old_value, new_value):
         try:
-            result = np.all(super().compare_elements(old_value, new_value))
+            result = old_value.shape == new_value.shape
+            
+            if result:
+                result = np.all(super().compare_elements(old_value, new_value))
             if result:
                 result = np.all(old_value.array_annotations == new_value.array_annotations)
                 
         except:
-            traceback.print_exc()
+            # traceback.print_exc()
             result = False
             
         return result
     
     def set(self, obj, value):
+        # NOTE: 2025-07-06 13:18:56 NOT using hashes here as thy are expensive
         new_value = self._validate(obj, value) 
         silent = True
         change_type = "modified"
@@ -1291,8 +1426,19 @@ class NeoDataObjectTrait(NeoBaseNeoTrait):
             change_type="new"
             
         try:
-            if any(not isinstance(v, self.klass) for v in (new_value, old_value)):
-                silent=False
+            klass = getattr(self, "klass", None)
+            check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False
+            if any(not check_klass(v) for v in (new_value, old_value)):
+                if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
+                    change_type = "new"
+                else:
+                    change_type = "modified"
+                    
+                obj._trait_values[self.name] = new_value
+                obj._notify_trait(self.name, old_value, new_value, 
+                                change_type = change_type)
+                    
+                return
                 
             if silent:
                 if all(hasattr(x, "dtype") for x in (new_value, old_value)):
@@ -1301,9 +1447,6 @@ class NeoDataObjectTrait(NeoBaseNeoTrait):
             if silent:
                 silent = self.compare_elements(old_value, new_value)
                 
-            # print(f"\n{self.__class__.__name__}<NeoDataObjectTrait>[{self.name}] compare_elements → {silent}")
-                
-            # if silent:
         except:
             traceback.print_exc()
             silent = False
@@ -1311,11 +1454,9 @@ class NeoDataObjectTrait(NeoBaseNeoTrait):
         obj._trait_values[self.name] = new_value
         
         if not silent:
-            # print(f"\n{self.__class__.__name__}<NeoDataObjectTrait>[{self.name}] to notify {change_type}")
             obj._notify_trait(self.name, old_value, new_value,
                               change_type=change_type)
             
-                
 class NeoAnalogSignalTrait(NeoDataObjectTrait):
     klass = neo.AnalogSignal
     info_text = f"Traitlet for {klass}"
@@ -1404,7 +1545,50 @@ class NeoSpikeTrainTrait(NeoDataObjectTrait):
     
     def make_dynamic_default(self):
         return self.klass([0.]*pq.s, 0.)
+    
+class NeoObjectListTrait(NeoBaseNeoTrait):
+    klass = NeoObjectList
+    info_text = f"Traitlet for {klass}"
+    default_value = Undefined
+    _cast_types = tuple()
+    _valid_defaults = (klass,)
+           
+    def compare_elements(self, old_value, new_value) -> bool:
+        try:
+            result = type(old_value) == type(new_value)
             
+            if result and isinstance(old_value, self.klass):
+                result = len(old_value) == len(new_value)
+                
+            if result:
+                result = np.all(old_value == new_value)
+                
+            if all(hasattr(v, "all_channel_ids") for v in (old_value, new_value)):
+                if result:
+                    result = len(old_value.all_channel_ids) == len(new_value.all_channel_ids)
+                        
+                if result:
+                    result = old_value.all_channel_ids == new_value.all_channel_ids
+                
+            if all(len(v) > 0 for v in (old_value, new_value)):
+                if result:
+                    if all(hasattr(v, "t_start") for v in (old_value,  new_value)):
+                        result = result and old_value.t_start == new_value.t_start 
+                    elif any(hasattr(v, "t_start") for v in (old_value,  new_value)):
+                        result = False
+                        
+                if result:
+                    if all(hasattr(v, "t_stop") for v in (old_value,  new_value)):
+                        result = result and old_value.t_stop == new_value.t_stop 
+                    elif any(hasattr(v, "t_stop") for v in (old_value,  new_value)):
+                        result = False
+                    
+        except:
+            traceback.print_exc()
+            result = False
+            
+        return result
+    
 class NeoSpikeTrainListTrait(NeoBaseNeoTrait):
     klass = neo.spiketrainlist.SpikeTrainList
     info_text = f"Traitlet for {klass}"
@@ -1412,7 +1596,27 @@ class NeoSpikeTrainListTrait(NeoBaseNeoTrait):
     _cast_types = tuple()
     _valid_defaults = (klass,)
     
-    def compare_elements(self, old_value, new_value):
+#     def set(self, obj, value):
+#         # NOTE: 2025-11-25 13:49:29 brinbging in some of the ListTrait API
+#         # TODO/FIXME consider inheriting from ListTrait also
+#         new_value = self._validate(obj, value)
+#         new_hash = gethash(new_value)
+#         silent = True
+#         change_type = "modified"
+#         
+#         if self.name and self.name in obj._trait_values and self.name in obj.traits():
+#             old_value = obj._trait_values[self.name]
+#             if not self.hashed:
+#                 self.hashed = gethash(old_value)
+#         else:
+#             change_type="new"
+#             old_value = self.default_value
+#             if not self.hashed:
+#                 self.hashed = gethash(old_value)
+#             silent=False
+
+        
+    def compare_elements(self, old_value, new_value) -> bool:
         try:
             result = type(old_value) == type(new_value)
             
@@ -1426,7 +1630,20 @@ class NeoSpikeTrainListTrait(NeoBaseNeoTrait):
                 result = len(old_value.all_channel_ids) == len(new_value.all_channel_ids)
                     
             if result:
-                result = old_value.all_channel_ids == new_value.all_channel_ids and old_value.t_start == new_value.t_start and old_value.t_stop == new_value.t_stop
+                result = old_value.all_channel_ids == new_value.all_channel_ids
+                
+            if all(len(v) > 0 for v in (old_value, new_value)):
+                if result:
+                    if all(hasattr(v, "t_start") for v in (old_value,  new_value)):
+                        result = result and old_value.t_start == new_value.t_start 
+                    elif any(hasattr(v, "t_start") for v in (old_value,  new_value)):
+                        result = False
+                        
+                if result:
+                    if all(hasattr(v, "t_stop") for v in (old_value,  new_value)):
+                        result = result and old_value.t_stop == new_value.t_stop 
+                    elif any(hasattr(v, "t_stop") for v in (old_value,  new_value)):
+                        result = False
                     
         except:
             traceback.print_exc()
@@ -1440,12 +1657,6 @@ class NeoImageSequenceTrait(NeoDataObjectTrait):
     default_value = Undefined
     _cast_types = tuple()
     _valid_defaults = (klass,)
-    
-    # def compare_elements(self, old_value, new_value):
-    #     try:
-    #         result = super().compare_elements(old_value, new_value)
-    #         if result:
-    #             result = old_value.frame_duration == new_value.frame_duration
     
 class NeoCircularRegionOfInterestTrait(NeoBaseNeoTrait):
     klass = neo.regionofinterest.CircularRegionOfInterest
@@ -1578,26 +1789,14 @@ class QuantityTrait(Instance, ScipyenTraitTypeMixin):
         
         super().__init__(klass = self.klass, args=args, **kwargs)
         
-    # def length_error(self, obj, value):
-    #     e = "The '%s' trait of %s instance must be of length %i <= L <= %i, but a value of %s was specified." \
-    #         % (self.name, class_of(obj), self._minlen, self._maxlen, value)
-    #     raise TraitError(e)
-
     def validate_elements(self, obj, value):
-        # TODO/FIXME 2023-06-01 11:46:27
-        # what's this for ?!? get rid of length malarkey
-        
-        # length = len(value)
-        # if length < self._minlen or length > self._maxlen:
-        #     self.length_error(obj, value)
-
         return super().validate_elements(obj, value)
 
-        
     def make_dynamic_default(self):
         return pq.Quantity(self.default_value)
     
     def set(self, obj, value):
+        # NOTE: 2025-07-06 13:19:26 NOT using hashes here as they are expensive
         if isinstance(value, str):
             new_value = self._validate(obj, [value])
         else:
@@ -1620,29 +1819,34 @@ class QuantityTrait(Instance, ScipyenTraitTypeMixin):
             change_type="new"
         
         try:
-            if any(not isinstance(v, self.klass) for v in (new_value, old_value)):
-                silent=False
+            klass = getattr(self, "klass", None)
+            check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False
+            if any(not check_klass(v) for v in (new_value, old_value)):
+                if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
+                    change_type = "new"
+                else:
+                    change_type = "modified"
+                    
+                obj._trait_values[self.name] = new_value
+                obj._notify_trait(self.name, old_value, new_value, 
+                                change_type = change_type)
+                    
+                return
                 
             if silent:
                 if all(hasattr(x, "dtype") for x in (new_value, old_value)):
                     silent = new_value.dtype == old_value.dtype
                 
             if silent:
-                # so far silent is True when the observed knows about us
-                # check it we changed and notify
-                # silent = (new_hash == self.hashed)
                 silent = safe_identity_test(new_value, old_value)
             
         except:
             traceback.print_exc()
             silent = False
             
-        #print(f"silent {silent}")
-                
         obj._trait_values[self.name] = new_value
         
         if silent is not True:
-            # obj._notify_trait(self.name, old_value, new_value)
             obj._notify_trait(self.name, old_value, new_value,
                               change_type=change_type)
         
@@ -1705,11 +1909,9 @@ class IrregularlySampledDataSignalTrait(NeoDataObjectTrait):
     
     def make_dynamic_default(self):
         return self.klass([0.]*pq.dimensionless, [0], units=pq.dimensionless)
-        
-    
     
 class DataBagTrait(Instance, ScipyenTraitTypeMixin):
-    """Avoid slicing the DataBag type to dict.
+    r"""Avoid slicing the DataBag type to dict.
     
     When a DataBag is contained in another DataBag, its corresponding trait type
     should be DataBagTrait, such that the trait value type (DataBag) will be
@@ -1734,7 +1936,7 @@ class DataBagTrait(Instance, ScipyenTraitTypeMixin):
     
     def __init__(self, value_trait=None, per_key_traits=None, default_value=Undefined,
                  mutable_key_value_traits=True, **kwargs):
-        """Avoid back-casting DataBag to dict
+        r"""Avoid back-casting DataBag to dict
         """
         super(ScipyenTraitTypeMixin, self).__init__()
         
@@ -1801,16 +2003,6 @@ class DataBagTrait(Instance, ScipyenTraitTypeMixin):
         elif value_trait is not None:
             raise TypeError("`value_trait` must be a Trait or None, got %s" % repr_type(value_trait))
 
-        #if is_trait(key_trait):
-            #if isinstance(key_trait, type):
-                #warn("Traits should be given as instances, not types (for example, `Int()`, not `Int`)"
-                     #" Passing types is deprecated in traitlets 4.1.",
-                     #DeprecationWarning, stacklevel=2)
-                #key_trait = key_trait()
-            #self._key_trait = key_trait
-        #elif key_trait is not None:
-            #raise TypeError("`key_trait` must be a Trait or None, got %s" % repr_type(key_trait))
-
         self._per_key_traits = per_key_traits
         
         self.mutable_key_value_traits = mutable_key_value_traits
@@ -1827,13 +2019,10 @@ class DataBagTrait(Instance, ScipyenTraitTypeMixin):
         value = super(DataBagTrait, self).validate(obj, value) # this should always return a DataBag
         
         if isinstance(value, DataBag) and len(value):
-            # now, go ahead and validate its contents (or "elements")
             value = self.validate_elements(obj, value)
-            #return value
         return value
 
     def validate_elements(self, obj, value):
-        #print("DataBagTrait.validate_elements: obj", obj, "value", value)
         per_key_override = self._per_key_traits or {}
         key_trait = self._key_trait
         value_trait = self._value_trait
@@ -1843,7 +2032,6 @@ class DataBagTrait(Instance, ScipyenTraitTypeMixin):
         validated = {}
         for key in value:
             v = value[key]
-            #print(f"DataBag.validate_elements, obj: {obj}, value: {value}, key {key}:, v: {v}")
             if key_trait:
                 try:
                     key = key_trait._validate(obj, key, v)
@@ -1888,7 +2076,7 @@ class DataBagTrait(Instance, ScipyenTraitTypeMixin):
         super(DataBagTrait, self).instance_init(obj)
 
     def from_string(self, s):
-        """Load value from a single string"""
+        r"""Load value from a single string"""
         if not isinstance(s, str):
             raise TypeError(f"from_string expects a string, got {repr(s)} of type {type(s)}")
         try:
@@ -1900,7 +2088,7 @@ class DataBagTrait(Instance, ScipyenTraitTypeMixin):
             raise
 
     def from_string_list(self, s_list):
-        """Return a dict from a list of config strings.
+        r"""Return a dict from a list of config strings.
 
         This is where we parse CLI configuration.
 
@@ -1932,7 +2120,7 @@ class DataBagTrait(Instance, ScipyenTraitTypeMixin):
         return combined
 
     def item_from_string(self, s):
-        """Cast a single-key dict from a string.
+        r"""Cast a single-key dict from a string.
 
         Evaluated when parsing CLI configuration from a string.
 
@@ -1960,14 +2148,14 @@ class DataBagTrait(Instance, ScipyenTraitTypeMixin):
         return {key: value}
     
     def set(self, obj, value):
-        # print(f"{self.__class__.__name__}.set")
+        klass = getattr(self, "klass", None)
         try:
             old_value = obj._trait_values[self.name]
             
         except KeyError:
-            #print(f"{instance.name} not found")
             old_value = self.default_value
             
+        check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False
         # NOTE: 2021-10-21 22:02:40# self._validate is inherited from 
         # traitlets.TraitType.
         #
@@ -1980,47 +2168,58 @@ class DataBagTrait(Instance, ScipyenTraitTypeMixin):
         # When mutable_key_value_traits is False, next line will throw exception if
         # new value is a different trait from old_value
         new_value = self._validate(obj, value) 
+        new_hash = gethash(new_value.as_dict()) if check_klass(new_value) else gethash(new_value)
         silent=True
-        
         change_type = "modified"
         
         if self.name and self.name in obj._trait_values and self.name in obj.traits():
             old_value = obj._trait_values[self.name]
+            self.hashed = gethash(old_value.as_dict()) if check_klass(old_value) else gethash(old_value)
         else:
-            old_value = self.default_value
-            silent=False
             change_type="new"
+            old_value = self.default_value
+            self.hashed = gethash(old_value.as_dict()) if check_klass(old_value) else gethash(old_value)
+            silent=False
             
-        obj._trait_values[self.name] = new_value
+        if new_value is None and old_value is None:
+            return
         
         try:
-            if any(not isinstance(v, (self.klass, dict)) for v in (new_value, old_value)):
-                silent=False
+            if any(not check_klass(v) for v in (new_value, old_value)):
+                if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
+                    change_type = "new"
+                else:
+                    change_type = "modified"
+                self.hashed = new_hash
+                obj._trait_values[self.name] = new_value
+                obj._notify_trait(self.name, old_value, new_value, 
+                                change_type = change_type)
+                    
+                return
                 
             if silent:
-                new_hash = gethash(new_value.as_dict())
-                #print("\told %s (hash %s)\n\tnew %s (hash %s)" % (old_value, instance.hashed, new_value, new_hash))
-                #print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)
-                silent = (new_hash == self.hashed)
+                silent = bool(new_hash == self.hashed)
             
                 if not silent:
-                    self.hashed = new_hash
+                    change_type = "modified"
+                    obj._trait_values[self.name] = new_value
+                    obj._notify_trait(self.name, old_value, new_value, 
+                                    change_type = change_type)
+                    return
                 
         except:
             traceback.print_exc()
             # if there is an error in comparing, default to notify
             silent = False
             
-        if silent is not True:
-            # we explicitly compare silent to True just in case the equality
-            # comparison above returns something other than True/False
-            # obj._notify_trait(self.name, old_value, new_value)
+        if not silent:
+            self.hashed = new_hash
+            obj._trait_values[self.name] = new_value
             obj._notify_trait(self.name, old_value, new_value,
                               change_type=change_type)
 
 class DequeTrait(Instance, ScipyenTraitTypeMixin):
     info_text = "Traitlet for deque"
-    # klass = _NotifierDeque_
     klass = deque
     _cast_types = (list, tuple)
     _valid_defaults = (deque, list, tuple, set, frozenset) # -- why ?!?
@@ -2083,55 +2282,49 @@ class DequeTrait(Instance, ScipyenTraitTypeMixin):
         return super().validate_elements(obj, value)
 
     def set(self, obj, value):
-        # if isinstance(value, str):
-        #     new_value = self._validate(obj, [value])
-        # else:
-        #     new_value = self._validate(obj, value)
-        
         new_value = self._validate(obj, value)
-            
-        # NOTE: 82021-10-20 09:13:51
-        # to also flag addition of this trait:
-        # when DataBag is empty, its hashed value will be 0 thus not different 
-        # from the default; therefore when and old_value of this trait does not
-        # exist we should be notifying the observer
+        new_hash = gethash(new_value)
         silent = True 
-        
         change_type="modified"
         
         if self.name and self.name in obj._trait_values and self.name in obj.traits():
             old_value = obj._trait_values[self.name]
+            self.hashed = gethash(old_value)
         else:
             old_value = self.default_value
+            self.hashed = gethash(old_value)
             silent=False
             change_type="new"
         
-        obj._trait_values[self.name] = new_value
         
         try:
-            if any(not isinstance(v, self.klass) for v in (new_value, old_value)):
-                silent=False
+            klass = getattr(self, "klass", None)
+            check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False
+            if any(not check_klass(v) for v in (new_value, old_value)):
+                if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
+                    change_type = "new"
+                else:
+                    change_type = "modified"
+                    
+                obj._trait_values[self.name] = new_value
+                obj._notify_trait(self.name, old_value, new_value, 
+                                change_type = change_type)
+                    
+                return
                 
             if silent:
                 silent = bool(old_value == new_value)
 
             if silent:
-                # so far silent is True when the observed knows about us
-                # check it we changed and notify
-                new_hash = gethash(new_value)
                 silent = (new_hash == self.hashed)
             
-                if not silent:
-                    self.hashed = new_hash
-                
         except:
             traceback.print_exc()
             silent = False
             
-        #print(f"silent {silent}")
-                
         if silent is not True:
-            # obj._notify_trait(self.name, old_value, new_value)
+            self.hashed = new_hash
+            obj._trait_values[self.name] = new_value
             obj._notify_trait(self.name, old_value, new_value,
                               change_type=change_type)
         

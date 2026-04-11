@@ -1,4 +1,4 @@
-""" see qt examples/widgets/painting/gradients
+r""" see qt examples/widgets/painting/gradients
 """
 import array, os, typing, numbers, inspect, traceback
 from collections import OrderedDict
@@ -6,15 +6,37 @@ import numpy as np
 from enum import IntEnum, auto
 from functools import partial
 
-from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
-from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
-# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 
-from core.prog import safeWrapper
+from core.prog import safewrapper
 
-from core.utilities import (counter_suffix, reverse_dict, reverse_mapping_lookup)
+from core.utilities import (reverse_dict, reverse_mapping_lookup)
+from core.strutils import counter_suffix
 
 from gui.painting_shared import (HoverPoints, x_less_than, y_less_than,
                               qtGlobalColors, standardPalette, standardPaletteDict, 
@@ -143,7 +165,7 @@ class ShadeWidget(QtWidgets.QWidget):
         return self._hoverPoints.points
     
     def colorAt(self, x:int) -> int:
-        """Returns the color of the pixel in the shade's image at index 'x'.
+        r"""Returns the color of the pixel in the shade's image at index 'x'.
         'x' is an integer 'x' coordinate in shade's image.
         
         """
@@ -663,7 +685,7 @@ class GradientRenderer(QtWidgets.QWidget):
         self._useRelativeFocalRadius = False
         self.update()
     
-    @safeWrapper
+    @safewrapper
     def paintEvent(self, e:QtGui.QPaintEvent) -> None:
         painter = QtGui.QPainter()
         painter.begin(self)
@@ -743,7 +765,7 @@ class GradientRenderer(QtWidgets.QWidget):
     def _restrictPoint(self, p:QtCore.QPointF) -> QtCore.QPointF:
         return restrict_point(p, self.width(), self.height())
             
-    @safeWrapper
+    @safewrapper
     def paint(self, p:QtGui.QPainter) -> None:
         # NOTE: 2021-05-27 08:17:19
         # not sure why, but if setting the painter brush to a gradient stored as
@@ -917,7 +939,7 @@ class GradientWidget(QtWidgets.QWidget):
         
         
     def showEvent(self, ev):
-        """Executed when the widget becomes visible.
+        r"""Executed when the widget becomes visible.
         """
         #print("GradientWidget.showEvent self._rendererGradient", self._rendererGradient)
         if self._rendererGradient is None:
@@ -1324,7 +1346,7 @@ class GradientWidget(QtWidgets.QWidget):
                       gradient:typing.Union[QtGui.QLinearGradient, QtGui.QRadialGradient, QtGui.QConicalGradient, QtGui.QGradient, QtGui.QGradient.Preset, str, ColorGradient],
                       gradientType:typing.Optional[typing.Union[QtGui.QGradient.Type, str]]=QtGui.QGradient.LinearGradient,
                       points:typing.Optional[QtGui.QPolygonF] = None) -> None:
-        """Displays gradient.
+        r"""Displays gradient.
         
         If gradient is generic (QtGui.QGradient) then the concrete gradient type
         must be specified in the parameter 'gradientType'
@@ -1500,7 +1522,7 @@ class GradientWidget(QtWidgets.QWidget):
         
     def addGradient(self, val:typing.Union[QtGui.QGradient, QtGui.QGradient.Preset, str, ColorGradient],
                     name:str="") -> None:
-        """Qt slot for adding a custom gradient
+        r"""Qt slot for adding a custom gradient
         """
         sigBlocker = QtCore.QSignalBlocker(self._presetComboBox)
         
@@ -1525,7 +1547,7 @@ class GradientWidget(QtWidgets.QWidget):
         self.removeGradient(self._presetComboBox.currentText())
         
     def removeGradient(self, name:str):
-        """Remove a gradient from the list by name.
+        r"""Remove a gradient from the list by name.
         Standard Qt gradient presets are not affected (they are read-only).
         The 'Default' gradient can be removed.
         
@@ -1697,7 +1719,7 @@ class GradientWidget(QtWidgets.QWidget):
         self._resetTitle()
             
     def _getRendererGradientLine(self) -> QtCore.QLineF:
-        """ Returns the QLineF through the renderer's hoverpoints"""
+        r""" Returns the QLineF through the renderer's hoverpoints"""
         g = self._renderer.gradient # always one of QLinearGradient, QRadialGradient, QConicalGradient
         hoverStopsLine = QtCore.QLineF(*(p for p in self._renderer.hoverPoints.points))
         return hoverStopsLine
@@ -1725,14 +1747,14 @@ class GradientWidget(QtWidgets.QWidget):
         
     @property
     def normalizedGradient(self) -> QtGui.QGradient:
-        """The currently displayed gradient normalized to the renderer's size
+        r"""The currently displayed gradient normalized to the renderer's size
         """
         #return normalizeGradient(self.gradient, self._renderer.sizeHint())
         return normalizeGradient(self._renderer.gradient, self._renderer.rect())
     
     @property
     def gradient(self) -> QtGui.QGradient:
-        """Accessor to the currently displayed gradient (a QGradient).
+        r"""Accessor to the currently displayed gradient (a QGradient).
         NOTE: This is dynamically generated by the renderer.
         The setter for this method uses the QGradient object passsed as argument
         to instruct the rendering of a new gradient which can be accesses by this
@@ -1766,7 +1788,7 @@ class GradientWidget(QtWidgets.QWidget):
     def setGradient(self, val:typing.Union[QtGui.QGradient, QtGui.QGradient.Preset, str],
                     gradientType:typing.Optional[typing.Union[QtGui.QGradient.Type, str]]=None,
                     points:typing.Optional[QtGui.QPolygonF] = None) -> None:
-        """Sets the display to show a gradient.
+        r"""Sets the display to show a gradient.
         
         The gradient is NOT added to the internal list of gradients.
         

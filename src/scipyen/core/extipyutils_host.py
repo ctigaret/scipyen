@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Module with housekeeping utilities for an external IPython kernel.
+r"""Housekeeping utilities for an external IPython kernel.
 
 To be run/imported inside a REMOTE ipython kernel (see extipyutils_client).
 
@@ -20,54 +20,28 @@ extipyutils_client.
 
 To expose Scipyen API inside the REMOTE IPython kernel workspace, either insert
 relevant import statements in the init_commands list inside extipyutils_client
-module. NOTE: extipy_init module cannot be used for importing Scipyen API in 
-the REMOTE kernel namespace, as it is oblivious of Scipyen's module paths.
+module. 
+
+NOTE: extipy_init module cannot be used for importing Scipyen API in 
+the REMOTE kernel namespace, as it is oblivious of most of Scipyen's modules. 
+Although many of these are imported in the remote kernel by executing 'init_commands'
+defined in the module extipyutils_client (called from the Scipyen's "side") the
+PyQt classes will be useless there (see NOTE below), unless a new instance of 
+QApplication is started (CAUTION: This may break things!)
+
+NOTE: Currently, there is no Qt event loop in the foreign kernel although, in
+principle, one could be started and run independently of the Scipyen's main Qt 
+event loop.
+While the external console lives in the main Scipyen's process, it only provides 
+a command line interface to the remote kernel. Any commands run at the external 
+console will be executed in the remote kernel workspace, with no access to 
+Scipyen's QApplication.
 
 NOTE: NeuronMagics are useful to start NEURON manually from an external IPython
 kernel, optionally with ('nrngui') or without NEURON GUI ('nrnpy')
 """
 
 import os, sys
-
-# NOTE: 2023-04-03 19:27:55
-# don't need this anymore, do we?
-#if sys.platform == 'win32':
-    ## Try conda first
-    #scipyenvdir = os.getenv("CONDA_PREFIX")
-
-    #if scipyenvdir is None:
-        #scipyenvdir = os.getenv("VIRTUAL_ENV")
-        #if scipyenvdir is None:
-            #sys.exit("You are NOT inside a virtual Python environment")
-        #else:
-
-            #scipyenvbin     = os.path.join(scipyenvdir,"bin")
-            #scipyenvlib     = os.path.join(scipyenvdir,"lib")
-            #scipyenvlib64   = os.path.join(scipyenvdir,"lib64")
-
-
-        #if os.path.isdir(scipyenvbin):
-            #os.add_dll_directory(scipyenvbin)
-        #else:
-            #print(f"{scipyenvbin} directory not found; functionality will be limited")
-        #if os.path.isdir(scipyenvlib):
-            #os.add_dll_directory(scipyenvlib)
-        #else:
-            #print(f"{scipyenvlib} directory not found; functionality will be limited")
-        #if os.path.isdir(scipyenvlib64):
-            #os.add_dll_directory(scipyenvlib64)
-        #else:
-            #print(f"{scipyenvlib64} directory not found; functionality will be limited")
-
-        #vigranumpyextdir = os.path.join(scipyenvdir, "lib", "site-packages", "vigra")
-
-        #if os.path.isdir(vigranumpyextdir):
-            #sys.path.append(vigranumpyextdir)
-            #os.add_dll_directory(vigranumpyextdir)
-
-
-        #del scipyenvbin, scipyenvlib, scipyenvlib64, vigranumpyextdir
-
 
 from contextlib import (contextmanager,
                         ContextDecorator,)
@@ -91,7 +65,6 @@ nrn_ipython_initialization_file = os.path.join(os.path.dirname(__module_path__),
 
 shell = get_ipython()
 shell.run_cell("from ipykernel import (get_connection_file, get_connection_info, connect_qtconsole)")
-#shell.run_cell(os.path.join())
 
 @magics_class
 class NeuronMagics(Magics):
@@ -101,18 +74,17 @@ class NeuronMagics(Magics):
     @line_magic
     @needs_local_scope
     def nrngui(self, line, local_ns):
-        """Starts NEURON modelling with gui, in this kernel
+        r"""Starts NEURON modelling with gui, in this kernel
         """
         get_ipython().run_line_magic("run", self.nrngui_magic_cmd)
         
     @line_magic
     @needs_local_scope
     def nrnpy(self, line, local_ns):
-        """Starts NEURON modelling (without gui), in this kernel
+        r"""Starts NEURON modelling (without gui), in this kernel
         """
         get_ipython().run_line_magic("run", self.nrnpy_magic_cmd)
         
-#get_ipython().register_magics(NeuronMagics)
 shell.register_magics(NeuronMagics)
 
 

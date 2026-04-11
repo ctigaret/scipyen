@@ -1,34 +1,51 @@
 # -*- coding: utf-8 -*-
-"""Widgets for parameter inputs
+# $Id: modelfitting_ui.py $
+# SPDX-FileCopyrightText: 2022 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+r"""Widget for model parameter inputs
 """
 import math, numbers, typing, os
 import numpy as np
 import quantities as pq
 import pandas as pd
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 from core.strutils import str2symbol
+from core import models
 from gui import guiutils
 import gui.quickdialog as qd
 from gui.widgets.small_widgets import QuantitySpinBox
 
-from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-from qtpy.uic import loadUiType
-# from PyQt5 import QtCore, QtGui, QtWidgets
-# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
-# from PyQt5.uic import loadUiType
-
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-# Ui_TestParamsWidgets2, QWidget = loadUiType(os.path.join(__module_path__, "TestParamsWidget2.ui"), from_imports=True, import_from="gui")
-# 
-# class TestParamsWidgets2(QWidget, Ui_TestParamsWidgets2):
-#     def __init__(self, parent=None):
-#         super().__init__(parent)
-#         self.setupUi(self)
-
 class ModelParametersWidget(QtWidgets.QWidget):
-    """A widget composed of labels and spin boxes for input of numeric values
+    r"""A widget composed of labels and spin boxes for input of numeric values
     The child widgets (input field and labels) are arranged in a grid.
     There is support for numerical scalar parameters only, used for model fitting.
 
@@ -56,7 +73,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
     """
     sig_dataChanged = Signal(name="sig_dataChanged")
     #                                 index(row), column name
-    sig_parameterChanged = Signal(str,        str,        name="sig_parameterChanged")
+    sig_parameterChanged = Signal(str,str, name="sig_parameterChanged")
     sig_badBounds = Signal(str, name="sig_badBounds")
     sig_infeasible_x0 = Signal(str, name="sig_infeasible_x0")
     
@@ -65,10 +82,10 @@ class ModelParametersWidget(QtWidgets.QWidget):
     _spin_min_ = -math.inf
     _spin_max_ =  math.inf
     
-    _mandatory_columns_ = ("Initial Value:", "Lower Bound:", "Upper Bound:")
+    _mandatory_columns_ = ("Initial Value", "Lower Bound", "Upper Bound")
     
     def __init__(self, parent:QtWidgets.QWidget=None, **kwargs):
-        """ Constructor of ModelParametersWidget.
+        r""" Constructor of ModelParametersWidget.
     
             Positional parameters:
             ======================
@@ -144,19 +161,12 @@ class ModelParametersWidget(QtWidgets.QWidget):
         self._parameters_ = self.setParameters(parameters, lower, upper, names,
                                                refresh=False)
             
-        # if not self._verticalLayout_:
-        #     self._parameters_ = self._parameters_.T
-        
-        self._configureUI_()# mus be called
+        self._configureUI_() # must be called even if we're not defined in a UI file
         
     def _generate_widgets(self):
         paramsDF = self._parameters_
-        # if self._verticalLayout_:
-        #     paramsDF = self._parameters_
-        # else:
-        #     paramsDF = self._parameters_.T
             
-        header = ["Parameters:"] + [c for c in self._parameters_.columns]
+        header = ["Parameters"] + [c for c in self._parameters_.columns]
         minSpinWidth = list()
         self.spinBoxes = list()
 
@@ -178,33 +188,38 @@ class ModelParametersWidget(QtWidgets.QWidget):
                     
                 else:
                     p = paramsDF.loc[i,c]
-                    # print(f"\tparam {i} {c} = {p}")
-                    w = QuantitySpinBox(self)
-                    w.setObjectName(f"{str2symbol(i)}_{str2symbol(c)}_spinBox")
+                    if isinstance(p, bool):
+                        w = QtWidgets.QCheckBox(self)
+                        w.setObjectName(f"{str2symbol(i)}_{str2symbol(c)}_checkBox")
+                        w.setChecked(p==True)
+                        w.toggled.connect(self._slot_setBool)
+                    else:
+                        w = QuantitySpinBox(self)
+                        w.setObjectName(f"{str2symbol(i)}_{str2symbol(c)}_spinBox")
                     
-                    # WARNING: 2022-11-03 23:39:21
-                    # This is for general case.
-                    # Depending on the model for which this is intended, one may
-                    # have to restrict these to physically (and mathematically)
-                    # reasonable values by accessing these spine boxes directly
-                    # (based on parameter name and value type i.e. initial, lower
-                    # or upper bound)
-                    # This can be done using self.getSpinBox() method, see
-                    # mPSCanalysis.EventAnalysis for an example
-                    w.setMinimum(self._spin_min_)
-                    w.setMaximum(self._spin_max_)
-                    
-                    w.setDecimals(self.spinDecimals)
-                    w.setSingleStep(self.spinStep)
-                    w.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
-                    # w.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectToNearestValue)
-                    w.valueChanged[float].connect(self._slot_newValue)
-                    w.setAccelerated(True)
-                    w.setValue(p)
-                    
-                    t = w.text()
-                    minSpinWidth.append(guiutils.get_text_width(t))
-                    self.spinBoxes.append(w)
+                        # WARNING: 2022-11-03 23:39:21
+                        # This is for general case.
+                        # Depending on the model for which this is intended, one may
+                        # have to restrict these to physically (and mathematically)
+                        # reasonable values by accessing these spin boxes directly
+                        # (based on parameter name and value type i.e. initial, lower
+                        # or upper bound)
+                        # This can be done using self.getSpinBox() method, see
+                        # mPSCanalysis.EventAnalysis for an example
+                        w.setMinimum(self._spin_min_)
+                        w.setMaximum(self._spin_max_)
+                        
+                        w.setDecimals(self.spinDecimals)
+                        w.setSingleStep(self.spinStep)
+                        w.setStepType(QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+                        # w.setCorrectionMode(QtWidgets.QAbstractSpinBox.CorrectToNearestValue)
+                        w.valueChanged[float].connect(self._slot_newValue)
+                        w.setAccelerated(True)
+                        w.setValue(p)
+                        
+                        t = w.text()
+                        minSpinWidth.append(guiutils.get_text_width(t))
+                        self.spinBoxes.append(w)
                     
                 self.widgetsLayout.addWidget(w, layout_row, layout_col, 1, 1)
                 
@@ -243,7 +258,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
         
             
     def getSpinBox(self, paramName:str, value_type:str):
-        """Access the spin box of a numeric parameter initial value, or boundary.
+        r"""Access the spin box of a numeric parameter initial value, or boundary.
         
         Useful to restrict the of values for a particular spin box to a range
         that is both physically and numerically reasonable, AFER the widget has
@@ -295,7 +310,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
     
     @property
     def parameters(self):
-        """A pandas DataFrame with model parameters, lower and upper bounds.
+        r"""A pandas DataFrame with model parameters, lower and upper bounds.
             Follows the widget's orientation
         
         Orientation must be changed BEFORE setting new parameters via the setter
@@ -308,15 +323,15 @@ class ModelParametersWidget(QtWidgets.QWidget):
             
     @parameters.setter
     def parameters(self, params):
-        if isinstance(params, pd.DataFrame) and all(s in params.columns for s in ("Initial Value:", "Lower Bound:", "Upper Bound:")):
-            self.setParameters(params["Initial Value:"], 
-                               lower = params["Lower Bound:"], 
-                               upper = params["Upper Bound:"],
+        if isinstance(params, pd.DataFrame) and all(s in params.columns for s in ("Initial Value", "Lower Bound", "Upper Bound")):
+            self.setParameters(params["Initial Value"], 
+                               lower = params["Lower Bound"], 
+                               upper = params["Upper Bound"],
                                names = params.index,
                                refresh=True)
             
     def setParameters(self, parameters:typing.Sequence, lower=None, upper=None, names=None, refresh = True):
-        """Generates new parameters data frame.
+        r"""Generates new parameters data frame.
         
         The display is refreshed UNLESS refresh is False. The display update
         either changes individual values in the spin boxes (if the new parameters
@@ -400,9 +415,9 @@ class ModelParametersWidget(QtWidgets.QWidget):
             else:
                 raise TypeError(f"'upper' expected to be a scalar or a sequence of {len(parameters)} elements; instead, got {upper}")
         
-            paramsDF = pd.DataFrame({"Initial Value:": parameters,
-                                     "Lower Bound:":lower,
-                                     "Upper Bound:":upper},
+            paramsDF = pd.DataFrame({"Initial Value": parameters,
+                                     "Lower Bound":lower,
+                                     "Upper Bound":upper},
                                      index = names)
             
         elif isinstance(parameters, pd.DataFrame):
@@ -421,21 +436,21 @@ class ModelParametersWidget(QtWidgets.QWidget):
             # NOTE: 2022-11-24 23:14:36
             # perform sanity checks on bounds
             for i in paramsDF.index:
-                if paramsDF.loc[i, "Lower Bound:"] > paramsDF.loc[i, "Upper Bound:"]:
-                    lo = paramsDF.loc[i, "Upper Bound:"]
-                    up = paramsDF.loc[i, "Lower Bound:"]
-                    paramsDF.loc[i, "Lower Bound:"] = lo
-                    paramsDF.loc[i, "Upper Bound:"] = up
+                if paramsDF.loc[i, "Lower Bound"] > paramsDF.loc[i, "Upper Bound"]:
+                    lo = paramsDF.loc[i, "Upper Bound"]
+                    up = paramsDF.loc[i, "Lower Bound"]
+                    paramsDF.loc[i, "Lower Bound"] = lo
+                    paramsDF.loc[i, "Upper Bound"] = up
                     
                     # sig_badBounds.emit(str(i))
                     
-                if paramsDF.loc[i, "Lower Bound:"] > paramsDF.loc[i, "Initial Value:"]:
-                    paramsDF.loc[i, "Lower Bound:"] = paramsDF.loc[i, "Initial Value:"]
+                if paramsDF.loc[i, "Lower Bound"] > paramsDF.loc[i, "Initial Value"]:
+                    paramsDF.loc[i, "Lower Bound"] = paramsDF.loc[i, "Initial Value"]
                     
                     # sig_infeasible_x0.emit(str(i))
                     
-                if paramsDF.loc[i, "Upper Bound:"] < paramsDF.loc[i, "Initial Value:"]:
-                    paramsDF.loc[i, "Upper Bound:"] = paramsDF.loc[i, "Initial Value:"]
+                if paramsDF.loc[i, "Upper Bound"] < paramsDF.loc[i, "Initial Value"]:
+                    paramsDF.loc[i, "Upper Bound"] = paramsDF.loc[i, "Initial Value"]
                     
                     # sig_infeasible_x0.emit(str(i))
             
@@ -482,9 +497,37 @@ class ModelParametersWidget(QtWidgets.QWidget):
     @spinStep.setter
     def spinStep(self, value:float):
         self._spinStep_ = float(value)
+        
+    @Slot(bool)
+    def _slot_setBool(self, value:bool):
+        widget = self.sender()
+        if self.isVertical: # FIXME/TODO/BUG
+            paramsDF = self._parameters_
+        else:
+            paramsDF = self._parameters_.T
+            
+        if isinstance(widget, QtWidgets.QCheckBox):
+            if index == -1: # this should never happen
+                return
+
+            layout_col = index // self.widgetsLayout.rowCount()
+            layout_row = index % self.widgetsLayout.rowCount()
+            
+            param_col = self._parameters_.columns[layout_col-1]
+            param_row = self._parameters_.index[layout_row-1]
+
+            old_val = self._parameters_.iloc[layout_row-1, layout_col-1]
+            
+            if old_val == value:
+                return
+            
+            self._parameters_.iloc[layout_row-1, layout_col-1] = value
+            self.sig_dataChanged.emit()
+            self.sig_parameterChanged.emit(self._parameters_.index[layout_row-1], 
+                                           self._parameters_.columns[layout_col-1])
     
     @Slot(float)
-    def _slot_newValue(self, value):
+    def _slot_newValue(self, value:float):
         widget = self.sender()
         if self.isVertical: # FIXME/TODO/BUG
             paramsDF = self._parameters_
@@ -577,7 +620,7 @@ class ModelParametersWidget(QtWidgets.QWidget):
                                            self._parameters_.columns[layout_col-1])
             
     def validate(self):
-        """ Always returns True.
+        r""" Always returns True.
         This method is present so that ModelParametersWidget instances can be
         embedded in QuickDialog (which expects widgets with a `validate` method)
         """
@@ -588,3 +631,5 @@ class ModelParametersWidget(QtWidgets.QWidget):
     
     def getParameterValue(self, parameter_name:str, what:str):
         return self.parameters.loc[parameter_name, what]
+
+

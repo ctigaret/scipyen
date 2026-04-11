@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""
+r"""
 Created on Sun May 10 14:05:54 2020
 
 @author: cezar
@@ -34,12 +34,12 @@ h.nrnmpi_init() # must happen before any use of the ParallelContext class
 pc = h.ParallelContext()
 
 class Ring:
-    """A network of *N* ball-and-stick cells where cell n makes an
+    r"""A network of *N* ball-and-stick cells where cell n makes an
     excitatory synapse onto cell n + 1 and the last, Nth cell in the
     network projects to the first cell.
     """
     def __init__(self, N=5, stim_w=0.04, stim_t=9, stim_delay=1, syn_w=0.01, syn_delay=5, r=50, nseg=51):
-        """
+        r"""
         :param N: Number of cells.
         :param stim_w: Weight of the stimulus
         :param stim_t: time of the stimulus (in ms)
@@ -62,7 +62,7 @@ class Ring:
         self._nc.weight[0] = stim_w
     
     def _create_cells(self, N, r, nseg=51):
-        """n = number of cells; r = circle radius
+        r"""n = number of cells; r = circle radius
         """
         self.cells = []
         for i in range(N):
@@ -77,7 +77,7 @@ class Ring:
             source._ncs.append(nc)        
         
     def set_nseg(self, value=51):
-        """(Re)set the number of segments for the sections in each cell
+        r"""(Re)set the number of segments for the sections in each cell
         :param value: new number of segments (default is 51)
         """
         for cell in self.cells:
@@ -91,12 +91,12 @@ class Ring:
     
     
 class Ring1:
-    """A network of *N* ball-and-stick cells where cell n makes an
+    r"""A network of *N* ball-and-stick cells where cell n makes an
     excitatory synapse onto cell n + 1 and the last, Nth cell in the
     network projects to the first cell.
     """
     def __init__(self, N=5, stim_w=0.04, stim_t=9, stim_delay=1, syn_w=0.01, syn_delay=5, r=50, nseg=51):
-        """
+        r"""
         :param N: Number of cells.
         :param stim_w: Weight of the stimulus
         :param stim_t: time of the stimulus (in ms)
@@ -126,7 +126,7 @@ class Ring1:
             self._nc.weight[0] = stim_w
         
     def set_gids(self):
-        """Set the gidlist on this host.
+        r"""Set the gidlist on this host.
         Each process specifies which cells it will simulate.
         """
         #### Round-robin counting.
@@ -139,7 +139,7 @@ class Ring1:
     
      
     def _create_cells(self, r, nseg=51):
-        """n = number of cells; r = circle radius
+        r"""n = number of cells; r = circle radius
         """
         #### associate the cell gid with the NetCon _spike_detector. 
         #### This allows the _connect_cells to make connections based on gids 
@@ -170,7 +170,7 @@ class Ring1:
             #source._ncs.append(nc)        
         
     def set_nseg(self, value=51):
-        """(Re)set the number of segments for the sections in each cell
+        r"""(Re)set the number of segments for the sections in each cell
         :param value: new number of segments (default is 51)
         """
         for cell in self.cells:

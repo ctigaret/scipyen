@@ -1,0 +1,88 @@
+# created manually on 2025-03-05 00:31:03
+# to use, call mamba env create --prefix <your chosen location> --file <this file>
+# but PLEASE avoid long pathnames and avoid empty spaces in the pathnames
+# (make it easy for yourself)
+#
+# NOTE: 2025-03-11 19:28:07
+# you MAY change the value for "name", below and dependencies - python (e.g. 3.12)
+name: scipyenv
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python>=3.13
+  - pip
+  - sphinx
+  - isodate
+  - cmasher
+  - confuse
+  - docrepr
+  - markdown
+  - pymarkdown
+  - pydoc-markdown
+  - restructuredtext_lint
+  - marko
+  - pyxdg
+  - jupyter
+  - qtconsole
+  - jupyterthemes
+  - matplotlib
+  - more-itertools
+  - ipyparallel
+  - conda-forge::pywin32
+  - conda-forge::jupyter_cms
+  - conda-forge::jupyter_qtconsole_colorschemes
+  - conda-forge::biopython
+  - conda-forge::brainglobe-atlasapi
+  - conda-forge::napari
+  - conda-forge::brainglobe-napari-io
+  - conda-forge::brainglobe-segmentation
+  - conda-forge::brainrender-napari
+  - conda-forge::vigra
+  - conda-forge::researchpy
+  - conda-forge::pyserial
+  - conda-forge::termcolor
+  - conda-forge::termcolor2
+  - conda-forge::colorama
+  - conda-forge::pickleshare
+  - conda-forge::shapely
+  - conda-forge::pynwb
+  - conda-forge::scikit-bio
+  - conda-forge::scikit-learn
+  - conda-forge::scikit-image
+  - conda-forge::pandas-flavor
+  - conda-forge::opencv
+  - sympy
+  - pyqtgraph
+  - qimage2ndarray
+  - quantities
+  - python-neo
+  - cmocean
+  - inflect
+  - seaborn
+  - pingouin
+  - dill
+  - libNeuroML
+  - matlab_kernel
+  - octave_kernel
+  - pyinstaller
+  - pip:
+      - openmath
+      - openexpressions
+      - cattrs==24.1.2
+      - gnuplot-kernel==0.4.1
+      - hdf5view==0.2.3
+      - imreg-dft==2.0.0
+      - modelspec==0.3.6
+      - nixio==1.5.4
+      - pyabf==2.3.8
+      - python-magic==0.4.27
+      - winshell
+      - ncbi-taxonomist
+      - entrez-utils
+      - taxoniq
+      - pyqt6
+      - pyqt6-sip
+      - pyqt6-charts
+      - pyqt6-webengine
+

@@ -1,0 +1,9 @@
+README.md
+keplerdark.py
+pyproject.toml
+scipyen_console_styles.egg-info/PKG-INFO
+scipyen_console_styles.egg-info/SOURCES.txt
+scipyen_console_styles.egg-info/dependency_links.txt
+scipyen_console_styles.egg-info/entry_points.txt
+scipyen_console_styles.egg-info/requires.txt
+scipyen_console_styles.egg-info/top_level.txt

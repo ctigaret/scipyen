@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
     This module contains various generic GUI utilities: mostly dialogues
 """
 # NOTE: 2018-04-15 10:34:03
@@ -47,19 +47,40 @@ from copy import copy
 #### END core python modules
 
 #### BEGIN 3rd party modules
-from gui.pyqtgraph_patch import pyqtgraph as pg
-import numpy as np
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 
-from qtpy import QtCore, QtGui, QtWidgets, QtXml
-from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
-# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
+from core.pyqtgraph_patch import pyqtgraph as pg
+import numpy as np
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
 from core.traitcontainers import DataBag
-from core.prog import (safeWrapper, deprecated,
+from core.prog import (safewrapper, deprecated,
                        timefunc, processtimefunc,)
 from core.workspacefunctions import debug_scipyen
 
@@ -67,7 +88,7 @@ from core.workspacefunctions import debug_scipyen
 
 #### BEGIN pict.gui modules
 from . import quickdialog
-from . import resources_rc # OK this is resources_rc.py
+# from . import resources_rc # OK this is resources_rc.py
 # from . import icons_rc
 # NOTE: 2023-07-12 09:23:22 are these needed here? FIXME/TODO
 from .planargraphics import (Arc, ArcMove, Cubic, Cursor, Ellipse, Line, Move, Path,
@@ -153,7 +174,7 @@ class GuiWorker(QtCore.QRunnable):
             self.signals.signal_Finished.emit()  # Done
             
 class ProgressWorkerSignals(QtCore.QObject):
-    """See Martin Fitzpatrick's tutorial on Multithreading PyQt applications with QThreadPool 
+    r"""See Martin Fitzpatrick's tutorial on Multithreading PyQt applications with QThreadPool 
     https://martinfitzpatrick.name/article/multithreading-pyqt-applications-with-qthreadpool/
     
     Defines the signals available from a running worker thread.
@@ -181,8 +202,17 @@ class ProgressWorkerSignals(QtCore.QObject):
     signal_setMaximum = Signal(int)
     signal_Canceled = Signal()
     
+    @property
+    def signals(self):
+        return (self.signal_Finished,
+                self.sig_error,
+                self.signal_Result,
+                self.signal_Progress,
+                self.signal_setMaximum,
+                self.signal_Canceled)
+    
 class ProgressWorkerRunnable(QtCore.QRunnable):
-    """
+    r"""
     ProgressWorkerRunnable thread
 
     Inherits from QRunnable to handle worker thread setup, signals and wrap-up.
@@ -209,7 +239,7 @@ class ProgressWorkerRunnable(QtCore.QRunnable):
     # canceled = Signal(name="canceled")
     
     def __init__(self, fn, progressDialog, *args, **kwargs):
-        """
+        r"""
         fn: callable
         progressDialog: QtWidgets.QProgressDialog
         *args, **kwargs are passed to fn
@@ -263,7 +293,8 @@ def checkboxDialogPrompt(parent, title, slist):
     
     checkboxes = [quickdialog.CheckBox(group, value) for value in slist]
     
-    dlg.resize(dlg.minimumSize())
+    # dlg.resize(dlg.minimumSize())
+    dlg.adjustSize()
     
     if dlg.exec() == 1:
         return [w.isChecked() for w in checkboxes]
@@ -308,7 +339,7 @@ class MouseEventSink(QtCore.QObject):
         self.close()
         
 class ProgressWorkerThreaded(QtCore.QObject):
-    """Wraps a worker function in a separate QThread.
+    r"""Wraps a worker function in a separate QThread.
         The worker function is typically executing a time-consuming loop (such
         as an iteration through some data, where each cycle involves a time-
         consuming operation).
@@ -322,7 +353,7 @@ class ProgressWorkerThreaded(QtCore.QObject):
     """
     def __init__(self, fn, /, progressDialog:typing.Optional[QtWidgets.QProgressDialog]=None, 
                  loopControl:typing.Optional[dict]=None, *args, **kwargs):
-        """
+        r"""
         fn: callable
         progressDialog: QtWidgets.QProgressDialog
         loopControl:dict with a single mapping: "break" ↦ bool
@@ -391,7 +422,7 @@ class ProgressWorkerThreaded(QtCore.QObject):
             self.signals.signal_Finished.emit()  # Done
         
 class ProgressThreadController(QtCore.QObject):
-    """The problem(s) with this approach:
+    r"""The problem(s) with this approach:
 • the progres dialog's timers would be stopped from another thread, thus generating
         'QObject::killTimer: Timers cannot be stopped from another thread' which 
         may crash Scipyen.
@@ -455,7 +486,7 @@ class ProgressThreadController(QtCore.QObject):
         self.sig_ready.emit(None)
         
 class WorkerThread(QtCore.QThread):
-    """Thread for a generic returning function
+    r"""Thread for a generic returning function
     """
     def __init__(self, parent, fn:typing.Callable, /, *args, **kwargs):
         QtCore.QThread.__init__(self, parent)
@@ -468,7 +499,8 @@ class WorkerThread(QtCore.QThread):
     def run(self):
         try:
             result = self.fn(*self.args, **self.kwargs)
-            self.signals.signal_Result.emit(result)
+            if result:
+                self.signals.signal_Result.emit(result)
         except:
             traceback.print_exc()
             exctype, value = sys.exc_info()[:2]
@@ -480,9 +512,9 @@ class WorkerThread(QtCore.QThread):
         
         
 class LoopWorkerThread(QtCore.QThread):
-    """Thread for an atomic function call in a loop.
-See https://stackoverflow.com/questions/9957195/updating-gui-elements-in-multithreaded-pyqt/9964621#9964621
-"""
+    r"""Thread for an atomic function call in a loop.
+    See https://stackoverflow.com/questions/9957195/updating-gui-elements-in-multithreaded-pyqt/9964621#9964621
+    """
     # sig_ready = Signal(object, name="sig_ready")
     
     def __init__(self, parent, fn:typing.Callable, /, 
@@ -516,3 +548,4 @@ See https://stackoverflow.com/questions/9957195/updating-gui-elements-in-multith
             # self.signals.signal_Result.emit(result)
             self.signals.signal_Finished.emit()
             
+        

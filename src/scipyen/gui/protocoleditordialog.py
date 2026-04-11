@@ -4,22 +4,43 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-import os
-from numbers import (Number, Real,)
+import os, numbers
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 
-from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-from qtpy.uic import loadUiType
-# from PyQt5 import QtCore, QtGui, QtWidgets
-# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
-# from PyQt5.uic import loadUiType
+    from qtpy.QtCore import Signal, Slot, Property
+    from qtpy.uic import loadUiType
+    
 
 import numpy as np
 import quantities as pq
 
-from core.quantities import (arbitrary_unit, check_time_units, units_convertible,
-                            unit_quantity_from_name_or_symbol, quantity2str, )
+from core.scipyen_quantities import (arbitrary_unit, checkTimeUnits, unitsConvertible,
+                            unitQuantityFromNameOrSymbol, quantity2str, )
 from core.datatypes import UnitTypes
 from core.strutils import (numbers2str,)
 from core.traitcontainers import DataBag
@@ -37,7 +58,7 @@ else:
 class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
     model_columns = ["Name", "Presynaptic", "Postsynaptic", "Photostimulation", "Imaging delay", "Frames"]
     
-    editCompleted = Signal(str, name="editCompleted")
+    sig_editCompleted = Signal(str, name="sig_editCompleted")
     
     def __init__(self, protocols=None, parent=None):
         super().__init__(parent)
@@ -55,7 +76,7 @@ class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
         return len(self._data_)
     
     def columnCount(self, parent):
-        return 6
+        return len(self.model_columns)
     
     def data(self, index, role=QtCore.Qt.DisplayRole):
         if self._data_ is None:
@@ -132,7 +153,7 @@ class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
             return tip
             #return QtCore.QVariant(tip)
         
-    def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
+    def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
         if len(self._data_) == 0:
             return QtCore.QVariant()
         
@@ -206,7 +227,7 @@ class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
                         if isinstance(val, (tuple, list)):
                             event_times = np.array(v)
                             
-                        elif isinstance(val, Number):
+                        elif isinstance(val, numbers.Number):
                             event_times = np.array([v])
                             
                         event = TriggerEvent(times = event_times * pq.s,
@@ -250,7 +271,7 @@ class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
         else:
             return False
         
-        self.editCompleted.emit(value)
+        self.sig_editCompleted.emit(value)
         
         return True
     
@@ -259,7 +280,7 @@ class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
     
     @property
     def modelData(self):
-        """The reference to a protocol list.
+        r"""The reference to a protocol list.
         """
         return self._data_
     
@@ -272,7 +293,7 @@ class TriggerProtocolsTableModel(QtCore.QAbstractTableModel):
             self.endResetModel()
             
 class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
-    """Gateway of GUI actions to triggers protocols management.
+    r"""Gateway of GUI actions to triggers protocols management.
     The dialog uses Qt signal/slot communication to redirect GUI requests for
     trigger protocol changes, to caller code which actually implements these 
     changes.
@@ -300,25 +321,25 @@ class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
         
     def _configureUI_(self):
         self.setupUi(self)
-        self.addProtocolAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("list-add"),
+        self.addProtocolAction = QAction(QtGui.QIcon.fromTheme("list-add"),
                                                    "Add protocol", self)
         self.addProtocolAction.triggered.connect(self._slot_addProtocol)
-        self.removeProtocolAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("list-remove"),
+        self.removeProtocolAction = QAction(QtGui.QIcon.fromTheme("list-remove"),
                                                       "Remove protocol", self)
         self.removeProtocolAction.triggered.connect(self._slot_removeProtocol)
-        self.clearProtocolsAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("edit-clear-all"),
+        self.clearProtocolsAction = QAction(QtGui.QIcon.fromTheme("edit-clear-all"),
                                                       "Clear", self)
         
         self.clearProtocolsAction.triggered.connect(self._slot_clearProtocols)
-        self.detectProtocolsAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("tools-wizard"),
+        self.detectProtocolsAction = QAction(QtGui.QIcon.fromTheme("tools-wizard"),
                                                        "Detect trigger events", self)
         self.detectProtocolsAction.triggered.connect(self._slot_detectTriggers)
         
-        self.importProtocolsAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("document-import"),
+        self.importProtocolsAction = QAction(QtGui.QIcon.fromTheme("document-import"),
                                                       "Import triggers", self)
         self.importProtocolsAction.triggered.connect(self._slot_importProtocols)
         
-        self.loadProtocolsAction = QtWidgets.QAction(QtGui.QIcon.fromTheme("document-open"),
+        self.loadProtocolsAction = QAction(QtGui.QIcon.fromTheme("document-open"),
                                                      "Load protocols", self)
         self.loadProtocolsAction.triggered.connect(self._slot_loadProtocols)
         
@@ -337,7 +358,7 @@ class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
         self.protocolTableView.model().dataChanged.connect(self._slot_dataChanged)
         self.protocolTableView.addAction(self.addProtocolAction)
         self.protocolTableView.addAction(self.removeProtocolAction)
-        sep = QtWidgets.QAction(self)
+        sep = QAction(self)
         sep.setSeparator(True)
         self.protocolTableView.addAction(sep)
         self.protocolTableView.addAction(self.detectProtocolsAction)
@@ -390,7 +411,7 @@ class ProtocolEditorDialog(GuiMessages, QDialog, Ui_ProtocolEditorDialog):
     
     @Slot()
     def _slot_detectTriggers(self):
-        """Emits sig_detectTriggers signal.
+        r"""Emits sig_detectTriggers signal.
         
         This should be connected to a slot in the caller widget, which would
         execute (or call the appropriate functions to execute) the trigger event 

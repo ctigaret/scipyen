@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>900</width>
-    <height>564</height>
+    <width>827</width>
+    <height>435</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -101,7 +101,7 @@
          <item>
           <spacer name="horizontalSpacer">
            <property name="orientation">
-            <enum>Qt::Horizontal</enum>
+            <enum>Qt::Orientation::Horizontal</enum>
            </property>
            <property name="sizeHint" stdset="0">
             <size>
@@ -126,8 +126,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>900</width>
-     <height>28</height>
+     <width>827</width>
+     <height>27</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -151,9 +151,16 @@
    </widget>
    <widget class="QMenu" name="menuTools">
     <property name="title">
-     <string>Tools</string>
+     <string>Analysis</string>
     </property>
-    <addaction name="actionDetect_Triggers"/>
+    <widget class="QMenu" name="menuTriggers">
+     <property name="title">
+      <string>Events and Triggers</string>
+     </property>
+     <addaction name="actionDetect_Triggers"/>
+     <addaction name="actionRemoveTriggers"/>
+    </widget>
+    <addaction name="menuTriggers"/>
    </widget>
    <widget class="QMenu" name="menuSettings">
     <property name="title">
@@ -166,14 +173,33 @@
      <addaction name="actionViewMain_Toolbar"/>
      <addaction name="actionViewFrame_Navigator"/>
      <addaction name="actionViewSignal_Selectors"/>
+     <addaction name="actionViewCursors_Toolbar"/>
+     <addaction name="actionViewEpochs_Toolbar"/>
+     <addaction name="actionViewTriggers_Toolbar"/>
+     <addaction name="separator"/>
+     <addaction name="actionLockToolbars"/>
+    </widget>
+    <widget class="QMenu" name="menuAxes">
+     <property name="title">
+      <string>Axes</string>
+     </property>
+     <addaction name="actionLink_X_axes"/>
+     <addaction name="actionShow_X_grid"/>
+     <addaction name="actionShow_Y_grid"/>
+     <addaction name="actionLeft_Axis_Spacer"/>
+     <addaction name="actionEnable_Auto_Range"/>
+    </widget>
+    <widget class="QMenu" name="menuType_Here">
+     <property name="title">
+      <string>Type Here</string>
+     </property>
     </widget>
     <addaction name="actionShow_Legends"/>
     <addaction name="actionIgnore_empty_spike_trains"/>
-    <addaction name="actionLink_X_axes"/>
     <addaction name="actionShow_Cursor_Edit_Dialog_When_Created"/>
-    <addaction name="actionShow_X_grid"/>
-    <addaction name="actionShow_Y_grid"/>
     <addaction name="menuView"/>
+    <addaction name="menuAxes"/>
+    <addaction name="menuType_Here"/>
    </widget>
    <widget class="QMenu" name="cursorsMenu">
     <property name="title">
@@ -201,6 +227,8 @@
      <addaction name="addDynamicVerticalCursorAction"/>
      <addaction name="addDynamicHorizontalCursorAction"/>
      <addaction name="addDynamicCrosshairCursorAction"/>
+     <addaction name="separator"/>
+     <addaction name="actionVertical_cursor_series"/>
     </widget>
     <widget class="QMenu" name="editCursorsMenu">
      <property name="title">
@@ -245,10 +273,19 @@
      <addaction name="actionVerticalCursorsFromEpochInCurrentAxis"/>
      <addaction name="actionMultiAxisVerticalCursorsFromEpoch"/>
     </widget>
+    <widget class="QMenu" name="menuExport_Cursor_Data">
+     <property name="title">
+      <string>Export Cursor Data</string>
+     </property>
+     <addaction name="actionExportVerticalCursorData"/>
+     <addaction name="actionExportHorizontalCursorData"/>
+     <addaction name="actionExportCrosshairCursorData"/>
+    </widget>
     <addaction name="addCursorsMenu"/>
     <addaction name="editCursorsMenu"/>
     <addaction name="removeCursorsMenu"/>
     <addaction name="menuVerticalCursorsFromEpoch"/>
+    <addaction name="menuExport_Cursor_Data"/>
     <addaction name="separator"/>
     <addaction name="setCursorsShowValue"/>
     <addaction name="setCursorsLabelPrecisionAction"/>
@@ -259,28 +296,53 @@
      <string>Epochs</string>
     </property>
     <widget class="QMenu" name="makeEpochsMenu">
+     <property name="toolTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates Epochs and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;exports&lt;/span&gt; them to the workspace. &lt;/p&gt;&lt;p&gt;Epochs are &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;not added&lt;/span&gt; to the data&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="statusTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates Epochs and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;exports&lt;/span&gt; them to the workspace. &lt;/p&gt;&lt;p&gt;Epochs are &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;not added&lt;/span&gt; to the data&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="whatsThis">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates Epochs and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;exports&lt;/span&gt; them to the workspace. &lt;/p&gt;&lt;p&gt;Epochs are &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;not added&lt;/span&gt; to the data&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
      <property name="title">
-      <string>Make Epochs</string>
+      <string>Create Epochs   </string>
+     </property>
+     <property name="icon">
+      <iconset theme="timeline-use-zone-on"/>
      </property>
      <addaction name="epochsFromCursorsAction"/>
      <addaction name="epochFromSelectedCursorAction"/>
      <addaction name="epochBetweenCursorsAction"/>
     </widget>
     <widget class="QMenu" name="makeEpochsInDataMenu">
+     <property name="toolTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates Epochs and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;adds&lt;/span&gt; them to the data. &lt;/p&gt;&lt;p&gt;Epochs are &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;NOT&lt;/span&gt; exported to the workspace&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="statusTip">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates Epochs and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;adds&lt;/span&gt; them to the data. &lt;/p&gt;&lt;p&gt;Epochs are &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;NOT&lt;/span&gt; exported to the workspace&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="whatsThis">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates Epochs and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;adds&lt;/span&gt; them to the data. &lt;/p&gt;&lt;p&gt;Epochs are &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;NOT&lt;/span&gt; exported to the workspace&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
      <property name="title">
-      <string>Make Epocks In Data</string>
+      <string>Add Epochs To Data    </string>
+     </property>
+     <property name="icon">
+      <iconset theme="preview-add-zone"/>
      </property>
      <addaction name="epochsInDataFromCursorsAction"/>
      <addaction name="epochInDataFromSelectedCursorAction"/>
      <addaction name="epochInDataBetweenCursors"/>
     </widget>
-    <addaction name="makeEpochsMenu"/>
     <addaction name="makeEpochsInDataMenu"/>
+    <addaction name="makeEpochsMenu"/>
+    <addaction name="actionRemove_All_Epochs"/>
    </widget>
    <addaction name="menuFile"/>
-   <addaction name="menuTools"/>
    <addaction name="cursorsMenu"/>
    <addaction name="epochsMenu"/>
+   <addaction name="menuTools"/>
    <addaction name="menuSettings"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -311,7 +373,7 @@
      <item row="0" column="0">
       <widget class="QPlainTextEdit" name="coordinatesViewer">
        <property name="textInteractionFlags">
-        <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+        <set>Qt::TextInteractionFlag::TextSelectableByKeyboard|Qt::TextInteractionFlag::TextSelectableByMouse</set>
        </property>
       </widget>
      </item>
@@ -328,7 +390,7 @@
    <widget class="QWidget" name="dockWidgetContents_2">
     <layout class="QGridLayout" name="gridLayout_3">
      <item row="0" column="0">
-      <widget class="InteractiveTreeWidget" name="annotationsViewer" native="true"/>
+      <widget class="DataTreeView" name="annotationsViewer" native="true"/>
      </item>
     </layout>
    </widget>
@@ -343,9 +405,78 @@
    <attribute name="toolBarBreak">
     <bool>false</bool>
    </attribute>
+   <addaction name="actionRefresh"/>
    <addaction name="actionLink_X_axes"/>
+   <addaction name="actionAutoScaleSelectedAxis"/>
    <addaction name="actionShow_X_grid"/>
    <addaction name="actionShow_Y_grid"/>
+  </widget>
+  <widget class="QToolBar" name="cursorsToolBar">
+   <property name="windowTitle">
+    <string>Cursors</string>
+   </property>
+   <property name="toolTip">
+    <string>Manage Cursors</string>
+   </property>
+   <property name="statusTip">
+    <string>Manage Cursors</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="actionVertical_Cursor"/>
+   <addaction name="actionCrosshair_Cursor"/>
+   <addaction name="actionHorizontal_Cursor"/>
+   <addaction name="actionRemove_Cursor"/>
+  </widget>
+  <widget class="QToolBar" name="triggersToolBar">
+   <property name="windowTitle">
+    <string>Triggers</string>
+   </property>
+   <property name="toolTip">
+    <string>Events and Triggers</string>
+   </property>
+   <property name="statusTip">
+    <string>Add or remove Triggers and Events</string>
+   </property>
+   <property name="whatsThis">
+    <string>Add or remove Triggers and Events</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="actionDetect_Triggers"/>
+   <addaction name="actionRemoveTriggers"/>
+  </widget>
+  <widget class="QToolBar" name="epochsToolBar">
+   <property name="windowTitle">
+    <string>Epochs</string>
+   </property>
+   <property name="toolTip">
+    <string>Manage Epochs</string>
+   </property>
+   <property name="statusTip">
+    <string>Manage Epochs</string>
+   </property>
+   <property name="whatsThis">
+    <string>Manage Epochs</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="epochsInDataFromCursorsAction"/>
+   <addaction name="epochInDataFromSelectedCursorAction"/>
+   <addaction name="epochInDataBetweenCursors"/>
+   <addaction name="actionRemove_All_Epochs"/>
   </widget>
   <action name="actionClose">
    <property name="text">
@@ -373,23 +504,47 @@
    </property>
   </action>
   <action name="actionCrosshair_Cursor">
+   <property name="icon">
+    <iconset theme="escape-direction-all"/>
+   </property>
    <property name="text">
     <string>Crosshair</string>
    </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add a crosshair cursor to current axis;&lt;/p&gt;&lt;p&gt;press &amp;amp; hold SHIFT for a multi-axis cursor&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
   </action>
   <action name="actionVertical_Cursor">
+   <property name="icon">
+    <iconset theme="escape-direction-vertical"/>
+   </property>
    <property name="text">
     <string>Vertical</string>
    </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add a vertical cursor to the active axes;&lt;/p&gt;&lt;p&gt;press &amp;amp; hold SHIFT for a multi-axis cursor&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
   </action>
   <action name="actionHorizontal_Cursor">
+   <property name="icon">
+    <iconset theme="escape-direction-horizontal"/>
+   </property>
    <property name="text">
     <string>Horizontal</string>
    </property>
+   <property name="toolTip">
+    <string>Add a horizontal cursor to the active axes</string>
+   </property>
   </action>
   <action name="actionRemove_Cursor">
+   <property name="icon">
+    <iconset theme="remove"/>
+   </property>
    <property name="text">
     <string>Remove Cursor...</string>
+   </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Removes the currently selected cursor.&lt;/p&gt;&lt;p&gt;Use the &lt;span style=&quot; text-decoration: underline;&quot;&gt;Cursors menu&lt;/span&gt; to remove &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;all&lt;/span&gt; cursors.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="actionSVG">
@@ -408,13 +563,25 @@
    </property>
   </action>
   <action name="actionDetect_Triggers">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="mark-location"/>
+   </property>
    <property name="text">
     <string>Detect Triggers</string>
    </property>
   </action>
   <action name="actionRefresh">
+   <property name="icon">
+    <iconset theme="view-refresh"/>
+   </property>
    <property name="text">
     <string>Refresh</string>
+   </property>
+   <property name="toolTip">
+    <string>Reload data</string>
    </property>
   </action>
   <action name="actionData_to_workspace">
@@ -550,33 +717,69 @@
    </property>
   </action>
   <action name="epochsFromCursorsAction">
+   <property name="icon">
+    <iconset theme="timeline-use-zone-on"/>
+   </property>
    <property name="text">
-    <string>From Vertical Cursors</string>
+    <string>Create Epoch From Vertical Cursor...</string>
+   </property>
+   <property name="toolTip">
+    <string>Create Epoch From Vertical Cursor...</string>
    </property>
   </action>
   <action name="epochFromSelectedCursorAction">
+   <property name="icon">
+    <iconset theme="timeline-use-zone-on"/>
+   </property>
    <property name="text">
-    <string>From Selected Vertical Cursor</string>
+    <string>Create Epoch From Selected Vertical Cursor</string>
+   </property>
+   <property name="toolTip">
+    <string>Create Epoch From Selected Vertical Cursor</string>
    </property>
   </action>
   <action name="epochBetweenCursorsAction">
+   <property name="icon">
+    <iconset theme="timeline-use-zone-on"/>
+   </property>
    <property name="text">
-    <string>Between Two Vertical Cursors</string>
+    <string>Create Epoch Between Two Vertical Cursors</string>
+   </property>
+   <property name="toolTip">
+    <string>Create Epoch Between Two Vertical Cursors</string>
    </property>
   </action>
   <action name="epochsInDataFromCursorsAction">
+   <property name="icon">
+    <iconset theme="preview-add-zone"/>
+   </property>
    <property name="text">
-    <string>From Vertical Cursors</string>
+    <string>Add Epoch From Vertical Cursors</string>
+   </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates an Epoch from several vertical cursors.&lt;/p&gt;&lt;p&gt;Creates an Epoch with &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;as many intervals as there are vertical cursors selected&lt;/span&gt; in a subsequent dialog.&lt;/p&gt;&lt;p&gt;The Epoch is embedded in the data.&lt;/p&gt;&lt;p&gt;The Epoch will have &lt;span style=&quot; text-decoration: underline;&quot;&gt;one interval for each selected vertical cursor&lt;/span&gt;, defined by &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;start&lt;/span&gt; and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;duration&lt;/span&gt; attributes, centered on the cursors' horizontal (&lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;x&lt;/span&gt;) coordinate, with duration equal to the cursors' horizontal window (&lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;xwindow&lt;/span&gt;).&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="epochInDataFromSelectedCursorAction">
+   <property name="icon">
+    <iconset theme="preview-add-zone"/>
+   </property>
    <property name="text">
-    <string>From Selected Vertical Cursor</string>
+    <string>Add Epoch From Selected Vertical Cursor</string>
+   </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates an Epoch from a single vertical cursor.&lt;/p&gt;&lt;p&gt;The Epoch is embedded in the data.&lt;/p&gt;&lt;p&gt;The Epoch will have &lt;span style=&quot; text-decoration: underline;&quot;&gt;one interval&lt;/span&gt;, defined by &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;start&lt;/span&gt; and &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;duration&lt;/span&gt; attributes, centered on the cursors' horizontal (&lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;x&lt;/span&gt;) coordinate, with duration equal to the cursors' horizontal window (&lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;xwindow&lt;/span&gt;).&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="epochInDataBetweenCursors">
+   <property name="icon">
+    <iconset theme="preview-add-zone"/>
+   </property>
    <property name="text">
-    <string>Between Two Vertical Cursors</string>
+    <string>Add Epoch Between Two Vertical Cursors</string>
+   </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Creates an epoch between two Vertical Cursors.&lt;/p&gt;&lt;p&gt;The Epoch is embedded in the data.&lt;/p&gt;&lt;p&gt;The Epochs will contain a single interval, between the two cursors &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;x&lt;/span&gt; coordinates.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="actionLink_X_axes">
@@ -584,8 +787,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="link">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="link"/>
    </property>
    <property name="text">
     <string>Link X axes</string>
@@ -596,8 +798,7 @@
   </action>
   <action name="actionUnlink_X_Axes">
    <property name="icon">
-    <iconset theme="remove-link">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="remove-link"/>
    </property>
    <property name="text">
     <string>Unlink X Axes</string>
@@ -611,8 +812,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="settings-configure">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="settings-configure"/>
    </property>
    <property name="text">
     <string>Edit Cursor At Creation</string>
@@ -622,8 +822,14 @@
    </property>
   </action>
   <action name="actionVerticalCursorsFromEpochInCurrentAxis">
+   <property name="icon">
+    <iconset theme="zone-out"/>
+   </property>
    <property name="text">
     <string>In current axis...</string>
+   </property>
+   <property name="toolTip">
+    <string>Create Vertical Cursors from Epoch In current axis</string>
    </property>
   </action>
   <action name="actionMultiAxisVerticalCursorsFromEpoch">
@@ -639,8 +845,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="view-grid">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="labplot-axis-horizontal"/>
    </property>
    <property name="text">
     <string>Show X Grid on All Axes</string>
@@ -657,8 +862,7 @@
     <bool>true</bool>
    </property>
    <property name="icon">
-    <iconset theme="view-grid">
-     <normaloff>.</normaloff>.</iconset>
+    <iconset theme="labplot-axis-vertical"/>
    </property>
    <property name="text">
     <string>Show Y Grid on All Axes</string>
@@ -706,6 +910,121 @@
     <string>Signal Selectors</string>
    </property>
   </action>
+  <action name="actionVertical_cursor_series">
+   <property name="text">
+    <string>Vertical cursor series</string>
+   </property>
+  </action>
+  <action name="actionLeft_Axis_Spacer">
+   <property name="icon">
+    <iconset theme="adjustcol"/>
+   </property>
+   <property name="text">
+    <string>Left Axis Spacer</string>
+   </property>
+  </action>
+  <action name="actionExportVerticalCursorData">
+   <property name="text">
+    <string>Vertical</string>
+   </property>
+  </action>
+  <action name="actionExportHorizontalCursorData">
+   <property name="text">
+    <string>Horizontal</string>
+   </property>
+  </action>
+  <action name="actionExportCrosshairCursorData">
+   <property name="text">
+    <string>Crosshair</string>
+   </property>
+  </action>
+  <action name="actionViewCursors_Toolbar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Cursors Toolbar</string>
+   </property>
+  </action>
+  <action name="actionViewTriggers_Toolbar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Triggers Toolbar</string>
+   </property>
+  </action>
+  <action name="actionLockToolbars">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="object-locked"/>
+   </property>
+   <property name="text">
+    <string>Lock Toolbars</string>
+   </property>
+  </action>
+  <action name="actionRemoveTriggers">
+   <property name="icon">
+    <iconset theme="remove"/>
+   </property>
+   <property name="text">
+    <string>Remove Events and Triggers</string>
+   </property>
+  </action>
+  <action name="actionRemoveAllEvents">
+   <property name="icon">
+    <iconset theme="delete"/>
+   </property>
+   <property name="text">
+    <string>Remove All Events</string>
+   </property>
+  </action>
+  <action name="actionViewEpochs_Toolbar">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Epochs Toolbar</string>
+   </property>
+  </action>
+  <action name="actionRemove_All_Epochs">
+   <property name="icon">
+    <iconset theme="preview-remove-zone"/>
+   </property>
+   <property name="text">
+    <string>Remove All Epochs</string>
+   </property>
+  </action>
+  <action name="actionEnable_Auto_Range">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="auto-scale-all"/>
+   </property>
+   <property name="text">
+    <string>Enable Auto Range</string>
+   </property>
+   <property name="toolTip">
+    <string>Enable Auto Range By Default (All axes)</string>
+   </property>
+  </action>
+  <action name="actionAutoScaleSelectedAxis">
+   <property name="icon">
+    <iconset theme="auto-scale-all"/>
+   </property>
+   <property name="text">
+    <string>Auto Range (X,Y) for  Selected Axis</string>
+   </property>
+   <property name="toolTip">
+    <string>Auto Range (X,Y) for  Selected Axis</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::MenuRole::NoRole</enum>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
@@ -715,9 +1034,9 @@
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>InteractiveTreeWidget</class>
+   <class>DataTreeView</class>
    <extends>QWidget</extends>
-   <header location="global">gui.widgets.interactivetreewidget</header>
+   <header location="global">gui.widgets.datatreeview</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

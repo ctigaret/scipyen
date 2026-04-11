@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 2021-04-26 21:24:43
 PlanarGraphics, GraphicsObject and ancillary code
 
@@ -172,15 +172,40 @@ from copy import copy
 import numpy as np
 import scipy
 from traitlets import Bunch
-from qtpy import QtCore, QtGui, QtWidgets, QtXml
-from qtpy.QtCore import Signal, Slot, Property
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+
 #### END 3rd party modules
 
 #### BEGIN core modules
-from core.datatypes import (TypeEnum, )
+from core.typeenum import (TypeEnum, )
 from core.utilities import (reverse_mapping_lookup, reverse_dict, )
 from core.traitcontainers import DataBag
-from core.prog import (safeWrapper, deprecated,
+from core.prog import (safewrapper, deprecated,
                        timefunc, processtimefunc,filter_type)
 #from core.utilities import (unique, index_of,)
 from core.workspacefunctions import debug_scipyen
@@ -219,7 +244,7 @@ PlanarGraphicsState = GraphicsState = Bunch
 def __new_planar_graphic__(cls, states, name="", frameindex=[], currentframe=0, 
                         graphicstype=None, closed=False, linked_objects = dict(), 
                         position = (0,0)):
-    """
+    r"""
     Will dispatch to sub-class c'tor.
     
     Positional parameters:
@@ -272,7 +297,7 @@ def __constrain_0_45_90__(p0, p1):
     return p2
 
 def __constrain_square__(p0, p1):
-    """Createds a copy of p1 constrained to a square locus with p0 at the diagonally opposite corner.
+    r"""Createds a copy of p1 constrained to a square locus with p0 at the diagonally opposite corner.
     To be used for forced circles (ellipse with bounding rect constrained at square)
     
     p0 = origin point => topLeft
@@ -312,7 +337,7 @@ def __constrain_square__(p0, p1):
     return QtCore.QPointF(x1, y1)
 
 class PlanarGraphicsType(TypeEnum):
-    """Enumeration of all supported graphical object types.
+    r"""Enumeration of all supported graphical object types.
     Type name             type value  QGraphicsItem               Planar Descriptors
     ===============================================================================
     vertical_cursor     = 1                                     x, y, width, height, xWin, yWin, radius
@@ -396,7 +421,7 @@ class PlanarGraphicsType(TypeEnum):
 GraphicsObjectType = PlanarGraphicsType
 
 class PlanarGraphics():
-    """Ancestor for all planar graphic object types in Scipyen imaging.
+    r"""Ancestor for all planar graphic object types in Scipyen imaging.
     
     PlanarGraphics objects encapsulate two-dimensional geometric shapes to be 
     used as landmarks (ROIs, and Cursors) on 2D images or frames (in this context
@@ -745,7 +770,7 @@ class PlanarGraphics():
         
     @classmethod
     def validateStates(cls, value):
-        """Checks that the states in "value" are conformant.
+        r"""Checks that the states in "value" are conformant.
         Applied validateState or each element in value.
         
         Parameters:
@@ -765,7 +790,7 @@ class PlanarGraphics():
         
     @classmethod
     def defaultState(cls):
-        """Returns a state conaining planar descriptors specific to this
+        r"""Returns a state conaining planar descriptors specific to this
         subclass.
         
         The descriptors have the default value of 0, except for the z_frame 
@@ -782,7 +807,7 @@ class PlanarGraphics():
     
     @classmethod
     def copyConvertState(cls, src):
-        """Use this to create a copy of a state generated from old API.
+        r"""Use this to create a copy of a state generated from old API.
         """
         #If src does not have an attribute "z_frame" then it is given one, with
         #value None
@@ -843,7 +868,7 @@ class PlanarGraphics():
     
     @classmethod
     def copyConvertStates(cls, *args):
-        """Use this to convert states from old API
+        r"""Use this to convert states from old API
         """
         #print("\tPlanarGraphics (%s).copyConvertStates" % cls.__name__, args)
         return [s for s in map(cls.copyConvertState, args)]
@@ -860,7 +885,7 @@ class PlanarGraphics():
     # ### END static methods
     
     def __init_from_descriptors__(self, *args, frameindex:typing.Optional[typing.Iterable]=[], currentframe:int=0) -> None:
-        """This can (and should) be overloaded in subclasses
+        r"""This can (and should) be overloaded in subclasses
         """
         
         if len(args) != len(self.__class__._planar_descriptors_):
@@ -911,7 +936,7 @@ class PlanarGraphics():
                  name:typing.Optional[str]=None, 
                  frameindex:typing.Optional[typing.Iterable]=[], 
                  currentframe:int=0, linked_objects:dict=dict()):
-        """Constructor.
+        r"""Constructor.
         
         Var-positional parameters:
         =========================
@@ -1300,7 +1325,7 @@ class PlanarGraphics():
                  frame:typing.Optional[int]=None, 
                  closed:typing.Optional[bool]=None, 
                  connected:typing.Optional[bool]=False) -> QtGui.QPainterPath:
-        """Returns a QtGui.QPainterPath object. 
+        r"""Returns a QtGui.QPainterPath object. 
         
         QPainterPath composition methods used here depend on the subclass of
         PlanarGraphics, and is specified by the 'qt_path_composition_call'
@@ -1399,7 +1424,7 @@ class PlanarGraphics():
             object.__setattr__(self, name, value)
             
     def checkStates(self):
-        """Ensures consistency of states with respect to z_frame.
+        r"""Ensures consistency of states with respect to z_frame.
         
         A PlanarGraphics state can be:
         
@@ -1521,7 +1546,7 @@ class PlanarGraphics():
             
     @classmethod
     def isStateVisible(cls, state:Bunch, frame:int) -> bool:
-        """Checks if state is visible in frame.
+        r"""Checks if state is visible in frame.
         """
         if not isinstance(state, Bunch):
             raise TypeError("Expecting a Bunch object; got %s instead" % type(state).__name__)
@@ -1556,7 +1581,7 @@ class PlanarGraphics():
                     
     def _applyFrameIndex_(self, frameindex:typing.Optional[typing.Iterable]=[],
                             sort=False, none_last=False):
-        """Reassigns the z_frame values.
+        r"""Reassigns the z_frame values.
         Use with CAUTION
         
         Parameters:
@@ -1679,7 +1704,7 @@ class PlanarGraphics():
             
     @property
     def pos(self) -> QtCore.QPointF:
-        """The position of this object as a Qt QPointF.
+        r"""The position of this object as a Qt QPointF.
         """
         position = self.position
         #print("PlanarGraphics.pos: position = (%s, %s)" % position)
@@ -1701,7 +1726,7 @@ class PlanarGraphics():
         
     @property
     def position(self) -> tuple:
-        """The position of this object as (x,y) coordinates tuple.
+        r"""The position of this object as (x,y) coordinates tuple.
         
         To change, assign a pair (x,y) of new coordinate values (a tuple), 
         a QPoint, or a QPointF object to this property.
@@ -1757,17 +1782,17 @@ class PlanarGraphics():
         # self.x += dy
         
     def point(self, frame=None):
-        """Alias to qPoint()
+        r"""Alias to qPoint()
         """
         return self.qPoint(frame=frame)
     
     def points(self, frame:typing.Optional[int]=None):
-        """Alias to qPoints
+        r"""Alias to qPoints
         """
         return self.qPoints(frame=frame)
     
     def qPoints(self, frame:typing.Optional[int]=None, inPath:bool=False):
-        """Returns a list of QPointF objects.
+        r"""Returns a list of QPointF objects.
         
         For primitive PlanarGraphics the points encapsulate the (x,y)
         coordinates of the "destination" point - typically the first point -
@@ -1792,7 +1817,7 @@ class PlanarGraphics():
             return list()
     
     def qPoint(self, frame:typing.Optional[int]=None, inPath:bool=False):
-        """Returns the QPointF of the destination point in a PlanarGraphics primitive.
+        r"""Returns the QPointF of the destination point in a PlanarGraphics primitive.
         For Path, Ellipse, Rect, Arc, ArcMove, returns the QPoint of its first element.
         
         This may be a null point if specified frame does not associate a state.
@@ -1804,7 +1829,7 @@ class PlanarGraphics():
     
     @property
     def currentState(self):
-        """Read-only. Alias to self.getState()
+        r"""Read-only. Alias to self.getState()
         
         NOTE: even if this is a read-only property, the returned object is 
         mutable.
@@ -1814,7 +1839,7 @@ class PlanarGraphics():
         
     @property
     def currentFrame(self):
-        """Gets/sets the frame index of the "current" state, or None for no current state
+        r"""Gets/sets the frame index of the "current" state, or None for no current state
         
         For Path PlanarGraphics objects, returns the current frame of the first
         element (which should be the same as for all other elements in the Path)
@@ -1837,7 +1862,7 @@ class PlanarGraphics():
         
     @currentFrame.setter
     def currentFrame(self, value):
-        """Sets the frame index in "value" as the "current" frame.
+        r"""Sets the frame index in "value" as the "current" frame.
         
         Will select current state as the state having z_frame the same as value.
         
@@ -1857,13 +1882,13 @@ class PlanarGraphics():
         
     @property
     def states(self):
-        """The list of underlying states
+        r"""The list of underlying states
         """
         return self._states_
     
     @property
     def sortedStates(self):
-        """A list of frame states, sorted by their z_frame attribute
+        r"""A list of frame states, sorted by their z_frame attribute
         States where z_frame is None are placed at the end of the list.
         
         NOTE: Does not verify the states' z_frame conformance with the three rules
@@ -1877,7 +1902,7 @@ class PlanarGraphics():
             return self._states_
         
     def sortStates(self, none_last=True):
-        """Sorts the states according to the value of z_frame attribute.
+        r"""Sorts the states according to the value of z_frame attribute.
         
         States where z_frame is None are placed at the end of the list if none_last
         is True, or at the beginning otherwise.
@@ -1900,7 +1925,7 @@ class PlanarGraphics():
     
     @property
     def descriptors(self):
-        """Tuple of planar graphics descriptor names specific to this
+        r"""Tuple of planar graphics descriptor names specific to this
         concrete subclass.
         Read-only
         """
@@ -1908,7 +1933,7 @@ class PlanarGraphics():
     
     @property
     def shapeDescriptors(self):
-        """Tuple of shape descriptor names.
+        r"""Tuple of shape descriptor names.
         These are the 'descriptor' property, less "z_frame".
         Read-only
         """
@@ -1926,12 +1951,12 @@ class PlanarGraphics():
         self._closed_ = value
         
     def destination(self, frame:typing.Optional[int] = None) -> tuple:
-        """(X,Y) coordinate pair for the last point of the PlanarGraphics"""
+        r"""(X,Y) coordinate pair for the last point of the PlanarGraphics"""
         cp = self.controlPoints(frame)
         return cp[-1]
         
     def controlPoints(self, frame:typing.Optional[int]=None, inPath:bool=False):
-        """Returns the control points coordinates for the primitive.
+        r"""Returns the control points coordinates for the primitive.
         Coordnates are given for the state associated with a frame (if given) or
         with the current frame.
         Parameters:
@@ -1988,7 +2013,7 @@ class PlanarGraphics():
         return tuple(map(lambda x: QtCore.QPointF(x[0], x[1]), cp))
         
     def controlPath(self, frame:typing.Optional[int]=None, inPath:bool=False):
-        """Returns a copy of this object as a Path object containing control points.
+        r"""Returns a copy of this object as a Path object containing control points.
         
         The returned Path is composed of Move and Line elements only.
         
@@ -2011,7 +2036,7 @@ class PlanarGraphics():
         return ret
         
     def fromControlPath(self, path, frame:typing.Optional[int]=None):
-        """Set this planar graphics' descriptor coordinates from a control Path.
+        r"""Set this planar graphics' descriptor coordinates from a control Path.
         A control Path is a Path containing exclusively Move and Line primitives.
         Overwritten in Move, Arc, ArcMove
         """
@@ -2098,7 +2123,7 @@ class PlanarGraphics():
         self.updateFrontends()
 
     def convertToPath(self, closed=False): 
-        """Creates a Path from all frame-state associations.
+        r"""Creates a Path from all frame-state associations.
         """
         # TODO: 2024-08-24 20:38:29 FIXME
         # must revisit this — what does it do ?!?
@@ -2118,7 +2143,7 @@ class PlanarGraphics():
         return ret
     
     def copy(self):
-        """Calls copy constructor and returns the result.
+        r"""Calls copy constructor and returns the result.
         WARNING: linked objects are stored by reference
         """
         #Path objects need special treatment here:
@@ -2147,7 +2172,7 @@ class PlanarGraphics():
         return ret
         
     def appendStates(self, other):
-        """Joins the state descriptors of the "other" PlanarGraphics object to self.
+        r"""Joins the state descriptors of the "other" PlanarGraphics object to self.
         
         The "other" is copied internally, the frame indices in its states are 
         incremented by 1 + max frame in this object, then its states are appended
@@ -2231,7 +2256,7 @@ class PlanarGraphics():
             
     @property
     def maxFrameIndex(self):
-        """The largest frame index or None (for frameless state objects)
+        r"""The largest frame index or None (for frameless state objects)
         """
         if len(self._states_):
             if len(self._states_) == 1:
@@ -2245,7 +2270,7 @@ class PlanarGraphics():
     
     @deprecated
     def addState(self, state):
-        """ Adds (inserts or appends) a state.
+        r""" Adds (inserts or appends) a state.
         DEPRECATED Please use setState instead
         Parameters:
         ===========
@@ -2333,7 +2358,7 @@ class PlanarGraphics():
         return
         
     def updateLinkedObjects(self):
-        """Must be called asynchronously.
+        r"""Must be called asynchronously.
         
         To avoid infinite recursion, do not calling this function from __setattr__()
         """
@@ -2352,9 +2377,9 @@ class PlanarGraphics():
                     
                 obj.updateFrontends()
         
-    @safeWrapper
+    @safewrapper
     def updateFrontends(self):
-        """To be called after manual changes to this objects' descriptors.
+        r"""To be called after manual changes to this objects' descriptors.
         
         To avoid infinite recursion, do not call this function from __setattr__()
         
@@ -2406,7 +2431,7 @@ class PlanarGraphics():
                 f.redraw()
                 
     def updateFrontend(self, f):
-        """To be called after manual changes to this objects' descriptors.
+        r"""To be called after manual changes to this objects' descriptors.
         
         To avoid infinite recursion, do not calling this function from __setattr__()
         
@@ -2423,7 +2448,7 @@ class PlanarGraphics():
             f.setPos(self.x, self.y) # also calls _makeObject_() and update()
             
     def removeState(self, stateOrFrame):
-        """Removes a state associated with a frame index or indices specified in "stateOrFrame".
+        r"""Removes a state associated with a frame index or indices specified in "stateOrFrame".
         
         stateOrFrame must contain valid frame indices.
         
@@ -2481,7 +2506,7 @@ class PlanarGraphics():
             raise TypeError("expecting an int, a Bunch, or a sequence of int or Bunch objects (no mixed types); got %s instead" % stateOrFrame)
         
     def setParameter(self, name, value, frame=None):
-        """Sets the value of a named planar graphics descriptor.
+        r"""Sets the value of a named planar graphics descriptor.
         
         Parameters:
         ==========
@@ -2520,7 +2545,7 @@ class PlanarGraphics():
             setattr(state, name, value)
             
     def hasStateForFrame(self, frame=None):
-        """Returns True if there is a state is visible in frame.
+        r"""Returns True if there is a state is visible in frame.
 
         Parameters:
         ===========
@@ -2543,7 +2568,7 @@ class PlanarGraphics():
         return (state is not None) 
         
     def qGraphicsItem(self, pointSize=1, frame=None):
-        """Generates a concrete QGraphicsItem instance using the 
+        r"""Generates a concrete QGraphicsItem instance using the 
         state descriptors for the current frame.
         
         This is to be used as shaped graphics item by GraphicsObject instances.
@@ -2656,7 +2681,7 @@ class PlanarGraphics():
         
     def stateIndex(self, state:typing.Optional[typing.Union[Bunch, int]]= None, 
                            visible_only:bool=False) -> typing.Optional[int]:
-        """Get the index of a state in this object's internal list of states.
+        r"""Get the index of a state in this object's internal list of states.
         
         Parameters:
         ===========
@@ -2742,7 +2767,7 @@ class PlanarGraphics():
                         
     def getState(self, frame:typing.Optional[int]=None,
                  visible:bool=True) -> typing.Optional[Bunch]:
-        """Access the state according to their z_frame value.
+        r"""Access the state according to their z_frame value.
         
         By definition, a primitive PlanarGraphics (i.e., NOT a Path) has only
         one state Bunch associated with a given frame (which, depending on its
@@ -2832,7 +2857,7 @@ class PlanarGraphics():
                       new_frame:typing.Optional[int]=None,
                       check_visible:bool=True,
                       nFrames:typing.Optional[int]=None):
-        """Sets the z_frame of an EXISTING state to a new value.
+        r"""Sets the z_frame of an EXISTING state to a new value.
         
         Does nothing if the state does not exist in self.states
         
@@ -3081,7 +3106,7 @@ class PlanarGraphics():
         
                 
     def setState(self, state:Bunch, frame:typing.Optional[int], nFrames:typing.Optional[int]=None):
-        """Sets/adds a state
+        r"""Sets/adds a state
         
         For Path objects, this function does nothing. To alter frame states for 
         an indivdual Path element, call setState on that specific Path element
@@ -3474,7 +3499,7 @@ class PlanarGraphics():
         
     def objectForFrame(self, frame:typing.Optional[int]=None,
                        visible:typing.Optional[bool]=True) -> typing.Optional[object]:
-        """Returns a new PlanarGraphics with frame-specific descriptors.
+        r"""Returns a new PlanarGraphics with frame-specific descriptors.
         
         In contrast with getState(frame) which returns the Bunch state object
         for the specified frame, this function constructs a new PlanarGraphics 
@@ -3498,7 +3523,7 @@ class PlanarGraphics():
     
     @staticmethod
     def getCurveLength(obj, prev=None):
-        """Static version of PlanarGraphics.curveLength()
+        r"""Static version of PlanarGraphics.curveLength()
         Useful to apply it to a state, or a sequence of states (instead of PlanarGraphics)
         TODO/FIXME 2024-08-22 10:08:40
         Rewrite to harmonize with the instance method curveLength()
@@ -3609,7 +3634,7 @@ class PlanarGraphics():
             return 0
         
     def curveLength(self, prev=None, full:bool=False):
-        """Calculates the length of the curve represented by this PlanarGraphics.
+        r"""Calculates the length of the curve represented by this PlanarGraphics.
         Here, 'curve' has the general meaning of a 1D function y = f(x)
         
         Parameters:
@@ -3801,7 +3826,7 @@ class PlanarGraphics():
                 raise NotImplementedError("Function is not implemented for %s PlanarGraphics" % self.type)
             
     def interpolate(self, n:int, prev=None):
-        """Interpolated coordinates for n points on the 'curve' of this object
+        r"""Interpolated coordinates for n points on the 'curve' of this object
         """
         
         if not isinstance(n, int):
@@ -3870,7 +3895,7 @@ class PlanarGraphics():
         return len(self._linked_objects_) > 0
     
     def linkToObject(self, other, mappingFcn, *args, **kwargs):#, inverseFcn=None, reciprocal=False):
-        """ Dynamic link between two PlanarGraphics objects.
+        r""" Dynamic link between two PlanarGraphics objects.
         
         mappingFcn  = function that realises a mapping from one object's planar 
                         descriptors to another object's planar descriptors and
@@ -3915,13 +3940,13 @@ class PlanarGraphics():
     
     @property
     def objectLinks(self):
-        """Directly exposes the _linked_objects_ dictionary
+        r"""Directly exposes the _linked_objects_ dictionary
         """
         return self._linked_objects_
     
-    @safeWrapper
+    @safewrapper
     def unlinkFromObject(self, obj):
-        """ Breaks the link between this PlanarGraphics (self) and obj.
+        r""" Breaks the link between this PlanarGraphics (self) and obj.
         
         Obj is a PlanarGraphics object to which self is linked, and is present
         in self._linked_objects_.keys()
@@ -3946,7 +3971,7 @@ class PlanarGraphics():
         self.clearObjectLinks()
         
     def linkFrames(self, value):
-        """Associates planar descriptor state values to frame indices.
+        r"""Associates planar descriptor state values to frame indices.
         
         A planar descriptor state (datatypes.Bunch) can be:
         a) "frameless" when its z_frame attribute is None
@@ -3976,7 +4001,7 @@ class PlanarGraphics():
         self.frameIndices = value
             
     def unlinkFrames(self):
-        """Makes the current planar descriptor state common to all available data frames.
+        r"""Makes the current planar descriptor state common to all available data frames.
         DEPRECATED
         Same thing can be achieved by calling self.linkFrames([]) or self.linkFrames(None)
         
@@ -3987,7 +4012,7 @@ class PlanarGraphics():
         self._states_[:] = states[:]
         
     def propagateState(self, state, destframes):
-        """Creates copies of "state" to all frames in destframes.
+        r"""Creates copies of "state" to all frames in destframes.
         TODO
         States linked to frames in destframes will be replaced with copies of 
         "state".
@@ -4041,7 +4066,7 @@ class PlanarGraphics():
             #self._currentframe_ = srcframe
                     
     def remapFrameStateAssociations(self, newmap):
-        """Remaps the frame state associations.
+        r"""Remaps the frame state associations.
         
         Set frame indices using a dictionary of (int -> int) mapping, where
         
@@ -4106,7 +4131,7 @@ class PlanarGraphics():
         
     @property
     def frameIndices(self):
-        """A list of frame indices for the PlanarGraphics state.
+        r"""A list of frame indices for the PlanarGraphics state.
         
         For Path PlanarGraphics objects, all elements of the Path have either 
         the same frame-state associations, or all have a common state.
@@ -4140,7 +4165,7 @@ class PlanarGraphics():
         
     @frameIndices.setter
     def frameIndices(self, values:typing.Optional[typing.Iterable]):
-        """FIXME Re-assigns the z_frame values in existing states.
+        r"""FIXME Re-assigns the z_frame values in existing states.
         
         Parameters:
         ===========
@@ -4402,7 +4427,7 @@ class PlanarGraphics():
         
     @property
     def frontends(self):
-        """A list of GraphicsObject front ends.
+        r"""A list of GraphicsObject front ends.
         This property is read-only, but its value (a list) is mutable..
         """
         return self._frontends_
@@ -4496,7 +4521,7 @@ class PlanarGraphics():
         
         
 class Cursor(PlanarGraphics):
-    """Encapsulates the coordinates of a cursor:
+    r"""Encapsulates the coordinates of a cursor:
     
     x, y, width, height, xwindow, ywindow, radius
     
@@ -4518,7 +4543,7 @@ class Cursor(PlanarGraphics):
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
                  graphicstype=PlanarGraphicsType.crosshair_cursor, closed=False,
                  linked_objects=dict()):
-        """
+        r"""
         Variadic parameters:
         ====================
         x, y:               scalars, cursor position (in pixels) - coordinates 
@@ -4563,7 +4588,7 @@ class Cursor(PlanarGraphics):
     def __call__(self, path:typing.Optional[QtGui.QPainterPath]=None, 
                 frame:typing.Optional[int]=None, closed:typing.Optional[bool]=None,
                 connected:typing.Optional[bool]=False) -> QtGui.QPainterPath:
-        """Returns a QtGui.QPainterPath object. 
+        r"""Returns a QtGui.QPainterPath object. 
         In contrast with the other PlanarGraphics, 'closed' and 'connected'
         parameters are ignored here
         """
@@ -4652,7 +4677,7 @@ class VerticalCursor(Cursor):
     def __call__(self, path:typing.Optional[QtGui.QPainterPath]=None, 
                 frame:typing.Optional[int]=None, closed:typing.Optional[bool]=None,
                 connected:typing.Optional[bool]=False) -> QtGui.QPainterPath:
-        """Returns a QtGui.QPainterPath object. 
+        r"""Returns a QtGui.QPainterPath object. 
         In contrast with the other PlanarGraphics, 'closed' and 'connected'
         parameters are ignored here
         """
@@ -4682,7 +4707,7 @@ class HorizontalCursor(Cursor):
     def __call__(self, path:typing.Optional[QtGui.QPainterPath]=None, 
                 frame:typing.Optional[int]=None, closed:typing.Optional[bool]=None,
                 connected:typing.Optional[bool]=False) -> QtGui.QPainterPath:
-        """Returns a QtGui.QPainterPath object. 
+        r"""Returns a QtGui.QPainterPath object. 
         In contrast with the other PlanarGraphics, 'closed' and 'connected'
         parameters are ignored here
         """
@@ -4713,7 +4738,7 @@ class CrosshairCursor(Cursor):
     def __call__(self, path:typing.Optional[QtGui.QPainterPath]=None, 
                 frame:typing.Optional[int]=None, closed:typing.Optional[bool]=None,
                 connected:typing.Optional[bool]=False) -> QtGui.QPainterPath:
-        """Returns a QtGui.QPainterPath object. 
+        r"""Returns a QtGui.QPainterPath object. 
         In contrast with the other PlanarGraphics, 'closed' and 'connected'
         parameters are ignored here
         """
@@ -4750,7 +4775,7 @@ class PointCursor(Cursor):
     def __call__(self, path:typing.Optional[QtGui.QPainterPath]=None, 
                 frame:typing.Optional[int]=None, closed:typing.Optional[bool]=None,
                 connected:typing.Optional[bool]=False) -> QtGui.QPainterPath:
-        """Returns a QtGui.QPainterPath object. 
+        r"""Returns a QtGui.QPainterPath object. 
         In contrast with the other PlanarGraphics, 'closed' and 'connected'
         parameters are ignored here
         """
@@ -4768,7 +4793,7 @@ class PointCursor(Cursor):
         return path
         
 class Arc(PlanarGraphics):
-    """Encapsulates parameters for QPainterPath.arcTo() function.
+    r"""Encapsulates parameters for QPainterPath.arcTo() function.
         This is not an arc of a circle unless the bounding rectangle is a square.
     
     x, y, w, h: the bounding rectangle;
@@ -4796,7 +4821,7 @@ class Arc(PlanarGraphics):
     
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, graphicstype=None, 
                  closed=False, linked_objects=dict()):
-        """
+        r"""
         Positional parameters:
         =======================
         x, y, w, h = bounding rectangle (top left (x, y) width and height)
@@ -4812,7 +4837,7 @@ class Arc(PlanarGraphics):
                          graphicstype=PlanarGraphicsType.arc, closed=closed, linked_objects=linked_objects)
         
     def controlPoints(self, frame:typing.Optional[int] = None, inPath:bool=False):
-        """Returns the control points for this Arc, as a tuple.
+        r"""Returns the control points for this Arc, as a tuple.
         
         To be used for graphical manipulation of the arc.
         Overrides PlanarGraphics.controlPoints(…)
@@ -4866,7 +4891,7 @@ class Arc(PlanarGraphics):
         return (cp0, cp1, cp2, cp3)
     
     def controlPath(self, frame:typing.Optional[int] = None, inPath:bool=False):
-        """Returns the control points for this Arc, as a Path object
+        r"""Returns the control points for this Arc, as a Path object
         
         To be used for graphical manipulation of the arc.
         Overrides PlanarGraphics.controlPath(…)
@@ -4899,7 +4924,7 @@ class Arc(PlanarGraphics):
         return ret
     
     def fromControlPath(self, path:Path, frame:typing.Optional[int]=None):
-        """Overrides PlanarGraphics.fromControlPath(…)"""
+        r"""Overrides PlanarGraphics.fromControlPath(…)"""
         if not isinstance(path, Path):
             raise TypeError("path expected ot be a pictgui.Path; got %s instead" % type(path).__name__)
         
@@ -4951,12 +4976,12 @@ class Arc(PlanarGraphics):
             return QtWidgets.QGraphicsPathItem(path)
         
     def shape(self, frame:typing.Optional[int] = None) -> shapes.Geometry:
-        """Returns an empty point"""
+        r"""Returns an empty point"""
         return shapes.Point()
             
         
 class ArcMove(PlanarGraphics):
-    """Encapsulates parameters for QPainterPath.arcMoveTo() function.
+    r"""Encapsulates parameters for QPainterPath.arcMoveTo() function.
         NOTE: This does NOT create an arc curve, only "jumps" a point along an arc
         defined by the parameters below.
         Therefore, by defintion, it is never drawn and its curveLength is 0
@@ -4979,7 +5004,7 @@ class ArcMove(PlanarGraphics):
     def __init__(self, *args, name:str=None, frameindex:list=[], currentframe:int=0, 
                  graphicstype=None, closed:bool=False,
                  linked_objects:dict=dict()):
-        """
+        r"""
         Positional parameters:
         =====================
         x, y, w, h = bounding rectangle (top left (x,y), width and height)
@@ -4992,7 +5017,7 @@ class ArcMove(PlanarGraphics):
                          linked_objects=linked_objects)
     
     def controlPoints(self, frame:typing.Optional[int] = None, inPath:bool=False):
-        """Returns the control points for this Arc, as a tuple.
+        r"""Returns the control points for this Arc, as a tuple.
         
         To be used for graphical manipulation of the arc.
         
@@ -5048,7 +5073,7 @@ class ArcMove(PlanarGraphics):
         return (cp0, cp1, cp2)
     
     def controlPath(self, frame:typing.Optional[int] = None, inPath:bool=False):
-        """Returns the control points for this ArcMove, as a Path object
+        r"""Returns the control points for this ArcMove, as a Path object
         
         NOTE: Since this is a move on an arc trajectory, there is NO sweep length
         To be used for graphical manipulation of the arc.
@@ -5081,7 +5106,7 @@ class ArcMove(PlanarGraphics):
         return ret
         
     def fromControlPath(self, path:Path, frame:typing.Optional[int]=None):
-        """Overrides this method in the superclass (PlanarGraphics)."""
+        r"""Overrides this method in the superclass (PlanarGraphics)."""
         if not isinstance(path, Path):
             raise TypeError("path expected ot be a pictgui.Path; got %s instead" % type(path).__name__)
         
@@ -5129,12 +5154,12 @@ class ArcMove(PlanarGraphics):
             return QtWidgets.QGraphicsPathItem(path)
 
     def shape(self, frame:typing.Optional[int] = None) -> shapes.Geometry:
-        """Returns an empty point"""
+        r"""Returns an empty point"""
         return shapes.Point()
             
             
 class Line(PlanarGraphics):
-    """A linear path segment, with coordinates x and y (float type).
+    r"""A linear path segment, with coordinates x and y (float type).
     
     Corresponds to a QPainterPath.LineToElement.
     """
@@ -5153,7 +5178,7 @@ class Line(PlanarGraphics):
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, graphicstype=None,
                  closed=False,
                  linked_objects=dict()):
-        """Parameters:
+        r"""Parameters:
         x0, y0 = start point coordinates
         x1, y1 = end point coordinates
         """
@@ -5190,7 +5215,7 @@ class Line(PlanarGraphics):
         return path
 
     def qGraphicsItem(self, frame:typing.Optional[int] = None) -> typing.Optional[QtWidgets.QGraphicsItem]:
-        """Call this only for a object that is visible in the specified frame"""
+        r"""Call this only for a object that is visible in the specified frame"""
         qp = self.qPoints(frame)
         if len(qp) >= 2:
             return QtWidgets.QGraphicsLineItem(QtCore.QLineF(qp[0],qp[1]))
@@ -5199,7 +5224,7 @@ class Line(PlanarGraphics):
         return shapes.LineString(self.controlPoints(frame, False))
         
 class Move(PlanarGraphics):
-    """Starting path point with coordinates x and y (float type).
+    r"""Starting path point with coordinates x and y (float type).
     
     Corresponds to a QPainterPath.MoveToElement.
     
@@ -5220,7 +5245,7 @@ class Move(PlanarGraphics):
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
                  graphicstype=None, closed=False,
                  linked_objects=dict()):
-        """Parameters: move to point coordinates (x,y)
+        r"""Parameters: move to point coordinates (x,y)
         """
         super().__init__(*args, 
                          name=name, 
@@ -5282,7 +5307,7 @@ class Move(PlanarGraphics):
         return QtCore.QPointF(self.x, self.y)
     
     def qGraphicsItem(self, pointSize=0, frame = None):
-        """Overrides PlanarGraphics.qGraphicsItem;
+        r"""Overrides PlanarGraphics.qGraphicsItem;
         Returns a circle
         """
         if frame is None:
@@ -5313,7 +5338,7 @@ Start = Move
 Point = Move
                               
 class Cubic(PlanarGraphics):
-    """A cubic curve path segment
+    r"""A cubic curve path segment
     
     Corresponds to the triplet:
     (QPainterPath.CurveToElement, QPainterPath.CurveToDataElement, QPainterPath.CurveToDataElement).
@@ -5330,7 +5355,7 @@ class Cubic(PlanarGraphics):
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, graphicstype=None,
                  closed=False,
                  linked_objects=dict()):
-        """
+        r"""
         Parameters:
         c0x, c0y = start point coordinates
         c1x, c1y = first control point coordinates
@@ -5438,7 +5463,7 @@ class Cubic(PlanarGraphics):
 #         return ret
     
 #     def fromControlPath(self, path, frame=None):
-#         """Updates from a control path.
+#         r"""Updates from a control path.
 #         A control path is a polyline Path object containing 3 or 4 control 
 #         points (cp):
 #         cp0 (optional:) - the first control point — this is typically a "virtual"
@@ -5492,12 +5517,12 @@ class Cubic(PlanarGraphics):
     #     # print(f"\n → {self}")
         
     def shape(self, frame:typing.Optional[int] = None) -> shapes.Geometry:
-        """Returns an empty point"""
+        r"""Returns an empty point"""
         scipywarn("shapely does not support cubic splines")
         return shapes.Point()
     
     def makeBSpline(self, xy:typing.Optional[typing.Union[typing.Sequence[numbers.Number], Move, Point, Line]]=None, extrapolate=True):
-        """Creates a cubic BSpline object with origin at "xy"
+        r"""Creates a cubic BSpline object with origin at "xy"
         
         Parameters:
         ==========
@@ -5542,7 +5567,7 @@ class Cubic(PlanarGraphics):
         #ret = QtWidgets.QGraphicsPathItem(self())
         
 class Quad(PlanarGraphics):
-    """A quadratic curve path segment.
+    r"""A quadratic curve path segment.
     
     Coordinates are, respectively, for the control point: x, y and for the end
     end point (destination): x1, y1.
@@ -5562,7 +5587,7 @@ class Quad(PlanarGraphics):
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, 
                  graphicstype=None, closed=False,
                  linked_objects=dict()):
-        """
+        r"""
         Parameters:
         c0x, c0y = first point coordinates
         c1x, c1y = control point coordinates
@@ -5747,7 +5772,7 @@ class Quad(PlanarGraphics):
             return list()
         
     def makeBSpline(self, xy, extrapolate=True):
-        """Creates a cubic BSpline object with origin at "xy"
+        r"""Creates a cubic BSpline object with origin at "xy"
         
         Parameters:
         ==========
@@ -5766,7 +5791,7 @@ class Quad(PlanarGraphics):
         return BSpline(t, c, 2, extrapolate=extrapolate)
         
 class Ellipse(PlanarGraphics):
-    """Encapsulates parameters for QPainterPath.addEllipse() function:
+    r"""Encapsulates parameters for QPainterPath.addEllipse() function:
     
     x, y, w, h specify the coordinates of the bounding rectangle
     """
@@ -5781,7 +5806,7 @@ class Ellipse(PlanarGraphics):
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, graphicstype=None, 
                  closed=False,
                  linked_objects=dict()):
-        """
+        r"""
         Parameters: 
         x, y, w, h = bounding rectangle (top left (x,y), width, height)
         """
@@ -5828,7 +5853,7 @@ class Ellipse(PlanarGraphics):
                 
         
     def controlPoints(self, frame:typing.Optional[int]=None, inPath:bool=False):
-        """Control points are the top-left and bottom right of the enclosing rectangle
+        r"""Control points are the top-left and bottom right of the enclosing rectangle
         """
         # TODO use more detailed control points as for ArcTo 
         # NOTE: this would be an unnecessary complication
@@ -5848,7 +5873,7 @@ class Ellipse(PlanarGraphics):
     
     
 #     def controlPath(self, frame:typing.optional[int]=None):
-#         """Control path is a line along the first diagonal of the enclosing rectangle
+#         r"""Control path is a line along the first diagonal of the enclosing rectangle
 #         (top-left to bottom-right)
 #         """
 #         ret = Path()
@@ -5918,7 +5943,7 @@ class Ellipse(PlanarGraphics):
     
         
     def shape(self, frame:typing.Optional[int] = None) -> shapes.Geometry:
-        """Returns an empty point"""
+        r"""Returns an empty point"""
         if frame is None:
             state = self.currentState
             
@@ -5940,7 +5965,7 @@ class Ellipse(PlanarGraphics):
     
         
     def qPoints(self, frame = None):
-        """Returns the points (vertices) of the enclosing rectangle.
+        r"""Returns the points (vertices) of the enclosing rectangle.
         
         If there is no associated state for the specified frame index returns an
         empty list.
@@ -5971,7 +5996,7 @@ class Ellipse(PlanarGraphics):
                                                             state.w, state.h))
 
 class Rect(PlanarGraphics):
-    """Encapsulates parameters for QPainterPath.addRect() function:
+    r"""Encapsulates parameters for QPainterPath.addRect() function:
     
     x, y, w, h specify the coordinates of the bounding rectangle
     """
@@ -5992,7 +6017,7 @@ class Rect(PlanarGraphics):
    
     def __init__(self, *args, name=None, frameindex=[], currentframe=0, graphicstype=None,
                  closed=False, linked_objects=dict()):
-        """
+        r"""
         Positional parameters: 
         =====================
         
@@ -6006,7 +6031,7 @@ class Rect(PlanarGraphics):
                          linked_objects=linked_objects)
         
     def controlPoints(self, frame=None, inPath:bool=False):
-        """Control points are the top-left and bottom right vertices
+        r"""Control points are the top-left and bottom right vertices
         """
         if frame is None:
             state = self.currentState
@@ -6023,7 +6048,7 @@ class Rect(PlanarGraphics):
         return ((state.x, state.y), (state.x + state.w, state.y + state.h))
     
     def controlPath(self, frame=None, inPath:bool=False):
-        """Control path is the diagonal from top-left to bottom-right
+        r"""Control path is the diagonal from top-left to bottom-right
         
         This is based on the state associated with the specified frame, or with
         the current frame when 'frame' is None
@@ -6074,7 +6099,7 @@ class Rect(PlanarGraphics):
         self.updateFrontends()
         
     def qPoints(self, frame = None):
-        """Returns the points (apices) of the rectangle.
+        r"""Returns the points (apices) of the rectangle.
         
         If there is no associated state for the frame index specified returns
         an empty list
@@ -6173,7 +6198,7 @@ class Rect(PlanarGraphics):
         ret.currentFrame = self.currentFrame
             
 class Text(PlanarGraphics):
-    """PlanarGraphics object encapsulating a string.
+    r"""PlanarGraphics object encapsulating a string.
     WARNING Incomplete API
     TODO also adapt the GraphicsObject frontend to support this class!
     """
@@ -6234,7 +6259,7 @@ class Text(PlanarGraphics):
                  frame:typing.Optional[int]=None, 
                  closed:typing.Optional[bool]=None, 
                  connected:typing.Optional[bool]=False) -> QtGui.QPainterPath:
-        """Returns path unaltered, or an empty path"""
+        r"""Returns path unaltered, or an empty path"""
         if path is None:
             path = QtGui.QPainterPath()
             
@@ -6276,7 +6301,7 @@ class Text(PlanarGraphics):
     # def qGraphicsItem(self, pointSize=0, frame = None):
         
 class Path(PlanarGraphics):
-    """Encapsulates a path composed of simple PlanarGraphics objects.
+    r"""Encapsulates a path composed of simple PlanarGraphics objects.
     
     Emulates a Python list. Path objects can be constructed from a sequence of
     PlanarGraphics elements. 
@@ -6393,7 +6418,7 @@ class Path(PlanarGraphics):
 
     def __init_from_planar_graphics_(self, *args, frameindex:typing.Optional[typing.Iterable]=[],
                                     currentframe:int=0) -> None:
-        """
+        r"""
         Initialize Path from a sequence of PlanarGraphics objects.
         This is also used for unpickling
         """
@@ -6409,7 +6434,7 @@ class Path(PlanarGraphics):
     def __init__(self, *args, name:typing.Optional[str]="path", frameindex=[], currentframe:int=0, 
                  graphicstype=None, closed=False,
                  linked_objects = dict(), position = (0,0)):
-        """
+        r"""
         Path constructor
         
         Parameters:
@@ -6710,7 +6735,7 @@ class Path(PlanarGraphics):
     def __call__(self, path:typing.Optional[QtGui.QPainterPath]=None, 
                 frame:typing.Optional[int]=None, closed:typing.Optional[bool]=None,
                 connected:typing.Optional[bool]=False):
-        """Generates a QtGui.QPainterPath.
+        r"""Generates a QtGui.QPainterPath.
         
         Named parameters:
         =================
@@ -6795,7 +6820,7 @@ class Path(PlanarGraphics):
             self._objects_.__setitem__(key, value)
             
     def __getitem__(self, key):
-        """Implements self[key] list semantic
+        r"""Implements self[key] list semantic
         
         When key is an int, returns the PlanarGraphics object at index key.
         
@@ -6809,7 +6834,7 @@ class Path(PlanarGraphics):
             raise TypeError(" expecting an int or a slice object; got %s instead" % type(key).__name__)
 
     def __len__(self):
-        """Returns the number of PlanarGraphics elements in this Path object.
+        r"""Returns the number of PlanarGraphics elements in this Path object.
         """
         return len(self._objects_)
     
@@ -6868,22 +6893,22 @@ class Path(PlanarGraphics):
         return ret
     
     def __iter__(self, *args, **kwargs):
-        """Returns a list_iterator
+        r"""Returns a list_iterator
         """
         return self._objects_.__iter__(*args, **kwargs)
     
     def __reversed__(self):
-        """Returns a list_reverseiterator
+        r"""Returns a list_reverseiterator
         """
         return self._objects_.__reversed__()
     
     def appendStates(self, other):
-        """ Overrides PlanarGraphics.appendStates() to flag that Path objects does not support this method
+        r""" Overrides PlanarGraphics.appendStates() to flag that Path objects does not support this method
         """
         raise NotImplementedError("Path objects do not support this function; use appendStates on individual Path elements")
         
     def append(self, other):
-        """Paths are appended as nested subpaths.
+        r"""Paths are appended as nested subpaths.
         To append all elements of another path, use appendStates().
         
         Returns:
@@ -6967,7 +6992,7 @@ class Path(PlanarGraphics):
         self._objects_.remove(other)
         
     def reverse(self):
-        """Reverses the order of the elements in this Path.
+        r"""Reverses the order of the elements in this Path.
         """
         self._objects_.reverse()
         
@@ -6984,7 +7009,7 @@ class Path(PlanarGraphics):
         return all([isinstance(k, int) and self.validateState(state) for (k, state) in value.items()])
         
     def addState(self, state):
-        """Adds a copy of state to each of its objects.
+        r"""Adds a copy of state to each of its objects.
         Use with CAUTION.
         
         """
@@ -7004,7 +7029,7 @@ class Path(PlanarGraphics):
             element.addState(state.copy())
             
     def subpath(self, n):
-        """Returns the nth subpath as a Path object, or self when there are no subpaths
+        r"""Returns the nth subpath as a Path object, or self when there are no subpaths
         
         NOTE: The returned Path object contains REFERENCES, NOT COPIES, of the
         corresponding elements in this object.
@@ -7032,7 +7057,7 @@ class Path(PlanarGraphics):
         return self._objects_[path_slice]
     
     def remapFrameStateAssociations(self, newmaps):
-        """Overrides PlanarGraphics.remapFrameStateAssociations, for Path objects.
+        r"""Overrides PlanarGraphics.remapFrameStateAssociations, for Path objects.
         
         Re-asssigns frame links to PlanarGraphics elements in the Path.
         
@@ -7076,7 +7101,7 @@ class Path(PlanarGraphics):
     
     @property
     def components(self):
-        """Read-only property: the list of components of this Path object.
+        r"""Read-only property: the list of components of this Path object.
         
         Being a list, is not immutable!
         """
@@ -7084,7 +7109,7 @@ class Path(PlanarGraphics):
     
     @property
     def density(self):
-        """The density of elements in this path.
+        r"""The density of elements in this path.
         This is defined as the ratio :
         len(path)/int(path.curveLength())
         
@@ -7112,7 +7137,7 @@ class Path(PlanarGraphics):
 
     @property
     def subpathCount(self):
-        """Returns the number of subpaths.
+        r"""Returns the number of subpaths.
         
         This is the number of Move elements minus one. 
         
@@ -7140,7 +7165,7 @@ class Path(PlanarGraphics):
     
     @property
     def x(self):
-        """The "x" coordinate of the current state of this path.
+        r"""The "x" coordinate of the current state of this path.
         
         This is the minimum of all x positions of its elements, in the current 
         state.
@@ -7178,7 +7203,7 @@ class Path(PlanarGraphics):
         
     @property
     def y(self):
-        """The "y" coordinate of the current state of this path's first element.
+        r"""The "y" coordinate of the current state of this path's first element.
         
         This is the minimum of all y positions of its elements, in the current 
         state.
@@ -7223,7 +7248,7 @@ class Path(PlanarGraphics):
         
     @property
     def elementsFrameIndices(self):
-        """Sequence of nested lists of frame indices, one per element in this Path.
+        r"""Sequence of nested lists of frame indices, one per element in this Path.
         
         Nested Paths are given as nested lists at a deeper level.
         
@@ -7236,7 +7261,7 @@ class Path(PlanarGraphics):
     
     @elementsFrameIndices.setter
     def elementsFrameIndices(self, value):
-        """Parameter MUST be a sequence of nested sequences, of the same length as self.
+        r"""Parameter MUST be a sequence of nested sequences, of the same length as self.
         
         Parametrs:
         ==========
@@ -7301,7 +7326,7 @@ class Path(PlanarGraphics):
                 
     @property
     def frameIndices(self):
-        """List of unique frame indices that are associated with a state.
+        r"""List of unique frame indices that are associated with a state.
             Read-only; to change frames in the elements' states use elementsFrameIndices
         """
         from core.utilities import unique
@@ -7319,7 +7344,7 @@ class Path(PlanarGraphics):
     
     @frameIndices.setter
     def frameIndices(self, value):
-        """Parameter MUST be a sequence of nested sequences, of the same length as self.
+        r"""Parameter MUST be a sequence of nested sequences, of the same length as self.
         
         Parametrs:
         ==========
@@ -7408,7 +7433,7 @@ class Path(PlanarGraphics):
         
     @property
     def states(self):
-        """Returns a list of lists of states (one list per element)
+        r"""Returns a list of lists of states (one list per element)
         """
         ## FIXME should this not be a list of states (as paths) instead?
         ## as it is right now it returns a list with as many elements as there are
@@ -7440,7 +7465,7 @@ class Path(PlanarGraphics):
             
     @property
     def currentState(self):
-        """ A Path object containing the list of objects visible in the current
+        r""" A Path object containing the list of objects visible in the current
         state.
         
         As for the currentStateIndexed property, the states are taken from the
@@ -7521,7 +7546,7 @@ class Path(PlanarGraphics):
         raise NotImplementedError("Path objects do not support this method")
     
     def propagateState(self, frame, destframes):
-        """Propagate the states at specified frame, to destframes
+        r"""Propagate the states at specified frame, to destframes
         """
         
         for o in self:
@@ -7538,7 +7563,7 @@ class Path(PlanarGraphics):
         
     def objectForFrame(self, frame:typing.Optional[int]=None,
                visible:typing.Optional[bool] = True) -> object:
-        """Returns a new Path object with frame-specific decriptors.
+        r"""Returns a new Path object with frame-specific decriptors.
         
         WARNING: Since this is a new Path object, and NOT a reference to the 
         current descriptor values, modyfing it does not affect the original
@@ -7561,7 +7586,7 @@ class Path(PlanarGraphics):
         
     def getState(self, frame:typing.Optional[int]=None,
                  visible:typing.Optional[bool]=True) -> typing.Optional[list]:
-        """Returns this Path elements' states for the specified frame.
+        r"""Returns this Path elements' states for the specified frame.
         
         A state is defined for the specified frame if either:
         * its z_frame == frame
@@ -7596,7 +7621,7 @@ class Path(PlanarGraphics):
         return tuple(ret)
         
     def controlPath(self, frame=None, inPath:bool=False):
-        """Returns a Path that represents a polyline connecting all control points.
+        r"""Returns a Path that represents a polyline connecting all control points.
         """
         ret = Path()
         
@@ -7641,7 +7666,7 @@ class Path(PlanarGraphics):
                 o.linkFrames(value[k]) # o.linkFrame() may raise its own error.
     
     def adoptPainterPath(self, p):
-        """Re-composes this Path from a (possibly different) QPainterPath object.
+        r"""Re-composes this Path from a (possibly different) QPainterPath object.
         
         The (new) Path will be composed of Tier 1 primitives (MoveTo, LineTo and CubicTo)
         
@@ -7709,7 +7734,7 @@ Tier2PathElements = (Ellipse, Rect) # can be used as parameters for the Graphics
 Tier3PathElements = () # TODO: connectPath, addPath, addRegion, addPolygon, addText
 
 class Planar2QGraphicsManager(QtCore.QObject):
-    """Each planar graphics object can be displayed by several graphics objects.
+    r"""Each planar graphics object can be displayed by several graphics objects.
     e.g. one ROI or Cursor can be shown in several image windows.
     
     The planar descriptors of the planar graphics object can thus be manipulated
@@ -7796,7 +7821,7 @@ class Planar2QGraphicsManager(QtCore.QObject):
         
 def simplifyPath(path:Path, max_adjacent_points:int = 5, 
                  frame:typing.Optional[int] = None):
-    """Simplifies a Path that consists of a long sequence of Move & Line points.
+    r"""Simplifies a Path that consists of a long sequence of Move & Line points.
     
     The Path is simplified by removing sequence of points that differ in one coordinate
     only (and thus can be replaced by a single horizontal or vertical line).
@@ -7965,7 +7990,7 @@ def simplifyPath(path:Path, max_adjacent_points:int = 5,
 
 
 class GraphicsObjectLnF(object):
-    """Default styles and colours for GraphicsObject objects in Scipyen.
+    r"""Default styles and colours for GraphicsObject objects in Scipyen.
     GraphicsObjects are used as frontends for PlanarGraphics (which define
     data cursors and landmarks such as ROIs and lines for the ImageViewer).
     
@@ -8213,7 +8238,7 @@ class GraphicsObjectLnF(object):
             
             
 class GraphicsObject(QtWidgets.QGraphicsObject):
-    """Frontend for PlanarGraphics objects using the Qt Graphics Framework.
+    r"""Frontend for PlanarGraphics objects using the Qt Graphics Framework.
     TODO
     FIXME Logic for building/editing ellipse, cubic, quad ROIs
     FIXME check cachedPath logic
@@ -8364,7 +8389,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                  parentWidget=None,
                  roundCursorPoint=True):
                  
-        """
+        r"""
         Named parameters:
         =================
         obj: (optional) a PlanarGraphics object or None (default)
@@ -8499,7 +8524,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             % (self.__repr__(), type(self.backend).__name__, self.backend.__repr__())
             
     def _setAppearance_(self, cosmeticPen:bool=True):
-        """Sets up appearance parameters based on defaults set in GraphicsObjectLnF"""
+        r"""Sets up appearance parameters based on defaults set in GraphicsObjectLnF"""
         self.controlLnF = Bunch({"pen": Bunch({"line": GraphicsObjectLnF.pen(graphic ="pen_line", 
                                                                             control=True),
                                                "text": GraphicsObjectLnF.pen(graphic="pen_text",
@@ -8580,7 +8605,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                             })
                                 })
                          
-    @safeWrapper
+    @safewrapper
     def _defaultLinePen(self, selected:bool=False, linked:bool=False, cosmetic:bool=True):
         pen = QtGui.QPen(self.link_colors["%s" % linked].pen,
                          self.lnf_default_selection_styles_default["%s" % selected].pen.style,
@@ -8593,7 +8618,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return pen
     
-    @safeWrapper
+    @safewrapper
     def _defaultPointBrush(self, selected:bool=False, linked:bool=False):
         brush = QtGui.QBrush(QtGui.QColor(self.link_colors["%s" % linked].point).setAlpha(self.lnf_default_selection_styles_default["%s" % selected].pointBrushAlpha),
                              self.lnf_default_selection_styles_default["%s" % selected].point.style,
@@ -8601,7 +8626,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return brush
         
-    @safeWrapper
+    @safewrapper
     def _defaultTextPen(self, selected:bool=False, linked:bool=False, cosmetic:bool=True):
         pen = QtGui.QPen(self.link_colors["%s" % linked].text,
                          self.lnf_default_selection_styles_default["%s" % selected].text.style,
@@ -8614,7 +8639,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return pen
     
-    @safeWrapper
+    @safewrapper
     def _defaultLabelBrush(self, selected:bool=False, linked:bool=False):
         brush = QtGui.QBrush(self.link_colors["%s" % linked].brush,
                              self.lnf_default_selection_styles_default["%s" % selected].brush.style,
@@ -8622,7 +8647,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return brush
         
-    @safeWrapper
+    @safewrapper
     def _defaultControlLinePen(self, cosmetic:bool=True):
         pen = QtGui.QPen(self.lnf_control_default.pen.color,
                          self.lnf_control_default.pen.style,
@@ -8635,7 +8660,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return pen
     
-    @safeWrapper
+    @safewrapper
     def _defaultControlPointPen(self, cosmetic:bool=True):
         pen = QtGui.QPen(self.lnf_control_default.point.color,
                          self.lnf_control_default.point.style,
@@ -8648,7 +8673,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return pen
     
-    @safeWrapper
+    @safewrapper
     def _defaultControlPointBrush(self):
         brush = QtGui.QBrush(self.lnf_control_default.brush.color,
                              self.lnf_control_default.brush.style,
@@ -8656,7 +8681,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return brush
         
-    @safeWrapper
+    @safewrapper
     def _defaultControlTextPen(self, cosmetic:bool=True):
         pen = QtGui.Pen(self.lnf_control_default.text.color,
                         self.lnf_control_default.text.style,
@@ -8669,7 +8694,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         return pen
         
-    @safeWrapper
+    @safewrapper
     def _defaultControlLabelBrush(self):
         brush = QtGui.QBrush(self.lnf_control_default.brush.color,
                              self.lnf_control_default.brush.style,
@@ -8678,7 +8703,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         return brush
         
     def _setDisplayStr_(self, value:str=None):
-        """Constructs the label string.
+        r"""Constructs the label string.
         
         Value may be an empty string
         """
@@ -8696,9 +8721,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             
         self._displayStr_ = nameStr
         
-    @safeWrapper
+    @safewrapper
     def _updateLabelRect_(self):
-        """Calculates label bounding rectangle
+        r"""Calculates label bounding rectangle
         """
         if len(self._displayStr_) > 0:
             fRect = self._parentWidget_.fontMetrics().boundingRect(self._displayStr_)
@@ -8708,7 +8733,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             self._labelRect  = QtCore.QRectF() # a null rect
         
     def _finalizeShape_(self):
-        """Creates the _graphicsShapedItem, an instance of QGraphicsItem.
+        r"""Creates the _graphicsShapedItem, an instance of QGraphicsItem.
         Used only by non-cursor types, after exit from build mode.
         Relies on self._cachedPath_ which is a PlanarGraphics Path object. Therefore
         if makes inferences from self._planar_graphics_type_ and the number of elements in
@@ -8764,7 +8789,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self.update()
 
     def _makeObject_(self):
-        """Generates the rendered graphics components.
+        r"""Generates the rendered graphics components.
         """
         if self._backend_ is None:
             return
@@ -8784,7 +8809,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         self.update()
         
     def _makeCursorLines_(self, state:dict, vert:bool=True, horiz:bool=True):
-        """Draws the main cursor lines.
+        r"""Draws the main cursor lines.
         state: dict (or Bunch) with x, y, height and width attributes (see Cursor)
         vert, horiz: bool (by default, both True) 
         
@@ -8816,7 +8841,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                         self.mapFromScene(QtCore.QPointF(state.width, state.y)))
 
     def _makeCursorWhiskers_(self, state:dict, vert:bool=False, horiz:bool=False):
-        """Draws the whisker bars orthogonal to the main cursor line(s)
+        r"""Draws the whisker bars orthogonal to the main cursor line(s)
         state: dict (or Bunch) with x, y, xwindow and ywindow attributes (see Cursor)
         vert:  draws the (horizontal) whisker for the vertical main line (horizontal whisker bar)
         horiz: draws the (vertical) whisker for horizontal main line (vertical whisker bar)
@@ -8848,7 +8873,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                                                          state.y)))
         
     def _makeCursor_(self):
-        """Draws cursor.
+        r"""Draws cursor.
         Creates the graphic components, which are rendered by __paint__
         """
         state = self._backend_.currentState
@@ -8935,7 +8960,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     # TODO OPTIONAL: keyReleaseEvent (to move it by keyboard)
     # TODO OPTIONAL: hoverMoveEvent -- optional
     
-    @safeWrapper
+    @safewrapper
     def getShapePathElements(self):
         if isinstance(self._backend_, Cursor) or not self.hasState:
             return
@@ -8953,9 +8978,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
         return paths
     
-    @safeWrapper
+    @safewrapper
     def __updateCachedPathFromBackend__(self):
-        """No mapping transformations here, as the cached path is a copy of the
+        r"""No mapping transformations here, as the cached path is a copy of the
         _backend_'s state associated with the current frame.
         """
         if isinstance(self._backend_, (Cursor, type(None))):
@@ -8968,9 +8993,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     def hide(self):
         self.setvibisle(False)
     
-    #@safeWrapper
+    #@safewrapper
     def boundingRect(self):
-        """Mandatory to get the bounding rectangle of this item
+        r"""Mandatory to get the bounding rectangle of this item
         """
         # TODO 2021-05-07 13:30:45
         # Factor this into PlanarGraphics; then map it to the item coordinates
@@ -9068,7 +9093,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         return bRect
     
     def toScenePath(self):
-        """Returns a new pictgui.Path object or None if isCursor is True.
+        r"""Returns a new pictgui.Path object or None if isCursor is True.
         
         This constructs a new pictgui.Path object. 
         
@@ -9094,7 +9119,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 #return Path([self.mapToScene(p) for p in self._cachedPath_.qPoints()])
             
     def toSceneCursor(self):
-        """Returns a new pictgui.Cursor object or None if isCursor is False.
+        r"""Returns a new pictgui.Cursor object or None if isCursor is False.
         
         This constructs a new pictgui.Cursor object. 
         
@@ -9115,7 +9140,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                 return Cursor(self._backend_.name, p.x(), p.y(), self._backend_.width, self._backend_.height, self._backend_.xwindow, self._backend_.ywindow, self._backend_.radius)
             
     def getScenePosition(self):
-        """Returns the position in the scene as x, y sequence
+        r"""Returns the position in the scene as x, y sequence
         FIXME
         """
         p = self.mapToScene(self._backend_.pos)
@@ -9124,7 +9149,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
             
     def getSceneCoordinates(self):
-        """Returns the coordinates that define this shape in the scene.
+        r"""Returns the coordinates that define this shape in the scene.
         FIXME
         Coordinates are mapped to scene's coordinate system
         """
@@ -9191,9 +9216,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                                         state.ywindow))
         return [vRect, hRect]
     
-    @safeWrapper
+    @safewrapper
     def shape(self):
-        """ Used in collision detection, etc.
+        r""" Used in collision detection, etc.
         Currently return a path made of this item's bounding rectangle.
         """
         # TODO: 2021-05-07 13:32:01
@@ -9306,7 +9331,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         #return path
     
     def setPos(self, x, y=None):
-        """Overloads QGraphicsItem.setPos()
+        r"""Overloads QGraphicsItem.setPos()
         Parameters:
         ==========
         x: numbers.Real or QtCore.QPointF when y is None
@@ -9360,9 +9385,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         # instead of "__paint__" in self.paint(...) - see NOTE: 2021-03-07 18:30:02
         self.__paint__(painter, styleOption, widget)
         
-    #@safeWrapper
+    #@safewrapper
     def __paint__(self, painter, styleOption, widget):
-        """Does the actual painting of the item.
+        r"""Does the actual painting of the item.
         Also called by self.update(), super().update() & scene.update()
         """
         # NOTE: 2021-03-07 18:33:05
@@ -9860,9 +9885,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         except Exception as exc:
             traceback.print_exc()
             
-    @safeWrapper
+    @safewrapper
     def itemChange(self, change, value):
-        """Customizes the cursor movement by mouse or keyboard.
+        r"""Customizes the cursor movement by mouse or keyboard.
         
         1. For vertical/horizontal cursors, movement of cursor main line, whiskers
            and label are adjusted in self.__paint__() such that:
@@ -9965,9 +9990,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
 
         return super(GraphicsObject, self).itemChange(change, value)
 
-    @safeWrapper
+    @safewrapper
     def mousePressEvent(self, evt):
-        """Mouse press event handler.
+        r"""Mouse press event handler.
         
         In build mode, entered when the ROI type has not beed pre-determined at 
         __init__(), keyboard modifiers determine what type of ROI is being created
@@ -10231,9 +10256,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         evt.accept()
 
-    @safeWrapper
+    @safewrapper
     def mouseMoveEvent(self, evt):
-        """Mouse move event handler.
+        r"""Mouse move event handler.
         
         In buildMode the type of ROI must have already been determined by the time
         this event is issued, either at __init__ or at the time of first mouse press event.
@@ -10399,9 +10424,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
             self.selectMe.emit(self.ID, True)
 
-    @safeWrapper
+    @safewrapper
     def mouseReleaseEvent(self, evt):
-        """Mouse release event handler
+        r"""Mouse release event handler
         """
         #print(self._backend_.x)
         self._c_activePoint = -1 # restore this anyway!
@@ -10460,9 +10485,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         evt.accept()
 
-    #@safeWrapper
+    #@safewrapper
     #"def" mouseDoubleClickEvent(self, evt):
-        #"""Mouse double-click event handler - do I need this ???
+        #r"""Mouse double-click event handler - do I need this ???
         #"""
         ## TODO: bring up cursor properties dialog
         ## NOTE: if in buildMode, end ROI construction 
@@ -10473,9 +10498,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
 
         #super(GraphicsObject, self).mouseDoubleClickEvent(evt)
 
-    @safeWrapper
+    @safewrapper
     def contextMenuEvent(self, evt):
-        """
+        r"""
         #TODO: popup context menu => Edit, Link/Unlink, Remove
         """
         self.selectMe.emit(self.ID, True)
@@ -10486,7 +10511,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         evt.accept()# so that this doesn't propagate to the underlying graphics items
         
-    @safeWrapper
+    @safewrapper
     def hoverEnterEvent(self, evt):
         if self._buildMode_:
             self.setCursor(QtGui.QCursor(QtCore.Qt.CrossCursor))
@@ -10504,9 +10529,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         super(GraphicsObject, self).hoverEnterEvent(evt)
         
-    @safeWrapper
+    @safewrapper
     def hoverMoveEvent(self, evt):
-        """Hover move event handler.
+        r"""Hover move event handler.
         
         In buildMode the type of ROI must have already been determined by the time
         this event is issued, either at __init__ or at the time of first mouse press event.
@@ -10591,14 +10616,14 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
         super(GraphicsObject, self).hoverMoveEvent(evt)
         
-    @safeWrapper
+    @safewrapper
     def hoverLeaveEvent(self, evt):
         self.unsetCursor()
         self.update()
         #print("hover leave position x %g, y %g" % (evt.pos().x(), evt.pos().y()))
         super(GraphicsObject, self).hoverLeaveEvent(evt)
             
-    @safeWrapper
+    @safewrapper
     def keyPressEvent(self, evt):
         # NOTE: 2017-06-29 08:44:34
         # "up" means move down (coordinates origin are top-left !!!)
@@ -10692,7 +10717,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         #self.update()
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def slotFrameChanged(self, val):
         self._currentframe_ = val
         if self._backend_ is not None:
@@ -10733,9 +10758,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             
         self.update()
         
-    @safeWrapper
+    @safewrapper
     def __updateBackendFromCachedPath__(self):
-        """Updates the backend primitive from this object, it being a ROI
+        r"""Updates the backend primitive from this object, it being a ROI
         TODO/FIXME for now only supports Ellipse, Rect, and Path backends
         TODO expand for line, etc.
         NOTE: do not use for cursors !
@@ -10777,9 +10802,9 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
             except Exception as e:
                 traceback.print_exc()
                     
-    #@safeWrapper
+    #@safewrapper
     def removeFromWidget(self):
-        """Call this to have the GraphicsObject remove itself from the GraphicsImageViewerWidget
+        r"""Call this to have the GraphicsObject remove itself from the GraphicsImageViewerWidget
         """
         if type(self.parentwidget).__name__ == "ImageViewer":
             #print("GraphicsObject.removeFromWidget %s from %s" % (self.name, self.parentwidget.windowTitle()))
@@ -10818,7 +10843,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     
     @property
     def cachedPath(self):
-        """Read-only
+        r"""Read-only
         """
         return self._cachedPath_
     
@@ -10833,7 +10858,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     
     @frameVisibility.setter
     def frameVisibility(self, value):
-        """
+        r"""
         value: int, a list of int or a range
         
         Ignored for Path objects (this is determined by inidividual elements of the Path)
@@ -10891,7 +10916,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
     @property
     def name(self):
-        """Alias to self.ID
+        r"""Alias to self.ID
         """
         return self.ID
     
@@ -10901,7 +10926,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     
     @property
     def ID(self):
-        """Name of this GUI GraphicsObject.
+        r"""Name of this GUI GraphicsObject.
         This is kept in sync with the backend.name property
         """
         if self._backend_ is None:
@@ -10934,7 +10959,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
     @property
     def linkedToFrame(self):
-        """Read-only
+        r"""Read-only
         To change, one can only manipulate "framesVisibility" property
         """
         return len(self._frameindex)
@@ -10947,7 +10972,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
 
     @property
     def labelShowsPosition(self):
-        """When True, the coordinates will be displayed next to its name, on the label
+        r"""When True, the coordinates will be displayed next to its name, on the label
         """
         return self._labelShowsCoordinates_
     
@@ -10966,7 +10991,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
 
     @property
     def x(self):
-        """The x coordinate
+        r"""The x coordinate
         """
         return self.pos().x()
     
@@ -11016,7 +11041,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                                 
     @property
     def xwindow(self):
-        """Alias for the "horizontalWindow" property
+        r"""Alias for the "horizontalWindow" property
         """
         return self.horizontalWindow
     
@@ -11026,7 +11051,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     
     @property
     def y(self):
-        """The y coordinate
+        r"""The y coordinate
         """
         return self.pos().y()
     
@@ -11064,7 +11089,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
                             
     @property
     def ywindow(self):
-        """ Alias for the "verticalWindow" property
+        r""" Alias for the "verticalWindow" property
         """
         return self.verticalWindow
     
@@ -11204,7 +11229,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
     def getColor(self, pen:bool=True, linked:bool=False, text:bool=False,
                  control:bool=False, controlpoint:bool=False, controltext:bool=False):
-        """Colors for pen or brush.
+        r"""Colors for pen or brush.
         For main graphics, color depends on whether the backend is linked or not.
         For control lineart, there are different colors for control line pen,
         control point pen, control point fill, control label text and control 
@@ -11217,7 +11242,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
     def setColor(self, qcolor, pen:bool=True, selected:bool=False, linked:bool=False, text:bool=False,
                  control:bool=False, controlpoint:bool=False):
-        """
+        r"""
         """
         if not isinstance(qcolor, QtGui.QColor):
             qcolor = QtGui.QColor(qcolor)
@@ -11259,7 +11284,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
     
     @linkedColor.setter
     def linkedColor(self, qcolor):
-        """Set both the pen and text color to the same value
+        r"""Set both the pen and text color to the same value
         """
         if isinstance(qcolor, QtGui.QColor) and qcolor.isValid():
             self._linePenLinked.setColor(qcolor)
@@ -11358,13 +11383,13 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
     @property
     def buildMode(self):
-        """Read-only
+        r"""Read-only
         """
         return self._buildMode_
     
     @property
     def editMode(self):
-        """When True, the shape of the object (non-cursor types) can be edited.
+        r"""When True, the shape of the object (non-cursor types) can be edited.
         Default if False.
         Editing is done via control points (GUI editing).
         
@@ -11389,7 +11414,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
     @property
     def canMove(self):
-        """Can this object be moved by mouse or keyboard.
+        r"""Can this object be moved by mouse or keyboard.
         By default, all graphics object types can be moved.
         For ROI types, setting this to False also sets editMode to False.
         """
@@ -11419,7 +11444,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         
     @property
     def canTransform(self):
-        """Can the object be transformed (rotated/scaled/skewed).
+        r"""Can the object be transformed (rotated/scaled/skewed).
         By default, objects cannot be transformed, except for being moved
         around the scene (see "canMove").
         However, non-cursor objects can be rotated/scaled/skewed
@@ -11469,7 +11494,7 @@ def makeLnFBunch(linePen:typing.Optional[QtGui.QPen] = None,
                  control:bool = False,
                  linked:bool = False,
                  selected:bool = False) -> Bunch:
-    """Generates a LnF mapping (a traitlets.Bunch) for GraphicsObject instances.
+    r"""Generates a LnF mapping (a traitlets.Bunch) for GraphicsObject instances.
     The mapping has the following structure:
     
     "pen"       -> Bunch: 
@@ -11585,7 +11610,7 @@ def makeControlLnF(linePen:typing.Optional[QtGui.QPen] = None,
                    pointBrush:typing.Optional[QtGui.QBrush] = None,
                    font:typing.Optional[QtGui.QFont] = None, 
                    pointSize:typing.Optional[typing.Union[int, float]] = None):
-    """Shortcut to generate a LnF Bunch for control graphics"""
+    r"""Shortcut to generate a LnF Bunch for control graphics"""
     return makeLnFBunch(linePen=linePen, textPen=textPen, pointPen=pointPen,
                         textBrush=textBrush, pointBrush=pointBrush,
                         font=font, pointSize=pointSize, 

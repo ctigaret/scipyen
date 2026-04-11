@@ -4,15 +4,41 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""
+r"""
 Qt5-based viewer window for two dimensional ndarrays
 
 """
 #### BEGIN 3rd party modules
+import os
 import numpy as np
 from core.vigra_patches import vigra
-from qtpy import QtCore, QtWidgets, QtGui
-# from PyQt5 import QtCore, QtWidgets, QtGui
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+
 #### END 3rd party modules
 
 #### BEGIN pict.iolib modules
@@ -33,14 +59,14 @@ __scipyen_plugin__ = None
 
 # TODO / FIXME: 2019-11-10 16:33:13 Merge with TableEditor
 class MatrixViewer(ScipyenViewer):
-    """Simple table viewer for numpy arrays and vigra.filters.Kernel* objects.
+    r"""Simple table viewer for numpy arrays and vigra.filters.Kernel* objects.
     
     No context menu or editing capabilities are implemented.
     
     On its way to deprecation -- use TableEditor (see below)
     
     See also:
-    * gui.dictviewer.SimpleTableWidget
+    * gui.dataviewer.SimpleTableWidget
     * gui.tableeditor.TableEditorWidget for extended functionality
     
     """
@@ -64,7 +90,10 @@ class MatrixViewer(ScipyenViewer):
         
     def _configureUI_(self):
         self.fileMenu = self.menuBar().addMenu("&File")
-        self.fileMenu.addAction("&Save As...", self.saveAsFile, "Ctrl+Sift+S")
+        if __has_PyQt6__ or __has_PySide6__:
+            self.fileMenu.addAction("&Save As...", "Ctrl+Shift+S", self.saveAsFile)
+        else:
+            self.fileMenu.addAction("&Save As...", self.saveAsFile, "Ctrl+Shift+S")
         
         self._tableWidget = QtWidgets.QTableWidget(self)
         #self._tableWidget.setSortingEnabled(False) # this IS the default!
@@ -115,7 +144,7 @@ class MatrixViewer(ScipyenViewer):
         if self._data_ is None:
             return
         
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:

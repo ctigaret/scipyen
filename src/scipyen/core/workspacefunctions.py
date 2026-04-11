@@ -4,11 +4,9 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-""" Various utilities for Scipyen workspace functions
+r""" Various utilities for Scipyen workspace functions
 All functions defined here are to be imported in the top namespace
 (e.g., 'from workspacefunctions import *')
-
-DOES NOT WORK (yet)
 
 """
 from __future__ import print_function
@@ -16,11 +14,49 @@ from __future__ import print_function
 
 import re as _re # re is also imported directly from pict
 
-import inspect, keyword, warnings, typing, os, sys
+import inspect, keyword, warnings, typing, os, sys, traceback
+
+from functools import singledispatch
 
 from operator import attrgetter, itemgetter, methodcaller
 
 from collections import OrderedDict, deque
+import dataclasses
+
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+# 
+# import qtpy
+# qtpy.API = os.environ["QT_API"]
+# if os.environ["QT_API"] == "pyside6":
+#     import PySide6
+#     from PySide6 import QtWidgets
+# else:
+#     from qtpy import QtWidgets
 
 from core.prog import (with_doc, scipywarn)
 from core.strutils import (is_glob, is_regexp)
@@ -32,7 +68,7 @@ except ImportError:
     pass
 
 def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None):
-    """Sets or gets the state of scipyen debugging.
+    r"""Sets or gets the state of scipyen debugging.
     
     The state is a boolean variable SCIPYEN_DEBUG in the user namespace.
     
@@ -83,7 +119,7 @@ def lsvars(*args,
            sort:bool=False, 
            sortkey:object=None, 
            reverse:bool=False) -> typing.Union[typing.List[str], typing.Generator, typing.KeysView]:
-    """List names of variables in a namespace, according to selection criteria.
+    r"""List names of variables in a namespace, according to selection criteria.
     
 The selection occurs in stages:
 
@@ -106,7 +142,7 @@ args: comma-separated list of strings, types, or sequence of types
     variable names in the search namespace.
     
     When args only contain an empty string, or not given, the function
-    returns a list with all the varioable names in the search namespace.
+    returns a list with all the variable names in the search namespace.
     
     When args contains types, these identify what type of variables to be listed
     in the search namespace.
@@ -234,7 +270,7 @@ A (possibly sorted) list of variable names if found, or an empty list.
     return ret
     
 def getvarsbytype(vartype, ws=None):
-    """Get variables by type, from a namespace or a dict
+    r"""Get variables by type, from a namespace or a dict
     """
     if not isinstance(vartype, (type, tuple, list)):
         raise TypeError("Expecting  type or a sequence of types as first argument; got %s instead" % (type(vartype).__name__))
@@ -268,7 +304,7 @@ def getvars(*args,
             sort:bool= False, 
             sortkey:object=None, 
             reverse:bool = False) -> typing.Sequence:
-    """Collects a subset of variabes from a workspace or a dictionary.
+    r"""Collects a subset of variabes from a workspace or a dictionary.
 
 Returns a (possibly sorted) list of the variables if found, or an empty list.
 
@@ -418,8 +454,10 @@ NOTE: The function was designed to complement the %who, %who_ls and %whos
         
     return ret
 
-def assignin(variable, varname, ws=None):
-    """Assign variable as varname in workspace ws"""
+def assignin(variable:object, varname:str, ws:typing.Optional[dict]=None):
+    r"""Assign variable as varname in workspace ws"""
+    # TODO: 2025-06-07 17:39:06
+    # consider shell.push(…) as alternative
     user_ws = user_workspace()
     if ws is None:
         ws = user_ws
@@ -428,13 +466,14 @@ def assignin(variable, varname, ws=None):
         raise ValueError("No valid workspace has been specified or found")
         
     ws[varname] = variable
+    
     if ws is user_ws:
         ws["mainWindow"].workspaceModel.update()
     
 assign = assignin # syntactic sugar
 
 def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None):
-    """Returns a list of symbols to which 'x' is bound in the namespace 'ws'
+    r"""Returns a list of symbols to which 'x' is bound in the namespace 'ws'
     
     The  list is empty when the variable 'x' does not exist in ws (e.g when it is
     dynamically created by an expression).
@@ -455,8 +494,180 @@ def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None):
         
     return [k for k in ws if ws[k] is x and not k.startswith("_")]
 
+def getMainScipyenWindow() -> object:
+    r"""Try and retrieve Scipyen's main window instance.
+This is searched in 
+    1) the user's workspace;
+    2) the call stack
+    3) in the list of top level widgets of the QApplication
+
+Returns None if the SciyenWindow instance is not found
+
+.. note::
+    This seems redundant, given the existence of ``gui.guiutils.getScipyenMainWindow()``
+    In fact, since 2026-01-04 22:38:21 it actually calls that function, and is left here because it is being called in various other places.
+    
+    """
+    from gui import guiutils 
+    return guiutils.getScipyenMainWindow()
+# #     # NOTE: 2026-01-04 22:34:17
+# #     # redundant: see gui.guiutils.getScipyenMainWindow
+# #     ret = None
+# #     ws = user_workspace()
+# #     if ws is not None:
+# #         ret = ws["mainWindow"]
+# #     else:
+# #         frame_records = inspect.getouterframes(inspect.currentframe())
+# #         for (n,f) in enumerate(frame_records):
+# #             if "ScipyenWindow" in f[0].f_globals:
+# #                 if __has_PyQt6__:
+# #                     ret = f[0].f_globals["ScipyenWindow"]
+# #                 else:
+# #                     ret = f[0].f_globals["ScipyenWindow"].instance()
+# #                 break
+# #             
+# #     if ret is None:
+# #         try:
+# #             app = QtWidgets.QApplication.instance()
+# #             if app is not None:
+# #                 ww = list(filter(lambda x: "ScipyenWindow" in x.__class__.__name__, app.topLevelWidgets()))
+# #                 if len(ww):
+# #                     ret = ww[0]
+# #         except:
+# #             traceback.print_exc()
+# # 
+# #     return ret
+
+def getCallSource() -> object:
+    # FIXME
+    ret = None
+    frame_records = inspect.getouterframes(inspect.currentframe())
+    for (n,f) in enumerate(frame_records):
+        if "ScipyenWindow" in f[0].f_globals:
+            if __has_PyQt6__:
+                ret = f[0].f_globals["ScipyenWindow"]
+            else:
+                ret = f[0].f_globals["ScipyenWindow"].instance()
+            break
+    if ret is None:
+        for (n,f) in enumerate(frame_records):
+            if "ScipyenConsole" in f[0].f_globals:
+                if __has_PyQt6__:
+                    ret = f[0].f_globals["ScipyenConsole"]
+                else:
+                    ret = f[0].f_globals["ScipyenConsole"].instance()
+                break
+    if ret is None:
+        for (n,f) in enumerate(frame_records):
+            if "ExternalConsoleWindow" in f[0].f_globals:
+                if __has_PyQt6__:
+                    ret = f[0].f_globals["ExternalConsoleWindow"]
+                else:
+                    ret = f[0].f_globals["ExternalConsoleWindow"].instance()
+                break
+            
+    return ret
+
+# def unpack(o, ws:typing.Optional[typing.Union[dict, str]] = None):
+@singledispatch
+def unpack(o, ws:typing.Optional[dict] = None):
+    r"""Unpacks the contents of a dict, a named tuple, or a dataclass.
+    
+    For dict objects (mapping key ↦ values), the values are bound to symbols
+(names) derived from the corresponding key in the mapping. The keys must be either
+str or int; any other type raises an error.
+    
+    Key type                    Symbol
+    -------------------------------------
+    str                         the key itself
+    int                         "data_" + string representation of the key
+    
+For named tuples, the values are bound to the coresponding field name (which, by
+definition, is a str)
+
+For dataclasses, the values are bound to symbols derived from the corresponding
+field (attribute) of the dataclass as retrieved by the dataclasses.fields() 
+function.
+    
+Value ↦ symbol binding is done in the target dictionary, typically a namespace
+
+By default the user workspace (or namespace) is used, see below.
+    
+WARNING: Symbols are NOT verified for uniqueness in the target. This means that
+unpack may overwrite variables bound to the same symbol in the target namespace.
+    
+    
+"""
+    from core.scipyendataclasses import isDataclass
+
+    if not isDataclass(o):
+        raise NotImplementedError(f"'unpack is not implemented for objects of type {type(o).__name__}")
+    
+    if ws is None:
+        ws = user_workspace()
+        
+    elif not isinstance(ws, dict):
+        raise TypeError(f"'ws': Expected a dict; instead, got a {type(ws).__name__}")
+
+    items = map(lambda f: (f.name, getattr(o, f.name)), dataclasses.fields(o))
+    for k,v in items:
+        if not isinstance(k, str):
+            if isinstance(k, int):
+                name =  f"data_{k}"
+            else:
+                raise TypeError(f"Key {k} type {type(k).__name__} is NOT supported; expecting a str or an int")
+        else:
+            name = k
+            
+        name = validate_varname(name, checkUnique=False)
+        assignin(v, name, ws)
+    
+@unpack.register(dict)
+def _unpack(x:dict, __ws__:typing.Optional[dict] = None):
+    if __ws__ is None:
+        __ws__ = user_workspace()
+        
+    elif not isinstance(ws, dict):
+        raise TypeError(f"'ws': Expected a dict; instead, got a {type(ws).__name__}")
+        # raise TypeError(f"'ws': Expected a dict or the string 'caller'; instead, got a {type(ws).__name__}")
+
+    for k,v in x.items():
+        if not isinstance(k, str):
+            if isinstance(k, int):
+                name =  f"data_{k}"
+            else:
+                raise TypeError(f"Key {k} type {type(k).__name__} is NOT supported; expecting a str or an int")
+        else:
+            name = k
+            
+        name = validate_varname(name, __ws__, checkUnique=False)
+        assignin(v, name, __ws__)
+        
+@unpack.register(tuple)
+def _unpack(x:tuple, ws:typing.Optional[dict] = None):
+    from core.dataypes import is_namedtuple
+    if not is_namedtuple(x):
+        raise TypeError("Expecting a named tuple")
+    if ws is None:
+        ws = user_workspace()
+        
+    elif not isinstance(ws, dict):
+        raise TypeError(f"'ws': Expected a dict; instead, got a {type(ws).__name__}")
+
+    for k, v in map(lambda f: (f, getattr(x, f)), x._fields):
+        if not isinstance(k, str):
+            if isinstance(k, int):
+                name =  f"data_{k}"
+            else:
+                name = f"{k}"
+        else:
+            name = k
+            
+        name = validate_varname(name, checkUnique=False)
+        assignin(v, name, ws)
+
 def user_workspace():
-    """Returns a reference to the user workspace (a.k.a user namespace)
+    r"""Returns a reference to the user workspace (a.k.a user namespace)
     """
     frame_records = inspect.getouterframes(inspect.currentframe())
     for (n,f) in enumerate(frame_records):
@@ -491,7 +702,7 @@ def scipyentopdir():
     return user_ns["mainWindow"]._scipyendir_
 
 def delvars(*args, glob=True, ws=None):
-    """Delete variable named in *args from workspace ws
+    r"""Delete variable named in *args from workspace ws
     CAUTION 
     """
     if ws is None:
@@ -617,27 +828,44 @@ def delvars(*args, glob=True, ws=None):
                 for t in targets:
                     ws.pop(t[0], None)
                         
-def validate_varname(arg, ws=None, start_counter=0, sep = "_", return_counter:bool=False):
-    """Returns a valid symbol based on an intended variable name.
+def validate_varname(arg, ws:typing.Optional[dict]=None, 
+                     start_counter:int=0, 
+                     sep = "_", 
+                     returns_counter:typing.Optional[bool]=None, # tri-state logic!!!
+                     checkUnique:bool=True) -> tuple:
+    r"""Returns a valid symbol based on an intended variable name.
     
     arg: a string (symbol to be bound to a variable in the namespace `ws`)
     
     ws: a namespace (dict), default None => will search for the topmost workspace
     
     start_counter: int (default is 0) the start value of the counter used in the
-            suffix to the variable name is an identical symbol already exists in 
-            ws.
-    
-    sep: str, default is "_"; the separator between the symbol base string and 
+
+            suffix to the variable name if an identical symbol already exists in
+
+            the workspace ``ws``
+
+
+            See also ``strutils.counter_suffix``
+
+    sep: str, default is "_"; the separator between the symbol base string and
+
         its suffix (counter)
-    
-    return_counter:bool, default is False;
-            When True, returns the valid symbol _AND_ the integer counter for 
+
+        .. attention::
+            Python restricts the number of characters that can be used in a symbol
+
+    returns_counter:bool, default is False;
+            When True, returns the valid symbol _AND_ the integer counter for
+
             the suffix.
+
+
+            See also ``strutils.counter_suffix``
     
     Returns:
     
-    • When return_counter is False (default), returns a modified verions of `arg`
+    • When returns_counter is False (default), returns a modified verions of `arg`
         where:
     
         1)  Non-valid characters are replaced with underscores.
@@ -653,14 +881,14 @@ def validate_varname(arg, ws=None, start_counter=0, sep = "_", return_counter:bo
             3.a) If a counter suffix already exists, it will be incremented as
                 necessary.
     
-    • When return_counter is True, returns a two-elements tuple containing the
+    • When returns_counter is True, returns a two-elements tuple containing the
         modified `arg` as above, AND the counter suffix as an int or None (when
         a suffix was not appended to the modified `arg`)
         
     
     """
-    from core.utilities import counter_suffix
-    from core.strutils import str2symbol
+    # from core.utilities import 
+    from core.strutils import str2symbol, counter_suffix
     
     if ws is None:
         frame_records = inspect.getouterframes(inspect.currentframe())
@@ -682,30 +910,31 @@ def validate_varname(arg, ws=None, start_counter=0, sep = "_", return_counter:bo
         arg = str2symbol(arg)
         # arg = _re.sub("^(?=\d)","data_", _re.sub("\W", "_", arg))
         
-    # NOTE: 2022-12-26 14:35:33
-    # no need to add suffix if arg is not already in the workspace symbols
-    # HOWEVER, IF arg is already there THEN:
-    # • if arg is a symbol bound to a class or a type, then start the counter at
-    #   0 (as in <variable of given type>_0, etc)
-    # • otherwise, start the counter at 1 ('cause an instance with same name 
-    # already exists)
-    if arg not in ws.keys():
-        # not need to append suffix since arg symbol is not in the ws
-        if return_counter:
-            return arg, None
-        
-        return arg
-    else:
-        # print(f"validate_varname arg {arg} exists")
-        if inspect.isclass(ws[arg]) or isinstance(ws[arg], type):
-            start_counter = 0 # 
+    if checkUnique:
+        # NOTE: 2022-12-26 14:35:33
+        # no need to add suffix if arg is not already in the workspace symbols
+        # HOWEVER, IF arg is already there THEN:
+        # • if arg is a symbol bound to a class or a type, then start the counter at
+        #   0 (as in <variable of given type>_0, etc)
+        # • otherwise, start the counter at 1 ('cause an instance with same name 
+        # already exists)
+        if arg not in ws.keys():
+            # not need to append suffix since arg symbol is not in the ws
+            return (arg, None) if returns_counter is None else None if returns_counter == True else arg
         else:
+            # print(f"validate_varname arg {arg} exists")
+            # if inspect.isclass(ws[arg]) or isinstance(ws[arg], type):
+            #     start_counter = 0 #
+            # else:
+            #     start_counter = 1
             start_counter = 1
+                
+            # print(f"validate_varname start_counter = {start_counter}")
             
-        # print(f"validate_varname start_counter = {start_counter}")
-        
-    arg = counter_suffix(arg, list(ws.keys()), sep=sep, start=start_counter, ret=return_counter)
-    # print(f"validate_varname return {arg}")
+        arg = counter_suffix(arg, list(ws.keys()), sep=sep,
+                             start=start_counter,
+                             returns_counter=returns_counter)
+        # print(f"validate_varname return {arg}")
         
     return arg
     

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Module for Ca2+ transient analysis
+r"""Module for Ca2+ transient analysis
 do not use 
 """
 import quantities as pq

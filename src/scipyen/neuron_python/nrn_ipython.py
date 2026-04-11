@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""Initialization code to use NEURON environment with external IPython kernels.
+r"""Initialization code to use NEURON environment with external IPython kernels.
 To be used on the "host" side (i.e. executed by the external kernel)
 
 Should NOT be imported in Scipyen or its internal IPython console; instead, its
@@ -54,7 +54,7 @@ if start_gui:
     ## NOTE: 2021-02-04 18:00:07
     ## On linux, prevent KDE or other DEs theming from overriding the resources 
     ## (colors etc) in the InterViews GUI
-    #if sys.platform == "linux":
+    #if sys.platform.startswith("linux"):
         #import subprocess
         #compl = subprocess.run(["xrdb", "-merge", os.path.join(__module_path__, "app-defaults", "nrniv")])
         #print("xrdb: ", compl.returncode)

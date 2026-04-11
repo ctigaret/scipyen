@@ -4,10 +4,37 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 import os
-from qtpy import QtWidgets
+
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+
 from gui.workspacegui import GuiMessages
 from gui.textviewer import TextViewer
-from core.prog import printStyled
+from core.prog import print_styled
 from iolib.pictio import loadTextFile
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -17,13 +44,13 @@ __text_file__ = os.path.join(__module_path__, "simple_plugin_text")
 __scipyen_plugin__ = None
 
 def my_plugin_function():
-    print(f"{printStyled('Hello world', 'green', True)}", file = mainWindow.console.stdout)
+    print(f"{print_styled('Hello world', 'green', True)}", file = mainWindow.console.stdout)
 
 def output_to_system_console():
-    print(f"{printStyled('Hello world', 'cyan', True)}")
+    print(f"{print_styled('Hello world', 'cyan', True)}")
 
 def helloWorld():
-    """
+    r"""
     The following attributes are "injected" in this module
     namespace:
     

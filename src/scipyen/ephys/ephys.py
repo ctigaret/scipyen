@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-""" Classes and functions for electrophysiology data.
+r""" Classes and functions for electrophysiology data.
 
 NOTATIONS USED BELOW:
 
@@ -17,7 +17,7 @@ The module provides a set of utility functions to operate primarily on objects
 in NeuralEnsemble's neo package (http://neuralensemble.org/), 
 documented here: https://neo.readthedocs.io/en/stable/
 
-Some of these function also apply to datatypes.DataSignal in Scipyen package.
+Some of these function also apply to datasignal.DataSignal in Scipyen package.
 
 NOTE 2020-10-07 09:42:28
 # Code split and redistributed across ephys.ephys, core.neoutils and core.triggerprotocols
@@ -166,11 +166,11 @@ from functools import singledispatch
 import warnings
 import typing, types
 import difflib
-import re as _re
+# import re as _re
 from enum import Enum, IntEnum
 from abc import ABC
-from dataclasses import (dataclass, KW_ONLY, MISSING, field)
-# from dataclasses import (dataclass, MISSING)
+import dataclasses
+from dataclasses import (dataclass, MISSING)
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -185,33 +185,67 @@ import neo
 import h5py
 import pandas as pd
 # import pyabf
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+
 import matplotlib as mpl
 # import pyqtgraph as pg
-from gui.pyqtgraph_patch import pyqtgraph as pg
-from qtpy import (QtGui, QtCore, QtWidgets)
-from qtpy.QtCore import (Signal, Slot, )
-# from PyQt5 import (QtGui, QtCore, QtWidgets)
-# from PyQt5.QtCore import (Signal, Slot, )
+from core.pyqtgraph_patch import pyqtgraph as pg
+# import qtpy
+# qtpy.API = os.environ["QT_API"]
+# if os.environ["QT_API"] == "pyside6":
+#     import PySide6
+#     from PySide6 import (QtGui, QtCore, QtWidgets)
+#     from PySide6.QtCore import (Signal, Slot, )
+# else:
+#     from qtpy import (QtGui, QtCore, QtWidgets)
+#     from qtpy.QtCore import (Signal, Slot, )
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
 from core.basescipyen import BaseScipyenData
 from core.traitcontainers import DataBag
-from core.prog import (safeWrapper, with_doc, get_func_param_types, scipywarn)
+from core.prog import (safewrapper, with_doc, get_func_param_types, scipywarn)
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import (DataZone, Interval)
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import TriggerProtocol
 
+from core.typeenum import TypeEnum
+from core.scipyendataclasses import (Episode, Schedule,)
 from core import datatypes
-from core.datatypes import (Episode, Schedule, TypeEnum, check_type, type2str)
+from core.datatypes import (check_type, type2str)
 from core import workspacefunctions
 from core import signalprocessing as sigp
 from core import utilities
 from core import neoutils
 from core import strutils
 
-from core.utilities import (safeWrapper, 
+from core.utilities import (safewrapper, 
                             reverse_mapping_lookup, 
                             get_index_for_seq, 
                             sp_set_loc,
@@ -220,11 +254,11 @@ from core.utilities import (safeWrapper,
                             GeneralIndexType)
 
 from core.neoutils import (get_index_of_named_signal, concatenate_blocks)
-from core import quantities as scq
-from core.quantities import (units_convertible, check_time_units, 
-                             check_electrical_current_units, 
-                             check_electrical_potential_units,
-                             check_rescale)
+from core import scipyen_quantities as scq
+from core.scipyen_quantities import (unitsConvertible, checkTimeUnits, 
+                             checkElectricalCurrentUnits, 
+                             checkElectricalPotentialUnits,
+                             checkRescale)
 import core.pyabfbridge as pab 
 
 from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
@@ -251,12 +285,98 @@ LOCATOR_SEQUENCE = typing.Sequence[LocatorTypeVar]
 REGULAR_SIGNAL_TYPES = (neo.AnalogSignal, DataSignal)
 IRREGULAR_SIGNAL_TYPES = (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
 
+class ClampMode(TypeEnum):
+    NoClamp=1           # i.e., voltage follower (I=0) e.g., ElectrodeMode.Field,
+                        # but OK with other ElectrodeMode
+    VoltageClamp=2      # |these two should be
+    CurrentClamp=4      # |     self-explanatory
+    
+class ElectrodeMode(TypeEnum):
+    Null = 0
+    Field=1             # typically, associated with ClampMode.NoClamp; other ClampModes don't make sense
+    WholeCellPatch=2    # can associate any ClampMode
+    ExcisedPatch=4      # can associate any ClampMode although ClampMode.VoltageClamp makes more sense
+    Sharp=8             # can associate any ClampMode although ClampMode.CurrentClamp makes more sense
+    Tetrode=16          # 16-64 are for 
+    LinearArray=32      # local field potentials etc
+    MultiElectrodeArray=64 # MEAs on a culture/slice?
+   
+class RecordingEpisodeType(TypeEnum):
+    r"""Once can define valid type combinations as follows:
+    Tracking | Drug     (= 3)   ⇒ Tracking episode recorded in the presence of 
+                                    drug(s)
+    Conditioning | Drug (= 5)   ⇒ Conditioning in the presence of drug(s)
+    
+    A Tracking (no Drug) episode that follows a Drug episode is interpreted as 
+    an episode of "drug washout".
+    
+    A value of 0 and any value > 5 are invalid.
+    
+    """
+    Tracking        = 1 # used for tracking the electrophysiological behaviour of
+                        # a source (e.g., synaptic responses, somatic spiking, etc);
+                        # this is the most common type of electrophysiology recording
+                        # epiode
+    
+    Monitoring      = Tracking
+                        
+    Conditioning    = 2 # used for induction of plasticity (i.e. application of 
+                        # the induction protocol)
+                        
+class SynapticPathwayType(TypeEnum):
+    r"""
+    Synaptic pathway type.
+    Encapsulates: Null, Test, Control, Auxiliary, UserDefined
+    
+    A Test pathway is defined by the presence of a Conditioning episode between
+    two non-Conditioning episodes - see RecordingEpisodeType class.
+    
+        A non-Conditioning episode is usually a Tracking episode, but can also be
+        a Crosstalk or Drug episode.
+        
+        Where justified, the test pathway may be "conditioned" more than once.
+        In this case, the Conditioning episodes MUST be separated by at least 
+        one non-Conditioning episode (usually a Tracking episode).
+        
+        In addition, there may be any number of Crosstalk, Drug and Washout
+        applied either before, or after the Conditioning episode.
+    
+    The Control pathway is defined by the presence of at least one Tracking
+        episode. No Conditioning episodes are allowed in a Control pathway.
+        
+    A combination of types IS NOT ALLOWED. The values were chosen to prevent
+    ambiguities. Thus,
+    
+    Null    | Control   ⇒ Control       (1)
+    Null    | Test      ⇒ Test          (2)
+    Control | Test      ⇒ Auxiliary     (3)
+    Control | Auxiliary ⇒ UserDefined   (4)
+    
+    Any value > 4 is invalid.
+    
+    """
+    Null        = 0 # undefined; can associate any episode type, EXCEPT for Conditioning and Tracking
+    Undefined   = Null
+    Control     = 1 # can associate any episode type, EXCEPT for Conditioning
+    Test        = 2 # can associate any episode type
+    Auxiliary   = 3 # can associate any episode type, EXCEPT for Tracking;
+                    # NOTE: this requirement is for analysis purpose only; the 
+                    # pathway can be activated during any type of episode, but
+                    # synaptic responses do not need to be analysed during the 
+                    # tracking episodes.
+                    # auxiliary pathways can be:
+                    # • present along the tracking pathway, during tracking only
+                    # • present along the induction pathway, during induction only
+                    # • present throughout
+    UserDefined = 4 # can associate any episode type, EXCEPT for Tracking (see above)
 
 class __BaseSynStim__(typing.NamedTuple):
     name: str = "stim"
     channel: typing.Union[int, str] = 0
     dig: bool=True
-    
+
+class SynapticPathway: pass
+
 class SynapticStimulus(__BaseSynStim__):
     # see https://stackoverflow.com/questions/61844368/how-to-initialize-a-namedtuple-child-class-different-ways-based-on-input-argumen
     __slots__ = ()
@@ -302,7 +422,7 @@ class SynapticStimulus(__BaseSynStim__):
         new_args = dict()
         for k, arg in enumerate(args):
             # if not isinstance(arg, super_anns[fields[k]]):
-            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
+            if not datatypes.check_type(type(arg), super_anns[fields[k]]).value:
                 raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
             new_args[fields[k]] = arg
             
@@ -335,14 +455,24 @@ class SynapticStimulus(__BaseSynStim__):
                     
         return super().__new__(cls, **new_args)
     
+    def __eq__(self, other) -> bool:
+        ret = type(self) == type(other)
+        if not ret:
+            return ret
+        
+        ret &= all(getattr(self, f) == getattr(other, f) for f in self._fields)
+        
+        return ret
+        
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Dataset:
         
         from iolib import h5io
+        # print(f"{self.__class__.__name__}.toHDF5: {self.name} -> name: {name}, oname: {oname}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
-            group[target_name] = cached_entity
+            group[name] = cached_entity
             return cached_entity
         
         attrs = {"name": self.name, "channel": self.channel, "dig": self.dig}
@@ -387,7 +517,7 @@ SynapticStimulus.channel.__doc__ = "int, str: index or name of the output channe
 SynapticStimulus.dig.__doc__ = "bool: indicates if the triggering channel if a digital output (True) or a DAC (False)"
                 
 def synstim(name:str, channel:typing.Optional[int]=None, dig:bool=True) -> SynapticStimulus:
-    """Shorthand constructor of SynapticStimulus (saves typing)"""
+    r"""Shorthand constructor of SynapticStimulus (saves typing)"""
     return SynapticStimulus(name, channel, dig)
 
 class __BaseAuxInput__(typing.NamedTuple):
@@ -440,7 +570,7 @@ class AuxiliaryInput(__BaseAuxInput__):
         
         new_args = dict()
         for k, arg in enumerate(args):
-            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
+            if not datatypes.check_type(type(arg), super_anns[fields[k]]).value:
                 raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
             new_args[fields[k]] = arg
             
@@ -475,8 +605,6 @@ class AuxiliaryInput(__BaseAuxInput__):
     
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Dataset:
-        
-
         from iolib import h5io
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
@@ -523,7 +651,7 @@ AuxiliaryInput.adc.__doc__  = "int, str, None: index or name of the ADC channel 
 AuxiliaryInput.cmd.__doc__  = "bool, None: indicates if the auxiliary ADC records a clamping command signal (True), a trigger (TTL-like) signal (False) or any other analog input (None); default is None"
 
 def auxinput(name:str, adc:typing.Optional[int]=None, cmd:typing.Optional[bool]=None) -> AuxiliaryInput:
-    """Constructs a run-of-the-mill AuxiliaryInput"""
+    r"""Constructs a run-of-the-mill AuxiliaryInput"""
     if adc is None:
         adc = 0
     elif not isinstance(adc, int):
@@ -576,7 +704,7 @@ class AuxiliaryOutput(__BaseAuxOutput__):
         
         new_args = dict()
         for k, arg in enumerate(args):
-            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
+            if not datatypes.check_type(type(arg), super_anns[fields[k]]).value:
                 raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
             new_args[fields[k]] = arg
             
@@ -657,7 +785,7 @@ AuxiliaryOutput.channel.__doc__ = "int, str: specifies the auxiliary output chan
 AuxiliaryOutput.digttl.__doc__ = "bool, or None: flag to indicate if the output is used to send out triggers via a DIG (True), emulated via a DAC (False) or other waveforms (None); default is None"
 
 def auxoutput(name:str, channel:typing.Optional[int]=None, digttl:typing.Optional[bool]=None) -> AuxiliaryOutput:
-    """Constructs a run-of-the-mill AuxiliaryOutput"""
+    r"""Constructs a run-of-the-mill AuxiliaryOutput"""
     if channel is None:
         channel = 0
         
@@ -666,115 +794,172 @@ def auxoutput(name:str, channel:typing.Optional[int]=None, digttl:typing.Optiona
     
     return AuxiliaryOutput(name, channel, digttl)
 
-class __BaseSource__(typing.NamedTuple):
+# class __BaseSource__(typing.NamedTuple):
+#     name: str = "cell"
+#     adc: int = 0
+#     dac: typing.Optional[int] = None
+#     syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]] = None
+#     auxin: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]   = None
+#     auxout: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]  = None
+#     electrodeMode: ElectrodeMode = ElectrodeMode.Null
+    
+# class RecordingSource(__BaseSource__):
+@dataclass
+class RecordingSource():
     name: str = "cell"
     adc: int = 0
-    # adc: typing.Union[int, str] = 0
     dac: typing.Optional[int] = None
-    # dac: typing.Optional[typing.Union[int, str]] = None
-    syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]] = None
-    auxin: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]   = None
-    auxout: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]  = None
+    syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]]     = dataclasses.field(default_factory=list)
+    auxin: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]     = dataclasses.field(default_factory=list)
+    auxout: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]   = dataclasses.field(default_factory=list)
+    electrodeMode: ElectrodeMode = dataclasses.field(default=ElectrodeMode.Null)
+    pathways: dataclasses.InitVar[typing.Sequence[SynapticPathway]] = tuple()
     
-class RecordingSource(__BaseSource__):
-    __slots__ = ()
-    __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseSource__.__annotations__.items()])
+    def __post_init__(self, pathways):
+        if isinstance(pathways, (tuple, list)) and len(pathways) and all(isinstance(p, SynapticPathway) and p.adc == self.adc and p.dac == self.dac for p in pathways):
+            pp = list()
+            for p in pathways:
+                if isinstance(self.syn, SynapticStimulus):
+                    if p.stimulus == self.syn:
+                        pp.append(p)
+                        
+                elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+                    if p.stimulus in self.syn:
+                        pp.append(p)
+                        
+            self.pathways = tuple(pp)
+            
+        elif isinstance(pathways, SynapticPathway):
+            if isinstance(self.syn, SynapticStimulus):
+                if pathways.stimulus == self.syn:
+                    self.pathways = (pathway, )
+                    
+            elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+                if pathways.stimulus in self.syn:
+                    self.pathways = (pathways, )
+                    
+        else:
+            if isinstance(self.syn, SynapticStimulus):
+                self.pathways = (SynapticPathway(stimulus = self.syn,
+                                        name = self.syn.name, adc = self.adc, 
+                                        dac = self.dac,
+                                        electrode = self.electrodeMode), )
+            elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+                if len(self.syn) == 1:
+                    self.pathways = tuple(SynapticPathway(stimulus = self.syn[0],
+                                        name = self.syn[0].name,
+                                        adc = self.adc, dac = self.dac,
+                                        electrode = self.electrodeMode))
+                elif len(self.syn) > 1:
+                    self.pathways = tuple(SynapticPathway(stimulus = s,
+                                                name = s.name,
+                                                adc = self.adc, dac = self.dac,
+                                                electrode = self.electrodeMode) for s in self.syn)
+                
+            else:
+                self.pathways = tuple()
+        
+    
+    # __slots__ = ()
+    # __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseSource__.__annotations__.items()])
 
-    __doc__ = "\n".join(["Semantic association between input and output signals in single-electrode recordings.\n",
-                   "Signature:\n",
-                   f"\tRecordingSource({__sig__})\n",
-                   "where:",
-                   "• name (str): The name of the source; default is 'cell'\n",
-                   "• adc (int): The PHYSICAL¹ index (int) or name (str) of the ADC channel for the",
-                   "    input signal containing the recorded electric behaviour of the source",
-                   "    (a.k.a the primary 'input' channel i.e., cell or field → amplifier → DAQ device).\n",
-                   "• dac (int, None): The PHYSICAL index (int) or name (str) of the DAC channel",
-                   "    sending analog commands to the source in voltage- or current-clamp, (a.k.a the primary 'output', i.e.,",
-                   "    DAQ device → amplifier → cell) other than synaptic stimuli (see below).",
-                   "    Optional; default is None².\n",
-                   "• syn (SynapticStimulus, sequence of SynapticStimulus, or None):",
-                   "    Specify the origin of trigger (TTL-like) signals for synaptic stimulation",
-                   "    (one SynapticStimulus per synaptic pathway).",
-                   "    The 'syn.dig' and 'syn.dac' fields must contain indices different",
-                   "    from those specified in 'dac', or 'auxout' fields of this object. ",
-                   "    Optional; default is SynapticStimulus('stim', None, None).\n",
-                   "• auxin (AuxiliaryInput or sequence of AuxiliaryInput objects, or None)",
-                   "    NOTE: When present, these must specify ADCs distinct from the 'adc' above",
-                   "    Optional; default is None.\n",
-                   "• auxout (AuxiliaryOutput, sequence of AuxiliaryOutput, or None): ",
-                   "    Auxiliary outputs for purposes OTHER THAN clamping command waveforms or ",
-                   "    synaptic stimulation (e.g., imaging frame triggers, etc)",
-                   "    NOTE: These must be distinct from the channels specified by the 'dac' ",
-                   "    or 'syn' fields above.",
-                   "    Optional; default is None.\n",
-                   "",
-                   "Channel indices are expected to be >= 0 and correspond to the",
-                   "    PHYSICAL¹ (NOT logical!) channel indices in the acquisition protocol. ",
-                   "",
-                   "Channel names are as assigned in the acquisition protocol (if available).",
-                   "",
-                   "NOTES:",
-                   "",
-                   "¹ Analog channels (analog input — ADCs — or output — DACs) have both physical ",
-                   "    and logical indices. Physical indices are integers from 0 to one less than the ",
-                   "    maximum number of physical channels of the same category (i.e. input or output)",
-                   "    provided by the digital acquisition (DAQ) device.",
-                   "    Logical indices are integers from 0 to one less than maximum number of channels",
-                   "    of the same category, ACTUALLY used in the recording protocol.",
-                   "",
-                   "    Assuming a DAQ device provides eight ADCs (physical indices 0-7)",
-                   "    with only four of these used to record data (say, 0, 1, 5, 6) - their",
-                   "    logical indices would be 0-3, corresponding to physical indices as follows:",
-                   "    0: 0, 1: 1, 2: 5, 3: 6",
-                   "",
-                   "    The logical index is also the index of the recorded signal stored in the file.",
-                   "    E.g. in an ABF file, the signal at index 0 may have been recorded from the physical",
-                   "    ADC 1 (taking data from, say, the second amplifier channel).",
-                   "    In such case, the ADC in question has physical index 1, and logical index 0.",
-                   "",
-                   "    A more complex case is when a large set of inputs is specified in the recording",
-                   "    protocol, such that the signal recorded from the cell via the physical ADC ends up ",
-                   "    with a higher index in the file. Here, specifying a logical index of 0 will not",
-                   "    indicate the actual ADC channel used to record from the cell.",
-                   "",
-                   "    Because of this, it is not possible to infer which ADC channel has been",
-                   "    actually used to record from a source (cell or field) based only on the",
-                   "    signals contained in the recorded file."
-                   "",
-                   "    The RecordingSource object helps avoid such ambiguities.",
-                   "",
-                   "",
-                   "²   The DAC channels are used for sending analog `command` signals to the recorded source",
-                   "    in order to `clamp` the membrane potential or membrane current. However, not all experiments",
-                   "    require this — a good example are field recordings, where there is nothing to `clamp`."
-                   "",
-                   "ADDITIONAL NOTES: ",
-                   "",
-                   "1. This object type is oblivious to the recording mode or electrode mode.",
-                   "",
-                   "2. The order of parameters matters, unless they are given as name↦value pairs.",
-                   "",
-                   "3. A RecordingSource object is immutable. However one can create a modified copy by calling",
-                   "    its '_replace' method specifying different values to selected fields, e.g.:",
-                   "",
-                   "\t source1 = RecordingSource('cell1', 0, 1, SynapticStimulus('path0', 0))",
-                   "",
-                   "\t source2 = source1._replace(name='cell2', adc=2, dac=1, syn=SynapticStimulus('path0', 0))"
-                   "",
-                   ])
+    # __doc__ = "\n".join(["Semantic association between input and output signals in single-electrode recordings.\n",
+    #                "Signature:\n",
+    #                f"\tRecordingSource({__sig__})\n",
+    #                "where:",
+    #                "• name (str): The name of the source; default is 'cell'\n",
+    #                "• adc (int): The PHYSICAL¹ index (int) or name (str) of the ADC channel for the",
+    #                "    input signal containing the recorded electric behaviour of the source",
+    #                "    (a.k.a the primary 'input' channel i.e., cell or field → amplifier → DAQ device).\n",
+    #                "• dac (int, None): The PHYSICAL index (int) or name (str) of the DAC channel",
+    #                "    sending analog commands to the source in voltage- or current-clamp, (a.k.a the primary 'output', i.e.,",
+    #                "    DAQ device → amplifier → cell) other than synaptic stimuli (see below).",
+    #                "    Optional; default is None².\n",
+    #                "    WARNING: This must be the DAC channel actually used for clamping.\n",
+    #                "    and not necessarily the 'active' DAC channel of the protocol\n",
+    #                "• syn (SynapticStimulus, sequence of SynapticStimulus, or None):",
+    #                "    Specify the origin of trigger (TTL-like) signals for synaptic stimulation",
+    #                "    (one SynapticStimulus per synaptic pathway).",
+    #                "    The 'syn.dig' and 'syn.dac' fields must contain indices different",
+    #                "    from those specified in 'dac', or 'auxout' fields of this object. ",
+    #                "    Optional; default is SynapticStimulus('stim', None, None).\n",
+    #                "• auxin (AuxiliaryInput or sequence of AuxiliaryInput objects, or None)",
+    #                "    NOTE: When present, these must specify ADCs distinct from the 'adc' above",
+    #                "    Optional; default is None.\n",
+    #                "• auxout (AuxiliaryOutput, sequence of AuxiliaryOutput, or None): ",
+    #                "    Auxiliary outputs for purposes OTHER THAN clamping command waveforms or ",
+    #                "    synaptic stimulation (e.g., imaging frame triggers, etc)",
+    #                "    NOTE: These must be distinct from the channels specified by the 'dac' ",
+    #                "    or 'syn' fields above.",
+    #                "    Optional; default is None.\n",
+    #                "",
+    #                "Channel indices are expected to be >= 0 and correspond to the",
+    #                "    PHYSICAL¹ (NOT logical!) channel indices in the acquisition protocol. ",
+    #                "",
+    #                "Channel names are as assigned in the acquisition protocol (if available).",
+    #                "",
+    #                "NOTES:",
+    #                "",
+    #                "¹ Analog channels (analog input — ADCs — or output — DACs) have both physical ",
+    #                "    and logical indices. Physical indices are integers from 0 to one less than the ",
+    #                "    maximum number of physical channels of the same category (i.e. input or output)",
+    #                "    provided by the digital acquisition (DAQ) device.",
+    #                "    Logical indices are integers from 0 to one less than maximum number of channels",
+    #                "    of the same category, ACTUALLY used in the recording protocol.",
+    #                "",
+    #                "    Assuming a DAQ device provides eight ADCs (physical indices 0-7)",
+    #                "    with only four of these used to record data (say, 0, 1, 5, 6) - their",
+    #                "    logical indices would be 0-3, corresponding to physical indices as follows:",
+    #                "    0: 0, 1: 1, 2: 5, 3: 6",
+    #                "",
+    #                "    The logical index is also the index of the recorded signal stored in the file.",
+    #                "    E.g. in an ABF file, the signal at index 0 may have been recorded from the physical",
+    #                "    ADC 1 (taking data from, say, the second amplifier channel).",
+    #                "    In such case, the ADC in question has physical index 1, and logical index 0.",
+    #                "",
+    #                "    A more complex case is when a large set of inputs is specified in the recording",
+    #                "    protocol, such that the signal recorded from the cell via the physical ADC ends up ",
+    #                "    with a higher index in the file. Here, specifying a logical index of 0 will not",
+    #                "    indicate the actual ADC channel used to record from the cell.",
+    #                "",
+    #                "    Because of this, it is not possible to infer which ADC channel has been",
+    #                "    actually used to record from a source (cell or field) based only on the",
+    #                "    signals contained in the recorded file."
+    #                "",
+    #                "    The RecordingSource object helps avoid such ambiguities.",
+    #                "",
+    #                "",
+    #                "²   The DAC channels are used for sending analog `command` signals to the recorded source",
+    #                "    in order to `clamp` the membrane potential or membrane current. However, not all experiments",
+    #                "    require this — a good example are field recordings, where there is nothing to `clamp`."
+    #                "",
+    #                "ADDITIONAL NOTES: ",
+    #                "",
+    #                "1. This object type is oblivious to the recording mode or electrode mode.",
+    #                "",
+    #                "2. The order of parameters matters, unless they are given as name↦value pairs.",
+    #                "",
+    #                "3. A RecordingSource object is immutable. However one can create a modified copy by calling",
+    #                "    its '_replace' method specifying different values to selected fields, e.g.:",
+    #                "",
+    #                "\t source1 = RecordingSource('cell1', 0, 1, SynapticStimulus('path0', 0))",
+    #                "",
+    #                "\t source2 = source1._replace(name='cell2', adc=2, dac=1, syn=SynapticStimulus('path0', 0))"
+    #                "",
+    #                ])
     
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
-        
-        
         from iolib import h5io
+        # print(f"{self.__class__.__name__}.toHDF5: {self.name}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
             group[target_name] = cached_entity
             return cached_entity
         
-        attrs = {"name":self.name, "adc":self.adc, "dac":self.dac}
+        attrs = {"name":self.name, "adc":self.adc, "dac":self.dac,
+                 "electrodeMode": self.electrodeMode}
         
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
@@ -800,9 +985,13 @@ class RecordingSource(__BaseSource__):
                             track_order=track_order,
                             entity_cache=entity_cache)
         
+        h5io.toHDF5(self.pathways, entity, name="pathways", oname="pathways",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+        
         h5io.storeEntityInCache(entity_cache, self, entity)
         return entity
-    
 
     @classmethod
     def fromHDF5(cls, entity:h5py.Group, 
@@ -817,16 +1006,19 @@ class RecordingSource(__BaseSource__):
         name = attrs["name"]
         adc  = attrs["adc"]
         dac  = attrs["dac"]
+        electrodeMode = attrs["electrodeMode"]
         
         syn = h5io.fromHDF5(entity["syn"], cache=cache)
         auxin = h5io.fromHDF5(entity["auxin"], cache=cache)
         auxout = h5io.fromHDF5(entity["auxout"], cache=cache)
+        pathways = h5io.fromHDF5(entity["pathways"], cache=cache)
         
-        return cls(name=name, adc=adc, dac=dac, syn=syn, auxin=auxin, auxout=auxout)
+        return cls(name=name, adc=adc, dac=dac, syn=syn, 
+                   auxin=auxin, auxout=auxout, electrodeMode = electrodeMode)
         
     @property
     def clamped(self) -> bool:
-        """Returns True when a primary DAC is defined.
+        r"""Returns True when a primary DAC is defined.
     
         A primary DAC is the index or name of the DAC channel used to send command
         waveforms to a clamped cell and is specified by the field 'dac'.
@@ -847,7 +1039,7 @@ class RecordingSource(__BaseSource__):
     
     @property
     def syn_dig(self) -> tuple:
-        """Tuple of DIG channels used for synaptic stimulation; may be empty.
+        r"""Tuple of DIG channels used for synaptic stimulation; may be empty.
         These channels emit TTLs to drive devices that elicit synaptic activity,
         such as stimulus isolation boxes, modulators for uncaging lasers, or LEDs
         for optogenetic stimulation.
@@ -862,9 +1054,9 @@ class RecordingSource(__BaseSource__):
     
     @property
     def syn_dac(self) -> tuple:
-        """Tuple of DAC channels used for synaptic stimulation; may be empty.
-        These channels emit TTLs (emulated as pulses or steps in ± 5 V range and 
-        embedded in analog signals) to drive devices that elicit synaptic activity,
+        r"""Tuple of DAC channels used for synaptic stimulation; may be empty.
+        These channels emulate TTLs by emitting analog waveforms as pulses or steps 
+        in ± 5 V range, to drive devices that elicit synaptic activity
         such as stimulus isolation boxes, modulators for uncaging lasers, or LEDs
         for optogenetic stimulation.
         """
@@ -876,39 +1068,46 @@ class RecordingSource(__BaseSource__):
         
         return tuple()
     
-    @property
-    def pathways(self):
-        """Factory for SynapticPathway objects based on the `syn` field.
-        The SynapticPathway fields `pathwayType`, `schedule` and `measurement` 
-        will have their default values.
-        
-        Depending on the `syn` field, returns a SynapticPathway, a tuple of 
-        SynapticPathway objects, or None.
-    
-        """
-        if isinstance(self.syn, SynapticStimulus):
-            return SynapticPathway(source = self, stimulus = self.syn,
-                                   name = self.syn.name,
-                                   # name = "_".join([self.name, self.syn.name]),
-                                   # name = " ".join([self.name, self.syn.name]),
-                                   )
-            
-        if isinstance(self.syn, (tuple, list)):
-            if len(self.syn) == 1:
-                return SynapticPathway(source=self, stimulus = self.syn[0],
-                                       name = self.syn[0].name,
-                                       # name = "_".join([self.name, self.syn[0].name]),
-                                       # name = " ".join([self.name, self.syn[0].name]),
-                                       )
-            elif len(self.syn) > 1:
-                return tuple(SynapticPathway(source=self, stimulus = s,
-                                             name = s.name) for s in self.syn)
-                                             # name = "_".join([self.name, s.name])) for s in self.syn)
-                                             # name = " ".join([self.name, s.name])) for s in self.syn)
+    # FIXME: 2024-10-17 22:35:04
+    # this approach is WRONG, because it will create a new Python object 
+    # (SynapticPathway instance) every time the property getter is called; this
+    # creates all sorts of trouble when attempting to use them by reference, down 
+    # the line (the new objects represent conceptually the same pathway even if 
+    # they are distinct Python objects!)
+#     @property
+#     def pathways(self) -> tuple:
+#         r"""Factory for SynapticPathway objects based on the specifications in the `syn` field.
+#         The SynapticPathway fields `pathwayType`, `schedule` and `measurement` 
+#         will have their default values.
+#         
+#         Returns a possibly empty tuple of SynapticPathway objects where all their 
+#         fields are set to default values, except for their 'name', 'stimulus',
+#         and 'source'.
+#     
+#         """
+#         if isinstance(self.syn, SynapticStimulus):
+#             return (SynapticPathway(source = self, stimulus = self.syn,
+#                                     name = self.syn.name, adc = self.adc, 
+#                                     dac = self.dac,
+#                                     electrode = self.electrodeMode), )
+#             
+#         if isinstance(self.syn, (tuple, list)):
+#             if len(self.syn) == 1:
+#                 return tuple(SynapticPathway(source=self, stimulus = self.syn[0],
+#                                        name = self.syn[0].name,
+#                                        adc = self.adc, dac = self.dac,
+#                                        electrode = self.electrodeMode))
+#             elif len(self.syn) > 1:
+#                 return tuple(SynapticPathway(source=self, stimulus = s,
+#                                              name = s.name,
+#                                              adc = self.adc, dac = self.dac,
+#                                              electrode = self.electrodeMode) for s in self.syn)
+#             
+#         return tuple()
         
     @property
     def in_daq_cmd(self) -> tuple:
-        """Tuple of ADCs for recording DAQ-issued command waveforms other than TTLs.
+        r"""Tuple of ADCs for recording DAQ-issued command waveforms other than TTLs.
         May be empty.
         
         These ADCs are specified in the 'auxin' field, and correspond to the auxiliary
@@ -944,7 +1143,7 @@ class RecordingSource(__BaseSource__):
     
     @property
     def in_daq_triggers(self) -> tuple:
-        """Tuple of ADCs for recording DAQ-generated TTL signals; 
+        r"""Tuple of ADCs for recording DAQ-generated TTL signals; 
         may be empty.
         
         These ADCs (analog inputs) are specified in the 'auxin' field and correspond
@@ -974,7 +1173,7 @@ class RecordingSource(__BaseSource__):
     
     @property
     def other_inputs(self) -> tuple:
-        """Tuple of ADCs recording input signals not issued by the DAQ device.
+        r"""Tuple of ADCs recording input signals not issued by the DAQ device.
         May be empty.
         
         These ADCs are specified in the 'auxin' field.
@@ -995,7 +1194,7 @@ class RecordingSource(__BaseSource__):
     
     @property
     def syn_blocks(self) -> tuple:
-        """Tuple of (name, neo.Block) tuples, one for each SynapticStimulus.
+        r"""Tuple of (name, neo.Block) tuples, one for each SynapticStimulus.
         May be empty.
         """
         if isinstance(self.syn, SynapticStimulus):
@@ -1008,13 +1207,13 @@ class RecordingSource(__BaseSource__):
     
     @property
     def syn_blocks_dict(self) -> dict:
-        """Returns syn_blocks as a dict with syn name ↦ empty neo.Block.
+        r"""Returns syn_blocks as a dict with syn name ↦ empty neo.Block.
         """
         return dict(self.syn_blocks)
     
     @property
     def out_dig_triggers(self) -> tuple:
-        """Tuple of DIG channels used to emit TTL (triggers) to 3ʳᵈ party devices.
+        r"""Tuple of DIG channels used to emit TTL (triggers) to 3ʳᵈ party devices.
         These TTLs are used for purposes other than synaptic stimulation.
         May be empty
         """
@@ -1028,7 +1227,7 @@ class RecordingSource(__BaseSource__):
     
     @property
     def out_dac_triggers(self) -> tuple:
-        """Tuple of DAC channels used to emit TTL to 3ʳᵈ party devices.
+        r"""Tuple of DAC channels used to emit TTL to 3ʳᵈ party devices.
         These TTLs are emulated (pulses or steps with ± 5 V range) and are used
         for purposes other than synaptic stimulation.
         """
@@ -1050,106 +1249,188 @@ class RecordingSource(__BaseSource__):
         
         return tuple()
     
-    @classmethod
-    def __new__(cls, *args, **kwargs):
-        super_anns = super().__annotations__
-        fields = list(super_anns.keys())
-        super_defaults = super()._field_defaults
+    def getPathwaysByStimulationType(self, digital:typing.Optional[bool]=None,
+                                     asDict:bool=False) -> typing.Union[tuple, dict[str, tuple]]:
+        r"""Groups the synaptic pathways in this recording source by their means of activation.
         
-        args = args[1:] # drop cls
+        A synaptic pathway is activated by stimulating its synaptic inputs¹ using a
+        physical "stimulus": e.g., electric pulse delivered to axons through electrodes, 
+        light pulses delivered from a light source, mechanical stimulus (piezo device).
         
-        if len(args) > len(super_anns):
-            raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
+        To control, the timing and, sometimes, the duration of the stimulus, the device
+        that emits the stimulus is controlled va a TTL² electric signal delivered 
+        using a DAQ board, in one of two ways:
+        • via a digital output channel ("DIG") - the most common way by far
+        • as an analog waveform that emulates a TTL, via a digital to analog output
+            channel (DAC) - typically used when no digital channels are available
+            in the hardware.
         
-        new_args = dict()
+        This function simply groups the SynapticPathway objects in the RecordingSource
+        'src' according to whether the pathways use a digital (DIGPathways) or 
+        analog-to-digital channel (DACPathways).
         
-        for k, arg in enumerate(args):
-            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
-                raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
-            new_args[fields[k]] = arg
-            
-        if len(new_args) == len(super_anns):
-            if len(kwargs):
-                dups = [k for k in kwargs if k in fields]
-                if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-                else:
-                    raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
-                
+        Parameters:
+        -----------
+        asDict:bool, optional default is False
+        
+        Returns:
+        --------
+        If `asDict` is False (default) return a pair of tuples, each containing
+        a poibly empty sequence of SynapticPathway objects: 
+            • the first element contain pathways where the stimulus is delivered 
+                via a DAC using TTL emulation
+            • the second element contains pathways where stimulus is delivered 
+                via a DIG channel
+        
+        If `asDict` is True, returns a dict with the keys "DACPathways", 
+            "DIGPathways" mapped to the sequences described above.
+        
+        NOTE: All fields of the SynapticPathway objects returned by this method
+        have default values, except for those specified in this source ('name', 
+        'stimulus', and 'source').
+        
+        ¹ Neurotransmitter photo-uncaging is included here as method of activating
+        synaptic inputs although technically it only emulates presynaptic neurotransmitter
+        release.
+        
+        ² transistor-transistor-logic; this is typically a DC voltage pulse of 5 V
+        amplitude (of either polarity) which "triggers" circuits in the controlled 
+        device (stimulus isolator, light shutter, piezo device, etc).  The controlled
+        device can usually be configured to "react" to the rising or falling phase 
+        of the pulse, or to one of the two voltage levels of the pulse.
+        
+        See also:
+        ---------
+        • self.pathways
+        
+        """
+        import more_itertools
+        pathways = self.pathways
+        if len(pathways) == 0:
+            if asDict:
+                return {"DACStimPathways": tuple(), "DIGStimPathways": tuple()}
+            return tuple(), tuple()
+        
+        if isinstance(digital, bool):
+            if digital:
+                dac_stim = tuple()
+                dig_stim = tuple(x for x in pathways if x.stimulus.dig)
+            else:
+                dac_stim = tuple()
+                dig_stim = tuple(x for x in pathways if not x.stimulus.dig)
         else:
-            if len(kwargs):
-                dups = [k for k in kwargs if k in new_args]
-                if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-                
-                spurious = [k for k in kwargs if k not in fields]
-                if len(spurious):
-                    raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
-                
-                new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
-                
-                new_args.update(new_kwargs)
-                
-            # finally, add the default unspecified args
-            for (k,v) in super_defaults.items():
-                if k not in new_args:
-                    new_args[k] = v
-                    
-        return super().__new__(cls, **new_args)
+            dac_stim, dig_stim = tuple(tuple(x) for x in more_itertools.partition(lambda x: x.stimulus.dig, pathways))
+            
+        if asDict:
+            return {"DACStimPathways": dac_stim, "DIGStimPathways": dig_stim}
+        return dac_stim, dig_stim
+        
+    def pathwaysInProtocol(self, protocol:ElectrophysiologyProtocol, asDict:bool=False) -> typing.Union[tuple, dict[str, tuple]]:
+        r"""SynapticPathway objects used in 'protocol'.
+        
+        The method identified which SynapticPathway objects defined by this 
+        RecordingSource are actually used in the specified protocol, by checking
+        the usage of the pathway's ADC/DAC/DIG channels in the protocol.
+        
+        SynapticPathway objects are grouped by their stimulation
+        method (DIG TTL or DAC emulation of TTL) and wrapped in a tuple or dict.
+        
+        To obtain a sequence of the SynapticPathway instances use the following
+        idiom:
+        
+        ``` python
+        
+        tuple(unique(itertools.chain.from_iterable(src.pathwaysInProtocol(protocol)), idcheck=False))
+        
+        ```
+        
+        where 'src' is a RecordingSource object, and 'protocol' is an 
+        ElectrophysiologyProtocol object.
+        
+        See also:
+        • self.pathways
+        • self.getPathwaysByStimulationType
+        
+        """
+        dac_stim_pathways, dig_stim_pathways = self.getPathwaysByStimulationType()
+        
+        adc = protocol.getADC(self.adc)
+        dac = protocol.getDAC(self.dac)
+        
+        activeDAC  = protocol.getDAC()
+        # digOutDacs = protocol.digitalOutputDACs
+        
+        mainDIGOut = protocol.digitalOutputs(alternate=False)
+        altDIGOut  = protocol.digitalOutputs(alternate=True)
+        
+        if self.clamped:
+            protocol_dac_stim_pathways = tuple(p for p in dac_stim_pathways if len(protocol.getDAC(p.stimulus.channel).emulatesTTL) and protocol.getDAC(p[1].stimulus.channel) not in (dac, activeDAC))
+        else:
+            protocol_dac_stim_pathways = tuple(p for p in dac_stim_pathways if len(protocol.getDAC(p.stimulus.channel).emulatesTTL))
+            
+        protocol_dig_stim_pathways = tuple(p for p in dig_stim_pathways if p.stimulus.channel in mainDIGOut or altDIGOut)
+        
+        if asDict:
+            return {"DACStimPathways": protocol_dac_stim_pathways, "DIGStimPathways": protocol_dig_stim_pathways}
+        
+        return protocol_dac_stim_pathways, protocol_dig_stim_pathways
     
-RecordingSource.name.__doc__ = "str: The name of the source; default is 'cell'"
-RecordingSource.adc.__doc__  = "int, str: The index or name of the primary ADC channel — records the eletrical behaviour of the source (cell or field)."
-RecordingSource.dac.__doc__  = "int, str: The index or name of the primary DAC channel — the output channel that operates the voltage- or current-clamp."
-RecordingSource.syn.__doc__  = "SynapticStimulus, sequence of SynapticStimulus objects or None — origin of trigger (TTL-like) signals for synaptic stimulation, one per 'synaptic pathway'."
-RecordingSource.auxin.__doc__  = "AuxiliaryInput, sequence of AuxiliaryInput objects or None — input(s) for recording signals NOT generated by the recorded source."
-RecordingSource.auxout.__doc__  = "AuxiliaryOutput, sequence of AuxiliaryOutput objects or None — output channel(s) for emitting command or TTL signals to 3ʳᵈ party devices."
-
-
-class ClampMode(TypeEnum):
-    NoClamp=1           # i.e., voltage follower (I=0) e.g., ElectrodeMode.Field,
-                        # but OK with other ElectrodeMode
-    VoltageClamp=2      # |these two should be
-    CurrentClamp=4      # |     self-explanatory
+    def getPathwayActivationbBySweep(self, protocol:ElectrophysiologyProtocol) -> dict:
+        r"""Distribution of pathway activation by sweep, in a given protocol.
+        
+        Returns:
+        --------
+        
+        A key ↦ value mapping indicating which synaptic pathways are activated
+            during specific sweeps, as configured in the protocol.
+        
+        key: int|tuple[int] — sweep index or indices
+        
+        value: tuple[SynapticPathway] — the pathways that are activated while
+            recording the sweeps with index (indices) in the 'key'; may be empty.
+        
+        To obtain a sequence of all pathways used in the protocol one can use the
+        following idiom:
+        
+        ``` python
+        mapping = self.getPathwayActivationbBySweep(protocol)
+        
+        pathways = tuple(unique(itertools.chain.from_iterable(mapping.values()), idcheck=False))
+        
+        ```
+        (NOTE: `idcheck` is set to False in order to force comparing the SynapticPathway
+        objects by their properties, rather than their Python ID or memory locations)
+        
+        
+        See also:
+        ---------
+        • self.pathwaysInProtocol
+        
+        """
+        protocol_dac_stim_pathways, protocol_dig_stim_pathways = self.pathwaysInProtocol(protocol)
+        if all(len(x) == 0 for x in (protocol_dac_stim_pathways, protocol_dig_stim_pathways)):
+            return dict()
+        
+        uniquePathways = unique(protocol_dac_stim_pathways + protocol_dig_stim_pathways, idcheck=True)
+        
+        return getPathwayBySweepActivation(protocol, uniquePathways)
     
-class ElectrodeMode(TypeEnum):
-    Field=1             # typically, associated with ClampMode.NoClamp; other ClampModes don't make sense
-    WholeCellPatch=2    # can associate any ClampMode
-    ExcisedPatch=4      # can associate any ClampMode although ClampMode.VoltageClamp makes more sense
-    Sharp=8             # can associate any ClampMode although ClampMode.CurrentClamp makes more sense
-    Tetrode=16          # these are really for 
-    LinearArray=32      # local field potentials etc
-    MultiElectrodeArray=64 # MEAs on a culture/slice?
-   
-class RecordingEpisodeType(TypeEnum):
-    """Once can define valid type combinations as follows:
-    Tracking | Drug     (= 3)   ⇒ Tracking episode recorded in the presence of 
-                                    drug(s)
-    Conditioning | Drug (= 5)   ⇒ Conditioning in the presence of drug(s)
+    def __repr__(self) -> str:
+        import dataclasses
+        ret = [f"{self.__class__.__name__}("]
+        ret += ", ".join([f"{a.name}={getattr(self,a.name).name if a == 'electrodeMode' else getattr(self, a.name)}" for a in dataclasses.fields(self)])
+        ret +=[")"]
+        if len(self.pathways):
+            ret += f" with {len(self.pathways)} synaptic pathways:\n"
+            if len(self.pathways) <= 5:
+                ret += ", ".join([f"{p.name}" for p in self.pathways])
+            else:
+                ret += ",\n".join([f"{p.name}" for p in self.pathways])
+        return "".join(ret)
     
-    A Tracking (no Drug) episode that follows a Drug episode is interpreted as 
-    an episode of "drug washout".
-    
-    A value of 0 and any value > 5 are invalid.
-    
-    """
-    Drug            = 1 # a recording episode in the presence of a drug or mixture
-                        # of drugs
-    
-    Tracking        = 2 # used for tracking the electrophysiological behaviour of
-                        # a source (e.g., synaptic responses, somatic spiking, etc);
-                        
-    Monitoring      = Tracking
-                        
-    Conditioning    = 4 # used for induction of plasticity (i.e. application of 
-                        # the induction protocol)
-                        
-
-
-class SynapticPathway: pass
-
 @with_doc(Episode, use_header=True, header_str = "Inherits from:")
 class RecordingEpisode(Episode):
-    """
+    r"""
     Specification of an electrophysiology recording episode.
         
     An "episode" is a contiguous series of sweeps recorded under a common set 
@@ -1157,7 +1438,8 @@ class RecordingEpisode(Episode):
     experiment where distinct sets of conditions are applied in sequence.
 
     All sweeps in the episode must have been recorded using the same recording
-    protocol (an ElectrophysiologyProtocol object).
+    protocol (an ElectrophysiologyProtocol object) and, implicitly, from the
+    same RecordingSource.
     
     The sweeps in an episode may belong to either:
     
@@ -1195,8 +1477,8 @@ class RecordingEpisode(Episode):
     ↓
     • recording after drug wash-out
     
-    In all three episodes the synaptic respones are recorded with the SAME 
-        electrophysiology recording protocol.
+    In each of the three episodes the synaptic respones are recorded with the 
+    SAME electrophysiology recording protocol.
 
     2) Segments recorded while testing for cross-talk between synaptic pathways,
     (and therefore, where the paired pulses are crossed between pathways) is a
@@ -1230,12 +1512,12 @@ class RecordingEpisode(Episode):
     
         The pathways define their own clamping modes and recording source.
     
-    • xtalk: optional, a mapping of int (sweep indices) or tuples (start:int,step:int)
-        to pairs (2-tuples) of valid int indices into the 'pathways' attribute.
-        
-        When not None, it indicates that the episode was used for testing the 
-        independence of two or more synaptic pathways, using paired-pulse stimulations.
-        
+    • pathActivationBySweep: a dict with key ↦ value mapping where:
+        key: int (sweep indices) or tuples (start:int,step:int)
+        value: tuples of SynapticPathway objects
+    
+        Optional, default is an empty dict.
+    
         E.g., for two pathways, using int keys:
             0 ↦ (0,1)       ⇒ sweep 0 tests cross-talk from path 0 to path 1
             1 ↦ (1,0)       ⇒ sweep 1 tests cross-talk from path 1 to path 0
@@ -1266,16 +1548,23 @@ class RecordingEpisode(Episode):
         (theoretically possible, but then one may also think of this as being two
         distinct pathways)
     
-"""
+    """
     # @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
-    def __init__(self, episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
+    # FIXME: 2024-09-29 23:32:05 TODO:
+    # conversion to mapping protocol ↦ sweep indices across all blocks in the episode
+    # actually, strike that: an episode must contain blocks recorded WITH THE SAME EPISODE
+    #
+    # NOTE: 2024-10-01 08:34:35
+    # 'pathways' removed - one can get the pathways from pathActivationBySweep
+    def __init__(self, blocks:typing.Optional[typing.Sequence[neo.Block]] = None,
+                 protocol: typing.Optional[ElectrophysiologyProtocol] = None,
                  name: typing.Optional[str] = None,
-                 blocks:typing.Optional[typing.Sequence[neo.Block]] = None,
-                 protocols: typing.Sequence[ElectrophysiologyProtocol] = list(), 
-                 pathways: typing.Sequence[SynapticPathway] = list(),
-                 xtalk: typing.Optional[typing.Union[dict, tuple, list]] = None ,
+                 episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
+                 pathActivationBySweep: dict = dict() ,
+                 electrodeMode:typing.Union[ElectrodeMode, int, str] = ElectrodeMode.Null,
+                 clampMode:typing.Union[ClampMode, int, str] = ClampMode.NoClamp,
                  **kwargs):
-        """Constructor for RecordingEpisode.
+        r"""Constructor for RecordingEpisode.
 
         Named parameters:
         ------------------
@@ -1285,78 +1574,63 @@ class RecordingEpisode(Episode):
         name:str - the name of this episode (optional, default is None)
             When None, it is up to the user of this object to give an appropriate
             name
-        protocols: the electrophysiology recording protocol object, or obejcts, or None
-            WARNING: As of 2024-02-18 11:09:55 Scipyen only supports 
-            pyabfbridge.ABFProtocol objects.
+    
+        protocol: ElectrophysiologyProtocol — the protocol used in common througout
+            the episode
 
-            Optional; default is None.
+        pathActivationBySweep: dict — indicates which pathways are stimulated in
+            which sweep; also useful for testing pathway cross-talk, or independence
+    
+            This is a key ↦ value mapping, where:
+    
+            • the keys are either:
+                ∘ an int: the index of the segment¹ where the cross-stimulation
+                    of the pathways indicated in the corresponsing tuple, 
+                    has occurred.
+    
+                ∘ a tuple of two int (x,y) where `x` is the index of the 
+                    first segment where cross-stimulation is applied, and 
+                    `y` is the number of segments skipped.
 
-        pathways: sequence (i.e. tuple, list) of SyanpticPathway objects, or None
-            Optional; default is None.
+            • values are tuples of SynapticPathway objects, and their ORDER
+                indicates the order in which the pathways are cross-stimulated
+                in a given sweep;
 
-        xtalk: dict, tuple, or list — configuration of pathway cross-stimulation
-            (for testing pathway cross-talk, or independence)
+                In theory, there can be any number of pathways, but in practice
+                only first two pathways are tested for cross-talk.
+    
+                A tuple that contains only one pathway indicates no crosstalk in
+                the sweep(s) specified by the key.
 
-            • when a dict it contains key ↦ value mappings
-                ∘ values are tuples of int indices of pathways, and their ORDER
-                    indicates the order in which the pathways are cross-stimulated;
+            Examples: 
+            A dictionary with the following structure:
 
-                    in theory, there can be any number of pathways, but in practice
-                    the tuple contains only two pathways tested for cross-talk
+            0 ↦ (path0, path1)
+            1 ↦ (path1, path0)
 
-                    For example, a tuple (0,1) indicates that the pathways are
-                    given each a single stimulus (pathwya 0 first, then pathway 1).
+            indicates a cross-stimulation of two pathwyas ('path0' & 'path1') in 
+            the order 'path0' → 'path1' in the 1ˢᵗ segment (sweep 0), and in 
+            the order 'path1' → 'path0' in the 2ⁿᵈ segment (sweep 1)
 
-                    To be useful these stimulations must occur with the same 
-                    inter-stimulus interval (ISI) as the one used for paired-
-                    pulse stimulation of a single pathway (so that pathway 
-                    independence can be assessed based on response facilitation
-                    or lack thereof)
-                    
-                ∘ the keys are either:
-                    □ an int: the index of the segment¹ where the cross-stimulation
-                        of the pathways, indicated in the tuple, has occurred
 
-                        Example: a dictionary with the following structure
+            A dictionary with the following structure:
 
-                        0 ↦ (0,1)
-                        1 ↦ (1,0)
+            (0,2) ↦ (path0, path1)
+            (1,2) ↦ (path1, path0)
 
-                        indicates a cross-stimulationof two pathwyas in the 
-                        order 0 → 1 in the first segment, and in the order 1 → 0
-                        in the second segment
-
-                    □ a tuple of two int (x,y) where `x` is the index of the 
-                        first segment where cross-stimulation is applied, and 
-                        `y` is the number of segments skipped.
-
-                        Example: a dictionary with the following structure
-
-                        (0,2) ↦ (0,1)
-                        (1,2) ↦ (1,0)
-
-                        indicates cross-stimulation of two pathways in the 
-                        order 0 → 1 in every other segment, starting with the
-                        first (segment index 0)² i.e., on `even-numbered` segments, 
-                        and in the order 1 → 0 in every other segment, starting
-                        with the second (segment index 1) i.e., on `odd-numbered`
-                        segments
-
-            • when a tuple or list, it indicates the pathway indices and the 
-                order in which they are stimulated, througout the episode
+            indicates cross-stimulation of two pathways ('path0' & 'path1') in 
+            the order 'path0' → 'path1' in every other segment starting with the
+            1ˢᵗ  (segment index 0) , 𝑖.𝑒, on `even-numbered` segments, 
+            and in the order 'path1' → 'path0' in every other segment, starting
+            with the 2ⁿᵈ (segment index 1) , 𝑖.𝑒,, on `odd-numbered` segments.
                 
-            By default the `xtalk` attribute of a recording episode is an empty
-            tuple.
-
+            By default the `pathActivationBySweep` attribute of a recording 
+            episode is an empty dict.
+    
             ¹ Here a `segment` has the same meaning as a `sweep`; we use `segment`
             to also indicate that this refers to a neo.Segment object.
 
-            ² Python uses 0-based indexing of elements in a collection.
-
-            Indicates the order of the stimulated pathways in a cross-talk contingency,
-            were each pathway is stimulated in turn, in a paired-pulse stimulation
-
-            Optional, default is None
+            Optional, default is an empty dictionary.
 
         Var-keyword parameters (kwargs)
         -------------------------------
@@ -1375,68 +1649,31 @@ class RecordingEpisode(Episode):
         self._beginFrame_ = 0
         self._endFrame_ = 0
         
-        self._protocols_ = list()
+        self._protocol_ = None
         
+        # sequence of neo.Block objects.
+        # these may be references to existing Block objects, or can be owned by
+        # the episode
         self._blocks_ = list()
-        self._pathways_ = list()
+        # self._pathways_ = list()
         
-        super().__init__(name=name)#, **kwargs)
+        super().__init__(name, **kwargs)
         
         if isinstance(blocks, (tuple, list, collections.deque)) and all(isinstance(v, neo.Block) for v in blocks):
             self._blocks_[:] = sorted(list(blocks), key = lambda x: x.rec_datetime)
             self._setup_from_blocks_() # also sets up protocols
             
-        begin = kwargs.pop("begin", None)
-        end = kwargs.pop("end", None)
-        beginFrame = kwargs.pop("beginFrame", None)
-        endFrame = kwargs.pop("endFrame", None)
-        if isinstance(begin, datetime.datetime):
-            self.begin = begin
-        if isinstance(end, datetime.datetime):
-            self.end = end
-            
-        if isinstance(beginFrame, int):
-            if beginFrame < 0:
-                raise ValueError(f"Invalid 'beginFrame': {beginFrame}")
-            
-            if isinstance(endFrame, int):
-                if endFrame < beginFrame:
-                    raise ValueError(f"Invalid 'endFrame': {endFrame} must be larger than {beginFrame}")
-                
-                if len(self._blocks_):
-                    nframes = self.nFrames # cache that:)
-                    if endFrame >= nFrames:
-                        raise ValueError(f"Invalid 'endFrame': {endFrame} must be smaller than {nFrames}  frames")
-            
-            self.beginFrame = beginFrame
-            
-        if isinstance(endFrame, int):
-            self.endFrame = endFrame
-            
-        # TODO 2024-06-18 11:30:48 FIXME
-        # check that all blocks follow the same protocol
-        # self.protocols = list() # set up from blocks, if any
-        if isinstance(protocols, ElectrophysiologyProtocol):
-            if len(self._protocols_) == 0:
-                self._protocols_.append(protocols)
-                
+        if isinstance(protocol, ElectrophysiologyProtocol):
+            # NOTE: 2024-09-30 08:49:45
+            # ignore (with warning) if protocol was set up from the 'blocks' argument
+            if isinstance(self._protocol_, ElectrophysiologyProtocol):
+                scipywarn("The episode's protocol was already set up by the 'blocks' argument; 'protocol' argument will be ignored")
             else:
-                scipywarn("protocols already set up by the blocks; 'protocol' argument will be ignored")
+                self._protocol_ = protocol
                 
-        elif isinstance(protocols, (tuple, list, collections.deque)) and all (isinstance(p, ElectrophysiologyProtocol) for p in protocols):
-            self._protocols_.extend(protocols)
-            
-        if isinstance(pathways, (tuple, list)):
-            if len(pathways):
-                if not all(isinstance(v, SynapticPathway) for v in pathways):
-                    raise TypeError(f"'pathways' must contain only SynapticPatwhay instances")
-            self._pathways_ = pathways
-        # else:
-        #     self._pathways_ = []
-        
         # NOTE: 2023-10-15 13:27:27
-        # crosstalk mapping: ATTENTION: in this context cross-talk means an overlap
-        # between synapses activated by ideally distinct axonal pathways 
+        # crosstalk mapping: ATTENTION: in this context cross-talk represents an
+        # overlap between synapses activated by ideally distinct axonal pathways 
         # (encapsulated by SynapticStimulus objects) in the same RecordingSource
         #
         # Testing the degree of pathway separation is based on short-term plasticity
@@ -1462,54 +1699,114 @@ class RecordingEpisode(Episode):
         #   ᵃ NOTE: relative to the first sweep in the episode! 
         #
         # NOTE: no checks are done on the value of the key(s) so expect errors
-        #   when trying to match an episode with data having the wrong number of sweeps
-        if isinstance(xtalk, dict) and all(isinstance(k, int) or (isinstance(k, tuple) and len(k)==2 and all(isinstance(k_, int) for k_ in k)) and isinstance(v, tuple) and len(v) == 2 and all(isinstance(x, int) for x in v) for kv in xtalk.items()):
-            if len(self._pathways_) == 0:
-                raise ValueError("Cannot apply crosstalk when there are no pathways defined")
+        #   when trying to match an episode with data having the wrong number of
+        # sweeps
+        #
+        # if isinstance(pathActivationBySweep,dict):
+        if validatePAxS(pathActivationBySweep):
+            self._pAxS = pathActivationBySweep
+
+        # NOTE: 2024-09-30 08:52:22
+        # parameters for the superclass (dataytypes.Episode) constructor
+        #
+        begin = kwargs.pop("begin", None)
+        end = kwargs.pop("end", None)
+        beginFrame = kwargs.pop("beginFrame", None)
+        endFrame = kwargs.pop("endFrame", None)
+        
+        if isinstance(begin, datetime.datetime):
+            self.begin = begin
+        if isinstance(end, datetime.datetime):
+            self.end = end
             
-            for k,p in xtalk.items():
-                if not isinstance(k, int) and not (isinstance(k, tuple) and len(k) == 2 and all(isinstance(k_, int) for k_ in k)):
-                    raise TypeError("Cross-talk has invalid key types; expecting int or pairs of int")
+        if isinstance(beginFrame, int):
+            if beginFrame < 0:
+                raise ValueError(f"Invalid 'beginFrame': {beginFrame}")
+            
+            if isinstance(endFrame, int):
+                if endFrame < beginFrame:
+                    raise ValueError(f"Invalid 'endFrame': {endFrame} must be larger than {beginFrame}")
                 
-                if any(p_ not in range(len(self._pathways_)) for p_ in p):
-                    raise ValueError(f"Cross-talk {k} is testing invalid pathway indices {p}, for {len(self._pathways_)} pathways")
-                
-            self.xtalk = xtalk
+                if len(self._blocks_):
+                    nframes = self.nFrames # cache that:)
+                    if endFrame >= nFrames:
+                        raise ValueError(f"Invalid 'endFrame': {endFrame} must be smaller than {nFrames}  frames")
             
-        # elif xtalk is None:
-        #     self.xtalk = tuple()
-        
-        elif isinstance(xtalk, (tuple, list)):
-            if len(xtalk) and not all(isinstance(v, int) for v in xtalk):
-                raise TypeError("When a tuple, 'xtalk' must contain only integers")
+            self.beginFrame = beginFrame
             
-            self.xtalk = tuple(xtalk)
+        if isinstance(endFrame, int):
+            self.endFrame = endFrame
             
-        else:
-            self.xtalk = tuple()
-            # raise ValueError(f"Invalid xtalk specification ({xtalk})")
+        if isinstance(electrodeMode, (int, str)):
+            if electrodeMode not in ElectrodeMode:
+                raise ValueError(f"Invalid electrode mode {electrodeMode}")
+            
+            electrodeMode = ElectrodeMode.type(electrodeMode)
+            
+        if not isinstance(electrodeMode, ElectrodeMode):
+            raise TypeError(f"Invalid electrode mode {electrodeMode}")
         
-        # self._data_ = None
+        self._electrodeMode_ = electrodeMode
         
-    def __repr__(self):
+        if isinstance(clampMode, (int, str)):
+            if clampMode not in ClampMode:
+                raise ValueError(f"Invalid clamp mode {clampMode}")
+            
+            clampMode = ClampMode.type(clampMode)
+            
+        if not isinstance(clampMode, ClampMode):
+            raise TypeError(f"Invalid clamp mode {clampMode}")
+        
+        self._clampMode_ = clampMode
+        
+    @property
+    def electrodeMode(self) -> ElectrodeMode:
+        return self._electrodeMode_
+    
+    @electrodeMode.setter
+    def electrodeMode(self, val:typing.Union[int, str, ElectrodeMode]):
+        if isinstance(val, (int, str)):
+            if val not in ElectrodeMode:
+                raise ValueError(f"Invalid electrode mode {val}")
+            
+            val = ElectrodeMode.type(val)
+            
+        if not isinstance(val, ElectrodeMode):
+            raise TypeError(f"Invalid electrode mode {val}")
+        
+        self._electrodeMode_ = val
+        
+    @property
+    def clampMode(self) -> ClampMode:
+        return self._clampMode_
+    
+    @clampMode.setter
+    def clampMode(self, val:typing.Union[int, str, ClampMode]):
+        if isinstance(val, (int, str)):
+            if val not in ClampMode:
+                raise ValueError(f"Invalid clamp mode {val}")
+            
+            val = ClampMode.type(val)
+            
+        if not isinstance(val, ClampMode):
+            raise TypeError(f"Invalid clamp mode {val}")
+        
+        self._clampMode_ = val
+        
+    def __repr__(self) -> str:
         ret = list()
         ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}), with:")
         ret.append(f"\tBlocks: {self.nBlocks}")
         ret.append(f"\tFrames: {self.nFrames}")
         ret.append(f"\tbegin={self.begin}, end={self.end}")
         ret.append(f"\tbeginFrame={self.beginFrame}, endFrame={self.endFrame}")
+        ret.append(f"\tElectrode mode={self.electrodeMode}")
+        ret.append(f"\tClamp mode={self.clampMode}")
             
-        if len(self._pathways_) == 0:
-            ret.append(f"\tPathways: []")
-        else:
-            ret.append(f"\tPathways:")
-            for p in self._pathways_:
-                ret.append(f"\t{p}")
-
-        ret.append(f"\txtalk: {self.xtalk}")
+        ret.append(f"\tPathway Stimulation by Sweep: {self.pathActivationBySweep}")
         
-        ret.append(f"\tprotocols:")
-        ret += unique([f"\t\t{p.name}" for p in self.protocols])
+        ret.append(f"\tProtocol name: {self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else None}")
+        # ret += unique([f"\t\t{p.name}" for p in self.protocols])
         
         return "\n".join(ret)
         
@@ -1522,61 +1819,50 @@ class RecordingEpisode(Episode):
             p.text(supertxt)
             p.breakable()
             attr_repr = [" "]
-            attr_repr += [f"{a}: {getattr(self, a, None).__repr__()}" for a in ("type",
-                                                                                "electrodeMode",
-                                                                                "clampMode",
-                                                                                )]
             
-            attr_repr.append("Protocols:")
+            p.text("Protocol name:")
+            # attr_repr.append("Protocol:")
+            attr_repr.append(f"\t{self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else None}")
+            # attr_repr += [f"\t{s}" for s in repr(self.protocol).split("\n")]
             
-            attr_repr += unique([f"\t\t{p.name}" for p in getattr(self, "protocols", list())])
-            
-            # with p.group(4 ,"(",")"):
+            # with p.group(q4 ,"(",")"):
             with p.group(4 ,"",""):
                 for t in attr_repr:
                     p.text(t)
                     p.breakable()
                 p.text("\n")
                 
-            # p.text("\n")
-                
             p.text("Pathways:")
             p.breakable()
             
-            if isinstance(self._pathways_, (tuple, list)) and len(self._pathways_):
-                # with p.group(4, "(",")"):
-                with p.group(4, "",""):
-                    for pth in self._pathways_:
-                        p.text(pth.name)
-                        p.breakable()
-                    p.text("\n")
-                
-            if isinstance(self.xtalk, (tuple, list)) and len(self.xtalk):
+            if isinstance(self.pathActivationBySweep, dict) and len(self.pathActivationBySweep):
                 link = " \u2192 "
-                txt = ["Test for independence:"]
-                for x in self.xtalk:
-                    if len(x[1]) > 1:
-                        txt.append(f"sweep {x[0]}: {x[1][0].name} {link} {x[1][1].name}")
+                txt = ["Pathway Stimulation by Sweep:"]
+                
+                for k,v in self.pathActivationBySweep.items():
+                    txt.append(f"Sweeps {k} ↦ {v}")
+
                 p.text("\n".join(txt))
                 p.breakable()
                 p.text("\n")
                 
             p.breakable()
             
-
     def toHDF5(self,group:h5py.Group, name:str, oname:str, 
                        compression:str, chunks:bool, track_order:bool,
                        entity_cache:dict) -> h5py.Group:
-        """Overrides datatypes.Episode.toHDF5"""
+        r"""Overrides datatypes.Episode.toHDF5"""
         
         from iolib import h5io
+        # print(f"{self.__class__.__name__}.toHDF5: {self.name}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
             group[target_name] = cached_entity
             return cached_entity
         
-        attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame", "xtalk", "type"))
+        attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame", "type",
+                                                     "clampMode", "electrodeMode"))
         
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
@@ -1593,12 +1879,12 @@ class RecordingEpisode(Episode):
                             track_order=track_order,
                             entity_cache=entity_cache)
         
-        h5io.toHDF5(self.protocols, entity, name="protocols", oname="protocols",
+        h5io.toHDF5(self.protocol, entity, name="protocol", oname="protocol",
                             compression=compression,chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
         
-        h5io.toHDF5(self.pathways, entity, name="pathways", oname="pathways",
+        h5io.toHDF5(self.pathActivationBySweep, entity, name="pathActivationBySweep", oname="pathActivationBySweep",
                             compression=compression,chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
@@ -1618,43 +1904,43 @@ class RecordingEpisode(Episode):
         attrs = h5io.attrs2dict(entity.attrs)
         
         blocks = h5io.fromHDF5(entity["blocks"], cache=cache)
-        protocols = h5io.fromHDF5(entity["protocols"], cache=cache)
-        pathways = h5io.fromHDF5(entity["pathways"], cache=cache)
-        
+        protocol = h5io.fromHDF5(entity["protocol"], cache=cache)
+        pathActivationBySweep = h5io.fromHDF5(entity["pathActivationBySweep"], cache=cache)
+
         name=attrs["name"]
         begin=attrs["begin"]
         end=attrs["end"]
         beginFrame=attrs["beginFrame"]
         endFrame=attrs["endFrame"]
-        xtalk=attrs["xtalk"]
         episodeType=attrs["type"]
+        clampMode = attrs["clampMode"]
+        electrodeMode = attrs["electrodeMode"]
         
         return cls(name=name, episodeType=episodeType, begin=begin, end=end,
                 beginframe=beginFrame,endFrame=endFrame,
-                protocols=protocols,
+                protocol=protocol,
                 blocks = blocks,
-                pathways=pathways,
-                xtalk=xtalk)
+                pathActivationBySweep=pathActivationBySweep,
+                clampMode = clampMode,
+                electrodeMode = electrodeMode)
         
         
     @property
-    def pathways(self) -> list:
-        return self._pathways_
+    def pathActivationBySweep(self) -> dict:
+        r"""Maps a correspondence between the sweep(s) that stimulate pathways and the stimulated pathways
+        """
+        return self._pAxS
     
-    @pathways.setter
-    def pathways(self, val):
-        if isinstance(val, (tuple, list)):
-            if all(isinstance(v, SynapticPathway) for v in val):
-                self._pathways_[:] = [v for v in val]
-            elif len(val) == 0:
-                self._pathways_.clear()
-            else:
-                raise TypeError("pathways setter expecting a sequence of SyanpticPathway objects")
-            
-        elif val is None:
-            self._pathways_.clear()
-        else:
-            raise TypeError("pathways setter expecting a sequence of SyanpticPathway objects")
+    @pathActivationBySweep.setter
+    def pathActivationBySweep(self, val:dict) -> None:
+        if not validatePAxS(val):
+            raise ValueError("pathActivationBySweep got an incorrect argument")
+        
+        self._pAxS = val
+        
+    @property
+    def isXTalk(self) -> bool:
+        return checkCrossTalk(self.pathActivationBySweep)
             
     @property
     def blocks(self) -> list:
@@ -1662,7 +1948,7 @@ class RecordingEpisode(Episode):
     
     @blocks.setter
     def blocks(self, val:typing.Sequence[neo.Block]):
-        """Assign new blocks to the episode.
+        r"""Assign new blocks to the episode.
         If val is an empty sequence, the blocks will be cleared.
         """
         if not isinstance(val, (tuple, list, collections.deque)):
@@ -1697,30 +1983,31 @@ class RecordingEpisode(Episode):
             scipywarn("Cannot parse protocols from the Block objects")
             traceback.print_exc()
             
-        if len(block_protocols):
-            if len(self._protocols_):
-                protocols = self._protocols_ + block_protocols
-                self._protocols_ = unique(protocols, idcheck=False)
-            else:
-                self._protocols_[:] = block_protocols
-    
+        if len(block_protocols) != 1:
+            raise RuntimeError("An episode can have exactly one protocol")
+        
+        self._protocol_ = block_protocols[0]
+        
     def addBlock(self, x:neo.Block):
-        """Adds a new block; blocks will be reordered by rec_datetime if necessary"""
+        r"""Adds a new block; blocks will be reordered by rec_datetime if necessary"""
         if not isinstance(x, neo.Block):
             raise TypeError(f"Expecting a neo.Block; instead, got {type().__name__}")
         
         protocol = getProtocol(x)
-        if isinstance(protocol, ElectrophysiologyProtocol):
-            if len(self._protocols_):
-                if protocol not in self.protocols:
-                    scipywarn("The block was acquired with a different protocol")
-            self._protocols_.append(protocol)
+        if isinstance(self._protocol_, ElectrophysiologyProtocol):
+            # make sure they use the same protocol
+            protocols = unique([protocol, self._protocol_], idcheck=False)
+            if len(protocols) != 1:
+                raise RuntimeError("Cannot add new block because is using a different protocol")
             
+        else:
+            self._protocol_ = protocol
+        
         blocks = self._blocks_ + [x]
         self.blocks = blocks
         
     def removeBlock(self, index:typing.Union[int, str]):
-        """Removes a block by name or by its index in the episode blocks"""
+        r"""Removes a block by name or by its index in the episode blocks"""
         if isinstance(index, str):
             blocknames = [b.name for b in self._blocks_]
             if index not in blocknames:
@@ -1746,7 +2033,6 @@ class RecordingEpisode(Episode):
                 del self._protocols_[ndx]
             
         self._setup_from_blocks_() # will also update the protocols, 
-        # but best deal with these now
         
     def setFrameLimits(self, begin:int, end:int):
         if abs(end-begin) != self.nFrames-1:
@@ -1758,8 +2044,13 @@ class RecordingEpisode(Episode):
         self._endFrame_ = end
             
     @property
-    def protocols(self) -> list:
-        return self._protocols_
+    def protocol(self) -> ElectrophysiologyProtocol:
+        return self._protocol_
+    
+    @protocol.setter
+    def protocol(self, val:ElectrophysiologyProtocol) -> None:
+        if isinstance(val, ElectrophysiologyProtocol) or val is None:
+            self._protocol_ = val
     
     @property
     def begin(self) -> datetime.datetime:
@@ -1815,8 +2106,6 @@ class RecordingEpisode(Episode):
         if not isinstance(val, int):
             raise TypeError(f"Expecting an int; got {type(val).__name__} instead")
         
-        # nFrames = sum([len(b.segments) for b in self._blocks_])
-        
         if len(self._blocks_) and val >= self.beginFrame + self.nFrames:
             raise ValueError(f"'endFrame' ({val}) must be less than {self.nFrames} available frames")
         
@@ -1830,13 +2119,9 @@ class RecordingEpisode(Episode):
     
     @property
     def nFrames(self) -> int:
-        """Number of frames in this episode; """
+        r"""Number of frames in this episode; """
         if len(self._blocks_) == 0:
             return 0
-        
-        # if len(self._blocks_) == 1:
-        #     return len(self._blocks_[0].segments)
-            # return self._endFrame_ - self._beginFrame_ + 1
         
         return sum([len(b.segments) for b in self._blocks_])
     
@@ -1854,7 +2139,16 @@ class RecordingEpisode(Episode):
             self._type_ = val
         else:
             scipywarn(f"Expecting a RecordingEpisodeType, instead got {val}")
+            
+    @property
+    def pathways(self) -> typing.List[SynapticPathway]:
+        ret = list()
+        for v in self.pathActivationBySweep.values():
+            p = [v_ for v_ in v if v_ not in ret]
+            ret += p
 
+        return ret
+    
 @with_doc(Schedule, use_header=True, header_str = "Inherits from:")
 class RecordingSchedule(Schedule):
     def __init__(self, name: typing.Optional[str] = None, **kwargs):
@@ -1868,6 +2162,85 @@ class RecordingSchedule(Schedule):
             
         return "\n".join(ret)
         
+    def __add__(self, other):
+        if isinstance(other, self.__class__):
+            newepisodes = self.episodes.__add__(other.episodes)
+            return self.__class__(name=self.name, episodes = newepisodes)
+            
+        elif isinstance(other, typing.Sequence):
+            if len(other) and not all(isinstance(e, RecordingEpisode)):
+                raise TypeError("Can only add a sequence of RecordingEpisodes")
+            newepisodes = self.episodes.__add__(other)
+            return self.__class__(name=self.name, episodes = newepisodes)
+        
+        else:
+            raise TypeError(f"Invalid argument type ({type(other).__name__})")
+            
+    def __iadd__(self, other):
+        if isinstance(other, self.__class__):
+            self.episodes.__iadd__(other.episodes)
+            return self
+            
+        elif isinstance(other, typing.Sequence):
+            if len(other) and not all(isinstance(e, RecordingEpisode)):
+                raise TypeError("Can only add a sequence of RecordingEpisodes")
+            self.episodes.__iadd__(other)
+            return self
+        
+        else:
+            raise TypeError(f"Invalid argument type ({type(other).__name__})")
+
+    def append(self, value:RecordingEpisode):
+        if not isinstance(value, RecordingEpisode):
+            raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+        
+        self.episodes.append(value)
+        
+    def insert(self, index:int, value:RecordingEpisode):
+        if not isinstance(value, RecordingEpisode):
+            raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+
+        self.episodes.insert(index, value)
+        
+    def remove(self, value:RecordingEpisode):
+        if not isinstance(value, RecordingEpisode):
+            raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+        
+        self.episodes.remove(value)
+
+    def extend(self, value):
+        if isinstance(value, self.__class__):
+            self.episodes.append(value.episodes)
+            
+        elif isinstance(value, typing.Sequence):
+            if len(value):
+                if all(isinstance(v, RecordingEpisode) for v in value):
+                    self.episodes.append(value)
+                else:
+                    raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+                    
+        else:
+            raise TypeError(f"Can only append a RecordingSchedule or a sequence of RecordingEpisodes")
+        
+    def index(self, episode:RecordingEpisode):
+        if not isinstance(episode, RecordingEpisode):
+            raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+        if episode not in self.episodes:
+            raise ValueError("Episode is not contained in this RecordingSchedule")
+        
+        ndx = [k for k in range(len(self.episodes)) if self.episodes[k] == episode]
+        
+        return ndx[0]
+
+    def count(self, episode:RecordingEpisode):
+        if not isinstance(episode, RecordingEpisode):
+            raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+        
+        if episode not in self.episodes:
+            return 0
+        
+        return len(e for e in self.episodes if e == episode)
+    
     @property
     def nFrames(self) -> int:
         return sum([e.nFrames for e in self.episodes])
@@ -1885,18 +2258,6 @@ class RecordingSchedule(Schedule):
             
         return ret
         
-    def addEpisode(self, episode: RecordingEpisode):
-        if not isinstance(episode, RecordingEpisode):
-            raise TypeError(f"Expecting a RecordingEpisode; instead, got {type(episode).__name__}")
-        super().addEpisode(episode)
-        
-    def addEpisodes(self, episodes:typing.Sequence[RecordingEpisode]):
-        if len(episodes):
-            if not all(isinstance(e, RecordingEpisode) for e in episodes):
-                raise TypeError("Expecting a sequence of Recording Episode objects")
-            
-            super().addEpisodes(episodes)
-            
     def updateEpisodeFrames(self):
         currentFrame = 0
         for k, episode in enumerate(self.episodes):
@@ -1913,6 +2274,7 @@ class RecordingSchedule(Schedule):
         # datatypes.Schedule, that method encodes datatype.Episode as h5py.Datasets
         # whereas here we need to encode RecordingEpisodes as h5py.Group
         from iolib import h5io
+        # print(f"{self.__class__.__name__}.toHDF5: {self.name}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
@@ -1955,77 +2317,144 @@ class RecordingSchedule(Schedule):
         
         return cls(name, episodes=episodes)
         
-class SynapticPathwayType(TypeEnum):
-    """
-    Synaptic pathway type.
-    Encapsulates: Null, Test, Control, Auxiliary, UserDefined
-    
-    A Test pathway is defined by the presence of a Conditioning episode between
-    two non-Conditioning episodes - see RecordingEpisodeType class.
-    
-        A non-Conditioning episode is usually a Tracking episode, but can also be
-        a Crosstalk or Drug episode.
-        
-        Where justified, the test pathway may be "conditioned" more than once.
-        In this case, the Conditioning episodes MUST be separated by at least 
-        one non-Conditioning episode (usually a Tracking episode).
-        
-        In addition, there may be any number of Crosstalk, Drug and Washout
-        applied either before, or after the Conditioning episode.
-    
-    The Control pathway is defined by the presence of at least one Tracking
-        episode. No Conditioning episodes are allowed in a Control pathway.
-        
-    A combination of types IS NOT ALLOWED. The values were chosen to prevent
-    ambiguities. Thus,
-    
-    Null    | Control   ⇒ Control       (1)
-    Null    | Test      ⇒ Test          (2)
-    Control | Test      ⇒ Auxiliary     (3)
-    Control | Auxiliary ⇒ UserDefined   (4)
-    
-    Any value > 4 is invalid.
-    
-    """
-    Null        = 0 # undefined; can associate any episode type, EXCEPT for Conditioning and Tracking
-    Undefined   = Null
-    Control     = 1 # can associate any episode type, EXCEPT for Conditioning
-    Test        = 2 # can associate any episode type
-    Auxiliary   = 3 # can associate any episode type, EXCEPT for Tracking;
-                    # NOTE: this requirement is for analysis purpose only; the 
-                    # pathway can be activated during any type of episode, but
-                    # synaptic responses do not need to be analysed during the 
-                    # tracking episodes.
-                    # auxiliary pathways can be:
-                    # • present along the tracking pathway, during tracking only
-                    # • present along the induction pathway, during induction only
-                    # • present throughout
-    UserDefined = 4 # can associate any episode type, EXCEPT for Tracking (see above)
     
 # @with_doc(BaseScipyenData, use_header=True)
 @dataclass
 class SynapticPathway:
-    """Logical association of a SynapticStimulus with a Schedule.
-    Also specifies the "type" of the SynapticPathway - specifies the role of
-    the SynapticPathway in an experiment.
+    r"""Logical association of a SynapticStimulus with a recording configuration.
+    Also specifies the "type" of the SynapticPathway, which represents the role
+    of the SynapticPathway in an experiment.
 
-    SynapticPathway objects have a pathwayType attribute which specifies
-    the pathway's role in a synaptic plasticity experiment.
-    
     """
-    pathwayType: SynapticPathwayType = SynapticPathwayType.Null
     name: str = "pathway"
-    stimulus: SynapticStimulus = field(default_factory = lambda: SynapticStimulus())
-    electrodeMode: typing.Union[ElectrodeMode, typing.Sequence[ElectrodeMode]] = field(default_factory = lambda: list())
-    clampMode: typing.Union[ClampMode, typing.Sequence[ClampMode]] = field(default_factory = lambda: list())
-    schedule: typing.Optional[RecordingSchedule] = None
-    measurements: typing.Sequence[typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = field(default_factory = lambda: list())
-    source: RecordingSource = field(default_factory = lambda: RecordingSource())
+    adc: int|None = None # physical index of the ADC channel used in recording this pathway
+    dac: int|None = None # physical index of the DAC channel used in recording this pathway
+    stimulus: SynapticStimulus = dataclasses.field(default_factory = SynapticStimulus)
+    
+    # NOTE: 2024-10-16 11:57:17
+    # 'clampMode' is not needed, in a SynapticPathway, which can be recorded in
+    # either clamp mode, and the clamp mode can change during a session (i.e.,
+    # a sequence of recording trials).
+    #
+    # On the other hand it makes sense to define an electrode mode, as it cannot
+    # change during the session - once impaled, it would be tricky to also patch
+    # the cell, and vice-versa (although re-patching the cells has been reported,
+    # e.g. see Lamsa et al, Science 315:1262, 2007, for the purpose of this 
+    # software one can consider a repatched cell as the same source, with same
+    # electrode mode, but undergoing different episodes).
+    #
+    # Therefore:
+    # NOTE: 2024-10-16 13:36:07
+    # add clampMode to RecordingEpisode!
+    electrode: dataclasses.InitVar[typing.Union[ElectrodeMode, int, str]] = ElectrodeMode.Null
+    
+    pathType: dataclasses.InitVar[typing.Union[SynapticPathwayType, int, str]] = SynapticPathwayType.Null
+    
+    schedule: RecordingSchedule = dataclasses.field(default_factory = RecordingSchedule)
+    
+    # CAUTION 2024-10-17 22:31:14 FIXME
+    # these measurements MUST be mapped to the episode boundaries, so that one 
+    # can easily access the measurement values during a particular episode or
+    # across several apisodes of the schedule!
+    measurements: typing.Mapping[str, typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = dataclasses.field(default_factory = dict)
+    # source: RecordingSource = dataclasses.field(default_factory = lambda: RecordingSource())
+    
+    def __post_init__(self, electrode:typing.Union[ElectrodeMode, int, str] = ElectrodeMode.Null,
+                      pathType:typing.Union[SynapticPathwayType, int, str] = SynapticPathwayType.Null):
+        
+        # print(f"{self.__class__.__name__}.__post_init__: electrodeMode = {electrodeMode}, pathwayType = {pathType}")
+        
+        if isinstance(electrode, (int, str)):
+            if electrode not in ElectrodeMode:
+                raise ValueError(f"Invalid electrode mode {electrode}")
+            
+            electrode = ElectrodeMode.type(electrode)
+            
+        if not isinstance(electrode, ElectrodeMode):
+            raise TypeError(f"Invalid electrode mode {electrode}")
+        
+        self._electrodeMode_ = electrode
+        
+        if isinstance(pathType, (int, str)):
+            if pathType not in SynapticPathwayType:
+                raise ValueError(f"Invalid synaptic pathway type {pathType}")
+            
+            pathType = SynapticPathwayType.type(pathType)
+            
+        if not isinstance(pathType, SynapticPathwayType):
+            raise TypeError(f"Invalid synaptic pathway type {pathType}")
+        
+        self._pathwayType_ = pathType
+        
+    @property
+    def electrodeMode(self) -> ElectrodeMode:
+        return self._electrodeMode_
+    
+    @electrodeMode.setter
+    def electrodeMode(self, val:typing.Union[int, str, ElectrodeMode]):
+        if isinstance(val, (int, str)):
+            if val not in ElectrodeMode:
+                raise ValueError(f"Invalid electrode mode {val}")
+            
+            val = ElectrodeMode.type(val)
+            
+        if not isinstance(val, ElectrodeMode):
+            raise TypeError(f"Invalid electrode mode {val}")
+        
+        self._electrodeMode_ = val
+        
+    @property
+    def pathwayType(self) -> SynapticPathwayType:
+        return self._pathwayType_
+    
+    @pathwayType.setter
+    def pathwayType(self, val:typing.Union[SynapticPathwayType, int, str]):
+        if isinstance(val, (int, str)):
+            if val not in SynapticPathwayType:
+                raise ValueError(f"Invalid syaptic pathway type {val}")
+            
+            val = SynapticPathwayType.type(val)
+            
+        if not isinstance(val, SynapticPathwayType):
+            raise TypeError(f"Invalid synaptic pathway type {val}")
+        
+        self._pathwayType = val
+        
+    def __repr__(self) -> str:
+        import dataclasses
+        all_attr_names = list(f.name for f in dataclasses.fields(self.__class__)) + [x[0] for x in inspect.getmembers_static(self, lambda x: isinstance(x, property))]
+        ret = [f"{self.__class__.__name__}"]
+        ret += ["("]
+        
+        ret += ", ".join([f"{a}={getattr(self,a).name if a in ('electrodeMode', 'pathwayType') else getattr(self, a)}" for a in all_attr_names])
+        ret += [")"]
+        
+        return "".join(ret)
+        
+        
+        
+    def __eq__(self, other) -> bool:
+        from dataclasses import fields
+        ret = type(self) == type(other)
+        
+        if not ret:
+            return ret
+        
+        ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in fields(type(self)) if f.name != "source")
+        
+        if ret:
+            ret &= self.pathwayType == other.pathwayType
+            
+        if ret:
+            ret &= self.electrodeMode == other.electrodeMode
+            
+        return ret
     
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
         
         from iolib import h5io
+        # print(f"{self.__class__.__name__}.toHDF5: {self.name}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
@@ -2033,9 +2462,11 @@ class SynapticPathway:
             return cached_entity
         
         attrs = {"name": self.name,
+                 "adc": self.adc,
+                 "dac":self.dac,
                  "pathwayType": self.pathwayType,
                  "electrodeMode": self.electrodeMode,
-                 "clampMode": self.clampMode}
+                 }
         
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
@@ -2045,6 +2476,11 @@ class SynapticPathway:
         
         entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
+        
+        # h5io.toHDF5(self.source, entity, name="source", oname="source",
+        #                     compression=compression, chunks=chunks,
+        #                     track_order=track_order,
+        #                     entity_cache=entity_cache)
         
         h5io.toHDF5(self.stimulus, entity, name="stimulus", oname="stimulus",
                             compression=compression, chunks=chunks,
@@ -2061,12 +2497,8 @@ class SynapticPathway:
                             track_order=track_order,
                             entity_cache=entity_cache)
         
-        h5io.toHDF5(self.source, entity, name="source", oname="source",
-                            compression=compression, chunks=chunks,
-                            track_order=track_order,
-                            entity_cache=entity_cache)
-        
         h5io.storeEntityInCache(entity_cache, self, entity)
+        
         return entity
     
     @classmethod
@@ -2081,22 +2513,37 @@ class SynapticPathway:
         name = attrs["name"]
         pathwayType = attrs["pathwayType"]
         electrodeMode = attrs["electrodeMode"]
-        clampMode = attrs["clampMode"]
+        adc = attrs["adc"]
+        dac = attrs["dac"]
         schedule = h5io.fromHDF5(entity["schedule"], cache=cache)
         stimulus = h5io.fromHDF5(entity["stimulus"], cache=cache)
-        source = h5io.fromHDF5(entity["source"], cache=cache)
+        # source = h5io.fromHDF5(entity["source"], cache=cache)
         measurements = h5io.fromHDF5(entity["measurements"], cache=cache)
         
-        return cls(name=name, pathwayType=pathwayType, stimulus=stimulus,
-                   electrodeMode=electrodeMode, clampMode=clampMode,
-                   schedule=schedule, measurements=measurements, source=source)
+        return cls(name=name, adc=adc, dac=dac, pathType=pathwayType, 
+                   stimulus=stimulus, electrode=electrodeMode,
+                   schedule=schedule, measurements=measurements)#, source=source)
         
+    @classmethod
+    def fromDict(cls, **kwargs):
+        r"""Constructs an instance of this class using 'kwargs' keys that match the class fields.
+        Keys in kwargs that are NOT valid field names for this class are silently 
+        ignored. 
+        """
+        field_names = tuple(f.name for f in dataclasses.fields(cls))
         
+        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
         
-        
+        return cls(**initkwargs)
+    
+# FIXME 2025-04-26 14:10:24 
+# Interval.extent True means that:
+# interval.t0 is the mid point, 
+# interval.t1 is the symmetric window around the mid point!
 @dataclass
-class LocationMeasure:
-    """Functor to calculate a signal measure at a location using a suitable function or functor.
+class LocationMeasure: 
+                        
+    r"""Functor to calculate a signal measure at a location using a suitable function or functor.
 
     In turn, a `location` is an object with one of the following types ('locator' types):
     • SignalCursor
@@ -2392,7 +2839,7 @@ class LocationMeasure:
         WARNING: In order to be fully mutable when locations are specified as 
         sequences of scalars, the sequences must also be mutable
     
-"""
+    """
     # NOTE: 2024-02-29 22:37:54
     # mandatory signature for func:
     # func(*args, **kwargs) where:
@@ -2409,7 +2856,7 @@ class LocationMeasure:
     # __slots__ = ()
     
     def __call__(self, *args, **kwargs):
-        """
+        r"""
         Var-positional parameters (*args):
         ----------------------------------
         Passed to encapsulated function (`func` field); MUST contain a signal or
@@ -2445,7 +2892,7 @@ class LocationMeasure:
         return self.func(*args, **kwargs)
   
 class DataListener(QtCore.QObject):
-    """
+    r"""
     Dynamically constructs and augments neo.Block data as
     axon files are created in the current working directory
     """
@@ -2474,7 +2921,7 @@ class DataListener(QtCore.QObject):
         print(f"{self.__class__.__name__}.slot_filesNew {newItems}")
         
 class Analysis(BaseScipyenData):
-    """TODO Finalize me !!!"""
+    r"""TODO Finalize me !!!"""
     _data_attributes_ = (
         ("measurements", list, list()),     # list of time-varying measurements, by default is empty
                                             # e.g., EPSP amplitude(s), fEPSP slope(s), RS, Rin, DC
@@ -2488,21 +2935,83 @@ class Analysis(BaseScipyenData):
 
 def detectClampMode(signal:typing.Union[neo.AnalogSignal, DataSignal], 
                     command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity]) -> ClampMode:
-    """Infers the clamping mode from the units of signal and command"""
-    vc_mode = scq.check_electrical_current_units(signal) and scq.check_electrical_potential_units(command)
-    ic_mode = scq.check_electrical_potential_units(signal) and scq.check_electrical_current_units(command)
+    r"""Infers the clamping mode from the units of signal and command"""
+    vc_mode = scq.checkElectricalCurrentUnits(signal) and scq.checkElectricalPotentialUnits(command)
+    ic_mode = scq.checkElectricalPotentialUnits(signal) and scq.checkElectricalCurrentUnits(command)
     
             
     clampMode = ClampMode.VoltageClamp if vc_mode else ClampMode.CurrentClamp if ic_mode else ClampMode.NoClamp
 
     return clampMode
 
+def checkCrossTalk(val:dict) -> bool:
+    if len(val) == 0:
+        return False
+    
+    if validatePAxS(val):
+        return all(len(unique(v))==2 for v in val.values())
+        
+    else:
+        return False
+#     
+#     if not all(isinstance(k, int) or (isinstance(k, tuple) and len(k)>0 and all(isinstance(k_, int) for k_ in k)) for k in val) or \
+#         not all(isinstance(v, tuple) and all(isinstance(x, SynapticPathway) for x in v) for v in val.values()):
+#         raise ValueError("Argument must map ints or tuples of int keys to tuples of SynapticPathway objects")
+    
+    # ret = all(len(v)==2 for v in val.values())
+    
+    # return ret
+
+    # TODO: 2024-10-10 09:03:01
+    # check combinatorics:
+    # 1 pathway => no xtalk
+    # 2 pathways => 1->2, 2->1 => even number of pathways, even number of sweeps
+    # 3 pathways => 1->2, 1->3, 2->3, 2->1, 3->1, 3->2 => even number of sweeps
+    # ⋮
+    # etc
+    #
+    # if ret:
+    #     paths = list()
+    #     for v in val.values():
+    #         p = [v_ for v_ in v if v_ not in ret]
+    #         paths += p
+
+        
+
+def validatePAxS(val:dict):
+    if not isinstance(val, dict):
+        return False
+    
+    if len(val) == 0:
+        return True
+    
+    # if not all(isinstance(k, int) or (isinstance(k, tuple) and len(k)>0 and all(isinstance(k_, int) for k_ in k)) for k in val) or \
+    #     not all(isinstance(v, tuple) and all(isinstance(x, SynapticPathway) for x in v) for v in val.values()):
+    #     raise ValueError("Argument must map ints or tuples of int keys to tuples of SynapticPathway objects")
+    
+    keys = list(val.keys())
+    
+    int_keys = list(filter(lambda x: isinstance(x, int), keys))
+    tuple_keys = list(filter(lambda x: isinstance(x, tuple) and len(x)==2 and all(isinstance (v, int) for v in x), keys))
+    
+    if len(int_keys + tuple_keys) != len(val):
+        return False
+    
+    values = [val[k] for k in int_keys + tuple_keys]
+    
+    OK_vals = list(filter(lambda x: isinstance(x, tuple) and (all(isinstance(v, SynapticPathway) for v in x) if len(x) else True), values ))
+    
+    if len(OK_vals) != len(values):
+        return False
+    
+    return True
+
 def checkClampMode(clampMode:ClampMode, signal:typing.Union[neo.AnalogSignal, DataSignal],
                    command:typing.Union[neo.AnalogSignal, DataSignal, pq.Quantity, numbers.Number]) -> tuple:
-    """Verifies that the clamping mode in clampMode is applicable to the signal & command.
+    r"""Verifies that the clamping mode in clampMode is applicable to the signal & command.
 Returns the signal and the command, possibly with units modified as expected for the specified clamping mode"""
     if clampMode == ClampMode.VoltageClamp:
-        if not scq.check_electrical_current_units(signal):
+        if not scq.checkElectricalCurrentUnits(signal):
             warnings.warn(f"'signal' has wrong units ({signal.units}) for VoltageClamp mode.\nThe signal will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
             klass = type(signal)
             signal = klass(signal.magnitude, units = pq.pA, 
@@ -2510,7 +3019,7 @@ Returns the signal and the command, possibly with units modified as expected for
                                          name=signal.name)
             
         if isinstance(command, pq.Quantity):# scalar Quantity, or Quantity array (including signal)
-            if not scq.check_electrical_potential_units(command):
+            if not scq.checkElectricalPotentialUnits(command):
                 if isinstance(command, (neo.AnalogSignal, DataSignal)):
                     warnings.warn(f"'command' has wrong units ({command.units}) for VoltageClamp mode.\nThe command signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
                     klass = type(command)
@@ -2526,7 +3035,7 @@ Returns the signal and the command, possibly with units modified as expected for
             command = command * pq.mV
         
     else: # current clamp mode
-        if not scq.check_electrical_potential_units(signal):
+        if not scq.checkElectricalPotentialUnits(signal):
             warnings.warn(f"'signal' has wrong units ({signal.units}) for CurrentClamp mode.\nThe signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
             klass = type(signal)
             signal = klass(signal.magnitude, units = pq.mV, 
@@ -2534,7 +3043,7 @@ Returns the signal and the command, possibly with units modified as expected for
                                          name=signal.name)
             
         if isinstance(command, pq.Quantity):
-            if not scq.check_electrical_current_units(command):
+            if not scq.checkElectricalCurrentUnits(command):
                 if isinstance(command, (neo.AnalogSignal, DataSignal)):
                     warnings.warn(f"'command' has wrong units ({command.units}) for CurrentClamp mode.\nThe command signal will be FORCED to correct units ({pq.pA}). If this is NOT what you want then STOP NOW")
                     klass = type(command)
@@ -2553,7 +3062,7 @@ Returns the signal and the command, possibly with units modified as expected for
 
 def detectMembraneTest(command:typing.Union[neo.AnalogSignal, DataSignal], 
                        **kwargs) -> tuple:
-    """Detects or checks the timing and amplitude of a membrane test waveform (boxcar).
+    r"""Detects or checks the timing and amplitude of a membrane test waveform (boxcar).
     The detection occurs in a command signal (a copy of the DAC command) where the boxcar is defined.
     Use this an alternative to parsing an ElectrophysiologyProtocol, in order to 
     infer the parameters of a membrane test epoch.
@@ -2627,7 +3136,7 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable],
                  span:int=1, 
                  isISI:bool=False,
                  useNan:bool=True):
-    """Calculates the reciprocal of an inter-event interval.
+    r"""Calculates the reciprocal of an inter-event interval.
     
     This can be the time interval between any two events with indices "start" &
     "start" + "span".
@@ -2729,13 +3238,13 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable],
         return (1/(stamps[-1]-stamps[start])).rescale(pq.Hz)
     
     
-@safeWrapper
+@safewrapper
 def epoch_reduce(func:types.FunctionType, 
                  signal: typing.Union[neo.AnalogSignal, DataSignal], 
                  epoch: typing.Union[neo.Epoch, tuple], 
                  intervals: typing.Optional[typing.Union[int, str]] = None,
                  channel: typing.Optional[int] = None) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
-    """
+    r"""
     Applies a reducing function to a signal, within the epoch's intervals.
     
     Parameters:
@@ -2745,13 +3254,9 @@ def epoch_reduce(func:types.FunctionType,
     epoch: neo.Epoch, DataZone
 
     intervals: int or str, a sequence of int or str; optional, default is None.
-
-        This parameters is used when the Epoch or DataZone contains more than 
+        This parameter is used when the Epoch or DataZone contains more than 
         one interval, to indicate on which epoch or zone interval(s) 'func' will
         be applied to the signal.
-
-        See neoutils.get_epoch_interval(…) for details about how the epoch 
-        intervals are selected.
 
         In addition, when the 'intervals' parameter is dataclasses.MISSING, then
         'func' is applied to a new signal generated by concatenating the slices 
@@ -2780,37 +3285,40 @@ def epoch_reduce(func:types.FunctionType,
     
     if isinstance(epoch, (neo.Epoch, DataZone)):
         if len(epoch) == 0:
-            return np.nan*signal.units
+            return np.nan * signal.units
                 
         if len(epoch) > 1:
             if intervals is None or isinstance(intervals, type(MISSING)):
+                intervals = Interval.fromNeoEpoch(epoch)
+                slices = intervals.sliceSignal(signal)
                 if isinstance(intervals, type(MISSING)):
-                    intervals = [neoutils.get_epoch_interval(epoch, i) for i in range(len(epoch))]
-                    # get all signal slices
-                    slice_times = [(i[0][0] if i[0].ndim > 0 else i[0], i[1][0] if i[1].ndim > 0 else i[1]) for i in intervals]
-                    slices = [signal.time_slice(*t) for t in slice_times]
-                    #  and concatenate to new signal - use our (more convenient?)
-                    # signal concatenation function
+                    # create a new signal by concatenating the slices
+                    # then apply the function 'fun' on axis 0 of the new signal
                     new_sig = neoutils.concatenate_signals(slices, axis=0)
-                    
                     ret = fun(new_sig, axis=0)
                     
-                    if isinstance(chanel, int):
-                        return ret[channel].flatten()
+                else:
+                    # apply fun on axis 0 of each slice individually
+                    ret = tuple(map(lambda x: fun(x, axis=0), slices))
                     
-                    return ret
+                if isinstance(channel, int):
+                    return ret[channel].flatten()
+                return ret
 
             elif isinstance(intervals, (int, str, np.str_, bytes)):
-                intervals = [neoutils.get_epoch_interval(epoch, interval)]
+                intervals = Interval.fromNeoEpoch(epoch, intervals)
                 
-            elif isinstance(intervals, (tuple, list))  and all(isinstance(i, (int, str, np.str_, bytes)) for i in intervals):
-                intervals = [neoutils.get_epoch_interval(epoch, i) for i in intervals]
-                
-            else:
-                raise TypeError(f"Unexpected index type")
+            elif isinstance(intervals, (tuple, list)):
+                if all(isinstance(i, (int, str, np.str_, bytes)) for i in intervals):
+                    intervals = Interval.fromNeoEpoch(epoch, intervals)
+                else:
+                    raise TypeError(f"The 'intervals' sequence has elements of unexpected type")
+                    
+            elif not isinstance(intervals, Interval):
+                raise TypeError(f"Unexpected index type: {type(intervals).__name__}")
             
         else:
-            intervals = [(epoch.times[0], epoch.times[0] + epoch.durations[0])]
+            intervals = Interval.fromNeoEpoch(epoch)
         
     else:
         raise TypeError(f"epoch expected to be a tuple (t0, duration) or a neo.Epoch; got {epoch} instead")
@@ -2825,10 +3333,11 @@ def epoch_reduce(func:types.FunctionType,
     
 def interval_reduce(func:typing.Callable,
                     signal: typing.Union[neo.AnalogSignal, DataSignal],
-                    interval:typing.Union[Interval, typing.Sequence[typing.Union[numbers.Number, pq.Quantity]]],
+                    interval: Interval,
+                    # interval: typing.Union[Interval, typing.Sequence[typing.Union[numbers.Number, pq.Quantity]]],
                     channel:typing.Optional[int] = None,
                     duration:bool=False) -> pq.Quantity:
-    """As cursor_reduce, but using an interval instead.
+    r"""As cursor_reduce, but using an interval instead.
     
     The semantics of the interval is set by the 'duration' keyword parameters:
         • True ⇒ the interval tuple contains (start, duration, …)
@@ -2994,7 +3503,7 @@ def interval_slice(signal, interval, duration=False):
     return signal.time_slice(t0, t1)
 
 def interval_mid_point(interval:tuple, duration:bool=False):
-    """Calculated the mid-point of a interval tuple
+    r"""Calculated the mid-point of a interval tuple
 """
     i0, i1 = interval[0:2]
     
@@ -3025,14 +3534,14 @@ def interval_chord_slope(signal, interval, channel = None, duration = False):
     return ret
 
 def interval_index(signal, interval:tuple, duration:bool=False):
-    """Index of signal sample at the interval midpoint"""
+    r"""Index of signal sample at the interval midpoint"""
     x = interval_mid_point(interval, duration=duration)
     
     if not isinstance(x, pq.Quantity):
         x *= signal.times.units
         
     else:
-        x = check_rescale(x, signal.times.units)
+        x = checkRescale(x, signal.times.units)
         
     return signal.time_index(x)
     
@@ -3043,7 +3552,7 @@ def intervals_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
                          channel: typing.Optional[int]=None, 
                          duration:bool = False,
                          subfun: typing.Optional[typing.Union[typing.Callable, types.FunctionType]] = None):
-    """Similar to cursors_difference(…).
+    r"""Similar to cursors_difference(…).
     See cursors_difference(…) for details.
 """
     if func is None:
@@ -3119,7 +3628,7 @@ def intervals_distance(signal, interval0, interval1, duration=False):
 def intervals_chord_slope(signal, interval0, interval1, 
                           channel:typing.Optional[int] = None,
                           duration:bool=False):
-    """Signal chord slope between two intervals.
+    r"""Signal chord slope between two intervals.
         Similar to cursors_chord_slope but uses interval tuples
 """
     t0, t1 = [interval_mid_point(i, duration=duration) for i in (interval0, interval1)]
@@ -3138,7 +3647,7 @@ def event_amplitude_at_intervals(signal:typing.Union[neo.AnalogSignal, DataSigna
                                  func:typing.Optional[typing.Callable]=None,
                                  channel:typing.Optional[int]=None, 
                                  duration:bool=False):
-    """Similar to event_amplitude_at_cursors but using intervals.
+    r"""Similar to event_amplitude_at_cursors but using intervals.
 
     NOTE: when passed, 'func' must have the signature:
     
@@ -3164,7 +3673,7 @@ def event_amplitude_at_intervals(signal:typing.Union[neo.AnalogSignal, DataSigna
 
 def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
                   cursor: typing.Union[SignalCursor, tuple, DataCursor]) -> typing.Union[neo.AnalogSignal, DataSignal]:
-    """Returns a slice of the signal corresponding to a cursor's xwindow"""
+    r"""Returns a slice of the signal corresponding to a cursor's xwindow"""
     
     if isinstance(cursor, SignalCursor):
         t0 = (cursor.x - cursor.xwindow/2) * signal.times.units
@@ -3184,14 +3693,14 @@ def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
         t0 *= signal.times.units
         
     else:
-        if not units_convertible(t0, signal.times.units):
+        if not unitsConvertible(t0, signal.times.units):
             raise ValueError(f"t0 units ({t0.units}) are not compatible with the signal's time units {signal.times.units}")
 
     if not isinstance(t1, pq.Quantity):
         t1 *= signal.times.units
 
     else:
-        if not units_convertible(t1, signal.times.units):
+        if not unitsConvertible(t1, signal.times.units):
             raise ValueError(f"t1 units ({t1.units}) are not compatible with the signal's time units {signal.times.units}")
     
     if t0 == t1:
@@ -3204,10 +3713,10 @@ def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
 
 def cursor_reduce(func:types.FunctionType, 
                   signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                  cursor: typing.Union[SignalCursor, tuple, DataCursor], 
+                  cursor: typing.Union[SignalCursor, tuple, DataCursor, Interval], 
                   channel: typing.Optional[int] = None,
                   relative:bool = True) -> pq.Quantity:
-    """Calculates reduced signal values (e.g. min, max, median etc) across a cursor's window.
+    r"""Calculates reduced signal values (e.g. min, max, median etc) across a cursor's window.
     
     The reduced signal value is the value calculated by the `func` parameter
     from a signal region defined by the cursor.
@@ -3262,38 +3771,45 @@ def cursor_reduce(func:types.FunctionType,
     cursors, just call max(), min(), argmax() argmin() on a signal time slice 
     obtained using the two cursor's x values.
     """
-    # from gui.signalviewer import SignalCursor as SignalCursor
-    
-    # if not isinstance(func, types.FunctionType):
-    #     raise TypeError(f"Expecting a function as first argument; got {type(func).__name__} instead")
-    
-    # print(f"cursor_reduce: signal.t_start = {signal.t_start}; signal.t_stop = {signal.t_stop}")
-    if isinstance(cursor, SignalCursor):
-        # print(f"cursor_reduce: cursor.x = {cursor.x}, cursor.xwindow = {cursor.xwindow}")
-        t0 = (float(cursor.x) - float(cursor.xwindow/2.)) * signal.times.units
-        t1 = (float(cursor.x) + float(cursor.xwindow/2.)) * signal.times.units
-        
-    elif isinstance(cursor, DataCursor):
-        t0 = cursor.coord - cursor.span/2
-        t1 = cursor.coord + cursor.span/2
-        
-    elif isinstance(cursor, tuple) and len(cursor) == 2:
+    from copy import deepcopy
+    if isinstance(cursor, tuple) and len(cursor) == 2:
         t0, t1 = cursor
         
-    else:
-        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {cursor} instead")
+    else:    
+        if isinstance(cursor, Interval):
+            t0 = Interval.t0[0].copy()
+            t1 = Interval.t1[0].copy()
+        else:
+            if isinstance(cursor, SignalCursor):
+                coord = float(cursor.x)
+                span = float(cursor.xwindow)
+                if isinstance(cursor.xUnits, pq.Quantity):
+                    coord *= cursor.xUnits
+                    span *= cursor.xUnits
+                
+            elif isinstance(cursor, DataCursor):
+                # need copies here, because of possible readjustment
+                coord = cursor.coord.copy() if isinstance(cursor.coord, np.ndarray) else float(cursor.coord)
+                span = cursor.span.copy() if isinstance(cursor.span, np.ndarray) else float(cursor.span)
+
+            else:
+                raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {cursor} instead")
+        
+            t0, t1 = (coord - span/2, coord + span/2)
+    
+    # print(f"cursor_reduce: t0 = {t0}, t1 = {t1}")
     
     if not isinstance(t0, pq.Quantity):
         t0 *= signal.times.units
         
     else:
-        t0 = check_rescale(t0, signal.times.units)
+        t0 = checkRescale(t0, signal.times.units)
 
     if not isinstance(t1, pq.Quantity):
         t1 *= signal.times.units
 
     else:
-        t1 = check_rescale(t1, signal.times.units)
+        t1 = checkRescale(t1, signal.times.units)
         
     t0, t1 = min(t0,t1), max(t0,t1)
         
@@ -3321,7 +3837,7 @@ def cursor_reduce(func:types.FunctionType,
     return ret
 
 def adjust_times_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSignal], *args) -> typing.Union[pq.Quantity, typing.List[pq.Quantity]]:
-    """Adjust the domain values supplied in `args` relative to signal's domain limit.
+    r"""Adjust the domain values supplied in `args` relative to signal's domain limit.
     `args` must contain scalar Quantities with (or convertible to) signal's domain units.
     
     Although the function's name refers to 'times', in fact it can be used on
@@ -3335,10 +3851,10 @@ def adjust_times_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSi
         scipywarn("No domain values were supplied")
         return
     
-    if not all(isinstance(v, pq.Quantity) and v.size == 1 and units_convertible(v, signal.times.units) for v in args):
+    if not all(isinstance(v, pq.Quantity) and v.size == 1 and unitsConvertible(v, signal.times.units) for v in args):
         raise TypeError(f"All domain values expected to be scalar Quantities in {signal.times.units}")
     
-    args = sorted([check_rescale(t, signal.times.units) for t in args])
+    args = sorted([checkRescale(t, signal.times.units) for t in args])
     
     t0 = args[0]
     
@@ -3356,33 +3872,33 @@ def adjust_times_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSi
     
     return t0
             
-@safeWrapper
+@safewrapper
 def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal], 
                cursor: typing.Union[SignalCursor, tuple, DataCursor], 
                channel: typing.Optional[int] = None,
                relative: bool=True) -> typing.Union[float, pq.Quantity]:
-    """The maximum value of the signal across the cursor's window.
+    r"""The maximum value of the signal across the cursor's window.
     Calls cursor_reduce with np.max as `func` parameter.
     """
     return cursor_reduce(np.max, signal, cursor, channel, relative)
 
-@safeWrapper
+@safewrapper
 def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal], 
                cursor: typing.Union[SignalCursor, tuple, DataCursor], 
                channel: typing.Optional[int] = None,
                relative: bool=True) -> typing.Union[float, pq.Quantity]:
-    """The maximum value of the signal across the cursor's window.
+    r"""The maximum value of the signal across the cursor's window.
     Calls cursor_reduce with np.min as `func` parameter.
     """
     return cursor_reduce(np.min, signal, cursor, channel, relaive)
 
 
-@safeWrapper
+@safewrapper
 def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal], 
                   cursor: typing.Union[SignalCursor, tuple, DataCursor], 
                   channel: typing.Optional[int] = None,
                   relative: bool=True) -> int:
-    """The index of maximum value of the signal across the cursor's window.
+    r"""The index of maximum value of the signal across the cursor's window.
 
     Parameters:
     ----------
@@ -3404,12 +3920,12 @@ def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     return cursor_reduce(np.argmax, signal, cursor, channel, relative)
     
-@safeWrapper
+@safewrapper
 def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
                   cursor: typing.Union[tuple, SignalCursor, DataCursor], 
                   channel: typing.Optional[int] = None,
                   relative: bool=True) -> int:
-    """The index of minimum value of the signal across the cursor's window.
+    r"""The index of minimum value of the signal across the cursor's window.
 
     Parameters:
     ----------
@@ -3431,12 +3947,12 @@ def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     return cursor_reduce(np.argmin, signal, cursor, channel, relative)
 
-@safeWrapper
+@safewrapper
 def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
                   cursor: typing.Union[tuple, SignalCursor, DataCursor], 
                   channel: typing.Optional[int] = None,
                   relative: bool=True) -> tuple:
-    """The maximum and minimum value of the signal across the cursor's window.
+    r"""The maximum and minimum value of the signal across the cursor's window.
 
     Parameters:
     ----------
@@ -3460,42 +3976,42 @@ def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     return cursor_reduce(sigp.maxmin, signal, cursor, channel, relative)
 
-@safeWrapper
+@safewrapper
 def cursor_minmax(signal: typing.Union[neo.AnalogSignal, DataSignal], 
                   cursor: typing.Union[tuple, SignalCursor, DataCursor], 
                   channel: typing.Optional[int]=None,
                   relative: bool=True) -> tuple:
     return cursor_reduce(sigp.minmax, signal, cursor, channel, relative)
 
-@safeWrapper
+@safewrapper
 def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal], 
                      cursor: typing.Union[tuple, SignalCursor, DataCursor], 
                      channel: typing.Optional[int] = None,
                      relative: bool=True) -> tuple:
-    """The indices of signal maximum and minimum across the cursor's window.
+    r"""The indices of signal maximum and minimum across the cursor's window.
     """
     return cursor_reduce(sigp.argmaxmin, signal, cursor, channel, relative)
 
-@safeWrapper
+@safewrapper
 def cursor_argminmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
                      cursor: typing.Union[tuple, SignalCursor, DataCursor], 
                      channel: typing.Optional[int]=None,
                      relative:bool = True) -> tuple:
     return cursor_reduce(sigp.argminmax, signal, cursor, channel, relative)
 
-@safeWrapper
+@safewrapper
 def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                   cursor: typing.Union[tuple, SignalCursor, DataCursor], 
+                   cursor: typing.Union[tuple, SignalCursor, DataCursor, Interval], 
                    channel: typing.Optional[int]=None,
                    relative: bool = True,
                    usenan: bool = False):
-    """Average of signal samples across the window of a vertical cursor.
+    r"""Average of signal samples across the window of a vertical cursor.
     Calls cursor_reduce with np.mean as `func` parameter
     
     Parameters:
     -----------
     
-    signal: neo.AnalogSignal or datatypes.DataSignal
+    signal: neo.AnalogSignal or datasignal.DataSignal
     
     cursor: tuple, or signalviewer.SignalCursor (vertical).
         When a tuple (t,w), it represents a notional vertical cursor with window
@@ -3523,18 +4039,18 @@ def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
 
 cursor_mean = cursor_average
 
-@safeWrapper
+@safewrapper
 def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal], 
                  cursor: typing.Union[float, SignalCursor, DataCursor, pq.Quantity, tuple], 
                  channel: typing.Optional[int] = None, 
                  relative:bool = True):
-    """Value of signal at the vertical cursor's time coordinate.
+    r"""Value of signal at the vertical cursor's time coordinate.
     
     Signal sample values are NOT averaged across the cursor's window.
     
     Parameters:
     -----------
-    signal: neo.AnalogSignal or datatypes.DataSignal
+    signal: neo.AnalogSignal or datasignal.DataSignal
     
     cursor: float, python Quantity or vertical SignalCursor
     
@@ -3571,15 +4087,15 @@ def cursor_value(signal:typing.Union[neo.AnalogSignal, DataSignal],
     
     return ret[channel].flatten() # so that it can be indexed
 
-@safeWrapper
+@safewrapper
 def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal], 
                  cursor: typing.Union[float, SignalCursor, DataCursor, pq.Quantity, tuple],
                  relative: bool = True):
-    """Index of signal sample at the vertical cursor's time coordinate.
+    r"""Index of signal sample at the vertical cursor's time coordinate.
     
     Parameters:
     -----------
-    signal: neo.AnalogSignal or datatypes.DataSignal
+    signal: neo.AnalogSignal or datasignal.DataSignal
     
     cursor: float, python Quantity, vertical SignalCursor or cursor parameters
             tuple
@@ -3621,7 +4137,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
             if t.size != 1:
                 raise ValueError(f"Expecting a scalar quantity instead, got {t}")
             
-            t = check_rescale(t, signal.times.units)
+            t = checkRescale(t, signal.times.units)
             
         else:
             raise TypeError(f"Invalid domain coordinate {t}")
@@ -3630,7 +4146,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
         if cursor.size != 1:
             raise ValueError(f"Expecting a scalar quantity; instead, got {cursor}")
         
-        t = check_rescale(cursor, signal.times.units)
+        t = checkRescale(cursor, signal.times.units)
         
     elif isinstance(cursor, (tuple, list)) and len(cursor) in (2,3) and all([isinstance(c, (numbers.Number, pq.Quantity)) for v in cursor[0:2] ]):
         # cursor parameter sequence
@@ -3643,7 +4159,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
             if t.size != 1:
                 raise ValueError(f"Expecting a scalar quantity; instead got {t}")
             
-            t = check_rescale(t, signal.times.units)
+            t = checkRescale(t, signal.times.units)
         
     else:
         raise TypeError("Cursor expected to be a float, python Quantity, DataCursor or SignalCursor; got %s instead" % type(cursor).__name__)
@@ -3655,7 +4171,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
     
     return data_index
 
-@safeWrapper
+@safewrapper
 def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal], 
                        cursor0: typing.Union[SignalCursor, tuple, DataCursor], 
                        cursor1: typing.Union[SignalCursor, tuple, DataCursor], 
@@ -3663,7 +4179,7 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
                        channel: typing.Optional[int] = None,
                        subfun: typing.Optional[typing.Union[typing.Callable, types.FunctionType]] = None,
                        relative:bool = True) -> pq.Quantity:
-    """Calculates the signal amplitude between two notional vertical cursors.
+    r"""Calculates the signal amplitude between two notional vertical cursors.
     
     amplitude = y1 - y0
     
@@ -3672,7 +4188,7 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     Parameters:
     -----------
-    signal:neo.AnalogSignal, datatypes.DataSignal
+    signal:neo.AnalogSignal, datasignal.DataSignal
     
     cursor0, cursor1: SignalCursor of vertical type, or (x, window) tuples 
         representing, respectively, the cursor's x coordinate (time) and window 
@@ -3809,13 +4325,13 @@ def cursors_difference(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     return np.diff(data, axis=0)
 
-@safeWrapper
+@safewrapper
 def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal], 
                      cursor0: typing.Union[SignalCursor, tuple, DataCursor], 
                      cursor1: typing.Union[SignalCursor, tuple, DataCursor], 
                      relative:bool = True,
                      samples:bool = True):
-    """Distance between two cursors.
+    r"""Distance between two cursors.
     
     NOTE: The distance between two cursors in the signal domain is simply the
             difference between the cursors' x coordinates.
@@ -3840,14 +4356,14 @@ def cursors_distance(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     return abs(ret[1]-ret[0]) if samples else abs(signal.times[ret[1]] - signal.times[ret[0]])
 
-@safeWrapper
+@safewrapper
 def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], 
                 t0: typing.Union[float, pq.Quantity], 
                 t1: typing.Union[float, pq.Quantity], 
                 w0: typing.Optional[typing.Union[float, pq.Quantity]] = 0.001*pq.s, 
                 w1: typing.Optional[typing.Union[float, pq.Quantity]] = None, 
                 channel: typing.Optional[int] = None):
-    """Calculates the chord slope of a signal between two time points t0 and t1.
+    r"""Calculates the chord slope of a signal between two time points t0 and t1.
     
                     slope = (y1 - y0) / (t1 - t0)
     
@@ -3923,13 +4439,13 @@ def chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     else:
         return ret[channel].flatten() # so that it can accept array indexing
     
-@safeWrapper
+@safewrapper
 def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal], 
-                        cursor0: typing.Union[SignalCursor, tuple, DataCursor], 
-                        cursor1: typing.Union[SignalCursor, tuple, DataCursor], 
+                        cursor0: typing.Union[SignalCursor, tuple, DataCursor, Interval], 
+                        cursor1: typing.Union[SignalCursor, tuple, DataCursor, Interval], 
                         channel: typing.Optional[int] = None,
                         relative:bool = True):
-    """Signal chord slope between two vertical cursors.
+    r"""Signal chord slope between two vertical cursors.
     
     The function calculates the slope of a straight line connecting the 
     intersection of the signal with two vertical cursors (or with the vertical
@@ -3945,46 +4461,57 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     
     cursor0, cursor1: tuple (x, window) representing, respectively, the cursor's
         x coordinate (time) and (horizontal) window, or a
-        gui.signalviewer.SignalCursor of type "vertical"
+        gui.signalviewer.SignalCursor of type "vertical", or a DataCursor
     
     """
-    # from gui.signalviewer import SignalCursor as SignalCursor
-    
-    if not isinstance(cursor0, (SignalCursor, DataCursor)):
+    from copy import deepcopy
+    if not isinstance(cursor0, (SignalCursor, DataCursor, typing.Sequence)):
         raise TypeError(f"Invalid first cursor specified; expecting a SignalCursor or DataCursor; instead, got {type(cursor0).__name__}")
 
-    if not isinstance(cursor1, (SignalCursor, DataCursor)):
+    if not isinstance(cursor1, (SignalCursor, DataCursor, typing.Sequence)):
         raise TypeError(f"Invalid first cursor specified; expecting a SignalCursor or DataCursor; instead, got {type(cursor1).__name__}")
 
-    t0 = cursor0.x if isinstance(cursor0, SignalCursor) else cursor0.coord
-    # t0 = cursor0[0] if isinstance(cursor0, tuple) else cursor0.x if isinstance(x, SignalCursor) else cursor0.coord
-    
+    if isinstance(cursor0, tuple):
+        t0 = float(cursor0[0])
+    elif isinstance(cursor0, Interval):
+        t0 = cursor0.t0[0].copy()
+    else:
+        if isinstance(cursor0, DataCursor):
+            coord = cursor0.coord.copy() if isinstance(cursor0.coord, np.ndarray) else float(cursor0.coord)
+            span = cursor0.span.copy() if isinstance(cursor0.span, np.ndarray) else float(cursor0.span)
+        elif isinstance(cursor0, SignalCursor):
+            coord = float(cursor0.x)
+            span = float(cursor0.xwindow)
+            if isinstance(cursor0.xUnits, pq.Quantity):
+                coord *= cursor0.xUnits
+                span *= cursor0.xUnits
+            
+        t0 = coord-span/2
+        
+    if isinstance(cursor1, tuple):
+        t1 = float(cursor1[0])
+    elif isinstance(cursor1, Interval):
+        t1 = cursor1.t0[0].copy()
+    else:
+        if isinstance(cursor1, DataCursor):
+            coord = cursor1.coord.copy() if isinstance(cursor1.coord, np.ndarray) else float(cursor1.coord)
+            span = cursor1.span.copy() if isinstance(cursor1.span, np.ndarray) else float(cursor1.span)
+            
+        elif isinstance(cursor1, SignalCursor):
+            coord = float(cursor1.x)
+            span = float(cursor1.xwindow)
+            if isinstance(cursor1.xUnits, pq.Quantity):
+                coord *= cursor1.xUnits
+                span *= cursor1.xUnits
+            
+        t1 = coord-span/2
+
     y0 = cursor_average(signal, cursor0, channel=channel)
-    
 
-    if isinstance(t0, float):
-        t0 *= signal.times.units
-        
-    t1 = cursor1.x if isinstance(cursor1, SignalCursor) else cursor1.coord
-    # t1 = cursor1[0] if isinstance(cursor1, tuple) else cursor1.x if isinstance(cursor1, SignalCursor) else cursor1.coord
-
-    if isinstance(t1, float):
-        t1 *= signal.times.units
-        
     y1 = cursor_average(signal, cursor1, channel=channel)
     
-    if relative:
-        t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
-    else:
-        if t0 < signal.t_start or t0 > signal.t_stop:
-            scipywarn(f"t0 {t0} fals outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
-            return np.nan
-        
-        if t1 < signal.t_start or t1 > signal.t_stop:
-            scipywarn(f"t1 {t1} fals outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
-            return np.nan
-    
     return (y1-y0)/(t1-t0).simplified
+    
 
 def cursor_chord_slope(signal:typing.Union[neo.AnalogSignal, DataSignal], 
                        cursor:typing.Union[SignalCursor, DataCursor], 
@@ -4002,13 +4529,13 @@ def cursor_chord_slope(signal:typing.Union[neo.AnalogSignal, DataSignal],
             t0 *= signal.times.units
             
         elif isinstance(t0, pq.Quantity):
-            t0 = check_rescale(t0, signal.times.units)
+            t0 = checkRescale(t0, signal.times.units)
         
         if isinstance(t1, numbers.Number):
             t1 *= signal.times.units
             
         elif isinstance(t1, pq.Quantity):
-            t1 = check_rescale(t1, signal.times.units)
+            t1 = checkRescale(t1, signal.times.units)
             
     else:
         raise TypeError(f"Invalid cursor specification: expecting a SignalCursor or a DataCursor instead got a {type(cursor).__name__}")
@@ -4040,16 +4567,16 @@ def cursor_chord_slope(signal:typing.Union[neo.AnalogSignal, DataSignal],
     
     return ret
     
-@safeWrapper
+@safewrapper
 def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
                   epoch: neo.Epoch, 
                   intervals: typing.Optional[typing.Union[int, str, typing.Sequence[int], typing.Sequence[str], range, slice]] = None,
                   channel: typing.Optional[int] = None):
-    """Signal average across an epoch's intervals.
+    r"""Signal average across an epoch's intervals.
     
     Parameters:
     -----------
-    signal: neo.AnalogSignal or datatypes.DataSignal
+    signal: neo.AnalogSignal or datasignal.DataSignal
     
     epoch: neo.Epoch
     
@@ -4095,7 +4622,7 @@ def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
         
     return ret
 
-@safeWrapper
+@safewrapper
 def plot_signal_vs_signal(x: typing.Union[neo.AnalogSignal, neo.Segment, neo.Block], *args, **kwargs):
     from plots import plots
     
@@ -4120,7 +4647,7 @@ def plot_signal_vs_signal(x: typing.Union[neo.AnalogSignal, neo.Segment, neo.Blo
         return plots.plotZeroCrossedAxes(x,args[0], **kwargs)
 
 
-@safeWrapper
+@safewrapper
 def plot_spike_waveforms(x: neo.SpikeTrain, figure: typing.Union[mpl.figure.Figure, type(None)] = None, new: bool = True, legend: bool = False):
     import matplotlib.pyplot as plt
     
@@ -4155,7 +4682,7 @@ def plot_spike_waveforms(x: neo.SpikeTrain, figure: typing.Union[mpl.figure.Figu
     return lines
     
 def generate_text_stimulus_file(spike_times, start, duration, sampling_frequency, spike_duration, spike_value, filename, atol=1e-12, rtol=1e-12, skipInvalidTimes=True, maxSweepDuration=None):
-    """Generates an axon text file ("*.atf") for use as external waveform.
+    r"""Generates an axon text file ("*.atf") for use as external waveform.
     
     The result is useful for Clampex protocols in sweep mode, using external 
     waveforms.
@@ -4167,7 +4694,7 @@ def generate_text_stimulus_file(spike_times, start, duration, sampling_frequency
     np.savetxt(filename, spike_trace)
     
 def generate_ripple_trace(ripple_times, start, duration, sampling_frequency, spike_duration=0.001, spike_value=5000, spike_count=5, spike_isi=0.01, filename=None, atol=1e-12, rtol=1e-12, skipInvalidTimes=True):
-    """Similar as generate_spike_trace and generate_text_stimulus_file combined.
+    r"""Similar as generate_spike_trace and generate_text_stimulus_file combined.
     
     However, ripple times are the t_start values for ripple events. In turn,
     a ripple event if generated as a short burst of spikes containing 
@@ -4290,9 +4817,9 @@ def generate_ripple_trace(ripple_times, start, duration, sampling_frequency, spi
     return ret
     
             
-@safeWrapper
+@safewrapper
 def generate_spike_trace(spike_times, start, duration, sampling_frequency, spike_duration=0.001, spike_value=5000, atol=1e-12, rtol=1e-12, skipInvalidTimes=True, maxSweepDuration=None, asNeoSignal=True, time_units = pq.s, spike_units=pq.mV, name="Spike trace", description="Synthetic spike trace", **annotations):
-    """
+    r"""
     Converts a spike times array file to an AnalogSignal.
     
     A spike times array is a 1D array (column vector) that contains time "stamps"
@@ -4497,7 +5024,7 @@ def generate_spike_trace(spike_times, start, duration, sampling_frequency, spike
 
 
 def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs):
-    """Generates a signal containing a synthetic waveform, as a column vector.
+    r"""Generates a signal containing a synthetic waveform, as a column vector.
     
     Parameters:
     ===========
@@ -4535,19 +5062,19 @@ def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs)
                         documentation of the particular model_function for details) 
     
     **kwargs            : keyword parameters for the model function and those for
-                        the constructor of neo.AnalogSignal or datatypes.DataSignal, 
+                        the constructor of neo.AnalogSignal or datasignal.DataSignal, 
                         used when asSignal is True (see below, for details)
                         
     Keyword parameters of special interest:
     
         asSignal        : boolean default False; when True, returns a neo.AnalogSignal
-                        of datatypes.DataSignal according to the keyword parameter
+                        of datasignal.DataSignal according to the keyword parameter
                         "domain_units" (see below).
                         When False, returns a np.array (column vector).
                         
         domain_units    : Python UnitQuantity or Quantity; default is s.
                         When different from pq.s and asSignal is True, then the
-                        function returns a datatypes.DataSignal; othwerise the 
+                        function returns a datasignal.DataSignal; othwerise the 
                         function returns a neo.AnalogSignal unless asSignal is False
                         in which case it returns a numpy array
                         
@@ -4567,7 +5094,7 @@ def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs)
     When asSignal is True:
         
         when "domain_units" is present in kwargs and is NOT a time unit:
-            returns a datatypes.DataSignal
+            returns a datasignal.DataSignal
                 
         otherwise:
             returns a neo.AnalogSignal (domain units are s by default)
@@ -4609,7 +5136,7 @@ def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs)
             raise TypeError("When specified, domain_units must be a Python UnitQuantity or Quantity object; got %s instead" % type(domain_units).__name__)
         
         
-        if check_time_units(domain_units):
+        if checkTimeUnits(domain_units):
             returnDataSignal = False
             
         else:
@@ -4656,7 +5183,7 @@ def waveform_signal(extent, sampling_frequency, model_function, *args, **kwargs)
 
         if returnDataSignal:
             origin = 0*domain_units
-            return  datatypes.DataSignal(y, origin=origin, **signalkwargs)
+            return  datasignal.DataSignal(y, origin=origin, **signalkwargs)
             
         else:
             return neo.AnalogSignal(y, **signalkwargs)
@@ -4667,7 +5194,7 @@ def event_amplitude_at_cursors(signal:typing.Union[neo.AnalogSignal, DataSignal]
                                cursors:typing.Union[typing.Sequence[tuple], typing.Sequence[SignalCursor]],
                                func:typing.Optional[typing.Callable] = None,
                                channel:typing.Optional[int] = None) -> list:
-    """
+    r"""
     Measures the amplitude of events(s) using "cursors".
     Use this for evoked events e.g. EPSC or IPSC
     
@@ -4732,7 +5259,7 @@ def cursors_measure(func: typing.Callable,
                     signal:typing.Union[neo.AnalogSignal, DataSignal],
                     cursors: typing.Union[typing.Sequence[tuple], typing.Sequence[SignalCursor], typing.Sequence[DataCursor]],
                     channel: typing.Optional[int]=None) -> list:
-    """Calculates a signal measure from signal data at cursors locations.
+    r"""Calculates a signal measure from signal data at cursors locations.
     
     Parameters:
     ----------
@@ -4759,7 +5286,7 @@ def reduce(locator, func:typing.Callable,
            channel:typing.Optional[int]=True, 
            duration:bool=False,
            loatorIndex:typing.Optional[int] = None):
-    """Single-dispatch version of *_reduce functions in this module.
+    r"""Single-dispatch version of *_reduce functions in this module.
 
 WARNING: this currently is just a springboard for the *_reduce functions already
 defined in the module and delegates to them.
@@ -4788,7 +5315,7 @@ def _(locator, func, signal, channel=None,
 def amplitudeMeasure(*args, name:str = "amplitude",
                      channel:int = 0, 
                      relative: bool = True) -> LocationMeasure:
-    """LocationMeasure factory for an amplitude of a signal.
+    r"""LocationMeasure factory for an amplitude of a signal.
 
     The amplitude is measured as the difference between signal averages at a
     a location, and a baseline. Each of these two locations can be indicated as:
@@ -4846,7 +5373,7 @@ def amplitudeMeasure(*args, name:str = "amplitude",
         
                 
 def chordSlopeMeasure(*args, name:str="chord_slope", channel:int = 0, relative:bool=True) -> LocationMeasure:
-    """LocationMeasure factory for the slope of a straight line (chord) between two points on the signal.
+    r"""LocationMeasure factory for the slope of a straight line (chord) between two points on the signal.
     The two points can be specified as:
     • two (vertical) SignalCursor or two DataCursor objects
     • a single (vertical) SignalCursor, or a DataCursor; in this case, the two
@@ -4890,7 +5417,7 @@ def chordSlopeMeasure(*args, name:str="chord_slope", channel:int = 0, relative:b
 @singledispatch
 def durationMeasure(c0:typing.Union[DataCursor, SignalCursor], c1: typing.Union[DataCursor, SignalCursor], 
                     name: str = "duration", relative: bool = True) -> LocationMeasure:
-    """LocationMeasure factory for the distance between two locations in the signal.
+    r"""LocationMeasure factory for the distance between two locations in the signal.
     The locations are specified as two (vertical) SignalCursor or two DataCursor
     objects. Bt default, the distance between them can be reported in signal domain
     units — e.g., time units — but it can be reported in samples.
@@ -4918,7 +5445,7 @@ def membraneTestVClampMeasure(base: typing.Union[DataCursor, SignalCursor],
                               name:str = "DC Rs Rin",
                               channel: int = 0,
                               relative:bool=True) -> LocationMeasure:
-    """LocationMeasure factory for membrane test in voltage-clamp.
+    r"""LocationMeasure factory for membrane test in voltage-clamp.
     Calculates DC, Rs and Rin based on three cursors (baseline, Rs and Rin).
 
     Rs cursor is located on the extremum of the first current transient at the 
@@ -4984,7 +5511,7 @@ def signal_measures_in_segment(s: neo.Segment,
                             membraneTest: typing.Optional[typing.Union[float, pq.Quantity, neo.Epoch, typing.Sequence[typing.Sequence[numbers.Number]], typing.Sequence[str], typing.Sequence[typing.Sequence[pq.Quantity]], typing.Sequence[SignalCursor]]]=None,
                             stim: typing.Optional[TriggerEvent]=None,
                             isi:typing.Union[float, pq.Quantity, None]=None) -> tuple:
-    """
+    r"""
     TODO: 
     Calculates several signal measures on a signal contained in a neo.Segment.
     
@@ -5190,7 +5717,7 @@ on the acquisition device)
             testVm = testVm * pq.mV
             
         elif isinstance(testVm, pq.Quantity):
-            if not units_convertible(testVm, pq.V):
+            if not unitsConvertible(testVm, pq.V):
                 raise TypeError("When a quantity, testVm must have voltage units; got %s instead" % testVm.dimensionality)
             
             if testVm.size != 1:
@@ -5205,7 +5732,7 @@ on the acquisition device)
         
         vm_signal = s.analogsignals[command_signal]
         
-        if not units_convertible(vm_signal, pq.V):
+        if not unitsConvertible(vm_signal, pq.V):
             warnings.warn(f"The Vm signal has wrong units ({vm_signal.units}); expecting electrical potential units")
             warnings.warn(f"The Vm signal will be FORCED to correct units ({pq.mV}). If this is NOT what you want then STOP NOW")
             klass = type(vm_signal)
@@ -5271,7 +5798,7 @@ on the acquisition device)
         if isi.size != 1:
             raise ValueError("ISI given explicitly must be a scalar; got %s instead" % isi)
             
-        if not units_convertible(isi, s.analogsignals[signal].times):
+        if not unitsConvertible(isi, s.analogsignals[signal].times):
             raise ValueError("ISI given explicitly has units %s which are incompatible with the time axis" % isi.units)
             
         warnings.warn("Inter-stimulus interval is explicitly given: %s" % isi)
@@ -5319,7 +5846,7 @@ on the acquisition device)
 
 def infer_clamp_mode(signal:typing.Union[neo.AnalogSignal, DataSignal], 
                      command:typing.Optional[typing.Union[neo.AnalogSignal, DataSignal]]) -> typing.Optional[ClampMode]:
-    """
+    r"""
     Infers a clamp mode from the units embedded in the signals.
     
 When 'command' is None, returns NoClamp, as this might be a recording of 
@@ -5421,8 +5948,8 @@ command signal.
     commandIsPotential = False
     
     if isinstance(signal, (neo.AnalogSignal, DataSignal)):
-        recordsCurrent = check_electrical_current_units(signal)
-        recordsPotential = check_electrical_potential_units(signal)
+        recordsCurrent = checkElectricalCurrentUnits(signal)
+        recordsPotential = checkElectricalPotentialUnits(signal)
         
     else:
         raise TypeError(f"'signal' expected a neo.AnalogSignal or DataSignal; instead, got {type(signal).__name__}")
@@ -5431,8 +5958,8 @@ command signal.
         raise ValueError(f"'signal' had incompatible units {signal.units}")
         
     if isinstance(command, (neo.AnalogSignal, DataSignal)):
-        commandIsCurrent = check_electrical_current_units(command)
-        commandIsPotential = check_electrical_potential_units(command)
+        commandIsCurrent = checkElectricalCurrentUnits(command)
+        commandIsPotential = checkElectricalPotentialUnits(command)
         
         if not any(commandIsCurrent, commandIsPotential):
             raise ValueError(f"'command' has incompatible units {command.units}")
@@ -5454,7 +5981,7 @@ command signal.
     
 
 def trials_sequence_info(*args, return_sorted:bool=False):
-    """Reveals the temporal order of trials represented by neo.Block objects.
+    r"""Reveals the temporal order of trials represented by neo.Block objects.
 
     Returns:
     • DataFrame with the following columns:
@@ -5498,7 +6025,7 @@ def trials_sequence_info(*args, return_sorted:bool=False):
     return pd.DataFrame(ret)
 
 def infer_schedule(*args, name:typing.Optional[str] = None) -> RecordingSchedule:
-    """WARNING: Based on the naming of the trials (neo.Block objects).
+    r"""WARNING: Based on the naming of the trials (neo.Block objects).
     
     The names of the blocks must follow the format: aaa_<bbb_>*<xxxx>
     
@@ -5547,17 +6074,31 @@ def infer_schedule(*args, name:typing.Optional[str] = None) -> RecordingSchedule
     return schedule
     # return episodes
     
-def getProtocol(x:typing.Union[neo.Block, pab.pyabf.ABF]):
+def getProtocol(x:typing.Union[neo.Block, pab.pyabf.ABF]) -> ElectrophysiologyProtocol | None:
+    r"""Tries to retrieve the protocol used to record the data.
+    The outcome depends on whether `x` is a `neo.Block` generated by reading 
+    a data file created by electrophysiology acquisition software. 
+    
+    Currently, this function supports only data acquired with Clampex® (part of 
+    the pClamp® software from MolecularDevices™).
+    
+    Support for CED™ Signal® software is under development.
+    
+"""
     if not isinstance(x, (neo.Block, pab.pyabf.ABF)):
-        raise TypeError(f"Expecting a neo.Block or a pyabf.ABF object; mstead, got {type(x).__name__}")
+        raise TypeError(f"Expecting a neo.Block or a pyabf.ABF object; instead, got {type(x).__name__}")
     
     if isinstance(x, neo.Block) and not pab.sourcedFromABF(x):
-        raise NotImplementedError("Only ABF protocols are supported for the moment")
+        scipywarn("The neo.Block has not been generated directly from ABF data")
+        return
+        # raise NotImplementedError("The neo.Block has not been generated directly from ABF data")
     
     if isinstance(x, neo.Block) and getattr(x, "annotations", None) is None or getattr(x, "annotations", {}).get("abf_version", None) is None:
         scipywarn(f"{type(x).__name__} object does not appear to have been created from an ABF file; cannot parse a protocol")
         return 
     return pab.ABFProtocol(x)
     
-    
+def getPathwayBySweepActivation(protocol:ElectrophysiologyProtocol, pathways) -> dict:
+    r"""Correspondence between pathway activation and sweep number"""
+    return dict(protocol.getSweepwiseDigitalActivationForPathways(pathways, indices=False))
     

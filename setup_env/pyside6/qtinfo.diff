@@ -1,0 +1,13 @@
+--- /home/cezar/pyside6_uv_venv/src/pyside-setup/build_scripts/qtinfo.py	2025-06-16 23:11:41.684492496 +0100
++++ /home/cezar/pyside6_uv_venv/src1/pyside-setup/build_scripts/qtinfo.py	2025-06-16 20:56:04.150182518 +0100
+@@ -78,6 +78,10 @@
+         def module_json_files_dir(self):
+             # FIXME: Use INSTALL_DESCRIPTIONSDIR once QTBUG-116983 is done.
+             result = Path(self.arch_data) / "modules"
++            if not result.exists():
++                result = Path(self.data_dir) / "modules"
++            if not result.exists():
++                raise ValueError("Cannot find the directory 'modules', containing JSON files for Qt modules")
+             return os.fspath(result)
+ 
+         @property

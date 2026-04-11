@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 Shapely-based planar graphics 2024-08-27 10:21:39
 Work in progress
 """
@@ -20,12 +20,38 @@ from copy import copy
 import numpy as np
 import scipy
 from traitlets import Bunch
-from qtpy import QtCore, QtGui, QtWidgets, QtXml
-from qtpy.QtCore import Signal, Slot, Property
-from core.datatypes import (TypeEnum, )
+
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+
+from core.typeenum import (TypeEnum, )
 from core.utilities import (reverse_mapping_lookup, reverse_dict, )
 from core.traitcontainers import DataBag
-from core.prog import (safeWrapper, deprecated,
+from core.prog import (safewrapper, deprecated,
                        timefunc, processtimefunc,filter_type)
 #from core.utilities import (unique, index_of,)
 from core.workspacefunctions import debug_scipyen

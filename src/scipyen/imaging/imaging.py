@@ -3,11 +3,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Routines for image acquisition and laser scanning
+r"""Routines for image acquisition and laser scanning
 """
 
 def cartesian_scan_angle_coordinate_transform(xy, wh, fast_slow_multiplier, theta, shift, zeta, fwd=True):
-    """cartesian_scan_angle_coordinate_transform
+    r"""cartesian_scan_angle_coordinate_transform
     
     Transforms the coordinates of a point, between the Cartesian coordinate system
     (<x,y>) of an image and the scanning angle coordinate system (<fast,slow>) of

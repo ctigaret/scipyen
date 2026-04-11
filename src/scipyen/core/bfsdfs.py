@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Breadth-first and depth-first search algorithms.
+r"""Breadth-first and depth-first search algorithms.
 """
 from collections import deque
-from core.prog import safeWrapper
+from core.prog import safewrapper
 from core.utilities import safe_identity_test, NestedFinder
 
 import numpy as np
@@ -289,7 +289,7 @@ def gen_dict_extract(var, key):
             yield from gen_dict_extract(v, key)
             
 def gen_dict_extract0(key, var):
-    """
+    r"""
     hexerei software
     https://stackoverflow.com/questions/9807634/find-all-occurrences-of-a-key-in-nested-dictionaries-and-lists
     """
@@ -362,9 +362,9 @@ def height(node):
     
     return rheight + 1
 
-@safeWrapper
+@safewrapper
 def find_leaf(src, leaf, key=True):
-    """Search for a leaf object in src - depth-first
+    r"""Search for a leaf object in src - depth-first
     Returns a mixed sequence of hashable objects and int.
     
     Parameters:
@@ -444,7 +444,7 @@ def find_leaf(src, leaf, key=True):
                 
                 
 def dict_depth(x):
-    """Return max depth of a nested dict
+    r"""Return max depth of a nested dict
     """
     ret = 0
     depths = list()
@@ -569,7 +569,7 @@ class Finder:
     
         
     def find(self, data, leaf, key=True):
-        """search for a leaf
+        r"""search for a leaf
         
         key = True =>  search for a leaf KEY, return its value: 
             leaf is a (possibly nested) key

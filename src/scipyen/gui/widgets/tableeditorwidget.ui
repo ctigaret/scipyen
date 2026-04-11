@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>505</width>
-    <height>389</height>
+    <width>433</width>
+    <height>341</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -36,6 +36,9 @@
        <property name="icon">
         <iconset theme="resizecol"/>
        </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
      <item>
@@ -55,12 +58,15 @@
        <property name="icon">
         <iconset theme="resizerow"/>
        </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
      <item>
       <widget class="QToolButton" name="prevSliceToolbutton">
        <property name="toolTip">
-        <string>Previous slice</string>
+        <string>Previous frame of data</string>
        </property>
        <property name="text">
         <string>Prev.</string>
@@ -68,12 +74,15 @@
        <property name="icon">
         <iconset theme="go-previous"/>
        </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
      <item>
       <widget class="QToolButton" name="nextSliceToolButton">
        <property name="toolTip">
-        <string>Next slice</string>
+        <string>Next frame of data</string>
        </property>
        <property name="text">
         <string>Next</string>
@@ -81,12 +90,15 @@
        <property name="icon">
         <iconset theme="go-next"/>
        </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
       </widget>
      </item>
      <item>
       <spacer name="horizontalSpacer">
        <property name="orientation">
-        <enum>Qt::Horizontal</enum>
+        <enum>Qt::Orientation::Horizontal</enum>
        </property>
        <property name="sizeHint" stdset="0">
         <size>
@@ -96,13 +108,49 @@
        </property>
       </spacer>
      </item>
+     <item>
+      <widget class="QToolButton" name="setEditableToolButton">
+       <property name="toolTip">
+        <string>Allow/Prevent Editing</string>
+       </property>
+       <property name="statusTip">
+        <string>Allow/Prevent Editing</string>
+       </property>
+       <property name="whatsThis">
+        <string>Allow/Prevent Editing</string>
+       </property>
+       <property name="text">
+        <string>Edit</string>
+       </property>
+       <property name="icon">
+        <iconset theme="object-locked"/>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
     </layout>
    </item>
    <item row="1" column="0">
-    <widget class="QTableView" name="tableView"/>
+    <widget class="TableDataView" name="tableView">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+       <horstretch>1</horstretch>
+       <verstretch>1</verstretch>
+      </sizepolicy>
+     </property>
+    </widget>
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>TableDataView</class>
+   <extends>QTableView</extends>
+   <header location="global">gui.widgets.tabledataview</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

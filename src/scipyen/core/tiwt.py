@@ -797,7 +797,7 @@ def tiwt_purelet(image, nLevels, wavelet=None, sigma2=None, thr=None):
         
     Fy_lp = x[:,:,0,nLevels-1]
     
-    print(len(kernels_rev_g))
+    # print(len(kernels_rev_g))
     # reconstruct the residual low-pass
     for j in range(nLevels-1, -1, -1):
         print("j: ", j)
@@ -1049,7 +1049,7 @@ def purelet_theta_analytic(x,y,thetaParams):
     return t, dt_dx, dt_dy, dt_dxdy, d2t_dx2, d2t_dy2
   
 def tiwt_dec(vigraimage, nLevels=None, wavelet=None):
-    """ Translation invariant wavelet decomposition 
+    r""" Translation invariant wavelet decomposition 
       using a trous algorithm
   
       Achieves perfect reconstruction within machine error
@@ -1176,7 +1176,7 @@ def tiwt_dec(vigraimage, nLevels=None, wavelet=None):
     return ret
 
 def tiwt_rec(coeffs, reclevel = None, wavelet=None):
-    """ Synthesis of the image or of the approximation at level `reclevel' from 
+    r""" Synthesis of the image or of the approximation at level `reclevel' from 
         the set of decomposition coefficients.
         Achieves perfect reconstruction within machine error.
         

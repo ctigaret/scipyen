@@ -1,3 +1,13 @@
+# -*- coding: utf-8 -*-
+# $Id: tableeditorwidget.py $
+# SPDX-FileCopyrightText: 2023 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+r"""Table Editor widget and custom table model, for tabular-like data
+"""
+
+
 #### BEGIN core python modules
 from __future__ import print_function
 
@@ -5,20 +15,39 @@ import os, inspect, warnings, traceback, datetime, typing
 #### END core python modules
 
 #### BEGIN 3rd party modules
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+
+
 import pandas as pd
 import quantities as pq
 #import xarray as xa
 import numpy as np
 import neo
 from core.vigra_patches import vigra
-
-from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-from qtpy.uic import loadUiType as __loadUiType__
-# from PyQt5 import QtCore, QtGui, QtWidgets
-# from PyQt5.QtCore import Signal, Slot, QEnum, Property
-# from PyQt5.uic import loadUiType as __loadUiType__
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -28,29 +57,33 @@ import matplotlib.mlab as mlb
 
 #### BEGIN pict.core modules
 #from core.patchneo import *
-import core.datatypes  
+import core.datatypes
 
 import core.utilities as utilities
 import core.strutils as strutils
 from core.strutils import str2float
 
-from core.prog import (safeWrapper, )
+from core.prog import (safewrapper, scipywarn)
 
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType)
-from core.triggerprotocols import TriggerProtocol
+from core.triggerprotocols import TriggerProtocolList
 from core.datazone import DataZone
 
 import core.datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.datatypes import array_slice
 from core.sysutils import adapt_ui_path
+from core import scipyen_quantities as scq
 
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
-from gui import resources_rc
+from gui.delegates import PythonItemDelegate
+from gui.widgets.tabledataview import TableDataView
+from gui.itemmodels.tabulardatamodel import TabularDataModel
+# from gui import resources_rc
 # from gui import icons_rc
 #### END pict.gui modules
 
@@ -63,131 +96,201 @@ __ui_path__ = adapt_ui_path(__module_path__, "tableeditorwidget.ui")
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_TableEditorWidget, QWidget = __loadUiType__(__ui_path__)
-# Ui_TableEditorWidget, QWidget = __loadUiType__(os.path.join(__module_path__, "tableeditorwidget.ui"))
+TabularType = typing.Union[pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
+                           neo.AnalogSignal, neo.IrregularlySampledSignal,
+                           neo.Epoch, neo.Event, neo.SpikeTrain,
+                           DataSignal, IrregularlySampledDataSignal,
+                           TriggerEvent, TriggerProtocolList,
+                           np.ndarray, vigra.VigraArray,
+                           vigra.filters.Kernel1D, vigra.filters.Kernel2D]
+
+Ui_TableEditorWidget, QWidget = loadUiType(__ui_path__)
 
 class TableEditorWidget(QWidget, Ui_TableEditorWidget):
+    r"""Uses TableDataView as the UI"""
     # TODO 2019-11-01 22:57:01
     # finish implementing all these
     viewer_for_types = (pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
                        neo.AnalogSignal, neo.IrregularlySampledSignal,
                        neo.Epoch, neo.Event, neo.SpikeTrain,
                        DataSignal, IrregularlySampledDataSignal,
-                       TriggerEvent, TriggerProtocol,
+                       TriggerEvent, TriggerProtocolList,
                        np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D)
-    
+
     view_action_name = "Table"
-    
-    #def __init__(self, model:typing.Optional[QtCore.QAbstractTableModel]=None, 
-                 #parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
-    def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None) -> None:
+
+    sig_selectionChanged = Signal(name="sig_selectionChanged")
+    sig_dataChanged = Signal(name="sig_dataChanged")
+    sig_valueChanged = sig_dataChanged
+
+    def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None,
+                 readOnly:bool=True, enforceFloat:bool=False,
+                 enforceReadOnly:bool=False) -> None:
         super().__init__(parent=parent)
-        
+        # FIXME: 2025-11-23 09:58:38 next line is DEPRECATED
+        self._is_vigra_filter_kernel_:bool = False # needed in future implementations of editing functionality
         self._dataModel_ = TabularDataModel(parent=self)
-        
+        # self._dataModel_.sig_rowsPopulated.connect(self._slot_rowsPopulated)
+        # self._dataModel_.sig_columnsPopulated.connect(self._slot_columnsPopulated)
+        self._selectedIndexes_ = list()
+        self._readOnly_:bool = readOnly == True
+        self._enforceFloat_:bool = enforceFloat == True
+        self._enforceReadOnly_:bool=False
+
         # NOTE: 2021-10-18 09:32:45
-        # ### BEGIN keep this  - you may re-enable the possibility to use custom tabular
+        # ### BEGIN keep this  - you may re-enable the possibility to use other custom tabular
         # data models
-        
+
         #if model is None:
             #self._dataModel_ = TabularDataModel(parent=self)
-            
+
         #else:
             #self._dataModel_ = model
         # ### END keep this ...
-        
+
         self._configureUI_()
-        
+
+        self._defaultItemDelegate_ = self.tableView.itemDelegate()
+        self._editItemDelegate_ = PythonItemDelegate(parent=self, enforceFloat = self._enforceFloat_)
+
         # NOTE: 2021-08-16 17:22:20
         # By default, this is defined in the .ui file as:
         # QtWidgets.QAbstractItemView.DoubleClicked |
         # QtWidgets.QAbstractItemView.EditKeyPressed |
         # QtWidgets.QAbstractItemView.AnyKeyPressed
         self._defaultEditTriggers_ = self.tableView.editTriggers()
-        
+        if self._readOnly_:
+            self.tableView.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        else:
+            # FIXME: 2025-11-23 10:23:31 is this too time-consuming?
+            self.tableView.setItemDelegate(self._editItemDelegate_)
+
         self._data_ = None
-        
+
         self._slicingAxis_ = None
-        
+
         self._currentSlice_ = 0
-        
+
         self._selectedRowIndex_ = None
         self._selectedColumnIndex_ = None
-        
-    def setData(self, data:(pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
-                       neo.AnalogSignal, neo.IrregularlySampledSignal,
-                       neo.Epoch, neo.Event, neo.SpikeTrain,
-                       DataSignal, IrregularlySampledDataSignal,
-                       TriggerEvent, TriggerProtocol,
-                       np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D), *args, **kwargs):
-        
+
+        if hasattr(self._dataModel_, "sig_modelDataChanged") and isinstance(type(self._dataModel_).sig_modelDataChanged, Signal):
+            self._dataModel_.sig_modelDataChanged.connect(self.sig_dataChanged) # connect signal to signal directly
+
+        # self.setData(None)
+
+    def setValue(self: typing.Self, value: TabularType, *args, **kwargs):
+        self.setData(value, *args, **kwargs)
+
+    def value(self):
+        return self._data_
+
+    def setData(self, data: TabularType, *args, **kwargs):
+        r"""Called when this widget is part of TableEditor
+    """
+        from imaging import vigrautils
+        # timer = QtCore.QElapsedTimer()
+        # timer.start()
+        if isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
+            data = vigrautils.kernel2array(data)
+            self._is_vigra_filter_kernel_ = True
+        else:
+            self._is_vigra_filter_kernel_ = False
+
         self._data_ = data
-        
-        if isinstance(data, np.ndarray):
-            if data.ndim > 2:
-                self._slicingAxis_ = kwargs.get("sliceaxis", None)
-                if not isinstance(self._slicingAxis_, int) or self._slicingAxis_ < 0 or self._slicingAxis_ >= data.ndim:
-                    self._slicingAxis_ = 2
-                    
-                if data.ndim > 3:
-                    new_shape = list(data.shape[0:self._slicingAxis_]) + [np.prod(data.shape[self._slicingAxis_:])]
-                    self._data_ = np.squeeze(data).reshape(tuple(new_shape))
-                    
-                self._currentSlice_ = 0
-                self._dataModel_.setModelData(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
-                
-                self.prevSliceToolbutton.setEnabled(True)
-                self.nextSliceToolButton.setEnabled(True)
-                return
-        
-        self.prevSliceToolbutton.setEnabled(False)
-        self.nextSliceToolButton.setEnabled(False)
-        self._dataModel_.setModelData(self._data_)
-        
+
+        if getattr(data, "shape", (0,0))[0] > 10:
+            # avoid auto-resizing rows for data with more than 10 rows — it is
+            # resource consuming
+            self.resizeRowsToolButton.setEnabled(False)
+
+        if isinstance(data, np.ndarray) and data.ndim > 2:
+            self._slicingAxis_ = kwargs.get("sliceaxis", None)
+            if not isinstance(self._slicingAxis_, int) or self._slicingAxis_ < 0 or self._slicingAxis_ >= data.ndim:
+                self._slicingAxis_ = 2
+
+            if data.ndim > 3:
+                new_shape = list(data.shape[0:self._slicingAxis_]) + [np.prod(data.shape[self._slicingAxis_:])]
+                self._data_ = np.squeeze(data).reshape(tuple(new_shape))
+
+            self._currentSlice_ = 0
+            self._dataModel_.setModelData(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
+
+            self.prevSliceToolbutton.setEnabled(True)
+            self.nextSliceToolButton.setEnabled(True)
+
+        else:
+            self.prevSliceToolbutton.setEnabled(False)
+            self.nextSliceToolButton.setEnabled(False)
+            self._dataModel_.setModelData(self._data_)
+
+        # NOTE: 2025-11-23 19:53:14
+        # to show bool cell data as checkboxes
+        for row in range(self._dataModel_.rowCount()):
+            for col in range(self._dataModel_.columnCount()):
+                index = self._dataModel_.index(row, col)
+                if isinstance(indexdata, bool):
+                    self.tableView.openPersistentEditor(index)
+#                 if self._immutability_["joint"]:
+#                     immutable = col in self._immutability_["columns"] and row in self._immutability_["rows"]
+#                 else:
+#                     immutable = col in self._immutability_["columns"] or row in self._immutability_["rows"]
+#
+#                 if immutable:
+#                     continue
+#
+#                 index = self._dataModel_.index(row, col)
+#                 indexdata = self._dataModel_.data(index).value()
+#                 if isinstance(indexdata, bool):
+#                     self.tableView.openPersistentEditor(index)
+
     @Slot()
     def _slot_prevSlice(self):
         if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
             if self.currentSlice > 0:
                 self.currentSlice = self.currentSlice - 1
-        
+
     @Slot()
     def _slot_nextSlice(self):
         if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
             if self.currentSlice <= self._data_.shape[self._slicingAxis_] -1 :
                 self.currentSlice = self.currentSlice + 1
-        
+
     @property
     def selectedColumnIndex(self) -> typing.Optional[int]:
-        """DEPRECATED"""
+        r"""DEPRECATED"""
         # warnings.warn("This property is deprecated; please use self.selectedColumnIndexes")
         return self._selectedColumnIndex_
-    
+
     @selectedColumnIndex.setter
     def selectedColumnIndex(self, val:int):
         self._selectedColumnIndex_ = val
-        
+
     @property
     def selectedColumnIndexes(self) -> list:
         return utilities.unique([ndx.column() for ndx in self.tableView.selectedIndexes()])
-    
-    
+
     @property
     def selectedRowIndexes(self) -> list:
         return utilities.unique([ndx.row() for ndx in self.tableView.selectedIndexes()])
-    
+
     @property
     def selectedRowIndex(self) -> typing.Optional[int]:
-        """DEPRECATED"""
+        r"""DEPRECATED"""
         return self._selectedRowIndex_
-    
+
     @selectedRowIndex.setter
     def selectedRowIndex(self, val:int):
         self._selectedRowIndex_ = val
-    
+
+    @property
+    def selectedIndexes(self):
+        return self.tableView.selectedIndexes()
+
     @property
     def currentSlice(self):
         return self._currentSlice_
-    
+
     @currentSlice.setter
     def currentSlice(self, val):
         if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
@@ -197,50 +300,99 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                     if self._currentSlice_ == 0:
                         self.prevSliceToolbutton.setEnabled(False)
                         self.nextSliceToolButton.setEnabled(True)
-                        
+
                     elif self._currentSlice_ >= self._data_.shape[self._slicingAxis_] - 1:
                         self.prevSliceToolbutton.setEnabled(True)
                         self.nextSliceToolButton.setEnabled(False)
-                        
+
                     else:
                         self.prevSliceToolbutton.setEnabled(True)
                         self.nextSliceToolButton.setEnabled(True)
-                        
+
                     self._dataModel_.setModelData(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
-                        
-                        
+
+    def clear(self):
+        self._dataModel_ = TabularDataModel(parent=self)
+        self.tableView.setModel(self._dataModel_)
+
     @property
     def model(self):
         return self.tableView.model()
-    
+
     @model.setter
-    def model(self, md):
+    def model(self, md:QtCore.QAbstractTableModel|None):
         self._dataModel_ = md
-        self.tabelView.setModel(self._dataModel_)
-        
+        self.tableView.setModel(self._dataModel_)
+        if hasattr(self._dataModel_, "sig_modelDataChanged") and isinstance(type(self._dataModel_).sig_modelDataChanged, Signal):
+            self._dataModel_.sig_modelDataChanged.connect(self.sig_dataChanged) # connect signal to signal directly
+
+    @property
+    def enforceFloat(self) -> bool:
+        return self._enforceFloat_
+
+    @enforceFloat.setter
+    def enforceFloat(self, val:bool):
+        self._enforceFloat_ = val == True
+        if not self.readOnly and isinstance(self.tableView.itemDelegate(), PythonItemDelegate):
+            self.tableView.itemDelegate().enforceFloat = self._enforceFloat_
+
+    @property
+    def enforceReadOnly(self) -> bool:
+        return self._enforceReadOnly_
+
+    @enforceReadOnly.setter
+    def enforceReadOnly(self, val:bool):
+        self._enforceReadOnly_ = val == True
+
+        sigBlocker = QtCore.QSignalBlocker(self.setEditableToolButton)
+        if self._enforceReadOnly_:
+            self.readOnly = True
+            self.setEditableToolButton.setChecked(False)
+            self.setEditableToolButton.setEnabled(False)
+            self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-locked"))
+            self.setEditableToolButton.setToolTip("Editing disabled; set enforceReadOnly to True to enable this switch then then toggle to enable")
+
+
     @property
     def readOnly(self):
-        return self.tableView.editTriggers() == QtWidgets.QAbstractItemView.NoEditTriggers
-    
+        return self._readOnly_
+        # return self.tableView.editTriggers() == QtWidgets.QAbstractItemView.NoEditTriggers
+
     @readOnly.setter
     def readOnly(self, val:bool):
-        if val:
+        self._readOnly_ = val == True
+        signalBlocker = QtCore.QSignalBlocker(self.setEditableToolButton)
+        if self._readOnly_:
             self.tableView.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+            self.tableView.setItemDelegate(self._defaultItemDelegate_)
+            # NOTE:2026-03-08 09:38:02
+            # don't change these: these depend on the type of the data represented
+            # in the model
+            # self.tableView.model.canAlterRows = False
+            # self.tableVire.model.canAlterColumns = False
+            self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-locked"))
+            self.setEditableToolButton.setToolTip("Editing disabled; toggle to enable")
         else:
+            # NOTE:2026-03-08 09:38:02
+            # don't change these: these depend on the type of the data represented
+            # in the model
+            # self.tableView.model.canAlterRows = True
+            # self.tableVire.model.canAlterColumns = True
             self.tableView.setEditTriggers(self._defaultEditTriggers_)
-            
+            self.tableView.setItemDelegate(self._editItemDelegate_)
+            self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-unlocked"))
+            self.setEditableToolButton.setToolTip("Editing enabled; toggle to disable")
+
     def setEditTriggers(self, val):
-        """See documentation for QtWidgets.QAbstractItemView.setEditTriggers()
+        r"""See documentation for QtWidgets.QAbstractItemView.setEditTriggers()
         """
         self.tableView.setEditTriggers(val)
-            
+
     def _configureUI_(self):
         self.setupUi(self)
         self.tableView.setSortingEnabled(False)
         self.tableView.setModel(self._dataModel_)
-        #self._dataModel_.signal_rowsPopulated[int].connect(self.slot_rowsReceived)
-        #self._dataModel_.signal_columnsPopulated[int].connect(self.slot_columnsReceived)
-        
+
         self.tableView.horizontalHeader().setSectionsMovable(False)
         # NOTE: 2018-11-28 21:46:18
         # WARNING HUGE speed penalty when using ResizeToContents policy, for large
@@ -250,92 +402,110 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         # NOTE: 2018-11-29 23:15:13
         # you may play with this by also setting the precision to be based only
         # on what is actually visible:
-        self.tableView.horizontalHeader().setResizeContentsPrecision(0) 
-        
+        self.tableView.horizontalHeader().setResizeContentsPrecision(0)
+
         self.tableView.horizontalHeader().setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.tableView.horizontalHeader().customContextMenuRequested[QtCore.QPoint].connect(self.slot_horizontal_header_context_menu_request)
-        
+
         self.tableView.verticalHeader().setSectionsMovable(False)
-        
+
         # see NOTE: 2018-11-28 21:46:18 and NOTE: 2018-11-29 23:15:13
-        #self.tableView.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
-        #self.tableView.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-        self.tableView.verticalHeader().setResizeContentsPrecision(0) 
-        
+        self.tableView.verticalHeader().setResizeContentsPrecision(0)
+
         self.tableView.verticalHeader().setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.tableView.verticalHeader().customContextMenuRequested[QtCore.QPoint].connect(self.slot_vertical_header_context_menu_request)
-        
-        
+
+
         self.tableView.setAlternatingRowColors(True)
         self.tableView.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.tableView.customContextMenuRequested[QtCore.QPoint].connect(self.slot_table_context_menu_requested)
+        self.tableView.clicked[QtCore.QModelIndex].connect(self.slot_tableItemClicked)
+
 
         self.resizeColumnsToolButton.clicked.connect(self.slot_resizeAllColumnsToContents)
         self.resizeRowsToolButton.clicked.connect(self.slot_resizeAllRowsToContents)
-        
+
         self.prevSliceToolbutton.setEnabled(False)
         self.prevSliceToolbutton.clicked.connect(self._slot_prevSlice)
         self.nextSliceToolButton.setEnabled(False)
         self.nextSliceToolButton.clicked.connect(self._slot_nextSlice)
-        
+
+        if self._readOnly_:
+            self.setEditableToolButton.setChecked(False)
+            self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-locked"))
+            self.setEditableToolButton.setToolTip("Editing disabled; toggle to enable")
+        else:
+            self.setEditableToolButton.setChecked(True)
+            self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-unlocked"))
+            self.setEditableToolButton.setToolTip("Editing enabled; toggle to disable")
+        self.setEditableToolButton.toggled.connect(self._slot_setEditable)
+
+    @Slot(bool)
+    def _slot_setEditable(self, value:bool):
+        self.readOnly = not value
+
+    @Slot(QtCore.QModelIndex)
+    def slot_tableItemClicked(self, index:QtCore.QModelIndex):
+        self.sig_selectionChanged.emit()
+
     @Slot()
     def slot_resizeAllColumnsToContents(self):
         #print("TableEditorWidget slot_resizeAllColumnsToContents")
         signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
         self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
-        
+
     @Slot()
     def slot_resizeAllRowsToContents(self):
         signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
         self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
-        
+
     @Slot(QtCore.QPoint)
-    @safeWrapper
+    @safewrapper
     def slot_horizontal_header_context_menu_request(self, pos):
         #print("horizontal header context menu at pos %s" % pos)
         #print("clicked column %s" % self.tableView.columnAt(pos.x()))
-        
+
         if len(self.selectedColumnIndexes) == 0:
             self.selectedColumnIndex = self.tableView.columnAt(pos.x())
         else:
             self.selectedColumnIndex = None
-        
+
         cm = QtWidgets.QMenu("Column Menu", self.tableView)
         copyColumnTitleAction = cm.addAction("Copy column name")
         copyColumnTitleAction.triggered.connect(self.slot_copyColumnName)
-        
+
         resizeColumnToContentsAction = cm.addAction("Resize to contents")
         resizeColumnToContentsAction.triggered.connect(self.slot_resizeSelectedColumnsToContents)
-        
+
         resizeAllColumsToContextAction = cm.addAction("Resize All Columns To Contents")
-        
+
         resizeAllColumsToContextAction.triggered.connect(self.slot_resizeAllColumnsToContents)
-        
+
         cm.exec(self.tableView.mapToGlobal(pos))
-        
+
     @Slot(QtCore.QPoint)
-    @safeWrapper
+    @safewrapper
     def slot_vertical_header_context_menu_request(self, pos):
         if len(self.selectedRowIndexes) == 0:
             self.selectedRowIndex = self.tableView.rowAt(pos.x())
         else:
             self.selectedRowIndex = None
-        
+
         cm = QtWidgets.QMenu("Row Menu", self.tableView)
         copyColumnTitleAction = cm.addAction("Copy row name")
         copyColumnTitleAction.triggered.connect(self.slot_copyRowName)
-        
+
         resizeRowToContentsAction = cm.addAction("Resize to contents")
         resizeRowToContentsAction.triggered.connect(self.slot_resizeSelectedRowsToContents)
-        
+
         resizeAllRowsToContextAction = cm.addAction("Resize All Rows To Contents")
-        
+
         resizeAllRowsToContextAction.triggered.connect(self.slot_resizeAllRowsToContents)
-        
+
         cm.exec(self.tableView.mapToGlobal(pos))
-        
+
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_copyColumnName(self):
         quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
         ret = ""
@@ -345,7 +515,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             # link = ", "
             # colNames = link.join([f"'{v}'" for v in values]) if quote else link.join(values)
             # QtWidgets.QApplication.instance().clipboard().setText(colNames)
-            
+
         elif isinstance(self.selectedColumnIndex, int):
             ret = self.getColumnNames(self.selectedColumnIndex, quoted=quote)
             # colName = self.tableView.model().headerData(self.selectedColumnIndex, QtCore.Qt.Horizontal).value()
@@ -353,11 +523,11 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             #     colName = f"'{colName}'"
             # QtWidgets.QApplication.instance().clipboard().setText(colName)
         else:
-            return 
+            return
         QtWidgets.QApplication.instance().clipboard().setText(ret)
-        
+
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_copyRowName(self):
         quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
         ret = ""
@@ -367,25 +537,25 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             # link = ", "
             # rowNames = link.join([f"'{v}'" for v in values]) if quote else link.join(values)
             # QtWidgets.QApplication.instance().clipboard().setText(rowNames)
-            
+
         elif isinstance(self.selectedRowIndex, int):
             ret = self.getRowNames(self.selectedRowIndex, quoted = quote)
             # rowName = self.tableView.model().headerData(self.selectedRowIndex, QtCore.Qt.Vertical).value()
             # if quote:
             #     rowName = f"'{rowName}'"
         else:
-            return 
+            return
             # QtWidgets.QApplication.instance().clipboard().setText(rowName)
         QtWidgets.QApplication.instance().clipboard().setText(ret)
-            
+
     def getRowNames(self, ndx:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
                     quoted:bool=False, sep:str = "\t", asList:bool=False):
         if ndx is None:
             ndx = range(self.tableView.model().rowCount())
-        
+
         elif isinstance(ndx, int):
             ndx = [ndx]
-        
+
         elif isinstance(ndx, (list, tuple)):
             if len(ndx) == 0:
                 ndx = range(self.tableView.model().rowCount())
@@ -393,39 +563,39 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                 raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
         else:
             raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
-        
+
         values = [self.tableView.model().headerData(k, QtCore.Qt.Vertical).value() for k in ndx]
         # link = ", "
         if len(values) == 1:
             ret = f"'{values[0]}'" if quoted else values[0]
-            
+
             if asList:
                 ret = [ret]
-            
+
         else:
             ret = [f"'{v}'" for v in values] if quoted else values
             if not asList:
                 ret = sep.join(ret)
-                
+
         return ret
-        
+
     def getColumnNames(self, ndx:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
                     quoted:bool=False, sep:str = ", ", asList:bool=False):
         if ndx is None:
             ndx = range(self.tableView.model().columnCount())
-        
+
         elif isinstance(ndx, int):
             ndx = [ndx]
-        
+
         elif isinstance(ndx, (list, tuple)):
             if len(ndx) == 0:
                 ndx = range(self.tableView.model().columnCount())
-                
+
             elif not all(isinstance(v, int) for v in ndx):
                 raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
         else:
             raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
-        
+
         values = [self.tableView.model().headerData(k, QtCore.Qt.Horizontal).value() for k in ndx]
         # link = ", "
         if len(values) == 1:
@@ -436,941 +606,173 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             ret = [f"'{v}'" for v in values] if quoted else values
             if not asList:
                 ret = sep.join(ret)
-                
+
         return ret
-        
-            
-    # @Slot()
-    # @safeWrapper
-    # def slot_copySelection(self):
-    #     # TODO 2023-11-17 15:00:12
-    #     quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
-    #     withHeaders = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
-        
-        
-    @Slot(QtWidgets.QTableWidgetItem)
-    @safeWrapper
-    def slot_tableEdited(self, item):
-        # TODO code for xarray.DataArray
-        # TODO code for multi-indexed pandas data frames
-        # TODO code for as_type(...) for pandas data -- e.g. categorical
-        col = item.column()
-        row = item.row()
-        value = item.text()
-        
-        if isinstance(self._data_, pd.DataFrame):
-            colHeaderText = self.tableView.horizontalHeaderItem(col).text()
-            
-            if colHeaderText not in self._data_.columns:
-                raise RuntimeError("%s not found in data columns!" % colHeaderText)
-            
-            columnDType = self._data_[colHeaderText].dtype
-            
-            if np.can_cast(eval(value), columnDType):
-                if columnDType == np.dtype("bool"):
-                    if value.lower().strip() in ("true, t, 1"):
-                        value = "True"
-                        
-                    elif value.lower().strip() in ("false, f, 0"):
-                        value = False
-                        
-                # CAUTION here
-                data_value = np.array(eval(value), dtype=columnDType)
-                
-                self._data_.loc[self._data_.index[row], colHeaderText] = data_value
-                
-            else:
-                raise RuntimeError("cannot cast %s to %s" % (value, columnDType))
-            
-            
-        elif isinstance(self._data_, pd.Series):
-            dataDType = self._data_.dtype
-            
-            if np.can_cast(eval(value), dataDType):
-                data_value = np.array(eval(value), dtype=dataDType)
-            
-                self._data_.loc[self._data_.index[row]] = data_value
-            
-        elif isinstance(self._data_, np.ndarray):
-            dataDType = self._data_.dtype
-            
-            if np.can_cast(eval(value), dataDType):
-                data_value = np.array(eval(value), dtype=dataDType)
-                
-                if self._data_.ndim == 3:
-                    self._data_[row,col,self.frameNo] = data_value
-                    
-                elif self._data_.ndim == 2:
-                    self._data_[row,col] = data_value
-                    
-                elif self._data_.ndim == 1:
-                    self._data_[row] = data_value
-           
-            else:
-                raise RuntimeError("cannot cast %s to %s" % (value, dataDType))
-            
+
+    @Slot(int,int,int)
+    def _slot_rowsPopulated(self, start:int, fetched:int, total:int):
+        print(f"{self.__class__.__name__} fetched rows: {start}...{fetched}/{total}")
+
+    @Slot(int,int,int)
+    def _slot_columnsPopulated(self, start:int, fetched:int, total:int):
+        print(f"{self.__class__.__name__} fetched columns: {start}...{fetched}/{total}")
+
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_resizeSelectedRowsToContents(self):
         if not isinstance(self.selectedRowIndex, int):
             return
-        
+
         signalBlocker = QtCore.QSignalBlocker(self.tableView.verticalHeader())
-        
+
         if len(self.tableView.selectionModel().selectedRows()) > 1:
             row_indices = [ndx.row() for ndx in self.tableView.selectionModel().selectedColumns()]
-            
+
             for ndx in row_indices:
                 sizeHint = max([self.tableView.sizeHintForRow(ndx), self.tableView.verticalHeader().sectionSizeHint(ndx)])
                 #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(ndx)
                 self.tableView.verticalHeader().resizeSection(ndx, sizeHint)
-                
+
         else:
             sizeHint = max([self.tableView.sizeHintForRow(self.selectedRowIndex), self.tableView.verticalHeader().sectionSizeHint(self.selectedRowIndex)])
             #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
             self.tableView.verticalHeader().resizeSection(self.selectedRowIndex, sizeHint)
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_resizeSelectedColumnsToContents(self):
         if not isinstance(self.selectedColumnIndex, int):
             return
-        
+
         signalBlocker = QtCore.QSignalBlocker(self.tableView.horizontalHeader())
-        
+
         if len(self.tableView.selectionModel().selectedColumns()) > 1:
             col_indices = [ndx.column() for ndx in self.tableView.selectionModel().selectedColumns()]
-            
+
             for ndx in col_indices:
                 sizeHint = max([self.tableView.sizeHintForColumn(ndx), self.tableView.horizontalHeader().sectionSizeHint(ndx)])
                 #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(ndx)
                 self.tableView.horizontalHeader().resizeSection(ndx, sizeHint)
-                
+
         else:
             sizeHint = max([self.tableView.sizeHintForColumn(self.selectedColumnIndex), self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)])
             #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
             self.tableView.horizontalHeader().resizeSection(self.selectedColumnIndex, sizeHint)
-        
+
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_copySelection(self):
+        # TODO: 2025-05-24 22:56:56
+        # copy data from the actual data, not the model's representation!
+        # i.e. if it's a Quantity, then return a Quantity, etc
+
         quote = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
         withHeaders = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
         commasep = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
-        
+
         colsep = ", " if commasep else "\t"
-        
+
         modelIndexes = self.tableView.selectedIndexes()
-        
+
         if len(modelIndexes) == 0:
             return
-        
+
+        # TODO: 2025-05-24 22:53:10
+        # 1) group modelIndexes by row
+        # 2) in each row group, sort model indexes by column
+        # 3) if smallest column is > 0, fill in with "\t" or ","
+        # OR:
+        # use the logic in withHeaders branch, below
+
+        minRow = minCol = 0
+        # don't delete - may be useful later?
+        # minCol = min([m.column() for m in modelIndexes])
+        # maxCol = max([m.column() for m in modelIndexes])
+        # minRow = min([m.row() for m in modelIndexes])
+        # maxRow = max([m.row() for m in modelIndexes])
+
         selected_text = list()
         previous = modelIndexes[0]
         #selected_text.append(self._dataModel_.data(previous).toString())
-        
-        minRow = minCol = 0
-        
-        data = str(self._dataModel_.data(previous).value())
+
+        data = str(self._dataModel_.data(previous, QtCore.Qt.EditRole).value())
         if quote:
-            data = f"'{data}"
-        
+            data = f"'{data}'"
+
         if withHeaders:
             # preallocate column & row names
-            
+
             minCol = min([m.column() for m in modelIndexes])
             maxCol = max([m.column() for m in modelIndexes])
             minRow = min([m.row() for m in modelIndexes])
             maxRow = max([m.row() for m in modelIndexes])
-            
+
             rowTexts = np.full((maxRow-minRow+2, maxCol-minCol+2), " ", dtype=object)
-            
+
             column = previous.column()
             row = previous.row()
-            
+
             colNdx = column-minCol+1
             rowNdx = row-minRow+1
-            
+
             rowTexts[0,colNdx] = self.getColumnNames(column)
-            
+
             rowTexts[rowNdx,0] = self.getRowNames(row)
-            
+
             rowTexts[rowNdx,colNdx] = data
-            
+
             for modelIndex in modelIndexes[1:]:
-                data = str(self._dataModel_.data(modelIndex).value())
+                data = str(self._dataModel_.data(modelIndex, QtCore.Qt.EditRole).value())
                 if quote:
-                    data = f"'{data}"
+                    data = f"'{data}'"
                 row = modelIndex.row()
                 rowNdx = row-minRow+1
                 col = modelIndex.column()
                 colNdx = col-minCol+1
-                
+
                 if col != previous.column():
                     rowTexts[0,colNdx] = self.getColumnNames(col)
-                    
+
                 if row != previous.row():
-                    rowTexts[rowNdx,0] = self.getRowNames(row) 
-                    
+                    rowTexts[rowNdx,0] = self.getRowNames(row)
+
                 rowTexts[rowNdx,colNdx] = data
-                
+
                 previous = modelIndex
-                
+
             for r_ in range(rowTexts.shape[0]):
                 selected_text.append(colsep.join(rowTexts[r_,:]))
                 selected_text.append("\n")
-                    
+
         else:
             selected_text.append(data)
-            
+
             for modelIndex in modelIndexes[1:]:
-                data = str(self._dataModel_.data(modelIndex).value())
+                data = str(self._dataModel_.data(modelIndex, QtCore.Qt.EditRole).value())
                 if quote:
-                    data = f"'{data}"
+                    data = f"'{data}'"
                 row = modelIndex.row()
                 col = modelIndex.column()
                 if row != previous.row():
                     selected_text.append("\n")
-                    
+
                 elif col != previous.column():
                     selected_text.append(colsep)
-                
+
                 selected_text.append(data)
-                
+
                 previous = modelIndex
-            
+
         QtGui.QGuiApplication.clipboard().setText("".join(selected_text))
-    
+
     @Slot(QtCore.QPoint)
-    @safeWrapper
+    @safewrapper
     def slot_table_context_menu_requested(self, pos):
         #print("table_context_menu at pos %s" % pos)
-        
+
         cm = QtWidgets.QMenu("Cell menu", self.tableView)
         copySelectedAction = cm.addAction("Copy")
-        
+
         copySelectedAction.triggered.connect(self.slot_copySelection)
 
         cm.popup(self.tableView.mapToGlobal(pos), copySelectedAction)
-
-class TabularDataModel(QtCore.QAbstractTableModel):
-    """
-    Change log:
-    NOTE  2018-11-25 01:24:39
-    1. Read-only row/column headers
-    2. Supports: 
-        * 1D and 2D numpy arrays (by default one-dimensonal numpy arrays are
-            displayed as column vectors)
-        * pandas DataFrame and Series objects; header data supports MultiIndex
-            axis index objects (see pandas Indexing API)
-
-    WARNING use with caution
-    """
-    editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="editCompleted")
-    
-    signal_rowsPopulated = Signal(int, name="signal_rowsPopulated")
-    signal_columnsPopulated = Signal(int, name="signal_columnsPopulated")
-    
-    def __init__(self, data=None, parent=None):
-        super(TabularDataModel, self).__init__(parent=parent)
-        
-        #if not isinstance(data, (pd.Series, pd.DataFrame, np.ndarray, type(None))):
-            #raise TypeError("%s data is not yet supported" % type(data).name)
-        
-        #if isinstance(data, np.ndarray) and data.ndim > 2:
-            #raise TypeError("cannot support numpy array data with more than two dimensions")
-        
-        self._modelData_ = None
-        self._modelRows_ = 0
-        self._modelColumns_ = 0
-        
-        # NOTE: 2018-11-10 10:58:09
-        # how many columns & rows are actually displayed
-        #self._displayedColumns = 0
-        self._displayedRows_ = 0
-        
-        #self._viewers_ = list()
-        
-        self.setModelData(data)
-        
-    #### BEGIN paged display
-    #def canFetchMore(self, parentIndex):
-        #return True
-        ##return self._displayedRows_ < self._modelRows_
-        ##ret = self._displayedColumns < self._modelColumns_ or self._displayedRows_ < self._modelRows_
-        ##print("displayed columns %d" % self._displayedColumns, "rows %d" % self._displayedRows_)
-        ##print("canFetchMore: %s" % ret)
-        ##return ret
-        
-    #def fetchMore(self, parentIndex):
-        #remainingRows = self._modelRows_ - self._displayedRows_
-        ##remainingColumns = self._modelColumns_ - self._displayedColumns
-        ##print("remaining rows %d" % remainingRows, "columns %d" % remainingColumns)
-        
-        #rowsToFetch = min(10, remainingRows)
-        ##columnsToFetch = min(2, remainingColumns)
-        
-        #if remainingRows > 0:
-            #self.beginInsertRows(QtCore.QModelIndex(), self._displayedRows_, self._displayedRows_ + rowsToFetch -1)
-            #self._displayedRows_ += rowsToFetch
-            #self.endInsertRows()
-            
-            ##self.signal_rowsPopulated.emit(rowsToFetch)
-            
-        ##if remainingColumns > 0:
-            ##self.beginInsertColumns(QtCore.QModelIndex(), self._displayedColumns, self._displayedColumns + columnsToFetch -1)
-            ##self._displayedColumns += columnsToFetch
-            ##self.endInsertColumns()
-            
-            ##self.signal_columnsPopulated.emit(columnsToFetch)
-    
-    #### END paged display
-                
-    #### BEGIN item data handling
-    #### BEGIN read-only access
-    def data(self, modelIndex, role=QtCore.Qt.DisplayRole):
-        try:
-            if self._modelData_ is None:
-                return QtCore.QVariant()
-            
-            if not modelIndex.isValid():
-                return QtCore.QVariant()
-            
-            row = modelIndex.row()
-            col = modelIndex.column()
-            
-            if row >= self._modelRows_ or row < 0:
-                return QtCore.QVariant()
-            
-            if col >= self._modelColumns_ or row < 0:
-                return QtCore.QVariant()
-            
-            return self.__getModelData__(row, col, role)
-            
-        except Exception as e:
-            traceback.print_exc()
-            
-    def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
-        #print("TabularDataModel headerData")
-        if self._modelData_ is None:
-            return QtCore.QVariant()
-        
-        return self.__getHeaderData__(section, orientation, role)
-        
-    def rowCount(self, parentIndex=QtCore.QModelIndex()):
-        #print("TabularDataModel rowCount")
-        return self._modelRows_
-        
-    def columnCount(self, parentIndex=QtCore.QModelIndex()):
-        #print("TabularDataModel columnCount")
-        return self._modelColumns_
-        
-    #### END  read-only access
-    
-    #### BEGIN editable items
-    def flags(self, modelIndex):
-        #print("TabularDataModel flags")
-        if not modelIndex.isValid():
-            return QtCore.Qt.ItemIsEnabled
-        
-        return QtCore.Qt.ItemIsEditable | super().flags(modelIndex)
-        #return QtCore.Qt.ItemIsEditable | QtCore.Qt.ItemIsSelectable
-    
-    def setData(self, modelIndex, value, role=QtCore.Qt.EditRole):
-        if self._modelData_ is None:
-            return False
-        
-        row = modelIndex.row()
-        col = modelIndex.column()
-        
-        if row >= self._modelData_.shape[0]:
-            return False
-        
-        if col >= self._modelData_.shape[1]:
-            return False
-            
-        if role != QtCore.Qt.EditRole:
-            return False
-        
-        if self._setDataValue_(value, row, col):
-            self.dataChanged.emit(modelIndex, modelIndex)
-            return True
-        
-        return False
-        
-    #### END editable items
-    
-    #### BEGIN resizable model
-    
-    #### END resizable model
-    
-    #### END item data handling
-
-    def setModelData(self, data):
-        #print("TabularDataModel setModelData")
-        try:
-            if not isinstance(data, (pd.Series, pd.DataFrame, np.ndarray, type(None))):
-                raise TypeError("%s data is not yet supported" % type(data).__name__)
-            
-            #if isinstance(data, np.ndarray) and data.ndim > 2:
-                #raise TypeError("cannot support numpy array data with more than two dimensions")
-            
-            self.beginResetModel()
-            
-            #self._modelData_ = data
-            
-            if isinstance(data, pd.DataFrame):
-                self._modelData_ = data
-                self._modelRows_ = data.shape[0]
-                self._modelColumns_ = data.shape[1]
-                #self._modelData_ = data.values
-                #self._modelDataRowHeaders = data.index
-                #self._modelDataColumnHeaders = data.columns
-                
-            elif isinstance(data, pd.Series):
-                self._modelData_ = data
-                self._modelRows_ = data.shape[0]
-                self._modelColumns_ = 1
-                #self._modelData_ = data.values
-                #self._modelDataRowHeaders = data.index
-                #self._modelDataColumnHeaders = data.name
-                
-            elif isinstance(data, pd.Index):
-                self._modelData_ = data
-                self._modelRows_ = data.shape[0]
-                self._modelColumns_ = 1
-                
-            elif isinstance(data, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
-                if data.ndim:
-                    self._modelRows_ = data.shape[0]
-                    
-                    if data.ndim > 1:
-                        self._modelColumns_ = data.shape[1] + 1 # include domain as the first column
-                    
-                else:
-                    self._modelRows_ = 1
-                    self._modelColumns_ = 1
-                
-                #self._modelRows_ = data.shape[0]
-                #self._modelColumns_ = data.shape[1] + 1 
-                self._modelData_ = data
-                
-            elif isinstance(data, np.ndarray):
-                if data.ndim > 2:
-                    self._modelData_ = np.squeeze(data).reshape((data.shape[0], np.prod(data.shape[1:])))
-                else:
-                    self._modelData_ = data
-                    
-                if self._modelData_.ndim:
-                        
-                    self._modelRows_ = self._modelData_.shape[0]
-                    
-                    if self._modelData_.ndim > 1:
-                        self._modelColumns_ = self._modelData_.shape[1]
-                        
-                    else:
-                        self._modelColumns_ = 1
-                    
-                else:
-                    self._modelRows_ = 1
-                    self._modelColumns_ = 1
-                
-            elif data is None:
-                self._modelData_ = data
-                self._modelRows_ = 0
-                self._modelColumns_ = 0
-                
-            #self._displayedColumns = 0
-            self._displayedRows_ = 0
-            
-            self.endResetModel()
-            
-            #print("TabularDataModel setModelData %s" % type(self._modelData_).__name__)
-            if self._modelData_ is None:
-                self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, 0)
-                
-            else:
-                #self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, self._modelData_.shape[0])
-                self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, self._modelRows_)
-            
-        except Exception as e:
-            traceback.print_exc()
-        
-    #@property
-    #def views(self):
-        #return self._viewers_
-            
-    #def appendView()
-    
-    @safeWrapper
-    def __getHeaderData__(self, section, orientation, role = QtCore.Qt.DisplayRole):
-        try:
-            if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
-                return QtCore.QVariant()
-                
-            if isinstance(self._modelData_, pd.DataFrame):
-                if orientation == QtCore.Qt.Horizontal: # column header
-                    # NOTE: 2018-11-24 14:57:12
-                    # axis indexes in pandas are instances of Index or one of its
-                    # subclasses; so we need to check for its subclasses first
-                    if isinstance(self._modelData_.columns, pd.MultiIndex):# MultiIndex is subclass of Index so catch it first
-                        if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            # NOTE: 2018-11-27 21:32:16
-                            # TODO: chech pandas API for other possibilities
-                            return QtCore.QVariant(str(self._modelData_.columns[section]))
-                        
-                        elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                            #if isinstance(self._modelData_.iloc[:,section], pd.core.arrays.categorical.CategoricalDtype):
-                            if "%s" % self._modelData_.iloc[:,section].dtype == "category":
-                                
-                                if len(self._modelData_.iloc[:,section].cat.categories) > 6:
-                                    ret = "\n".join(["%s" % v for v in self._modelData_.columns.names] + \
-                                                    ["%d categories:" % len(self._modelData_.iloc[:,section].cat.categories)] + \
-                                                    ["%s" % v for v in self._modelData_.iloc[:,section].cat.categories[0:3]] + \
-                                                    ["..."] + \
-                                                    ["%s" % v for v in self._modelData_.iloc[:,section].cat.categories[-3:]])
-                                    
-                                    
-                                else:
-                                    ret = "\n".join(["%s" % v for v in self._modelData_.columns.names] + \
-                                                    ["categories:"] +\
-                                                    ["%s" % v for v in self._modelData_.iloc[:,section].cat.categories])
-                                    
-                            else:
-                                ret = "\n".join(["%s" % v for v in self._modelData_.columns.names] + ["(%s)" % self._modelData_.iloc[:,section].dtype])
-                            
-                            return QtCore.QVariant(ret)
-                        
-                        else:
-                            return QtCore.QVariant()
-                        
-                    elif isinstance(self._modelData_.columns, pd.Index):
-                        if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            return QtCore.QVariant(str(self._modelData_.columns[section]))
-
-                        elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                            #if isinstance(self._modelData_.iloc[:,section], pd.core.arrays.categorical.CategoricalDtype):
-                            if "%s" % self._modelData_.iloc[:,section].dtype == "category":
-                                if len(self._modelData_.iloc[:,section].cat.categories) > 6:
-                                    ret = "\n".join(["%d categories:" % len(self._modelData_.iloc[:,section].cat.categories)] + \
-                                                    ["%s" % v for v in self._modelData_.iloc[:,section].cat.categories[0:3]] + \
-                                                    ["..."] + \
-                                                    ["%s" % v for v in self._modelData_.iloc[:,section].cat.categories[-3:]])
-                                    
-                                else:
-                                    ret = "\n".join(["categories:"] + \
-                                                    ["%s" % v for v in self._modelData_.iloc[:,section].cat.categories])
-                                #print(ret)
-                                
-                                return QtCore.QVariant(ret)
-                                
-                            else:
-                                return QtCore.QVariant("%s" % self._modelData_.iloc[:, section].dtype)
-                            
-                        else:
-                            return QtCore.QVariant()
-                        
-                    
-                    else: # NOTE: 2018-11-22 23:16:45 could columns be anything else than Index?
-                        return QtCore.QVariant()
-                    
-                else: # vertical (rows) header
-                    if isinstance(self._modelData_.index, pd.MultiIndex):# MultiIndex is subclass of Index so catch it first
-                        if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            return QtCore.QVariant(str(self._modelData_.index[section]))
-                            
-                        elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                            #if isinstance(self._modelData_.iloc[section,:], pd.core.arrays.categorical.CategoricalDtype):
-                            if "%s" % self._modelData_.iloc[section,:].dtype == "category":
-                                if len(self._modelData_.iloc[section,:].cat.categories) > 6:
-                                    ret = " ".join(["%s" % v for v in self._modelData_.index.names] + \
-                                                ["%d categories:" % len(self._modelData_.iloc[section,:].cat.categories)] + \
-                                                ["%s" % v for v in self._modelData_.iloc[section,:].cat.categories[0:3]] + \
-                                                ["..."] +\
-                                                ["%s" % v for v in self._modelData_.iloc[section,:].cat.categories[-3:]])
-
-                                else:
-                                    ret = " ".join(["%s" % v for v in self._modelData_.index.names] + \
-                                                ["categories:"] + \
-                                                ["%s" % v for v in self._modelData_.iloc[section,:].cat.categories])
-                                
-                            else:
-                                ret = " ".join(["%s" % v for v in self._modelData_.index.names] + ["(%s)" % self._modelData_.iloc[section,:].dtype])
-                                
-                            return QtCore.QVariant(ret)
-
-                        else:
-                            return QtCore.QVariant()
-                        
-                    elif isinstance(self._modelData_.index, pd.Index):
-                        if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            return QtCore.QVariant(str(self._modelData_.index[section]))
-                            
-                        elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                            #if isinstance(self._modelData_.iloc[:,section], pd.core.arrays.categorical.CategoricalDtype):
-                            if "%s" % self._modelData_.iloc[section,:].dtype == "category":
-                                if len(self._modelData_.iloc[section,:].cat.category) > 6:
-                                    ret = " ".join(["%d categories:" % len(self._modelData_.iloc[section,:].cat.categories)] + \
-                                                    ["%s" % v for v in self._modelData_.iloc[section,:].cat.categories[0:3]] + \
-                                                    ["..."] + \
-                                                    ["%s" % v for v in self._modelData_.iloc[section,:].cat.categories[-3:]])
-
-                                else:
-                                    ret = " ".join(["categories:"] + \
-                                                    ["%s" % v for v in self._modelData_.iloc[section,:].cat.categories])
-                                
-                            else:
-                                ret = "%s" % self._modelData_.iloc[section,:].dtype # the type of the data row, not of its index !
-                                
-                            return QtCore.QVariant(ret)
-
-                        else:
-                            return QtCore.QVariant()
-                        
-                    else:
-                        return QtCore.QVariant()
-                        
-            elif isinstance(self._modelData_, pd.Series):
-                if orientation == QtCore.Qt.Horizontal:
-                    if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                        return QtCore.QVariant(str(self._modelData_.name))
-                        
-                    elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                        #if isinstance(self._modelData_.dtype, pd.core.arrays.categorical.CategoricalDtype):
-                        if "%s" % self._modelData_.dtype == "category":
-                            if len(self._modelData_.cat.categories) > 6:
-                                ret = "\n".join(["%d categories:" % len(self._modelData_.cat.categories)] + \
-                                                ["%s" % v for v in self._modelData_.cat.categories[0:3]] + \
-                                                ["..."] + \
-                                                ["%s" % v for v in self._modelData_.cat.categories[-3:]])
-
-                            else:
-                                ret = "\n".join(["categories:"] + \
-                                                ["%s" % v for v in self._modelData_.cat.categories])
-                            
-                            return QtCore.QVariant(ret)
-                        
-                        else:
-                            return QtCore.QVariant("%s" % self._modelData_.dtype)
-                        
-                    else:
-                        return QtCore.QVariant()
-                    
-                else:
-                    if isinstance(self._modelData_.index, pd.MultiIndex): # MultiIndex is subclass of Index so catch it first
-                        if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            return QtCore.QVariant(str(self._modelData_.index[section]))
-                        
-                        elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                            #if isinstance(self._modelData_.iloc[section], pd.core.arrays.categorical.CategoricalDtype):
-                            if "%s" % self._modelData_.iloc[section].dtype == "category":
-                                if len(self._modelData_.iloc[section].cat.categories) > 6:
-                                    ret = " ".join(["%s" % v for v in self._modelData_.index.names] +\
-                                                   ["%d categories:" % len(self._modelData_.iloc[section].cat.categories)] + \
-                                                   ["%s" % v for v in self._modelData_.iloc[section].cat.categories[0:3]] + \
-                                                   ["..."] + \
-                                                   ["%s" % v for v in self._modelData_.iloc[section].cat.categories[-3:]])
-
-                                else:
-                                    ret = " ".join(["categories:"] +\
-                                                ["%s" % v for v in self._modelData_.iloc[section].cat.categories])
-                                
-                                return QtCore.QVariant(ret)
-                            
-                        else:
-                            return QtCore.QVariant()
-                        
-                    elif isinstance(self._modelData_.index, pd.Index): 
-                        if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            return QtCore.QVariant(str(self._modelData_.index[section]))
-                            
-                        elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                            #if isinstance(self._modelData_.index[section], pd.core.arrays.categorical.CategoricalDtype):
-                            if "%s" % self._modelData_.iloc[section].dtype == "category":
-                                if len(self._modelData_.iloc[section].cat.categories) > 6:
-                                    ret = " ".join(["%d categories:" % len(self._modelData_[section].cat.categories)] + \
-                                                   ["%s" % v for v in self._modelData_[section].cat.categories[0:3]] + \
-                                                   ["..."] + \
-                                                   ["%s" % v for v in self._modelData_[section].cat.categories[-3:]])
-
-                                else:
-                                    ret = " ".join(["categories:"] + \
-                                                ["%s" % v for v in self._modelData_[section].cat.categories])
-                                
-                                return QtCore.QVariant(ret)
-                                
-                            else:
-                                return QtCore.QVariant("%s" % self._modelData_[section].dtype) # the type of data at [section]
-                            
-                        else:
-                            return QtCore.QVariant()
-                        
-                    else:
-                        return QtCore.QVariant()
-                    
-            #elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
-            elif isinstance(self._modelData_, neo.core.basesignal.BaseSignal):
-                if orientation == QtCore.Qt.Horizontal: # horizontal (columns) header
-                    if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                        if section == 0:
-                            if isinstance(self._modelData_, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
-                                domain_name = getattr(self._modelData_,"domain_name", None)
-                                domain = getattr(self._modelData_, "domain", None)
-                                # NOTE: 2024-01-23 23:45:53
-                                # better do this:
-                                if isinstance(self._modelData_, neo.IrregularlySampledSignal):
-                                    domain_name = "Time"
-                                    domain = self._modelData_.times
-                                if isinstance(domain_name, str) and isinstance(domain, pq.Quantity):
-                                    dname = f"{domain_name} ({domain.dimensionality})" if len(domain_name.strip()) else "Sample index"
-                                    return QtCore.QVariant(dname)
-                                    #return QtCore.QVariant("%s (%s)" % (self._modelData_.domain_name, self._modelData_.domain.dimensionality))
-                                else:
-                                    return QtCore.QVariant("Sample")
-                                                       
-                            else:
-                                return QtCore.QVariant("Time (%s)" % self._modelData_.times.dimensionality)
-                            
-                        else:
-                            return QtCore.QVariant("%s (channel %d, %s)" % (self._modelData_.name, section-1, self._modelData_.dimensionality))
-                        
-                    elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                        return QtCore.QVariant("%s" % self._modelData_[:,section].dtype)
-                    
-                    else:
-                        return QtCore.QVariant()
-                        
-                else: # vertical (rows) header
-                    if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
-                        return QtCore.QVariant("%s" % section)
-                    
-                    elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                        return QtCore.QVariant("%s" % self._modelData_[section,:].dtype)
-                            
-                    else:
-                        return QtCore.QVariant()
-                
-                    
-            elif isinstance(self._modelData_, np.ndarray):
-                if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
-                    return QtCore.QVariant("%s" % section)
-                
-                elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                    if orientation == QtCore.Qt.Horizontal:
-                        return QtCore.QVariant("%s" % self._modelData_[:,section].dtype)
-                        
-                    else:
-                        return QtCore.QVariant("%s" % self._modelData_[section,:].dtype)
-                        
-                else:
-                    return QtCore.QVariant()
-                
-            else:
-                return QtCore.QVariant()
-            
-            # NOTE: 2018-11-10 11:12:39 TODO nested lists !!!
-                
-        except (IndexError, ):
-            return QtCore.QVariant()
-        
-    def __getModelData__(self, row, col, role = QtCore.Qt.DisplayRole):
-        try:
-            if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
-                return QtCore.QVariant()
-                
-            if isinstance(self._modelData_, pd.DataFrame):
-                ret = self._modelData_.iloc[row,col]
-                
-                ret_type = type(ret).__name__
-
-                if isinstance(ret, datetime.datetime):
-                    ret = ret.isoformat(" ")
-                
-            elif isinstance(self._modelData_, pd.Series):
-                ret = self._modelData_.iloc[row]
-                
-                ret_type = type(ret).__name__
-                
-                if isinstance(ret, datetime.datetime):
-                    ret = ret.isoformat(" ")
-                    
-            elif isinstance(self._modelData_, pd.Index):
-                ret = self._modelData_[row]
-                
-                ret_type = type(ret).__name__
-
-                if isinstance(ret, datetime.datetime):
-                    ret = ret.isoformat(" ")
-                    
-            elif isinstance(self._modelData_, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal)):
-                if col == 0:
-                    ret = self._modelData_.times[row]
-                    ret_type = type(ret).__name__
-                    
-                else:
-                    ret = self._modelData_[row, col-1]
-                    ret_type = type(ret).__name__
-                    
-                if isinstance(ret, pq.Quantity):
-                    ret = ret.magnitude
-                    
-            elif isinstance(self._modelData_, np.ndarray):
-                if self._modelData_.ndim  == 0: # e.g. pq object
-                    ret = np.atleast_1d(self._modelData_)[row]
-                    
-                elif self._modelData_.ndim > 1:
-                    ret = self._modelData_[row, col]
-                    
-                else:
-                    ret = self._modelData_[row]
-                
-                ret_type = type(ret).__name__
-
-                if isinstance(ret, datetime.datetime):
-                    ret = ret.isoformat(" ")
-                
-            else:
-                return QtCore.QVariant()
-                
-            if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole):
-                return QtCore.QVariant("%s" % ret)
-            
-            elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                return QtCore.QVariant(ret_type)
-            
-            elif role in (QtCore.Qt.UserRole, ):
-                return QtCore.QVariant(ret)
-            
-            else:
-                return QtCore.QVariant()
-            
-        except (IndexError,):
-            return QtCore.QVariant()
-        
-    def _setDataValue_(self, value, row, col):
-        if self._modelData_ is None:
-            return False
-        
-        if not isinstance(value, str):
-            raise TypeError("Expecting a str, got %s instead" % type(value).__name__)
-        
-        # NOTE: 2018-11-22 11:11:43
-        # don't delete this; contemplate using it at module/app level
-        #old_qvariant_autoconv = sip.enableautoconversion(QtCore.QVariant, False)
-        
-        try:
-            if isinstance(self._modelData_, pd.DataFrame):
-                data_row = self._modelData_.index[row]
-                data_col = self._modelData_.columns[col]
-                
-                current_value = self._modelData_.loc[data_row, data_col]
-                
-                if hasattr(current_value, "dtype"):
-                    data_type = current_value.dtype.type
-                    
-                else:
-                    data_type = type(current_value)
-                
-                #data_type = self._modelData_.loc[data_row, data_col].dtype
-                #data_type = self._modelData_.iloc[row, col].dtype
-                
-                if isinstance(value, QtCore.QVariant) or hasattr(value, "value"):
-                    pyvalue = value.value()
-                    
-                else:
-                    pyvalue = value
-                
-                if data_type != object:
-                    if isinstance(pyvalue, str):
-                        if len(pyvalue.strip()) > 0:
-                            data_value = pyvalue
-                            
-                        else:
-                            data_value = None
-                        
-                    #else:
-                data_value = data_type(data_value)
-                    
-                self._modelData_.at[data_row, data_col] = data_value
-                #self._modelData_.set_value(data_row, data_col, data_value)
-                
-                #result = np.fromstring(value, dtype=data_type)
-                #self._modelData_.loc[data_row, data_col] = result
-                #self._modelData_.iloc[row, col] = result
-                
-            elif isinstance(self._modelData_, pd.Series):
-                data_row = self._modelData_.index[row]
-                current_value = self._modelData_.loc[row]
-                if hasattr(current_value, "dtype"):
-                    data_type = self._modelData_.loc[row].dtype.type
-                    
-                else:
-                    data_type = type(current_value)
-                #data_type = self._modelData_.iloc[row].dtype
-                
-                if isinstance(value, QtCore.QVariant) or hasattr(value, "value"):
-                    pyvalue = value.value()
-                    
-                else:
-                    pyvalue = value
-                
-                if data_type != object:
-                    if isinstance(pyvalue, str):
-                        if len(pyvalue.strip()) > 0:
-                            data_value = pyvalue
-                            
-                        else:
-                            data_value = None
-                        
-                    #else:
-                data_value = data_type(data_value)
-                        
-                self._modelData_.at[data_row] = data_value
-                        
-                    
-                #result = np.fromstring(value, dtype=data_type)
-                #self._modelData_.iloc[row] = result
-                
-            elif isinstance(self._modelData_, np.ndarray):
-                current_value = self._modelData_[row, col]
-                if hasattr(current_value, "dtype"):
-                    data_type = current_value.dtype.type
-                else:
-                    data_type = type(current_value)
-                    
-                if isinstance(value, QtCore.QVariant) or hasattr(value, "value"):
-                    pyvalue = value.value()
-                    
-                else:
-                    pyvalue = value
-                
-                if data_type != object:
-                    if isinstance(pyvalue, str):
-                        if len(pyvalue.strip()) > 0:
-                            data_value = pyvalue
-                            
-                        else:
-                            data_value = None
-                        
-                    #else:
-                data_value = data_type(data_value)
-                        
-                self._modelData_[row, col] = data_value
-                        
-                #result = np.fromstring(value, dtype=data_type)
-                #self._modelData_[row, col] = result
-                
-            else:
-                return False
-            
-            return True
-            
-        except Exception as e:
-            traceback.print_exc()
-            return False
-        
-        # NOTE: 2018-11-22 11:11:43
-        # don't delete this; contemplate using it at module/app level
-        #sip.enableautoconversion(QtCore.QVariant, old_qvariant_autoconv)
-            
-        return False

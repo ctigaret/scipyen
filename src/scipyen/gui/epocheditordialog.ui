@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>673</width>
-    <height>389</height>
+    <height>365</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -45,8 +45,7 @@
             <string>Add epoch</string>
            </property>
            <property name="icon">
-            <iconset theme="list-add">
-             <normaloff>.</normaloff>.</iconset>
+            <iconset theme="list-add"/>
            </property>
           </widget>
          </item>
@@ -65,8 +64,7 @@
             <string>Remove selected epoch</string>
            </property>
            <property name="icon">
-            <iconset theme="list-remove">
-             <normaloff>.</normaloff>.</iconset>
+            <iconset theme="list-remove"/>
            </property>
           </widget>
          </item>
@@ -104,15 +102,14 @@
             <string>Clear</string>
            </property>
            <property name="icon">
-            <iconset theme="edit-clear-all">
-             <normaloff>.</normaloff>.</iconset>
+            <iconset theme="edit-clear-all"/>
            </property>
           </widget>
          </item>
          <item>
           <spacer name="horizontalSpacer_2">
            <property name="orientation">
-            <enum>Qt::Horizontal</enum>
+            <enum>Qt::Orientation::Horizontal</enum>
            </property>
            <property name="sizeHint" stdset="0">
             <size>
@@ -180,8 +177,7 @@
             <string>Import Epochs</string>
            </property>
            <property name="icon">
-            <iconset theme="download">
-             <normaloff>.</normaloff>.</iconset>
+            <iconset theme="download"/>
            </property>
           </widget>
          </item>
@@ -245,7 +241,7 @@
          <item>
           <spacer name="horizontalSpacer_3">
            <property name="orientation">
-            <enum>Qt::Horizontal</enum>
+            <enum>Qt::Orientation::Horizontal</enum>
            </property>
            <property name="sizeHint" stdset="0">
             <size>
@@ -288,8 +284,7 @@
             <string>Add interval</string>
            </property>
            <property name="icon">
-            <iconset theme="list-add">
-             <normaloff>.</normaloff>.</iconset>
+            <iconset theme="list-add"/>
            </property>
           </widget>
          </item>
@@ -308,15 +303,14 @@
             <string>Remove interval</string>
            </property>
            <property name="icon">
-            <iconset theme="list-remove">
-             <normaloff>.</normaloff>.</iconset>
+            <iconset theme="list-remove"/>
            </property>
           </widget>
          </item>
          <item>
           <spacer name="horizontalSpacer">
            <property name="orientation">
-            <enum>Qt::Horizontal</enum>
+            <enum>Qt::Orientation::Horizontal</enum>
            </property>
            <property name="sizeHint" stdset="0">
             <size>
@@ -335,10 +329,10 @@
    <item>
     <widget class="QDialogButtonBox" name="buttonBox">
      <property name="orientation">
-      <enum>Qt::Horizontal</enum>
+      <enum>Qt::Orientation::Horizontal</enum>
      </property>
      <property name="standardButtons">
-      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+      <set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Ok</set>
      </property>
     </widget>
    </item>

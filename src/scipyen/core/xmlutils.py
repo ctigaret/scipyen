@@ -56,21 +56,51 @@ import xml.etree.ElementTree as ET # the default parsers in here are from xml.pa
                                    # see documentation for xml.etree.ElementTree.XMLParser
 import xml.dom
 import xml.dom.minidom
+
+from functools import singledispatch
 #import abc
 
 # 2016-09-25 21:28:37 
 # add XMl text viewer, schema viewer and xquery editor
 
-# 2016-08-16 09:30:07
-# NOTE FIXME QtXml is not actively maintained anymore in Qt >= 5.5
-from qtpy import (QtCore, QtWidgets, QtXml, QtGui, )
-from qtpy.QtCore import (Signal, Slot, )
-# from qtpy.uic import loadUiType as __loadUiType__
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 
-# from PyQt5 import (QtCore, QtWidgets, QtXmlPatterns, QtXml, QtGui, )
-# from PyQt5.QtCore import (Signal, Slot, )
-# from PyQt5.uic import loadUiType as __loadUiType__
-#from datatypes import DataBag
+# 2016-08-16 09:30:07
+# import qtpy
+# qtpy.API = os.environ["QT_API"]
+# if os.environ["QT_API"] == "pyside6":
+#     import PySide6
+#     from PySide6 import (QtCore, QtWidgets, QtXml, QtGui, )
+#     from PySide6.QtCore import (Signal, Slot, )
+# else:
+#     from qtpy import (QtCore, QtWidgets, QtXml, QtGui, )
+#     from qtpy.QtCore import (Signal, Slot, )
+
 # NOTE: use Python re instead of QRegExp
 import re
 
@@ -186,15 +216,32 @@ class XmlSyntaxHighlighter(QtGui.QSyntaxHighlighter):
             else:
                 break
             
-def getChildren(element, eltype:int=1) -> typing.Generator:
-    """Compensate for the loss of xlm.etree.Element.getchildren() in Python 3.9.7
-    """
+@singledispatch
+def getChildren(element, eltype:int=1, tagName:typing.Optional[str]=None) -> typing.Generator:
+    raise NotImplementedError(f"Function does not support {type(element)} objects")
+
+@getChildren.register(xml.dom.minidom.Element)
+def _(element:xml.dom.minidom.Element, eltype:int=1, tagName:typing.Optional[str]=None) -> typing.Generator:
+    r""""""
     if eltype not in range(1,13):
         raise ValueError(f"'eltype' expected to be an int in the range 1⋯13; instead, got {eltype}")
-    
     children = element.childNodes
     if len(children):
-        yield from (c for c in children if c.nodeType == eltype)
+        if isinstance(tagName, str) and len(tagName.strip()):
+            yield from filter(lambda c: c.nodeType == eltype and getattr(c, "tagName", "") == tagName, children)
+            # yield from (c for c in children if c.nodeType == eltype and getattr(c, "tagName", "") == tagName)
+        else:
+            yield from filter(lambda c: c.nodeType == eltype, children)
+            # yield from (c for c in children if c.nodeType == eltype)
+    
+@getChildren.register(ET.Element)
+def _(element:ET.Element, eltype:int=None, tagName:typing.Optional[str]=None) -> typing.Generator:
+    r""""""
+    if isinstance(tagName, str) and len(tagName.strip()):
+        yield from filter(lambda c: c.tag == tagName, element.iter())
+    else:
+        yield from (c for c in element.iter())
+        
         # return (c for c in children if c.nodeType == eltype)
     # chiter = element.iter()
     # return (c for c in next(chiter))
@@ -208,7 +255,7 @@ def elementToDict(node, eltype:int = 1):
     return ret
 
 def attributesToDict(node):
-    """Returns a dictionary with the attributes names/values
+    r"""Returns a dictionary with the attributes names/values
     """
     if node.attributes is None:
         return None
@@ -495,7 +542,7 @@ def parseDOMNode(domnode):
         # i.e. domnode.childNodes should return a list of one Element object
         # which can be retrieved by domnode.documentElement
         if not domnode.hasChildNodes():
-            print("Empty XMl node!")
+            # print("Empty XMl node!")
             return None
 
         domelement = domnode.documentElement # this is the root element of the document
@@ -650,7 +697,7 @@ def dictToXMLDocument(data, name=None, maxElements = 10):
     return doc
 
 def composeStringListForXMLElement(tagname, value):
-    """Generates a list with the components of a string representation for an XML element
+    r"""Generates a list with the components of a string representation for an XML element
     
     Parameters:
     ===========
@@ -680,4 +727,98 @@ def composeStringListForXMLElement(tagname, value):
     
     return ret
     
+def get_svg_size(s:typing.Union[str, xml.dom.minidom.Document]) -> tuple:
+    from core import strutils
+    # print(type(s))
+    try:
+        attrib = dict()
+        if isinstance(s, xml.dom.minidom.Document) and is_svg(s):
+            # print(f"is SVG: {is_svg(s)}")
+            svgElements = s.getElementsByTagName("svg")
+            # print(f"{svgElements}")
+            if len(svgElements) == 0:
+                return (None, None)
+            
+            width = svgElements[0].getAttribute("width)")
+            if len(width.strip())==0:
+                width = None
+            else:
+                width = int(width)
+                
+            height = svgElements[0].getAttribute("height)")
+            if len(height.strip()) == 0:
+                height = None
+            else:
+                height = int(height)
+                
+            viewBox = svgElements[0].getAttribute("viewBox")
+            # print(f"viewBox: {viewBox}")
+            if len(viewBox.strip()):
+                x,y, width, height = list(map(lambda v: int(v), viewBox.split()))
+                
+            return width, height
+        
+        if isinstance(s, str):
+            if not strutils.is_svg(s) and not strutils.is_xml(s):
+                if isinstance(s, str) and os.path.isfile(s):
+                    element = ET.parse(s)
+                    root = tree.getroot()
+                    attrib = root.attrib
+                        
+                else:
+                    return None, None
+            else:
+                # Parse the SVG string
+                root = ET.fromstring(s)
+                attrib = root.attrib
+            
+                
+        else:
+            return None, None
+            
+        # Extract width and height attributes
+        width = attrib.get('width', None)
+        height = attrib.get('height', None)
+        viewBox = attrib.get('viewBox', None)
+        
+        # print(f"width: {width}, height: {height}, viewBox: {viewBox}")
+        
+        # If width and height are None, check viewBox
+        if (width is None or height is None) and viewBox:
+            viewBox_values = viewBox.split()
+            if len(viewBox_values) >= 4:
+                width = viewBox_values[2]  # Width from viewBox
+                height = viewBox_values[3]  # Height from viewBox
+                
+        # print(f"viewBox: {viewBox}, width: {width}, height: {height}")
+
+        # Convert width and height to floats
+        if width is not None and height is not None:
+            return float(width), float(height)
+        else:
+            return None, None
+
+    except ET.ParseError:
+        scipywarn("Error parsing the SVG file.")
+        return None, None
     
+    except Exception as e:
+        traceback.print_exc()
+        return None, None
+    
+def is_svg(d:xml.dom.minidom.Document) -> bool:
+    if not isinstance(d, xml.dom.minidom.Document):
+        return False
+
+    svgElements = d.getElementsByTagName("svg")
+    return len(svgElements) > 0
+
+
+# # Example usage
+# file_path = 'path/to/your/file.svg'
+# width, height = get_svg_size(file_path)
+# if width is not None and height is not None:
+#     print(f"SVG Width: {width}, Height: {height}")
+# else:
+#     print("Could not determine the size.")
+

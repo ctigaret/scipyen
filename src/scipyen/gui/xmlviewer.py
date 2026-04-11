@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""Viewer for XML documents
+r"""Viewer for XML documents
 """
 #### BEGIN core python modules
 from __future__ import print_function
@@ -13,7 +13,7 @@ import sys, os, traceback, inspect, numbers
 from collections import OrderedDict
 
 # NOTE: use Python's re instead of QRegExp
-import re
+# import re
 
 import xml.parsers.expat
 import xml.etree
@@ -30,23 +30,44 @@ import xml.dom.minidom
 
 # 2016-08-16 09:30:07
 # NOTE FIXME QtXml is not actively maintained anymore in Qt >= 5.5 ?!
-from qtpy import (QtCore, QtWidgets, QtXml, QtGui, )
-from qtpy.QtCore import (Signal, Slot, )
-# from PyQt5 import (QtCore, QtWidgets, QtXmlPatterns, QtXml, QtGui, )
-# from PyQt5.QtCore import (Signal, Slot, )
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 
 
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
 import core.xmlutils as xmlutils
+from core import strutils
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
-# from . import resources_rc
-# from . import icons_rc
 #### END pict.gui modules
 
 
@@ -56,8 +77,7 @@ __scipyen_plugin__ = None
 
 # 2016-08-16 23:55:53
 class DomItem(object):
-    '''Wraps a QDomNode 
-    WARNING: This is based on a DEPRECATED Qt module
+    r'''Wraps a QDomNode 
     '''
     def __init__(self, node: (QtXml.QDomNode, QtXml.QDomDocument), row: int, parent: (QtXml.QDomNode, type(None)) = None):
         ''' DomItem constructor
@@ -191,7 +211,7 @@ class GenericDomModel(QtCore.QAbstractItemModel):
     
     Inherits QtCore.QAbstractItemModel
     
-    WARNING: This uses classes from QtXml which is being DEPRECATED
+    WARNING: This uses classes from QtXml which might become DEPRECATED
     
     '''
     def __init__(self, document: (QtXml.QDomDocument, type(None)) = None, parent=None):
@@ -404,7 +424,7 @@ class XMLViewer(ScipyenViewer):
                         xmlutils.xml.etree.ElementTree.Element: 99, 
                         QtXml.QDomNode: 99, 
                         QtXml.QDomDocument: 99, 
-                        str: 0}
+                        strutils.is_xml:0}
     # view_action_name = "XML Object"
         
     def __init__(self, data: (xml.etree.ElementTree.Element, xml.dom.minidom.Document, QtXml.QDomNode, QtXml.QDomDocument, str, type(None)) = None, 
@@ -428,7 +448,11 @@ class XMLViewer(ScipyenViewer):
         
     def _configureUI_(self):
         self.fileMenu = self.menuBar().addMenu("&File")
-        self.fileMenu.addAction("&Save As...", self.saveAsFile, "Ctrl+Shift+S")
+        if __has_PyQt6__ or __has_PySide6__:
+            action = self.fileMenu.addAction(QtGui.QIcon.fromTheme("document-save-as"), "&Save As...", self.saveAsFile)
+            action.setShortcut("Ctrl+Shift+S")
+        else:
+            self.fileMenu.addAction("&Save As...", self.saveAsFile, "Ctrl+Shift+S")
         
         # contruct a tree view
         self._docViewer_ = QtWidgets.QTreeView(self)
@@ -516,7 +540,7 @@ class XMLViewer(ScipyenViewer):
         if self._docModel_.domDocument.isNull():
             return
         
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
             kw = {"options":options}
         else:

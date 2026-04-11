@@ -7,7 +7,7 @@
 # TODO Code linking to ScanImage ?!?
 
 # -*- coding: utf-8 -*-
-"""Import routines for PrairieView data
+r"""Import routines for PrairieView data
 """
 #### BEGIN core python modules
 import os, sys, traceback, warnings, datetime, time, mimetypes, io, typing
@@ -23,15 +23,37 @@ import numpy as np
 import quantities as pq
 import neo
 from core.vigra_patches import vigra
-from qtpy import (QtCore, QtWidgets, QtGui,)
-from qtpy.QtCore import Signal, Slot
-#from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml
-# from PyQt5 import (QtCore, QtWidgets, QtGui,)
-# from PyQt5.QtCore import Signal, Slot
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+
 #### END 3rd party modules
 
 #### BEGIN scipyen modules
-from core.utilities import safeWrapper
+from core.utilities import safewrapper
 from core.traitcontainers import DataBag
 from core.triggerevent import (TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import (TriggerProtocol,
@@ -50,7 +72,7 @@ import core.datatypes
 
 import iolib.pictio as pio
 
-from gui import resources_rc # as resources_rc
+# from gui import resources_rc # as resources_rc
 # from gui import icons_rc
 from gui import quickdialog as qd
 from gui.triggerdetectgui import TriggerDetectDialog, TriggerDetectWidget

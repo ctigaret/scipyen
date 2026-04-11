@@ -3,26 +3,57 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""
+r"""
 """
 import sys, os, typing
-from qtpy import QtCore, QtGui, QtWidgets, QtSvg
-from qtpy.QtCore import Signal, Slot, Property
-from qtpy.uic import loadUiType as __loadUiType__
-from core.prog import (safeWrapper, deprecation, iter_attribute,
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+from core.prog import (safewrapper, deprecation, iter_attribute,
                        filter_type, filterfalse_type, 
                        filter_attribute, filterfalse_attribute,
                        filter_attr, filterfalse_attr)
+from core.strutils import counter_suffix
 from core.sysutils import adapt_ui_path
 from core.vigra_patches import vigra
 from gui import pictgui as pgui
-from gui.pyqtgraph_patch import pyqtgraph as pgraph
+from core.pyqtgraph_patch import pyqtgraph as pgraph
 from gui import painting_shared
 from collections import ChainMap, namedtuple, defaultdict
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-Ui_GraphicsImageViewerWidget, QWidget = __loadUiType__(adapt_ui_path(__module_path__,'graphicsimageviewer.ui'))
+if __has_PyQt6__:
+    # why is this working with PyQt6 ...
+    uifile = 'graphicsimageviewer_qt6.ui'
+else:
+    # while this is NOT, yet it works with PySide6?
+    uifile = 'graphicsimageviewer.ui'
+    
+Ui_GraphicsImageViewerWidget, QWidget = loadUiType(adapt_ui_path(__module_path__, uifile))
 
 class GraphicsImageViewerScene(QtWidgets.QGraphicsScene):
     signalMouseAt = Signal(int,int,name="signalMouseAt")
@@ -85,7 +116,7 @@ class GraphicsImageViewerScene(QtWidgets.QGraphicsScene):
             item.setVisible(True)
             
     def mouseMoveEvent(self, evt):
-        """Emits signalMouseAt(x,y) if event position is inside the scene.
+        r"""Emits signalMouseAt(x,y) if event position is inside the scene.
         """
         
         if self.__gpixitem__ is None:
@@ -122,7 +153,7 @@ class GraphicsImageViewerScene(QtWidgets.QGraphicsScene):
         evt.ignore()
         
 class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
-    """
+    r"""
     A simple image view widget based on Qt5 graphics view framework
     
     The widget does not own the data but a pixmap copy of it; therefore data values 
@@ -259,7 +290,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.signalZoomChanged[float].emit(self.__zoomVal__)
         
     def _removeGraphicsObject(self, o):
-        """Removes a GraphicsObject from the scene.
+        r"""Removes a GraphicsObject from the scene.
         A GraphicsObject is a frontend to a PlanarGraphics object.
         CAUTION: This function only removes the frontent (a Qt graphics item);
         the widget stil retains a reference to the PlanarGraphics backend of 
@@ -304,7 +335,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
 
     def _removePlanarGraphics(self, name:typing.Optional[str]=None,
                               cursors:typing.Optional[bool]=None):
-        """Removes a PlanarGraphics object by its name.
+        r"""Removes a PlanarGraphics object by its name.
         Optionally, the operation can be restricted to cursors or non-cursors
         (i.e., ROIs).
         """
@@ -340,6 +371,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             selectionDialog = ItemsListDialog(self, objNames,
                                                 title = dlgTitle,
                                                 selectmode = QtWidgets.QAbstractItemView.MultiSelection)
+            selectionDialog.adjustSize()
             
             ans = selectionDialog.exec_()
             
@@ -383,7 +415,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
         if not isinstance(crsId, str) or len(crsId.strip()) == 0:
             selectionDialog = ItemsListDialog(self, sorted([c.name for c in self.graphicsCursors]), "Select cursor")
-            
+            selectionDialog.adjustSize()
             a = selectionDialog.exec_()
             
             if a == QtWidgets.QDialog.Accepted:
@@ -527,6 +559,8 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 w.variable.redoAvailable=True
                 w.variable.undoAvailable=True
 
+        d.adjustSize()
+        
         if d.exec() == QtWidgets.QDialog.Accepted:
             old_name = cursor.name
             
@@ -587,25 +621,6 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 except:
                     traceback_print_exc()
                 
-            #elif txt.find(":") > 0:
-                #try:
-                    #newFrames = [int(f_) for f_ in txt.split(":")]
-                    #if len(newFrames) > 3:
-                        #newFrames = []
-                        
-                    #else:
-                        #newFrames = range(*newFrames)
-                        
-                #except Exception as e:
-                    #traceback_print_exc()
-                    
-            #else:
-                #try:
-                    #newFrames = [int(f_) for f_ in txt.split(",")]
-                    
-                #except Exception as e:
-                    #traceback.print_exc()
-                    
             linkToFrames = linkToFramesCheckBox.selection()
             
             if linkToFrames:
@@ -624,7 +639,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
     @Slot()
     def buildROI(self):
-        """Interactively builds a new ROI (i.e. using the GUI).
+        r"""Interactively builds a new ROI (i.e. using the GUI).
         """
         # NOTE: triggered by ImageViewer.newROIAction
         # once the ROI is build, the ROI is set to emit signalROIConstructed
@@ -664,7 +679,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                      editable=True, frameVisibility=[], 
                      showLabel=True, labelShowsPosition=True,
                      autoSelect=False, parentWidget=None):
-        """Creates a ROI programmatically, or interactively
+        r"""Creates a ROI programmatically, or interactively
         """
         if self.__scene__.rootImage is None:
             return
@@ -753,7 +768,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             if isinstance(params, pgui.PlanarGraphics) and (isinstance(params.name, str) and len(params.name) > 0):
                 tryName = params.name
                 if tryName in rDict.keys():
-                    tryName = utilities.counter_suffix(tryName, [s for s in rDict.keys()])
+                    tryName = counter_suffix(tryName, [s for s in rDict.keys()])
                     
                 roiId = tryName
                 
@@ -819,7 +834,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def newGraphicsObject(self, item:typing.Optional[typing.Union[pgui.PlanarGraphics, type]], 
                           movable=True, editable=True, showLabel=True, 
                           labelShowsPosition=True, autoSelect=False) -> typing.Optional[pgui.GraphicsObject]:
-        """Creates a GraphicsObject that represents a PlanarGraphics for display.
+        r"""Creates a GraphicsObject that represents a PlanarGraphics for display.
         
         The object is created by either:
         1) passing a PlanarGraphics (e.g. constructed in separate code then 
@@ -1032,7 +1047,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         return qobj
         
     def clear(self):
-        """Clears the contents of the viewer.
+        r"""Clears the contents of the viewer.
         
         Removes all cursors, rois and image data and clears the 
         underlying scene.
@@ -1055,7 +1070,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     ####
     
     @Slot(int, str)
-    @safeWrapper
+    @safewrapper
     def slot_newROIConstructed(self, roiType, roiName):
         sender = self.sender()
         
@@ -1103,22 +1118,22 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.signalRoiAdded.emit(sender.backend)
             
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_cursorChanged(self, obj):
         self.signalCursorChanged.emit(obj)
         
     @Slot(object)
-    @safeWrapper
+    @safewrapper
     def slot_roiChanged(self, obj):
         self.signalRoiChanged.emit(obj)
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_zoom(self, val):
         self._zoomView(val)
         
     @Slot(float)
-    @safeWrapper
+    @safewrapper
     def slot_relativeZoom(self, val):
         newZoom = self.__zoomVal__ + val
         
@@ -1130,18 +1145,18 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self._zoomView(newZoom)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editAnyCursor(self):
         self._cursorEditor()
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editSelectedCursor(self):
         if self.selectedCursor is not None:
             self._cursorEditor(self.selectedCursor.ID)
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editCursor(self):
         if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in iter_attribute(self.graphicsCursors, "name"):
             self._cursorEditor(self._cursorContextMenuSourceId)
@@ -1159,20 +1174,20 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                 cursor.backend.updateFrontends()
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editRoi(self):
         # TODO: select a roi fromt the list then bring up a ROI edit dialog
         pass
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editRoiProperties(self): # to always work on selected ROI
         # TODO bring up a ROI edit dialog
         # this MUST have a checkbox to allow shape editing when OK-ed
         pass
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_editRoiShape(self): # to always work on selected ROI!
         if self.selectedRoi is not None:
             self.selectedRoi.editMode = True
@@ -1180,7 +1195,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
 
     @Slot(str, QtCore.QPoint)
-    @safeWrapper
+    @safewrapper
     def slot_graphicsObjectMenuRequested(self, objId, pos):
         if objId in iter_attribute(self.graphicsCursors,"name"):
             self._cursorContextMenuSourceId = objId
@@ -1215,7 +1230,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
             cm.exec(pos)
             
     @Slot(str, bool)
-    @safeWrapper
+    @safewrapper
     def slot_setSelectedGraphicsObject(self, objId:str, sel:bool):
         # TODO 2021-05-10 13:31:27
         # do we want to have an unique selection among ALL the graphics items, 
@@ -1243,9 +1258,9 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         #else:
 
     @Slot(str, bool)
-    @safeWrapper
+    @safewrapper
     def slot_setSelectedCursor(self, cId:str, sel:bool):
-        """To keep track of what cursor is selected, 
+        r"""To keep track of what cursor is selected, 
         independently of the underlying graphics view fw.
         """
         if cId in iter_attribute(self.graphicsCursors, "name"):
@@ -1260,7 +1275,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.signalGraphicsDeselected.emit()
             
     @Slot(str, bool)
-    @safeWrapper
+    @safewrapper
     def slot_setSelectedRoi(self, rId:str, sel:bool):
         if rId in iter_attribute(self.rois, "name"):
             if sel:
@@ -1274,56 +1289,56 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.signalGraphicsDeselected.emit()
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_newHorizontalCursor(self):
         obj = self.newGraphicsObject(pgui.HorizontalCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_newPointCursor(self):
         obj = self.newGraphicsObject(pgui.PointCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_newVerticalCursor(self):
         obj = self.newGraphicsObject(pgui.VerticalCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_newCrosshairCursor(self):
         obj = self.newGraphicsObject(pgui.CrosshairCursor)
         if obj is not None:
             self.signalCursorAdded.emit(obj.backend)
     
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_selectCursor(self, crsId):
         if crsId in iter_attribute(self.graphicsCursors, "name"):
             self.slot_setSelectedCursor(crsId, True)
       
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_selectGraphicsObject(self, objId):
         self.slot_setSelectedGraphicsObject(objId)
       
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_receiveCursorUnlinkRequest(self):
         pass
     
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_receiveCursorLinkRequest(self):
         pass
     
     @Slot(str, "QPointF")
-    @safeWrapper
+    @safewrapper
     def slot_reportCursorPos(self, crsId, pos):
         if crsId in iter_attribute(self.graphicsCursors, "name"):
             obj = [o for o in self.imageCursor(crsId)]
@@ -1346,12 +1361,12 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
                                                     [np.floor(pos.x()), np.floor(pos.y()), obj.xwindow, obj.ywindow])
                 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeCursors(self):
         self._removePlanarGraphics(cursors=True)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeAllCursors(self):
         self._removeAllPlanarGraphics(cursors=True)
         for crs in filter(lambda x: isinstance(x.backend, pgui.Cursor), self.graphicsObjects):
@@ -1361,49 +1376,49 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         self.selectedCursor = None
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeSelectedCursor(self):
         self._removeSelectedPlanarGraphics(cursors=True)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeCursor(self):
         names = iter_attribute(self.graphicsCursors, "name")
         if self._cursorContextMenuSourceId is not None and self._cursorContextMenuSourceId in names:
             self._removePlanarGraphics(_cursorContextMenuSourceId)
         
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_removeCursorByName(self, crsId):
         self._removePlanarGraphics(crsId, True)
             
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeRois(self):
         self._removePlanarGraphics(cursors=False)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeAllRois(self):
         self._removeAllPlanarGraphics(cursors=False)
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeAllGraphics(self):
         self._removeAllPlanarGraphics()
         
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeSelectedRoi(self):
         self._removeSelectedPlanarGraphics(cursors=False)
         
     @Slot(str)
-    @safeWrapper
+    @safewrapper
     def slot_removeRoiByName(self, roiId):
         self._removePlanarGraphics(roiId, False)
 
     @Slot()
-    @safeWrapper
+    @safewrapper
     def slot_removeRoi(self):
         roiIDs = iter_attribute(self.rois, "name")
         if self._roiContextMenuSourceId is not None and self._roiContextMenuSourceId in roiIDs:
@@ -1443,7 +1458,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     
     @property
     def graphicsObjects(self) -> typing.Iterator:
-        """Iterator for existing pictgui.GraphicsObjects.
+        r"""Iterator for existing pictgui.GraphicsObjects.
         """
 
         #NOTE ATTENTION: 2021-05-08 21:27:31 New API:
@@ -1463,20 +1478,20 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
     @property
     def planarGraphics(self) -> typing.Generator:
-        """Iterator for the backends of all the GraphicsObjects in the scene.
+        r"""Iterator for the backends of all the GraphicsObjects in the scene.
         These include cursors and rois.
         """
         return iter_attribute(self.graphicsObjects, "backend")
     
     @property
     def rois(self) -> typing.Iterator:
-        """All ROIs (PlanarGraphics) with frontends in the scene.
+        r"""All ROIs (PlanarGraphics) with frontends in the scene.
         """
         return filterfalse_type(self.planarGraphics, pgui.Cursor)
     
     @property
     def graphicsCursors(self) -> typing.Iterator:
-        """All PlanarGraphics Cursors with frontends in the scene.
+        r"""All PlanarGraphics Cursors with frontends in the scene.
         """
         return filter_type(self.planarGraphics, pgui.Cursor)
         
@@ -1484,11 +1499,11 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
 
     #### BEGIN public methods
     
-    @safeWrapper
+    @safewrapper
     def roi(self, value:typing.Optional[typing.Any]=None, attribute:str="name", 
             predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y, 
             **kwargs):
-        """Iterates through ROIs with specific attributes.
+        r"""Iterates through ROIs with specific attributes.
         
         ROIs are selected by comparing the value of a specific ROI attribute
         (named in 'attribute') against the value specified in 'value'.
@@ -1555,12 +1570,12 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
         return filter_attribute(ret, attribute, value, predicate)
         
-    @safeWrapper
+    @safewrapper
     def imageCursor(self, value:typing.Optional[typing.Any] = None, 
                      attribute:str="name",
                      predicate:typing.Optional[typing.Callable[...,bool]]=lambda x,y: x == y, 
                      **kwargs):
-        """Iterates through Cursors with specific attributes.
+        r"""Iterates through Cursors with specific attributes.
         
         Data cursors are selected by comparing the value of a specific cursor 
         attribute (named in 'attribute') against the value specified in 'value'.
@@ -1639,9 +1654,9 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         return filter_attribute(filter_type(self.planarGraphics, pgui.PointCursor), 
                                 attribute, value, predicate)
         
-    @safeWrapper
+    @safewrapper
     def hasCursor(self, crsid):
-        """Tests for existence of a GraphicsObject cursor with given id or label.
+        r"""Tests for existence of a GraphicsObject cursor with given id or label.
         
         Parameters:
         ===========
@@ -1684,10 +1699,11 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     def keyPressEvent(self, evt):
         if evt.key() == QtCore.Qt.Key_Escape:
             self.__escape_pressed___ = True
-            
+        else:
+            super().keyPressEvent(evt)
         evt.accept()
         
-    @safeWrapper
+    @safewrapper
     def mousePressEvent(self, evt):
         self.__mouse_pressed___ = True
         
@@ -1699,7 +1715,7 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
         
         evt.accept()
     
-    @safeWrapper
+    @safewrapper
     def mouseReleaseEvent(self, evt):
         self.__mouse_pressed___ = True
         

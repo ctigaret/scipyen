@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Synthetic imaging data (image simulations)
+r"""Synthetic imaging data (image simulations)
 """
 #### BEGIN core python modules
 import collections 
@@ -31,9 +31,10 @@ from core import (datatypes  , signalprocessing as sgp, curvefitting as crvf,
                   models, strutils, )
 
 # NOTE: 2020-10-08 09:45:31
-# inside core.utilities, safeWrapper below is imported from core.prog
-from core.utilities import (safeWrapper, counter_suffix, unique, )
-from core.quantities import (units_convertible, check_time_units)
+# inside core.utilities, safewrapper below is imported from core.prog
+from core.utilities import (safewrapper, unique, )
+from core.strutils import counter_suffix
+from core.scipyen_quantities import (unitsConvertible, checkTimeUnits)
 
 #from .patchneo import neo
 from neo.core import baseneo
@@ -51,7 +52,7 @@ from imaging.vigrautils import concatenateImages
 
 
 def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
-    """Generates an idealized time-varying signal described by exponential rise & decay functions.
+    r"""Generates an idealized time-varying signal described by exponential rise & decay functions.
     
     
     Parameters:
@@ -62,7 +63,7 @@ def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
     Variadic parameters:
     ====================
     
-    *args               : list of parameters for the models.compound_exp_rise_multi_decay() function
+    *args               : list of parameters for the models.compound_exponential_rise_decays_product_biased_shifted() function
                         used to generate an EPSP waveform
                         
     **kwargs            : var-keyword parameters (see waveform_signal for details)
@@ -74,7 +75,7 @@ def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
     
     
     
-    The function uses models.compound_exp_rise_multi_decay to generate the waveform.
+    The function uses models.compound_exponential_rise_decays_product_biased_shifted to generate the waveform.
     
     Depending on the model parameters in *args, this can be used to generate
     any combination of exponential rise + decay time-varying waveforms that make physiological
@@ -104,7 +105,7 @@ def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
     
     epsp_train = simulations.synthetic_transients(1, 1000, parameters, asSignal=True, units=pq.mV, sampling_rate=1000 * pq.Hz, name="EPSP train")
 
-    See also models.compound_exp_rise_multi_decay for details 
+    See also models.compound_exponential_rise_decays_product_biased_shifted for details 
     
     EXAMPLE 3: generate a train of epsp+ap at 100 Hz, delivered at 5 Hz (200 ms intervals):
     
@@ -137,7 +138,7 @@ def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
      
     """
     def __f__(x, *args, **kwargs):
-        y = models.compound_exp_rise_multi_decay(x, *args, **kwargs)
+        y = models.compound_exponential_rise_decays_product_biased_shifted(x, *args, **kwargs)
         return y[0]
     
     asSignal = kwargs.get("asSignal", False)
@@ -151,7 +152,7 @@ def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
         if len(duration.magnitude.flatten()) != 1:
             raise TypeError("duration expected to be a scalar; got %s instead" % duration)
         
-        if not check_time_units(duration):
+        if not checkTimeUnits(duration):
             raise TypeError("When a quantity, duration muste have time units; got %s instead" % duration.units)
         
         kwargs["domain_units"] = duration.units
@@ -160,7 +161,7 @@ def synthetic_transients(duration, sampling_frequency, *args, **kwargs):
             if len(sampling_frequency.magnitude.flatten()) != 1:
                 raise TypeError(("sampling_frequency expected to be a scalar;  got %s instead" % sampling_frequency))
             
-            if not units_convertible(duration, 1/sampling_frequency):
+            if not unitsConvertible(duration, 1/sampling_frequency):
                 raise TypeError("duration (%s) and sampling_frequency (%s) have incompatible units" % (duration.units, sampling_frequency.units))
             
             sampling_frequency = sampling_frequency.rescale(1/duration.units).magnitude
@@ -205,7 +206,7 @@ def synthetic_spine(field_width, spatial_resolution, *args, **kwargs):
             if len(spatial_resolution.magnitude.flatten()) != 1:
                 raise TypeError("spatial_resolution expected to be a scalar")
             
-            if not units_convertible(width, spatial_resolution):
+            if not unitsConvertible(width, spatial_resolution):
                 raise TypeError("field_width and spatial_resolution have incompatible units")
             
             # rescale resolution units to width units
@@ -239,7 +240,7 @@ def synthetic_EPSCaT_linescan(field_width, duration,
                               twoChannels=False,
                               addChannelAxis=True,
                               returnCalibration=False):
-    """Generates a synthetic 2D EPSCaT as a vigra.VigraArray
+    r"""Generates a synthetic 2D EPSCaT as a vigra.VigraArray
     
     Parameters:
     ===========
@@ -262,9 +263,9 @@ def synthetic_EPSCaT_linescan(field_width, duration,
     
                 see models.gaussianSum1D() docstring for details
     
-    epscat_parameters: a sequence of parameters for the models.compound_exp_rise_multi_decay function
+    epscat_parameters: a sequence of parameters for the models.compound_exponential_rise_decays_product_biased_shifted function
     
-                see models.compound_exp_rise_multi_decay() docstring for details
+                see models.compound_exponential_rise_decays_product_biased_shifted() docstring for details
                 
     Named parameters (keywords):
     Default values indicated (in parenthesis are default values if field_width and duration are floats)

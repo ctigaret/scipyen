@@ -16,8 +16,11 @@ from neo.core import basesignal
 from neo.core.basesignal import BaseSignal
 from neo.core import container
 from neo.core.dataobject import DataObject, ArrayDict
+from neo.core import spiketrain
+from neo.core.spiketrain import SpikeTrain
+from neo.core.objectlist import ObjectList as NeoObjectList
 
-from core.quantities import (units_convertible, name_from_unit)
+from core.scipyen_quantities import (unitsConvertible, unitFamilyName)
 from core.strutils import is_path #, is_pathname_valid
 
 
@@ -67,9 +70,50 @@ def _new_IrregularlySampledDataSignal(cls, domain, signal, units=None, domain_un
     
     return obj
 
+def _new_places(
+    cls,
+    signal,
+    t_stop,
+    units=None,
+    dtype=None,
+    copy=None,
+    sampling_rate=1.0 * pq.Hz,
+    t_start=0.0 * pq.s,
+    waveforms=None,
+    left_sweep=None,
+    name=None,
+    file_origin=None,
+    description=None,
+    array_annotations=None,
+    annotations=None,
+    segment=None,
+    unit=None,
+):
+    if annotations is None:
+        annotations = {}
+    obj = SpikeTrain(
+        times=signal,
+        t_stop=t_stop,
+        units=units,
+        dtype=dtype,
+        copy=copy,
+        sampling_rate=sampling_rate,
+        t_start=t_start,
+        waveforms=waveforms,
+        left_sweep=left_sweep,
+        name=name,
+        file_origin=file_origin,
+        description=description,
+        array_annotations=array_annotations,
+        **annotations,
+    )
+    obj.segment = segment
+    obj.unit = unit
+    return obj
+
 
 class DataSignal(BaseSignal):
-    """A "generic" neo.AnalogSignal with domain not restricted to time.
+    r"""A "generic" neo.AnalogSignal with domain not restricted to time.
     
     Very much modeled after neo.AnalogSignal
     """
@@ -111,7 +155,22 @@ class DataSignal(BaseSignal):
     
     _recommended_attrs = neo.baseneo.BaseNeo._recommended_attrs
 
-    def __new__(cls, signal, units=None, domain_units=None, time_units = None, dtype=np.dtype("float64"), copy=True, t_start=0*pq.dimensionless, sampling_period=None, sampling_rate=None, name=None, domain_name=None, file_origin=None, description=None, array_annotations=None, **annotations):
+    def __new__(cls, 
+                signal, 
+                units=None, 
+                domain_units=None, 
+                time_units = None, 
+                dtype=np.dtype("float64"), 
+                copy=True, 
+                t_start=0*pq.dimensionless, 
+                sampling_period=None, 
+                sampling_rate=None, 
+                name=None, 
+                domain_name=None, 
+                file_origin=None, 
+                description=None, 
+                array_annotations=None, 
+                **annotations):
         # NOTE: 2021-12-09 21:45:08 try & sort out the mess from pickles saved with prev APIs
         # WARNING: This is NOT guaranteed to succeed
         # if trying to load an old pickle fails, you're better off going to the
@@ -194,9 +253,13 @@ class DataSignal(BaseSignal):
 
         return obj
     
-    def __init__(self, signal, units=None, domain_units = None, time_units = None, dtype=None, copy=True, t_start=0*pq.dimensionless, sampling_rate=None, sampling_period=None, name=None, domain_name = None, file_origin=None, description=None, array_annotations=None, **annotations):
+    def __init__(self, signal, units=None, domain_units = None, time_units = None,
+                 dtype=None, copy=True, 
+                 t_start=0*pq.dimensionless, sampling_rate=None, sampling_period=None, 
+                 name=None, domain_name = None, file_origin=None, description=None, 
+                 array_annotations=None, **annotations):
         
-        """DataSignal constructor.
+        r"""DataSignal constructor.
         """
         # ATTENTION: __init__ is called AFTER __new__ so `self` is already 
         # partly initialized here !!!
@@ -289,7 +352,7 @@ class DataSignal(BaseSignal):
                     annots["array_annotations"] = v
                     
                 elif isinstance(v, dict): # can be array_annotations or anotations; brrr...
-                    if len(v) == signal.shape[1]: # likely array annotations, too
+                    if signal.ndim > 1 and len(v) == signal.shape[1]: # likely array annotations, too
                         if annots["array_annotations"] is None:
                             arr_ann = ArrayDict(signal.shape[1])
                             for ka,va in v.items():
@@ -309,6 +372,8 @@ class DataSignal(BaseSignal):
                     elif k in ("t_start", "sampling_period", "sampling_rate"):
                         domainargs[k] = v
                         
+        # print(f"{self.__class__.__name__}.__init__: quants = {quants}")
+        # print(f"{self.__class__.__name__}.__init__: domainargs = {domainargs}")
         # harmonize time_units with domain_units
         if quants["domain_units"] is None:
             quants["domain_units"] = quants["time_units"]
@@ -318,38 +383,25 @@ class DataSignal(BaseSignal):
         # print(f"{self.__class__.__name__}.__init__ domainargs {domainargs}\n")
         # print(f"{self.__class__.__name__}.__init__ annots {annots}\n")
         
+        if not isinstance(domainargs["t_start"], pq.Quantity):
+            domainargs["t_start"] = 0 * (quants["domain_units"].units  if isinstance(quants["domain_units"], pq.Quantity)  else pq.dimensionless)
+            
         if isinstance(domainargs["sampling_period"], pq.Quantity):
             #print("sampling_period", domainargs["sampling_period"])
-            if units_convertible(1/domainargs["sampling_period"], quants["domain_units"]):
-                domainargs["sampling_rate"] = domainargs["sampling_period"]
-                domainargs["sampling_period"] = 1/domainargs["sampling_period"]
+            if unitsConvertible(domainargs["sampling_period"], domainargs["t_start"]):
+                domainargs["sampling_rate"] = 1/domainargs["sampling_period"]
+            elif domainargs["sampling_period"].units != domainargs["t_start"].units:
+                raise ValueError(f"Sampling period units {domainargs["sampling_period"].units} and t_start units {domainargs["t_start"].units} are incompatible")
+                # domainargs["sampling_period"] = 1/domainargs["sampling_period"]
         else:
-            if not isinstance(domainargs["t_start"], pq.Quantity):
-                domainargs["t_start"] = 0*pq.dimensionless
-
-            domainargs["sampling_period"] = 1 * domainargs["t_start"].units
-                
-        # else:
-        #     sp = domainargs["sampling_period"]
+            if isinstance(domainargs["sampling_rate"], pq.Quantity):
+                if unitsConvertible(1/domainargs["sampling_rate"], domainargs["t_start"].units):
+                    domainargs["sampling_period"] = 1/domainargs["sampling_rate"]
+                elif domainargs["sampling_rate"].units !=1/domainargs["t_start"].units:
+                    raise ValueError(f"Sampling rate units {domainargs["sampling_rate"].units} and t_start units {domainargs["t_start"].units} are incompatible")
+            else:
+                raise ValueError("At least one of 'sampling_rate' or 'sampling_period' must be specified")
             
-                
-        if isinstance(domainargs["sampling_rate"], pq.Quantity):
-            if units_convertible(domainargs["sampling_rate"], quants["domain_units"]):
-                domainargs["sampling_period"] = 1/domainargs["sampling_rate"]
-            
-        if all(isinstance(d, pq.Quantity) for d in (domainargs["t_start"], domainargs["sampling_period"])) :
-            if domainargs["t_start"] == 1/domainargs["sampling_period"]:
-                sr = domainargs["sampling_period"]
-                domainargs["sampling_period"] = domainargs["t_start"]
-                domainargs["sampling_rate"] = sr
-                domainargs["t_start"] = 0 * quants["domain_units"]
-            
-        elif all(isinstance(d, pq.Quantity) for d in (domainargs["t_start"], domainargs["sampling_rate"])) :
-            if domainargs["t_start"] == 1/domainargs["sampling_rate"]:
-                domainargs["sampling_period"] = domainargs["t_start"]
-                domainargs["t_start"] = 0 * quants["domain_units"]
-                
-                
         anns = annots.get("annotations", dict())
         
         if anns is None:
@@ -367,10 +419,11 @@ class DataSignal(BaseSignal):
         self._sampling_period = domainargs["sampling_period"]
 
         if not isinstance(self._domain_name_, str) or len(self._domain_name_.strip()) == 0:
-            self._domain_name_ = name_from_unit(self._origin)
+            self._domain_name_ = unitFamilyName(self._origin)
         
         if not hasattr(self, "_name_") or not isinstance(self._name_, str) or len(self._name_.strip()) == 0:
-            self._name_ = name_from_unit(self.units)
+            self._name_ = strings["name"]
+            # self._name_ = unitFamilyName(self.units)
     
     def __array_finalize__(self, obj):
         super(DataSignal, self).__array_finalize__(obj)
@@ -389,7 +442,7 @@ class DataSignal(BaseSignal):
         
         self.segment            = getattr(obj, "segment",       None)
         self.array_annotations  = getattr(obj, "array_annotations", None)
-        self._domain_name_    = name_from_unit(self._origin)
+        self._domain_name_    = unitFamilyName(self._origin)
     
     def __reduce__(self):
         return _new_DataSignal, (self.__class__, 
@@ -562,7 +615,7 @@ class DataSignal(BaseSignal):
     
     @property
     def origin(self):
-        """The domain coordinate of the first data sample in the signal.
+        r"""The domain coordinate of the first data sample in the signal.
         
         A convenience equivalent of neo.AnalogSignal.t_start
         """
@@ -584,19 +637,19 @@ class DataSignal(BaseSignal):
     
     @property
     def domain_begin(self):
-        """Alias to self.origin
+        r"""Alias to self.origin
         """
         return self.origin
     
     @property
     def domain_end(self):
-        """Alias to self.t_stop, which is an alias to self.domain[-1]
+        r"""Alias to self.t_stop, which is an alias to self.domain[-1]
         """
         return self.origin + self.extent
     
     @property
     def t_start(self):
-        """The domain coordinate of the first data sample in the signal.
+        r"""The domain coordinate of the first data sample in the signal.
         Alias to self.origin; convenience equivalent of neo.AnalogSignal.t_start
         
         """
@@ -604,7 +657,7 @@ class DataSignal(BaseSignal):
     
     @property
     def t_stop(self):
-        """The domain coordinate of the last data sample in the signal.
+        r"""The domain coordinate of the last data sample in the signal.
         Read-only; alias to self.domain_end
         A convenience equivalent of neo.AnalogSignal.t_stop
         """
@@ -659,7 +712,7 @@ class DataSignal(BaseSignal):
             
     @property
     def extent(self):
-        """The extent of the data domain of the signal, as a quantity.
+        r"""The extent of the data domain of the signal, as a quantity.
         
         Also the equivalent of neo.AnalogSignal.duration property. Read-only.
         
@@ -671,7 +724,7 @@ class DataSignal(BaseSignal):
     
     @property
     def end(self):
-        """The equivalent of neo.AnalogSignal.t_stop
+        r"""The equivalent of neo.AnalogSignal.t_stop
         """
         return self.origin + self.extent
     
@@ -686,10 +739,10 @@ class DataSignal(BaseSignal):
     
     @property
     def domain_name(self):
-        """A brief description of the domain name
+        r"""A brief description of the domain name
         """
         if self._domain_name_ is None:
-            self._domain_name_ = name_from_unit(self.domain)
+            self._domain_name_ = unitFamilyName(self.domain)
             
         return self._domain_name_
     
@@ -701,19 +754,19 @@ class DataSignal(BaseSignal):
             
     @property
     def extent(self):
-        """The extent of this signal in its domain
+        r"""The extent of this signal in its domain
         """
         return self.shape[0] / self.sampling_rate
     
     @property
     def duration(self):
-        """Alias to self extent
+        r"""Alias to self extent
         """
         return self.extent
     
     @property
     def domain(self):
-        """The domain for the data samples in the signal.
+        r"""The domain for the data samples in the signal.
         
         Equivalent to neo.AnalogSignal.times. Read-only.
         
@@ -729,7 +782,7 @@ class DataSignal(BaseSignal):
     
     @property
     def times(self):
-        """The domain for the data samples in the signal.
+        r"""The domain for the data samples in the signal.
         Alias to self.domain
         
         Provided for api compatibility with neo.AnalogSignal
@@ -749,7 +802,7 @@ class DataSignal(BaseSignal):
         return new_signal
     
     def time_index(self, t):
-        """Copied from neo.AnalogSignal"""
+        r"""Copied from neo.AnalogSignal"""
         i = (t - self.t_start) * self.sampling_rate
         i  = np/rint(i.simplified.magitude).astype(np.int64)
         
@@ -759,7 +812,7 @@ class DataSignal(BaseSignal):
         return self.time_index(x)
 
     def as_array(self, units=None):
-        """
+        r"""
         Return the signal as a plain NumPy array.
 
         If `units` is specified, first rescale to those units.
@@ -770,13 +823,13 @@ class DataSignal(BaseSignal):
             return self.magnitude
 
     def as_quantity(self):
-        """
+        r"""
         Return the signal as a quantities array.
         """
         return self.view(pq.Quantity)
     
     def rescale(self, units):
-        """Return a copy of the DataSignal object converted to specified units.
+        r"""Return a copy of the DataSignal object converted to specified units.
         
         """
         to_dims = pq.quantity.validate_dimensionality(units)
@@ -910,7 +963,7 @@ class DataSignal(BaseSignal):
         return obj
     
     def time_slice(self, start, stop):
-        """Calls self.interval(start, stop).
+        r"""Calls self.interval(start, stop).
         
         Provided for api compatibility with neo.AnalogSignal
         """
@@ -980,7 +1033,7 @@ class DataSignal(BaseSignal):
         return signal
 
     def downsample(self, downsampling_factor, **kwargs):
-        """
+        r"""
         Downsample the data of a signal.
         This method reduces the number of samples of the AnalogSignal to a fraction of the
         original number of samples, defined by `downsampling_factor`.
@@ -1023,7 +1076,7 @@ class DataSignal(BaseSignal):
         return downsampled_signal
 
     def resample(self, sample_count, **kwargs):
-        """
+        r"""
         Resample the data points of the signal.
         This method interpolates the signal and returns a new signal with a fixed number of
         samples defined by `sample_count`.
@@ -1069,7 +1122,7 @@ class DataSignal(BaseSignal):
         return resampled_signal
 
     def rectify(self, **kwargs):
-        """
+        r"""
         Rectify the signal.
         This method rectifies the signal by taking the absolute value.
         This method is a wrapper of numpy.absolute() and accepts the same set of keyword
@@ -1097,7 +1150,7 @@ class DataSignal(BaseSignal):
         return rectified_signal
 
     def concatenate(self, *signals, overwrite:bool=False, padding:bool=False):
-        """
+        r"""
         Concatenate multiple DataSignal objects across the domain axis.
 
         Units, sampling_rate and number of signal traces must be the same
@@ -1230,7 +1283,7 @@ class DataSignal(BaseSignal):
         return new_ranges
 
 class IrregularlySampledDataSignal(BaseSignal):
-    """Almost literal copy of the neo.IrregularlySampledSignal, accepting a domain other than time
+    r"""Almost literal copy of the neo.IrregularlySampledSignal, accepting a domain other than time
     """
     _parent_objects = ('Segment',)
     _parent_attrs = ('segment',)
@@ -1339,7 +1392,7 @@ class IrregularlySampledDataSignal(BaseSignal):
             # but we do allow rescaling
             # If this behaviour is not what you want then pass a non-quantity array as signal
             if isinstance(units, pq.Quantity):
-                if not units_convertible(quants["units"], units):
+                if not unitsConvertible(quants["units"], units):
                     raise TypeError(f"Specified units {units} are incompatible with those inferred from the signal data {quants['units']}")
                 
                 
@@ -1352,7 +1405,7 @@ class IrregularlySampledDataSignal(BaseSignal):
                 
         else:
             if isinstance(domain_units, pq.Quantity):
-                if not units_convertible(quants["domain_units"], domain_units):
+                if not unitsConvertible(quants["domain_units"], domain_units):
                     raise TypeError(f"Specified domain units {domain_units} are incompatible with those inferred from the domain data {quants['domain_units']}")
 
         # now,, rescale signal data if supplied as quantity(ies)
@@ -1388,7 +1441,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         return obj
                 
     def __init__(self, domain, signal, units=None, domain_units=None, time_units=None, dtype=None, domain_dtype=None, domain_name=None, copy=True, name=None, file_origin=None, description=None,array_annotations=None, **annotations):
-        """IrregularlySampledDataSignal constructor
+        r"""IrregularlySampledDataSignal constructor
         Similar to the neo.IrregularlySampledSignal but not restricted to the 
         time domain.
     
@@ -1492,12 +1545,12 @@ class IrregularlySampledDataSignal(BaseSignal):
                             **annots["annotations"])
 
         
-        self._domain_name_ = name_from_unit(self._domain)
+        self._domain_name_ = unitFamilyName(self._domain)
         
         if isinstance(name, str):
             self._name_ = name
         else:
-            self._name_ = name_from_unit(self.units)
+            self._name_ = unitFamilyName(self.units)
     
     def __reduce__(self):
         return _new_IrregularlySampledDataSignal, (self.__class__,
@@ -1528,7 +1581,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         #self.channel_index      = getattr(obj, "channel_index", None)
         self.array_annotations  = getattr(obj, "array_annotations", None)
         if isinstance(self._domain, pq.Quantity):
-            self._domain_name_    = name_from_unit(self._domain)
+            self._domain_name_    = unitFamilyName(self._domain)
         else:
             self._domain_name_    = "Dimensionless"
         
@@ -1566,12 +1619,13 @@ class IrregularlySampledDataSignal(BaseSignal):
             values_str_list = self.as_array().__repr__().replace("array(", "").replace(")", "").replace("[[", "[").replace("]]", "]").replace(",", "").split("\n")
             
             times_str_list = np.array(self.times).__repr__().replace("array(", "").replace(")", "").replace("[", "").replace("]", "").replace(",", "").split()
-            if len(times_str_list) == 0:
+            if len(times_str_list) == 0 or len(values_str_list) == 0:
                 reps_str_list = [""]
             else:
                 max_len = max([len(s) for s in times_str_list])
-                
-                repr_str_list = ["%s       %s" % (times_str_list[k].rjust(max_len), values_str_list[k].lstrip()) for k in range(len(times_str_list))]
+                min_elems = min(len(values_str_list), len(times_str_list))
+                # print(f"{self.__class__.__name__}.__repr__: min_elems = {min_elems}")
+                repr_str_list = ["%s       %s" % (times_str_list[k].rjust(max_len), values_str_list[k].lstrip()) for k in range(min_elems)]
             
         repr_str_list.insert(0, "%s       %s" % ("Domain", "Signal"))
         repr_str_list.append("* %s       * %s" % (self.times.units, self.units))
@@ -1647,7 +1701,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         '''
         Equality test (==)
         '''
-        from core import quantities as scq
+        from core import scipyen_quantities as scq
         if isinstance(other, self.__class__):
             if len(self) != len(other):
                 return False
@@ -1666,7 +1720,7 @@ class IrregularlySampledDataSignal(BaseSignal):
             
         elif isinstance(other, pq.Quantity):
             if other.size == 1:
-                if not units_convertible(other.units, self.units):
+                if not unitsConvertible(other.units, self.units):
                     ret = np.full_like(self, False)
                 else:
                     ret = self.magnitude == (other.rescale(self.units)).magnitude
@@ -1680,7 +1734,7 @@ class IrregularlySampledDataSignal(BaseSignal):
                 if other.shape != self.shape:
                     return False
                 
-                if not units_convertible(other.units, self.units):
+                if not unitsConvertible(other.units, self.units):
                     ret = np.full_like(self, False)
                 else:
                     ret = self.magnitude == (other.rescale(self.units)).magnitude1
@@ -1736,7 +1790,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     # def mean(self, axis:typing.Optional[int] = None, interpolation:bool=None):
     def mean(self, interpolation:bool=None):
-        """
+        r"""
         TODO interpolation
         """
         if interpolation is None:
@@ -1745,7 +1799,7 @@ class IrregularlySampledDataSignal(BaseSignal):
             raise NotImplementedError
         
     def nanmean(self, interpolation=None):
-        """
+        r"""
         TODO: Interpolation
         """
         if interpolation is None:
@@ -1755,7 +1809,7 @@ class IrregularlySampledDataSignal(BaseSignal):
             raise NotImplementedError
 
     def resample(self, sample_count, **kwargs):
-        """
+        r"""
         Resample the data points of the signal.
         This method interpolates the signal and returns a new signal with a fixed number of
         samples defined by `sample_count`.
@@ -1818,7 +1872,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         raise NotImplementedError
     
     def time_shift(self, t_shift):
-        """
+        r"""
         Shifts a :class:`IrregularlySampledSignal` to start at a new time.
 
         Parameters:
@@ -1858,7 +1912,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     @property
     def t_start(self):
-        """The domain coordinate of the first data sample in the signal.
+        r"""The domain coordinate of the first data sample in the signal.
         A convenience equivalent of neo.AnalogSignal.t_start
         
         Read-only
@@ -1868,7 +1922,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     @property
     def t_stop(self):
-        """The domain coordinate of the last data sample in the signal.
+        r"""The domain coordinate of the last data sample in the signal.
         
         A convenience equivalent of neo.AnalogSignal.t_stop
         
@@ -1886,7 +1940,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     @property
     def extent(self):
-        """The extent of the data domain of the signal, as a quantity.
+        r"""The extent of the data domain of the signal, as a quantity.
         
         Also the equivalent of neo.AnalogSignal.duration property. Read-only.
         
@@ -1902,7 +1956,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     @property
     def end(self):
-        """The equivalent of neo.AnalogSignal.t_stop
+        r"""The equivalent of neo.AnalogSignal.t_stop
         """
         return self.domain[0] + self.extent
     
@@ -1917,10 +1971,10 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     @property
     def domain_name(self):
-        """A brief description of the domain name
+        r"""A brief description of the domain name
         """
         if self._domain_name_ is None:
-            self._domain_name_ = name_from_unit(self.domain) if isinstance(self.domain, pq.Quantity) else "Dimensionless"
+            self._domain_name_ = unitFamilyName(self.domain) if isinstance(self.domain, pq.Quantity) else "Dimensionless"
             
         return self._domain_name_
     
@@ -1931,7 +1985,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     @property
     def domain(self):
-        """The domain coordinate for the data samples in the signal.
+        r"""The domain coordinate for the data samples in the signal.
         
         Equivalent to neo.AnalogSignal.times. 
         
@@ -1948,7 +2002,7 @@ class IrregularlySampledDataSignal(BaseSignal):
                 raise ValueError("new domain has incompatible length (%d); expecting %d" % (len(value), len(self)))
             
             if isinstance(value, pq.Quantity):
-                if not units_convertible(value, self.domain.units):
+                if not unitsConvertible(value, self.domain.units):
                     raise TypeError("incompatible units (%s) for new domain; expecting %s" % (value.units.dimensionality, self.domain.units.dimensionality))
                 
                 if value.units != self.domain.units:
@@ -1968,7 +2022,7 @@ class IrregularlySampledDataSignal(BaseSignal):
     
     @property
     def times(self):
-        """The domain coordinate for the data samples in the signal.
+        r"""The domain coordinate for the data samples in the signal.
         
         Provided for api compatibility with neo.AnalogSignal
         
@@ -1994,7 +2048,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         return new_signal
 
     def as_array(self, units=None):
-        """
+        r"""
         Return the signal as a plain NumPy array.
 
         If `units` is specified, first rescale to those units.
@@ -2005,13 +2059,13 @@ class IrregularlySampledDataSignal(BaseSignal):
             return self.magnitude
 
     def as_quantity(self):
-        """
+        r"""
         Return the signal as a quantities array.
         """
         return self.view(pq.Quantity)
     
     def rescale(self, units):
-        """Return a copy of the DataSignal object converted to specified units.
+        r"""Return a copy of the DataSignal object converted to specified units.
         
         """
         to_dims = pq.quantity.validate_dimensionality(units)
@@ -2140,7 +2194,7 @@ class IrregularlySampledDataSignal(BaseSignal):
         return obj
     
     def time_slice(self, start, stop):
-        """Calls self.interval(start, stop).
+        r"""Calls self.interval(start, stop).
         
         Provided for api compatibility with neo.AnalogSignal
         """
@@ -2287,3 +2341,410 @@ class IrregularlySampledDataSignal(BaseSignal):
 
         return signal
 
+class Places(SpikeTrain):
+    r"""A generic SpikeTrain-like object where the domain is not restricted to time.
+        WARNING In development, do not use yet
+"""
+    _parent_objects = ("Segment",)
+    _parent_attrs = ("segment",)
+    _quantity_attr = "times"
+    _necessary_attrs = (("times", pq.Quantity, 1), 
+                        ("t_start", pq.Quantity, 0), 
+                        ("t_stop", pq.Quantity, 0))
+    _recommended_attrs = (
+        ("waveforms", pq.Quantity, 3),
+        ("left_sweep", pq.Quantity, 0),
+        ("sampling_rate", pq.Quantity, 0),
+    ) + BaseNeo._recommended_attrs
+  
+    def __new__(
+        cls,
+        times,
+        t_stop,
+        units=None,
+        dtype=None,
+        copy=None,
+        sampling_rate:typing.Union[float, pq.Quantity]=1.0,
+        t_start:typing.Union[float, pq.Quantity]=0.0,
+        waveforms=None,
+        left_sweep=None,
+        name=None,
+        file_origin=None,
+        description=None,
+        array_annotations=None,
+        **annotations,
+    ):
+        if copy is not None:
+            raise ValueError(
+                "`copy` is now deprecated in Neo due to removal in Quantites to support Numpy 2.0. "
+                "In order to facilitate the deprecation copy can be set to None but will raise an "
+                "error if set to True/False since this will silently do nothing. This argument will be completely "
+                "removed in Neo 0.15.0. Please update your code base as necessary."
+            )
+
+        if len(times) != 0 and waveforms is not None and len(times) != waveforms.shape[0]:
+            # len(times)!=0 has been used to workaround a bug occurring during neo import
+            raise ValueError("the number of waveforms should be equal to the number of spikes")
+
+        if dtype is not None and hasattr(times, "dtype") and times.dtype != dtype:
+            raise ValueError("cannot change dtype during construction due to change in copy behavior")
+
+            if hasattr(t_start, "dtype") and t_start.dtype != times.dtype:
+                t_start = t_start.astype(times.dtype)
+                
+            if hasattr(t_stop, "dtype") and t_stop.dtype != times.dtype:
+                t_stop = t_stop.astype(times.dtype)
+
+        times, dim = normalize_domain_array(times, units, dtype, copy)
+        
+        # Construct Quantity from data
+        obj = times.view(cls)
+
+        # spiketrain times always need to be 1-dimensional
+        if len(obj.shape) > 1:
+            raise ValueError("Spiketrain times array has more than 1 dimension")
+
+        # if the dtype and units match, just copy the values here instead
+        # of doing the much more expensive creation of a new Quantity
+        # using items() is orders of magnitude faster
+        if (
+            hasattr(t_start, "dtype")
+            and t_start.dtype == obj.dtype
+            and hasattr(t_start, "dimensionality")
+            and t_start.dimensionality.items() == dim.items()
+        ):
+            obj.t_start = t_start.copy()
+        else:
+            obj.t_start = pq.Quantity(t_start, units=dim, dtype=obj.dtype)
+
+        if (
+            hasattr(t_stop, "dtype")
+            and t_stop.dtype == obj.dtype
+            and hasattr(t_stop, "dimensionality")
+            and t_stop.dimensionality.items() == dim.items()
+        ):
+            obj.t_stop = t_stop.copy()
+        else:
+            obj.t_stop = pq.Quantity(t_stop, units=dim, dtype=obj.dtype)
+
+        # Store attributes
+        obj.waveforms = waveforms
+        obj.left_sweep = left_sweep
+        obj.sampling_rate = sampling_rate
+
+        # parents
+        obj.segment = None
+        obj.unit = None
+
+        _check_domain_in_range(obj, obj.t_start, obj.t_stop, view=True)
+
+        return obj
+    
+    def __init__(
+        self,
+        times,
+        t_stop,
+        units=None,
+        dtype=None,
+        copy=None,
+        sampling_rate:typing.Union[float, pq.Quantity]=1.0,
+        t_start:typing.Union[float, pq.Quantity]=0.0,
+        waveforms=None,
+        left_sweep=None,
+        name=None,
+        file_origin=None,
+        description=None,
+        array_annotations=None,
+        **annotations,
+    ):
+        DataObject.__init__(
+            self,
+            name=name,
+            file_origin=file_origin,
+            description=description,
+            array_annotations=array_annotations,
+            **annotations,
+        )
+    
+    def __reduce__(self):
+        """
+        Map the __new__ function onto _new_BaseAnalogSignal, so that pickle
+        works
+        """
+        import numpy
+
+        return _new_places, (
+            self.__class__,
+            numpy.array(self),
+            self.t_stop,
+            self.units,
+            self.dtype,
+            None,
+            self.sampling_rate,
+            self.t_start,
+            self.waveforms,
+            self.left_sweep,
+            self.name,
+            self.file_origin,
+            self.description,
+            self.array_annotations,
+            self.annotations,
+            self.segment,
+            self.unit,
+        )
+
+    def __repr__(self):
+        """
+        Returns a string representing the :class:`SpikeTrain`.
+        """
+        return f"<Places({super().__repr__()}, [{self.t_start}, {self.t_stop}])>"
+
+    def __add__(self, time):
+        """
+        Shifts the time point of all spikes by adding the amount in
+        :attr:`time` (:class:`Quantity`)
+
+        If `time` is a scalar, this also shifts :attr:`t_start` and :attr:`t_stop`.
+        If `time` is an array, :attr:`t_start` and :attr:`t_stop` are not changed unless
+        some of the new spikes would be outside this range.
+        In this case :attr:`t_start` and :attr:`t_stop` are modified if necessary to
+        ensure they encompass all spikes.
+
+        It is not possible to add two SpikeTrains (raises ValueError).
+        """
+        spikes = self.view(pq.Quantity)
+        # check_has_dimensions_time(time)
+        if isinstance(time, (Places, SpikeTrain)):
+            raise TypeError("Can't add two spike trains")
+        new_times = spikes + time
+        if time.size > 1:
+            t_start = min(self.t_start, np.min(new_times))
+            t_stop = max(self.t_stop, np.max(new_times))
+        else:
+            t_start = self.t_start + time
+            t_stop = self.t_stop + time
+            
+        return Places(
+            times=new_times,
+            t_stop=t_stop,
+            units=self.units,
+            sampling_rate=self.sampling_rate,
+            t_start=t_start,
+            waveforms=self.waveforms,
+            left_sweep=self.left_sweep,
+            name=self.name,
+            file_origin=self.file_origin,
+            description=self.description,
+            array_annotations=deepcopy(self.array_annotations),
+            **self.annotations,
+        )
+
+    def __getitem__(self, i):
+        """
+        Get the item or slice :attr:`i`.
+        """
+        obj = super(DataObject, self).__getitem__(i)
+        if hasattr(obj, "waveforms") and obj.waveforms is not None:
+            obj.waveforms = obj.waveforms.__getitem__(i)
+        try:
+            obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
+        except AttributeError:  # If Quantity was returned, not SpikeTrain
+            pass
+        
+        return obj
+
+    def __setitem__(self, i, value):
+        """
+        Set the value the item or slice :attr:`i`.
+        """
+        if not hasattr(value, "units"):
+            value = pq.Quantity(value, units=self.units)  # or should we be strict: raise ValueError(
+            # "Setting a value  # requires a quantity")?
+        # check for values outside t_start, t_stop
+        _check_domain_in_range(value, self.t_start, self.t_stop)
+        super(DataObject, self).__setitem__(i, value)
+
+    def __setslice__(self, i, j, value):
+        if not hasattr(value, "units"):
+            value = pq.Quantity(value, units=self.units)
+        _check_domain_in_range(value, self.t_start, self.t_stop)
+        super(DataObject, self).__setslice__(i, j, value)
+
+    def duplicate_with_new_data(self, signal, t_start=None, t_stop=None, waveforms=None, deep_copy=True, units=None):
+        """
+        Create a new :class:`SpikeTrain` with the same metadata
+        but different data (times, t_start, t_stop)
+        Note: Array annotations can not be copied here because length of data can change
+        """
+        # using previous t_start and t_stop if no values are provided
+        if t_start is None:
+            t_start = self.t_start
+        if t_stop is None:
+            t_stop = self.t_stop
+        if waveforms is None:
+            waveforms = self.waveforms
+        if units is None:
+            units = self.units
+        else:
+            units = pq.quantity.validate_dimensionality(units)
+
+        signal = deepcopy(signal)
+        new_st = Places(signal, t_start=t_start, t_stop=t_stop, waveforms=waveforms, units=units)
+        new_st._copy_data_complement(self, deep_copy=deep_copy)
+
+        # Note: Array annotations are not copied here, because length of data could change
+
+        # overwriting t_start and t_stop with new values
+        new_st.t_start = t_start
+        new_st.t_stop = t_stop
+
+        # consistency check
+        _check_domain_in_range(new_st, new_st.t_start, new_st.t_stop, view=False)
+        spiketrain._check_waveform_dimensions(new_st)
+        return new_st
+
+    def time_shift(self, t_shift):
+        """
+        Shifts a :class:`SpikeTrain` to start at a new time.
+
+        Parameters
+        ----------
+        t_shift: Quantity (time)
+            Amount of time by which to shift the :class:`SpikeTrain`.
+
+        Returns
+        -------
+        spiketrain: :class:`SpikeTrain`
+            New instance of a :class:`SpikeTrain` object starting at t_shift later than the
+            original :class:`SpikeTrain` (the original :class:`SpikeTrain` is not modified).
+        """
+        # We need new to make a new SpikeTrain
+        times = self.times.copy() + t_shift
+        t_stop = self.t_stop + t_shift
+        t_start = self.t_start + t_shift
+        new_st = Places(
+            times=times,
+            t_stop=t_stop,
+            units=self.unit,
+            sampling_rate=self.sampling_rate,
+            t_start=t_start,
+            waveforms=self.waveforms,
+            left_sweep=self.left_sweep,
+            name=self.name,
+            file_origin=self.file_origin,
+            description=self.description,
+            array_annotations=deepcopy(self.array_annotations),
+            **self.annotations,
+        )
+
+        # Here we can safely copy the array annotations since we know that
+        # the length of the SpikeTrain does not change.
+        new_st.array_annotate(**self.array_annotations)
+
+        return new_st
+    
+def _check_domain_in_range(value, t_start, t_stop, view=False) -> None:
+    """
+    Verify that all times in `value` are between `t_start`
+    and `t_stop` (inclusive)
+
+    Parameters
+    ----------
+    value: array-like
+        An array-like object with times
+    t_start: float
+        The starting time
+    t_stop: float
+        The stopping time
+    view: bool, default: False
+        If true views are used for the test. This increases speed but
+        is only safe if certain that the dtype and units are the same.
+
+    Raises
+    ------
+    ValueError
+        * If t_stop < t_start
+        * value.min() < t_start
+        * value.max() > t_start
+
+    Returns
+    -------
+    None: If check passes
+    """
+
+    if t_start > t_stop:
+        raise ValueError(f"t_stop ({t_stop}) is before t_start ({t_start})")
+
+    if not value.size:
+        return
+
+    if view:
+        value = value.view(np.ndarray)
+        t_start = t_start.view(np.ndarray)
+        t_stop = t_stop.view(np.ndarray)
+
+    if value.min() < t_start:
+        raise ValueError(f"The first spike ({value}) is before t_start ({t_start})")
+    if value.max() > t_stop:
+        raise ValueError(f"The last spike ({value}) is after t_stop ({t_stop})")
+
+
+def normalize_domain_array(times, units=None, dtype=None, copy=None):
+    """
+    Return a quantity array with the correct units.
+    There are four scenarios:
+
+    A. times (NumPy array), units given as string or Quantities units
+    B. times (Quantity array), units=None
+    C. times (Quantity), units given as string or Quantities units
+    D. times (NumPy array), units=None
+
+    In scenarios A-C we return a tuple (times as a Quantity array, dimensionality)
+    In scenario C, we rescale the original array to match `units`
+    In scenario D, we raise a ValueError
+    """
+
+    if copy is not None:
+        raise ValueError(
+            "`copy` is now deprecated in Neo due to removal in Quantites to support Numpy 2.0. "
+            "In order to facilitate the deprecation copy can be set to None but will raise an "
+            "error if set to True/False since this will silently do nothing. This argument will be completely "
+            "removed in Neo 0.15.0. Please update your code base as necessary."
+        )
+
+    if dtype is None:
+        if not hasattr(times, "dtype"):
+            dtype = float
+    if units is None:
+        # No keyword units, so get from `times`
+        try:
+            dim = times.units.dimensionality
+        except AttributeError:
+            raise ValueError("you must specify units")
+    else:
+        if hasattr(units, "dimensionality"):
+            dim = units.dimensionality
+        else:
+            dim = pq.quantity.validate_dimensionality(units)
+
+        if hasattr(times, "dimensionality"):
+            if times.dimensionality.items() == dim.items():
+                units = None  # units will be taken from times, avoids copying
+            else:
+                raise ValueError("cannot rescale and return view")
+
+    # check to make sure the units are time
+    # this approach is orders of magnitude faster than comparing the
+    # reference dimensionality
+    # NOTE: 2025-11-10 21:26:53
+    # do away with checking for time units
+    # if len(dim) != 1 or list(dim.values())[0] != 1 or not isinstance(list(dim.keys())[0], pq.UnitTime):
+    #     ValueError(f"Units have dimensions {dim.simplified}, not [time]")
+    return (
+        pq.Quantity(
+            times,
+            units=units,
+            dtype=dtype,
+        ),
+        dim,
+    )

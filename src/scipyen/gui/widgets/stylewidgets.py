@@ -1,4 +1,4 @@
-"""Style widgets
+r"""Style widgets
 """
 
 import array, os, typing, numbers
@@ -7,16 +7,34 @@ from traitlets import Bunch
 from enum import IntEnum
 
 import numpy as np
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 
-from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
-from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-# from qtpy.uic import loadUiType as __loadUiType__
-# from PyQt5 import QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg
-# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
-# # from PyQt5.uic import loadUiType as __loadUiType__
-
-from core.prog import safeWrapper
+from core.prog import safewrapper
 from core.utilities import reverse_mapping_lookup
 
 from gui.painting_shared import (make_transparent_bg,
@@ -203,7 +221,7 @@ class PenComboDelegate(QtWidgets.QAbstractItemDelegate):
             return QtCore.QSize(50, option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
     
 class PenComboBox(QtWidgets.QComboBox):
-    """Use to select a QPen stroke, cap or join style
+    r"""Use to select a QPen stroke, cap or join style
     See:
       qt examples/widgets/painting/pathstroke
       qt examples/widgets/painting/pinterpaths
@@ -255,13 +273,14 @@ class PenComboBox(QtWidgets.QComboBox):
         self.setMaxVisibleItems(13)
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slotActivated(self, index:int):
         if self.styling == "stroke" and index == 0:
             from .quickdialog import (QuickDialog, OptionalStringInput)
             dlg  = QuickDialog(self, "Custom Dash Pattern")
             namePrompt = OptionalStringInput(dlg, "Name:")
             dashPrompt = OptionalStringInput(dlg, "Dash style:")
+            dlg.adjustSize()
             if dlg.exec_():
                 name = namePrompt.text()
                 dash = dashPrompt.text()
@@ -283,7 +302,7 @@ class PenComboBox(QtWidgets.QComboBox):
         self.activated[object].emit(self._internalStyle)
 
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slotHighlighted(self, index:int):
         if index == 0:
             self._internalStyle = self._customStyle
@@ -432,7 +451,7 @@ class PenComboBox(QtWidgets.QComboBox):
             
     @property
     def value(self):
-        """Returns a QPen stroke style, cap style or join style, depending on 
+        r"""Returns a QPen stroke style, cap style or join style, depending on 
         which styling has been used to initialize this instance of PenComboBox
         """
         return self._internalStyle
@@ -534,7 +553,7 @@ class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
         return QtCore.QSize(50, option.fontMetrics.height() + 2 * self.LayoutMetrics.FrameMargin)
     
 class BrushComboBox(QtWidgets.QComboBox):
-    """Selection of brush styles, texture and gradients, including custom ones.
+    r"""Selection of brush styles, texture and gradients, including custom ones.
 
     For brush gradients see 
       qt examples/widgets/painting/gradients
@@ -604,7 +623,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         
     @property
     def value(self):
-        """Returns a QBrush
+        r"""Returns a QBrush
         """
         return self._brush
         
@@ -664,7 +683,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         painter.end()
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slotActivated(self, index:int):
         if self.count() == 0:
             return
@@ -672,7 +691,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         customGradientBrushIndices = [k for k, (name,value) in enumerate(self._styles.items()) if isinstance(value, QtGui.QGradient) or name == "Gradient..."]
         
         if index in customTextureBrushIndices:
-            if sys.platform == "win32":
+            if sys.platform.startswith("win32"):
                 options = QtWidgets.QFileDialog.Option.DontUseNativeDialog
                 kw = {"options":options}
             else:
@@ -744,7 +763,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         self.activated[object].emit(self._internalStyle)
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slotHighlighted(self, index:int):
         gradientBrushIndex = [n for n in self._styles.keys()].index("Gradient...")
         pixmapBrushIndex = [n for n in self._styles.keys()].index("Pixmap...")
@@ -754,7 +773,7 @@ class BrushComboBox(QtWidgets.QComboBox):
         self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
         
     @Slot(int)
-    @safeWrapper
+    @safewrapper
     def _slotGradientDialogFinished(self, value:int):
         if value == QtGui.QDialog.Accepted:
             qGradient, points = self._gradientDialog.qGradientWithPoints

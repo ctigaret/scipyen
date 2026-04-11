@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Module with utilities for an external IPython kernel.
+r"""Module with utilities for an external IPython kernel.
 To be used on the client side (i.e. Scipyen app side, NOT in the REMOTE kernel).
 Contains functions and types used to communicate with the remote kernel via its
 messaging API.
@@ -70,9 +70,43 @@ messaging API.
 # easily abused by importing into the remote namespace functions and modules 
 # that end up only being used by the client, in the local namespace.
 
-import os, sys, pickle, inspect, typing
+import os, sys, pickle, inspect, traceback, types, typing
 from functools import wraps
 from core.traitcontainers import DataBag
+from core.prog import safewrapper
+
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+    qtPackages = ", ".join(PySide6._find_all_qt_modules())
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    qtPackages = ", ".join([p for p in qtpy.__dict__.keys() if p.startswith("Qt") and isinstance(qtpy.__dict__[p], types.ModuleType)])
+    __has_sip__ = True
+
+
+# print(f"extipyutils_client: QT API is {qtpy.API}")
+
+
 #from contextlib import contextmanager
 #print(sys.path)
 
@@ -82,14 +116,6 @@ __scipyen_path__ =  os.path.dirname(__module_path__)
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-#__virtual_env_dir__ = os.environ.get("VIRTUAL_ENV", None)
-
-#if isinstance(__virtual_env_dir__, str) and len(__virtual_env_dir__.strip()):
-    #__virtual_site_packages__ = os.path.join(__virtual_env_dir__, "lib", "python%i.%i" % sys.version_info[0:2], "site-packages")
-    
-#else:
-    #__virtual_site_packages__ = None
-    
 # initialization script for ALL available external IPython consoles
 # private: call indirectly via init_commands!
 _ext_ipython_initialization_file = os.path.join(__module_path__, "extipy_init.py")
@@ -115,12 +141,7 @@ init_commands = [
     "import sys, os, io, warnings, numbers, types, typing, re, importlib",
     "import traceback, keyword, inspect, itertools, functools, collections",
     ]
-#if __virtual_site_packages__:
-    #init_commands.append("".join(["sys.path.insert(2, '", __virtual_site_packages__, "')"]))
 
-if os.path.isfile(_ext_ipython_initialization_file):
-    init_commands.append(_ext_ipython_initialization_cmd)
-    
 # NOTE: 2022-02-06 22:30:26
 # some of the commands below expose Scipyen API to external kernels; this may
 # be done via such init commands as below; 
@@ -133,6 +154,8 @@ if os.path.isfile(_ext_ipython_initialization_file):
 # access by the user.
 init_commands.extend(
     [
+    "".join(["sys.path.insert(2, '", __scipyen_path__, "')"]),
+    "import sys, os",
     "import signal, pickle, json, csv",
     "import numpy as np",
     "import scipy",
@@ -140,6 +163,31 @@ init_commands.extend(
     "import seaborn as sb",
     "from importlib import reload",
     "from pprint import pprint",
+    "import qtpy",
+    "from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )",
+    "from qtpy.QtCore import (Signal, Slot, Property,)",
+    "__has_PySide6__ = False",
+    "__has_PyQt6__ = False",
+    "__has_sip__ = False",
+    "if os.environ['QT_API'] == 'pyside6':",
+    "    __has_PySide6__ = True",
+    "    import PySide6",
+    "    from PySide6 import Shiboken",
+    "    from PySide6.QtUiTools import loadUiType", # -- A-HA!
+    f"    from PySide6 import {qtPackages}",
+    "    QAction = QtGui.QAction",
+    "    QActionGroup = QtGui.QActionGroup",
+    "    QShortcut = QtGui.QShortcut",
+    "else:",
+    "    if os.environ['QT_API'] == 'pyqt6':",
+    "        __has_PyQt6__ = True",
+    "    from qtpy import sip",
+    "    from qtpy.uic import loadUiType",
+    "    QAction = QtWidgets.QAction",
+    "    QActionGroup = QtWidgets.QActionGroup",
+    "    QShortcut = QtWidgets.QShortcut",
+    "    __has_sip__ = True",
+    f"    from qtpy import ({qtPackages})",
     "import matplotlib as mpl",
     "mpl.rcParams['savefig.format'] = 'svg'",
     "mpl.rcParams['xtick.direction'] = 'in'",
@@ -147,20 +195,19 @@ init_commands.extend(
     "from matplotlib import pyplot as plt",
     "from matplotlib import cm",
     "import matplotlib.mlab as mlb",
-    #"mpl.use('Qt5Agg')",
-    "".join(["sys.path.insert(2, '", __scipyen_path__, "')"]),
-    "from core import extipyutils_host as hostutils",
+    "import core.extipyutils_host as hostutils",
+    # "from hostutils import ContextExecutor",
     "from core.workspacefunctions import *",
+    "import core.signalprocessing as sigp",
     "from plots import plots as plots",
     "from core import datatypes as dt",
     "from core import neoutils",
     "from core.datatypes import * ",
-    "import core.signalprocessing as sigp",
     "import core.curvefitting as crvf",
     "import core.strutils as strutils",
     "import core.data_analysis as anl",
     "from core.utilities import (summarize_object_properties,standard_obj_summary_headers,safe_identity_test, unique, index_of, gethash,NestedFinder, normalized_index)",
-    "from core.prog import (safeWrapper, deprecation, iter_attribute,filter_type, filterfalse_type, filter_attribute, filterfalse_attribute)",
+    "from core.prog import (safewrapper, deprecation, iter_attribute,filter_type, filterfalse_type, filter_attribute, filterfalse_attribute)",
     "from core import prog",
     "from core.traitcontainers import DataBag",
     "from core.triggerprotocols import TriggerProtocol",
@@ -174,36 +221,30 @@ init_commands.extend(
     "from imaging.axiscalibration import (AxesCalibration,AxisCalibrationData, ChannelCalibrationData, CalibrationData)",
     "from iolib import pictio as pio",
     "from iolib import h5io, jsonio",
-    "print('To use matplotlib run %matplotlib magic')"
+    "shell = get_ipython()",
+    "print('To use matplotlib run %matplotlib magic')",
+    
     ])
     
-#init_commands = ["import sys, os, io, warnings, numbers, types, typing, re, importlib",
-                 #"import traceback, keyword, inspect, itertools, functools, collections",
-                 #"import signal, pickle, json, csv",
-                 #"import numpy as np",
-                 #"import scipy",
-                 #"import pandas as pd",
-                 #"import seaborn as sb",
-                 #"from importlib import reload",
-                 #"from pprint import pprint",
-                 #"import matplotlib as mpl",
-                 #"mpl.rcParams['savefig.format'] = 'svg'",
-                 #"mpl.rcParams['xtick.direction'] = 'in'",
-                 #"mpl.rcParams['ytick.direction'] = 'in'",
-                 #"from matplotlib import pyplot as plt",
-                 #"from matplotlib import cm",
-                 #"import matplotlib.mlab as mlb",
-                 #"".join(["sys.path.insert(2, '", os.path.dirname(__module_path__), "')"]),
-                 #"from core import extipyutils_host as hostutils",
-                 
-                 ##"from IPython.lib.deepreload import reload as dreload",
-                 ##"sys.path=['" + sys.path[0] +"'] + sys.path",
-                 #]
 
+if os.path.isfile(_ext_ipython_initialization_file):
+    init_commands.append(_ext_ipython_initialization_cmd)
+    
+init_commands.extend([
+    "u_ns = get_ipython().user_ns",
+    "get_ipython().user_ns_hidden.update(u_ns)",
+    "del u_ns"
+    ])
 
+gui_magic = "%gui qt" if __has_PyQt6__ or __has_PySide6__ else "%gui qt5"
+
+init_scipyen_qt_gui = [
+    gui_magic,
+    "import gui as scipyengui",
+    ]
 
 class ForeignCall(DataBag):
-    """Usage:
+    r"""Usage:
     call = ForeignCall(user_expressions={"test":"etc"})
     
     kernel_client.execute(*call())
@@ -272,7 +313,7 @@ class ForeignCall(DataBag):
 #### BEGIN expression generators    
 
 def make_user_expression(**kwargs):
-    """TODO Generates a single user_expressions string for execution in a remote kernel.
+    r"""TODO Generates a single user_expressions string for execution in a remote kernel.
 
     The user_expressions parameter to the kernel local client's execute() is a 
     dict mapping some name (local to the calling namespace) to a command string
@@ -399,22 +440,32 @@ def pickle_wrap_expr(expr):
     return "".join(["pickle.dumps(",expr,")"])
     
 def define_foreign_data_props_getter_fun_str(dataname:str, namespace:str="Internal") -> str:
-    """Defines a function to retieve object properties in the foreign namespace.
+    r"""Defines a function to retieve object properties in the foreign namespace.
     
     The function is wrapped by a context manager so that any module imports are
     are not reflected in the foreign namespace. - is this true !?
     
     The function should be removed from the foreign ns after use.
     """
+    # NOTE: 2024-09-20 22:07:10
+    # remove "Icon" from summary, otherwise we have issues eval-ing it
     return "\n".join(["@hostutils.ContextExecutor()", # core.extipyutils_host is imported remotely as hostutils
     "def f(objname, obj):",                           # use regular function wrapped in a context manager
     "    from core.utilities import summarize_object_properties",
-    "    return summarize_object_properties(objname, obj, namespace='%s')" % namespace,
+    f"    ret = summarize_object_properties(objname, obj, namespace='{namespace}')",
+    "    ret.pop('Icon', None)",
+    "    return ret"
     "", # ensure NEWLINE
     ])
+    # return "\n".join(["@hostutils.ContextExecutor()", # core.extipyutils_host is imported remotely as hostutils
+    # "def f(objname, obj):",                           # use regular function wrapped in a context manager
+    # "    from core.utilities import summarize_object_properties",
+    # "    return summarize_object_properties(objname, obj, namespace='%s')" % namespace,
+    # "", # ensure NEWLINE
+    # ])
 
 def define_foreign_data_props_getter_gen_str(dataname:str, namespace:str="Internal") -> str:
-    """Defines a generator to retrieve object properties in the foreign namespace.
+    r"""Defines a generator to retrieve object properties in the foreign namespace.
     
     The function is decorated with @contextmanager hence behaves like such, and
     any module imports are not reflected in the foreign namespace.
@@ -426,7 +477,9 @@ def define_foreign_data_props_getter_gen_str(dataname:str, namespace:str="Intern
     return "\n".join(["@hostutils.contextmanager", # core.extipyutils_host is imported remotely as hostutils
     "def f_gen(objname, obj):",             # use a generator func
     "    from core.utilities import summarize_object_properties",
-    "    yield summarize_object_properties(objname, obj, namespace='%s')" % namespace,
+    f"    ret = summarize_object_properties(objname, obj, namespace='{namespace}')",
+    "    ret = ret.pop('Icon', None)",
+    "    yield ret"
     "",                                                     # ensure NEWLINE
      ])
     
@@ -435,7 +488,7 @@ def define_foreign_data_props_getter_gen_str(dataname:str, namespace:str="Intern
 #### BEGIN call generators
 
 def cmds_get_foreign_data_props(dataname:str, namespace:str="Internal") -> list:
-    """Creates a list of execute calls retrieving data properties in foregn ns
+    r"""Creates a list of execute calls retrieving data properties in foregn ns
     
     """
     # see NOTE 2020-07-11 10:26:3`8
@@ -485,11 +538,11 @@ def cmds_get_foreign_data_props(dataname:str, namespace:str="Internal") -> list:
     return exec_calls
     
 def cmds_get_foreign_data_props2(dataname:str, namespace:str="Internal") -> list:
-    """Creates a list of execute calls retrieving data properties in foregn ns
+    r"""Creates a list of execute calls retrieving data properties in foregn ns
     
     """
     exec_calls = list()
-    #### BEGIN variant 2 - works but the with statement must be executed (hence
+    #### BEGIN variant 2 - works but the 'with' statement must be executed (hence
     # passed as code , not as part of user_expressions)
     # a bit more convoluted, as it creates sub_special_%(dataname) in the foreign namespace
     special = "properties_of"
@@ -527,7 +580,7 @@ def cmds_get_foreign_data_props2(dataname:str, namespace:str="Internal") -> list
     return exec_calls
     
 def cmd_copy_from_foreign(varname:str, as_call=True) -> typing.Union[ForeignCall, dict]:
-    """Create user expression to fetch varname from a foreign kernel's namespace.
+    r"""Create user expression to fetch varname from a foreign kernel's namespace.
     
     The foreign kernel is the with which the kernel client executing this command
     is communicating.
@@ -592,7 +645,7 @@ def cmd_copy_from_foreign(varname:str, as_call=True) -> typing.Union[ForeignCall
         return expr
 
 def cmd_copies_from_foreign(*args, as_call=True) -> typing.Union[ForeignCall, dict]:
-    """Create user expressions to fetch several variables from a foreign kernel.
+    r"""Create user expressions to fetch several variables from a foreign kernel.
     
     The foreign kernel is the with which the kernel client executing this command
     is communicating.
@@ -653,7 +706,7 @@ def cmd_copies_from_foreign(*args, as_call=True) -> typing.Union[ForeignCall, di
     return expr
 
 def cmd_copy_to_foreign(dataname, data:typing.Any) -> str:
-    """Creates a user expression to place a copy of data to a remote kernel space.
+    r"""Creates a user expression to place a copy of data to a remote kernel space.
     
     The data will be bound, in the remote namespace, to the identifier specified
     by "dataname".
@@ -692,7 +745,7 @@ def cmd_copy_to_foreign(dataname, data:typing.Any) -> str:
     return exec_calls
     
 def cmd_foreign_namespace_listing(namespace:str="Internal", as_call=True) -> dict:
-    """Creates a user_expression containing the variable names in a foreign namespace.
+    r"""Creates a user_expression containing the variable names in a foreign namespace.
     """
     
     expr = {"ns_listing_of_%s" % namespace : "dir()"}
@@ -704,7 +757,7 @@ def cmd_foreign_namespace_listing(namespace:str="Internal", as_call=True) -> dic
     return expr
     
 def cmd_foreign_shell_ns_listing(namespace:str="Internal", as_call=True) -> dict:
-    """Creates a user_expression containing the variable names in a foreign namespace.
+    r"""Creates a user_expression containing the variable names in a foreign namespace.
     
     This one returns get_ipython().user_ns and get_ipython().user_ns_hidden
     """
@@ -724,11 +777,31 @@ def cmd_foreign_shell_ns_listing(namespace:str="Internal", as_call=True) -> dict
     
     return expr
     
+def cmd_foreign_shell_ns_hidden_listing(namespace:str="Internal", as_call=True) -> dict:
+    r"""Creates a user_expression containing the variable names in a foreign namespace.
+    
+    This one returns get_ipython().user_ns and get_ipython().user_ns_hidden
+    """
+    
+    # NOTE 2020-07-29 22:51:02: WRONG: the value of "ns_listing_of_%s" % namespace
+    # must be a str
+    #ue1 = "{'user_ns':set([k for k in get_ipython().user_ns.keys() if k not in get_ipython().user_ns_hidden.keys() and not inspect.ismodule(get_ipython().user_ns[k]) and not k.startswith('_') ])}"
+    
+    ue1 = "{'user_ns':set([k for k in get_ipython().user_ns_hidden.keys() or k.startswith('_') ])}"
+    
+    expr = {f"hidden_ns_listing_of_{namespace}" : ue1}
+    #expr = {"ns_listing_of_%s" % namespace.replace(" ", "_") : ue1}
+    
+    if as_call:
+        return ForeignCall(user_expressions = expr)
+    
+    return expr
+    
 #### END call generators
 
-
+@safewrapper
 def unpack_shell_channel_data(msg:dict) -> dict:
-    """Extracts data shuttled from the remote kernel via " execute_reply" message.
+    r"""Extracts data shuttled from the remote kernel via " execute_reply" message.
     
     The data are present as text/plain mime type data in the received execute_reply
     message, inside its "content"/"user_expressions" nested dictionary.
@@ -741,7 +814,7 @@ def unpack_shell_channel_data(msg:dict) -> dict:
     string representation of the seriazied variable (as a byte string) or just 
     plain text information. 
     
-    In the former case, the fucntion de-serialized the bytes into a copy of the 
+    In the former case, the function de-serialized the bytes into a copy of the 
     variable and binds it to %s (i..e, the same identifier to which the variable 
     is bound in the remote namespace).
 
@@ -749,7 +822,7 @@ def unpack_shell_channel_data(msg:dict) -> dict:
     to the %s identifier in the caller namespace
     
     ATTENTION 
-    If ths identifier is already bound to another variable in the caller namespace,
+    If this identifier is already bound to another variable in the caller namespace,
     this may result in this (local) variable being overwritten by the copy of the 
     remote variable. 
     
@@ -771,7 +844,7 @@ def unpack_shell_channel_data(msg:dict) -> dict:
     # "ns_listing_of_%s"    (workspace_name)
     #
     # ATTENTION The specials are set by the functions than generate the commands
-    # generating the user_expressions dictionaries.
+    # for constructing the user_expressions dictionaries.
     
     ret = dict()
     # peel-off layers one by one so we can always be clear of what this does
@@ -786,31 +859,19 @@ def unpack_shell_channel_data(msg:dict) -> dict:
                     data_dict = pickle.loads(eval(data_str))
                     
                 else:
-                    data_dict = {key:eval(data_str)}
+                    try:
+                        data_dict = {key:eval(data_str)}
+                    except:
+                        print(f"unpack_shell_channel_data: data_str = {data_str}\n")
+                        data_dict = dict()
+                        traceback.print_exc()
                     
                 ret.update(data_dict)
-                
-            
-            #elif value_status == "error":
-                #ret.update({"error_%s_%s" % (key, msg["workspace_name"]): {"ename":value["ename"],
-                                               #"evalue": value["evalue"],
-                                               #"traceback": value["traceback"]}})
-                
-            #else:
-                #ret.update({"%s_%s_%s" % (value_status, key, msg["workspace_name"]): value_status})
-                    
-    #elif msg_status == "error":
-        #ret.update({"error_%s_%s" % (msg["msg_type"], msg["workspace_name"]): {"ename": msg["content"]["ename"],
-                                                   #"evalue": msg["content"]["evalue"],
-                                                   #"traceback": msg["content"]["traceback"]}})
-        
-    #else:
-        #ret.update({"%s_%s_%s" % (msg_status, msg["msg_type"], msg["workspace_name"]): msg_status})
-    
+
     return ret
 
 def execute(client, *args, **kwargs):
-    """Execute code in the kernel, sent via the specified kernel client.
+    r"""Execute code in the kernel, sent via the specified kernel client.
         
     Parameters
     ----------

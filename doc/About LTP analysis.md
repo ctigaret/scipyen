@@ -19,7 +19,7 @@ The document is specific for the following devices & software:
 ### <a name=clampex_protocol></a> Interleaved stimulation protocol
 In `Clampex`, interleaved two-pathway stimulation can be achieved by setting up a protocol in `Episodic Stimulation` mode (selected in the `Mode/Rate` tab of the `Protocol editor` dialog).
 
-The protocol consists of a *trial* with six *runs* per trial, and two *sweeps* per run; alternative waveforms and alternative digital configuration are *enabled*. 
+The protocol consists of a *trial* with six *runs* per trial, and two *sweeps* per run; alternative waveforms and alternative digital configuration are *enabled*.
 
 Each *sweep* lasts one second, and within each run the sweeps are recorded with five seconds interval (*start-to-start*).
 
@@ -44,7 +44,7 @@ For example, the analog input 0 (by default named "IN0" in `Clampex`) provided i
 * "Im_prim_0", to be used as the "primary output signal in *voltage-clamp*, for the amplifier channel 0"
 * "Vm_prim_0", to be used as the "primary output signal in current-clamp, for the amplifier channel 0"
 
-Likewise, the analog input 1 (by default named "IN1" in `Clampex`) provided the analog input 1 of the digital acquisition box is connected to the secondary output of the amplifier channel 0, can be also named as: 
+Likewise, the analog input 1 (by default named "IN1" in `Clampex`) provided the analog input 1 of the digital acquisition box is connected to the secondary output of the amplifier channel 0, can be also named as:
 
 * "Vm_sec_0", to be used as the "secondary output signal in *voltage-clamp*, for the ampltifier channel 0"
 * "Im_sec_0", to be used as the "secondary output signal in *current-clamp*, for the ampltifier channel 0"
@@ -78,17 +78,17 @@ The EPSC amplitudes are then calculated based on epochs set up in each of the fo
 
 ### 1. Load the abf files for base, chase, induction, and where possible, cross-talk
 
-**NOTE**: in case the Clampex protocol consisted of several runs per trial, the 
+**NOTE**: in case the Clampex protocol consisted of several runs per trial, the
  block's segments (or sweeps) should contain the minute average responses in
  two sweeps (one per stimulation pathway); otherwise, the block's segments
  contain immediate (or raw) synaptic response data and you may need to average
  these (more about this later)
 
  **WARNING**: Check that data has:
-     
+
 1. appropriate names e.g. `base_X`, `chase_X`, `xtalk_X`, `tbp_0_X` etc
 2. appropriate structure:
-    
+
 * for the evoked epsc (or epsp), `base_*` and `chase_*` are `neo.Block` objects expected to contain and *EVEN* number of segments: with the *EVEN* indices(0, 2, 4, etc) containing signals related to one pathway index (say, path 0) and the *ODD* indices (1,3,5, etc) containing signals related to the other pathway index (path 1)
 
 * make sure the `xtalk_*` blocks contain cross-talk data (if recorded)
@@ -100,7 +100,7 @@ The EPSC amplitudes are then calculated based on epochs set up in each of the fo
 If you do not yet have an `LTPOptions` `dict` saved somewhere, call:
 
 ```python
-LTPOptions=ltp.load_synaptic_plasticity_options() 
+LTPOptions=ltp.load_synaptic_plasticity_options()
 ```
 otherwise, just load it (usually, from a pickle `*.pkl` file)
 
@@ -113,7 +113,7 @@ ltp_data = ltp.generate_minute_average_data_for_LTP(base, chase, LTPOptions, tes
 ```
 
  where:
-     
+
 `base:str` is a search string containing the common prefix for the baseline data, as a global
 pattern, e.g. `base_*`; make sure you include the asterisk and optional
 underscores so that you don't take into account other data objects named
@@ -128,15 +128,15 @@ more than two pathways stimulated in your experiment - just make sure this is se
 the LTP induction is done on either pathway `0` or `1`.
 
 `cell_name`: `str` - the name of your cell (for record-keeping)
-      
+
 The call [above](#gen_ltp_dict) returns a `dict` containing:
-    
+
 * <a name=Control_subdict></a>`Control`:`dict` with data for the `control` pathway:
-    
+
     * `Baseline`: `neo.Block` with synaptic responses on `control` pathway *before* LTP induction
     * `Chase`: `neo.Block` with synaptic responses on `control` pathway *after* LTP induction
     * `Path`:`int` the index of the `control` pathway (*either* `0` or `1`)
-    
+
 * `Test`:`dict` with data for the `test` pathway - same structure as the `Control`, shown [above](#Control_subdict).
 * `LTPOptions`:`dict` a copy of the LTP options object passed as argument (see [above](#gen_ltp_dict))
 
@@ -170,20 +170,20 @@ path1_baseline = neoutils.concatenate_blocks(baseline_blocks, segments = 1, anal
             * EPSC1Base (0.01)
             * ESPC1Peak (0.005)
         * **NOTE:** Windows can be readjusted
-            
+
     * align these cursors as follows:
         * Rbase ↦ current baseline BEFORE deplarization transient (for membrane Rs and Rin)
-        * Rs ↦ peak of the first capacitive transient 
+        * Rs ↦ peak of the first capacitive transient
         * Rin ↦ steady-state current during depolarization
         * EPSC0Base ↦ current baseline BEFORE 1<sup>st</sup> stimulus artifact (first pulse)
         * EPSC0Peak ↦ trough of the 1<sup>st</sup> EPSC
         * EPSC1Base ↦ current baseline BEFORE 2<sup>nd</sup> stimulus artifact (first pulse)
         * EPSC1Peak ↦ trough of the 2<sup>nd</sup> EPSC
         * **NOTE:** positions can/should be readjusted
-        
+
 * create epochs:
 
-### 4. View the [`ltp_data`](#gen_ltp_dict) (double-click in the `User Variables` table to open it in a `DataViewer`).
+### 4. View the [`ltp_data`](#gen_ltp_dict) (double-click in the `User Variables` table to open it in a `DataTreeViewer`).
 
 Expand the tree and right-click on, say, the `Control/Baseline` then select `View` to view this in a `SignalViewer` window.
 
@@ -192,7 +192,7 @@ all data is right.
 
 
 Make note of the following:
-    
+
 * name of the signal viewer window (last bit of the window tiytle, after the dash).
 * index of the path you are viewing (e.g., `0` for `control` and `1` for `test`, or *vice-versa*)
 
@@ -200,8 +200,8 @@ Make note of the following:
 
 ### 5. Set up cursors and epochs.
 
-Below, we assuming you are viewing the `Control/Baseline` data (both 
-baseline and chase data of *the same pathway* ought to have the same 
+Below, we assuming you are viewing the `Control/Baseline` data (both
+baseline and chase data of *the same pathway* ought to have the same
 time base or domain).
 
 #### <a name=set_cursors></a>Set up the cursors
@@ -234,10 +234,10 @@ where
 with paired-pulse stimulation (hence expecting *two EPSC* waveforms). In addition,
 a short, small depolarization at the beginning of the sweep is expected, to
 monitor the access (series) and input resistances.
-    
+
 The first three cursors relate to the calculation of the series (access)
 resistance and membrane (input) resistance - hence they are named accordingly:
-    
+
 * `Rbase` - baseline membrane current;
 * `Rs`    - series resistance - should sit on top of the peak of the first capacitive transient
 * `Rin`   - input resistance  - should sit on the steady-state part of the wavweform, just before the repolarization
@@ -264,8 +264,8 @@ After the adjustment, navigate again across the sweeps, to make sure that all cu
 2. From the signal viewer `Epochs` menu, select `Make Epochs in Data/From Cursors`
     * in the dialog, select all cursors shown, press `OK`
     * in the next dialog, *set the epoch name to "ltp"* (lower case)
-    * make sure the following checkboxes are selected: 
-        * `Embed in all segments` 
+    * make sure the following checkboxes are selected:
+        * `Embed in all segments`
         * `Relative to each segment start`
         * `Overwrite existing epochs`
     * press `OK`
@@ -275,15 +275,15 @@ You should now have exactly *one* epoch with 7 intervals in each segment.
 **NOTE**: the epochs are *embedded* in the data - hence, they will be saved with your data on disk.
 
 
-### Repeat this step for the `Control/Chase`. 
+### Repeat this step for the `Control/Chase`.
 
 **NOTE** Because the `Baseline` and `Chase` data *form the same pathway* have the same time base, the cursors will already be visible.
 
 Therefore, **you do not need to set up the cursors again**. However, **you may need to adjust their horizontal coordinates and/or windows**.
 
-#### Repeat the step again for the `Test/Baseline` and `Test/Chase` data in your [`ltp_data`](#gen_ltp_dict). 
+#### Repeat the step again for the `Test/Baseline` and `Test/Chase` data in your [`ltp_data`](#gen_ltp_dict).
 
-**NOTE**: This time, you will be viewing the "other" pathway - hence with a different time base. Nevertheless, the cursors should have "adapted" their 
+**NOTE**: This time, you will be viewing the "other" pathway - hence with a different time base. Nevertheless, the cursors should have "adapted" their
 horizontal positions to take into account the new time base. However, *should this not have happened*, then from the signal viewer's menu `Cursors` select `Remove Cursors/Remove all cursors` and [set up the cursors again](#set_cursors).
 
 [Adjust the cursors](#adjust_cursors), then create epochs in `Test/Baseline` and `Test/Chase` as [above](#gen_epochs).
@@ -312,7 +312,7 @@ where:
 
 The function returns two `DataFrame` objects - one each for the `Test` and the `Control` pathway - with the following numeric columns, containing minute-by-minute values from the baseline reference (-5 minutes before LTP induction) to the end of the chase recordings:
 
-* Rs    (MΩ) - series resistance 
+* Rs    (MΩ) - series resistance
 * Rin   (MΩ) - input resistance
 * DC    (pA) - baseline membrane current
 * EPSC0 (pA) - amplitude of the first EPSC

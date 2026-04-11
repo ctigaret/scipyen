@@ -4,11 +4,11 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""Plot utitilies
+r"""Plot utitilies
 Functions for plotting with matplotlib and seaborn
 """
 #### BEGIN core python modules
-import numbers, typing, warnings
+import numbers, typing, warnings, traceback
 from functools import partial
 #### END core python modules
 
@@ -39,6 +39,8 @@ import neo
 from scipy import stats
 import quantities as pq
 from core.vigra_patches import vigra
+import pywt
+
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -127,7 +129,7 @@ mpl_plot_functions["streamplot"]            = Axes.streamplot
 
 
 class IV2TimeScale(mpl.scale.ScaleBase):
-    """For IV curves (IV ramps) this defines the linear function V(t)of the Vm 
+    r"""For IV curves (IV ramps) this defines the linear function V(t)of the Vm 
     ramp, used to show a time axis in IV ramp plots.
     
     When plotting an IV ramp, Im is plotted as function of Vm (I(V)) whereas the
@@ -161,7 +163,7 @@ class IV2TimeScale(mpl.scale.ScaleBase):
     name = "iv2time"
     
     def __init__(self, axis, **kwargs):
-        """Receives keyword arguments via a call to "set_xscale".
+        r"""Receives keyword arguments via a call to "set_xscale".
         
         Additional keywords:
         
@@ -220,7 +222,7 @@ class IV2TimeScale(mpl.scale.ScaleBase):
         # contyemplate the use of masked arrays to keep the time values 
         # strictly within the RAMP region
         def transform_non_affine(self, a):
-            """Returns the time when Vm equals a
+            r"""Returns the time when Vm equals a
             """
             
             return self.t0 + (a-self.V0)/self.slope
@@ -250,7 +252,7 @@ mpl.scale.register_scale(IV2TimeScale)
     
 
 def zeroCrossedAxes(fig, axisStyle, *args, **kwargs):
-    """ Creates zero-crossing axes in a matplotlib figure
+    r""" Creates zero-crossing axes in a matplotlib figure
     
     Arguments:
     fig = a matplotlib.figure.Figure instance
@@ -305,7 +307,7 @@ def zeroCrossedAxes(fig, axisStyle, *args, **kwargs):
     
 
 def plotZeroCrossedAxes(x, y, fig=None, xlabel="Vm", ylabel="Im", axisStyle="-|>", t_axis=True, newPlot = False, legend=[], **kwargs):
-    """Plot y vs x as an IV plot (on zero-crossed axes).
+    r"""Plot y vs x as an IV plot (on zero-crossed axes).
     Arguments:
         x, y    = data to plot: must be numpy.ndarray vectors of similar lengths & shape
         
@@ -397,8 +399,9 @@ def plotNeoSignal(data, fig=None, label=None, newPlot=False, title = None,
                   xlabel=None, ylabel=None,
                   tick_direction="in", tick_length = 4.5, axes_offset=0,
                   despine=True, panel_size=None, **kwargs):
-    """
+    r"""
     TODO: plot multiple signals overlaid, with legend
+    Consider DEPRECATED in favour of neoutils.plot_neo.
     """
     import neo
     if not isinstance(data, neo.core.basesignal.BaseSignal):
@@ -503,7 +506,7 @@ def plotVigraKernel1D(val, fig=None, label=None, xlabel=None, ylabel=None,
 def plotVigraKernel(val, fig=None, label=None, xlabel=None, ylabel=None,
                       newPlot=False, plotStyle=None, tick_direction="in",
                       **kwargs):
-    """
+    r"""
     Important kwargs:
     ----------------
     plotStyle: str: 
@@ -604,14 +607,31 @@ def plotVigraKernel(val, fig=None, label=None, xlabel=None, ylabel=None,
     
     return ret
 
-        
-        
-    
+def plot_normal_pdf(ax:Axes, stats_val:np.ndarray = np.linspace(-5, 5, 100), 
+                    **kwargs):
+    r"""See examples in
 
+` Scipy Skewness test  <https://docs.scipy.org/doc/scipy/tutorial/stats/hypothesis_skewtest.html#hypothesis-skewtest>`_ 
+
+and in 
+
+`scipy.stats.monte_carlo_test <https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.monte_carlo_test.html#scipy.stats.monte_carlo_test>`_
+
+ """
+    title = kwargs.pop("title", "Skew Test Null Distribution")
+    xlabel = kwargs.pop("xlabel", "statistic")
+    ylabel = kwargs.pop("ylabel", "probability density")
+    dist = stats.norm()
+    pdf = dist.pdf(stats_val)
+    ax.plot(stats_val, pdf)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    
 # NOTE: 2022-04-16 20:11:11 
 # from here on this is code from the matplotlib tutorial "origin and extend in imshow"
 def index_to_coordinate(index, extent, origin):
-    """Return the pixel center of an index."""
+    r"""Return the pixel center of an index."""
     left, right, bottom, top = extent
 
     hshift = 0.5 * np.sign(right - left)
@@ -631,7 +651,7 @@ def index_to_coordinate(index, extent, origin):
 
 
 def get_index_label_pos(index, extent, origin, inverted_xindex):
-    """
+    r"""
     Return the desired position and horizontal alignment of an index label.
     """
     if extent is None:
@@ -647,7 +667,7 @@ def get_index_label_pos(index, extent, origin, inverted_xindex):
 
 
 def get_color(index, data, cmap):
-    """Return the data color of an index."""
+    r"""Return the data color of an index."""
     val = {
         "[0, 0]": data[0, 0],
         "[0, N']": data[0, -1],
@@ -658,7 +678,7 @@ def get_color(index, data, cmap):
 
 
 def lookup_extent(origin):
-    """Return extent for label positioning when not given explicitly."""
+    r"""Return extent for label positioning when not given explicitly."""
     if origin == 'lower':
         return (-0.5, 6.5, -0.5, 5.5)
     else:
@@ -671,7 +691,7 @@ def set_extent_None_text(ax):
 
 
 def plot_imshow_with_labels(ax, data, extent, origin, xlim, ylim):
-    """Actually run ``imshow()`` and add extent and index labels."""
+    r"""Actually run ``imshow()`` and add extent and index labels."""
     im = ax.imshow(data, origin=origin, extent=extent)
 
     # extent labels (left, right, bottom, top)
@@ -744,7 +764,7 @@ def generate_imshow_demo_grid(extents, xlim=None, ylim=None):
     return columns
 
 def plot_Gantt(data, **kwargs):
-    """
+    r"""
     Renders a Gantt chart plot.
     The data is organized in intervals (start, finish) with each interval being
     represented by a horizontal bar along a time axis, and is encapsulated in 
@@ -820,7 +840,7 @@ def plot_Gantt(data, **kwargs):
     return func(data, **kwargs)
 
 def plot_Gantt_Epochs(data:typing.Union[tuple, list, neo.Epoch], **kwargs):
-    """
+    r"""
     Renders a Gantt chart plot.
     The data is organized in intervals (start, finish) with each interval being
     represented by a horizontal bar along a time axis, encapsulated in a neo
@@ -899,7 +919,7 @@ def plot_Gantt_Epochs(data:typing.Union[tuple, list, neo.Epoch], **kwargs):
 
 
 def plot_Gantt_DF(data:typing.Union[tuple, list, pd.DataFrame], **kwargs):
-    """
+    r"""
     Renders a Gantt chart plot.
     The data is organized in intervals (start, finish) with each interval being
     represented by a horizontal bar along a time axis, encapsulated in a pandas
@@ -1170,3 +1190,223 @@ def adjust_spines(ax, spines):
     else:
         # no xaxis ticks
         ax.xaxis.set_ticks([])
+
+def plot_wavelet(w:typing.Union[str, pywt.Wavelet, pywt.ContinuousWavelet], /,level:typing.Optional[int] = None,
+                length:typing.Optional[int] = None, what:str="functions", 
+                separate:bool=False, newfig:bool=False) -> tuple:
+    r"""Plots a wavelet.
+    For discrete wavelets, the funtion plots either the scaling (ϕ) and wavelet 
+(ψ) functions, or tthe wavelet decoomposition and reconstruction filters.
+    For continuous wavelets, the function plot the wavelet function
+    
+    Parameters:
+    ===========
+    w: the wavelet object, or a string with the name of a wavelet object as 
+        listed by pywt.wavelist()
+    
+    level: the scaling level; when None (the default) it will be set to 8 (pywt default)
+    length: the length of the generated curve — only used for continuous wavelets;
+            when None (the default) is will be set to 2**level (pywt default)
+    
+    what: what to plot: "functions" (scaling and wavelet functions), "forward" (the filter bank), 
+        "inverse" (the inverse filtere bank)
+        Default is "functions".
+        NOTE: Only used for discrete wavelets. For continuous wavelets only the
+            wavelet function is plotted.
+    
+    separate: When False (default) all curves will be plotted on the same axes.
+        When True, each curve will be plotted on its individual axes.
+    
+    newfig: when False (default) the function will use the currently selected 
+        Matplotlib figure (if existing) or create a new one.
+    
+        When True, a new Matplotlib figure will be created.
+    
+    Returns:
+    ========
+    A tuple (figure, axes or axes list)
+    
+    """
+    if isinstance(w, str):
+        w = pywt.DiscreteContinuousWavelet(w)
+    
+    if not isinstance(w, (pywt.Wavelet, pywt.ContinuousWavelet)):
+        raise TypeError(f"Expecting a Wavelet or a ContinuousWavelet; got {type(w).__name__} instead")
+    
+    if level is None:
+        level = 8 # pyqt default
+    elif isinstance(level, int):
+        assert level > 0, f"'level' must be > 0; instead, got {level}"
+    elif not isinstance(level, int):
+        raise TypeError(f"Expecting 'level' to be None or an int  > 0; instead, got {type(level).__name__}")
+    
+    if isinstance(length, int):
+        if length<0:
+            raise ValueError(f"'length' must be > 0; instead, got {length}")
+    elif length is not None:
+        raise TypeError(f"'length' is expected to be an int > 0 or None; instead, got {type(length).__name__}")
+    
+    if isinstance(w, pywt.ContinuousWavelet):
+        [ψ, x] = w.wavefun(level, length)
+        curves = {"x": x, "ψ": ψ, "title": f"'{w.name}' wavelet function (ψ) at level {level}"}
+    else:
+        if what == "forward":
+            # show the filter bank
+            dec_lo, dec_hi, rec_lo, rec_hi = w.filter_bank
+            if w.dec_len == w.rec_len:
+                x = np.arange(w.dec_len)
+                curves = {"x": x, "Decomposition Low": dec_lo, "Decomposition High": dec_hi, "Reconstruction Low": rec_lo, "Reconstruction High": rec_hi}
+                curves["title"] = f"'{w.name}' filter bank"
+            else:
+                xdec = np.arange(w.dec_len)
+                xrec = np.arange(w.dec_len)
+                curves = {"Decomposition":  {"x": xdec, "Decomposition Low":  dec_lo, "Decomposition High":  dec_hi, "title": f"'{w.name}' Decomposition filter bank"},
+                          "Reconstruction": {"x": xrec, "Reconstruction Low": rec_lo, "Reconstruction High": rec_hi, "title": f"'{w.name}' Reconstruction filter bank"}}
+            
+        elif what == "inverse":
+            rec_lo, rec_hi, dec_lo, dec_hi = w.inverse_filter_bank
+            if w.dec_len == w.rec_len:
+                x = np.arange(w.dec_len)
+                curves = {"x": x, "Decomposition Low": dec_lo, "Decomposition High": dec_hi, "Reconstruction Low": rec_lo, "Reconstruction High": rec_hi}
+                curves["title"] = f"'{w.name}' inverse filter bank"
+            else:
+                xdec = np.arange(w.dec_len)
+                xrec = np.arange(w.dec_len)
+                curves = {"Reconstruction": {"x": xrec, "Reconstruction Low": rec_lo, "Reconstruction High": rec_hi, "title": f"'{w.name}' Reconstruction inverse filter bank"},
+                          "Decomposition":  {"x": xdec, "Decomposition Low":  dec_lo, "Decomposition High":  dec_hi, "title": f"'{w.name}' Decomposition inverse filter bank"}}
+            
+        elif what == "functions":
+            if w.orthogonal:
+                ϕ, ψ, x = w.wavefun(level = level)
+                curves = {"x":x, "ϕ": ϕ, "ψ":ψ}
+            else:
+                ϕd, ψd, ϕr, ψr, x = w.wavefun(level = level)
+                curves = {"x":x, "Decomposition ϕ": ϕd, "Decomposition ψ":ψd, "Reconstruction ϕ": ϕr, "Reconstruction ψ":ψr}
+                
+            curves["title"] = f"'{w.name}' functions (ϕ: scaling, ψ: wavelet) at level {level}"
+        else:
+            raise ValueError(f"Invalid 'what' ({what}); expecting a str, one of 'functions', 'forward', or 'inverse'")
+        
+    if newfig:
+        fig = plt.figure()
+    else:
+        fig = plt.gcf() # reuse the current figure
+        
+    fig.clf() 
+    
+    if separate:
+        if len(curves) == 2 and all(s in curves for s in ("Decomposition", "Reconstruction")):
+            ax = fig.subplots(len(curves["Decomposition"])-2, 2, sharex=True, sharey=True)
+            
+            dec_curves = curves["Decomposition"]
+            for k, (key, item) in enumerate(filter(lambda x: x[0] not in ("x", "title"), dec_curves.items())):
+                if what=="functions":
+                    ax[k,0].plot(dec_curves["x"], item, label = key)
+                else:
+                    ax[k,0].stem(dec_curves["x"], item, label = key)
+                ax[k,0].legend(loc="upper left")
+                if k == 0:
+                    ax[k].set_title(dec_curves["title"])
+                    
+            rec_curves = curves["Reconstruction"]
+            for k, (key, item) in enumerate(filter(lambda x: x[0] not in ("x", "title"), rec_curves.items())):
+                if what=="functions":
+                    ax[k,0].plot(rec_curves["x"], item, label = key)
+                else:
+                    ax[k,0].stem(rec_curves["x"], item, label = key)
+                ax[k,0].legend(loc="upper left")
+                if k == 0:
+                    ax[k].set_title(rec_curves["title"])
+            
+        else:
+            ax = fig.subplots(len(curves)-2, 1, sharex=True)
+            # print(f"{len(ax)} axes")
+            for k, (key, item) in enumerate(filter(lambda x: x[0] not in ("x", "title"), curves.items())):
+                if what == "functions":
+                    ax[k].plot(curves["x"], item, label = key)
+                else:
+                    ax[k].stem(curves["x"], item, label = key)
+                ax[k].legend(loc="upper left")
+                if k == 0:
+                    ax[k].set_title(curves["title"])
+            
+    else:
+        if len(curves) == 2 and all(s in curves for s in ("Decomposition", "Reconstruction")):
+            ax = fig.subplots(1, 2, sharey=True)
+            dec_curves = curves["Decomposition"]
+            for (key, item) in filter(lambda x: x[0] not in ("x", "title"), dec_curves.items()):
+                if what == "functions":
+                    ax[0,0].plot(dec_curves["x"], item, label = key)
+                else:
+                    ax[0,0].stem(dec_curves["x"], item, label = key)
+            ax[0,0].set_title(dec_curves["title"])
+            
+            rec_curves = curves["Reconstruction"]
+            for (key, item) in filter(lambda x: x[0] not in ("x", "title"), rec_curves.items()):
+                if what == "functions":
+                    ax[0,1].plot(rec_curves["x"], item, label = key)
+                else:
+                    ax[0,1].stem(rec_curves["x"], item, label = key)
+            ax[0,1].set_title(rec_curves["title"])
+        else:            
+            ax = fig.gca()
+            for (key, item) in filter(lambda x: x[0] not in ("x", "title"), curves.items()):
+                if what == "functions":
+                    ax.plot(curves["x"], item, label = key)
+                else:
+                    ax.stem(curves["x"], item, label = key)
+                ax.legend()
+            ax.set_title(curves["title"])
+            
+    return fig, ax
+    
+def plot_wavedec(coeffs, raster:bool=True, newfig:bool=False,
+                 extent:int = 1000, **kwargs):
+    r"""Raster plot of 1D multiscale wavelet decomposition.
+Adapted from Answer # 1 (JohanC) below:
+https://stackoverflow.com/questions/60934996/visualization-of-wavelets-coefficients-using-python
+
+Parameters:
+===========
+coeffs: list of approximation and detail coefficient arrays as returned by
+    pywt.wavedec
+
+Var-keyword parameters:
+=======================
+As expected by matplotlib.pyplot.imshow;
+
+"""
+    cmap = kwargs.get("cmap", "inferno")
+    aspect = kwargs.get("aspect", "auto")
+    interpolation = kwargs.get("interpolation", "nearest")
+    nLevels = len(coeffs)-1
+
+    if newfig:
+        fig = plt.figure()
+    else:
+        fig = plt.gcf() # reuse the current figure
+        
+    fig.clf()
+    
+    if raster:
+        for i, ci in enumerate(coeffs):
+            plt.imshow(ci.reshape(1, -1), extent=[0, extent, i+0.5, i+1.5], 
+                    cmap=cmap, aspect=aspect, interpolation=interpolation)
+            # plt.imshow(ci.reshape(1, -1), 
+            #             cmap=cmap, aspect=aspect, interpolation=interpolation)
+        plt.ylim(0.5, len(coeffs) + 0.5)
+        plt.yticks(range(1, len(coeffs) + 1), [f"A{nLevels}"] + list(map(lambda l: f"D{l}", reversed(range(1, nLevels+1)))))
+
+    else:
+        ax = fig.subplots(len(coeffs), 1)
+        for k in list(reversed(range(len(coeffs)))):
+            axndx = len(coeffs)-1-k
+            c = coeffs[k]
+            ax[axndx].plot(np.arange(len(c)), c)
+            ax[axndx].set_ylabel(f"A{len(coeffs)-1}" if k == 0 else f"D{axndx+1}")
+            # ax[k].legend()s
+        
+    
+
+
+        

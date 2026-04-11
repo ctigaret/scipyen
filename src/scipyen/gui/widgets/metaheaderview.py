@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+
+
 #### BEGIN core python modules
 from __future__ import print_function
 
@@ -11,12 +18,33 @@ import quantities as pq
 import numpy as np
 import neo
 from core.vigra_patches import vigra
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
 
-from qtpy import QtCore, QtGui, QtWidgets
-from qtpy.QtCore import Signal, Slot, Property
-# from qtpy.QtCore import Signal, Slot, QEnum, Property
-# from PyQt5 import QtCore, QtGui, QtWidgets
-# from PyQt5.QtCore import Signal, Slot, QEnum, Q_FLAGS, Property
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -31,7 +59,7 @@ import core.datatypes
 import core.strutils as strutils
 from core.strutils import str2float
 
-from core.prog import (safeWrapper, )
+from core.prog import (safewrapper, )
 
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType)
 from core.triggerprotocols import TriggerProtocol
@@ -46,7 +74,7 @@ from core.datatypes import array_slice
 #### BEGIN pict.gui modules
 # from .scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 # from . import quickdialog
-from gui import resources_rc
+# from gui import resources_rc
 # from gui import icons_rc
 #### END pict.gui modules
 

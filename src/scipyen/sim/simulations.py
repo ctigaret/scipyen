@@ -4,13 +4,13 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 import typing
-from numbers import Number
+import numbers
 import numpy as np
 from core.vigra_patches import vigra
 
 def g_blob(meanX:float = 64., meanY:float = 64., meanZ:typing.Optional[float]=None,
            varX:float = 1.0, varY:float = 1.0, varZ:float = 0., n:int = 128):
-    """Generates random normally distributed x and y coordinates for a set of points on a 2D grid.
+    r"""Generates random normally distributed x and y coordinates for a set of points on a 2D grid.
     
     Parameters:
     -----------
@@ -45,14 +45,14 @@ def g_blob(meanX:float = 64., meanY:float = 64., meanZ:typing.Optional[float]=No
     
     ret = rng.multivariate_normal(mean, cov, size=n)
     
-    if isinstance(meanZ, Number):
+    if isinstance(meanZ, numbers.Number):
         vals = rng.normal(meanZ, varZ, n)
         return np.hstack([ret, vals[:,np.newaxis]])
     
     return ret
 
 def g_blob_image(blob, img:typing.Optional[typing.Union[np.ndarray, vigra.VigraArray]]=None, size:int=128) -> vigra.VigraArray:
-    """Embeds a `g_blob` result in an image.
+    r"""Embeds a `g_blob` result in an image.
     The image may be passed as the `img` argument, or a `size` by `size` synthetic
     image will be generated.
     

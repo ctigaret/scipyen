@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Capture & redirect output from 3rd party C/C++ libraries
+r"""Capture & redirect output from 3rd party C/C++ libraries
 
 Inspired from code by Eli Bendersky
 
@@ -20,79 +20,9 @@ libc = ctypes.CDLL(None)
 c_stdout = ctypes.c_void_p.in_dll(libc, 'stdout')
 c_stderr = ctypes.c_void_p.in_dll(libc, 'stderr')
 
-#@contextmanager
-#def output_stream_redirector(stream, 
-                             #what:typing.Optional[typing.Union[io.TextIOWrapper, str, int]]=sys.stdout):
-    #if isinstance(what, str):
-        #if what.lower() not in ("out", "stdout", "err", "stderr"):
-            #p_stream = sys.stdout
-            #c_stream = c_stdout
-            ##raise ValueError(f"Incorrect output stream specification; expecting 'out' or 'err' got {what}")
-        #else:
-            ## NOTE: this is the python stream
-            #p_stream = sys.stderr if what.lower() in ("err", "stderr") else sys.stdout
-            #c_stream = c_stderr if what.lower() in ("err", "stderr") else c_stdout
-        
-    #elif isinstance(what, int):
-        #if what not in (1,2):
-            #p_stream = sys.stdout
-            #c_stream = c_stdout
-            ##raise ValueError(f"Incorrect output stream descriptor; expecting one of 1, 2; got {what}")
-        #else:
-            #p_stream = sys.stderr if what == 2 else sys.stdout
-            #c_stream = c_stderr if what == 2 else c_stdout
-        
-        ##original_fd = what
-            
-    #elif what in (sys.stdout, sys.stderr):
-        #p_stream = what
-        #c_stream = c_stderr if what is sys.stderr else c_stdout
-        
-    #else:
-        #p_stream = sys.stdout
-        #c_stream = c_stdout
-        ##raise TypeError(f"Expecting an one of sys.stdout or sys.stderr; got {type(what).__name__}")
-        
-    #original_fd = p_stream.fileno()
-    
-    ## NOTE: 2021-11-30 12:36:29
-    ## The original fd points to. On POSIX systems this is isually 1 for stdout
-    ## and 2 for stderr
-    ##original_stdout_fd = sys.stdout.fileno()
-
-    #def _redirect_(ostr, to_fd):
-        #"""Redirect stdout to the given file descriptor."""
-        ## Flush the C-level buffer stdout
-        #libc.fflush(c_stream)
-        ## Flush and close sys.stdout - also closes the file descriptor (fd)
-        #ostr.close()
-        ## Make original_stdout_fd point to the same file as to_fd
-        #os.dup2(to_fd, original_fd)
-        ## Create a new sys.stdout that points to the redirected fd
-        #ostr = io.TextIOWrapper(os.fdopen(original_fd, 'wb'))
-        #return ostr
-
-    ## Save a copy of the original stdout fd in saved_stdout_fd
-    #saved_fd = os.dup(original_fd)
-    
-    #try:
-        ## Create a temporary file and redirect stdout to it
-        #tfile = tempfile.TemporaryFile(mode='w+b')
-        #p_stream = _redirect_(p_stream, tfile.fileno())
-        ## Yield to caller, then redirect stdout back to the saved fd
-        #yield
-        #p_stream = _redirect_(p_stream, saved_fd)
-        ## Copy contents of temporary file to the given stream
-        #tfile.flush()
-        #tfile.seek(0, io.SEEK_SET)
-        #stream.write(tfile.read().decode())
-    #finally:
-        #tfile.close()
-        #os.close(saved_fd)
-        
 @contextmanager
 def stdout_redirector(stream):
-    """FIXME: 2021-11-30 15:04:24
+    r"""FIXME: 2021-11-30 15:04:24
     Subsequent error messages from Python code(via sys.stderr) do not show up 
     anymore until after Scipyen has been closed. 
     """
@@ -104,7 +34,7 @@ def stdout_redirector(stream):
     original_stdout_fd = sys.stdout.fileno()
 
     def _redirect_(to_fd):
-        """Redirect stdout to the given file descriptor."""
+        r"""Redirect stdout to the given file descriptor."""
         # Flush the C-level buffer stdout
         libc.fflush(c_stdout)
         # Flush and close sys.stdout - also closes the file descriptor (fd)
@@ -144,7 +74,7 @@ def stderr_redirector(stream):
     #system_stderr_fd = sys.stderr.fileno() # also save this
 
     def _redirect_(to_fd):
-        """Redirect stderr to the given file descriptor."""
+        r"""Redirect stderr to the given file descriptor."""
         # Flush the C-level buffer stderr
         libc.fflush(c_stderr)
         

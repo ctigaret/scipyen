@@ -3,14 +3,14 @@
  <class>AxesCalibrationDialog</class>
  <widget class="QDialog" name="AxesCalibrationDialog">
   <property name="windowModality">
-   <enum>Qt::WindowModal</enum>
+   <enum>Qt::WindowModality::WindowModal</enum>
   </property>
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>291</width>
-    <height>404</height>
+    <width>356</width>
+    <height>473</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,7 +19,7 @@
   <property name="modal">
    <bool>true</bool>
   </property>
-  <layout class="QGridLayout" name="gridLayout_2">
+  <layout class="QGridLayout" name="gridLayout_3">
    <item row="0" column="0">
     <layout class="QHBoxLayout" name="horizontalLayout_2">
      <item>
@@ -59,10 +59,10 @@
       <string>Axis length (samples)</string>
      </property>
      <property name="frameShape">
-      <enum>QFrame::StyledPanel</enum>
+      <enum>QFrame::Shape::StyledPanel</enum>
      </property>
      <property name="frameShadow">
-      <enum>QFrame::Plain</enum>
+      <enum>QFrame::Shadow::Plain</enum>
      </property>
      <property name="midLineWidth">
       <number>1</number>
@@ -77,7 +77,7 @@
       <bool>true</bool>
      </property>
      <property name="textInteractionFlags">
-      <set>Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+      <set>Qt::TextInteractionFlag::TextSelectableByKeyboard|Qt::TextInteractionFlag::TextSelectableByMouse</set>
      </property>
     </widget>
    </item>
@@ -90,12 +90,12 @@
       </sizepolicy>
      </property>
      <property name="toolTip">
-      <string>Calibrate axis</string>
+      <string>Calibrate axis. Selected parameter below will be calculated based on the value of the other two</string>
      </property>
      <property name="title">
       <string>Calibration</string>
      </property>
-     <layout class="QGridLayout" name="gridLayout">
+     <layout class="QGridLayout" name="gridLayout_2">
       <item row="0" column="0">
        <widget class="QLabel" name="label_5">
         <property name="text">
@@ -106,7 +106,7 @@
         </property>
        </widget>
       </item>
-      <item row="0" column="1" colspan="2">
+      <item row="0" column="1">
        <widget class="QLineEdit" name="unitsLineEdit">
         <property name="sizePolicy">
          <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
@@ -115,7 +115,13 @@
          </sizepolicy>
         </property>
         <property name="toolTip">
-         <string>Units of measurement</string>
+         <string>Physical Units of the Selected Axis</string>
+        </property>
+        <property name="statusTip">
+         <string>Physical Units of the Selected Axis</string>
+        </property>
+        <property name="whatsThis">
+         <string>Physical Units of the Selected Axis</string>
         </property>
        </widget>
       </item>
@@ -129,10 +135,16 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="2">
+      <item row="1" column="1">
        <widget class="QDoubleSpinBox" name="originSpinBox">
         <property name="toolTip">
-         <string>Axis origin (in calibrated units)</string>
+         <string>Axis origin in physical units</string>
+        </property>
+        <property name="statusTip">
+         <string>Axis origin in physical units</string>
+        </property>
+        <property name="whatsThis">
+         <string>Axis origin in physical units</string>
         </property>
         <property name="maximum">
          <double>1000000.000000000000000</double>
@@ -140,75 +152,128 @@
        </widget>
       </item>
       <item row="2" column="0" colspan="2">
-       <widget class="QRadioButton" name="resolutionRadioButton">
+       <widget class="QGroupBox" name="groupBox">
         <property name="toolTip">
-         <string>Select to calculate resolution</string>
+         <string>Selected parameter to calculate using the values of other two parameters.</string>
         </property>
-        <property name="text">
-         <string>Resolu&amp;tion</string>
+        <property name="statusTip">
+         <string>Selected parameter to calculate using the values of other two parameters.</string>
         </property>
-        <property name="checked">
-         <bool>true</bool>
+        <property name="whatsThis">
+         <string>Selected parameter to calculate using the values of other two parameters.</string>
         </property>
-       </widget>
-      </item>
-      <item row="2" column="2">
-       <widget class="QDoubleSpinBox" name="resolutionSpinBox">
-        <property name="enabled">
-         <bool>true</bool>
+        <property name="title">
+         <string>Calculate</string>
         </property>
-        <property name="toolTip">
-         <string>Axis resolution (size of one pixel in calibrated units)</string>
-        </property>
-        <property name="readOnly">
-         <bool>false</bool>
-        </property>
-        <property name="decimals">
-         <number>4</number>
-        </property>
-        <property name="maximum">
-         <double>1000000.000000000000000</double>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="0" colspan="2">
-       <widget class="QRadioButton" name="pixelsDistanceRadioButton">
-        <property name="toolTip">
-         <string>Select to calculate distance in pixels</string>
-        </property>
-        <property name="text">
-         <string>Pixe&amp;ls</string>
-        </property>
-       </widget>
-      </item>
-      <item row="3" column="2">
-       <widget class="QSpinBox" name="pixelsDistanceSpinBox">
-        <property name="toolTip">
-         <string>Distance in pixels</string>
-        </property>
-        <property name="maximum">
-         <number>1000000000</number>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="0" colspan="2">
-       <widget class="QRadioButton" name="calibratedDistanceRadioButton">
-        <property name="toolTip">
-         <string>Select to calculate calibrated distance</string>
-        </property>
-        <property name="text">
-         <string>Axial Distance</string>
-        </property>
-       </widget>
-      </item>
-      <item row="4" column="2">
-       <widget class="QDoubleSpinBox" name="calibratedDistanceSpinBox">
-        <property name="toolTip">
-         <string>Distance in calibrated units</string>
-        </property>
-        <property name="maximum">
-         <double>1000000.000000000000000</double>
-        </property>
+        <layout class="QGridLayout" name="gridLayout">
+         <item row="0" column="0">
+          <widget class="QRadioButton" name="resolutionRadioButton">
+           <property name="toolTip">
+            <string>Resolution (units / pixel)
+Select this to calculate it using Distance in pixels and Calibrated length.</string>
+           </property>
+           <property name="statusTip">
+            <string>Axis resolution (size of one pixel in calibrated units)</string>
+           </property>
+           <property name="whatsThis">
+            <string>Axis resolution (size of one pixel in calibrated units)</string>
+           </property>
+           <property name="text">
+            <string>Resolu&amp;tion</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QDoubleSpinBox" name="resolutionSpinBox">
+           <property name="enabled">
+            <bool>true</bool>
+           </property>
+           <property name="toolTip">
+            <string>Axis resolution (size of one pixel in calibrated units)</string>
+           </property>
+           <property name="statusTip">
+            <string>Axis resolution (size of one pixel in calibrated units)</string>
+           </property>
+           <property name="whatsThis">
+            <string>Axis resolution (size of one pixel in calibrated units)</string>
+           </property>
+           <property name="readOnly">
+            <bool>false</bool>
+           </property>
+           <property name="decimals">
+            <number>4</number>
+           </property>
+           <property name="maximum">
+            <double>1000000.000000000000000</double>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QRadioButton" name="pixelsDistanceRadioButton">
+           <property name="toolTip">
+            <string>Distance in pixels, along the selected axis.
+Select this to calculate it based on Resolution and Calibrated distance</string>
+           </property>
+           <property name="statusTip">
+            <string>Distance in pixels, along the selected axis.\nSelect this to calculate it based on Resolution and Calibrated distance</string>
+           </property>
+           <property name="whatsThis">
+            <string>Distance in pixels, along the selected axis.
+Select this to calculate it based on Resolution and Calibrated distance</string>
+           </property>
+           <property name="text">
+            <string>Distance in pixels</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QSpinBox" name="pixelsDistanceSpinBox">
+           <property name="toolTip">
+            <string>Distance in pixels along the selected axis</string>
+           </property>
+           <property name="statusTip">
+            <string>Distance in pixels along the selected ax</string>
+           </property>
+           <property name="whatsThis">
+            <string>Distance in pixels along the selected ax</string>
+           </property>
+           <property name="maximum">
+            <number>1000000000</number>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QRadioButton" name="calibratedDistanceRadioButton">
+           <property name="toolTip">
+            <string>Calibrated distance in physical units.
+Select this to calculate it based on Resolution and Distance in pixels</string>
+           </property>
+           <property name="statusTip">
+            <string>Calibrated distance in physical units.\nSelect this to calculate it based on Resolution and Distance in pixels</string>
+           </property>
+           <property name="whatsThis">
+            <string>Calibrated distance in physical units.
+Select this to calculate it based on Resolution and Distance in pixels</string>
+           </property>
+           <property name="text">
+            <string>Calibrated Distance</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QDoubleSpinBox" name="calibratedDistanceSpinBox">
+           <property name="toolTip">
+            <string>Distance in calibrated units</string>
+           </property>
+           <property name="maximum">
+            <double>1000000.000000000000000</double>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </widget>
       </item>
      </layout>
@@ -243,10 +308,10 @@
    <item row="4" column="0" colspan="2">
     <widget class="QDialogButtonBox" name="buttonBox">
      <property name="orientation">
-      <enum>Qt::Horizontal</enum>
+      <enum>Qt::Orientation::Horizontal</enum>
      </property>
      <property name="standardButtons">
-      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+      <set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Ok</set>
      </property>
     </widget>
    </item>

@@ -8,10 +8,12 @@
 '''
 Various utilities
 '''
-import traceback, re, itertools, functools, time, typing, warnings, operator, inspect
-import random, math, pprint
+import traceback, re, itertools, functools, time, typing, types, warnings
+import operator, inspect, random, math, pprint, datetime, pathlib, sys, os
+import collections, collections.abc, dataclasses
+import numbers
 from numbers import Number
-from sys import getsizeof, stderr
+from sys import (getsizeof, stderr)
 from copy import (copy, deepcopy,)
 from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
                      isgeneratorfunction, iscoroutinefunction,
@@ -23,14 +25,26 @@ from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
                      )
 from functools import (partial, partialmethod, reduce, singledispatch)
 from itertools import chain
-import collections
-import collections.abc
 from collections import deque, OrderedDict
 from dataclasses import MISSING
 import numpy as np
+import sympy
+import PIL
+from PIL.Image import Image as PILImage
+from IPython.display import Image as IPImage
 import neo
 from neo.core.dataobject import DataObject as NeoDataObject
 from neo.core.container import Container as NeoContainer
+
+__has_graphviz__:bool = False
+try:
+    import graphviz
+    GraphSource:typing.TypeAlias = graphviz.Source
+    __has_graphviz__ = True
+except:
+    GraphSource:typing.TypeAlias = types.NoneType
+
+# NOTE: SpikeTrainList is a ObjectList in recent nwo versions
 if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList
     
@@ -43,19 +57,47 @@ import pyqtgraph # for their own eq operator
 import matplotlib as mpl
 #import language_tool_python
 
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
-# from PyQt5 import (QtCore, QtGui, QtWidgets, QtXmlPatterns, QtXml, QtSvg,)
-# try:
-#     from pyqtgraph import eq # not sure is needed
-# except:
-#     from operator import eq
+import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot, Property,)
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6
+    from PySide6 import Shiboken
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+        
+    from qtpy import sip
+    from qtpy.uic import loadUiType
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+    
+
+# import qtpy
+# qtpy.API = os.environ["QT_API"]
+# if os.environ["QT_API"] == "pyside6":
+#     import PySide6
+#     from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, Shiboken)
+# else:
+#     from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 
 from core import prog
-from .prog import safeWrapper, deprecation, with_doc, is_hashable
+from .prog import safewrapper, deprecation, with_doc, is_hashable, scipywarn
 
 from .strutils import get_int_sfx
-from .quantities import units_convertible
-from .datazone import DataZone
+from .scipyen_quantities import unitsConvertible
+# from .datazone import DataZone
 
 # NOTE: 2021-07-24 15:03:53
 # moved TO core.datatypes
@@ -86,10 +128,10 @@ standard_obj_summary_headers = ["Name","Workspace",
                                 "Object Type","Data Type (DType)", 
                                 "Minimum", "Maximum", "Size", "Dimensions",
                                 "Shape", "Axes", "Array Order", "Memory Size",
-                                "Address", "Icon"]
+                                "ID", "Icon"]
 
 GeneralIndexType = typing.Union[str, int, typing.Union[typing.Sequence[str], typing.Sequence[int]], np.ndarray, range, slice, type(MISSING)]
-"""Generic index type, used with normalized_indexed and similar functions"""
+r"""Generic index type, used with normalized_indexed and similar functions"""
 
 class SafeComparator(object):
     # NOTE: 2021-07-28 13:42:07
@@ -117,7 +159,7 @@ class SafeComparator(object):
             if isinstance(x, partial):
                 return x.func == y.func and x.args == y.args and x.keywords == y.keywords
                 
-            if isinstance(x, (np.ndarray, str, Number)):
+            if isinstance(x, (np.ndarray, str, numbers.Number)):
                 #return operator.eq(x,y)
                 return self.comp(x,y)
             
@@ -178,24 +220,34 @@ class SafeComparator(object):
             #print("y:", y)
             return False
         
-def __check_isclose_args__(rtol:typing.Optional[Number]=None, 
-                           atol:typing.Optional[Number]=None, 
-                           use_math:bool=True, equal_nan:bool=True) -> bool:
-    
-    if not isinstance(rtol, Number):
+def __check_isclose_args__(rtol:typing.Optional[numbers.Number]=None, 
+                           atol:typing.Optional[numbers.Number]=None, 
+                           use_math:bool=True, equal_nan:bool=True, 
+                           equal_na:bool=True) -> bool:
+    # TODO:2024-12-19 17:17:28
+    # implement equal_na
+    if not isinstance(rtol, numbers.Number):
         rtol = inspect.signature(math.isclose).parameters["rel_tol"].default if use_math else inspect.signature(np.isclose).parameters["rtol"].default
         
-    if not isinstance(atol, Number):
+    if not isinstance(atol, numbers.Number):
         atol = inspect.signature(math.isclose).parameters["abs_tol"].default if use_math else inspect.signature(np.isclose).parameters["atol"].default
         
     f_isclose = partial(math.isclose, rel_tol=rtol, abs_tol=atol) if use_math else partial(np.isclose, rtol=rtol, atol=atol, equal_nan=equal_nan)
     
     return f_isclose, rtol, atol
+
+def is_NA(x:object)-> bool:
+    if isinstance(x, (pd.DataFrame, pd.Series, pd.Index)):
+        return np.all(x.isna)
+    elif isinstance(x, np.ndarray):
+        return np.all(pd.isna(x))
+    
+    return pd.isna(x)
         
 @singledispatch
-def is_same_as(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def is_same_as(x, y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
                use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
-    """Compares two objects.
+    r"""Compares two objects.
     
     Parameters:
     ----------
@@ -223,12 +275,12 @@ def is_same_as(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Num
     return operator.eq(x,y)
 
 @is_same_as.register(str)
-def _(x, y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x, y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     return comparator(x,y)
 
 @is_same_as.register(np.ndarray)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     
     if comparator not in (operator.eq, isclose):
@@ -254,7 +306,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return ret
 
 @is_same_as.register(pq.Quantity)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     
     if comparator not in (operator.eq, isclose):
@@ -273,7 +325,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
         x = x.magnitude
         
     else:
-        if not units_convertible(x,y):
+        if not unitsConvertible(x,y):
             return False
         
         elif x.units != y.units:
@@ -290,7 +342,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return ret
 
 @is_same_as.register(collections.abc.Sequence)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None,
       use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     
     if comparator is isclose:
@@ -306,7 +358,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return ret
 
 @is_same_as.register(collections.abc.Mapping)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False, comparator = operator.eq) -> bool:
     
     # use for comparisons between mapping values
@@ -331,8 +383,8 @@ def ideq(x,y) -> bool:
     return id(x) == id(y)
 
 @singledispatch
-def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarray, pq.Quantity], rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, use_math:bool=True, equal_nan:bool=False):
-    """Generalized isclose.
+def isclose(x:typing.Union[numbers.Number, np.ndarray], y:typing.Union[numbers.Number, np.ndarray, pq.Quantity], rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, use_math:bool=True, equal_nan:bool=False):
+    r"""Generalized isclose.
     
     Parameters:
     ==========
@@ -396,17 +448,23 @@ def isclose(x:typing.Union[Number, np.ndarray], y:typing.Union[Number, np.ndarra
     """
     raise NotImplementedError(f"{type(x).__name__} objects are not supported")
 
+@isclose.register(type(None))
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
+      use_math:bool=True, equal_nan:bool=False) -> bool:
+    if any(v is None for v in (x,y)):
+        return x is None and y is None
+
 @isclose.register(str)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False) -> bool:
     # TODO/FIXME: 2023-03-24 15:51:03
     # use difflib.SequenceMatcher
     from difflib import SequenceMatcher
     ret = SequenceMatcher(None, x, y).ratio()
     
-    if isinstance(rtol, Number):
+    if isinstance(rtol, numbers.Number):
         return ret >= 1.0-abs(rtol)
-    elif isinstance(atol, Number):
+    elif isinstance(atol, numbers.Number):
         return ret >= 1.0-abs(atol)
     else:
         return ret == 1.0
@@ -414,18 +472,22 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     # return x.lower() == y.lower()
 
 @isclose.register(np.ndarray)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False) -> bool:
     
     if any(v.size > 1 for v in (x,y)):
+        use_math = False
+        
+    # NOTE: 2025-07-01 15:30:50
+    # switch to using np.isclose if equal_nan is True
+    if equal_nan:
         use_math = False
     
     f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
     
     if isinstance(y, pq.Quantity):
         y = y.magnitude
-    
-    # emulate equal_nan for math.isclose
+
     if use_math:
         if all(v is math.nan or v is np.nan for v in (x,y)):
             return True
@@ -435,7 +497,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return f_isclose(x,y)
 
 @isclose.register(pq.Quantity)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False) -> bool:
     
     if any(v.size > 1 for v in (x,y)):
@@ -448,7 +510,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
         x = x.magnitude
         
     else:
-        if not units_convertible(x,y):
+        if not unitsConvertible(x,y):
             return False
         
         elif x.units != y.units:
@@ -467,8 +529,8 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     
     return f_isclose(x,y)
 
-@isclose.register(Number)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+@isclose.register(numbers.Number)
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False) -> bool:
     
     f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
@@ -476,7 +538,7 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return f_isclose(x,y)
 
 @isclose.register(complex)
-def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None, 
+def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbers.Number]=None, 
       use_math:bool=True, equal_nan:bool=False) -> bool:
     
     f_isclose, rtol, atol = __check_isclose_args__(rtol, atol, use_math)
@@ -484,12 +546,12 @@ def _(x,y, rtol:typing.Optional[Number]=None, atol:typing.Optional[Number]=None,
     return reduce(operator.and_, (f_isclose(x_, y_) for x_, y_ in ((getattr(x, name), getattr(y, name)) for name in ("real", "imag"))))
 
 def all_or_all_not(*args) -> bool:
-    """Returns True when elements in args are either all True or all False.
+    r"""Returns True when elements in args are either all True or all False.
     """
     return all(args) or all(not(arg) for arg in args)
 
 def hashiterable(x:typing.Iterable[typing.Any]) -> int:
-    """Takes into account the order of the elements.
+    r"""Takes into account the order of the elements.
     
     NOTE: This works when the type of the elements contained in the iterable are
     basic Python type elements. 
@@ -587,9 +649,9 @@ def hashiterable(x:typing.Iterable[typing.Any]) -> int:
          #102740977810.8254]
     #return ( (hash(type(v)) if isinstance(v, (list, deque, dict)) else gethash(v) ) * k ** p for v,k,p in zip(x, range(1, len(x)+1), itertools.cycle((-1,1))))
 
-@safeWrapper
+@safewrapper
 def gethash(x:typing.Any) -> int:
-    """Calculates a hash-like figure for objects (including non-hashable types)
+    r"""Calculates a hash-like figure for objects (including non-hashable types)
     To be used for object comparisons.
     
     Not suitable for secure code.
@@ -673,7 +735,7 @@ def gethash(x:typing.Any) -> int:
 def get_index_for_seq(index:int, test:typing.Sequence[typing.Any], 
                       target:typing.Sequence[typing.Any], 
                       mapping:typing.Optional[dict]=None) -> typing.Any:
-    """Heuristic for computing an index into the target sequence.
+    r"""Heuristic for computing an index into the target sequence.
     
     Returns the index of an element in a `target` sequence given the `index`:int
     of the element into the `test` sequence and an optional index mapping.
@@ -855,7 +917,7 @@ def get_index_for_seq(index:int, test:typing.Sequence[typing.Any],
                 return min(index, len(test)-1)
             
 def total_size(o, handlers={}, verbose=False) -> int:
-    """ Returns the approximate memory footprint an object and all of its contents.
+    r""" Returns the approximate memory footprint an object and all of its contents.
 
     Automatically finds the contents of the following builtin containers and
     their subclasses:  tuple, list, deque, dict, set and frozenset.
@@ -909,23 +971,158 @@ def total_size(o, handlers={}, verbose=False) -> int:
 # define this here BEFORE NestedFinder so that we can use it as default value for
 # comparator
 
-@safeWrapper
+@safewrapper
 def hash_identity_test(x,y) -> bool:
     return gethash(x) == gethash(y)
 
-def similar_strings(a:str, b:str) -> bool:
-    from difflib import SequenceMatcher
-    return SequenceMatcher(None, a, b).ratio()
+# def similar_strings(a:str, b:str) -> bool:
+#     from difflib import SequenceMatcher
+#     return SequenceMatcher(None, a, b).ratio()
 
-@safeWrapper
+@safewrapper
 def safe_identity_test2(x, y) -> bool:
-    """Uses SafeComparator object"""
+    r"""Uses SafeComparator object
+    Work in progress, expect bugs!
+    """
     return SafeComparator(comp=eq)(x, y)
 
-# @safeWrapper
-# def safe_identity_test(x, y) -> bool:
-def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
-    """Test that symbols in x and y refer to identical Python objects.
+
+def diff(x:object, y:object, showValues:bool=False, idcheck:bool=True) -> dict:
+    r"""Reveal differences between x and y attributes.
+    x and y MUST be instances of the SAME class (type)
+    # TODO 2024-12-14 15:04:29
+    """
+    import dataclasses
+    if type(x) != type(y):
+        if showValues:
+            return {"class": (type(x), type(y))}
+        return ("class", )
+    
+    if idcheck:
+        idx = id(x)
+        idy = id(y)
+        if idx != idy:
+            return ({"id": (idx, idy)}) if showValues else ("id", )
+        
+
+    # NOTE: 2024-12-19 08:53:29
+    # since x, y are of the same class, then if x has "diff" so should y; furthermore,
+    # if both are dataclasses, they should both have the same fields; 
+    if "diff" in tuple(map(lambda i: i[0], inspect.getmembers_static(x, predicate=lambda m: inspect.isfunction(m)))):
+        return x.diff(y)
+    
+    if all(map(dataclasses.is_dataclass, (x,y))):
+        # NOTE: both are dataclasses, but not necessarily of the SAME type
+        x_field_names = tuple(map(lambda f: f[0], dataclasses.fields(type(x))))
+        y_field_names = tuple(map(lambda f: f[0], dataclasses.fields(type(y))))
+        if len(x_field_names) != len(y_field_names) or x_field_names != y_field_names:
+            if showValues:
+                return {"field_names": (x_field_names, y_field_names)}
+            return ("field names", )
+        
+        # emulate ScipyenDataclass diff method
+        # at this stage, they should both have the same field names
+        fields = tuple(map(lambda f: (f.name, getattr(x, f.name), getattr(y, f.name)), dataclasses.fields(type(x))))
+        diff_fields = tuple(filter(lambda f: type(f[1]) != type(f[2]) or not safe_identity_test(f[1], f[2]), fields))
+        if showValues:
+            return dict(map(lambda f: (f[0], (f[1], f[2])), diff_fields))
+        
+        return tuple(map(lambda f: f[0], diff_fields))
+    
+    if isinstance(x, (numbers.Number, str, bytes, bytearray)):
+        if x != y:
+            return {"value": (x, y)} if showValues else ("value", )
+        
+    if isinstance(x, (tuple, list, collections.deque)):
+        if len(x) != len(y):
+            return {"length":(len(x), len(y))} if showValues else ("length", )
+        
+        if not all(map(lambda x: x[0] == x[1], zip(x,y))):
+            # diff_elems = dict(filter(lambda x: x[1][0]!=x[1][1], enumerate(zip(x,y))))
+            diff_elems = dict(filter(lambda x: safe_identity_test(*x[1], idcheck=False), enumerate(zip(x,y))))
+            return diff_elems if showValues else tuple(diff_elems.keys())
+        
+    if isinstance(x, dict):
+        x_keys = tuple(x.keys())
+        y_keys = tuple(y.keys())
+        if x_keys != y_keys:
+            return diff(x_keys, y_keys, showValues, False)
+        
+        x_vals = tuple(x.values())
+        y_vals = tuple(y.values())
+        if x_vals != y_vals:
+            return diff(x_vals, y_vals, showValues, False)
+        
+    if isinstance(x, np.ndaray):
+        ret = dict()
+        if x.size != y.size:
+            ret["size"] = (x.size, y.size)
+            
+        if x.ndim != y.ndim:
+            ret["ndim"] = (x.ndim, y.ndim)
+            
+        if x.shape != y.shape:
+            ret["shape"] = (x.shape, y.shape)
+    
+        if x.dtype != y.dtype:
+            ret["dtype"] = (x.dtype, y.dtype)
+            
+        if isinstance(x, pq.Quantity):
+            if x.units != y.units:
+                ret["units"] = (x.units, y.units)
+                
+        if isinstance(x, vigra.VigraArray):
+            if x.axistags != y.axistags:
+                ret["axistags"] = (x.axistags, y.axistags)
+                
+        return ret if showValues else tuple(ret.keys())
+    
+    if isinstance(x, (pd.DataFrame, pd.Series, pd.Index)):
+        ret = dict()
+        if x.size != y.size:
+            ret["size"] = (x.size, y.size)
+            
+        if x.shape != y.shape:
+            ret["shape"] = (x.shape, y.shape)
+            
+        if isinstance(x, (pd.Series, pd.Index)):
+            if x.dtype != y.dtype:
+                ret["dtype"] = (x.dtype, y.dtype)
+                
+        if isinstance(x, (pd.Series, pd.DataFrame)):
+            x_ndx = x.index
+            y_ndx = y.index
+            if x_ndx != y_ndx:
+                ret["index"] = diff(x_ndx, y_ndx, showValues, False)
+            if isinstance(x, pd.DataFrame):
+                x_col = x.columns
+                y_col = y.columns
+                if x_col != y_col:
+                    ret["columns"] = diff(x_col, y_col, showValues, False)
+        
+        return ret if showValues else tuple(ret.keys()) # TODO revisit this !
+    
+    members = inspect.getmembers_static(x, predicate = lambda x: not inspect.isfunction(x))
+    
+    # TODO: 2024-12-19 09:54:25
+    # 1. filter the above to use the public API of x & y only
+    # 2. craft the special case of neo data types
+                       
+                       
+        
+    return tuple()
+
+# @safewrapper
+def safe_identity_test(x:object, y:object, idcheck:bool=True,
+                       equal_na:bool=True, equal_nan:bool=True) -> bool:
+    r"""Test that symbols in x and y refer to identical Python objects.
+    
+    # TODO: 2024-12-19 17:15:27 FIXME:
+    # check for NA and NaNs, use equal_na and equal_nan
+    # a = {"1":[1,2,pd.NA, 3], "2":["a", "b", "c", "d"], pd.NA: [7,8,9,1.]}
+    # b = pd.Index([0,1,pd.NA, math.nan])
+    # d = pd.DataFrame(a, index=b, columns=a.keys())
+    # 
     
     Allows for the particular case where a simple comparison using '==', the 
     operator.eq or the objects' own __eq__ would fail. For example, numpy arrays
@@ -962,133 +1159,426 @@ def safe_identity_test(x:object, y:object, idcheck:bool=True) -> bool:
     NOTE: 2024-05-17 14:58:56
     to save some typing, you can use the alias 'eq'
     
-"""
-    try:
-        
-        if x is y:
+    """
+    # TODO: 2024-12-19 17:15:27 FIXME:
+    # check for NA and NaNs, use equal_na and equal_nan
+    # a = {"1":[1,2,pd.NA, 3], "2":["a", "b", "c", "d"], pd.NA: [7,8,9,1.]}
+    # b = pd.Index([0,1,pd.NA, math.nan])
+    # d = pd.DataFrame(a, index=b, columns=a.keys())
+    # 
+    
+    from core import bgbridge
+    if idcheck:
+        # if x is y or ideq(x, y):
+        if ideq(x, y):
             return True
         
-        # if all(isinstance(v, type) for v in (x,y)):
-        if isinstance(x, type) and isinstance(y, type):
-            return x==y
+    # if isinstance(x, type) and isinstance(y, type):
+    if all(map(lambda o: isinstance(o, type), (x,y) )):
+        return x==y
+    
+    if type(x) != type(y):
+        return False
+    
+    check_modules = map(lambda o: inspect.ismodule(o), (x,y))
+    
+    if any(check_modules):
+        if all(check_modules):
+            return x == y
+        return False
+    
+    if isfunction(x):
+        return x == y
+    
+    if isinstance(x, partial):
+        return x.func == y.func and x.args == y.args and x.keywords == y.keywords
+    
+    # if all(isinstance(o, bgbridge.Structure) for o in (x,y)):
+    if all(map(lambda o: isinstance(o, bgbridge.Structure), (x,y))):
+        # print(f"safe_identity_test for two BrainGlobe Atlas Structure objects")
+        if bgbridge.hasBrainGlobeAtlasAPI:
+            # print(f"has brain globe atlas = {bgbridge.hasBrainGlobeAtlasAPI}")
+            # NOTE: 2024-12-14 15:34:31
+            # avoid comparing the mesh object in brainglobe atlasapi Structure - 
+            # they will NEVER be reported as same even if loaded from the same 
+            # physical data - I think that is because of the way meshio creates 
+            # these objects...
+            x_dict = dict(filter(lambda i: i[0] != "mesh", x.data.items()))
+            y_dict = dict(filter(lambda i: i[0] != "mesh", y.data.items()))
+            # print(f"same dicts: {x_dict == y_dict}")
+            return x_dict == y_dict
+        else:
+            return x == y # TODO: 2024-12-14 15:40:08 verify this works...
+            
+    # if all(isinstance(o, np.ndarray) for o in (x,y)):
+    if all(map(lambda o: isinstance(o, np.ndarray), (x,y))):
+        ret = type(x) == type(y)
         
-        ret = True
+        if ret:
+            ret &= x.dtype == y.dtype
+            
+        if ret & all(isinstance(o, pq.Quantity) for o in (x,y)):
+            ret &= x.units == y.units
+            
+        if ret:
+            ret &= x.size == y.size
+            
+        if ret:
+            ret &= x.ndim == y.ndim
+            
+        if ret:
+            if x.size == 1:
+                if any(pd.isnull(o) for o in (x,y)):
+                    ret &= all(pd.isnull(o) for o in (x,y))
+                else:
+                    ret &= x == y
+                        
+            else:
+                xnull = pd.isnull(x[:])
+                ynull = pd.isnull(y[:])
+                if any((np.any(xnull), np.any(ynull))):
+                    ret &= np.all(xnull==ynull)
+                    # ret &= np.all(pd.isnull(x[:]) == pd.isnull(y[:]))
+                else:
+                    ret &= np.all(x[:]==y[:])
+                    
+        return ret
+    
+    if all(map(lambda o: isinstance(o, pd.DataFrame), (x,y))):
+        ret = x.size == y.size
+        if ret:
+            ret &= x.shape == y.shape
+            
+        if ret:
+            ret &= np.all(x.columns == y.columns)
+            
+        if ret:
+            ret &= np.all(x.index == y.index)
+            
+        if ret:
+            for c in x.columns:
+                ret &= np.all(x[c].dtype == y[c].dtype)
+            
+        if ret:
+            ret &= np.all(x==y)
         
-        if idcheck:
-            ret &= ideq(x, y)
-            if not ret:
-                return ret
+        return ret
         
-        ret &= type(x) == type(y)
+    if all(map(lambda o: isinstance(o, pd.Series), (x,y))):
+        ret = x.size == y.size
+        if ret:
+            ret &= x.shape == y.shape
+            
+        if ret:
+            ret &= np.all(x.index == y.index)
+            
+        if ret:
+            ret &= np.all(x.dtype == y.dtype)
+            
+        if ret:
+            ret &= np.all(x==y)
+        
+        return ret
+        
+    if all(map(lambda o: isinstance(o, pd.Index), (x,y))):
+        ret = x.size == y.size
+        if ret:
+            ret &= x.shape == y.shape
+            
+        if ret:
+            ret &= np.all(x.index == y.index)
+            
+        if ret:
+            ret &= np.all(x.dtype == y.dtype)
+            
+        if ret:
+            ret &= np.all(x==y)
+        
+        return ret
+    
+    ret = True
+    
+    if all(hasattr(o, "__eq__") and not isinstance(o, (np.ndarray, pd.DataFrame, pd.Series, pd.Index)) and not inspect.ismodule(o) for o in (x,y)):
+        try:
+            ret &= x.__eq__(y)
+        except: 
+            # traceback.print_exc()
+            # print(f"in hasattr __eq__: x is {type(x)} and y is {type(y)}")
+            ret = False
+                
+                
+        if not ret:
+            return ret
+    
+    if all(map(lambda o: hasattr(o, "size"), (x,y))): 
+        ret &= x.size == y.size
+        if not ret:
+            return ret
+    
+    if all(map(lambda o: hasattr(o, "ndim"), (x,y))): 
+        ret &= x.ndim == y.ndim
+        if not ret:
+            return ret
+    
+    if all(map(lambda o: hasattr(o, "shape"), (x,y))): 
+        ret &= x.shape == y.shape
+        if not ret:
+            return ret
+    
+    if all(map(lambda o: hasattr(o, "dtype"), (x,y))): 
+        ret &= x.dtype == y.dtype
+        if not ret:
+            return ret
+    
+    # if hasattr(x, "__len__") or hasattr(x, "__iter__"): # any ContainerABC
+    if all(map(lambda o: hasattr(o, "__len__") or hasattr(o, "__iter__"), (x,y))): # any ContainerABC
+        # NOTE: 2024-12-19 16:51:59 
+        # con dition below this is implied by the condition check of x & y 
+        # having the same type
+        # if not hasattr(y, "__len__") and not hasattr(y, "__iter__"):
+        #     return False
+        
+        ret &= len(x) == len(y)
         
         if not ret:
             return ret
         
-        # if all(hasattr(v, "__eq__") and not isinstance(v, np.ndarray) for v in (x,y)):
-        #     try:
-        #         # return np.all(x == y)
-        #         return x == y
-        #     except:
-        #         print(f"x is {type(x)}, y is {type(y)}")
-        #         raise
-        
-        if isfunction(x):
-            return x == y
-        
-        if isinstance(x, partial):
-            return x.func == y.func and x.args == y.args and x.keywords == y.keywords
-            
-        if hasattr(x, "size"): # np arrays and subtypes
-            if not hasattr(y, "size"):
-                return False
-            
-            ret &= x.size == y.size
-
+        if all(isinstance(v, dict) for v in (x,y)):
+            # FIXME: 2023-06-01 13:37:10
+            # prone to infinite recursion when either dict is among either x.values() or y.values()
+            try:
+                ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1], idcheck=idcheck), zip(x.items(), y.items())))
+            except:
+                ret = False
             if not ret:
                 return ret
+        else:
+            # FIXME: 2023-06-01 13:43:34
+            # prone to infinite recursion when either element is in x or y
+            try:
+                ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1], idcheck=idcheck), zip(x,y)))
+            except:
+                ret = False
         
-        elif hasattr(x, "__len__") or hasattr(x, "__iter__"): # any ContainerABC
-            if not hasattr(y, "__len__") and not hasattr(y, "__iter__"):
-                return False
-            
-            ret &= len(x) == len(y)
-            
-            if not ret:
-                return ret
-            
-            if all(isinstance(v, dict) for v in (x,y)):
-                # FIXME: 2023-06-01 13:37:10
-                # prone to infinite recursion when either dict is among either x.values() or y.values()
-                try:
-                    ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1], idcheck=idcheck), zip(x.items(), y.items())))
-                except:
-                    ret = False
-                if not ret:
-                    return ret
-            else:
-                # FIXME: 2023-06-01 13:43:34
-                # prone to infinite recursion when either element is in x or y
-                try:
-                    ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1], idcheck=idcheck), zip(x,y)))
-                except:
-                    ret = False
-            
-            if not ret:
-                return ret
-            
-        if hasattr(x, "shape"):
-            if not hasattr(y, "shape"):
-                return False
-            
-            ret &= x.shape == y.shape
-                
-            if not ret:
-                return ret
-        
-        # NOTE: 2018-11-09 21:46:52
-        # isn't this redundant after checking for shape?
-        # unless an object could have shape attribte but not ndim
-        if hasattr(x, "ndim"):
-            if not hasattr(y, "ndim"):
-                return False
-            ret &= x.ndim == y.ndim
-        
-            if not ret:
-                return ret
-        
-        if hasattr(x, "dtype"):
-            if not hasattr(y, "dtype"):
-                return False
-            ret &= x.dtype == y.dtype
-        
-            if not ret:
-                return ret
-        
-        if isinstance(x, (np.ndarray, str, Number, pd.DataFrame, pd.Series, pd.Index)):
-            ret &= np.all(x==y)
-            
+        if not ret:
             return ret
-            # NOTE: 2023-05-17 08:54:39
-            # event if ret was True here, not sure that falling throhugh to eq would
-            # work for arrays
-            # if not ret:
-            #     return ret
-            
-        # ret &= pyqtgraph.eq(x,y)
+
+
+    if ret:
+        ret &= x == y
         
-        return ret ## good fallback, though potentially expensive
+        if np.any(is_NA(ret)): # implies at least one of them is pd.NA
+            ret = all(map(is_NA, (x,y))) # when False, one of them may be pd.NA
+            
+        if isinstance(ret, np.ndarray):
+            ret = np.all(ret)
+            
+        # here ret may be False if x != y; but:
+        # • all below are False, yet if both are their corresponding singletons we
+        # need to return True here, to compare composite objects that contain them;
+        #   ∘ np.nan == np.nan
+        #   ∘ math.nan == np.nan
+        #   ∘ math.nan == math.nan
+        #
+        # NOTE: dataclasses.MISSING and math.inf behave as expected
+        #
+        # if not ret and not np.any(map(lambda v: np.all(pd.isna(v)), (x,y))): # ret is False NOT because one is pd.NA!
+        if not ret and not np.any(map(lambda v: np.all(is_NA(v)), (x,y))): # ret is False NOT because one is pd.NA!
+            if all(map(lambda v: isinstance(v, numbers.Number), (x,y))):
+                ret = all(map(math.isnan, (x,y)))
+            elif all(map(lambda v: isinstance(v, np.ndarray), (x,y))):
+                ret = np.all(tuple(map(math.isnan, (x,y))))
+            
+    return ret
+#     try:
+#     
+#     except:
+#         traceback.print_exc()
+        # try:
+#             if x is y:
+#                 return True
+#             
+#             if isinstance(x, type) and isinstance(y, type):
+#                 return x==y
+            
+            # ret = True
+            
+            # if idcheck:
+            #     ret &= ideq(x, y)
+            #     if not ret:
+            #         return ret
+            
+            # ret &= type(x) == type(y)
+            
+#             if not ret:
+#                 return ret
+#             
+#             if all(hasattr(v, "__eq__") and not isinstance(v, np.ndarray) for v in (x,y)):
+#                 try:
+#                     # return np.all(x == y)
+#                     return x.__eq__(y)
+#                 except:
+#                     # print(f"x is {type(x)}, y is {type(y)}")
+#                     raise
+            
+#             if isinstance(x, np.ndarray):
+#                 ret &= x.size == y.size
+#                 if ret:
+#                     ret &= x.shape == y.shape
+#                     
+#                 if ret:
+#                     ret &= x.dtype == y.dtype
+#                     
+#                 if ret:
+#                     ret &= np.all(x==y)
+#                 
+#                 return ret
+            
+#             if isinstance(x, pd.DataFrame):
+#                 ret &= x.size == y.size
+#                 if ret:
+#                     ret &= x.shape == y.shape
+#                     
+#                 if ret:
+#                     ret &= np.all(x.columns == y.columns)
+#                     
+#                 if ret:
+#                     ret &= np.all(x.index == y.index)
+#                     
+#                 if ret:
+#                     for c in x.columns:
+#                         ret &= np.all(x[c].dtype == y[c].dtype)
+#                     
+#                 if ret:
+#                     ret &= np.all(x==y)
+#                 
+#                 return ret
+                
+#             if isinstance(x, pd.Series):
+#                 ret &= x.size == y.size
+#                 if ret:
+#                     ret &= x.shape == y.shape
+#                     
+#                 if ret:
+#                     ret &= np.all(x.index == y.index)
+#                     
+#                 if ret:
+#                     ret &= np.all(x.dtype == y.dtype)
+#                     
+#                 if ret:
+#                     ret &= np.all(x==y)
+#                 
+#                 return ret
+                
+#             if isinstance(x, pd.Index):
+#                 ret &= x.size == y.size
+#                 if ret:
+#                     ret &= x.shape == y.shape
+#                     
+#                 if ret:
+#                     ret &= np.all(x.index == y.index)
+#                     
+#                 if ret:
+#                     ret &= np.all(x.dtype == y.dtype)
+#                     
+#                 if ret:
+#                     ret &= np.all(x==y)
+#                 
+#                 return ret
+                
+#             if hasattr(x, "size"): # np arrays and subtypes
+#                 if not hasattr(y, "size"): # NOTE: 2024-12-19 16:51:59 this is implied bny the condition check of x & y having the same type
+#                     return False
+#                 
+#                 ret &= x.size == y.size
+# 
+#                 # if not ret:
+#                 return ret
+            
+#             if hasattr(x, "__len__") or hasattr(x, "__iter__"): # any ContainerABC
+#                 if not hasattr(y, "__len__") and not hasattr(y, "__iter__"):
+#                     return False
+#                 
+#                 ret &= len(x) == len(y)
+#                 
+#                 if not ret:
+#                     return ret
+#                 
+#                 if all(isinstance(v, dict) for v in (x,y)):
+#                     # FIXME: 2023-06-01 13:37:10
+#                     # prone to infinite recursion when either dict is among either x.values() or y.values()
+#                     try:
+#                         ret &= all(map(lambda x_: safe_identity_test(x_[0], x_[1], idcheck=idcheck), zip(x.items(), y.items())))
+#                     except:
+#                         ret = False
+#                     if not ret:
+#                         return ret
+#                 else:
+#                     # FIXME: 2023-06-01 13:43:34
+#                     # prone to infinite recursion when either element is in x or y
+#                     try:
+#                         ret &= all(map(lambda x_: safe_identity_test(x_[0],x_[1], idcheck=idcheck), zip(x,y)))
+#                     except:
+#                         ret = False
+#                 
+#                 if not ret:
+#                     return ret
+#             
+#             # ### BEGIN array-like ...
+#             if hasattr(x, "shape"):
+#                 if not hasattr(y, "shape"):
+#                     return False
+#                 
+#                 ret &= x.shape == y.shape
+#                     
+#                 if not ret:
+#                     return ret
+#             
+#             # NOTE: 2018-11-09 21:46:52
+#             # isn't this redundant after checking for shape?
+#             # unless an object could have shape attribte but not ndim
+#             if hasattr(x, "ndim"):
+#                 if not hasattr(y, "ndim"):
+#                     return False
+#                 ret &= x.ndim == y.ndim
+#             
+#                 if not ret:
+#                     return ret
+#             
+#             if hasattr(x, "dtype"):
+#                 if not hasattr(y, "dtype"):
+#                     return False
+#                 ret &= x.dtype == y.dtype
+#             
+#                 if not ret:
+#                     return ret
+            
+            # if isinstance(x, (np.ndarray, str, numbers.Number, pd.DataFrame, pd.Series, pd.Index)):
+            #     ret &= np.all(x==y)
+                
+                # return ret
+                # NOTE: 2023-05-17 08:54:39
+                # event if ret was True here, not sure that falling throhugh to eq would
+                # work for arrays
+                # if not ret:
+                #     return ret
+                
+            # ### END arrays ...
+            # ret &= pyqtgraph.eq(x,y)
+            
+            # return ret ## good fallback, though potentially expensive
     
-    except:
-        traceback.print_exc()
-        frame = inspect.currentframe()
-        call_stack = "\n".join([f"{fi.function} from {fi.filename} at line {fi.lineno}" for fi in inspect.getouterframes(frame)])
-        print("Call stack:")
-        print(call_stack)
+        # except:
+        #     traceback.print_exc()
+        #     frame = inspect.currentframe()
+        #     call_stack = "\n".join([f"{fi.function} from {fi.filename} at line {fi.lineno}" for fi in inspect.getouterframes(frame)])
+        #     print("Call stack:")
+        #     print(call_stack)
         
 eq = safe_identity_test
 
 class NestedFinder(object):
-    """Provides searching in nesting (hierarchical) data structures.
+    r"""Provides searching in nesting (hierarchical) data structures.
     
     A nesting, or hierarchical, data structure is a mapping (dict) or sequence 
     (tuple, list, deque) where at least one elements (or value) is another 
@@ -1101,15 +1591,16 @@ class NestedFinder(object):
     performed INSIDE their elements when these elements are of a nesting type as
     described above.
     
-    FIXME: This is buggy whe searching by type !!!
+    FIXME: This is buggy when searching by type !!!
     
     """
-    supported_collection_types = (np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame, pd.Index) # this implicitly includes namedtuple
-    supported_hierarchical_types = (dict, list, tuple, deque)
+    supported_collection_types = (np.ndarray, dict, list, tuple, deque, pd.Series, pd.DataFrame, pd.Index, set, NeoObjectList) # this implicitly includes namedtuple
+    supported_hierarchical_types = (dict, list, tuple, deque, set, types.MappingProxyType, NeoObjectList)
     nesting_types = supported_hierarchical_types
     
-    def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None, comparator:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=safe_identity_test):
-        """NestedFinder initializer.
+    def __init__(self, src:typing.Optional[typing.Union[dict, list, tuple, deque]]=None, 
+                 comparator:typing.Optional[typing.Union[str, typing.Callable[..., typing.Any]]]=safe_identity_test):
+        r"""NestedFinder initializer.
         
         Parameters:
         -----------
@@ -1151,6 +1642,7 @@ class NestedFinder(object):
         self._item_as_value_ = None
         
         self._comparator_ = operator.eq # see 'operator' module for other examples
+        self._safe_comparator_ = comparator
         
         isbinfun = isfunction(comparator) and len(signature(comparator).parameters) == 2
         isparfun = isinstance(comparator, partial) and len(signature(comparator.func).parameters) >= 2
@@ -1164,14 +1656,14 @@ class NestedFinder(object):
             self._comparator_ = comparator
         
     def reset(self):
-        """Clears book-keeping queues, results and removes data reference
+        r"""Clears book-keeping queues, results and removes data reference
         The comparator function is left the same.
         """
         self.initialize()
         self._data_ = None
         
     def initialize(self):
-        """Clears the result and book-keeping queues.
+        r"""Clears the result and book-keeping queues.
         The comparator function is left unchanged.
         """
         self._visited_.clear()
@@ -1184,13 +1676,13 @@ class NestedFinder(object):
         
     @property
     def comparator(self):
-        """Returns the comparator function used in searching of the str '=='
+        r"""Returns the comparator function used in searching of the str '=='
         """
         return self._comparator_
     
     @comparator.setter
     def comparator(self, fn:typing.Callable[..., typing.Any]):
-        """Sets the comparator function to a custom binary comparator.
+        r"""Sets the comparator function to a custom binary comparator.
         A binary comparator compares two arguments e.g., func(x, y) -> bool
         
         A comparator that also accept further optional parameters (i.e.
@@ -1219,19 +1711,19 @@ class NestedFinder(object):
         
     @property
     def lastSearchIndex(self):
-        """Read-only acces to the last search item
+        r"""Read-only acces to the last search item
         """
         return self._item_as_index_
     
     @property
     def lastSearchValue(self):
-        """Read-only acces to the last search item
+        r"""Read-only acces to the last search item
         """
         return self._item_as_value_
     
     @property
     def paths(self):
-        """Rad-only access to the collection of indexing paths.
+        r"""Rad-only access to the collection of indexing paths.
         Since this may be consumed in other code (e.g. self.get or 
         NestedFinder.getvalue) this property returns a deep copy of the results.
         """
@@ -1240,7 +1732,7 @@ class NestedFinder(object):
         
     @property
     def result(self):
-        """Read-only, deep copy of the search result.
+        r"""Read-only, deep copy of the search result.
         Since this may be consumed in other code (e.g. self.get or 
         NestedFinder.getvalue) this property returns a deep copy of the results.
         """
@@ -1248,7 +1740,7 @@ class NestedFinder(object):
     
     @property
     def values(self):
-        """Read-only, of the collection of values found with search by index.
+        r"""Read-only, of the collection of values found with search by index.
         
         This is a deep copy so that modifications by other code does not alter
         the collection stored in the NestedFinder.
@@ -1257,7 +1749,7 @@ class NestedFinder(object):
     
     @property
     def data(self):
-        """Read/write access to the nesting data structure"""
+        r"""Read/write access to the nesting data structure"""
         return self._data_
     
     @data.setter
@@ -1267,7 +1759,7 @@ class NestedFinder(object):
         
     @staticmethod
     def is_namedtuple(x):
-        """ core.datatype.is_namedtuple imported here.
+        r""" core.datatype.is_namedtuple imported here.
         """
         from core.datatypes import is_namedtuple
         return is_namedtuple(x)
@@ -1337,6 +1829,9 @@ class NestedFinder(object):
                 return ""
                 
             return "[%s]" % aexpr
+        
+        elif dataclasses.is_dataclass(src):
+            return f".{ndx}"
             
         else:
             if isinstance(ndx, int):
@@ -1351,7 +1846,7 @@ class NestedFinder(object):
         return ""
             
     def _gen_elem(self, src:typing.Any, ndx:typing.Any, report:bool=False):
-        """Element retrieval from collection given key or index
+        r"""Element retrieval from collection given key or index
         Parameters:
         -----------
         src: python object
@@ -1407,6 +1902,8 @@ class NestedFinder(object):
                 elif isinstance(src, (np.ndarray, pd.Index)):
                     yield src[ndx]
                     
+                elif dataclasses.is_dataclass(src):
+                    yield getattr(src, ndx, None)
                 else:
                     yield src
             
@@ -1478,7 +1975,7 @@ class NestedFinder(object):
             return self._ndx_expr(src, path)
             
     def _gen_search(self, var, item, parent=None, as_index=False, by_type=False):#, ntabs=0): # ntabs - for debugging only!
-        """Generator to search item in a nesting data structure.
+        r"""Generator to search item in a nesting data structure.
         
         Item can be an indexing object, or a value.
         
@@ -1562,7 +2059,11 @@ class NestedFinder(object):
                             self._paths_.append(list(self._found_))
                             yield k
                     else:
-                        if self._comparator_(item, v):
+                        if all(is_hashable(o) for o in (item, v)):
+                            comp = self._comparator_
+                        else:
+                            comp = self._safe_comparator_
+                        if comp(item, v):
                             self._found_.append(k)
                             self._paths_.append(list(self._found_))
                             # print("%sFOUND in %s member %s(%s): %s -" % ("".join(["\t"] * (ntabs+1)), type(var).__name__, k, type(k).__name__, type(v).__name__, ), "visited:", self._found_)
@@ -1845,7 +2346,7 @@ class NestedFinder(object):
                 # customized support for qualified comparators e.g., np.isclose
                 # and string comparisons (using pandas parser. etc) according to
                 # the column's dtype
-                if isinstance(item, (Number, str)):
+                if isinstance(item, (numbers.Number, str)):
                     try:
                         ndx = var == item
                         if np.any(ndx): # check in values
@@ -1966,10 +2467,10 @@ class NestedFinder(object):
                 # customized application of qualified comparators e..g, 
                 # np.isclose for numeric arrays and other comparisons for non-numeric
                 # dtypes
-                if isinstance(item, (Number, str)) or (isinstance(item, np.ndarray) and item.size == 1):
+                if isinstance(item, (numbers.Number, str)) or (isinstance(item, np.ndarray) and item.size == 1):
                     try:
                         ndx = np.array([False])
-                        if isinstance(item, (Number,str)):
+                        if isinstance(item, (numbers.Number,str)):
                             ai = np.array([item])
                             if ai.dtype == var.dtype:
                                 ndx = var == item
@@ -2000,7 +2501,7 @@ class NestedFinder(object):
             
     def find(self, item:typing.Optional[typing.Any]=None, find_value:typing.Optional[bool]=None,
              find_by_type:typing.Optional[bool] = False):
-        """Search for 'item' in a nesting data structure.
+        r"""Search for 'item' in a nesting data structure.
         
         A nesting data structure if a collection (sequence or mapping - a dict)
         that contains other sequnences or dicts nested inside (with arbitrary
@@ -2474,7 +2975,7 @@ class NestedFinder(object):
         return deepcopy(self._result_)
     
     def findkey(self, obj):
-        """Search for value given an atomic key or indexing object
+        r"""Search for value given an atomic key or indexing object
         Returns a sequence of (path, value) tuples, where path is a list of
         indexing objects (or keys) from the top to the item's nesting level,
         and value is the nested value.
@@ -2484,19 +2985,19 @@ class NestedFinder(object):
         return self.find(obj, find_value=False)
     
     def findindex(self, obj):
-        """Calls self.findkey(key_or_indexing_obj).
+        r"""Calls self.findkey(key_or_indexing_obj).
         """
         return self.findkey(key_or_indexing_obj)
     
     def findvalue(self, value):
-        """Search for the key or indexing object nested in self.data.
+        r"""Search for the key or indexing object nested in self.data.
         
-        Calls self.find(value, True)
+        Calls self.find(value, find_value=True)
         """
         return self.find(value, find_value=True)
     
     def path_expression(self, paths:typing.Optional[typing.Union[tuple, list,deque]]=None, single:bool=True):
-        """Generates a str expression to be valuated on the hierarchical data
+        r"""Generates a str expression to be valuated on the hierarchical data
         """
         if not isinstance(paths, (deque, list, tuple)):
             if not self._paths_:
@@ -2525,7 +3026,7 @@ class NestedFinder(object):
         return NestedFinder()._get_path_expression(data, paths)
             
     def get(self, paths:typing.Optional[typing.Union[tuple, list,deque]]=None, single:bool=True):
-        """Retrieves nested value(s) from the internal data using indexing paths.
+        r"""Retrieves nested value(s) from the internal data using indexing paths.
         
         The internal data is the nesting (hierarchical) data type established at
         initialization or later by setting the 'data' property.
@@ -2611,7 +3112,7 @@ class NestedFinder(object):
             
     @staticmethod
     def getvalue(data, paths:typing.Optional[typing.Union[tuple, list, deque]]=None, single:bool = True):
-        """Static version of NestedFinder.get.
+        r"""Static version of NestedFinder.get.
         
         Parameters:
         -----------
@@ -2649,7 +3150,7 @@ class NestedFinder(object):
         
     
 def reverse_dict(x:dict) -> dict:
-    """Returns a reverse mapping (values->keys) from x
+    r"""Returns a reverse mapping (values->keys) from x
     
     Parameters:
     ==========
@@ -2677,7 +3178,7 @@ def reverse_dict(x:dict) -> dict:
     return ret
 
 def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union[typing.Any, typing.Sequence[typing.Any]]]:
-    """Looks up the key mapped to value y in the x mapping (dict)
+    r"""Looks up the key mapped to value y in the x mapping (dict)
     Parameters:
     ===========
     x:dict
@@ -2694,13 +3195,13 @@ def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union
     #from .traitcontainers import (DataBag, Bunch, )
     #from collections import OrderedDict
     
-    vals = list(x.values()) # bypass the errors raise when comparing np.arrays
+    vals = list(filter(lambda o: isinstance(o, type(y)), x.values())) # bypass the errors raise when comparing np.arrays
     
     if any(isinstance(v, (np.ndarray, pd.DataFrame, pd.Series, pd.Index)) for v in vals) or isinstance(y, (np.ndarray, pd.DataFrame, pd.Series, pd.Index)):
         testincluded = any(safe_identity_test(y,v) for v in vals)
         
     else:
-        testincluded = y in x.values()
+        testincluded = y in vals
     
     if testincluded:
         ret = [name for name, val in x.items() if safe_identity_test(y, val)]
@@ -2708,19 +3209,71 @@ def reverse_mapping_lookup(x:dict, y:typing.Any) -> typing.Optional[typing.Union
         
         return tuple(ret)
         
-#         if len(ret) == 1:
-#             return ret[0]
-#         
-#         elif len(ret) > 1:
-#             return tuple(ret)
     else:
         return tuple()
     
-def summarize_object_properties(objname, obj, namespace="Internal"):
-    """Returns a dict with object properties for display in Scipyen workspace.
-    The dict keys represent the column names in the WorkspaceViewer table, and 
-    are mapped to the a dict with two key: str value pairs: display, tooltip,
-    where:
+def library_for_module(x: str) -> str:
+    from core.workspacefunctions import getMainScipyenWindow
+    # print(f"utilities.library_for_module({x})")
+    mainWindow = getMainScipyenWindow()
+    plugins_dir = None
+    scipyen_dir = None
+    if mainWindow:
+        plugins_dir = mainWindow.userPluginsDirectory
+        # scipyen_dir = mainWindow._scipyendir_
+        scipyen_dir = mainWindow.scipyenDir
+        
+    if any(s in x for s in ("builtin", "built-in")):
+        return "standard (built-in)"
+    
+    if x in sys.modules:
+        xFile = getattr(sys.modules[x], "__file__", getattr(sys.modules[x], "__name__", None))
+        
+        if isinstance(xFile, str):
+            if pathlib.Path(xFile).exists():
+                if hasattr(sys, "_MEIPASS") and sys._MEIPASS in xFile: # pyinstaller bundle
+                        return "bundled application"
+                    
+                else:
+                    if (isinstance(scipyen_dir, str) and scipyen_dir in xFile) or ("scipyen/src/scipyen" in xFile):
+                        return "'Scipyen'"
+                    
+                    elif "site-packages" in xFile:
+                        p = pathlib.Path(xFile)
+                        ndx = p.parts.index("site-packages")
+                        return f"'{p.parts[ndx+1]}' package"
+                    
+                    elif f"{sys.platlibdir}/python" in xFile:
+                        return "standard"
+                    
+                    elif isinstance(plugins_dir, str) and plugins_dir in xFile:
+                        p = pathlib.Path(xFile)
+                        subpath = pathlib.Path(*list(filter(lambda _p: _p not in pathlib.Path(plugins_dir).parts, p.parts)))
+                        return f"user plugin '{subpath.as_posix()}'"
+                    
+                    else:
+                        return "unknown"
+            else:
+                return f"{xFile} (built-in)"
+        else:
+            return "unknown"
+    else:
+        return "unknown"
+    
+def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal") -> dict:
+    r"""Summary of object properties to be displayed in Scipyen workspace view.
+    
+    Parameters:
+    
+    
+
+    Returns a dict (key ↦ value mapping) with the following keys:
+        "Data Type (DType)", "Workspace", "Minimum", "Maximum", "Size",
+        "Dimensions", "Shape", "Axes", "Array Order", "Memory Size",
+        "ID", "Icon"
+    
+    and the values are nested key ↦ str where the keys define the "role" of the
+        str value in the workspace view:
     
     "display" : str with the display string of the property (display role for the
                 corresponding item)
@@ -2759,12 +3312,16 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     
     objtype = type(obj)
     typename = objtype.__name__
-    typemodulename = objtype.__module__
+    module_name = obj.__module__ if isinstance(obj, type) else objtype.__module__
+    module_library = library_for_module(module_name) if isinstance(module_name, str) and len(module_name.strip()) else ""
+        
     objcls = obj.__class__
     clsname = objcls.__name__
     
-    fqual = ".".join([objcls.__module__, clsname])
-    ttip = ".".join([typemodulename, typename])
+    # fqual = ".".join([objcls.__module__, clsname])
+    fqual = f"module: {module_name}\nlibrary: {module_library}"
+    # ttip = ".".join([module_name, typename])
+    ttip = f"{typename}"
     
     if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
         icon = QtGui.QIcon.fromTheme("window")
@@ -2775,21 +3332,6 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
     #     icon = QtGui.QIcon.fromTheme("class-or-package")
     
     wspace_name = "Namespace: %s" % namespace
-    
-    # NOTE: 2021-10-03 21:07:45
-    # this consumes too much of resources (time & memory) and is unnecessary
-    # use the short version above
-    #if isinstance(obj, str):
-        #ttip = obj
-    #elif isinstance(obj, (tuple, list)):
-        #ttip = "%s" % (obj,)
-    #else:
-        #try:
-            #ttip = "%s" % obj
-        #except:
-            #ttip = typename
-    
-    # icon = None
     
     result["Name"] = {"display": "%s" % objname, "tooltip":"\n".join([ttip, wspace_name])}
     
@@ -2803,13 +3345,16 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         tt = abbreviated_type_names.get(clsname, clsname)
         icon = QtGui.QIcon.fromTheme("class")
         
-    if tt == "function":
+    if tt == "function" or "function" in tt or "method" in tt:
         icon = QtGui.QIcon.fromTheme("code-function")
 
     if tt == "module":
         icon = QtGui.QIcon.fromTheme("class-or-package")
         
-    if objtype is type:
+    if tt.lower() == "macro":
+        icon = QtGui.QIcon.fromTheme("component")
+        
+    if objtype is type or type in inspect.getmro(objtype):
         tt += f" <{obj.__name__}>"
         icon = QtGui.QIcon.fromTheme("datatype") if obj.__name__ in builtins.__dict__ else QtGui.QIcon.fromTheme("class")
         
@@ -2891,7 +3436,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             # icon = QtGui.QIcon.fromTheme("datatype")
             pass
         elif isinstance(obj, sequence_types):
-            if len(obj) and all([isinstance(v, Number) for v in obj]):
+            if len(obj) and all([isinstance(v, numbers.Number) for v in obj]):
                 datamin = str(min(obj))
                 mintip = "min: "
                 datamax = str(max(obj))
@@ -2905,7 +3450,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsztip = "memory size: "
             
         elif isinstance(obj, set_types):
-            if len(obj) and all([isinstance(v, Number) for v in obj]):
+            if len(obj) and all([isinstance(v, numbers.Number) for v in obj]):
                 datamin = str(min([v for v in obj]))
                 mintip = "min: "
                 datamax = str(max([v for v in obj]))
@@ -2926,11 +3471,27 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz    = str(getsizeof(obj))
             memsztip = "memory size: "
             
+        elif isinstance(obj, types.SimpleNamespace):
+            sz = str(len(obj.__dict__))
+            sizetip = "length: "
+            memsz    = str(getsizeof(obj))
+            memsztip = "memory size: "
+            
         elif isinstance(obj, NeoContainer):
-            sz = pprint.pformat(obj.size)
+            try:
+                sz = pprint.pformat(obj.size)
+            except:
+                traceback.print_exc()
+                sz = ""
             sizetip = "size: "
                 
             memsz = str(getsizeof(obj))
+            memsztip = "memory size: "
+            
+        elif isinstance(obj, NeoObjectList):
+            sz = str(len(obj))
+            sizetip = "length: "
+            memsz    = str(getsizeof(obj))
             memsztip = "memory size: "
             
         elif isinstance(obj, (str, bytes, bytearray)):
@@ -2946,7 +3507,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
-        elif isinstance(obj, Number):
+        elif isinstance(obj, numbers.Number):
             dtypestr = tt
             datamin = str(obj)
             mintip = "min: "
@@ -2996,36 +3557,36 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
+        elif isinstance(obj, PILImage):
+            sz = str(obj.size)
+            sizetip = "size: "
+            shp = f"({obj.width}, {obj.height})"
+            shapetip = "shape: "
+            
         elif isinstance(obj, np.ndarray):
             dtype = obj.dtype
             dtypestr = str(obj.dtype)
             dtypetip = f"{type(dtype).__module__}.{type(dtype).__name__}"
-            # dtypetip = ""
-            # dtypetip = "dtype: "
             
-            if obj.size > 0:
-                try:
-                    if np.all(np.isnan(obj[:])):
-                        datamin = str(np.nan)
+            if not isinstance(obj, pq.UnitQuantity):
+                if dtype != np.dtype(object) and dtype.char != "U":
+                    if obj.size > 0:
+                        try:
+                            datamin = str(np.nan) if np.all(np.isnan(obj.flatten())) else str(np.nanmin(obj))
+                        except:
+                            traceback.print_exc()
+                            # pass
+                            
+                        mintip = "min: "
+                            
+                        try:
+                            datamax = str(np.nan) if np.all(np.isnan(obj.flatten())) else str(np.nanmax(obj))
+                                
+                        except:
+                            traceback.print_exc()
+                            # pass
                         
-                    else:
-                        datamin = str(np.nanmin(obj))
-                except:
-                    pass
-                    
-                mintip = "min: "
-                    
-                try:
-                    if np.all(np.isnan(obj[:])):
-                        datamax = str(np.nan)
-                        
-                    else:
-                        datamax  = str(np.nanmax(obj))
-                        
-                except:
-                    pass
-                
-                maxtip = "max: "
+                        maxtip = "max: "
                 
             sz = str(obj.size)
             sizetip = "size: "
@@ -3060,13 +3621,26 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
             memsz    = str(getsizeof(obj))
             memsztip = "memory size: "
             
+        elif hasattr(obj, "__len__"):
+            try:
+                sz = len(obj)
+            except:
+                sz = ""
+                
+            if isinstance(obj, vigra.AxisTags):
+                axes = repr(obj)
+                axestip = "axis tags: "
+                
+        elif isinstance(obj, vigra.AxisInfo):
+            axes = obj.key
+            axestip = "axis key: "
+            
         else:
             #vmemsize = QtGui.QStandardItem(str(getsizeof(obj)))
             memsz = str(getsizeof(obj))
             memsztip = "memory size: "
             
         result["Data Type (DType)"]     = {"display": dtypestr,     "tooltip" : dtypetip}
-        # result["Data Type (DType)"]     = {"display": dtypestr,     "tooltip" : "%s%s" % (dtypetip, dtypestr)}
         result["Workspace"]     = {"display": namespace,    "tooltip" : "Location: %s kernel namespace" % namespace}
         result["Minimum"]       = {"display": datamin,      "tooltip" : "%s%s" % (mintip, datamin)}
         result["Maximum"]       = {"display": datamax,      "tooltip" : "%s%s" % (maxtip, datamax)}
@@ -3076,7 +3650,7 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
         result["Axes"]          = {"display": axes,         "tooltip" : "%s%s" % (axestip, axes)}
         result["Array Order"]   = {"display": arrayorder,   "tooltip" : "%s%s" % (ordertip, arrayorder)}
         result["Memory Size"]   = {"display": memsz,        "tooltip" : "%s%s" % (memsztip, memsz)}
-        result["Address"]       = {"display": hexaddress,   "tooltip" : f"Memory address in hex (decimal):\n{hexaddress} ({address})"}
+        result["ID"]       = {"display": hexaddress,   "tooltip" : f"Memory address in hex (decimal):\n{hexaddress} ({address})"}
         result["Icon"]          = icon
         
         # NOTE: 2021-06-12 12:22:38
@@ -3090,8 +3664,45 @@ def summarize_object_properties(objname, obj, namespace="Internal"):
 
     return result
     
+def augment_obj_prop_dict(prop_dict):
+    r"""Adds/modifies 'Icon' entry in the properties dictionary for variable listing.
+    Only useful for objects in the namespace of an external kernel.
+    See summarize_object_properties for what a properties dict looks like
+    """
+    import builtins
+    if 'Icon' not in prop_dict.keys(): # don't overwrite what summarize_object_properties did
+        tt = prop_dict["Object Type"]["display"]
+        
+        icon = QtGui.QIcon.fromTheme("object")
+        
+        if "<" in tt and ">" in tt:
+            tt, dundername = tt.split(" ")
+            icon = QtGui.QIcon.fromTheme("datatype") if dundername in builtins.__dict__ else QtGui.QIcon.fromTheme("class")
+            
+        
+        elif tt == "type":
+            icon = QtGui.QIcon.fromTheme("class")
+        
+        if "instance" in tt == "instance":
+            tt = abbreviated_type_names.get(clsname, clsname)
+            icon = QtGui.QIcon.fromTheme("class")
+            
+        if tt == "function" or "function" in tt or "method" in tt:
+            icon = QtGui.QIcon.fromTheme("code-function")
+
+        if tt == "module":
+            icon = QtGui.QIcon.fromTheme("class-or-package")
+            
+        if tt.lower() == "macro":
+            icon = QtGui.QIcon.fromTheme("component")
+        
+        
+        prop_dict["Icon"] = icon
+        
+    return prop_dict
+        
 def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True):
-    """Alternative to list.index(), such that a missing value returns None
+    r"""Alternative to list.index(), such that a missing value returns None
     instead of raising an Exception.
     DEPRECATED
     Use prog.filter_attr
@@ -3106,7 +3717,7 @@ def silentindex(a: typing.Sequence, b: typing.Any, multiple:bool = True):
         return None
     
 def index_of(seq, obj, key=None, multiple=False, comparator=None):
-    """Find the index of obj in the object sequence seq.
+    r"""Find the index of obj in the object sequence seq.
     
     Object finding can be based on the object's identity (by default) or by the 
     value of a specific object attribute. 
@@ -3212,7 +3823,7 @@ def yyMdd(now=None):
     return "%s%s%s" % (time.strftime("%y", tuple(now)), string.ascii_lowercase[now.tm_mon-1], time.strftime("%d", tuple(now)))
 
 def unpack(x:typing.Union[list, tuple, deque], varnames:typing.Sequence[str]):
-    """Unpacks a sequence x of len(x) <= len(varnames) into len(varnames) variables"""
+    r"""Unpacks a sequence x of len(x) <= len(varnames) into len(varnames) variables"""
     import keyword
     from core.datatypes import NoData
     
@@ -3224,8 +3835,6 @@ def unpack(x:typing.Union[list, tuple, deque], varnames:typing.Sequence[str]):
     
     return list(itertools.zip_longest(varnames, x, fillvalue=NoData()))
     
-
-
 def make_file_filter_string(extList, genericName):
     extensionList = [''.join(i) for i in zip('*' * len(extList), '.' * len(extList), extList)]
 
@@ -3240,127 +3849,12 @@ def make_file_filter_string(extList, genericName):
     return (fileFilterString, individualFilterStrings)
 
 def elements_types(s) -> typing.Sequence[type]:
-    """Returns the unique types in a sequence
+    r"""Returns the unique types in a sequence
     """
     return gen_unique(map(lambda x: type(x).__name__, s))
 
-
-def counter_suffix(x:str, strings:typing.List[str], sep:str="_", start:int=0, ret:bool=False):
-    """Appends a counter suffix to x:str if x is found in the list of strings
-    
-    Parameters:
-    ==========
-    
-    x = str: string to check for existence
-    
-    strings = sequence of str to check for existence of x
-    
-    sep: str, default is "_"; suffix separator
-    
-    start: 
-    
-    """
-    # TODO:
-    
-    #base = "AboveTheSky"
-    #p = re.compile("^%s_{0,1}\d*$" % base)
-    #p = re.compile("^%s_{0,1}\d*$" % base)
-    #items = list(filter(lambda x: p.match(x), standardQtGradientPresets.keys()))
-    #items
-    #names = list(standardQtGradientPresets.keys())
-    #names.append("AboveTheSky_1")
-    #items = list(filter(lambda x: p.match(x), names))
-    #items
-
-    if not isinstance(strings, (tuple, list)) and not hasattr(strings, "__iter__"):
-        raise TypeError("Second positional parameter was expected to be an iterable; got %s instead" % type(strings).__name__)
-    
-    if not all ([isinstance(s, str) for s in strings]):
-        raise TypeError("Second positional parameter was expected to contain str elements only")
-    
-    if not isinstance(sep, str):
-        raise TypeError("Separator must be a str; got %s instead" % type(sep).__name__)
-    
-    # if len(sep.strip()) == 0:
-    #     raise ValueError("Separator cannot be an empty string")
-    
-    if not isinstance(start, int):
-        raise TypeError(f"'start' expected to be an int; got {type(start).__name__} instead")
-    
-    if start < 0:
-        raise ValueError(f"'start' expected to be a positive int (>= 0); instead, got {start}")
-    
-    # print(f"counter_suffix: x = {x}, strings = {strings}, start = {start}")
-    # print(f"counter_suffix: x = {x}, start = {start}, ret = {ret}")
-    
-    if len(strings):
-        base, cc = get_int_sfx(x, sep=sep)#, bracketed=bracketed)
-        
-        # print(f"counter_suffix: base = {base}, cc = {cc}")
-        
-        #p = re.compile(base)
-        # if bracketed:
-        #     p = re.compile("^%s%s{0,1}\(\d*\)$" % (base, sep))
-        # else:
-        #     p = re.compile("^%s%s{0,1}\d*$" % (base, sep))
-        p = re.compile("^%s%s{0,1}\d*$" % (base, sep))
-        
-        items = sorted(list(filter(lambda x: p.match(x), strings)))
-        
-        # print(f"counter_suffix items = {items}")
-        newsfx = None
-        if len(items):
-            full_ndx = list(range(start, len(items)))
-            currentsfx = list(x[1] for x in sorted(list(filter(lambda x: isinstance(x[1], int), (map(lambda x: get_int_sfx(x, sep=sep), items)))), key=lambda x: x[1]))
-            # currentsfx = list(x[1] for x in sorted(list(filter(lambda x: isinstance(x[1], int), (map(lambda x: get_int_sfx(x, sep=sep, bracketed=bracketed), items)))), key=lambda x: x[1]))
-            if len(currentsfx):
-                min_current = min(currentsfx)
-                max_current = max(currentsfx)
-                if  len(full_ndx) == 0:
-                    newsfx = 0
-                else:
-                    if min_current > min(full_ndx):
-                        newsfx = min(full_ndx)
-                    else:
-                        # find out missing indices
-                        if len(currentsfx) > 1:
-                            dsfx = np.ediff1d(currentsfx)
-                            locs = np.where(dsfx > 1)[0]
-                            if len(locs):
-                                newsfx = locs[0] + 1
-                            else:
-                                newsfx = currentsfx[-1] + 1
-                        else:
-                            newsfx = currentsfx[-1] + 1
-                        
-                    # newsfx = full_ndx[-1]
-                    
-            else:
-                newsfx = start   
-                
-            # if bracketed:
-            #     result = sep.join([base, "(%d)" % newsfx])
-            # else:
-            #     result = sep.join([base, "%d" % newsfx])
-            result = sep.join([base, "%d" % newsfx])
-            
-            if ret:
-                return result, newsfx
-            
-            return result
-        
-        else:
-            result = x
-            if ret:
-                return x, None
-            return x
-        
-    if ret:
-        return x, None
-    return x
-                
 def get_nested_value(src, path):
-    """Returns a value contained in a hierarchical data structure.
+    r"""Returns a value contained in a hierarchical data structure.
     
     Returns None if path is not found in dict.
     
@@ -3431,7 +3925,7 @@ def get_nested_value(src, path):
         raise TypeError("Expecting a hashable object or a sequence of hashable objects, for path %s; got %s instead" % (path, type(path).__name__))
         
 def set_nested_value(src, path, value):
-    """Adds (or sets) a nested value in a mapping (dict) src.
+    r"""Adds (or sets) a nested value in a mapping (dict) src.
     """
     #print(src)
     if not isinstance(src, dict):
@@ -3457,7 +3951,7 @@ def set_nested_value(src, path, value):
         raise TypeError("Expecting a hashable object or a sequence of hashable objects, for path %s; got %s instead" % (path, type(path).__name__))
         
 def nth(iterable, n, default=None):
-    """Returns the nth item or a default value
+    r"""Returns the nth item or a default value
     
     iterable: an iterable
     
@@ -3470,7 +3964,7 @@ def nth(iterable, n, default=None):
     return next(itertools.islice(iterable, n, None), default)
 
 def pairwise(iterable)-> zip:
-    """s -> (s0,s1), (s1,s2), (s2, s3), ...
+    r"""s -> (s0,s1), (s1,s2), (s2, s3), ...
     
     NOTE: Recipe from the documentation for python itertools module.
     """
@@ -3487,11 +3981,15 @@ def sort_with_none(iterable, none_last = True) -> typing.Sequence:
 
 # def unique(seq, key=None, indices:bool=False) -> typing.Sequence:
 def unique(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Sequence:
-    """Returns a sequence of unique elements in the iterable 'seq'.
+    r"""Returns a sequence of unique elements in the 1D iterable 'seq'.
+    
     Functional version of gen_unique.
+    
     Parameters:
     -----------
-    seq: an iterable (tuple, list, range, map, generator)
+    seq: an iterable (tuple, list, range, map, generator, numpy array)
+        NOTE: when `seq` is a numpy array this function will flatten it first.
+        Therefore when possible please use the `numpy.unique` function directly.
     
     key: predicate for uniqueness (optional, default is None)
         Typically, this is an object returned by a lambda function
@@ -3499,6 +3997,9 @@ def unique(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Seque
         e.g.
         
         unique(seq, lambda x: x._some_member_property_or_getter_function_)
+    
+        When None, elements are compared according via safe_identity_test function
+    defined in this module.
     
     indices: bool, default is False. When True, the function returns a sequence
         of (element, index) tuples, where 'index' is the 0-based index of 
@@ -3526,11 +4027,17 @@ def unique(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Seque
     if not hasattr(seq, "__iter__"):
         raise TypeError(f"Expecting an iterable; got {type(seq).__name__} instead")
     
+    if isinstance(seq, np.ndarray):
+        if indices:
+            u, i = np.unique(seq, return_index=True)
+            return i
+        return np.unique(seq)
+    
     return seq.__class__(gen_unique(seq, key=key, indices=indices, idcheck=idcheck))
     # return seq.__class__(gen_unique(seq, key=key, indices=indices))
 
 def duplicates(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Sequence:
-    """Returns a sequence of duplicate elements in 'seq'.
+    r"""Returns a sequence of duplicate elements in 'seq'.
     
     Implements:
         if indices:
@@ -3572,17 +4079,16 @@ def duplicates(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.S
     if not hasattr(seq, "__iter__"):
         raise TypeError(f"Expecting an iterable; got {type(seq).__name__} instead")
     
-    if indices:
-        return seq.__class__(gen_unique(gen_duplicates(seq, key=key, indices=indices, idcheck=idcheck)))
-        
-    else:
-        return seq.__class__(gen_unique(gen_duplicates(seq, key=key, idcheck=idcheck), key=key))
+    return seq.__class__(gen_unique(gen_duplicates(seq, key=key, indices=indices, idcheck=idcheck)))
+#     if indices:
+#         
+#     else:
+#         return seq.__class__(gen_unique(gen_duplicates(seq, key=key, idcheck=idcheck), key=key))
     
     
 
-# def gen_unique(seq, key=None, indices:bool=False):
 def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
-    """Iterates through unique elements in the sequence 'seq'.
+    r"""Iterates through unique elements in the sequence 'seq'.
     
     Parameters:
     -----------
@@ -3630,7 +4136,7 @@ def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
     See also:
     ========
     
-    unique for a function version
+    unique for a functional version
     
     gen_duplicates for iterating through the duplicates in 'seq'.
     
@@ -3714,9 +4220,8 @@ def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
             else:
                 yield from (x for x in seq if __check_val__(key))
             
-# def gen_duplicates(seq, key=None, indices:bool=False):
 def gen_duplicates(seq, key=None, indices:bool=False, idcheck:bool=True):
-    """Iterates through the duplicate elements in the sequence 'seq'.
+    r"""Iterates through the duplicate elements in the sequence 'seq'.
     Parameters:
     -----------
     seq: an iterable sequence (tuple, list, range)
@@ -3836,7 +4341,7 @@ def gen_duplicates(seq, key=None, indices:bool=False, idcheck:bool=True):
     
             
 def name_lookup(container: typing.Sequence, name:str, multiple: bool = True) -> typing.Optional[typing.Union[int, typing.Sequence[int]]]:
-    """Get indices of container elements with attribute 'name' of given value(s).
+    r"""Get indices of container elements with attribute 'name' of given value(s).
     """
     
     names = [getattr(x, "name") for x in container if (hasattr(x, "name") and isinstance(x.name, str) and len(x.name.strip())>0)]
@@ -3856,7 +4361,7 @@ def name_lookup(container: typing.Sequence, name:str, multiple: bool = True) -> 
     return names.index(name)
 
 def merge_indexes(*args) -> typing.Optional[GeneralIndexType]:
-    """Merge several GeneralIndexType objects into one.
+    r"""Merge several GeneralIndexType objects into one.
     Prerequisites:
     • each element in args must be of the same type or MISSING
 
@@ -3913,7 +4418,7 @@ def merge_indexes(*args) -> typing.Optional[GeneralIndexType]:
 def normalized_index(data: typing.Optional[typing.Union[collections.abc.Sequence, int, pd.core.indexes.base.Index, pd.DataFrame, pd.Series, np.ndarray]], 
                      index: typing.Optional[GeneralIndexType] = None, 
                      silent:bool=False, axis:typing.Optional[int] = None) -> typing.Union[range, typing.Iterable[int]]:
-    """Transform various indexing objects to a range or an iterable of int indices.
+    r"""Transform various indexing objects to a range or an iterable of int indices.
     
 Also checks the validity of the index for an iterable, given its size.
 
@@ -3993,6 +4498,7 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         
     """
     from core.datatypes import is_vector
+    from core.datazone import DataZone
     
     if data is None:
         return tuple()
@@ -4039,7 +4545,7 @@ ret - an iterable object (range, or tuple of integer indices) that can be
         if index not in range(-data_len, data_len):
             if silent:
                 return None
-            raise ValueError(f"Index {index} is invalid for {len(data)} elements")
+            raise IndexError(f"Index {index} is out of range for {data_len} elements")
         
         if isinstance(data, pd.core.indexes.base.Index):
             return (data[index], )
@@ -4192,7 +4698,7 @@ ret - an iterable object (range, or tuple of integer indices) that can be
 # def _(data, )
     
 def normalized_sample_index(data:np.ndarray, axis: typing.Union[int, str, vigra.AxisInfo], index: typing.Optional[typing.Union[int, tuple, list, np.ndarray, range, slice]]=None):
-    """Calls normalized_index on a specific array axis.
+    r"""Calls normalized_index on a specific array axis.
     Also checks index validity along a numpy array axis.
     
     Parameters:
@@ -4229,7 +4735,7 @@ def normalized_sample_index(data:np.ndarray, axis: typing.Union[int, str, vigra.
         raise RuntimeError("For data axis %d with size %d:" % (axis, data_len)) from exc
 
 def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)):
-    """Returns an integer index for a specific array axis
+    r"""Returns an integer index for a specific array axis
     """
     if not isinstance(data, np.ndarray):
         raise TypeError("Expecting a numpy array or a derivative; got %s instead" % type(data).__name__)
@@ -4257,7 +4763,7 @@ def normalized_axis_index(data:np.ndarray, axis:(int, str, vigra.AxisInfo)):
     return axis
 
 def sp_set_loc(x, index, columns, val):
-    """Assign values to pandas.SparseArray
+    r"""Assign values to pandas.SparseArray
     Work around .loc idiom when fill value is pd.NA
     
     Parameters:
@@ -4346,7 +4852,7 @@ def sp_set_loc(x, index, columns, val):
     return x    
 
 def get_least_pwr10(x:typing.Sequence)-> int:
-    if not all(isinstance(v, Number) or (isinstance(v, pq.Quantity) and v.size == 1) for v in x):
+    if not all(isinstance(v, numbers.Number) or (isinstance(v, pq.Quantity) and v.size == 1) for v in x):
         raise TypeError("Expecting a sequence of scalars or scalar Quantity objects")
     
     if any (math.isinf(v) for v in x):
@@ -4356,7 +4862,7 @@ def get_least_pwr10(x:typing.Sequence)-> int:
     return min(int(math.log10(v)) if v > 0 else 0 for v in fr)
 
 def sp_get_loc(x, index, columns):
-    """Retrieve values to pandas.SparseArray
+    r"""Retrieve values to pandas.SparseArray
     Work around .loc idiom when fill value is pd.NA
     
     See also sp_set_loc
@@ -4480,5 +4986,245 @@ def truncate_to_10_power(x):
         pw10 = 1. if abs(x) < 10. else 10. ** math.trunc(math.log(abs(x), 10.))
         return math.trunc(x/pw10) * pw10
         
+def timelineDateString(year:int, month:int, day:int=0):
+    date = f"{year}-{month}"
+    if day > 0:
+        date = f"{date}-{day}"
+        
+    return date
+
+def posixUTC(d:datetime.datetime) -> float:
+    return (d - datetime.datetime(1970, 1, 1)) / datetime.timedelta(seconds=1)
+
+def render_sympy(expr:typing.Union[sympy.Expr, sympy.Basic], backend:str="auto", out:str="ipython", 
+              parser:str="sympy",
+              darkmode:typing.Optional[bool]=None, 
+              wrap:bool=False,
+              **kwargs) -> typing.Optional[typing.Union[PIL.Image, QtGui.QPixmap, QtGui.QImage, IPImage, dict]]:
+    r"""Generates a latex rendering of a sympy expression, as a bitmap image.
+    Positional parameters:
+    ======================
+    expr: a sympy Expression
+    
+    Named parameters:
+    =================
+    backend: one of "auto", "dvipng", "matplotlib", "sympy" (all case-insensitive)
+        When 'backend' is "auto" (the default), the function will try IPython's 
+        latex_to_png (from IPython.lib.latextools package) using the IPython's
+        "dvipng" backend or, if this fails, the IPytyon's "matplotlib" backend. 
+
+        If the latter also fails, then the function will call sympy.preview(…), 
+        which here is the equivalent to the "sympy" backend.
+    
+        Any other backend will force the use of the corresponding option described
+        above.
+    
+    parser: one of "sympy" or "shell"
+        Specifies the parser of the expression that generates a latex string.
+        "sympy" uses the sympy.latex(…) function to generate a latex string;
+        "shell" uses the Scipyen console shell's default formatter — WARNING I 
+        cannot get the shell formatter to play nice with "matplotlib" backend
+        (see below)
+    
+    darkmode:bool Determines whether the foreground is white (when True) or 
+        black (when False)
+    
+        The default (True) creates pixmaps suitable for dark background GUI 
+        palette. 
+    
+        NOTE: The generated pixmaps have transparent background.
+    
+    out:str, one of (value ↦ output type):
+        * "ipython" ↦ IPython.Image.Image (the *default*), 
+        * "pil" ↦ PIL.Image.Image, 
+        * "img" ↦ QtGui.QImage
+        * "pix" ↦ QtGui.QPixmap
+        * "bytes" ↦ bytes (PNG data)
+        * "svg" ↦ dict with SVG string mapped to "svg" key inside the dict (uses latex2svg)
+    
+        .. note:: When ``out`` is "svg", the ``backend`` parmeter is ignored.
+    
+    Var-keyword parameters:
+    =======================
+    • used by the "sympy" backend (i.e. by sympy.preview(…) function):
+    
+    euler:bool — whether to use Euler fonts
+    fontsize:str|int — when a str is SHOULD be in typogrtaphic points (e.g "12pt")
+        which is the default
+    
+    • a subset of those used by the sympy.latex(…) function: 
+    
+    NOTE: the default value of the 'mode' keyword is set to "equation*" and 
+    should NOT be changed
+    
+    full_prec=False,
+    fold_frac_powers=False,
+    fold_func_brackets=False,
+    # fold_short_frac=None,
+    inv_trig_style='abbreviated',
+    itex=False,
+    ln_notation=False,
+    long_frac_ratio=None,
+    mat_delim='[',
+    mat_str=None,
+    mode='inline',
+    mul_symbol=None,
+    order=None,
+    symbol_names={},
+    root_notation=True,
+    mat_symbol_style='plain',
+    imaginary_unit='i',
+    gothic_re_im=False,
+    decimal_separator='period',
+    perm_cyclic=True,
+    parenthesize_super=True,
+    min=None,
+    max=None,
+    diff_operator='d',
+    adjoint_style='dagger',
+    disable_split_super_sub=False,    
+    
+    WARNING about backends
+    ======================
+    The "dvipng" and "sympy" backends rely on the existence of a tex/latex
+    software stack on your platform, which MUST include a 'dvipng' utility.
+    
+    The "matplotlib" backend uses 'matplotlib.mathtext', unless 
+    matplotlib.rcParams["text.usetex"] is True; however, 'mathtext' does NOT 
+    play very nice with a mode other than 'inline'.
+    Setting matplotlib.rcParams["text.usetex"] to True relies the existence of a 
+    tex/latex software stack on your platform.
+    
+    I am having trouble with mathtext failing to parse the output from the shell
+    parser. 
+    
+    The "dvipng" and "matplotlib" backends rely on IPytyhon.lib.latextools
+    (which in turn MAY require on a tex/latex software stack, as above).
+    
+    Therefore, in a nutshell:
+    -------------------------
+    • if tex/latex and 'dvipng' are available, you can specify 'dvipng' or 
+        'sympy' as backend, which are the most flexible; for 'dvipng' backend
+        you can use 'shell' parser
+    
+    • if tex/latex and 'dvipng' are NOT available, you can only specify 
+        'matplotlib' as backend, and you MUST pass 'sympy' for parser and 'inline'
+        for mode.
+    
+    • when not sure, see bottomline below
+    
+    • the "sympy" backend uses the "sympy" parser by default (hence "parser" 
+        parameter has no effect)
+        
+    • use "sympy" parser by default; use the "shell" parser only with the "dvipng"
+     backend for now.
+    
+    • bottomline: safest option is to pass "auto" as backend, "sympy" as parser
+        and mode="inline"
+    
+"""
+    from io import BytesIO
+    from IPython.lib import latextools
+    from core.strutils import render_latex
+    from gui.guiutils import (getScipyenConsoleShell, isDarkGui)
+    
+    if not isinstance(expr, (sympy.Expr, sympy.Basic)):
+        raise TypeError(f"Expecxting a sympy Basic, or a sympy Expr object instead, got a {type(expr).__name__}")
+    
+    if not isinstance(backend, str) or backend.lower() not in ("auto", "dvipng", "matplotlib", "sympy"):
+        backend = "auto"
+    else:
+        backend = backend.lower()
+        
+    if not isinstance(darkmode, bool):
+        darkmode = isDarkGui()
+        
+    if out == "svg":
+        ltx = "".join(["$", sympy.latex(expr), "$"])
+        return render_latex(ltx, out="svg")
+        
+        
+    color = "white" if darkmode else "black" 
+    euler = kwargs.pop("euler", True)
+    fontsize = kwargs.pop("fontsize", None)
+    itex = kwargs.pop("itex", None)
+    mode = kwargs.pop("mode", "equation*")
+    
+    # mode = kwargs.pop("mode", "inline")
+    # print(f"mode = {mode}")
+    # if not isinstance(mode, str) or mode == "plain":
+    #     kwargs["mode"] = "inline"
+        
+    # print(f"kwargs = {kwargs}")
+    
+    def _sympypng_(ex, out, darkmode, euler, fontsize, **kw):
+        # print(f"kw = {kw}")
+        # kw["mode"] = mode
+        dataio = BytesIO()
+        sympy.preview(expr, output='png', viewer='BytesIO', outputbuffer=dataio, euler=euler, fontsize=fontsize, itex=itex, **kw)
+        data = dataio.getvalue()
+        if out.lower() not in ("bytes", "img", "pix", "pil", "ipython"):
+            raise ValueError(f"I do not understand 'out' ({out}); expecting one of 'bytes', 'img', 'pix', 'pil', 'ipython' (case-insensitive)")
+        elif out.lower() == "ipython":
+            return IPImage(data)
+        elif out.lower() == "bytes":
+            return data
+        elif out.lower() == "pil":
+            return PIL.Image.open(BytesIO(data))
+        else:
+            ret = QtGui.QPixmap()
+            ok = ret.loadFromData(QtCore.QByteArray(data))
+            if not ok:
+                scipywarn("Cannot convert data to a pixmap")
+                return
+            if out.lower()=="img":
+                return ret.toImage()
+            else:
+                return ret
+        
+    def _shell_parse_(sh, ex):
+        # print(f"sh = {sh}")
+        return sh.display_formatter.format(ex, include="text/latex")[0]["text/latex"].replace("$", "")
+        
+    if parser.lower() == "sympy":
+        if backend == "matplotlib":
+            parse = functools.partial(sympy.latex, mode="inline", itex=itex, **kwargs)
+        else:
+            parse = functools.partial(sympy.latex, mode=mode, itex=itex, **kwargs)
             
+    elif parser.lower() == "shell":
+        shell = guiutils.getScipyenConsoleShell()
+        parse = functools.partial(_shell_parse_, shell)
+        
+    else:
+        raise ValueError(f"Invalid 'parser' specified ({parser}); expecting one of 'sympy', 'shell' (case-insensitive)")
             
+    if backend == "auto":
+        # scipywarn("Trying 'dvipng' backend")
+        data = render_latex(parse(expr), backend=backend, darkmode=darkmode, out=out, wrap=wrap)
+        if data is None:
+            return _sympypng_(expr, out, darkmode, euler, fontsize, **kwargs)
+        return data
+        # data = latextools.latex_to_png(parse(expr), backend="dvipng", wrap=False, color=color)
+        # # data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="dvipng", wrap=False, color=color)
+        # if not isinstance(data, bytes):
+        #     # scipywarn("The 'dvipng' backend failed; trying 'matplotlib'")
+        #     data = latextools.latex_to_png(parse(expr), backend="matplotlib", wrap=False, color=color)
+        #     # data = latextools.latex_to_png(sympy.latex(expr, mode=mode, itex=itex, **kwargs), backend="matplotlib", wrap=False, color=color)
+    elif backend in ("dvipng", "matplotlib"):
+        return render_latex(parse(expr), backend=backend, darkmode=darkmode, out=out, wrap=wrap)
+    elif backend == "sympy":
+        return _sympypng_(expr, out, darkmode, euler, fontsize, **kwargs)
+    else:
+        raise ValueError(f"Unknown/unsupported backend {backend}")
+    
+def sympygraph(s:sympy.Basic) -> GraphSource:
+    if not isinstance(s, sympy.Basic):
+        raise TypeError(f"Expecting a sympy Basic object;got a {type(s).__name__} instead")
+    
+    if not __has_graphviz__:
+        scipywarn("Graphviz package is not installed")
+        return GraphSource()
+    
+    return GraphSource(sympy.dotprint(s))
+    

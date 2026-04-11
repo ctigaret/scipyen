@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-"""Small patches to neo.Epoch and neo.Events
+r"""Small patches to neo.Epoch and neo.Events
 """
 
 #__all__ = ["neo"]
@@ -20,11 +20,7 @@ from colorama import Fore, Back, Style
 
 import neo
 from neo.core.baseneo import BaseNeo, _check_annotations
-#from neo.rawio.baserawio import (BaseRawIO, _signal_channel_dtype, _unit_channel_dtype,
-                        #_event_channel_dtype)
 
-#from core.axonrawio_patch import AxonRawIO_v1
-# # from core.neoevent import (_new_Event_v1, _new_Event_v2,)
 import core
 from core.workspacefunctions import scipyentopdir
 from core.neoevent import Event
@@ -33,9 +29,10 @@ from core import neoepoch
 from core.neoepoch import Epoch, _new_Epoch
 
 # print(f"_new_Epoch: {_new_Epoch.__name__} in {_new_Epoch.__module__}")
-from core.prog import (safeWrapper, signature2Dict, SpecFinder)
+from core.prog import (safewrapper, signature_as_dict, SpecFinder)
 
-# #neo.io.axonio.AxonRawIO = _axonrawio.AxonRawIO_v1
+neo_major, neo_minor, neo_micro = map(lambda x: int(x), neo.__version__.split("."))
+
 
 original ={"neo.core.analogsignal._new_AnalogSignalArray": neo.core.analogsignal._new_AnalogSignalArray,
            "neo.core.irregularlysampledsignal._new_IrregularlySampledSignal":neo.core.irregularlysampledsignal._new_IrregularlySampledSignal,
@@ -48,7 +45,7 @@ original ={"neo.core.analogsignal._new_AnalogSignalArray": neo.core.analogsignal
            } 
 
 def _patch_new_neo(original_f, *args, **kwargs):
-    """Workarounds to load pickled neo data created a long time ago..."""
+    r"""Workarounds to load pickled neo data created a long time ago..."""
     # All params in neo's _new_* factory functions are NAMED !!!
     # since this 'patches' _new_* functions, the first element in args is
     # the actual class of the array type being created:
@@ -58,7 +55,7 @@ def _patch_new_neo(original_f, *args, **kwargs):
     
     # print(f"_patch_new_neo original_f: {original_f}")
     
-    sig = signature2Dict(original_f)
+    sig = signature_as_dict(original_f)
     # print(f"originalsignature: {sig}\n")
     # print(f" {len(sig.positional)} positional parameters\n")
     sig_named = list(sig.named.keys())
@@ -112,12 +109,27 @@ def _patch_new_neo(original_f, *args, **kwargs):
             
     if not isinstance(var[annotations_index], dict):
         var[annotations_index] = dict()
+        
+    # tmpdict = dict()
+    # for key in var[annotations_index].keys():
+    #     if isinstance(key, str):
+    #         tmpdict[key] = var[annotations_index]
+    #     if not isinstance(key, str):
+            
             
     # print(f" {Fore.YELLOW}{original_f.__name__}{Style.RESET_ALL} will be called with {len(var)} arguments:")
-    # for k in range(len(var)):
-    #     arg_name = f" ({sig_named[k]})" #if k in sig.named else ""
-    #     print(f"  {k}: {var[k]}{arg_name}")
-            
+    for k in range(len(var)):
+        # NOTE: 2025-01-22 09:36:57 since neo 0.14.0
+        if neo_minor > 13:
+            if neo_minor < 15:
+                if sig_named[k] == "copy":
+                    var[k] = None
+                    
+        # arg_name = f" ({sig_named[k]})" #if k in sig.named else ""
+        # print(f"  {k}: {var[k]}{arg_name}")
+    if neo_minor > 14: # 'copy' argument will be removed in neo 0.15.0
+        var.pop("copy", None)
+        
     try:
         return original_f(*var)
     except Exception as e:
@@ -162,7 +174,7 @@ def unpatch_channelindex():
         ndx = sys.meta_path.index(i)
         del sys.meta_path[ndx]
         
-@safeWrapper
+@safewrapper
 def patch_neo_new():
 #     from legacy.neo.core import channelindex
 #     neo.core.channelindex = channelindex
@@ -192,7 +204,7 @@ def patch_neo_new():
             traceback.print_exc()
             raise
             
-@safeWrapper
+@safewrapper
 def restore_neo_new():
     # unpatch_channelindex()
     for key, value in original.items():

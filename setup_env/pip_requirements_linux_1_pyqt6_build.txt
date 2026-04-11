@@ -1,0 +1,56 @@
+# -*- coding: utf-8 -*-
+# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# WARNING: some of the packages listed below may have already been installed, or 
+# are available from your Linux distribution. Therefore by installing them INSIDE
+# the virtual environment they will overshadow the packages in the system-wide
+# site-packages directory. This has consequences ONLY IF the virtual environment 
+# was created with the --system-site-packages option .
+#
+# ATTENTION: ONLY USE THIS FILE INSIDE A VIRTUAL PYTHON ENVIRONMENT (see INSTALL
+# for details).
+#
+# You may manually check this list against the python packages installed on 
+# your machine (either locally as "user", see $HOME/local/lib/pythonX.Y/site-packages,
+# or system-wide, see /usr/lib64/PythonX.Y.site-packages) and comment out, below,
+# the ones already installed on your system. Otherwise, the packages installed 
+# here will take precedence over those available.
+#
+#
+# NOTE: Not all packages here are used/needed by Scipyen in its current version
+# (some are installed for experimentation, e.g. the extra jupyter kernel packages,
+# and others). 
+
+
+
+# NOTE as of 2021-10-12 11:59:52 might have to compile from source if using Python >= 3.9.7
+# also see nrn/docs/docs_requirements.txt, reproduced below after excluding 
+# linguistics
+# packages already listed above
+#
+# ALSO NOTE that linguistics only supports python up to ~ 3.6 or so (see Pypi)
+# because one of its dependencies (slytherin); importing slytherin or any package
+# that imports slytherin will raise an error on Pyton >= 3.11 
+
+# CHANGELOG
+# 2024-05-02 08:45:19
+# accommodate installation of PyQt6
+# 2025-03-13 08:44:24
+# breakdown in two parts for building pyqt5 locally
+
+distlib
+pickleshare
+pyinstaller
+Babel
+GitPython
+Jinja2
+MarkupSafe
+dbus-python ; sys_platform == "linux"
+Pillow
+PyLEMS
+PyQt-builder ; sys_platform == 'linux'
+Pyqt6-sip ; sys_platform == 'linux'
+qtpy
+

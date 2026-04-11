@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-"""
+r"""
 
 WARNING: h.allsec() will enumerate sections both INSIDE your cell and outside 
 of it!
@@ -17,7 +17,7 @@ Created on Sun May 10 14:05:54 2020
 
 """
 import os, typing, warnings
-from numbers import Number, Real
+import numbers
 import numpy as np
 import scipy as sp
 import pandas as pd
@@ -42,13 +42,13 @@ h.load_file(os.path.join(__module_path__, "my_import3d.hoc"))
 #h.load_file("import3d.hoc")
 
 class PyNRNCell(object):
-    """Generic PyNRNCell ball-and-stick model
+    r"""Generic PyNRNCell ball-and-stick model
     """
     default_nseg = 51
     d_lambda = 0.1
     
     def __init__(self, gid:int, /, **kwargs):
-        """
+        r"""
         Constructs a ball-and-stick neuron model.
         
         Positional-only parameters
@@ -137,7 +137,7 @@ class PyNRNCell(object):
             
         
     def __del__(self):
-        """Remove all pointers to sections that belong to this cell
+        r"""Remove all pointers to sections that belong to this cell
         """
         for section in self.all:
             #self.__dict__.__delitem__(section.name)
@@ -265,7 +265,7 @@ class PyNRNCell(object):
             
     @all.setter
     def all(self, value:typing.Optional[typing.Union[tuple, list]] = None):
-        """Gives write acces to 'all' property
+        r"""Gives write acces to 'all' property
         """
         # NOTE: 2021-02-09 11:59:02 required so that neuron._create_all_list()
         # defined in site-packages/neuron/__init__.py works
@@ -277,19 +277,19 @@ class PyNRNCell(object):
         
     @property
     def nSections(self):
-        """Number of sections in this cell model
+        r"""Number of sections in this cell model
         """
         return len(tuple(filter(lambda x: x if isinstance(x, nrn.Section) else (), self.__dict__.values())))
     
     @property
     def sections(self):
-        """Dict of nrn.Section objects in this cell
+        r"""Dict of nrn.Section objects in this cell
         """
         return dict(filter(lambda x: x if isinstance(x[1], nrn.Section) else (), self.__dict__.items()))
     
     @sections.setter
     def sections(self, value:typing.Optional[typing.Union[tuple, list, dict]]=None):
-        """Gives write access to sections property
+        r"""Gives write access to sections property
         
         NOTE: 2021-02-09 11:58:19
         Required because neuron._create_all_list() sets this up.
@@ -346,7 +346,7 @@ class PyNRNCell(object):
     
     @property
     def wholetree(self):
-        """Really the same thing as self.all
+        r"""Really the same thing as self.all
         """
         return self.all[0].wholetree()
     
@@ -362,7 +362,7 @@ class PyNRNCell(object):
             #self.removeSection(section)
     
     def showInNeuronGUI(self, mode:int=0):
-        """Plots the cell in a Neuron GUI Shape window.
+        r"""Plots the cell in a Neuron GUI Shape window.
         
         Parameters:
         mode: int, default is 0: mode parameter to Shape.show() 
@@ -381,7 +381,7 @@ class PyNRNCell(object):
         self._shape_view.show(mode)
         
     def removeSection(self, section:typing.Union[nrn.Section, str]):
-        """Removes a section from this cell and from the HOC interpreter object
+        r"""Removes a section from this cell and from the HOC interpreter object
         """
         #print("removeSection")
         if not section in self:
@@ -403,7 +403,7 @@ class PyNRNCell(object):
         delattr(self, secname)
         
     def loadMorphologySWC(self, fname:str=None):
-        """
+        r"""
         See https://neuron.yale.edu/phpBB/viewtopic.php?f=13&t=4247
         The SWC file should be in standardized morphology SWC format 
         # (CNG version - use CVapp or StdSwc to obtain such files)
@@ -478,7 +478,7 @@ class PyNRNCell(object):
                    #parent:typing.Optional[nrn.Section]=None,
                    #parent_pos:typing.Optional[Real]=None,
                    #orientation:typing.Optional[int]=None) -> nrn.Section:
-        #"""
+        #r"""
         #cm: Real scalar, or a sequence (tuple, list) of Real scalars.
             #The membrane float, sequence (tuple, list) of float; optional; 
             #When None, the section gets NEURON's default value of 1
@@ -567,7 +567,7 @@ class PyNRNCell(object):
                    nseg:[int] = 1,
                    L:typing.Optional[Real]=None,
                    diam:typing.Union[Real, tuple, list] = 1) -> nrn.Section:
-        """Add a section to this cell.
+        r"""Add a section to this cell.
         
         The section is created using stylized geometry (L, nseg, diam) with
         'diam' being set the same across all 'nseg' discretization segments (or 
@@ -981,7 +981,7 @@ class PyNRNCell(object):
     
     #def geomNseg(self, section:nrn.Section, freq:Real, 
                  #d_lambda:typing.Optional[Real]=None) -> int:
-        #"""Calculates nseg according to d-lambda rule.
+        #r"""Calculates nseg according to d-lambda rule.
         
         #Parameters:
         #===========
@@ -1021,19 +1021,19 @@ class PyNRNCell(object):
             return ret[0]
         
     #def _setup_morphology(self, nseg:typing.Optional[int] = None):
-        #"""To override in subclass
+        #r"""To override in subclass
         #"""
         #if len(self.all) == 0:
             #print("The cell has no sections (e.g., soma, dendrites, axon, etc.).")
             #print("To add sections to this cell call its 'addSection(...)' method, or its 'loadMorphologySWC(swc_file_name)' method to load a neuron morphology from a SWC file.")
             
     def _setup_biophysics(self):
-        """To override in subclass
+        r"""To override in subclass
         """
         pass
     
     def __verify_section__(self, section:nrn.Section) -> bool:
-        """Check argument is a nrn.Section and that belongs to this cell
+        r"""Check argument is a nrn.Section and that belongs to this cell
         """
         if not isinstance(section, nrn.Section):
             warnings.warn("Expecting a nrn.Section; got %s instead" % type(section).__name__)
@@ -1049,7 +1049,7 @@ class PyNRNCell(object):
         return True
     
     def __contains__(self, section:typing.Union[nrn.Section, str]):
-        """Implements the idiom "section in cell -> True/False "
+        r"""Implements the idiom "section in cell -> True/False "
         """
         if isinstance(section, str):
             return hasattr(self, section) and isinstance(getattr(self, section, None), nrn.Section)
@@ -1063,7 +1063,7 @@ class PyNRNCell(object):
         
     
     def _set_position(self, x, y, z):
-        """Place cell at (x,y,z).
+        r"""Place cell at (x,y,z).
         This implies its sections have 3D points (n3d() != 0), which happens
         AFTER calling h.define_shape().
         """
@@ -1077,7 +1077,7 @@ class PyNRNCell(object):
         self._x, self._y, self._z = x, y, z
         
     def _rotate(self, theta):
-        """Rotate cell about the Z axis.
+        r"""Rotate cell about the Z axis.
         This implies its sections have 3D points (n3d() != 0), which happens
         AFTER calling h.define_shape().
         """
@@ -1121,7 +1121,7 @@ class PyNRNCell(object):
         
     def setNseg(self, section: typing.Optional[nrn.Section]=None,
                 value:typing.Optional[int]=None):
-        """Set the number of compartments for a stylized section.
+        r"""Set the number of compartments for a stylized section.
         
         Named parameters:
         ------------------
@@ -1157,7 +1157,7 @@ class PyNRNCell(object):
                 section.nseg = value
     
     def segmentsStats(self, section:typing.Union[nrn.Section, str]) -> typing.Optional[pd.DataFrame]:
-        """Returns the Diameter, Area and Axial resistance of each segment in the section.
+        r"""Returns the Diameter, Area and Axial resistance of each segment in the section.
         
         Parameters:
         ===========
@@ -1202,7 +1202,7 @@ class PyNRNCell(object):
             
     def section3DPoints(self, section:typing.Union[nrn.Section, str],
                         asDataFrame:typing.Optional[bool]=False) -> typing.Optional[typing.Union[np.ndarray, pd.DataFrame]]:
-        """Returns 3D shape parameters of the section (when defined).
+        r"""Returns 3D shape parameters of the section (when defined).
         
         If section.n3d() == 0 returns None
         """
@@ -1256,7 +1256,7 @@ class Example3DCell(PyNRNCell):
     
             
 def remove_sections(cell:typing.Optional[PyNRNCell]=None):
-    """Removes sections from the HOC interpreter workspace.
+    r"""Removes sections from the HOC interpreter workspace.
     
     The "clean-up" can be limited to the sections of a PyNRNCell instance; 
     otherwise, all the sections are removed from the HOC workspace.
@@ -1277,7 +1277,7 @@ def remove_sections(cell:typing.Optional[PyNRNCell]=None):
         raise TypeError(f"A PyNRNCell instance or None was expected; got {type(cell).__name__} instead")
 
 def lambda_f(freq:Real, section:nrn.Section) -> float:
-    """Calculates the section's AC length constant at a given frequency (λf).
+    r"""Calculates the section's AC length constant at a given frequency (λf).
     See https://neuron.yale.edu/neuron/static/docs/d_lambda/d_lambda.html
     
     The corresponding HOC function 'lambda_f' is supplied by NEURON in the file
@@ -1335,7 +1335,7 @@ def lambda_f(freq:Real, section:nrn.Section) -> float:
     
 def geomNseg(section:nrn.Section, freq:Real=100, 
                 d_lambda:typing.Optional[Real]=0.1) -> int:
-    """Calculates nseg according to d-lambda rule.
+    r"""Calculates nseg according to d-lambda rule.
     
     Parameters:
     ===========
@@ -1359,7 +1359,7 @@ def geomNseg(section:nrn.Section, freq:Real=100,
         raise TypeError("Expecting a nrn.Section; got %s instead" % type(section).__name__)
 
 def setRaCm(section:nrn.Section, Ra:float=None, cm:float=None):
-    """Sets the very basic biophysics for a section: Ra and cm.
+    r"""Sets the very basic biophysics for a section: Ra and cm.
     
     """
     if not isinstance(section, nrn.Section):
@@ -1372,7 +1372,7 @@ def setRaCm(section:nrn.Section, Ra:float=None, cm:float=None):
         section.cm = cm
         
 def stub3d(section:nrn.Section):
-    """Equivalent of h.define_shape() for one section.
+    r"""Equivalent of h.define_shape() for one section.
     While h.define_shape generates a 3D geometry for all sections in the HOC,
     this function emulates this behaviour for a single section. It is best called
     for an individual section AFTER the seciton has been constructed using the
@@ -1409,7 +1409,7 @@ def section3DPoints(section:nrn.Section,
     
     
 def sectionParent(section:nrn.Section) -> typing.Optional[typing.Union[nrn.Section, PyNRNCell]]:
-    """Returns the parent section (if it exists) or the owner (if is exists).
+    r"""Returns the parent section (if it exists) or the owner (if is exists).
     
     To retrieve the parent segment of the section (if it exists) just call
     section.parentseg()

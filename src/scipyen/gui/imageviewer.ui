@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>691</width>
-    <height>616</height>
+    <width>525</width>
+    <height>541</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -28,7 +28,7 @@
    </property>
    <layout class="QGridLayout" name="gridLayout">
     <property name="sizeConstraint">
-     <enum>QLayout::SetNoConstraint</enum>
+     <enum>QLayout::SizeConstraint::SetNoConstraint</enum>
     </property>
     <property name="leftMargin">
      <number>0</number>
@@ -140,7 +140,7 @@
            <bool>false</bool>
           </property>
           <property name="orientation">
-           <enum>Qt::Horizontal</enum>
+           <enum>Qt::Orientation::Horizontal</enum>
           </property>
          </widget>
         </item>
@@ -155,7 +155,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>691</width>
+     <width>525</width>
      <height>28</height>
     </rect>
    </property>
@@ -167,15 +167,15 @@
      <property name="title">
       <string>&amp;Export frame</string>
      </property>
-     <addaction name="actionExportAsPNG"/>
-     <addaction name="actionExportAsSVG"/>
-     <addaction name="actionExportAsTIFF"/>
+     <addaction name="actionExportSceneAsFile"/>
+     <addaction name="actionExportSceneToWorkspace"/>
     </widget>
     <widget class="QMenu" name="menuSave">
      <property name="title">
       <string>&amp;Save</string>
      </property>
-     <addaction name="actionSaveTIFF"/>
+     <addaction name="actionSaveToFile"/>
+     <addaction name="actionExportToWorkspace"/>
     </widget>
     <addaction name="separator"/>
     <addaction name="actionView"/>
@@ -233,9 +233,12 @@
     <string>Remove Cursor...</string>
    </property>
   </action>
-  <action name="actionExportAsPNG">
+  <action name="actionExportSceneAsFile">
+   <property name="icon">
+    <iconset theme="document-save"/>
+   </property>
    <property name="text">
-    <string>&amp;PNG</string>
+    <string>To File</string>
    </property>
   </action>
   <action name="actionExportAsSVG">
@@ -248,9 +251,12 @@
     <string>&amp;TIFF</string>
    </property>
   </action>
-  <action name="actionSaveTIFF">
+  <action name="actionSaveToFile">
+   <property name="icon">
+    <iconset theme="document-save"/>
+   </property>
    <property name="text">
-    <string>&amp;TIFF</string>
+    <string>To File</string>
    </property>
   </action>
   <action name="actionView">
@@ -279,6 +285,42 @@
    </property>
    <property name="whatsThis">
     <string>Refresh image display - only works for images in the workspace</string>
+   </property>
+  </action>
+  <action name="actionHDF5">
+   <property name="text">
+    <string>HDF5</string>
+   </property>
+  </action>
+  <action name="actionPickle">
+   <property name="text">
+    <string>Pickle</string>
+   </property>
+  </action>
+  <action name="actionExportAsHDF5">
+   <property name="text">
+    <string>HDF5</string>
+   </property>
+  </action>
+  <action name="actionExportAsPickle">
+   <property name="text">
+    <string>Pickle</string>
+   </property>
+  </action>
+  <action name="actionExportSceneToWorkspace">
+   <property name="icon">
+    <iconset theme="document-export"/>
+   </property>
+   <property name="text">
+    <string>To workspace</string>
+   </property>
+  </action>
+  <action name="actionExportToWorkspace">
+   <property name="icon">
+    <iconset theme="document-export"/>
+   </property>
+   <property name="text">
+    <string>To workspace</string>
    </property>
   </action>
  </widget>
