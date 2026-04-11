@@ -143,7 +143,7 @@
     </widget>
     <widget class="QMenu" name="menuFileNavigation">
      <property name="title">
-      <string>File Navigation</string>
+      <string>File System Navigation</string>
      </property>
      <property name="icon">
       <iconset theme="file-catalog-symbolic"/>
@@ -1902,8 +1902,11 @@ NOTE: you can click anywhere in the row to select</string>
    <property name="checkable">
     <bool>true</bool>
    </property>
+   <property name="icon">
+    <iconset theme="dirsync"/>
+   </property>
    <property name="text">
-    <string>Opening a recent file navigates to its directory</string>
+    <string>Synchronize working directory when opening a recent file</string>
    </property>
    <property name="toolTip">
     <string>Check this to enable navigating to the directory of a recent file uppon opening it successfully</string>

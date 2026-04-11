@@ -2580,17 +2580,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._console_docked_ = value is True
 
     @property
-    def autoRemoveViewers(self):
+    def autoRemoveViewers(self) -> bool:
         return self._auto_remove_viewers_
 
-    @markConfigurable("AutoRemoveViewers", "Qt", default=False, value_type=bool)
+    @markConfigurable("AutoRemoveViewers", "Qt")#, default=False, value_type=bool)
     @autoRemoveViewers.setter
-    def autoRemoveViewers(self, value):
+    def autoRemoveViewers(self, value: typing.Union[bool, str]) -> None:
         # print(f"autoRemoveViewers.setter: value = {value}")
         if isinstance(value, str):
             value = value.lower() == "true"
 
-        self._auto_remove_viewers_ = value == True
+        self._auto_remove_viewers_ = value
 
         sigBlock = QtCore.QSignalBlocker(self.actionAuto_delete_viewer)
         self.actionAuto_delete_viewer.setChecked(self._auto_remove_viewers_)
@@ -4671,16 +4671,22 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # themselves from workspace upon closing
         # FIXME might want to redesign so that it is not being called anymore
         # possibly redundant with self.removeWorkspaceSymbol
-        if by_name:
-            if isinstance(value, str):
-                r = self.workspace.unbindFromNamespace(value) # one-shot
+        if by_name and isinstance(value, str):
+            obj = self.workspaceModel.unbindFromNamespace(value) # one-shot
+            # if isinstance(obj, QtCore.QObject):
+            #     obj.deleteLater()
         else:
-            objects = [(name, obj)
-                       for (name, obj) in self.workspace.items() if obj is value]
-
-            if len(objects):
-                for o in objects:
-                    self.workspaceModel.unbindFromNamespace(o[0])
+            named_objects = list(filter(lambda i: i[1] is value, self.workspace.items()))
+            for n_o in named_objects:
+                obj = self.workspaceModel.unbindFromNamespace(n_o[0])
+                # if isinstance(obj, QtCore.QObject):
+                #     obj.deleteLater()
+            # named_objects = [(name, obj)
+            #            for (name, obj) in self.workspace.items() if obj is value]
+            #
+            # if len(named_objects):
+            #     for n_o in named_objects:
+            #         obj = self.workspaceModel.unbindFromNamespace(n_o[0])
 
         self.workspaceModel.currentItem = None
 
@@ -8614,7 +8620,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                             and not bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
                             )
                     ):
-                    self.slot_changeDirectory(fName)
+                    fileDir = pathlib.Path(fName).parent
+                    if fileDir.as_posix() != self.currentDirectory:
+                        self.slot_changeDirectory(fName)
 
     @Slot(str)
     @safewrapper
@@ -9628,8 +9636,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.statusbar.showMessage("Done!")
 
     @Slot(bool)
-    def _slot_setAutoRemoveViewers(self, value):
-        self.autoRemoveViewers = value == True
+    def _slot_setAutoRemoveViewers(self, value: bool) -> None:
+        self.autoRemoveViewers = value
 
     @Slot(str)
     @safewrapper

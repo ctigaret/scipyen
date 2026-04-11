@@ -849,18 +849,21 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # also de-register the viewer with Scipyen's main window, if this viewer
         # is NOT a client (child) of another Scipyen app (e.g. LSCaTWindow)
 
-        if self.isTopLevel:
-            if self._delete_on_close_ or (self.appWindow is not None and self.appWindow.autoRemoveViewers):
-                if any([v is self for v in self.appWindow.workspace.values()]):
-                    self.appWindow.deRegisterWindow(self) # this will also save settings and close the viewer window
-                    self.appWindow.removeFromWorkspace(self, by_name=False)
-
         if self.close():
             # NOTE: 2023-01-08 23:42:22
             # It is graceful to unregister with the global menu via DBus,
             # if/when it does exist
             self._deregister_menuBar_()
+
             self.sig_closeMe.emit()
+
+            if self.isTopLevel:
+                if self._delete_on_close_ or getattr(self.appWindow, "autoRemoveViewers", False):
+                    if any([v is self for v in self.appWindow.workspace.values()]):
+                        self.appWindow.deRegisterWindow(self)
+                        self.appWindow.removeFromWorkspace(self, by_name=False)
+
+            super().closeEvent(evt)
             evt.accept()
 
     def event(self, evt:QtCore.QEvent):

@@ -3075,7 +3075,23 @@ anything else       anything else       ❌
         # TODO/FIXME 2022-11-16 21:37:13
         # pgmembers = inspect.getmembers(self, lambda x: isinstance(x, (pg.GraphicsItem, pg.GraphicsView, QtWidgets.QWidget)))
 
-        super().closeEvent(evt)
+        if getattr(self, "_delete_on_close_", False) or getattr(self.appWindow, "autoRemoveViewers", False):
+            if len(self._signal_axes_):
+                self._signal_axes_.clear()
+
+            self._legends_.clear()
+            self._frame_analog_map_.clear()
+            self._frame_irregs_map_.clear()
+            self._target_overlays_.clear()
+            self._label_overlays_.clear()
+            self._spiketrains_axis_ = None
+            self._events_axis_ = None
+
+            self._plot_names_.clear()
+
+            # self.signalsLayout.clear()
+
+        super().closeEvent(evt) # NOTE: 2026-04-12 00:18:02 This is crucial!
         evt.accept()
 
     def addCursors(self, /, *args, **kwargs):
@@ -4553,7 +4569,7 @@ anything else       anything else       ❌
         if hasattr(d, "cursorComboBox"):
             d.cursorComboBox.disconnect()
 
-        del d
+        # del d
 
         return cursor.ID if cursor else None
 
@@ -9416,7 +9432,8 @@ anything else       anything else       ❌
     def _unregister_plot_item_name_(self, plotItem, entry):
         vb = plotItem.getViewBox()
         if entry in pg.ViewBox.NamedViews:
-            del pg.ViewBox.NamedViews[entry]
+            # del pg.ViewBox.NamedViews[entry]
+            pg.ViewBox.NamedViews.pop(entry)
         vb.name = None
 
     def _get_signals_selection_(self, signals, signalCBox):
