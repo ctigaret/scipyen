@@ -2524,100 +2524,102 @@ def __check_array_attribute__(rt, param) -> None:
             rt["default_value_units"] = param
 
 
-def __check_type__(
-    attr_type: typing.Union[type, typing.Tuple[type]],
-    specs: typing.Union[type, typing.Tuple[type]],
-    exclspecs: typing.Optional[typing.Union[type, typing.Tuple[type]]] = None,
-) -> bool:
-    r"""Checks if attr_type is a subclass of types in specs.
-    Optionally, checks that attr_type it NOT a subclass of types in
-    exclspecs.
-
-    Parameters:
-    -----------
-    attr_type: a type or sequence of types (in the latter case, all it elements
-        will be checked)
-
-    specs: a type or a tuple of types that must be a superclass of attr_type;
-        It may contain `None` objects.
-        (NOTE: I chose the name `specs` to avoid clashes with the `types` module)
-
-
-    exclspecs: type or sequence of types that must NOT be a superclass of attr_type
-
-    Returns a bool
-    --------------
-
-    """
-    if isinstance(specs, type):
-        specs = (specs,)
-
-    elif not isinstance(specs, tuple) or not all(
-        isinstance(
-            v_,
-            type,
-        )
-        for v_ in specs
-        if v_ is not None
-    ):
-        raise TypeError(
-            "__check_type__ expecting a type or tuple of types as second parameter"
-        )
-
-    specs = tuple(s for s in specs if s is not None)
-
-    if exclspecs is None:
-        exclspecs = tuple()
-
-    if isinstance(exclspecs, type):
-        exclspecs = (exclspecs,)
-
-    elif isinstance(exclspecs, tuple):
-        if len(exclspecs) and not all(isinstance(e_, type) for e_ in exclspecs):
-            raise TypeError(
-                "__check_type__: When a tuple, `exclspecs` must contain only types"
-            )
-
-    else:
-        raise TypeError(
-            f"__check_type__: `exclspecs` expected to be a type, a tuple of types, or None; got {type(exclspecs).__name__} instead"
-        )
-
-    if isinstance(attr_type, collections.abc.Sequence) and len(attr_type):
-        if (
-            isinstance(exclspecs, tuple)
-            and len(exclspecs)
-            and all(isinstance(e_, type) for e_ in exclspecs)
-        ):
-            return all(
-                isinstance(v_, type)
-                and issubclass(v_, specs)
-                and not issubclass(v_, exclspecs)
-                for v_ in attr_type
-                if v_ is not None
-            )
-
-        return all(
-            isinstance(v_, type) and issubclass(v_, specs)
-            for v_ in attr_type
-            if v_ is not None
-        )
-
-    elif isinstance(attr_type, type):
-        if (
-            isinstance(exclspecs, tuple)
-            and len(exclspecs)
-            and all(isinstance(e_, type) for e_ in exclspecs)
-        ):
-            return (
-                isinstance(attr_type, type)
-                and issubclass(attr_type, specs)
-                and not issubclass(attr_type, exclspecs)
-            )
-
-        return isinstance(attr_type, type) and issubclass(attr_type, specs)
-
-    return False
+# __check_type__ is DEPRECATED. Use core.datatypes.check_type
+# def __check_type__(
+#     attr_type: typing.Union[type, typing.Tuple[type]],
+#     specs: typing.Union[type, typing.Tuple[type]],
+#     exclspecs: typing.Optional[typing.Union[type, typing.Tuple[type]]] = None,
+# ) -> bool:
+#     r"""Checks if attr_type is a subclass of types in specs.
+#     Optionally, checks that attr_type it NOT a subclass of types in
+#     exclspecs.
+#
+#
+#     Parameters:
+#     -----------
+#     attr_type: a type or sequence of types (in the latter case, all it elements
+#         will be checked)
+#
+#     specs: a type or a tuple of types that must be a superclass of attr_type;
+#         It may contain `None` objects.
+#         (NOTE: I chose the name `specs` to avoid clashes with the `types` module)
+#
+#
+#     exclspecs: type or sequence of types that must NOT be a superclass of attr_type
+#
+#     Returns a bool
+#     --------------
+#
+#     """
+#     if isinstance(specs, type):
+#         specs = (specs,)
+#
+#     elif not isinstance(specs, tuple) or not all(
+#         isinstance(
+#             v_,
+#             type,
+#         )
+#         for v_ in specs
+#         if v_ is not None
+#     ):
+#         raise TypeError(
+#             "__check_type__ expecting a type or tuple of types as second parameter"
+#         )
+#
+#     specs = tuple(s for s in specs if s is not None)
+#
+#     if exclspecs is None:
+#         exclspecs = tuple()
+#
+#     if isinstance(exclspecs, type):
+#         exclspecs = (exclspecs,)
+#
+#     elif isinstance(exclspecs, tuple):
+#         if len(exclspecs) and not all(isinstance(e_, type) for e_ in exclspecs):
+#             raise TypeError(
+#                 "__check_type__: When a tuple, `exclspecs` must contain only types"
+#             )
+#
+#     else:
+#         raise TypeError(
+#             f"__check_type__: `exclspecs` expected to be a type, a tuple of types, or None; got {type(exclspecs).__name__} instead"
+#         )
+#
+#     if isinstance(attr_type, collections.abc.Sequence) and len(attr_type):
+#         if (
+#             isinstance(exclspecs, tuple)
+#             and len(exclspecs)
+#             and all(isinstance(e_, type) for e_ in exclspecs)
+#         ):
+#             return all(
+#                 isinstance(v_, type)
+#                 and issubclass(v_, specs)
+#                 and not issubclass(v_, exclspecs)
+#                 for v_ in attr_type
+#                 if v_ is not None
+#             )
+#
+#         return all(
+#             isinstance(v_, type) and issubclass(v_, specs)
+#             for v_ in attr_type
+#             if v_ is not None
+#         )
+#
+#     elif isinstance(attr_type, type):
+#         if (
+#             isinstance(exclspecs, tuple)
+#             and len(exclspecs)
+#             and all(isinstance(e_, type) for e_ in exclspecs)
+#         ):
+#             return (
+#                 isinstance(attr_type, type)
+#                 and issubclass(attr_type, specs)
+#                 and not issubclass(attr_type, exclspecs)
+#             )
+#
+#         return isinstance(attr_type, type) and issubclass(attr_type, specs)
+#
+#     return False
 
 def decorator(func):
     ''' Allow to use decorator either with arguments or not. 

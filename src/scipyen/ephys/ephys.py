@@ -422,7 +422,7 @@ class SynapticStimulus(__BaseSynStim__):
         new_args = dict()
         for k, arg in enumerate(args):
             # if not isinstance(arg, super_anns[fields[k]]):
-            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
+            if not datatypes.check_type(type(arg), super_anns[fields[k]]).value:
                 raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
             new_args[fields[k]] = arg
             
@@ -570,7 +570,7 @@ class AuxiliaryInput(__BaseAuxInput__):
         
         new_args = dict()
         for k, arg in enumerate(args):
-            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
+            if not datatypes.check_type(type(arg), super_anns[fields[k]]).value:
                 raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
             new_args[fields[k]] = arg
             
@@ -704,7 +704,7 @@ class AuxiliaryOutput(__BaseAuxOutput__):
         
         new_args = dict()
         for k, arg in enumerate(args):
-            if not datatypes.check_type(type(arg), super_anns[fields[k]]):
+            if not datatypes.check_type(type(arg), super_anns[fields[k]]).value:
                 raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
             new_args[fields[k]] = arg
             
@@ -1415,168 +1415,6 @@ class RecordingSource():
         
         return getPathwayBySweepActivation(protocol, uniquePathways)
     
-#     def mainAltPathways(self, protocol:ElectrophysiologyProtocol, asDict:bool=False) -> tuple:
-#         r"""Classifies the pathways used in `protocol` according to their main status.
-#         
-#         This applies to recording from two pathways in interleaved sweeps.
-#         
-#         A "Main" pathway is the one where the primary recording is performed.
-#         An "Alternate" pathway - when present - is recorded in alternative
-#         sweeps, such that the "Main" pathway is recorded on even-indexed sweeps
-#         (i.e., sweeps 0, 2, 4, …) whereas the "Alternate" is recorded in 
-#         odd-indexed sweeps (i.e., sweeep 1, 3, 5, …)
-#     
-#         NOTE: Clampex (and possibly, CED) support alternative (i.e. interleaved) recording from up to two pathways,
-#         alternatively stimulated across sweeps.
-#         """
-#         
-#         dac_stim_pathways, dig_stim_pathways = self.getPathwaysByStimulationType()
-#         adc = protocol.getADC(self.adc)
-#         dac = protocol.getDAC(self.dac)
-#         activeDAC  = protocol.getDAC()
-#         digOutDacs = protocol.digitalOutputDACs
-#         mainDIGOut = protocol.digitalOutputs(alternate=False)
-#         altDIGOut  = protocol.digitalOutputs(alternate=True)
-#         protocol_dac_stim_pathways = tuple(p for p in dac_stim_pathways if len(protocol.getDAC(p.stimulus.channel).emulatesTTL) and protocol.getDAC(p[1].stimulus.channel) not in (dac, activeDAC))
-#         protocol_dig_stim_pathways = tuple(p for p in dig_stim_pathways if p.stimulus.channel in mainDIGOut or altDIGOut)
-#         
-#         mainPathways = tuple()
-#         altPathways = tuple()
-#         nSrcStimPathways = len(protocol_dac_stim_pathways) + len(protocol_dig_stim_pathways)
-#         
-#         if nSrcStimPathways == 0:
-#             scipywarn(f"Protocol {protocol.name} does not seem to monitor any of the pathways declared in source {self.name}")
-#         
-#         elif nSrcStimPathways == 1:
-#             # When there is a single pathway simulated in the protocol, this 
-#             # is by definition the 'main' pathway.
-#             #
-#             mainPathways = protocol_dig_stim_pathways if len(protocol_dig_stim_pathways) else protocol_dac_stim_pathways
-#         
-#         elif nSrcStimPathways == 2:
-#             if len(protocol_dac_stim_pathways) == 0:
-#                 # both main and alternative stimulated pathways are stimulated
-#                 # via DIG channels
-#                 
-#                 # 'mainOnly': DIG channel indexes used in the 'main' but NOT the
-#                 # 'alternative' pattern; 
-#                 # will be an empty set when mainDIGOut is empty, or when
-#                 # mainDIGOut == altDIGOut
-#                 # 
-#                 mainOnly = mainDIGOut - altDIGOut
-#                 
-#                 # 'altOnly': DIG channel indexes used in the 'alternative' but NOT
-#                 # 'main' pattern; 
-#                 # will be an empty set when altDIGOut is empty, or when
-#                 # mainDIGOut == altDIGOut
-#                 #
-#                 altOnly  = altDIGOut - mainDIGOut
-# 
-#                 if len(mainDIGOut) > 0:
-#                     if len(mainOnly) == 0: # same channels in both mainDIGOut and altDIGOut
-#                         mainPathways = protocol_dig_stim_pathways
-#                     else:
-#                         mainPathways = tuple(x for x in protocol_dig_stim_pathways if x.stimulus.channel in mainOnly)
-#                     
-#                 if len(altDIGOut) > 0:
-#                     # there are pathways alternatively stimulated
-#                     if len(altOnly) == 0:
-#                         altPathways = protocol_dig_stim_pathways
-#                     else:
-#                         altPathways = tuple(x for x in protocol_dig_stim_pathways if x.stimulus.channel in altOnly)
-#                     
-#             elif len(protocol_dac_stim_pathways) == 1:
-#                 # one stim pathway (main) is DIG, the other (alternative) is DAC
-#                 # because here, nSrcStimPathways == 2
-#                 if not protocol.alternateDACOutputStateEnabled:
-#                     scipywarn(f"Tracking mode: Alternate DAC outputs are disabled in protocol {protocol.name} yet source {self.name} declares pathway {dac_stim_pathways[0][1].name} to be stimulated with DAC-emulated TTLs")
-#                 else:                        
-#                     mainPathways, altPathways = protocol_dig_stim_pathways, protocol_dac_stim_pathways
-#                     
-#             else: # enforce one dac and one dig pathway paradigm
-#                 scipywarn(f"Tracking mode: In protocol {protocol.name}, for source {self.name}: at most one pathway should be declared as simulated via DAC-emulated TTLs")
-#                     
-#         else: # nSrcStimPathways > 2
-#             # NOTE: 2024-03-09 22:54:05
-#             # I think this is technically impossible in Clampex
-#             scipywarn(f"Protocol {protocol.name} seems to be stimulating more than two pathways; This is not currently supported.")
-#             
-#         return mainPathways, altPathways
-#     
-#     @classmethod
-#     def __new__(cls, *args, **kwargs):
-#         super_anns = super().__annotations__
-#         fields = list(super_anns.keys())
-#         super_defaults = super()._field_defaults
-#         
-#         args = args[1:] # drop cls
-#         
-#         if len(args) > len(super_anns):
-#             raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
-#         
-#         new_args = dict()
-#         
-#         for k, arg in enumerate(args):
-#             if not datatypes.check_type(type(arg), super_anns[fields[k]]):
-#                 raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
-#             new_args[fields[k]] = arg
-#             
-#         if len(new_args) == len(super_anns):
-#             if len(kwargs):
-#                 dups = [k for k in kwargs if k in fields]
-#                 if len(dups):
-#                     raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-#                 else:
-#                     raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
-#                 
-#         else:
-#             if len(kwargs):
-#                 dups = [k for k in kwargs if k in new_args]
-#                 if len(dups):
-#                     raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-#                 
-#                 spurious = [k for k in kwargs if k not in fields]
-#                 if len(spurious):
-#                     raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
-#                 
-#                 new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
-#                 
-#                 new_args.update(new_kwargs)
-#                 
-#             # finally, add the default unspecified args
-#             for (k,v) in super_defaults.items():
-#                 if k not in new_args:
-#                     new_args[k] = v
-#                     
-#         self = super().__new__(cls, **new_args)
-#         ret._fields = ret._fields + ("pathways", )
-#         ret._field_defaults = ret._field_defaults + tuple()
-#         
-#         if isinstance(ret.syn, SynapticStimulus):
-#             pathways = (SynapticPathway(source = ret, stimulus = ret.syn,
-#                                     name = ret.syn.name, adc = ret.adc, 
-#                                     dac = ret.dac,
-#                                     electrode = ret.electrodeMode), )
-#         elif isinstance(ret.syn, (tuple, list)):
-#             if len(ret.syn) == 1:
-#                 pathways = tuple(SynapticPathway(source=ret, stimulus = ret.syn[0],
-#                                        name = ret.syn[0].name,
-#                                        adc = ret.adc, dac = ret.dac,
-#                                        electrode = ret.electrodeMode))
-#             elif len(ret.syn) > 1:
-#                 pathways = tuple(SynapticPathway(source=ret, stimulus = s,
-#                                              name = s.name,
-#                                              adc = ret.adc, dac = ret.dac,
-#                                              electrode = ret.electrodeMode) for s in ret.syn)
-#             
-#         else:
-#             pathways = tuple()
-#             
-#         setattr(ret, "pathways", pathways)
-#         
-#         
-#         return ret
-#     
     def __repr__(self) -> str:
         import dataclasses
         ret = [f"{self.__class__.__name__}("]
@@ -1590,15 +1428,6 @@ class RecordingSource():
                 ret += ",\n".join([f"{p.name}" for p in self.pathways])
         return "".join(ret)
     
-# RecordingSource.name.__doc__ = "str: The name of the source; default is 'cell'"
-# RecordingSource.adc.__doc__  = "int, str: The index or name of the primary ADC channel — records the eletrical behaviour of the source (cell or field)."
-# RecordingSource.dac.__doc__  = "int, str: The index or name of the primary DAC channel — the output channel that operates the voltage- or current-clamp."
-# RecordingSource.syn.__doc__  = "SynapticStimulus, sequence of SynapticStimulus objects or None — origin of trigger (TTL-like) signals for synaptic stimulation, one per 'synaptic pathway'."
-# RecordingSource.auxin.__doc__  = "AuxiliaryInput, sequence of AuxiliaryInput objects or None — input(s) for recording signals NOT generated by the recorded source."
-# RecordingSource.auxout.__doc__  = "AuxiliaryOutput, sequence of AuxiliaryOutput objects or None — output channel(s) for emitting command or TTL signals to 3ʳᵈ party devices."
-
-
-
 @with_doc(Episode, use_header=True, header_str = "Inherits from:")
 class RecordingEpisode(Episode):
     r"""
