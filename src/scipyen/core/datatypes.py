@@ -560,7 +560,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
 
     elif isinstance(ref, (list, tuple, set)):
         # here, ref is a collection of types!
-        result = any(check_type(t, r_) for r_ in ref)
+        result = any(check_type(t, r_)[0] for r_ in ref)
         return CheckTypeResult(result, t_set, t_keys, t_vals, t_elems)
         # ref = set(itertools.chain.from_iterable([inspect.getmro(t_) for t_ in ref])) if use_ref_mro else {ref}
 
@@ -603,6 +603,8 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
 
         r_s = tuple(ref_set)
 
+        result = len(t_set & ref_set) > 0 or any(issubclass(v, tuple(ref_set)) for v in t_set)
+
         # check if t is the expected collection type
         collection_OK = any(issubclass(t_, r_s) for t_ in t_set)
 
@@ -612,17 +614,18 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
             if len(t_elems) and len(ref_elems):
                 # t is a sequence-like thing
                 r_e = tuple(ref_elems)
-                collection_OK = all(issubclass(t_, r_e) for t_ in t_elems)
+                result &= all(issubclass(t_, r_e) for t_ in t_elems)
                 # print(f"** t_elems {t_elems} ↔ ref_elems {ref_elems} -> collection_OK: {collection_OK}\n")
 
             elif len(t_keys) and len(ref_keys):
                 r_k = tuple(ref_keys)
-                collection_OK = all(issubclass(t_, r_k) for t_ in t_keys)
+                result &= all(issubclass(t_, r_k) for t_ in t_keys)
                 if len(t_vals) and len(ref_vals):
                     r_v = tuple(ref_vals)
-                    collection_OK &= all(issubclass(t_, r_v) for t_ in t_vals)
+                    result &= all(issubclass(t_, r_v) for t_ in t_vals)
 
-        return CheckTypeResult(collection_OK, t_set, t_keys, t_vals, t_elems)
+        # print(f"datatypes.check_type:\n\tt_set -> {t_set},\n\tt_elems -> {t_elems},\n\tref_set -> {ref_set},\n\tref_elems -> {ref_elems},\n\tref_keys -> {ref_keys}")
+        return CheckTypeResult(result, t_set, t_keys, t_vals, t_elems)
 
     else:
         raise TypeError(f"'ref': Expecting a type, or a list, set, or tuple of types; instead, got {type(ref).__name__}")
@@ -633,7 +636,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     # print(f"datatypes.check_type:\n\tt_set -> {t_set},\n\tt_elems -> {t_elems},\n\tref_set -> {ref_set},\n\tref_elems -> {ref_elems},\n\tref_keys -> {ref_keys}")
 
     result = len(t_set & ref_set) > 0 or any(issubclass(v, tuple(ref_set)) for v in t_set)
-    return CheckTypeResult(collection_OK, t_set, t_keys, t_vals, t_elems)
+    return CheckTypeResult(result, t_set, t_keys, t_vals, t_elems)
 
 def check_mapping_fields(x:dict, constraints:list) -> bool:
     if not isinstance(x, dict):
