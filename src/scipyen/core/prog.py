@@ -5,7 +5,7 @@
 
 r"""
 Helper functions and classes for programming, including:
-package/module management, decorators, context managers, and 
+package/module management, decorators, context managers, and
 descriptor validators.
 
 
@@ -99,8 +99,8 @@ CALLABLE_TYPES = (
     types.MethodDescriptorType,
     types.ClassMethodDescriptorType,
 )
-TYPING_TYPES = (typing._GenericAlias, 
-                typing._SpecialGenericAlias, 
+TYPING_TYPES = (typing._GenericAlias,
+                typing._SpecialGenericAlias,
                 typing._UnionGenericAlias,
                 types.UnionType, types.GenericAlias)
 
@@ -112,6 +112,12 @@ VersionTuple4 = namedtuple("VersionTuple4", ["major", "minor", "micro","dot"])
 
 class ModSpec: pass # to be picked up in Kate editor's symbolviewer plugin
 ModSpec = importlib.machinery.ModuleSpec  # saves me some typing
+
+# class UnwindTypeResult(typing.NamedTuple):
+#     object_types: set
+#     key_types: set
+#     value_types: set
+#     element_types: set
 
 class NoData:
     r"""Empty placeholder class that signifies lack of any data.
@@ -294,15 +300,15 @@ class DescriptorValidatorABC(ABC):
 
         if preset_func is not None:
             # print(f"{print_styled(f'\n\twill call preset_hook {preset_func}', color='yellow')}")
-            
+
             # check callable definition to see how many arguments (positional parameters) the callable expects
             # the invoke the callable
             if isinstance(preset_func, types.MethodType):
                 args = inspect.getfullargspec(preset_func).args[1:]
-                
+
             elif isinstance(preset_func, types.FunctionType):
                 args = inspect.getfullargspec(preset_func).args
-                
+
             else:
                 args = inspect.getfullargspec(preset_func.__call__).args[1:]
 
@@ -342,10 +348,10 @@ class DescriptorValidatorABC(ABC):
 
             if isinstance(postset_func, types.MethodType):
                 args = inspect.getfullargspec(postset_func).args[1:]
-                
+
             elif isinstance(postset_func, types.FunctionType):
                 args = inspect.getfullargspec(postset_func).args
-                
+
             else:
                 args = inspect.getfullargspec(postset_func.__call__).args[1:]
 
@@ -399,7 +405,7 @@ class BaseDescriptorValidator(DescriptorValidatorABC):
         self.default = default
 
         self.preset_hook = None
-        
+
         if isinstance(
             preset_hook,
             (collections.abc.Callable, types.MethodType, types.FunctionType),
@@ -407,7 +413,7 @@ class BaseDescriptorValidator(DescriptorValidatorABC):
             self.preset_hook = preset_hook
 
         self.postset_hook = None
-        
+
         if isinstance(
             postset_hook,
             (collections.abc.Callable, types.MethodType, types.FunctionType),
@@ -994,12 +1000,12 @@ class SpecFinder(importlib_abc.MetaPathFinder):
         if self._verbose:
             print(f"{self.__class__.__name__}.find_spec (fullname = {fullname}, path = {path}, target = {target}):\n")
             if len(self.path_map):
-                
+
                 print(f"\t*** {self.__class__.__name__}.path_map:\n")
                 for k,v in self.path_map.items():
                     print(f"\t{k}: {v}")
                 print("\n\t***\n\n")
-                
+
         if fullname in self.path_map:
             path = pathlib.Path(self.path_map[fullname])
             if path.is_dir():
@@ -1019,7 +1025,7 @@ class SpecFinder(importlib_abc.MetaPathFinder):
     @property
     def verbose(self) -> bool:
         return self._verbose
-    
+
     @verbose.setter
     def verbose(self,val:bool):
         self._verbose = isinstance(val, bool) and val == True
@@ -1578,21 +1584,21 @@ def get_func_param_types(func: typing.Callable, report_components:bool=False):
     func: an annotated function
     report_components: when True, also report the types qualifiers of parameters
         parameters of 'func' that are of Sequence or Mapping type
-    
+
         Default is False
 
     NOTE:
     type.UnionType  is reported as a set of component types
-    
+
     When report_components is True:
-    
+
     typing.Sequence is reported as the tuple (Sequence, set of specified element types)
     typing.Mapping  is reported as a dict (mapping) of key type ↦ value type
         either of which may be annotated as Union of types, with the constraint
         that key types must be Hashable — this is NOT checked here
 
     """
-    
+
     if isinstance(func, functools.partial):
         fn = func.func
         pargtypes = tuple(type(a) for a in func.args)
@@ -1618,7 +1624,7 @@ def get_func_param_types(func: typing.Callable, report_components:bool=False):
             isinstance(t, type) for t in ptype
         ):
             t = tuple(ptype)
-            
+
         elif isinstance(ptype, TYPING_TYPES):
             # print(f"ptype {ptype} in TYPING_TYPES")
             if isinstance(ptype, types.UnionType):
@@ -1639,14 +1645,14 @@ def get_func_param_types(func: typing.Callable, report_components:bool=False):
                             # t = ptype_args
                         else:
                             t = ptype_origin
-            
+
         elif isinstance(type(ptype), TYPING_TYPES):
             # print(f"ptype's type ({type(ptype)}) in TYPING_TYPES")
             t = typing.get_origin(type(ptype))
             if isinstance(t, TYPING_TYPES) and hasattr(t, "__args__"):
                 t = typing.get_args(t)
-            
-            
+
+
 
         # elif type(ptype).__name__ in dir(typing) or type(ptype).__name__ in dir(types):
         #     # NOTE: UnionType is actually in the types module
@@ -1657,7 +1663,7 @@ def get_func_param_types(func: typing.Callable, report_components:bool=False):
         else:
             scipywarn(f"Cannot parse the type of {name} parameter")
             continue
-        
+
         # if name=="x":
         #     print(f"resolved = {t}")
 
@@ -1862,7 +1868,7 @@ def filter_attr(
 
     if indices_only is True:
         indices = True
-        
+
     # print("prog.filter_attr:")
     # print(f"  iterable: {type(iterable).__name__}")
     # print(f"  op: {op}")
@@ -2129,39 +2135,40 @@ def unwind_type_sig(x, include_x:bool=False):
     return unwind_type(x, include_x, visited)
 
 # def unwind_type(x, include_x:bool=False, visited:set = set()):
-def unwind_type(x, include_x:bool=False, visited: typing.Optional[set] = None):
+def unwind_type(x, include_x:bool=False, visited: typing.Optional[set] = None) -> set:
     r"""Unwinds a type to its component types.
-This includes special aliases defined in the ``types`` and ``typing`` standard 
+This includes special aliases defined in the ``types`` and ``typing`` standard
 library modules.
-    
+
     Parameters:
     ===========
     x: a type or a special type | type alias (e.g. types.Uniontype, types.GenericAlias)
         or a list | tuple of such
-        
+
         Typically this is found when inspecting a function annotation.
-    
+
     visited: a set
-    
+
     Returns:
     ========
     visited - a set
-    
+
     The function places the individual types inside the ```visited`` argument
     which should be present in the caller's namespace (and is passed here by reference
     as are all containers in Python).
-    
+
     Side effects:
     =============
     Populates ``visited`` with the "elementary" types found.
 """
+
     if not isinstance(visited, set):
         visited = set()
-    
+
     if isinstance(x, type):
         visited.add(x)
         return visited
-    
+
     elif isinstance(x, TYPING_TYPES):
         if hasattr(x, "__args__"):
             unwind_type(x.__args__, visited=visited)
@@ -2170,27 +2177,27 @@ library modules.
             visited.add(x)
 
         return visited
-    
+
     elif not isinstance(x, (tuple, list)):
         return visited
-    
+
     ret = list()
-    
+
     for v in x:
         visited.add(v)
-        
+
         if isinstance(v, type):
             visited.add(v)
-            
+
         elif isinstance(v, (tuple, list)):
             unwind_type(v, include_x=include_x, visited=visited)
-            
+
         elif isinstance(v, TYPING_TYPES):
             if hasattr(v, "__args__"):
                 unwind_type(v.__args__, visited=visited)
             if include_x:
                 visited.add(v)
-            
+
     return visited
 
 def get_positional_named_annotations(f:typing.Union[types.FunctionType, types.MethodType]) -> list:
@@ -2200,7 +2207,7 @@ def get_positional_named_annotations(f:typing.Union[types.FunctionType, types.Me
         raise TypeError(f"Expecting a function or method; got {type(f).__name__} instead")
     return list(map(lambda i: (i[0], i[1]), funcSignature["positional"].items())) + \
             list(map(lambda i: (i[0], compress_annot(tuple(set(i[1])-{inspect._empty}))), funcSignature["named"].items()))
-        
+
 def parent_types(data):
     r"""Returns a tuple of the immediate ancestor types of data.
     The order is as specified in the data type's definition, if data is an
@@ -2366,11 +2373,11 @@ def is_predicate(x:typing.Any, n:int=1) -> bool:
     ret = isinstance(x, types.FunctionType)
     if ret:
         ret &= len(inspect.signature(x).parameters) == n
-    
+
     if ret:
         annots = inspect.get_annotations(x)
         ret &= len(annots) and annots["return"] == bool
-        
+
     return ret
 
 def is_hashable(x) -> bool:
@@ -2392,34 +2399,35 @@ def unravel_types(x) -> set:
     if origin is None:
         if isinstance(x, type):
             ret.add(x)
+
         elif isinstance(x, (typing.Sequence, typing.Set)):
             if all(isinstance(v, type) for v in x):
                 ret |= set(x)
             else:
                 ret.add(type(x))
-                
+
         else:
             ret.add(type(x))
-            
+
     else:
         args = unravel_types(typing.get_args(x))
         ret |= args
-        
+
     return ret
-            
+
 def is_type_or_subclass(x: typing.Any, y:typing.Union[type, typing._Final]) -> bool:
     if not isinstance(y, (type, typing._Final)):
         raise TypeError(f"Second argument must be a type; instead, got {type(y).__name__}")
-    
+
     if isinstance(y, type):
         if isinstance(x, type):
             return issubclass(x, y)
 
         return isinstance(x, y)
-    
+
     else:
         return False
-    
+
 def __check_array_attribute__(rt, param) -> None:
     import vigra
     from core.scipyen_quantities import unitsConvertible
@@ -2621,7 +2629,7 @@ def __check_array_attribute__(rt, param) -> None:
 #     return False
 
 def decorator(func):
-    ''' Allow to use decorator either with arguments or not. 
+    ''' Allow to use decorator either with arguments or not.
     Taken from https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_optional_arguments
 '''
 
@@ -2877,7 +2885,7 @@ def is_class_defined_in_module(x: typing.Any, m: types.ModuleType):
         # dynamically generated - in which case it would NOT have been found in
         # any of th currently importd modules anyway
         return False
-    
+
     elif x_module.__spec__ is None:
         return False
 
@@ -2890,23 +2898,23 @@ def get_module_version(p:typing.Union[types.ModuleType, str]) -> str:
             p = sys.modules[p]
         else:
             try:
-                p = importlib.import_module(p) 
+                p = importlib.import_module(p)
             except:
                 traceback.print_exc()
                 return ""
-            
+
     elif isinstance(p, types.ModuleType):
         if p.__name__ in sys.modules:
             p = sys.modules[p.__name__]
         else:
             try:
-                p = importlib.import_module(p) 
+                p = importlib.import_module(p)
             except:
                 traceback.print_exc()
                 return ""
     else:
         raise TypeError(f"Expecting a module or a module name; instead, got {type(p).__name__}")
-    
+
     if hasattr(p, "version"):
         if isinstance(p.version, types.ModuleType):
             if hasattr(p.version, "full_version"):
@@ -2915,20 +2923,20 @@ def get_module_version(p:typing.Union[types.ModuleType, str]) -> str:
                 return str(p.version.version)
             else:
                 return ""
-            
+
         else:
             return str(p.version)
-        
+
     else:
         # return str(p.__version__) if hasattr(p,"__version__") else ""
         # print(f"\tversion {p.__version__}")
         return getattr(p,"__version__", "")
-    
+
 
 def get_qt_api_for_python(module:types.ModuleType) -> str:
     r"""Introspection of the Qt API for help purposes, NOT to guide GUI code"""
     hasPg = False
-    try: 
+    try:
         pg = importlib.import_module("pyqtgraph")
         hasPg = True
     except:
@@ -2939,7 +2947,7 @@ def get_qt_api_for_python(module:types.ModuleType) -> str:
             module = importlib.import_module(module.__name__)
 
         # version = getattr(module, "__version__", "")
-        
+
         if module.__name__ == "qtpy":
             QtCore = importlib.import_module("qtpy.QtCore")
             qtVersion = QtCore.qVersion()
@@ -2951,7 +2959,7 @@ def get_qt_api_for_python(module:types.ModuleType) -> str:
             pyqtAPI = getattr(module, "API", os.environ.get("QT_API", "pyqt5").lower())
             if hasPg:
                 pyqtAPI = getattr(pg.Qt, pyqtAPI.upper(), pyqtAPI)
-                
+
             if pyqtAPI.lower() in ("pyqt5", "pyqt6"):
                 pyqtAPIver = f" {pyqtAPI} {QtCore.PYQT_VERSION_STR}, Qt {qtVersion}"
             elif pyqtAPI.lower() in ("PySide2", "PySide6"):
@@ -2962,29 +2970,29 @@ def get_qt_api_for_python(module:types.ModuleType) -> str:
                     pyqtAPIver = f" Qt {qtVersion}"
             else:
                 pyqtAPIver = f" Qt {qtVersion}"
-                
+
         elif any(module.__name__.lower().startswith(s) for s in ("pyside", "pyqt")):
             QtCore = importlib.import_module(f"{module.__name__}.QtCore")
             qtVersion = QtCore.qVersion()
-                
+
             if module.__name__.lower().startswith("pyside"):
                 pyqtAPIver = f" {module.__name__} {module.__version__}, Qt {qtVersion}"
-                
+
             elif module.__name__.lower().startswith("pyqt"):
                 QtCore = importlib.import_module(f"{module.__name__}.QtCore")
                 pyqtAPIver = f" {module.__name__} {QtCore.PYQT_VERSION_STR}, Qt {qtVersion}"
-                        
+
             else:
                 pyqtAPIver = f" Qt {qtVersion}"
         else:
             pyqtAPIver = f" Qt {qtVersion}"
-            
+
         return pyqtAPIver
-            
+
     except:
         traceback.print_exc()
         return ""
-    
+
 def parse_module_class_path(x: str) -> typing.Union[type, types.ModuleType]:
     from core.utilities import unique
 
@@ -3147,7 +3155,7 @@ def get_top_level_modules(path:typing.Optional[typing.Union[str, pathlib.Path,ty
     infos = list(pkgutil.iter_modules(path))
     packages = list(filter(lambda i: i.ispkg, infos))
     nonpackages = list(filter(lambda i: not i.ispkg, infos))
-    
+
     return packages, nonpackages
 
 @singledispatch
@@ -3159,18 +3167,18 @@ def locate_obj_by_identifier(where:object, n:str) -> object:
         n = p.rpartition('.')[-1]
     if n in where.__dict__:
         return where.__dict__[n]
-    
+
     elif dataclasses.is_dataclass(where):
         flds = datalasses.fields(where)
-        fldnames = list(map(lambda f: f.name, flds)) 
+        fldnames = list(map(lambda f: f.name, flds))
         if n in fldnames:
             return flds[fldnames.index(n)]
-        
+
     else:
         members = dict(inspect.getmembers(where))
         if n in members:
             return members[n]
-        
+
 # @locate_obj_by_identifier.register(types.ModuleType)
 # def _(where:types.ModuleType, n:str) -> object:
 #     if not (isinstance(value, str) and all(isidentifier(a) for a in value.split("."))):
@@ -3182,10 +3190,10 @@ def locate_obj_by_identifier(where:object, n:str) -> object:
 def _(where:types.NoneType, n:str) -> object:
     if not (isinstance(value, str) and all(isidentifier(a) for a in value.split("."))):
         raise ValueError("A valid identifier string or dotted path was expected")
-    
+
     if '.' in n:
         n = p.rpartition('.')[-1]
-    
+
     modules = list()
     in_modules = list()
     nl_modules = list()
@@ -3197,7 +3205,7 @@ def _(where:types.NoneType, n:str) -> object:
             o = locate_obj_by_identifier(m, n)
             if o:
                 in_modules.append(o)
-        
+
     if len(modules) == 0 and len(in_modules) == 0:
         nlmodinfos = get_not_loaded_modules()
         nn = list(filter(lambda i: i.name == n, nlmodinfos))
@@ -3211,7 +3219,7 @@ def _(where:types.NoneType, n:str) -> object:
                         nl_modules.append(m)
                 except:
                     traceback.print_exc()
-                    
+
         else:
             for mi in nlmodinfos:
                 try:
@@ -3223,7 +3231,7 @@ def _(where:types.NoneType, n:str) -> object:
                         in_nlmodules.append(o)
                 except:
                     traceback.print_exc()
-        
+
 
 def get_loaded_modules(path:typing.Optional[typing.Union[str, pathlib.Path,typing.Sequence[str|pathlib.Path]]]=None) -> list:
     r"""This is redundant, since we always have direct access to sys.modules...
@@ -3242,7 +3250,7 @@ def get_modules(path:typing.Optional[typing.Union[str, pathlib.Path,typing.Seque
     packages = list(filter(lambda i: i.ispkg, infos))
     nonpackages = list(filter(lambda i: not i.ispkg, infos))
     return packages, nonpackages
-    
+
 def get_specs(infos:list) -> list:
     r"""Returns a list of module specs using the ModuleInfo in infos."""
     return list(map(lambda i: importlib.util.find_spec(i.name), infos))
@@ -3259,7 +3267,7 @@ def _find_in_sys_modules(head:str, rest:list, shell:typing.Optional[InteractiveS
     ismagic=False
     isalias=False
     ospace=None
-    
+
     for module in sys.modules.values():
         if not isinstance(module, types.ModuleType):
             continue
@@ -3280,14 +3288,14 @@ def _find_in_sys_modules(head:str, rest:list, shell:typing.Optional[InteractiveS
             # as 'parent' when in fact it is not
             # — what I'm after is the actual point where the module is defined
             # if isinstance(obj, types.ModuleType):
-                
+
             for idx, part in enumerate(rest):
                 # print(f"\tlooking for part {idx}: {part} in {obj}")
                 try:
                     parent = obj
 #                     if isinstance(parent, types.ModuleType):
 #                         # print(f"\t\tparent: {parent.__name__}, from {parent.__spec__.origin}")
-#                         
+#
 #                         opath.append(parent.__name__.split(".")[-1])
                     if idx == len(rest) - 1:
                         obj = shell._getattr_property(obj, part)
@@ -3310,7 +3318,7 @@ def _find_in_sys_modules(head:str, rest:list, shell:typing.Optional[InteractiveS
                 ospace = None # this is bettern as it reflects the fact that whatever is found does not belong to a namespace
                 # msg = ""
                 break  # modules loop
-    
+
     return oinspect.OInfo(
         obj=obj,
         found=found,
@@ -3334,7 +3342,7 @@ def _check_is_magic(oname, shell:typing.Optional[InteractiveShell]=None) -> tupl
     found = False
     ismagic=False
     isalias=False
-    
+
     if oname.startswith(ESC_MAGIC2):
         oname = oname.lstrip(ESC_MAGIC2)
         obj = shell.find_cell_magic(oname)
@@ -3351,13 +3359,13 @@ def _check_is_magic(oname, shell:typing.Optional[InteractiveShell]=None) -> tupl
         ospace = 'IPython internal'
         ismagic = True
         isalias = isinstance(obj, Alias)
-    
+
     return found, obj, ospace, ismagic, isalias
 
 def _get_pyobj_name_(obj:typing.Union[types.ModuleType, types.FunctionType, types.MethodType, type]) -> str:
     return obj.__qualname__ if isinstance(obj, (types.FunctionType, types.MethodType, type)) else obj.__name__ if isinstance(obj, types.ModuleType) else ""
 
-def _check_oname_alias_(obj:typing.Union[types.ModuleType, types.FunctionType, types.MethodType, type], 
+def _check_oname_alias_(obj:typing.Union[types.ModuleType, types.FunctionType, types.MethodType, type],
                         oname:str, shell:typing.Optional[InteractiveShell]=None) -> bool:
     r"""Returns ``True`` if *obj* is an alias to an object with original name *oname*.
 
@@ -3404,7 +3412,7 @@ WARNING: Potentially problematic...
                         ]
     if not isinstance(shell, InteractiveShell):
         shell = guiutils.getScipyenConsoleShell()
-        
+
     candidates = list()
     aliases = list()
     for nsname,ns in namespaces:
@@ -3424,9 +3432,9 @@ WARNING: Potentially problematic...
                 if oname in parts and ooname not in aliases: # NOTE: 2026-01-06 10:21:39 not the same as oname in ooname !!!
                     cinfo = shell._object_find(ooname, namespaces=[(nsname, ns)])
                     candidates.append((ooname, cinfo))
-                
+
     return aliases, candidates
-    
+
 def object_inspect(oname=str, detail_level:int=0,
                    shell:typing.Optional[InteractiveShell]=None) -> oinspect.InfoDict:
     r"""Emulates shell.object_inspect"""
@@ -3434,18 +3442,18 @@ def object_inspect(oname=str, detail_level:int=0,
     from gui import guiutils
     if not isinstance(shell, InteractiveShell):
         shell = guiutils.getScipyenConsoleShell()
-    # NOTE: 2026-01-02 14:28:47 
+    # NOTE: 2026-01-02 14:28:47
     # ``info`` is an oinspect.OInfo object
     info = object_find(oname, shell=shell)
-    
+
     # NOTE: 2026-01-02 14:29:21
     # either branch below produces an oinspect.InfoDict object (effectively, a dict)
     if info.found:
         # create an oinspect.InfoDict based on ``info``
-        return helputils.hinfo(info.obj, oname, info=info, detail_level=detail_level, shell=shell) 
+        return helputils.hinfo(info.obj, oname, info=info, detail_level=detail_level, shell=shell)
     else:
         # create a generic oinspect.InfoDict based on ``oname``
-        return oinspect.object_info(name=oname, found=False) 
+        return oinspect.object_info(name=oname, found=False)
 
 def object_find(oname=str, namespaces=None,
                 shell:typing.Optional[InteractiveShell]=None,
@@ -3456,11 +3464,11 @@ def object_find(oname=str, namespaces=None,
     from IPython.core.alias import Alias, AliasManager
     from core import strutils, utilities
     from gui import guiutils
-    
-    
+
+
     if not isinstance(shell, InteractiveShell):
         shell = guiutils.getScipyenConsoleShell()
-        
+
     foundinfos = list()
 
     candidates = list()
@@ -3476,40 +3484,40 @@ def object_find(oname=str, namespaces=None,
         if not with_candidates:
             return info, ""
         foundinfos.append(info)
-    
+
     if not info.found:
         # 0) try pkgutil
         try:
             obj = pkgutil.resolve_name(oname)
-            oinfo = oinspect.OInfo(obj=obj, found=True, ismagic=False, isalias=False, 
+            oinfo = oinspect.OInfo(obj=obj, found=True, ismagic=False, isalias=False,
                                    namespace=None, parent=None)
-            parentinfo = oinspect.OInfo(obj=None, found=False, ismagic=False, isalias=False, 
+            parentinfo = oinspect.OInfo(obj=None, found=False, ismagic=False, isalias=False,
                                    namespace=None, parent=None)
             objname = _get_pyobj_name_(obj)
 
             if isinstance(obj, (types.FunctionType, types.MethodType, type)):
                 parentinfo, _ = object_find(obj.__module__)
-            
+
             elif isinstance(obj, types.ModuleType):
                 pok, pp = shell._find_parts(objname)
                 if len(pp)>1:
                     parentinfo, _ = object_find(".".join([pp[:-1]]))
-                    
+
             if parentinfo.found:
                 oinfo.parent = parentinfo.obj
                 oinfo.namespace = f"module {oinfo.parent.__name__}"
-                
+
             if not with_candidates:
                 return oinfo, ""
             if len(foundinfos) == 0:
                 foundinfos.append(oinfo)
             else:
                 candidates.append((objname, oinfo))
-                
+
         except:
             # traceback.print_exc()
             pass
-        
+
         #
         # 1) the object might exist in the namespaces, but has been imported under an alias
         aliases, cnds = _find_by_alias(oname, namespaces, shell=shell)
@@ -3588,7 +3596,7 @@ def object_find(oname=str, namespaces=None,
                         sims = list(map(lambda k: strutils.jaccard(k, parts[-1]), members))
                         acc = list(filter(lambda s: s > 0.5, sims))
                         if len(acc):
-                            candidates.extend(list(map(lambda s: 
+                            candidates.extend(list(map(lambda s:
                                                            make_name_info(subname, s, sinfo.obj, sinfo.obj.__dict__[members[sims.index(s)]]),  acc)))
 
         # 3) the object has not been imported in any of the namespaces
@@ -3692,7 +3700,7 @@ def object_find(oname=str, namespaces=None,
                         foundinfos.append(cinfo)
                     else:
                         candidates.append((cname, cinfo))
-                
+
             info.obj    = None
             info.parent = None
             info.ismagic=False
@@ -3724,14 +3732,14 @@ def walk_packages(path:typing.Optional[typing.Union[str, pathlib.Path,typing.Seq
 
     if isinstance(path, (str, pathlib.Path)):
         path = [path]
-        
+
     elif isinstance(path, typing.Sequence):
         paths = list(filter(lambda p: isinstance(p, (str, pathlib.Path)), path))
         if len(paths) == 0:
             path = None
         else:
             path = paths
-        
+
     for info in pkgutil.iter_modules(path, prefix):
         yield info
         if info.ispkg:

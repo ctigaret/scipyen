@@ -2435,7 +2435,7 @@ class GenericInputWidget(QtWidgets.QFrame):
                     value = value_
 
             elif isinstance(varType, typing._Final):
-                t = prog.unwind_type(x)
+                t = prog.unwind_type(varType)
                 if len(t) == 0:
                     if default not in (dataclasses.MISSING, None): # get it from default's type
                         t = {type(default)}
@@ -2585,11 +2585,11 @@ class GenericInputWidget(QtWidgets.QFrame):
             self._current_vartype_ = self._vartype_[ndx]
 
         if isinstance(val, QtCore.Qt.CheckState):
-            if self._current_vartype_  == Tribool:
+            if self._current_vartype_  is Tribool:
                 v_ = None if val == QtCore.Qt.PartiallyChecked else True if val == QtCore.Qt.Checked else False
                 self._cached_value_[self._current_vartype_] = Tribool(v_)
 
-            elif self._current_vartype_ == bool:
+            elif self._current_vartype_ is bool:
                 v_ = val == QtCore.Qt.Checked
                 self._cached_value_[self._current_vartype_] = v_
 
@@ -2628,7 +2628,9 @@ class GenericInputWidget(QtWidgets.QFrame):
                 cachedVal = self._cached_value_[self._current_vartype_]
             else:
                 cachedVal = dataclasses.MISSING
+
             self._inputWidget_ = self._createInputWidget_(self._current_vartype_)
+
             if isinstance(self._inputWidget_, QtWidgets.QComboBox):
                 if self._current_vartype_ in self._value_choices_:
                     choices = self._value_choices_[self._current_vartype_]
