@@ -217,6 +217,13 @@ UnitTypes = collections.defaultdict(lambda: "NA",
 
 MissingType: typing.TypeAlias = type(MISSING)
 
+class CheckTypeResult(typing.NamedTuple):
+    value: bool
+    object_types: set
+    key_types: set
+    value_types: set
+    element_types: set
+
 # NOTE: 2024-07-28 15:46:49
 # these are utterly generic; almost surely you'd want to write your own
 # e.g. Cacna1c+/-, etc...
@@ -478,8 +485,7 @@ def sequence_element_type(s):
 def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
                 ref:typing.Union[type, typing.Sequence[type], typing.Set[type], typing._UnionGenericAlias],
                 use_mro:bool = False,
-                use_ref_mro:bool = False,
-                return_types: bool = False
+                use_ref_mro:bool = False
                 ) -> bool:
                 # check_elements:bool=False,
                 # check_keys:bool=False) -> bool:
@@ -513,11 +519,11 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     # NOTE: 2024-01-07 00:12:32
     # the following five variables are not currently used;
     # defined here for future code to check types nested in collections
-    t_keys = t_vals = t_elems = None
-    ref_keys = ref_vals = ref_elems = None
-    elems_OK = True
-    keys_OK = True
-    vals_OK = True
+    t_keys = t_vals = t_elems = set()
+    ref_keys = ref_vals = ref_elems = set()
+    # elems_OK = True
+    # keys_OK = True
+    # vals_OK = True
 
     if isinstance(t, type):
         # single type
@@ -528,12 +534,12 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
         t_set = set(itertools.chain_from_iterable([inspect.getmro(t_) for t_ in t])) if use_mro else {t}
 
     else:
-        # any object OTHER THAN a type
+        # any object OTHER THAN a type or sequence of types
         if issubclass(type(t), dict):
             # cache key/value types - not currently used
             # TODO 2024-01-06 23:54:37
             # write code to check these
-            t_keys, t_vals = tuple(map(lambda x: set(x), zip(*((type(k), type(v)) for k,v in t.items))))
+            t_keys, t_vals = tuple(map(lambda x: set(x), zip(*((type(k), type(v)) for k,v in t.items()))))
 
         elif issubclass(type(t), (list, tuple, set, collections.deque)):
             # cache element types
@@ -544,6 +550,8 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
         t = type(t)
         t_set = set(inspect.getmro(t)) if use_mro else {t}
 
+        # print(f"**\n\tt -> {t}\n\tt_set -> {t_set}\n\tt_elems -> {t_elems}\n\tt_keys -> {t_keys}\n\tt_vals -> t_vals")
+
     # else:
     #     raise TypeError(f"'t': Expecting a type, or a list, set, or tuple of types; instead, got {type(t).__name__}")
 
@@ -553,9 +561,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     elif isinstance(ref, (list, tuple, set)):
         # here, ref is a collection of types!
         result = any(check_type(t, r_) for r_ in ref)
-        if return_types:
-            return result, t_set, t_keys, t_vals, t_elems
-        return result
+        return CheckTypeResult(result, t_set, t_keys, t_vals, t_elems)
         # ref = set(itertools.chain.from_iterable([inspect.getmro(t_) for t_ in ref])) if use_ref_mro else {ref}
 
     elif type(ref).__module__ == "typing":
@@ -566,10 +572,12 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
             if len(ref_args) == 0:
                 raise RuntimeError(f"Cannot resolve {ref} with type arguments {ref_args}")
 
-            ref_set = set(itertools.chain.from_iterable(map(lambda x: inspect.getmro(typing.get_origin(x) or x), ref_args))) if use_ref_mro else set(map(lambda x: typing.get_origin(x) or x, ref_args))
+            ref_set = set(map(lambda x: typing.get_origin(x) or x, ref_args))
+            # ref_set = set(itertools.chain.from_iterable(map(lambda x: inspect.getmro(typing.get_origin(x) or x), ref_args))) if use_ref_mro else set(map(lambda x: typing.get_origin(x) or x, ref_args))
 
         else:
-            ref_set = {inspect.getmro(ref_origin)} if use_ref_mro else {ref_origin}
+            ref_set = {ref_origin}
+            # ref_set = {inspect.getmro(ref_origin)} if use_ref_mro else {ref_origin}
 
             if len(ref_args):
                 if issubclass(ref_origin, (dict, collections.abc.Mapping)):
@@ -588,13 +596,10 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
                     else:
                         ref_elems = set(ref_args)
 
-        # print(f"** ref_set: {ref_set}**\n")
+        # print(f"** ref_set: {ref_set}\n t_set: {t_set}**\n")
 
         if len(ref_set) == 0:
-            if return_types:
-                return False, t_set, t_keys, t_vals, t_elems
-
-            return False
+            return CheckTypeResult(False, t_set, t_keys, t_vals, t_elems)
 
         r_s = tuple(ref_set)
 
@@ -602,6 +607,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
         collection_OK = any(issubclass(t_, r_s) for t_ in t_set)
 
         if collection_OK:
+            # print(f"**\n\tcollection_OK:\n\tt -> {t}\n\tt_set -> {t_set}\n\tt_elems -> {t_elems}\n\tt_keys -> {t_keys}\n\tt_vals -> t_vals")
             # now check for its elements:
             if len(t_elems) and len(ref_elems):
                 # t is a sequence-like thing
@@ -616,10 +622,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
                     r_v = tuple(ref_vals)
                     collection_OK &= all(issubclass(t_, r_v) for t_ in t_vals)
 
-        if return_types:
-            return collection_OK, t_set, t_keys, t_vals, t_elems
-
-        return collection_OK
+        return CheckTypeResult(collection_OK, t_set, t_keys, t_vals, t_elems)
 
     else:
         raise TypeError(f"'ref': Expecting a type, or a list, set, or tuple of types; instead, got {type(ref).__name__}")
@@ -630,10 +633,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
     # print(f"datatypes.check_type:\n\tt_set -> {t_set},\n\tt_elems -> {t_elems},\n\tref_set -> {ref_set},\n\tref_elems -> {ref_elems},\n\tref_keys -> {ref_keys}")
 
     result = len(t_set & ref_set) > 0 or any(issubclass(v, tuple(ref_set)) for v in t_set)
-    if return_types:
-        return result, t_set, t_keys, t_vals, t_elems
-
-    return result
+    return CheckTypeResult(collection_OK, t_set, t_keys, t_vals, t_elems)
 
 def check_mapping_fields(x:dict, constraints:list) -> bool:
     if not isinstance(x, dict):

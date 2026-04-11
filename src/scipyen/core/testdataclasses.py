@@ -65,5 +65,6 @@ class TestData:
     a: str|int|typing.Sequence[int] = dataclasses.field(default_factory = str)
     # a: typing.Union[str, int, typing.Sequence[int]] = dataclasses.field(default_factory = str)
     b: typing.Optional[typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]] = None
+    c: typing.Optional[dict[int,str] | str] = None
     name: str = ""
 
