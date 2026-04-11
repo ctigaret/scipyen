@@ -533,6 +533,41 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
         # sequence of types
         t_set = set(itertools.chain_from_iterable([inspect.getmro(t_) for t_ in t])) if use_mro else {t}
 
+    elif type(t).__module__ == "typing":
+        t_origin = typing.get_origin(t)
+        t_args = typing.get_args(ref)
+
+        # print(f"**\n\tt -> {t}\n\tt_origin -> {t_origin}\n\tt_args -> {t_args}")
+
+        if t_origin == typing.Union:
+            # if len(t_args) == 0:
+            #     raise RuntimeError(f"Cannot resolve {t} with type arguments {t_args}")
+
+            t_set = set(map(lambda x: typing.get_origin(x) or x, t_args))
+
+
+        else:
+            t_set = {t_origin}
+            if len(t_args):
+                if issubclass(t_origin, (dict, collections.abc.Mapping)):
+                    if len(t_args) != 2:
+                        raise RuntimeError(f"Cannot resolve {t} with type arguments {t_args}")
+                    t_keys, t_vals = t_args
+                    t_keys = {t_keys}
+                    t_vals = {t_vals}
+
+                elif issubclass(t_origin, ((list, tuple, set, frozenset, collections.deque, collections.abc.Sequence))):
+                    if len(t_args) > 1:
+                        raise RuntimeError(f"Cannot resolve {t} with type arguments {t_args}")
+
+                    if typing.get_origin(t_args[0]) == typing.Union:
+                        t_elements = set(typing.get_args(t_args[0]))
+
+                    else:
+                        t_elements = set(t_args)
+
+        print(f"**\n\tt -> {t}\n\tt_origin -> {t_origin}\n\tt_args -> {t_args}")
+
     else:
         # any object OTHER THAN a type or sequence of types
         if issubclass(type(t), dict):
@@ -550,7 +585,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
         t = type(t)
         t_set = set(inspect.getmro(t)) if use_mro else {t}
 
-        # print(f"**\n\tt -> {t}\n\tt_set -> {t_set}\n\tt_elems -> {t_elems}\n\tt_keys -> {t_keys}\n\tt_vals -> t_vals")
+        # print(f"**\n\tt -> {t}\n\tt_set -> {t_set}\n\tt_elems -> {t_elems}\n\tt_keys -> {t_keys}\n\tt_vals -> {t_vals}")
 
     # else:
     #     raise TypeError(f"'t': Expecting a type, or a list, set, or tuple of types; instead, got {type(t).__name__}")
@@ -587,12 +622,13 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
                     ref_keys = {ref_keys}
                     ref_vals = {ref_vals}
 
-                if issubclass(ref_origin, (list, tuple, set, frozenset, collections.deque, collections.abc.Sequence)):
+                elif issubclass(ref_origin, (list, tuple, set, frozenset, collections.deque, collections.abc.Sequence)):
                     if len(ref_args) > 1:
                         raise RuntimeError(f"Cannot resolve {ref} with type arguments {ref_args}")
 
                     if typing.get_origin(ref_args[0]) == typing.Union:
                         ref_elems = set(typing.get_args(ref_args[0]))
+
                     else:
                         ref_elems = set(ref_args)
 

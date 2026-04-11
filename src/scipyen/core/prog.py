@@ -2386,14 +2386,13 @@ def is_hashable(x) -> bool:
 
     return ret
 
-
 def unravel_types(x) -> set:
     ret = set()
     origin = typing.get_origin(x)
     if origin is None:
         if isinstance(x, type):
             ret.add(x)
-        elif isinstance(x, typing.Sequence):
+        elif isinstance(x, (typing.Sequence, typing.Set)):
             if all(isinstance(v, type) for v in x):
                 ret |= set(x)
             else:

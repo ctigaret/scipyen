@@ -2397,6 +2397,7 @@ class GenericInputWidget(QtWidgets.QFrame):
                             type(dataclasses.MISSING)
                             ] = dataclasses.MISSING,
                  default = dataclasses.MISSING,
+                 value = dataclasses.MISSING,
                  valueChoices: typing.Optional[
                      typing.Union[typing.Set, typing.Sequence]
                      ] = None,
@@ -2407,6 +2408,7 @@ class GenericInputWidget(QtWidgets.QFrame):
 
         self._inputWidget_ = None
         self._typeCombo_ = None
+        self._value_ = dataclasses.MISSING
 
         if varType == dataclasses.MISSING:
             # NOTE: 2026-04-06 22:13:01
@@ -2422,11 +2424,15 @@ class GenericInputWidget(QtWidgets.QFrame):
         else:
             if isinstance(varType, InputSpec):
                 default = varType.default
-                valueChoices = varType.choices
+                valueChoices = varType.allowed_values
+                if value is dataclasses.MISSING and varType.value is not dataclasses.MISSING:
+                    value = varType.value
                 varType = varType.type
 
             elif isinstance(varType, dataclasses.Field):
-                varType, default = InputSpec.parse_args(varType, None)
+                varType, default, value_ = InputSpec.parse_args(varType, None)
+                if value is dataclasses.MISSING and value is not dataclasses.MISSING:
+                    value = value_
 
             elif isinstance(varType, typing._Final):
                 t = prog.unwind_type(x)
@@ -2438,14 +2444,23 @@ class GenericInputWidget(QtWidgets.QFrame):
 
                 varType = t
 
+            print(f"{self.__class__.__name__}.__init__ -> varType is a {type(varType).__name__}: {varType}")
+
+            if isinstance(varType, type) and varType in self.SUPPORTED_TYPES:
+                self._vartype_ = varType
+
+            # elif isinstance(varType, (typing.Set, typing.Sequence)):
+            #     if len(varType):
+
             if not ((isinstance(varType, type) and varType in self.SUPPORTED_TYPES)
                     or (
                         isinstance(varType, (typing.Set, typing.Sequence))
                         and len(varType)>0
-                        and all((isinstance(v, type) and v in self.SUPPORTED_TYPES) for v in varType)
+                        and all(dt.check_type(v, self.SUPPORTED_TYPES).value for v in varType)
+                        # and all((isinstance(v, type) and dt.check_type(v, self.SUPPORTED_TYPES).value) for v in varType)
                         )
                     ):
-                raise TypeError(f"Expecting a type, or a non-empty set or sequence of types, with all types being one of {self.SUPPORTED_TYPES}")
+                raise TypeError(f"Expecting a type, or a non-empty set or sequence of types, with all types being one of {self.SUPPORTED_TYPES}; instead, got {varType}")
 
             self._vartype_ = varType
 
@@ -2453,6 +2468,7 @@ class GenericInputWidget(QtWidgets.QFrame):
             self._vartype_names_ = list()
             self._current_vartype_ = dataclasses.MISSING
             self._default_ = dataclasses.MISSING
+
         else:
             if isinstance(self._vartype_, type):
                 self._vartype_names_ = self._vartype_.__name__
@@ -2497,10 +2513,17 @@ class GenericInputWidget(QtWidgets.QFrame):
 
         self._validator_ = None
 
+        if value is not dataclasses.MISSING:
+            if dt.check_type(value, self._vartype_).value:
+                self._value_ = value
+
+        else:
+            self._value_ = self._default_
+
         # print(f"{self.__class__.__name__}.__init__ -> _vartype_ = {self._vartype_}, _default_ = {self._default_}")
         self._configureUI_()
 
-        self._cached_value_ = {self._current_vartype_: self._default_}
+        self._cached_value_ = {self._current_vartype_: self._value_}
 
     def _configureUI_(self):
         self._layout_ = QtWidgets.QHBoxLayout(self)
@@ -2513,6 +2536,7 @@ class GenericInputWidget(QtWidgets.QFrame):
     def _setup_widgets_(self):
         if self._vartype_ == dataclasses.MISSING:
             self._inputWidget_ = self._createInputWidget_(self._vartype_)
+
         elif isinstance(self._vartype_, type):
             self._inputWidget_ = self._createInputWidget_(self._vartype_)
             self._typeCombo_ = None
@@ -2771,11 +2795,12 @@ class GenericInputWidget(QtWidgets.QFrame):
                             c: typing.Optional[typing.Sequence] = None
                             ) -> QtWidgets.QWidget:
         # print(f"{self.__class__.__name__}._createInputWidget_({t})")
+        value = self._default_ if self._value_ is dataclasses.MISSING else self._value_
         if t in self._value_choices_ and len(self._value_choices_[t]):
             w = QtWidgets.QComboBox(parent = self)
             w.setEditable(False)
             w.insertItems(0, list(map(lambda v: f"{v}",  self._value_choices_[t])))
-            if isinstance(self._default_, t) and self._default_ in  self._value_choices_[t]:
+            if isinstance(value, t) and value in  self._value_choices_[t]:
                 ndx =  self._value_choices_[t].index(self._default_)
                 w.setCurrentIndex(ndx)
             else:
@@ -2787,15 +2812,15 @@ class GenericInputWidget(QtWidgets.QFrame):
             if t == bool:
                 w = QtWidgets.QCheckBox(parent = self)
                 w.setTristate(False)
-                if isinstance(self._default_, bool):
-                    w.setChecked(self._default_ is True)
+                if isinstance(value, bool):
+                    w.setChecked(value is True)
                 w.toggled.connect(self._slot_inputValueChanged)
 
             elif t == Tribool:
                 w = QtWidgets.QCheckBox(parent = self)
                 w.setTristate(True)
-                if isinstance(self._default_, Tribool):
-                    checkState = QtCore.Qt.Checked if self._default_.value is True else QtCore.Qt.Unckecked if self._default_.value is False else QtCore.Qt.PartiallyChecked
+                if isinstance(value, Tribool):
+                    checkState = QtCore.Qt.Checked if value.value is True else QtCore.Qt.Unckecked if value.value is False else QtCore.Qt.PartiallyChecked
                     w.setCheckState(checkState)
                 w.toggled.connect(self._slot_inputValueChanged)
 
@@ -2804,8 +2829,8 @@ class GenericInputWidget(QtWidgets.QFrame):
                 w.setMinimum(-2147483648)
                 w.setMaximum(2147483647)
 
-                if isinstance(self._default_, t):
-                    w.setValue(self._default_)
+                if isinstance(value, t):
+                    w.setValue(value)
                 w.valueChanged.connect(self._slot_inputValueChanged)
 
             elif t in (float, np.floating):
@@ -2813,16 +2838,16 @@ class GenericInputWidget(QtWidgets.QFrame):
                 w.setMinimum(sys.float_info.min)
                 w.setMaximum(sys.float_info.max)
 
-                if isinstance(self._default_, t):
-                    w.setValue(self._default_)
+                if isinstance(value, t):
+                    w.setValue(value)
                 w.valueChanged.connect(self._slot_inputValueChanged)
 
             elif t == (complex, np.complexfloating):
                 w = ComplexSpinBox(parent = self)
                 w.setMinimum(sys.float_info.min)
                 w.setMaximum(sys.float_info.max)
-                if isinstance(self._default_, t):
-                    w.setValue(self._default_)
+                if isinstance(value, t):
+                    w.setValue(value)
                 w.sig_valueChanged.connect(self._slot_inputValueChanged)
 
             elif t == str:
@@ -2831,47 +2856,51 @@ class GenericInputWidget(QtWidgets.QFrame):
                 w.undoAvailable=True
                 w.redoAvailable=True
                 w.setClearButtonEnabled(True)
-                if isinstance(self._default_, str):
-                    w.setText(self._default_)
+                if isinstance(value, str):
+                    w.setText(value)
                 w.textChanged.connect(self._slot_inputValueChanged)
 
             elif t == pq.UnitQuantity:
                 w = QuantityChooserWidget(parent=self)
-                if self._default_ is None:
-                    self._default_ = pq.dimensionless
-                elif isinstance(self._default_, pq.Quantity) and not isinstance(self._default_, pq.UnitQuantity):
-                    if len(self._default_.units.dimensionality) == 1:
-                        self._default_ = self._default_.units.dimensionality[0][0]
+                if value is None:
+                    value = pq.dimensionless
+                elif isinstance(value, pq.Quantity) and not isinstance(value, pq.UnitQuantity):
+                    if len(value.units.dimensionality) == 1:
+                        if value == self._default_:
+                            self._default_ = self._default_.units.dimensionality[0][0]
+                            # self._value_ = self._value_.units.dimensionality[0][0]
+                        # else:
+                        #     self._value_ = self._value_.units.dimensionality[0][0]
 
-                if isinstance(self._default_, pq.UnitQuantity):
-                    w.setValue(self._default_)
+                if isinstance(value, pq.UnitQuantity):
+                    w.setValue(value)
 
                 w.valuechanged.connect(self._slot_inputValueChanged)
 
             elif t in (pq.Quantity, np.ndarray):
-                if isinstance(self._default_, t):
-                    if self._default_.size == 1:
+                if isinstance(value, t):
+                    if value.size == 1:
                         w = QuantitySpinBox(parent=self)
                     else:
                         w = ArrayEditorWidget(parent=self)
-                    w.setValue(self._default_)
+                    w.setValue(value)
                 else:
                     w = QuantitySpinBox(parent=self)
 
                 w.sig_valueChanged.connect(self._slot_inputValueChanged)
 
             elif t in (tuple, list, set):
-                if isinstance(self._default_, t):
-                    if all(isinstance(v, numbers.Number) for v in self._default_):
+                if isinstance(value, t):
+                    if all(isinstance(v, numbers.Number) for v in value):
                         w = ArrayEditorWidget(parent=self)
-                        w.setValue(self._default_)
+                        w.setValue(value)
 
                     else:
                         raise TypeError("Only sequence of numbers are currently supported")
 
             elif t is type(None):
                 w = QtWidgets.QLabel(parent=self)
-                w.setText(f"{self._default_}")
+                w.setText(f"{value}")
 
             elif t == dataclasses.MISSING:
                 # FIXME: 2026-04-06 22:10:42
@@ -2894,13 +2923,13 @@ class GenericInputWidget(QtWidgets.QFrame):
 
                 if self._current_vartype_  == Tribool:
                     v_ = None if state == QtCore.Qt.PartiallyChecked else True if state == QtCore.Qt.Checked else False
-                    self._default_ = Tribool(v_)
+                    self._value_ = Tribool(v_)
 
                 elif self._current_vartype_ == bool:
                     v_ = state == QtCore.Qt.Checked
-                    self._default_ = v_
+                    self._value_ = v_
             else:
-                self._default_ = w.value()
+                self._value_ = w.value()
 
         w.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding,
                         QtWidgets.QSizePolicy.Fixed)
