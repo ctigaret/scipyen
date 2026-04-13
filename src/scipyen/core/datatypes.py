@@ -531,7 +531,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
 
     elif isinstance(t, (tuple, list, set)) and all(isinstance(t_, type) for t_ in t):
         # sequence of types
-        t_set = set(itertools.chain_from_iterable([inspect.getmro(t_) for t_ in t])) if use_mro else {t}
+        t_set = set(itertools.chain_from_iterable([inspect.getmro(t_) for t_ in t])) if use_mro else set(t)
 
     elif type(t).__module__ == "typing":
         t_origin = typing.get_origin(t)

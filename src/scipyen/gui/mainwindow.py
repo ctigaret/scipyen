@@ -190,7 +190,7 @@ import pingouin as pn  # nicer stats
 import mpmath as mpm
 #import researchpy as rp  # for use with DataFrames & stats -- not here ?!?
 import joblib as jl  # to use functions as pipelines: lightweight pipelining in Python
-import sklearn as sk  # machine learning, also nice plot_* functionality
+# import sklearn as sk  # machine learning, also nice plot_* functionality
 import seaborn as sb  # statistical data visualization
 # print("mainwindow.py __name__ =", __name__)
 

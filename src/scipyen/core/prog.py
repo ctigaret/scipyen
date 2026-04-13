@@ -2135,7 +2135,8 @@ def unwind_type_sig(x, include_x:bool=False):
     return unwind_type(x, include_x, visited)
 
 # def unwind_type(x, include_x:bool=False, visited:set = set()):
-def unwind_type(x, include_x:bool=False, visited: typing.Optional[set] = None) -> set:
+def unwind_type(x, include_x:bool=False, use_mro:bool = False,
+                visited: typing.Optional[set] = None) -> set:
     r"""Unwinds a type to its component types.
 This includes special aliases defined in the ``types`` and ``typing`` standard
 library modules.
@@ -2165,11 +2166,21 @@ library modules.
     if not isinstance(visited, set):
         visited = set()
 
+    t_set = t_keys = t_vals = t_elems = set()
+
+
     if isinstance(x, type):
         visited.add(x)
+        t_set = set(inspect.getmro(t)) if use_mro else {t}
         return visited
 
-    elif isinstance(x, TYPING_TYPES):
+    elif isinstance(t, (tuple, list, set)) and all(isinstance(t_, type) for t_ in t):
+        # sequence of types
+        t_set = set(itertools.chain_from_iterable([inspect.getmro(t_) for t_ in t])) if use_mro else set(t)
+
+    elif isinstance(x, TYPING_TYPES) or type(x).__module__ == "typing":
+        t_origin = typing.get_origin(t)
+
         if hasattr(x, "__args__"):
             unwind_type(x.__args__, visited=visited)
 
@@ -2394,17 +2405,20 @@ def is_hashable(x) -> bool:
     return ret
 
 def unravel_types(x) -> set:
+    t_set = t_keys = t_vals = t_elems = set()
     ret = set()
     origin = typing.get_origin(x)
     if origin is None:
         if isinstance(x, type):
-            ret.add(x)
+            t_set.add(x)
 
         elif isinstance(x, (typing.Sequence, typing.Set)):
-            if all(isinstance(v, type) for v in x):
-                ret |= set(x)
-            else:
-                ret.add(type(x))
+            if all((isinstance(v, type) or type(v).__module__ in ("typing", "builtins")) for v in x):
+                for v in x:
+                    if isinstance(v, type):
+                        ret.add(v)
+                    else:
+                        ret |= unravel_types(v)
 
         else:
             ret.add(type(x))
