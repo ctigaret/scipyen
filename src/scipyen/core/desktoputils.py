@@ -168,6 +168,29 @@ def standardIconName(locationName: str, all_folder_icons: bool = False) -> str:
     else:
         return "folder"
 
+def testFilesystemMountUnmountOperation(x:object) -> bool:
+    return (
+            isinstance(x, dict)
+            and isinstance(x.get('org.freedesktop.UDisks2.Job', None), dict)
+            and x['org.freedesktop.UDisks2.Job'].get('Operation', '') in ('filesystem-mount', 'filesystem-unmount')
+            )
+
+def parseUDIsksFSMountOperationJobs(msg: object) -> list:
+    if __has_qtdbus__ and isinstance(msg, QtDBus.QDBusMessage):
+        msg_args = msg.arguments()
+        # print(f'desktoputils.parseUDIsksJob -> \n\tsignature: {msg.signature()!r},\n\targuments: {msg_args!r}')
+
+        # testFilesystemMountUnmountOperation = lambda x: (
+        #     isinstance(x, dict)
+        #     and isinstance(x.get('org.freedesktop.UDisks2.Job', None), dict)
+        #     and x['org.freedesktop.UDisks2.Job'].get('Operation', '') in ('filesystem-mount', 'filesystem-unmount')
+        #     )
+
+        return list(filter(lambda a: testFilesystemMountUnmountOperation(a), msg_args))
+
+    return list()
+
+
 
 def isUnixHiddenLocation(p: typing.Union[pathlib.Path, QtCore.QUrl, str]) -> bool:
     if isinstance(p, str):

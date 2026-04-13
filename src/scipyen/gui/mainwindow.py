@@ -1869,11 +1869,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._wm_id_ = int(self.winId())
         self._globalMenuServiceName_ = None
         self._dbusAppMenuInterface_ = None
+        self._systemDBusConnection_ = None
         self._dbusInterface_ = None
         self._dbusSessionBus_ = None
         self._dbusUniqueName_ = None
         if not QtWidgets.QApplication.instance().testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
             if desktoputils.is_kde() or desktoputils.is_gnome() and __has_qtdbus__:
+                self._systemDBusConnection_ = QtDBus.QDBusConnection.systemBus()
                 self._dbusSessionBus_ = QtDBus.QDBusConnection.sessionBus() # also a QDBusConnection
                 self._dbusUniqueName_ = self._dbusSessionBus_.baseService() # a str, empty if NOT connected to dbus dameon
                 appMenuServiceNames = list(name for name in self._dbusSessionBus_.interface().registeredServiceNames().value() if "AppMenu" in name)
@@ -1882,6 +1884,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     self._dbusAppMenuInterface_ = QtDBus.QDBusInterface(self._globalMenuServiceName_, "/" + self._globalMenuServiceName_.replace(".", "/"),
                                                   self._globalMenuServiceName_, QtDBus.QDBusConnection.sessionBus(), self)
                     self._dbusAppMenuInterface_.setTimeout(100)
+
+                try:
+                    uDisks_service = "org.freedesktop.UDisks2"
+                    uDisks_path = "/org/freedesktop/UDisks2"
+                    uDisks_iFace = "org.freedesktop.DBus.ObjectManager"
+                    self._systemDBusConnection_.registerObject("/Scipyen", self)
+                    self._systemDBusConnection_.connect(uDisks_service, uDisks_path, uDisks_iFace, "InterfacesAdded", self._slot_uDisk_changes)
+                    self._systemDBusConnection_.connect(uDisks_service, uDisks_path, uDisks_iFace, "InterfacesRemoved", self._slot_uDisk_changes)
+
+                except:
+                    traceback.print_exc()
                 # TODO 2025-06-30 23:47:57 finalize me !!!
 #                 if isinstance(self._dbusUniqueName_, str) and len(self._dbusUniqueName_.strip()):
 #
@@ -7294,10 +7307,16 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             try:
                 for item in self._recentFiles.keys():
-                    itemName = pathlib.Path(item).name
+                    itemPath  = pathlib.Path(item)
+                    itemName = itemPath.name
+
                     itemText = f"{itemName} [{item}]"
                     action = self.recentFilesMenu.addAction(itemText)
                     action.triggered.connect(self.slot_loadRecentFile)
+                    if not itemPath.exists():
+                        action.setEnabled(False)
+                    else:
+                        action.setEnabled(True)
             except:
                 traceback.print_exc()
 
@@ -7306,6 +7325,34 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 clearAction = self.recentFilesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
                     "Clear Recent Files List")
                 clearAction.triggered.connect(self._clearRecentFiles_)
+
+    if __has_qtdbus__:
+        @Slot(QtDBus.QDBusMessage)
+        def _slot_uDisk_changes(self, msg):
+            m_um_Ops = desktoputils.parseUDIsksFSMountOperationJobs(msg)
+            # print(f'{self.__class__.__name__}._slot_uDisk_changes: {m_um_Ops}')
+            if len(m_um_Ops):
+                if not self.fileSystemModel.testOption(QtGui.QFileSystemModel.DontWatchForChanges):
+                    self.fileSystemModel.setOption(QtGui.QFileSystemModel.DontWatchForChanges, True)
+                timer = QtCore.QTimer(self)
+                timer.setSingleShot(True)
+                timer.timeout.connect(self._slot_refreshrecentDirsAndFileMenus_)
+                timer.start(1000)
+
+
+    @Slot()
+    def _slot_refreshrecentDirsAndFileMenus_(self):
+        self._slot_refreshRecentFilesMenu_()
+        self._refreshRecentDirectoriesMenu_()
+        try:
+            if not pathlib.Path(self.currentDirectory).exists():
+                self.slot_changeDirectory(self.userHome)
+        except:
+            traceback.print_exc()
+
+        if self.fileSystemModel.testOption(QtGui.QFileSystemModel.DontWatchForChanges):
+            self.fileSystemModel.setOption(QtGui.QFileSystemModel.DontWatchForChanges, False)
+
 
 
     def _clearRecentFiles_(self):
@@ -7337,7 +7384,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         dirsNames = list(self._recentDirectories)[startIndex : lastIndex]
 
+
         dirsActions = list(map(lambda x: QAction(guiutils.csqueeze(x.replace('&', '&&'), 60), self), dirsNames))
+
         for action in dirsActions:
             action.triggered.connect(self._slot_recentDirActionTriggered)
 
@@ -7350,6 +7399,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         for k,i in enumerate(range(startIndex, lastIndex)):
             dirsActions[k].setData(i)
             dirsActions[k].setText(dirsNames[k])
+            dirPath = pathlib.Path(dirsNames[k])
+            try:
+                dirsActions[k].setEnabled(dirPath.exists())
+            except:
+                # traceback.print_exc()
+                dirsActions[k].setEnabled(False)
             # dirsActions[k].triggered.connect(self.slot_changeLocation)
             menu.addAction(dirsActions[k])
 
@@ -7964,7 +8019,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         from gui import guiutils
         index = action.data()
         # print(f"{self.__class__.__name__}.slot_recentDirActivated: index = {index}")
-        if index < 0 or index >= len(self._recentDirectories):
+        if not isinstance(index, int) or index < 0 or index >= len(self._recentDirectories):
             return
         path = pathlib.Path(self._recentDirectories[index]).absolute() #.resolve()   # the path to the subdirectory pointed to by the action
         self._recentDirectoryActioned(path)
