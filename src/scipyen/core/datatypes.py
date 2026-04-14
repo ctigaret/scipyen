@@ -556,7 +556,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
                     t_keys = {t_keys}
                     t_vals = {t_vals}
 
-                elif issubclass(t_origin, ((list, tuple, set, frozenset, collections.deque, collections.abc.Sequence))):
+                elif issubclass(t_origin, (list, tuple, set, frozenset, collections.deque, collections.abc.Sequence)):
                     if len(t_args) > 1:
                         raise RuntimeError(f"Cannot resolve {t} with type arguments {t_args}")
 

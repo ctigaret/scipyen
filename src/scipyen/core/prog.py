@@ -132,6 +132,12 @@ class NoData:
     def __repr__(self):
         return "NoData"
 
+class TypesSpec(typing.NamedTuple):
+    object_types: type | tuple[type]
+    key_types: type | tuple[type]
+    value_types: type | tuple[type]
+    element_types: type | tuple[type]
+
 
 class ArgumentError(Exception):
     pass
@@ -2405,29 +2411,42 @@ def is_hashable(x) -> bool:
     return ret
 
 def unravel_types(x) -> set:
-    t_set = t_keys = t_vals = t_elems = set()
-    ret = set()
+    obj_types = key_types = val_types = elem_types = tuple()
     origin = typing.get_origin(x)
+    args = typing.get_args(x)
+    # print(f"prog.unravel_types({x}: {type(x).__name__}):\n\torigin = {origin}: {type(origin).__name__}\n\targs = {args}")
     if origin is None:
         if isinstance(x, type):
-            t_set.add(x)
+            obj_types = (x, )
 
         elif isinstance(x, (typing.Sequence, typing.Set)):
-            if all((isinstance(v, type) or type(v).__module__ in ("typing", "builtins")) for v in x):
-                for v in x:
-                    if isinstance(v, type):
-                        ret.add(v)
-                    else:
-                        ret |= unravel_types(v)
+            if all((isinstance(v, type) or type(v).__module__ in ("typing", "builtins", "types")) for v in x):
+                obj_types = tuple(map(lambda x_: unravel_types(x_), x))
 
         else:
-            ret.add(type(x))
+            obj_types = (type(x), )
 
-    else:
-        args = unravel_types(typing.get_args(x))
-        ret |= args
+    elif isinstance(origin, type):
+        if origin == types.UnionType:
+            # print(f"\tUnionType")
+            obj_types = tuple(map(lambda a_: unravel_types(a_), args))
 
-    return ret
+        elif issubclass(origin, (dict, collections.abc.Mapping)):
+            assert len(args) == 2, f"Invalid type arguments: {args} for origin {origin} of {x}: {type(x).__name__}"
+            obj_types = (origin, )
+            key_types, val_types = tuple(map(lambda a_: unravel_types(a_), args))
+            # print(f"\t -> key_types: {key_types}\n\t -> val_types: {val_types}")
+
+        elif issubclass(origin, (list, tuple, set, frozentset, collections.deque, collections.abc.Sequence)):
+            assert len(args) <=1, f"Invalid type arguments: {args} for origin {origin} of {x}: {type(x).__name__}"
+            obj_types = (origin, )
+            elem_types = tuple(map(lambda t_: unravel_types(t_), args[0]))
+            # print(f"\t -> elem_types: {elem_types}")
+
+        else:
+            obj_types = (origin, )
+
+    return TypesSpec(obj_types, key_types, val_types, elem_types)
 
 def is_type_or_subclass(x: typing.Any, y:typing.Union[type, typing._Final]) -> bool:
     if not isinstance(y, (type, typing._Final)):
