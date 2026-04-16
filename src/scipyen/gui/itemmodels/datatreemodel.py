@@ -1670,7 +1670,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(TriggerEvent)
     def __parseObject_(self: typing.Self, obj: typing.Union[neo.Event, DataMark,
                                                TriggerEvent],
-          choicea: dict = dict(),
+          choices: dict = dict(),
           _: bool = True) -> tuple:
         objId = id(obj)
         objType = type(obj)
