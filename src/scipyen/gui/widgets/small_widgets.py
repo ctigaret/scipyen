@@ -2444,7 +2444,7 @@ class GenericInputWidget(QtWidgets.QFrame):
 
                 varType = t
 
-            print(f"{self.__class__.__name__}.__init__ -> varType is a {type(varType).__name__}: {varType}")
+            # print(f"{self.__class__.__name__}.__init__ -> varType is a {type(varType).__name__}: {varType}")
 
             if isinstance(varType, type) and varType in self.SUPPORTED_TYPES:
                 self._vartype_ = varType

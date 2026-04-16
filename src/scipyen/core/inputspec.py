@@ -66,7 +66,8 @@ class InputSpec():
             # extracts expected type and default value from the field's attributes;
             #
             # ignores d, as a dataclasses.Field provides their own default value
-            mytype = prog.unwind_type(x.type)
+            # mytype = prog.unwind_type(x.type)
+            mytype = prog.unravel_types(x.type) # NOTE: 2026-04-16 22:08:06 this is a TypeSpec
             # print(f"\n***\nInputSpec.parse_args(x field) -> mytype = {mytype}")
 
             # NOTE: 2026-04-05 16:53:34
@@ -78,10 +79,14 @@ class InputSpec():
             else:
                 default = x.default_factory()
 
-            # possibly a noop -- when field annotation results in a field
-            # "type" attribute of 'typing.Optional', the NoneType is already
-            # present in the mytype set
-            mytype.add(type(default))
+            def_type = prog.unravel_types(default)
+            if def_type not in mytype.object_types:
+                mytype.add(def_type)
+
+            # # possibly a noop -- when field annotation results in a field
+            # # "type" attribute of 'typing.Optional', the NoneType is already
+            # # present in the mytype set
+            # mytype.add(type(default))
 
             typing_types = tuple(filter(lambda t: isinstance(t, prog.TYPING_TYPES), mytype))
 

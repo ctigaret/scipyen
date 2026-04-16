@@ -133,10 +133,10 @@ class NoData:
         return "NoData"
 
 class TypesSpec(typing.NamedTuple):
-    object_types: type | tuple[type]
-    key_types: type | tuple[type]
-    value_types: type | tuple[type]
-    element_types: type | tuple[type]
+    object_types: type | tuple[type | typing.Self]
+    key_types: type | tuple[type | typing.Self]
+    value_types: type | tuple[type | typing.Self]
+    element_types: type | tuple[type | typing.Self]
 
     def check_type(self, t: typing.Union[type, typing.Self]):
         result = any(t_ in self.object_types for t_ in t.object_types) if isinstance(t, self.__class__) else t in self.object_types if isinstance(t, type) else False
@@ -147,6 +147,14 @@ class TypesSpec(typing.NamedTuple):
             result &= len(self.value_types) > 0 and len(t_spec.value_types) > 0 and all(t_ in self.value_types for t_ in t_spec.value_types)
             result &= len(self.element_types) > 0 and len(t_spec.element_types) > 0 and all(t_ in self.element_types for t_ in t_spec.element_types)
         return result
+
+    def add(self, x:typing.Self) -> typing.Self:
+        if isinstance(self.object_types, (type, self.__class__)):
+            new_object_types = (self.object_types, x)
+        else:
+            new_object_types = self.object_types + (x, )
+        return self.__class__(new_object_types,
+                              self.key_types, self.value_types, self.element_types)
 
 class ArgumentError(Exception):
     pass
