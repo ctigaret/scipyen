@@ -3116,7 +3116,7 @@ anything else       anything else       ❌
 
         Var-keyword arguments ("name=value" pairs):
         ===========================================
-        cursorType: str or SignalCursorsTypes enum value
+        cursorType: str or SignalCursorTypes enum value
                     When a str it should be one of "c", "v", "h", respectively,
                     for crosshair, vertical, horizontal cursors.
 
@@ -3255,6 +3255,31 @@ anything else       anything else       ❌
                        axis = axis,
                        editFirst = showEditor)
 
+    def addVerticalSignalCursorFromDataCursor(self, c: DataCursor,
+                                label: typing.Optional[
+                                    typing.Union[int, str, pg.PlotItem]
+                                    ] = None,
+                                name: typing.Optional[
+                                    typing.Union[int, str, pg.PlotItem]
+                                    ] = None,
+                                follows_mouse: bool = False,
+                                axis: typing.Optional[int] = None,
+                                editFirst: bool=False,
+                                **kwargs) -> None:
+
+        assert(isinstance(c, DataCursor)), f"Expecting a DataCursor; isntead, got a {type(c).__name__}"
+
+        if label is None:
+            if isinstance(c.name, str) and len(c.name.strip()) > 0:
+                label = c.name
+
+        if name is None:
+            if isinstance(c.name, str) and len(c.name.strip()) > 0:
+                name = c.name
+
+        self.addCursor(cursorType = SignalCursorTypes.vertical,
+                       x = c.coord, xwindow = c.span,
+                       name = name, relative=True)
 
     def addCursor(self, cursorType: typing.Optional[typing.Union[str, SignalCursorTypes]] = None,
                   x: typing.Optional[typing.Union[numbers.Number, DataCursor]] = None,
@@ -3268,7 +3293,7 @@ anything else       anything else       ❌
                   follows_mouse: bool = False,
                   axis: typing.Optional[int] = None,
                   editFirst: bool=False,
-                  **kwargs):
+                  **kwargs) -> None:
         r""" Add a cursor to the selected axes in the signal viewer window.
 
         When no data has been plotted, the cursor is created in the scene.
@@ -3281,6 +3306,8 @@ anything else       anything else       ❌
         x: None, float (cursor's horizontal coordinate in axis units) or a DataCursor.
                 When None, the cursor will be placed in the middle of the X range
                 of the selected axis.
+
+        x can also be a DataCursor -> vertical or horizintal cursor
 
         y: None, float (cursor's vertical coordinate in axis unitss), or a DataCursor.
                 When None, the cursor will be placed in the middle of the Y range
@@ -4079,7 +4106,7 @@ anything else       anything else       ❌
             axis = self.signalsLayout.scene()
 
         elif not isinstance(axis, (pg.PlotItem, pg.GraphicsScene)):
-            raise TypeError("axes expected to be an int, a str ('all' or 'a'), a pyqtgraph.PlotItem, a pyqtgraph.GraphicsScene, or None; got %s instead" % type(axes).__name__)
+            raise TypeError("axis expected to be an int, a str ('all' or 'a'), a pyqtgraph.PlotItem, a pyqtgraph.GraphicsScene, or None; got %s instead" % type(axis).__name__)
 
         #### END Figure out cursors destination: axis or scene
 
@@ -4134,6 +4161,20 @@ anything else       anything else       ❌
         #
         if any(isinstance(v, (DataCursor, Interval)) for v in (x,y)):
             cursor_type = SignalCursorTypes.getType((isinstance(y, (DataCursor, Interval)), isinstance(x, (DataCursor,Interval))))
+            if label is None or (isinstance(label, str) and len(label.strip()) == 0):
+                if isinstance(x, (DataCursor, Interval)):
+                    label = getattr(x, "name", None)
+
+                if isinstance(y, (DataCursor, Interval)):
+                    y_label = getattr(y, "name", None)
+
+                if isinstance(label, str) and len(label.strip()):
+                    if isinstance(y_label, str) and len(y_label.strip()):
+                        label = f"{label}_{y_label}"
+
+                elif isinstance(y_label, str) and len(y_label.strip()):
+                    label = y_label
+
             # print(f"{self.__class__.__name__}._addCursor_ (DataCursor): cursor_type = {cursor_type}")
         else:
             if isinstance(cursor_type, SignalCursorTypes):
@@ -4222,7 +4263,7 @@ anything else       anything else       ❌
             elif isinstance(y, pq.Quantity):
                 if yUnits != ax_yUnits:
                     assert scq.unitsConvertible(y.units, ax_yUnits), f"y.units {y.units} and axis Y units {ax_yUnits} are incompatible"
-                    y = rescale(ax_yUnits)
+                    y = y.rescale(ax_yUnits)
                     yUnits = y.units
 
                 y = float(y.magnitude.flatten()[0])
@@ -4326,7 +4367,8 @@ anything else       anything else       ❌
                     label = "_".join(labels)
 
             if label is None:
-                crsId = "%s%s" % (crsPrefix, str(nCursors))
+                # crsId = "%s%s" % (crsPrefix, str(nCursors))
+                crsId = f"{crsPrefix}{nCursors}"
 
             else:
                 crsId = label
@@ -4334,7 +4376,9 @@ anything else       anything else       ❌
         else:
             currentCursorLabels = list(cursorDict.keys() )
 
-            crsId = counter_suffix(label, currentCursorLabels)
+            crsId = counter_suffix(label, currentCursorLabels, returns_counter=False)
+
+        print(f"{self.__class__.__name__}._addCursor_: crsId -> {crsId}")
 
         if precision is None:
             if isinstance(axis, pg.PlotItem):

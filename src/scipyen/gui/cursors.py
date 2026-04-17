@@ -529,6 +529,7 @@ class SignalCursor(QtCore.QObject):
         if v:
             # set up the vertical InfiniteLine
             if not isinstance(self._vl_, pg.InfiniteLine):
+                # label = f"{self._cursorId_}: value: {self._v}"
                 label = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_) if self._show_value_ else self._cursorId_
                 #print(self._value_precision_)
                 self._vl_ = CursorLine(pos=pos, 

@@ -464,7 +464,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         if not issubclass(
             type(obj), NOTMEMOIZED + PODS
         ):
-            if objId in self._visited_ and objDict["objectType"] == self._visited_[objId][-1]:
+            if objId in self._visited_ and objDict["objType"] == self._visited_[objId][-1]:
                 visited = self._visited_[objId]
 
         rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType, visited)
