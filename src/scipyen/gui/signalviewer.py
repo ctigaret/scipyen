@@ -4113,10 +4113,11 @@ anything else       anything else       ❌
         #### BEGIN sort out cursor windows (and units, 1st pass) -- TODO 2025-07-14 22:40:39 streamline this
         if xwindow is None:
             if isinstance(x, DataCursor):
-                xwindow = x.span
                 if isinstance(xwindow, pq.Quantity):
                     xUnits = xwindow.units
                     xwindow = float(xwindow.magnitude.flatten()[0])
+                else:
+                    xwindow = float(x.span[0]) if isinstance(x.span, np.ndarray) else float(x.span)
 
             elif isinstance(x, Interval):
                 xwindow = x.durations[0]
@@ -4134,10 +4135,11 @@ anything else       anything else       ❌
 
         if ywindow is None:
             if isinstance(y, DataCursor):
-                ywindow = y.span
                 if isinstance(ywindow, pq.Quantity):
                     yUnits = ywindow.units
                     ywindow = float(ywindow.magnitude.flatten()[0])
+                else:
+                    ywindow = float(y.span[0]) if isinstance(y.span, np.ndarray) else float(y.span)
 
             elif isinstance(y, Interval):
                 ywindow = y.durations[0]
@@ -4167,6 +4169,8 @@ anything else       anything else       ❌
 
                 if isinstance(y, (DataCursor, Interval)):
                     y_label = getattr(y, "name", None)
+                else:
+                    y_label = ""
 
                 if isinstance(label, str) and len(label.strip()):
                     if isinstance(y_label, str) and len(y_label.strip()):
@@ -4378,7 +4382,7 @@ anything else       anything else       ❌
 
             crsId = counter_suffix(label, currentCursorLabels, returns_counter=False)
 
-        print(f"{self.__class__.__name__}._addCursor_: crsId -> {crsId}")
+        # print(f"{self.__class__.__name__}._addCursor_: crsId -> {crsId}")
 
         if precision is None:
             if isinstance(axis, pg.PlotItem):
