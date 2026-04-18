@@ -2257,11 +2257,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
 
     @safewrapper
-    def _plot_discrete_entities_(self, /, entities: typing.Union[dict, list, neo.core.spiketrainlist.SpikeTrainList],
-                                 axis:pg.PlotItem, clear:bool=True,
-                                 adapt_X_range:bool=True,
-                                 minX:typing.Optional[float]=None,
-                                 maxX:typing.Optional[float]=None,
+    def _plot_discrete_entities_(self, /, entities: typing.Union[
+                                        dict, list,
+                                        neo.core.spiketrainlist.SpikeTrainList
+                                        ],
+                                 axis: pg.PlotItem,
+                                 clear: bool = True,
+                                 adapt_X_range: bool = True,
+                                 minX: typing.Optional[float] = None,
+                                 maxX: typing.Optional[float] = None,
                                  **kwargs):
         r"""For plotting events and spike trains on their own (separate) axis
         Epochs & DataZones are represented as regions between vertical lines
@@ -5915,7 +5919,7 @@ anything else       anything else       ❌
     @Slot()
     @safewrapper
     def _slot_update_cursor_to_epoch_dlg(self, cid:typing.Optional[str]=None, d:typing.Optional[qd.QuickDialog]=None):
-        print(f"{self.__class__.__name__}._slot_update_cursor_to_epoch_dlg(cid={cid}, d={d})")
+        # print(f"{self.__class__.__name__}._slot_update_cursor_to_epoch_dlg(cid={cid}, d={d})")
         if (not isinstance(cid, str) or len(cid.strip()) == 0) and isinstance(d, qd.QuickDialog):
             if hasattr(d, "cursorComboBox"):
                 if d.cursorComboBox.variable.count() == 0:
@@ -9959,7 +9963,7 @@ anything else       anything else       ❌
 
     @safewrapper
     @Slot(dict)
-    def _slot_plot_numeric_data_(self, data:dict):
+    def _slot_plot_numeric_data_(self, data: dict):
         r"""For dict's keys and values see parameters of self._plot_numeric_data_
         For threading...
         """
@@ -9986,7 +9990,9 @@ anything else       anything else       ❌
         self.setCursor(QtCore.Qt.ArrowCursor)
         self.statusBar().clearMessage()
 
-    def _plot_events_or_marks_(self, entities_list, entities_axis, xLabel, yLabel, minX, maxX, adapt_X_range, height_interval, symbolStyle, **labelStyle):
+    def _plot_events_or_marks_(self, entities_list, entities_axis,
+                               xLabel, yLabel, minX, maxX, adapt_X_range,
+                               height_interval, symbolStyle, **labelStyle):
         r""" Helper method for self._plot_discrete_entities_(events or data marks)"""
         symbolColor = symbolStyle["color"]
         symbolPen = symbolStyle["pen"]
@@ -10042,7 +10048,8 @@ anything else       anything else       ❌
                                                         xUnits = xUnits,
                                                         symbolColor = symbolColor,
                                                         symbolBrush = symbolBrush,
-                                                        symbolPen   = symbolPen)
+                                                        symbolPen   = symbolPen,)
+                                                        # itemType    = pg.ScatterPlotItem) # don't delete - see TODO 2026-04-18 23:18:00
                                 )
         else:
             self._plot_numeric_data_(entities_axis, xx_, yy_,
@@ -10051,7 +10058,8 @@ anything else       anything else       ❌
                                     xUnits = xUnits,
                                     symbolColor = symbolColor,
                                     symbolBrush = symbolBrush,
-                                    symbolPen   = symbolPen)
+                                    symbolPen   = symbolPen,)
+                                    # itemType    = pg.ScatterPlotItem) # don't delete - see TODO 2026-04-18 23:18:00
 
         # entities_axis.setLabel(bottom = xLabel, left = yLabel)
         entities_axis.axes["left"]["item"].setPen(None)
@@ -10274,6 +10282,9 @@ anything else       anything else       ❌
         a pyqtgraph.PlotItem where the data was plotted
 
         """
+        # TODO 2026-04-18 23:18:00
+        # think about using pg.ScatterPlotItem for events
+
         # print(f"{self.__class__.__name__}._plot_numeric_data_ xUnits: {xUnits}, yUnits: {yUnits}")
 
         # ATTENTION: y is a numpy arrays here; x is either None, or a numpy array
@@ -10313,6 +10324,7 @@ anything else       anything else       ❌
         symbolColor = kwargs.get("symbolColor", None)
         color = kwargs.get("color", None)
         name = kwargs.get("name", None)
+        plotDataItemClass = kwargs.pop("itemType", pg.PlotDataItem)
 
         pen = kwargs.get("pen", QtGui.QPen(QtGui.QColor("black"),1))
         if isinstance(pen, QtGui.QPen): # because the caller may have passed 'pen=None'
@@ -10337,7 +10349,8 @@ anything else       anything else       ❌
         # rewriting into a pg.PlotDataItem needs vector (array with shape (N,))
         # OR array with shape (N,2);
         # "vectors" with shape (N,1) won't do
-        plotDataItems = [i for i in plotItem.listDataItems() if isinstance(i, pg.PlotDataItem)]
+        # plotDataItems = [i for i in plotItem.listDataItems() if isinstance(i, pg.PlotDataItem)]
+        plotDataItems = [i for i in plotItem.listDataItems() if isinstance(i, plotDataItemClass)]
 
         if y.ndim == 1:
             y_nan_ndx = np.atleast_1d(np.isnan(y))
@@ -10967,7 +10980,54 @@ anything else       anything else       ❌
             if plotitem.sceneBoundingRect().contains(pos):
                 plot_name = plotitem.vb.name
 
+                entity_text = None
+
                 mousePoint = plotitem.vb.mapSceneToView(pos)
+
+                if plotitem == self.eventsAxis:
+                    entities = list(filter(lambda i: isinstance(i, pg.PlotDataItem), plotitem.items))
+                    xax = plotitem.axes["bottom"]["item"]
+                    viewXrange = plotitem.vb.viewRange()[0]
+                    xax_length = xax.boundingRect().width()
+
+                    tickSpacing = xax.tickSpacing(viewXrange[0], viewXrange[1], xax_length)[-1][0]
+                    # NOTE: 2026-04-18 23:42:36
+                    # don't delete next line - consider ScatterPlotItem for events, see TODO 2026-04-18 23:18:00
+                    # entities = list(filter(lambda i: isinstance(i, pg.ScatterPlotItem), plotitem.items))
+                    if len(entities):
+                        if isinstance(self.yData, neo.Block):
+                            events = self.yData.segments[self.currentFrame].events
+                        elif isinstance(self.yData, typing.Sequence) and all(isinstance(y_, neo.Segment) for y_ in self.yData):
+                            events = self.yData[self.currentFrame].events
+                        elif isinstance(self.yData, neo.Segment):
+                            events = self.yData.events
+                        elif isinstance(self.yData, neo.Event):
+                            events = [self.yData]
+
+                        if len(events) == len(entities):
+                            height_interval = 1/len(entities)
+                            entityNdx = int((mousePoint.y() - height_interval/2) / height_interval)
+                            if entityNdx >=0 and entityNdx < len(entities):
+                                event = events[entityNdx]
+                                mp = mousePoint.x()
+                                if not np.isnan(mp):
+                                    entityPointNdx = np.where((event.times.magnitude > mp - tickSpacing) & (event.times.magnitude < mp + tickSpacing))[0]
+                                    if entityPointNdx.size > 0:
+                                        entityPointNdx = int(entityPointNdx[-1])
+                                        if entityPointNdx>=0 and entityPointNdx < event.labels.size:
+                                            entity_text = str(event.labels[entityPointNdx])
+                                        else:
+                                            entity_text = None
+                                    else:
+                                        entity_text = None
+                                else:
+                                    entity_text = None
+                            else:
+                                entity_text = None
+                        else:
+                            entity_text = None
+                    else:
+                        entity_text = None
 
                 x_text = "%f" % mousePoint.x()
                 y_text = "%f" % mousePoint.y()
@@ -10976,7 +11036,10 @@ anything else       anything else       ❌
 
                 self._mouse_coordinates_text_ = "%s:\n%s" % (plot_name, display_text)
 
-                self.statusBar().showMessage(self._mouse_coordinates_text_)
+                if isinstance(entity_text, str) and len(entity_text.strip()):
+                    self.statusBar().showMessage(self._mouse_coordinates_text_ + " " + entity_text)
+                else:
+                    self.statusBar().showMessage(self._mouse_coordinates_text_)
 
             else:
                 self.statusBar().clearMessage()

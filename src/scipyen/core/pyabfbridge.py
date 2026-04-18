@@ -487,6 +487,7 @@ import quantities as pq
 import neo
 from dataclasses import MISSING
 from collections import namedtuple
+from tribool import Tribool
 
 from core import scipyen_quantities as scq
 from core import datatypes, strutils, utilities
@@ -513,7 +514,12 @@ ABF = pyabf.ABF
 # This is 8 for DigiData 1550 series, and 4 for DigiData 1440 series
 DIGITAL_OUTPUT_COUNT = pyabf.waveform._DIGITAL_OUTPUT_COUNT # 8
 
-ABFDigitalPattern = namedtuple("ABFDigitalPattern", ["main", "alternate"], module=__name__)
+# ABFDigitalPattern = namedtuple("ABFDigitalPattern", ["main", "alternate"], module=__name__)
+
+class ABFDigitalPattern(typing.NamedTuple):
+    main: tuple
+    alternate: tuple
+
 
 # These two will be (properly) redefined further below
 class ABFOutputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
@@ -2681,80 +2687,92 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                ) -> tuple[int]:
         r"""Reports DIG chanel usage in a specified sweep.
 
-        By default this reports the DIG channels used for emitting either a "step"
-        (i.e. single pulse) or a "train", in the digital pattern that would be active
-        given the specified sweep.
-
-        This behaviour can be fine-tuned with the parameters below.
-
-        Parameters:
-        -----------
-        sweep: int, in the semi-open interval [0, nSweeps);
-                default is 0
-
-            Alternatively, the sweep can already be a digital bit pattern tuple
-            (or ABFDigitalPattern named tuple) — useful to avoid querying the bit
-            pattern twice in code that calls this method — but CAUTION on what it
-            is passed here! While it may be tempting to pass directly an entry
-            from the self.digitalPatterns dictionary, doing so would not take into
-            account the fact that the original order of the DIG channel indexes
-            are not stored in natrual (ie. increasing) order, in the entry. This
-            would result in reporting the wrong DIG channel indexes!
-
-            The correct approach, therefore, is:
-
-            # 1. get the digital bit pattern in natural order, as 2-tuple with
-            main and alternate patterns:
-            digPattern = self.getDigitalPattern(sweep, epoch, alternate="all",
-                                                natural=True, separateBanks=False)
-
-            # 2. pass the result here, to get the DIG channel indexes used
-            usedDigs = self.getUsedDigitalChannels(digPattern)
-
-            • NOTE that the parameters listed below are ignored in this syntax
-            variant.
-
-        epoch: and ABFEpoch object, an int (epoch number) or a str (epoch "letter")
-                Index of the ABFEpoch where the pattern is queried.
-
-                Optional, default is None, in which case returns the digital
-                patterns for all epochs, during the specified sweep.
-
-        letters:bool, default is False. Used when 'epoch' parameter is None.
-                When True, the epochs are reported by their letter; otherwise,
-                they are reported by their number in the epochs table.
-
-        alternate: bool. Optional, default is None.
-            When None, report digital channels used in either "main" or "alternate"
-            pattern.
-
-            When True, report only digital channels used in the "alternate" pattern.
-            When False, report only digital channels used in the "main" pattern.
-
-        trains:bool. Optional, default is None.
-            When None, reports the used digital channels regardless configured
-            to emit either a step (a.k.a single pulse) or a train (pulse train)
-
-            When True, report only digital channels emitting a pulse train.
-            When False, report only digital channels emitting a step (single pulse)
+.. |nbsp| unicode:: 0xA0
+   :trim:
 
 
-        Returns:
-        --------
+By default this reports the DIG channels used for emitting either a "step"
+(i.e. single pulse) or a "train", in the digital pattern that would be active
+given the specified sweep.
 
-        When 'epoch' is specified and not None return a tuple (posssibly empty)
-        with the indexes of the DIG channels emitting signals during the specified
-        sweep, in that epoch.
+This behaviour can be fine-tuned with the parameters below.
 
-        When 'epoch' is None, returns a mapping:
+Parameters:
+-----------
+:sweep: int, in the semi-open interval [0, nSweeps); default is 0
 
-        letters:            returned mapping:
-        ------------------------------------------------------------------------
-        False               epoch_number ↦ a tuple as above
-        True                epoch_letter ↦ a tuple as above
+    Alternatively, the sweep can already be a digital bit pattern tuple |nbsp|
+    (or ABFDigitalPattern named tuple) — useful to avoid querying the bit |nbsp|
+    pattern twice in code that calls this method — but CAUTION on what it |nbsp|
+    is passed here! While it may be tempting to pass directly an entry |nbsp|
+    from the self.digitalPatterns dictionary, doing so would not take into |nbsp|
+    account the fact that the original order of the DIG channel indexes |nbsp|
+    are not stored in natrual (ie. increasing) order, in the entry. This |nbsp|
+    would result in reporting the wrong DIG channel indexes!
+
+    The correct approach, therefore, is:
+
+    # 1. get the digital bit pattern in natural order, as 2-tuple with |nbsp|
+    main and alternate patterns:
+
+::
+    digPattern = self.getDigitalPattern(sweep, epoch, alternate="all",
+                                        natural=True, separateBanks=False)
 
 
-        """
+    # 2. pass the result here, to get the DIG channel indexes used
+
+::
+    usedDigs = self.getUsedDigitalChannels(digPattern)
+
+    • NOTE that the parameters listed below are ignored in this syntax |nbsp|
+    variant.
+
+:epoch: and ABFEpoch object, an int (epoch number) or a str (epoch "letter")
+
+        Index of the ABFEpoch where the pattern is queried.
+
+        Optional, default is None, in which case returns the digital |nbsp|
+        patterns for all epochs, during the specified sweep.
+
+:letters:, default is False. Used when 'epoch' parameter is None.
+
+        When True, the epochs are reported by their letter; otherwise, |nbsp|
+        they are reported by their number in the epochs table.
+
+:alternate: Optional, default is None.
+
+    When None, report digital channels used in either "main" or "alternate" |nbsp|
+    pattern.
+
+    When True, report only digital channels used in the "alternate" pattern. |nbsp|
+    When False, report only digital channels used in the "main" pattern.
+
+:trains: Optional, default is None.
+
+    When None, reports the used digital channels regardless of them being |nbsp|
+    configured to emit either a step (a.k.a single pulse) or a train (pulse train) |nbsp|
+
+    When True, report only digital channels emitting a pulse train. |nbsp|
+    When False, report only digital channels emitting a step (single pulse) |nbsp|
+
+
+Returns:
+--------
+
+When 'epoch' is specified and not None return a tuple (posssibly empty) |nbsp|
+with the indexes of the DIG channels emitting signals during the specified |nbsp|
+sweep, in that epoch.
+
+When 'epoch' is None, returns a mapping:
+
+letters:            returned mapping:
+------------------------------------------------------------------------
+False               epoch_number ↦ a tuple as above
+True                epoch_letter ↦ a tuple as above
+
+
+"""
         if isinstance(trains, bool):
             comparator = lambda x: x == ("*" if trains else 1)
         else:
@@ -3718,24 +3736,36 @@ class ABFProtocol(ElectrophysiologyProtocol):
 Parameters:
 ----------
 :sweep: int, the 0-based index of the sweep. Optional, default is the |nbsp|
-    ``activeDACChannel`` of the protocol.
+    active DAC output i.e., the ``activeDACChannel` attribute of the protocol. |nbsp|
+    The *active* DAC is the DAC output channel used to send command signals  |nbsp|
+    via the amplifier to the cell, during the trial. In experiments that do not |nbsp|
+    send command signals (e.g. field potential recordings) the *active* DAC is |nbsp|
+    the DAC associated with the ADC used for recording. This association is usually |nbsp|
+    defined in Clampex's Telegraphed Instruments... dialog. If a telegraphed |nbsp|
+    insstrument is not configured then the active DAC fallsback to DAC 0.
 
 :dac: the DAC channel (or DAC channel name, or DAC channel physical index) |nbsp|
     for which the Epochs table is queried. Optional, default is None.
 
-    When 'dac' is None, the method returns the Epochs table reflecting |nbsp|
-    the epoch parameters that would be output during the specified sweep.
-
-    In any other case, the method returns the Epochs table AS DEFINED in |nbsp|
-    the protocol editor dialog "Waveform" tab for the specified DAC channel |nbsp|
+    When this is specified, the method returns the Epochs table AS DEFINED in |nbsp|
+    the protocol editor dialog "Waveform" tab for the given DAC channel |nbsp|
     (thus, irrespective of the sweep index).
+
+    When 'dac' is None, the method returns the Epochs table reflecting |nbsp|
+    the epoch parameters that would be output during the specified sweep. In |nbsp|
+    Clampex this is not necessarily the same as the one configured for the active |nbsp|
+    DAC output.
+
+    When alternative digital outputs are *disabled* in the protocol, passing
+    ``dac = None`` will return the Epochs table confiured for the active DAC
+    output (i.e. the one used to send comman waveforms to the cell).
 
 :includeDigitalPattern:bool. Optional, default is True.|nbsp|
     When True, the Digital bit patterns for DIG channel banks 3-0 and 7-4 |nbsp|
     are output as in the Clampex's Waveform tab of the protocol editor. |nbsp|
     Otherwise, they are omitted.
 
-:holding: add the holding tiem period to the epoch timings (default ``True``)
+:holding: add the holding time period to the epoch timings (default ``True``)
 
 :fromRunStart: When ``True``, epoch timings are adjusted relative to the start |nbsp|
     of the trial. Default is ``False``.
@@ -4009,10 +4039,75 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
                            digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
                            separateWaves:bool=True,
                            normalized:bool=False,
-                           asSignals:bool=False) -> neo.AnalogSignal:
+                           asSignals:bool=True) -> typing.Optional[
+                               typing.Union[
+                                            typing.Sequence[
+                                                np.ndarray | neo.AnalogSignal
+                                                ],
+                                            np.ndarray
+                                            ]
+                               ]:
         r"""TTL (digital) waveforms for the given sweep.
-        See NOTE in the docstring for self.getEpochsTable(…)
-        """
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+Generates a waveform with the digital signals output during a given *sweep*.
+
+Parameters:
+-----------
+
+:sweep: 0-based index of the trial sweep. Optional, default is 0 (1ˢᵗ sweep)
+
+:dac:  the DAC channel (or DAC channel name, or DAC channel physical index) |nbsp|
+    for which the digital output waveform table is requeste. Optional, default is ``None``.
+
+    When 'dac' is ``None``, the method returns the waveform reflecting |nbsp|
+    the digital outputs signal emitted during the specified sweep.
+
+    In any other case, the method returns the digital outputs table AS DEFINED in |nbsp|
+    the protocol editor dialog "Waveform" tab for the specified DAC channel |nbsp|
+    (thus, irrespective of the sweep index).
+
+:digChannel: index (``int``) or sequence of indexes (all ``int``) for the digital |nbsp|
+    channel where the output is requested. When ``alternateDigitalOutputsEnabled`` |nbsp|
+    is ``True``, this may be *different* on alternate sweeps.
+
+    Optional; default is ``None``, in which case all digital channels emitting a |nbsp|
+    TTL signal will contribute to the generated waveform.
+
+    Moreover, when 'digChannel' is ``None`` *and* ``alternateDigitalOutputsEnabled`` |nbsp|
+    is ``True``, the generated waveform will reflect the digital output what *would* |nbsp|
+    emitted by the specified 'dac' during this particular sweep.
+
+    If, in adition, 'dac' is also ``None``, then the generated waveform will reflect |nbsp|
+    the TTL signals that *would* be emitted at all, during the sweep.
+
+:separateWaves: When ``True`` and there is more than one digital channel emitting |nbsp|
+    TTL signals, then a list of waveforms will be generated, one per digital channel. |nbsp|
+    When ``False`` the a single waveform will be generated, incorporating all |nbsp|
+    TTL signals emitted during the sweep.
+
+    Optional; default is ``True``.
+
+    When only *one* waveform would be generated for the specified sweep (see above) |nbsp|
+    then the method returns a single AnalogSignal or numpy array *irrespective* of |nbsp|
+    this parameter.
+
+:normalized: When ``True`` the generated waveform is normalized to the "high" logic |nbsp|
+    and will contains values of 0 and 1.
+
+    Optional; default is ``False``
+
+:asSignals: When ``True``, the generated waveforms are ``neo.AnalogSignal`` objects. |nbsp|
+    When ``False``, the egenrated waveforms are numpy arrays.
+
+    Optional; default is ``True``.
+
+See documentation of self.getEpochsTable(…) for details regarding digital patterns |nbsp|
+and alternative digital output.
+
+"""
         if sweep not in range(self.nSweeps):
             raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
 
@@ -4036,69 +4131,69 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
 
         hoDACActive = self.activeDACChannel not in (0,1)
 
-        isAlternateDigital = False
+        myDac = dac
 
-        if self.alternateDigitalOutputsEnabled:
-            if actualOutput:
-                if hoDACActive:
-                    isAlternateDigital = True
-                else:
-                    isAlternateDigital =  sweep % 2 > 0
-            else:
-                isAlternateDigital = dac.physicalIndex != self.activeDACChannel
+        wantsAltOutput = sweep % 2 > 0
 
         if actualOutput:
             if self.alternateDigitalOutputsEnabled:
-                # digDACs = self.getDACsForEpoch(epoch.number)
-                if len(digDACs) > 1:
-                    # assert dac.physicalIndex in digDACs, f"DAC {dac.physicalIndex} not in digital-emitting DACs"
-                    thisDacNdx = digDACs.index(dac.physicalIndex)
-                    if self.activeDACChannel == 0:
-                        myDac = self.getDAC(1 if isAlternateDigital else 0)
-                    elif self.activeDACChannel == 1:
-                        myDac = self.getDAC(0 if isAlternateDigital else 1)
-                    else:
-                        assert hoDACActive, f"Active DAC index expected to be > 1; got {self.activeDACChannel}"
-                        # activeDAC is a HO DAC
-                        if sweep % 2 == 0 and 0 in digDACs: # "even" sweeps => query DAC0
-                            myDac = self.getDAC(0)
-                        elif sweep % 2 > 0 and 1 in digDACs: # "odd" sweeps => query DAC1
-                            myDac = self.getDAC(1)
-                        else:
-                            myDac = dac
-                else:
-                    myDac = dac
+                if hoDACActive:
+                    if 1 in digDACs and wantsAltOutput:
+                        myDac = delf.getDAC(1)
+                    elif 0 in digDACs and not wantsAltOutput:
+                        myDac = self.getDAC(0)
 
-            else:
-                myDac = dac
-        else:
-            # OK here: shows the Epoch table AS DEFINED in Clampex, regardless
-            # of the sweep
-            myDac = dac
+                else:
+                    if self.activeDACChannel in digDACs:
+                        mainDacNdx = digDACs.index(self.activeDACChannel)
+                        if mainDacNdx > 0:
+                            altDacNdx = mainDacNdx - 1
+                        else:
+                            altDacNdx = mainDacNdx - 1
+
+                        if altDacNdx < len(digDACs):
+                            altDac = self.getDAC(digDACs[altDacNdx])
+
+                    myDac = altDac if wantsAltOutput else self.activeDAC
+
 
         # a tuple of ABFEpoch numbers where digital outputs are defined:
         digEpochs = self.epochsWithDigitalOutput
 
-        usedDigs = tuple(itertools.chain.from_iterable(map(lambda x: tuple(itertools.chain.from_iterable(x)) if isinstance(x, ABFDigitalPattern) else x, (self.getUsedDigitalChannels(sweep, e) for e in digEpochs))))
-
-        # print(f"{self.__class__.__name__}.getDigitalWaveform(sweep = {sweep}, dac = {dac}, digChannel = {digChannel})")
+        if actualOutput and self.alternateDigitalOutputsEnabled:
+            usedDigs = tuple(
+                            itertools.chain.from_iterable(
+                                map(
+                                    lambda x: tuple(x.alternate) if isinstance(x, ABFDigitalPattern) else x,
+                                    (self.getUsedDigitalChannels(sweep, e, alternate = wantsAltOutput) for e in digEpochs)
+                                    )
+                                )
+                            )
+        else:
+            usedDigs = tuple(
+                            itertools.chain.from_iterable(
+                                map(
+                                    lambda x: tuple(itertools.chain.from_iterable(x)) if isinstance(x, ABFDigitalPattern) else x,
+                                    (self.getUsedDigitalChannels(sweep, e) for e in digEpochs)
+                                    )
+                                )
+                            )
 
         # NOTE: 2023-09-20 22:22:41
         # the digital output is ALWAYS in V
         # "high logic" means 5V on a background of 0 V
         # "low logic" means 0V on a background of 5V
 
-        # print(f"{self.__class__.__name__}.getDigitalWaveform: supplied digChannel = {digChannel}")
-        # print(f"{self.__class__.__name__}.getDigitalWaveform: usedDigs = {usedDigs}")
-
         if isinstance(digChannel, int):
             if digChannel not in usedDigs:
                 digOFF, digON = self.getDigitalPulseLogicLevels(digChannel)
-                return neo.AnalogSignal(np.full((self.sweepSampleCount, 1),
-                                                digOFF),
-                                        units = pq.V, t_start = 0*pq.s,
-                                        sampling_rate = self.samplingRate,
-                                        name = f"DIG {digChannel}", DAC = {dac.name: dac.physicalIndex})
+                wave = np.full((self.sweepSampleCount, 1), digOFF)
+                if asSignals:
+                    return neo.AnalogSignal(wave,
+                                            units = pq.V, t_start = 0*pq.s,
+                                            sampling_rate = self.samplingRate,
+                                            name = f"DIG {digChannel}", DAC = {dac.name: dac.physicalIndex})
+                return wave
                 # raise ValueError(f"Invalid DIG channel index {digChannel}")
 
             digChannel = (digChannel,)
@@ -4137,8 +4232,6 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
             lastEpochNdx = 0
             lastLevel = None
 
-        # print(f"{self.__class__.__name__}.getDigitalWaveform: digChannel = {digChannel}")
-
         for epoch in myDac.epochs:
             actualDuration = epoch.firstDuration + sweep * epoch.deltaDuration
             t1 = t0 + actualDuration
@@ -4158,8 +4251,6 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
 
             epochWaves, epoch_digOFF, epoch_digON, epoch_trainOFF, epoch_trainON = eWaves
             offLevel = epoch_digOFF if epoch_digOFF is not None else epoch_trainOFF
-
-            # print(f"{self.__class__.__name__}.getDigitalWaveform: offLevel = {offLevel}")
 
             if isinstance(epochWaves, np.ndarray):
                 epochWaves = (epochWaves, )
@@ -4197,12 +4288,23 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
             for k in range(len(waveforms)):
                 waveforms[k][np.isnan(waveforms[k])] = offLevel
 
-            if len(waveforms) > 1:
+            if not asSignals:
+                waveforms = list(map(lambda w: w.magnitude.flatten(), waveforms))
+
+            if len(waveforms) == 0:
+                return
+
+            if len(waveforms) == 1:
                 return waveforms[0]
+
+            return waveforms
+
         else:
             waveforms[np.isnan(waveforms)] = offLevel
+            if not asSignals:
+                return waveforms.magnitude.flatten()
 
-        return waveforms
+            return waveforms
 
     def getEpochDigitalWaveform(self, epoch:typing.Union[ABFEpoch, str, int], /,
                                 sweep:int = 0,
@@ -4215,102 +4317,113 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
                                 returnLevels:bool = False) -> tuple[pq.Quantity]:
         r"""Waveform with the TTL signals emitted by the epoch.
 
-        Mandatory positional parameters:
-        --------------------------------
+.. |nbsp| unicode:: 0xA0
+   :trim:
 
-        epoch: the ABF epoch that is queried
 
-        Named parameters:
-        -----------------
+Mandatory positional parameters:
+--------------------------------
 
-        sweep: the index of the ABF sweep (digital outputs may be specific to the
-                sweep index, when alternate digital patterns are enabled in the
-                ABF protocol)
-                Default is 0 (first sweep)
+epoch: the ABF epoch that is queried
 
-        dac: index, name, or ABFOutputConfiguration: the DAC channel where the
-            epoch is defined. Optional, default is None.
+Named parameters:
+-----------------
 
-            When None, the method returns the digital waveform that would be
-            output during the specified sweep. Depending on the use of alternate
-            digital outputs and on the Epoch's delta duration parameter, the
-            output for the specified sweep may be different from what is defined
-            in the Clampex's Epochs table.
+:sweep: the index of the ABF sweep (digital outputs may be specific to the |nbsp|
+        sweep index, when alternate digital patterns are enabled in the |nbsp|
+        ABF protocol).
 
-            When not None, the method returns the digital waveform reflecting
-            what was defined in Clampex's Epochs table, irrespective of the
-            sweep index.
+        Default is 0 (first sweep)
 
-        digChannel:int, Sequence[int] default is None,
-            When None, the function returns a waveform for each digital output
-            channel that is active during this epoch (and during the specified
-            sweep). The waveforms may be returned as individual waveforms or as
-            column vectors of a 2D Quantity array — see 'separateWaves' parameter,
-            below.
+:dac: index, name, or ABFOutputConfiguration: the DAC channel where the |nbsp|
+    epoch is defined. Optional, default is None.
 
-        lastLevelOnly: default is False; when True, just generate a constant wave
-            with the value of the last digital logic level; that is, OFF for digital
-            pulse or train. NOTE that the actual value of this level is either 0 V
-            or 5 V, depending on the values of protocol.digitalHoldingValue(channel)
-            and protocol.digitalTrainActiveLogic.
+    When None, the method returns the digital waveform that would be |nbsp|
+    output during the specified sweep. Depending on the use of alternate |nbsp|
+    digital outputs and on the Epoch's delta duration parameter, the |nbsp|
+    output for the specified sweep may be different from what is defined |nbsp|
+    in the Clampex's Epochs table.
 
-            When 'normalized' is True (see below), the wave is dimensionless
-            (i.e. without physical units).
+    When not None, the method returns the digital waveform reflecting |nbsp|
+    what was defined in Clampex's Epochs table, irrespective of the |nbsp|
+    sweep index.
 
-            See self.getDigitalLogicLevels, self.getDigitalPulseLogicLevels,
-            and self.getDigitalTrainLogicLevels
+:digChannel:int, Sequence[int] default is None.
 
-        separateWaves: default is False.
-            When False, and more than one digChannel is queried, the function
-            returns a Quantity array with one channel-specific waveform per
-            column.
+    When None, the function returns a waveform for each digital output |nbsp|
+    channel that is active during this epoch (and during the specified |nbsp|
+    sweep). The waveforms may be returned as individual waveforms or as |nbsp|
+    column vectors of a 2D Quantity array — see 'separateWaves' parameter, |nbsp|
+    below.
 
-            When True, the function returns a list of vector waveforms (one per
-            channel).
+:lastLevelOnly: default is False; when True, just generate a constant wave |nbsp|
+    with the value of the last digital logic level; that is, OFF for digital |nbsp|
+    pulse or train. NOTE that the actual value of this level is either 0 V |nbsp|
+    or 5 V, depending on the values of protocol.digitalHoldingValue(channel) |nbsp|
+    and protocol.digitalTrainActiveLogic.
 
-        normalized: Flag to normalize the resulted waveform. Default is False.
-            When True, the waveform is normalized to
-            the value of the "high" logic (therefore containing values of 0 and 1).
-            When False (the default) the "high" logic is in mV (i.e. 5000 mV)
+    When 'normalized' is True (see below), the wave is dimensionless |nbsp|
+    (i.e. without physical units).
 
-        asSignals: Flag to return the waveform as neo.AnalogSignal. Default is False.
-            When True, the waveforms will be returned as analog signals; when
-            'separateWaves' is False, they will be contained as "channels" in the
-            returned AnalogSignal object.
+    See self.getDigitalLogicLevels, self.getDigitalPulseLogicLevels, |nbsp|
+    and self.getDigitalTrainLogicLevels
 
-            When 'normalized' is True, the waveform data will be dimensionless.
+:separateWaves: default is False.
 
-        returnLevels: default False; When True, returns the waves and the
-            digOFF, digON, trainOFF and trainON logical levels
+    When False, and more than one digChannel is queried, the function |nbsp|
+    returns a Quantity array with one channel-specific waveform per |nbsp|
+    column.
 
-        Returns:
-        --------
-        waves, [digOFF, digON, trainOFF, trainON], where:
+    When True, the function returns a list of vector waveforms (one per |nbsp|
+    channel).
 
-        'waves':
-            When 'digChannel' parameter is an int, 'waves' is a Python Quantity
-            array or a neo.AnalogSignal (depending on the value of 'asSignals'
-            parameter).
+:normalized: Flag to normalize the resulted waveform. Default is False. |nbsp|
+    When True, the waveform is normalized to the value of the "high" logic |nbsp|
+    (therefore containing values of 0 and 1).
 
-            Otherwise, 'waves' is a tuple of Python Quantity arrays or AnalogSignal
-            objects, each with the digital waveforms for each specified DIG channel,
-            if 'separateWaves' is True, else, a Python Quantity array (or AnalogSignal
-            object) where each DIG channel corresponds to a column vector.
+    When False (the default) the "high" logic is in mV (i.e. 5000 mV).
 
-            If there is only one DIG channel emitting signals in the epoch, then
-            'waves' is a single Python Quantity array or AnalogSignal.
+:asSignals: Flag to return the waveform as neo.AnalogSignal. Default is False. |nbsp|
+    When True, the waveforms will be returned as analog signals; when |nbsp|
+    'separateWaves' is False, they will be contained as "channels" in the |nbsp|
+    returned AnalogSignal object.
 
-        digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values
-            of the logical levels for digital pulse and digital train.
+    When 'normalized' is True, the waveform data will be dimensionless.
 
-            These are returned only when 'returnLevels' parameter is True.
+:returnLevels: default False; When True, returns the waves and the |nbsp|
+    digOFF, digON, trainOFF and trainON logical levels
 
-            NOTE:
-            1. trainOFF and trainON are None when the epoch emits only digital pulses
-            2. digOFF and digON are None when the epoch emits only digital pulse trains
-            3. Within a given epoch, these levels are identical for all DIG channels.
+Returns:
+--------
+waves, [digOFF, digON, trainOFF, trainON], where:
 
-        """
+'waves':
+    When 'digChannel' parameter is an int, 'waves' is a Python Quantity |nbsp|
+    array or a neo.AnalogSignal (depending on the value of 'asSignals' |nbsp|
+    parameter).
+
+    Otherwise, 'waves' is a tuple of Python Quantity arrays or AnalogSignal |nbsp|
+    objects, each with the digital waveforms for each specified DIG channel, |nbsp|
+    if 'separateWaves' is True, else, a Python Quantity array (or AnalogSignal |nbsp|
+    object) where each DIG channel corresponds to a column vector.
+
+    If there is only one DIG channel emitting signals in the epoch, then |nbsp|
+    'waves' is a single Python Quantity array or AnalogSignal.
+
+digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values |nbsp|
+    of the logical levels for digital pulse and digital train.
+
+    These are returned only when 'returnLevels' parameter is True.
+
+    .. note::
+
+        1. trainOFF and trainON are None when the epoch emits only digital pulses
+
+        2. digOFF and digON are None when the epoch emits only digital pulse trains
+
+        3. Within a given epoch, these levels are identical for all DIG channels.
+
+"""
         if sweep not in range(self.nSweeps):
             raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
 
@@ -4462,7 +4575,9 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
 
         return waves
 
-    def waveformPreview(self, continuous:typing.Optional[bool]=None):
+    def waveformPreview(self, continuous: typing.Optional[
+                                            typing.Union[bool, Tribool]
+                                            ]=None) -> neo.Block:
         r"""Generates a waveform preview, Clampex-style.
         Returns a neo.Block with output waveforms per sweep, for all DAC and DIG
         channels in the protocol, taking into account which waveform is generated
@@ -4530,37 +4645,50 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
         else:
             maxSweeps = 1
 
-        if maxSweeps == 1:
-            continuous=None
+        if maxSweeps == 1 or not isinstance(continuous, (bool, Tribool)):
+            continuous=Tribool()
 
-        if isinstance(continuous, bool):
+        elif isinstance(continuous, bool):
+            continuous = Tribool(continuous)
+
+        if isinstance(continuous.value, bool):
             # segment = neo.Segment(name=f"Sweeps {tuple(range(maxSweeps))} of {maxSweeps} sweeps")
-            pfx = "Continuous" if continuous else "Concatenated"
+            pfx = "Continuous" if continuous.value else "Concatenated"
             segment = neo.Segment(name=f"{pfx} sweeps")
             analogWaveforms = list()
             digitalWaveforms = list()
             for sweep in range(maxSweeps):
                 sweepAnalogs = [self.getCommandWaveform(sweep, dac) for dac in self.DACs]
                 sweepDigital = [self.getDigitalWaveform(sweep, digChannel=d,
-                                                            asSignals=True, separateWaves=False) for d in range(self.nDIGChannels)]
+                                                        asSignals=True,
+                                                        separateWaves=False) for d in range(self.nDIGChannels)]
                 if sweep == 0:
                     analogWaveforms.extend(sweepAnalogs)
                     digitalWaveforms.extend(sweepDigital)
+
+
                 else:
                     new_t_start = self.sweepInterval * sweep
                     for k,sig in enumerate(sweepAnalogs):
                         sig.t_start = new_t_start
                         analogWaveforms[k] = neoutils.concatenate_signals(analogWaveforms[k], sig, axis=0,
                                                                           name=analogWaveforms[k].name,
-                                                                          force_contiguous = continuous)
+                                                                          force_contiguous = continuous.value)
 
                     for k, sig in enumerate(sweepDigital):
                         sig.t_start = new_t_start
                         digitalWaveforms[k] = neoutils.concatenate_signals(digitalWaveforms[k], sig, axis=0,
                                                                            name = digitalWaveforms[k].name,
-                                                                          force_contiguous = continuous)
+                                                                          force_contiguous = continuous.value)
 
             segment.analogsignals += analogWaveforms + digitalWaveforms
+
+            if self.holdingTime > 0:
+                segment.events.append(neo.Event([self.holdingTime,
+                                                self.sweepDuration - self.holdingTime],
+                                                units = self.sweepDuration.units,
+                                                labels = ["Wave start","Wave end"]))
+
             ret.segments.append(segment)
 
         else:
@@ -4571,6 +4699,13 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
                                                             asSignals=True, separateWaves=False) for d in range(self.nDIGChannels)]
 
                 segment.analogsignals += analogWaveforms + digitalWaveforms
+
+                if self.holdingTime > 0:
+                    segment.events.append(neo.Event([self.holdingTime,
+                                                    self.sweepDuration - self.holdingTime],
+                                                    units = self.sweepDuration.units,
+                                                    labels = ["Wave start","Wave end"]))
+
                 ret.segments.append(segment)
 
         return ret
@@ -4651,6 +4786,7 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
                     return DataMark()
 
     def getDACAnalogEvents(self, dac, sweep):
+        pass # FIXME/TODO 2026-03-31 09:12:45 ?!?
         dac, _ = self.check_DAC_Epoch(dac, None)
 
         t0 = t1 = self.holdingTime.rescale(pq.s)
@@ -4711,84 +4847,99 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
         pass
 
 
-    def getAnalogWaveform(self, sweep:int=0,
-                          dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
-                          ignoreIsWaveformEnabled:bool=False) -> neo.AnalogSignal:
+    def getAnalogWaveform(self, sweep: int = 0,
+                          dac: typing.Optional[
+                              typing.Union[ABFOutputConfiguration, int, str]
+                              ] = None,
+                          ignoreIsWaveformEnabled: bool = False,
+                          asSignals: bool = True) -> neo.AnalogSignal:
         r"""Alias to self.getCommandWaveform"""
-        return self.getCommandWaveform(sweep, dac, ignoreIsWaveformEnabled=ignoreIsWaveformEnabled)
+        return self.getCommandWaveform(sweep, dac,
+                                       ignoreIsWaveformEnabled=ignoreIsWaveformEnabled,
+                                       asSignals = asSignals)
 
-    def getCommandWaveform(self, sweep:int = 0,
-                           dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
-                           ignoreIsWaveformEnabled:bool=False) -> neo.AnalogSignal:
+    def getCommandWaveform(self, sweep: int = 0,
+                           dac: typing.Optional[
+                                    typing.Union[ABFOutputConfiguration, int, str]
+                               ] = None,
+                           ignoreIsWaveformEnabled: bool = False,
+                           asSignals: bool = True) -> neo.AnalogSignal:
         r"""Generates an AnalogSignal representation of a DAC command waveform.
 
-        DAC command waveforms (and digital outputs) are enabled only in
-        Episodic Stimulation type of experiments.
+.. |nbsp| unicode:: 0xA0
+   :trim:
 
-        Parameters:
-        -----------
-        sweep: Index of the sweep for which the command waveform is required.
-            Must be in the semi-open interval [0, self.nSweeps).
+DAC command waveforms (and digital outputs) are enabled only in Episodic Stimulation nmode.
 
-        dac: Valid index (int) or name (str) of the DAC output (ABFOutputConfiguration)
-            or a ABFOutputConfiguration valid for this protocol, or None (default)
+Parameters:
+-----------
+:sweep: Index of the sweep for which the command waveform is required. |nbsp|
+    Must be in the semi-open interval [0, self.nSweeps).
 
-            • When 'dac' is None, the method will determine which DAC is used to
-            generate an analog command waveform, as follows:
+:dac: Valid index (int) or name (str) of the DAC output (ABFOutputConfiguration) |nbsp|
+    or a ABFOutputConfiguration valid for this protocol, or None (default)
 
-                ∘ when no DACs have Analog Waveform enabled, the method returns
-                    an empty waveform — this is an AnalogSignal containing the
-                    holding level of this DAC, throughout;
+    • When 'dac' is None, the method will determine which DAC is used to |nbsp|
+    generate an analog command waveform, as follows:
 
-                ∘ when there is a single DAC having Analog Waveform enabled, this
-                    DAC will be used to compute a command waveform, and:
+        ∘ when no DACs have Analog Waveform enabled, the method returns |nbsp|
+            an empty waveform — this is an AnalogSignal containing the |nbsp|
+            holding level of this DAC, throughout;
 
-                    ▷ If Alternate Waveforms is enabled in the protocol, then the
-                        method will return this DAC's analog command waveform for
-                        even values of 'sweep' (0,2,4,…), and an empty waveform
-                        (see above) for odd values (1,3,5,…).
+        ∘ when there is a single DAC having Analog Waveform enabled, this |nbsp|
+            DAC will be used to compute a command waveform, and:
 
-                    ▷  Otherwise, the method will return this DAC's analog
-                        command waveform for any sweep index.
+            ▷ If Alternate Waveforms is enabled in the protocol, then the |nbsp|
+                method will return this DAC's analog command waveform for |nbsp|
+                even values of 'sweep' (0,2,4,…), and an empty waveform |nbsp|
+                (see above) for odd values (1,3,5,…).
 
-                ∘ when there are more than one DAC with Analog Waveform enabled:
+            ▷  Otherwise, the method will return this DAC's analog |nbsp|
+                command waveform for any sweep index.
 
-                    ▷ If Alternative Waveforms is enabled in the protocol, only
-                        the DACS with the two lowest physical indexes in the
-                        collection of DACS with Analog Waveform enabled will be
-                        used:
-                        → the DAC with the lowest physical index will be used
-                          to generate the analog command waveform for sweeps with
-                          even index
+        ∘ when there are more than one DAC with Analog Waveform enabled: |nbsp|
 
-                        → the DAC with the next higher physical index will be used
-                          to generate the analog command waveform for sweeps with
-                          odd index
+            ▷ If Alternative Waveforms is enabled in the protocol, only |nbsp|
+                the DACs with the two lowest physical indexes in the |nbsp|
+                collection of DACs with Analog Waveform enabled will be |nbsp|
+                used:
+                → the DAC with the lowest physical index will be used |nbsp|
+                    to generate the analog command waveform for sweeps with |nbsp|
+                    even index.
 
-                    ▷ Otherwise, alll DACs with Analog Waveform enabled will be
-                        used to generate a collection of AnalogSignal objects
-                        for any sweep index passed to the method
+                → the DAC with the next higher physical index will be used |nbsp|
+                    to generate the analog command waveform for sweeps with |nbsp|
+                    odd index.
 
-        ignoreIsWaveformEnabled: default: False
-            When True, and a DAC is specified, its command waveform will be
-            generated even if it wouold not normally be output during an actual
-            trial (useful to inspect what command waveform the epochs in the DAC
-            are configured to generate IF Analog Waveform ws enabled on this DAC)
+            ▷ Otherwise, all DACs with Analog Waveform enabled will be |nbsp|
+                used to generate a collection of AnalogSignal objects |nbsp|
+                for any sweep index passed to the method.
 
-            NOTE: This parameter is only used when Alternate Waveforms is *DIS*abled!
+:ignoreIsWaveformEnabled: default: False
+    When True, and a DAC is specified, its command waveform will be |nbsp|
+    generated even if it wouold not normally be output during an actual |nbsp|
+    trial (useful to inspect what command waveform the epochs in the DAC |nbsp|
+    are configured to generate IF Analog Waveform ws enabled on this DAC)
 
-            BUG: 2024-11-10 01:12:01 FIXME
-            this messes up things!
+    NOTE: This parameter is only used when Alternate Waveforms is *DIS*abled!
+
+    BUG: 2024-11-10 01:12:01 FIXME
+    this messes up things!
+
+:asSignals: When ``True`` all waveforms are returned as ``neo.AnalogSignal`` obejcts |nbsp|;
+    otherwise, they wil be returned as numpy arrays.
+
+    Optional; default is ``True``.
 
 
-        Returns:
-        --------
+Returns:
+--------
 
-        A neo.AnalogSignal, or a tuple of neo.AnalogSignal objects, depending on
-        the value of 'dac', and on whether Alternative Waveforms is enabled in
-        the protocol.
+A neo.AnalogSignal, or a tuple of neo.AnalogSignal objects, depending on
+the value of 'dac', and on whether Alternative Waveforms is enabled in
+the protocol.
 
-        """
+"""
         if sweep not in range(self.nSweeps):
             raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
 
@@ -4815,10 +4966,12 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
         analogDACs = tuple(d for d in self.DACs if d.analogWaveformEnabled)
 
         if len(analogDACs) == 0:
-            return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
+            result = neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
                                     units = dac.units, t_start = 0*pq.s,
                                     sampling_rate = self.samplingRate,
                                     name = dac.name)
+
+            return result if asSignals else result.magnitude * dac.units
 
         if actualOutput:
             # NOTE: 2024-11-08 15:04:54
@@ -4829,19 +4982,24 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
             # for even sweeps, and next DAC up in the odd sweeps
             if self.alternateWaveformsEnabled:
                 if sweep % 2 == 0: # even-indexed sweep
-                    return self.getDACCommandWaveform(analogDACs[0], sweep)
+                    return self.getDACCommandWaveform(analogDACs[0], sweep, asSignals)
                 else: # odd-indexed sweeps
                     if len(analogDACs) > 1:
-                        return self.getDACCommandWaveform(analogDACs[1], sweep)
+                        return self.getDACCommandWaveform(analogDACs[1], sweep, asSignals)
                     else:
-                        return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
+                        result = neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
                                                 units = dac.units, t_start = 0*pq.s,
                                                 sampling_rate = self.samplingRate,
                                                 name = dac.name)
 
+                        return result if asSignals else result.magnitude * dac.units
+
             else:
-                return tuple(map(lambda x: self.getDACCommandWaveform(x, sweep), analogDACs))
-            # if dac is None:
+                result = tuple(map(lambda x: self.getDACCommandWaveform(x, sweep, asSignals), analogDACs))
+                if len(result) == 1:
+                    result = result[0]
+
+                return result
 
         else:
             # NOTE: 2024-11-09 13:28:41
@@ -4860,10 +5018,12 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
                 dNdx = tuple(d.physicalIndex for d in analogDACs)
                 if dac.physicalIndex not in dNdx:
                     # dac not found in analog DACs
-                    return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
+                    result = neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
                                             units = dac.units, t_start = 0*pq.s,
                                             sampling_rate = self.samplingRate,
                                             name = dac.name)
+
+                    return result if asSignals else result.magnitude * dac.units
 
                 # Find out where if this dac's physical index is among analogDACs.
                 dacNdx = dNdx.index(dac.physicalIndex)
@@ -4871,46 +5031,50 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
                     # this DAC has the lowest physical index => emit waveform
                     # if sweep is even, else emit empty waveform
                     if sweep % 2 == 0:
-                        return self.getDACCommandWaveform(dac, sweep)
+                        return self.getDACCommandWaveform(dac, sweep, asSignals)
                     else:
                         # emit empty waveform
-                        return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
+                        result = neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
                                                 units = dac.units, t_start = 0*pq.s,
                                                 sampling_rate = self.samplingRate,
                                                 name = dac.name)
+                        return result if asSignals else result.manitude * dac.units
                 elif dacNdx == 1:
                     # this DAC is the next highest => emit waveform if the
                     # sweep is odd else emit empty waveform
                     if sweep % 2 == 1:
-                        return self.getDACCommandWaveform(dac, sweep)
+                        return self.getDACCommandWaveform(dac, sweep, asSignals)
                     else:
-                        return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
+                        result = neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
                                                 units = dac.units, t_start = 0*pq.s,
                                                 sampling_rate = self.samplingRate,
                                                 name = dac.name)
+                        return result if asSignals else result.magnitude * dac.units
 
                 else:
                     # in case there are multiple analog emitting DACs, and
                     # this DAC has a higher index than the first two =>
                     # return empty wave:
-                    return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
+                    result = neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
                                             units = dac.units, t_start = 0*pq.s,
                                             sampling_rate = self.samplingRate,
                                             name = dac.name)
+                    return result if asSignals else result.magnitude * dac.units
             else:
-                # return self.getDACCommandWaveform(dac, sweep)
                 if ignoreIsWaveformEnabled:
-                    return self.getDACCommandWaveform(dac, sweep)
+                    return self.getDACCommandWaveform(dac, sweep, asSignals)
                 else:
                     if dac.analogWaveformEnabled:
-                        return self.getDACCommandWaveform(dac, sweep)
+                        return self.getDACCommandWaveform(dac, sweep, asSignals)
 
-                    return neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
+                    result = neo.AnalogSignal(np.full((self.sweepSampleCount, 1), dac.dacHoldingLevel),
                                             units = dac.units, t_start = 0*pq.s,
                                             sampling_rate = self.samplingRate,
                                             name = dac.name)
+                    return result if asSignals else result.manitude * dac.units
 
-    def getDACCommandWaveform(self, dac, sweep):
+    def getDACCommandWaveform(self, dac, sweep,
+                              asSignals: bool = True):
         r"""Returns the analog waveform emitted by the specified DAC during a sweep.
         This returns the output as defined in the Epochs table, i.e., regardless
         of whether the DAC would output a waveform or not, given the specified
@@ -4920,6 +5084,10 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
         durations and levels of the Epochs defined for the DAC.
 
         """
+
+        # NOTE: 2026-04-18 16:23:14
+        # treating as analosignals for convenience; returning their magnitude
+        # if requested (i.e., asSignals is False)
         from iolib import pictio as pio
 
         dac, _ = self.check_DAC_Epoch(dac, None)
@@ -4955,16 +5123,19 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
             if len(myDac.stimulusFile.strip()):
                 try:
                     stimData = pio.loadFile(myDac.stimulusFile)
+
                 except:
                     scipywarn(f"Simulus file DAC#{myDac.physicalIndex} ({myDac.name}) is not valid for {sys.platform} platform")
                     if askForStimFile:
-                        # TODO: 2024-11-12 16:25:17
+                        # TODO: 2024-11-12 16:25:17 FIXME
                         # bring up file open dialog
                         pass
-                    return waveform
+
+                    return waveform if asSignals else waveform.magnitude
             else:
                 scipywarn(f"DAC#{myDac.physicalIndex} ({myDac.name}) is configured to use a waveform source {myDac.analogWaveformSource} but the stimulus file is not defined")
-                return waveform
+
+                return waveform if asSignals else waveform.magnitude
 
             if isinstance(stimData, neo.Block):
                 # TODO: 2024-11-12 16:26:31
@@ -4975,19 +5146,20 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
                 if segNdx < len(stimData.segments):
                     seg = stimData.segments[segNdx]
                     if sigNdx < len(seg.analogsignals):
-                        return seg.analogsignals[sigNdx]
-                #     return waveform
-                # return waveform
+                        return seg.analogsignals[sigNdx] if asSignals else seg.analogsignals[sigNdx].magnitude
             return waveform
 
         if dac.returnToHold:
             waveform[ndx[1]:,0] = previousLevel
 
+        if not asSignals:
+            return waveform.magnitude
+
         return waveform
 
 
     def getEpochAnalogWaveform(self, epoch:typing.Union[ABFEpoch, str, int],
-                               previousLevel:pq.Quantity, /,
+                               previousLevel: pq.Quantity, /,
                                sweep:int = 0,
                                dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]] = None,
                                lastLevelOnly:bool=False,
