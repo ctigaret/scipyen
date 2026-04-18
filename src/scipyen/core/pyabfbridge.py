@@ -3660,7 +3660,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                     # the HO DAC) is ignored; instead, the "alt" pattern is used
                     # but with timings of DAC0 for even sweeps and those of DAC1
                     # on odd sweeps.
-                    # If neither DAC0 nor DAC1 defined digital bit patterns, then
+                    # If neither DAC0 nor DAC1 defines digital bit patterns, then
                     # no DIG pattern is emitted.
                     isAlternateDigital =  True # force the use of the "alt" pattern
                                                # sort out timings below
@@ -3709,7 +3709,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
                        holding:bool=True,
                        fromRunStart:bool=False,
                        asNeoEpoch:bool=False,
-                       actualDIGOutput:bool=False,
                        ) -> typing.Optional[pd.DataFrame | neo.Epoch] :
         r"""Returns the Epochs Description table for a specific DAC.
 
@@ -3746,7 +3745,7 @@ Parameters:
     output patter is defined in the protocol, this will **NOT** be included. |nbsp|
     To generate TriggerEvent objects, use the ``getDigitalTriggers`` method.
 
-:actualDIGOutput: When ``True``, the digital pattern, if shown, reflects the  |nbsp|
+:actualOutput: When ``True``, the digital pattern, if shown, reflects the  |nbsp|
     *actual* digital output for the given sweep. The default (``False``) outputs |nbsp|
     the digital pattern *as defined* in the given DAC. **NOTE** This requires |nbsp|
     passing ``includeDigitalPattern = True`` .
@@ -3808,6 +3807,7 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
         #   in this respect, consider factoring the logic out to a common instance
         #   method
 
+        actualOutput = dac is None
         dac, _= self.check_DAC_Epoch(dac, None) # when dac is None, dac is set to active DAC
 
         # a tuple of ABFEpoch numbers where digital outputs are defined:
@@ -3816,13 +3816,13 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
         # HO DAC is a "high-order" DAC: a DAC with index > 1
         hoDACActive = self.activeDACChannel not in (0,1)
 
-        isAlternateDigital = self.getIsAlternateDigital(sweep, dac)
+        # isAlternateDigital = self.getIsAlternateDigital(sweep, dac)
 
         # ### BEGIN set up row labels for output data frame
         if sweep not in range(self.nSweeps):
             raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
 
-        if actualDIGOutput:
+        if actualOutput:
             outputNdx = f"(as output in sweep {sweep})"
 
         else:
@@ -3837,15 +3837,16 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
                                              dac.epochs)))
             etypes = list(map(lambda e: e.type, dac.epochs))
 
-            digPatterns = list(map(lambda e: self.getEpochDigitalPattern(e.epochNumber,
-                                                        alternate=isAlternateDigital,
-                                                        natural=False, separateBanks=True),
-                                    dac.epochs))
 
-            return neo.Epoch(times=times, durations=durations, labels=labels,
+            # digPatterns = list(map(lambda e: self.getEpochDigitalPattern(e.epochNumber,
+            #                                             alternate=isAlternateDigital,
+            #                                             natural=False, separateBanks=True),
+            #                         dac.epochs))
+
+            result = neo.Epoch(times=times, durations=durations, labels=labels,
                              name = f"{dac.name} Epochs in sweep {sweep}",
                              units = times[0].units,
-                             epochTypes = etypes, digital = digPatterns)
+                             epochTypes = etypes)#, digital = digPatterns)
 
         else:
             if includeDigitalPattern:
@@ -3871,76 +3872,97 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
             rowIndex.append(outputNdx)
             # ### END set up row labels for output data frame
 
-            epochData = dict()
+            result = dict()
 
             # print(f"{self.__class__.__name__}.getEpochsTable: isAlternateDigital = {isAlternateDigital}")
 
-            for i, epoch in enumerate(dac.epochs):
-                epochDigPattern = self.getEpochDigitalPattern(epoch.epochNumber,
-                                                        alternate=isAlternateDigital,
-                                                        natural=False, separateBanks=True)
+            # hoDACActive = self.activeDACChannel not in (0,1)
 
-                if actualDIGOutput:
-                    if self.alternateDigitalOutputsEnabled and epoch.number in digEpochs:
-                        # get the actual dac where the alternative digital bit pattern was defined:
-                        digDACs = self.getDACsForEpoch(epoch.number)
-                        # print(f"{self.__class__.__name__}.getEpochsTable: digDACs = {digDACs}")
-                        if len(digDACs) > 1:
-                            assert dac.physicalIndex in digDACs, f"DAC {dac.physicalIndex} not in digital-emitting DACs"
-                            thisDacNdx = digDACs.index(dac.physicalIndex)
-                            # print(f"{self.__class__.__name__}.getEpochsTable: thisDacNdx ({dac.physicalIndex}) = {thisDacNdx}")
+        for i, epoch in enumerate(dac.epochs):
+            # print(f"\n{self.__class__.__name__}.getEpochsTable: epoch {epoch.letter}:")
 
-                            if self.activeDACChannel == 0:
-                                if dac.physicalIndex == self.activeDACChannel:# BUG 2026-04-17 23:04:54
-                                    myDac = self.getDAC(digDACs[thisDacNdx]) if isAlternateDigital and sweep % 2 > 0 else self.getDAC(0)
-                            else:
+            myDac = dac # allocate early — use the given dac
 
-                            elif self.activeDACChannel == 1:
-                                myDac = self.getDAC(0) if isAlternateDigital and sweep % 2 > 0 else self.getDAC(1)
-                            else:
-                                assert hoDACActive, f"Active DAC index expected to be > 1; got {self.activeDACChannel}"
-                                # activeDAC is a HO DAC
-                                if sweep % 2 == 0 and 0 in digDACs: # "even" sweeps => query DAC0
-                                    myDac = self.getDAC(0)
-                                elif sweep % 2 > 0 and 1 in digDACs: # "odd" sweeps => query DAC1
-                                    myDac = self.getDAC(1)
-                                else:
-                                    continue
+            # would an alt output be output for this sweep?
+            # for how alt output is def'ed see comments in self.getIsAlternateDigital
+            wantsAltOutput = sweep % 2 > 0
 
-                            # to report correct temporal params for epoch in DAC, given sweep index
-                            myEpoch = myDac.getEpoch(epoch.number)
+            if actualOutput:
+                if self.alternateDigitalOutputsEnabled and epoch.number in digEpochs:
+                    # get the dac where the alternative digital bit pattern was defined:
+                    digDACs = self.getDACsForEpoch(epoch.number)
+                    # print(f"{self.__class__.__name__}.getEpochsTable: digDACs = {digDACs}")
+
+                    if len(digDACs) > 1 and dac.physicalIndex in digDACs:
+
+                        if hoDACActive:
+                            if 1 in digDACs and wantsAltOutput:
+                                myDac = self.getDAC(1)
+                            elif 0 in digDACs and not wantsAltOutput:
+                                myDac = self.getDAC(0)
 
                         else:
-                            myDac = dac
-                            myEpoch = epoch
+                            if self.activeDACChannel in digDACs:
+                                mainDacNdx = digDACs.index(self.activeDACChannel)
+                                if mainDacNdx > 0:
+                                    altDacNdx = mainDacNdx - 1
+                                else:
+                                    altDacNdx = mainDacNdx + 1
+
+                                if altDacNdx < len(digDACs):
+                                    altDac = self.getDAC(digDACs[altDacNdx])
+
+                            myDac = altDac if wantsAltOutput else self.activeDAC
+
+                        # to report correct temporal params for epoch in DAC, given sweep index
+                        myEpoch = myDac.getEpoch(epoch.number)
 
                     else:
                         myDac = dac
                         myEpoch = epoch
+
                 else:
-                    # OK here: shows the Epoch table AS DEFINED in Clampex, regardless
-                    # of the sweep
                     myDac = dac
                     myEpoch = epoch
+            else:
+                # OK here: shows the Epoch table AS DEFINED in Clampex, regardless
+                # of the sweep
+                myDac = dac
+                myEpoch = epoch
 
-                # print(f"{self.__class__.__name__}.getEpochsTable: active DAC is {self.activeDACChannel}; myDac is {myDac.physicalIndex}; showing actual output: {actualOutput}")
+            # isAlternateDigital = self.getIsAlternateDigital(sweep, myDac)
 
-                duration = self.getEpochDuration(myEpoch, myDac, sweep, samples = False)
-                durationSamples = scq.nSamples(duration, self.samplingRate)
+            epochDigPattern = self.getEpochDigitalPattern(epoch.epochNumber,
+                                                    alternate=wantsAltOutput,
+                                                    natural=False, separateBanks=True)
 
-                deltaDuration = self.getEpochDeltaDuration(myEpoch, myDac)
-                deltaDurationSamples = scq.nSamples(deltaDuration, self.samplingRate)
+            # print(f"{self.__class__.__name__}.getEpochsTable: active DAC is {self.activeDACChannel}; myDac is {myDac.physicalIndex}; showing actual output: {actualOutput}")
 
-                finalDuration = self.getEpochDuration(myEpoch, myDac, self.nSweeps-1, samples = False)
-                finalDurationSamples = scq.nSamples(finalDuration, self.samplingRate)
+            duration = self.getEpochDuration(myEpoch, myDac, sweep, samples = False)
+            durationSamples = scq.nSamples(duration, self.samplingRate)
 
-                pulsePeriod = self.getEpochPulsePeriod(myEpoch, myDac)
-                pulsePeriodSamples = scq.nSamples(pulsePeriod, self.samplingRate)
+            deltaDuration = self.getEpochDeltaDuration(myEpoch, myDac)
+            deltaDurationSamples = scq.nSamples(deltaDuration, self.samplingRate)
 
-                pulseCount = 0 if pulsePeriod == 0. else int(np.ceil(duration/pulsePeriod))
-                finalPulseCount = 0 if pulsePeriod == 0. else int(np.ceil(finalDuration/pulsePeriod))
+            finalDuration = self.getEpochDuration(myEpoch, myDac, self.nSweeps-1, samples = False)
+            finalDurationSamples = scq.nSamples(finalDuration, self.samplingRate)
 
-                if includeDigitalPattern:
+            pulsePeriod = self.getEpochPulsePeriod(myEpoch, myDac)
+            pulsePeriodSamples = scq.nSamples(pulsePeriod, self.samplingRate)
+
+            pulseCount = 0 if pulsePeriod == 0. else int(np.ceil(duration/pulsePeriod))
+            finalPulseCount = 0 if pulsePeriod == 0. else int(np.ceil(finalDuration/pulsePeriod))
+
+            if includeDigitalPattern:
+                if asNeoEpoch:
+                    if "digital" not in result.annotations:
+                        result.annotations["digital"] = list()
+
+                    result.annotations["digital"].append({epoch.letter:
+                                                              {"bank 0": epochDigPattern[0],
+                                                               "bank 1": epochDigPattern[1]}
+                                                         })
+                else:
                     epValues = [myEpoch.typeName, myEpoch.firstLevel,
                                 myEpoch.deltaLevel, myEpoch.firstDuration,
                                 scq.nSamples(myEpoch.firstDuration, self.samplingRate),
@@ -3958,25 +3980,29 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
                                 ""
                                 ]
 
-                else:
-                    epValues = [myEpoch.typeName, myEpoch.firstLevel,
-                                myEpoch.deltaLevel, myEpoch.firstDuration,
-                                scq.nSamples(myEpoch.firstDuration, self.samplingRate),
-                                deltaDuration, deltaDurationSamples,
-                                duration, durationSamples,
-                                finalDuration, finalDurationSamples,
-                                myEpoch.pulseFrequency,
-                                pulsePeriod, pulsePeriodSamples,
-                                myEpoch.pulseWidth,
-                                scq.nSamples(myEpoch.pulseWidth, self.samplingRate),
-                                pulseCount,
-                                finalPulseCount,
-                                ""
-                                ]
+                    result[epoch.letter] = epValues
+            else:
+                epValues = [myEpoch.typeName, myEpoch.firstLevel,
+                            myEpoch.deltaLevel, myEpoch.firstDuration,
+                            scq.nSamples(myEpoch.firstDuration, self.samplingRate),
+                            deltaDuration, deltaDurationSamples,
+                            duration, durationSamples,
+                            finalDuration, finalDurationSamples,
+                            myEpoch.pulseFrequency,
+                            pulsePeriod, pulsePeriodSamples,
+                            myEpoch.pulseWidth,
+                            scq.nSamples(myEpoch.pulseWidth, self.samplingRate),
+                            pulseCount,
+                            finalPulseCount,
+                            ""
+                            ]
 
-                epochData[epoch.letter] = epValues
+                result[epoch.letter] = epValues
 
-            return pd.DataFrame(epochData, index = np.array(rowIndex))
+        if not asNeoEpoch:
+            result = pd.DataFrame(result, index = np.array(rowIndex))
+
+        return result
 
     def getDigitalWaveform(self, sweep:int = 0,
                            dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
