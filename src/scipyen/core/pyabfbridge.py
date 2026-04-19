@@ -4863,7 +4863,8 @@ digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values |nbs
                                     typing.Union[ABFOutputConfiguration, int, str]
                                ] = None,
                            ignoreIsWaveformEnabled: bool = False,
-                           asSignals: bool = True) -> neo.AnalogSignal:
+                           asSignals: bool = True,
+                           ) -> neo.AnalogSignal:
         r"""Generates an AnalogSignal representation of a DAC command waveform.
 
 .. |nbsp| unicode:: 0xA0
@@ -4930,7 +4931,6 @@ Parameters:
     otherwise, they wil be returned as numpy arrays.
 
     Optional; default is ``True``.
-
 
 Returns:
 --------
