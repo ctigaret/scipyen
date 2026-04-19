@@ -517,9 +517,190 @@ DIGITAL_OUTPUT_COUNT = pyabf.waveform._DIGITAL_OUTPUT_COUNT # 8
 # ABFDigitalPattern = namedtuple("ABFDigitalPattern", ["main", "alternate"], module=__name__)
 
 class ABFDigitalPattern(typing.NamedTuple):
+    r"""Digital pattern for the DIG channels in Clampex.
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+For Digidata 1500 series (with eight digital outputs) the DIG channels are stored |nbsp|
+as a pair of 4-tuple flags, one pair for each of the "main" and "alternate" digital |nbsp|
+patterns, with 'x' below standing for any of the three possible values (0, 1, '*'):
+
+::
+    Channel index:  3,2,1,0    7,6,5,4
+                  ((x,x,x,x), (x,x,x,x))
+
+For Digidata 1400 series (with only four digital outputs) there is only one such |nbsp|
+bank of four flags, for each of the "main" and "alternate" digital patterns:
+
+::
+    Channel index:  3,2,1,0
+                  ((x,x,x,x), )
+
+
+Members (attributes):
+---------------------
+
+:main: a pair of 4-channel banks with their value (0 = inactive, 1 = emitting a |nbsp|
+        TTL pulse, or '*' = emitting a TTL train), by default, in DESCENDING order |nbsp|
+        of their index (see above). For Digidata < 1500, the pair contains only one |nbsp|
+        bank of four channels.
+
+:alternate: as ``main``, but reflects the digital channel activity on alternate |nbsp|
+    sweeps (and therefore ONLY used in a protocol where "alternateDigitalOutputsEnabled" |nbsp|
+    is ``True``).
+
+:reversed: flag indicating the index order in which channels are stored in each bank. |nbsp|
+    By default, this is False.
+
+    Since ABFDigitalPattern objects are NamedTuples, this value cannot be changed |nbsp|
+    for a given instance (Python language feature). However, new instances can be |nbsp|
+    created with ``reversed`` set to True, which is whate the method ``self.reverse()`` |nbsp|
+    does.
+
+    To avoid any confusion, one should NOT pass a value to this parameter when |nbsp|
+    constructing a new ABFDigitalPattern, unless they have a very good reason to do so.
+
+
+.. note::
+    The default order of the channels is as depicted above. However, sometimes |nbsp|
+    it is convenient to have the channels in ascending (natural) order.
+
+    Therefore the new method self.reversed generates a new ABFDigitalPattern with
+    the order reversed. To ensure which order is beng used in an ABFDigitalPattern
+    instance, check the ``reversed`` attribute.!
+
+    The default value of ``False`` indicates that channels are stored in descending |nbsp|
+    order of their index (as used throughout the Clampex protocol).
+
+"""
     main: tuple
     alternate: tuple
+    reversed: bool = False
 
+    def channelIsUsed(self, channel: int,
+                        main: typing.Optional[
+                            typing.Union[bool, Tribool]
+                            ] = None,
+                        train: typing.Optional[
+                            typing.Union[bool, Tribool]
+                            ] = None) -> bool | tuple[bool]:
+        if main is None:
+            main = Tribool()
+
+        elif isinstance(main, bool):
+            main = Tribool(main)
+
+        elif not isinstance(main, Tribool):
+            raise TypeError(f"'main' expected a bool, Tribool, or None; got {type(main).__name__} instead")
+
+        if train is None:
+            train = Tribool()
+
+        elif isinstance(train, bool):
+            train = Tribool(train)
+
+        elif not isinstance(train, Tribool):
+            raise TypeError(f"'train' expected a bool, Tribool, or None; got {type(train).__name__} instead")
+
+        if main.value is None:
+            if len(self.main) == 0 and len(self.alternate) == 0:
+                return False
+
+            return (self.channelIsUsed(channel, Tribool(True), train),
+                    self.channelIsUsed(channel, Tribool(False),  train))
+
+        else:
+            banks = self.main if main.value else self.alternate
+
+            if channel >= 0:
+                if channel < 4:
+                    bank0  = tuple(reversed(banks[0])) if not self.reversed else banks[0]
+                    if train.value is None:
+                        return bank0[channel] != 0
+                    elif train.value:
+                        return bank0[channel] == "*"
+                    else:
+                        return bank0[channel] == 1
+
+                elif channel < 8:
+                    bank1 = tuple(reversed(banks[1])) if not self.reversed else banks[1]
+                    if train.value is None:
+                        return bank1[channel] != 0
+                    elif train.value:
+                        return bank1[channel] == "*"
+                    else:
+                        return bank1[channel] == 1
+
+        return False
+
+    def reverse(self) -> typing.Self:
+        r"""Generate a version of this object with the order of the channels REVERSED in each bank"""
+        main = tuple(map(lambda b: tuple(reversed(b)), self.main))
+        alternate = tuple(map(lambda b: tuple(reversed(b)), self.alternate))
+        return self.__class__(main, alternate, not self.reversed)
+
+    def getActiveChannels(self,
+                        main: typing.Optional[
+                            typing.Union[bool, Tribool]
+                            ] = None,
+                        train: typing.Optional[
+                            typing.Union[bool, Tribool]
+                            ] = None) -> tuple:
+        r"""Return a tuple of the indexes of the used digital channels.
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+Parameters:
+-----------
+:main: bool, Tribool, or None (default). Flag specifying which bank of digital |nbsp|
+    channels should be queried. When ``None``, the function queries both banks |nbsp|
+    and returns a pair of tuples, respectively, for the *main* and the *alternate* |nbsp|
+    digital channel banks.
+
+:train: bool, Tribool, or None (default). Flag specifying which type of TTL |nbsp|
+        signal is expected for the digital channels to emit for them to be considered |nbsp|
+        "in use". When ``None``, then a
+
+
+
+"""
+        if isinstance(main, bool):
+            main  = Tribool(main)
+
+        elif main is None:
+            main = Tribool()
+
+        elif not isinstance(main, Tribool):
+            raise TypeError(f"'main' expected a bool, Tribool, or None; instead, got a {type(main).__name__}")
+
+        if isinstance(train, bool):
+            train  = Tribool(train)
+
+        elif train is None:
+            train = Tribool()
+
+        elif not isinstance(train, Tribool):
+            raise TypeError(f"'train' expected a bool, Tribool, or None; instead, got a {type(train).__name__}")
+
+        if main.value is None:
+            return (self.getActiveChannels(Tribool(True), train),
+                    self.getActiveChannels(Tribool(False), train))
+
+        else:
+            pattern = self if self.reversed else self.reverse()
+
+            # print(f"{self.__class__.__name__}.getActiveChannels: pattern -> {pattern}")
+
+            banks = pattern.main if main.value else pattern.alternate
+
+            # full_banks = tuple(itertools.chain.from_iterable(banks))
+            full_banks = itertools.chain.from_iterable(banks)
+
+            testVal = lambda v: v != 0 if train.value is None else v == "*" if train.value else v == 1
+
+            return tuple(map(lambda i: i[0], filter(lambda i: testVal(i[1]), enumerate(full_banks))))
 
 # These two will be (properly) redefined further below
 class ABFOutputConfiguration:   # placeholder to allow the definition of ABFProtocol, below
@@ -1835,7 +2016,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
         return dac, epoch
 
     def digitalOutputs(self, alternate:typing.Optional[bool] = None,
-                       trains:typing.Optional[bool] = None) -> set:
+                       trains:typing.Optional[bool] = None,
+                       sweep: typing.Optional[
+                           typing.Union[int, tuple, ABFDigitalPattern]
+                           ] = None) -> set:
         r"""Indices of the digital output channels used in this protocol.
 
         By default, returns all DIG channels used in both main and alternate
@@ -1851,7 +2035,15 @@ class ABFProtocol(ElectrophysiologyProtocol):
 
         """
 
-        return set(itertools.chain.from_iterable([list(itertools.chain.from_iterable([self.getUsedDigitalOutputChannels(alternate, trains) for e in o.epochs])) for o in self.outputs]))
+        return set(
+            itertools.chain.from_iterable(
+                [list(
+                    itertools.chain.from_iterable(
+                        [self.getUsedDigitalChannels(sweep, epoch = e, alternate=alternate, trains=trains) for e in o.epochs]
+                        )
+                    ) for o in self.outputs]
+                )
+            )
         # return set(itertools.chain.from_iterable([list(itertools.chain.from_iterable([self.getUsedDigitalOutputChannels(alternate, trains) for e in o.epochs])) for o in self.outputs]))
 
     def getClampMode(self,
@@ -2143,6 +2335,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 if indices:
                     # this one returns pathway INDEXES, NOT pathway objects
                     ret = tuple((s, tuple( x[0] for x in tuple(sorted(tuple(filter(lambda j: len(j[1]), tuple([(k, dac.getEpochsForDigitalChannel(pathways[k].stimulus.channel, s)) for k in range(len(pathways))]))), key = lambda x: dac.getEpochRecordingStartTime(x[1][0]))))) for s in range(self.nSweeps))
+                    # ret = tuple((s, tuple( x[0] for x in tuple(sorted(tuple(filter(lambda j: len(j[1]), tuple([(k, dac.getEpochsForDigitalChannel(pathways[k].stimulus.channel, s)) for k in range(len(pathways))]))), key = lambda x: dac.getEpochRecordingStartTime(x[1][0]))))) for s in range(self.nSweeps))
                 else:
                     # this one returns pathway OBJECTS, NOT THEIR INDEXES
                     ret = tuple((s, tuple( x[0] for x in tuple(sorted(tuple(filter(lambda j: len(j[1]), tuple([(p, dac.getEpochsForDigitalChannel(p.stimulus.channel, s)) for p in pathways]))), key = lambda x: dac.getEpochRecordingStartTime(x[1][0]))))) for s in range(self.nSweeps))
@@ -2679,7 +2872,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
 
         return digOFF * pq.V
 
-    def getUsedDigitalChannels(self, sweep:typing.Union[int, tuple] = 0,
+    def getUsedDigitalChannels(self, sweep: typing.Union[int, tuple, ABFDigitalPattern] = 0,
                                epoch:typing.Optional[typing.Union[ABFEpoch, int, str]] = None,
                                letters:bool=False,
                                alternate:typing.Optional[bool]=None,
@@ -2707,13 +2900,13 @@ Parameters:
     is passed here! While it may be tempting to pass directly an entry |nbsp|
     from the self.digitalPatterns dictionary, doing so would not take into |nbsp|
     account the fact that the original order of the DIG channel indexes |nbsp|
-    are not stored in natrual (ie. increasing) order, in the entry. This |nbsp|
+    are not stored in natural (ie. increasing) order, in the entry. This |nbsp|
     would result in reporting the wrong DIG channel indexes!
 
     The correct approach, therefore, is:
 
     # 1. get the digital bit pattern in natural order, as 2-tuple with |nbsp|
-    main and alternate patterns:
+    main and alternate patterns, e.g.:
 
 ::
     digPattern = self.getDigitalPattern(sweep, epoch, alternate="all",
@@ -2773,6 +2966,9 @@ True                epoch_letter ↦ a tuple as above
 
 
 """
+        if sweep is None:
+            sweep = 0
+
         if isinstance(trains, bool):
             comparator = lambda x: x == ("*" if trains else 1)
         else:
@@ -2821,6 +3017,7 @@ True                epoch_letter ↦ a tuple as above
                                     self.digitalPatterns.items()))))
 
     def getDACsWithDigitalOutput(self) -> list:
+        r"""List of DACs that emit digital outputs"""
         digEpochs = self.epochsWithDigitalOutput
         ret = set() # DAC physical indexes
         for epoch in digEpochs:
@@ -2828,6 +3025,12 @@ True                epoch_letter ↦ a tuple as above
             for dac in dacs:
                 ret.add(dac)
         return sorted(list(ret))
+
+    @property
+    def digitalOutputDACs(self) -> list:
+        r"""Property version of self.getDACsWithDigitalOutput; read-only"""
+        return self.getDACsWithDigitalOutput()
+
 
     def getDACsForEpoch(self, epoch:typing.Union[ABFEpoch, str, int]) -> tuple:
         r"""A tuple of DAC physical indexes where the epoch is defined.
@@ -6952,96 +7155,98 @@ class ABFOutputConfiguration:
 #
 #         return digOFF * pq.V
 
-#     def getEpochsForDigitalChannel(self, digChannel: int, sweep: int = 0,
-#                                    indexes: bool=False,
-#                                    train: typing.Optional[bool] = None) -> list:
-#         r"""Returns the index of the epoch where the digChannel is used (set to 1 or '*')
-#         Parameters:
-#         -----------
-#         digChannel: int in the semi-open interval [0 ⋯ 8)
-#         sweep: int — index of the sweep (necessary to determine in which digital
-#             pattern — main or alternate — the digChannel is sought
-#         indexes:bool, default is False
-#             When True, the method returns a list of epoch indexes in this DAC epochs table
-#             When False (the default), return a list of epochs
-#         train:bool or None
-#             When a bool, restricts the look up to where digChannel emits a TTL train
-#             (True) or pulse (False).
-#
-#             Default is None
-#
-#         Returns:
-#         --------
-#         A list of epochs (or their indexes in the epochs table if 'indexes' is True)
-#         where digChannel is set (i.e., non-zero).
-#
-#         The list may be empty is none of the epochs define a digital pattern for
-#         the given sweep.
-#
-#         NOTE: In Clampex, the digital pattern defined in an epoch normally applies
-#         to ALL sweeps.
-#
-#         The only exception are the protocols where alternate digital pattern
-#         is enabled. In such protocols, the active DAC channel is the one where
-#         the "main" digital pattern is defined in the protocol editor, and this
-#         "main" pattern is applied to the sweeps with even index (0, 2, 4, etc).
-#         The "alternative" digital pattern is defined in any other DAC in the protocol
-#         editor, and is applied to the sweeps with odd index (1, 3, 5, etc)
-#
-#         NOTE: In reality, this apparent association between a digital pattern
-#         and a DAC is not born out by the hardware; however, digital patterns can
-#         only be configured inside an epoch for analog command waveform output
-#         defined for a particular DAC. This may give the false impression that
-#         a digital pattern is emitted through the DAC where such epochs were defined,
-#         in the protocol editor.
-#
-#         Things get more complicated when distinct digital patterns need to be
-#         emitted in consecutive sweeps. Currently, Clampex supports only the definition
-#         of only two digital patterns in the same protocol, as explained in the NOTE above.
-#
-#         For more complex experimental configuration (e.g. using three distinct
-#         digital patterns in consecutive sweeps) the only approach in Clampex
-#         appears to be the use of distinct ABF protocols via  "Sequencing keys".
-#         These protocols would have to generate just one sweep per run, with the
-#         disadvantage that recording averages would have to be done offline
-#         (or at least Outside Clampex).
-#
-#
-#         """
-#         isAlternateDigital = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
-#
-#         ret = list()
-#
-#         for k, epoch in enumerate(self.epochs):
-#             # see self.getEpochDigitalPattern for code logic
-#             digPattern = list()
-#             if self.alternateDigitalOutputStateEnabled and self.logicalIndex < 2:
-#                 if self.digitalOutputEnabled:
-#                     if self.physicalIndex == self.protocol.activeDACChannel:
-#                         if digChannel in range(4):
-#                             digPattern = list(reversed(epoch.getEpochDigitalPattern(isAlternateDigital)[0]))
-#                         elif digChannel in range(4,8):
-#                             digPattern = list(reversed(epoch.getEpochDigitalPattern(isAlternateDigital)[1]))
-#                             digChannel -= 4
-#                         else:
-#                             raise ValueError(f"Expecting a digital channel index ('digChannel') in the interval [0 ⋯ 8); instead, got {digChannel}")
-#             else:
-#                 if self.digitalOutputEnabled:
-#                     if digChannel in range(4):
-#                         digPattern = list(reversed(epoch.getEpochDigitalPattern()[0]))
-#                     elif digChannel in range(4,8):
-#                         digPattern = list(reversed(epoch.getEpochDigitalPattern()[1]))
-#                         digChannel -= 4
-#                     else:
-#                         raise ValueError(f"Expecting a digital channel index ('digChannel') in the interval [0 ⋯ 8); instead, got {digChannel}")
-#
-#             if digChannel < len(digPattern) and (digPattern[digChannel] != 0 if train is None else digPattern[digChannel] == '*' if train is True else digPattern[digChannel] == 1):
-#                 if indexes:
-#                     ret.append(k)
-#                 else:
-#                     ret.append(epoch)
-#
-#         return ret
+    # def getEpochsForDigitalChannel(self, digChannel: int, sweep: int = 0,
+    #                                indexes: bool=False,
+    #                                train: typing.Optional[bool] = None) -> list:
+    #     r"""Returns the index of the epoch where the specified digChannel is used.
+    #
+    #
+    #     Parameters:
+    #     -----------
+    #     digChannel: int in the semi-open interval [0 ⋯ 8)
+    #     sweep: int — index of the sweep (necessary to determine in which digital
+    #         pattern — main or alternate — the digChannel is sought
+    #     indexes:bool, default is False
+    #         When True, the method returns a list of epoch indexes in this DAC epochs table
+    #         When False (the default), return a list of epochs
+    #     train:bool or None
+    #         When a bool, restricts the look up to where digChannel emits a TTL train
+    #         (True) or pulse (False).
+    #
+    #         Default is None
+    #
+    #     Returns:
+    #     --------
+    #     A list of epochs (or their indexes in the epochs table if 'indexes' is True)
+    #     where digChannel is set (i.e., non-zero).
+    #
+    #     The list may be empty is none of the epochs define a digital pattern for
+    #     the given sweep.
+    #
+    #     NOTE: In Clampex, the digital pattern defined in an epoch normally applies
+    #     to ALL sweeps.
+    #
+    #     The only exception are the protocols where alternate digital pattern
+    #     is enabled. In such protocols, the active DAC channel is the one where
+    #     the "main" digital pattern is defined in the protocol editor, and this
+    #     "main" pattern is applied to the sweeps with even index (0, 2, 4, etc).
+    #     The "alternative" digital pattern is defined in any other DAC in the protocol
+    #     editor, and is applied to the sweeps with odd index (1, 3, 5, etc)
+    #
+    #     NOTE: In reality, this apparent association between a digital pattern
+    #     and a DAC is not born out by the hardware; however, digital patterns can
+    #     only be configured inside an epoch for analog command waveform output
+    #     defined for a particular DAC. This may give the false impression that
+    #     a digital pattern is emitted through the DAC where such epochs were defined,
+    #     in the protocol editor.
+    #
+    #     Things get more complicated when distinct digital patterns need to be
+    #     emitted in consecutive sweeps. Currently, Clampex supports only the definition
+    #     of only two digital patterns in the same protocol, as explained in the NOTE above.
+    #
+    #     For more complex experimental configuration (e.g. using three distinct
+    #     digital patterns in consecutive sweeps) the only approach in Clampex
+    #     appears to be the use of distinct ABF protocols via  "Sequencing keys".
+    #     These protocols would have to generate just one sweep per run, with the
+    #     disadvantage that recording averages would have to be done offline
+    #     (or at least Outside Clampex).
+    #
+    #
+    #     """
+    #     isAlternateDigital = self.alternateDigitalOutputStateEnabled and sweep % 2 > 0
+    #
+    #     ret = list()
+    #
+    #     for k, epoch in enumerate(self.epochs):
+    #         # see self.getEpochDigitalPattern for code logic
+    #         digPattern = list()
+    #         if self.alternateDigitalOutputStateEnabled and self.logicalIndex < 2:
+    #             if self.digitalOutputEnabled:
+    #                 if self.physicalIndex == self.protocol.activeDACChannel:
+    #                     if digChannel in range(4):
+    #                         digPattern = list(reversed(epoch.getEpochDigitalPattern(isAlternateDigital)[0]))
+    #                     elif digChannel in range(4,8):
+    #                         digPattern = list(reversed(epoch.getEpochDigitalPattern(isAlternateDigital)[1]))
+    #                         digChannel -= 4
+    #                     else:
+    #                         raise ValueError(f"Expecting a digital channel index ('digChannel') in the interval [0 ⋯ 8); instead, got {digChannel}")
+    #         else:
+    #             if self.digitalOutputEnabled:
+    #                 if digChannel in range(4):
+    #                     digPattern = list(reversed(epoch.getEpochDigitalPattern()[0]))
+    #                 elif digChannel in range(4,8):
+    #                     digPattern = list(reversed(epoch.getEpochDigitalPattern()[1]))
+    #                     digChannel -= 4
+    #                 else:
+    #                     raise ValueError(f"Expecting a digital channel index ('digChannel') in the interval [0 ⋯ 8); instead, got {digChannel}")
+    #
+    #         if digChannel < len(digPattern) and (digPattern[digChannel] != 0 if train is None else digPattern[digChannel] == '*' if train is True else digPattern[digChannel] == 1):
+    #             if indexes:
+    #                 ret.append(k)
+    #             else:
+    #                 ret.append(epoch)
+    #
+    #     return ret
 
 #     def getEpochDigitalPattern(self, epoch:typing.Union[ABFEpoch, str, int],
 #                                sweep:int=0) ->tuple:
