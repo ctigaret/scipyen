@@ -2044,7 +2044,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
             itertools.chain.from_iterable(
                 [list(
                     itertools.chain.from_iterable(
-                        [self.getDigitalChannelsUsage(sweep, epoch = e, main=main, trains=trains) for e in o.epochs]
+                        [self.getActiveDigitalChannels(sweep, epoch = e, main=main, trains=trains) for e in o.epochs]
                         )
                     ) for o in self.outputs]
                 )
@@ -2877,9 +2877,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
 
         return digOFF * pq.V
 
-    # def getDigitalChannelsUsage(self, sweep: typing.Union[int, tuple,
-    #                                                      ABFDigitalPattern] = 0,
-    def getDigitalChannelsUsage(self, sweep: typing.Optional[typing.Union[int, tuple]] = None,
+    def getActiveDigitalChannels(self, sweep: typing.Optional[typing.Union[int, tuple]] = None,
                                epoch:typing.Optional[
                                                 typing.Union[ABFEpoch, int, str]
                                                     ] = None,
@@ -2890,8 +2888,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
                                trains:typing.Optional[
                                                     typing.Union[bool, Tribool]
                                                     ] = None,
-                               ) -> tuple[int]:
-        r"""Reports DIG chanel usage in a specified sweep.
+                               ) -> list[dict]:
+        r"""Queries the active DIG channels in a given sweep, or in all sweeps.
 
 .. |nbsp| unicode:: 0xA0
    :trim:
@@ -2905,34 +2903,8 @@ This behaviour can be fine-tuned with the parameters below.
 
 Parameters:
 -----------
-:sweep: int, in the semi-open interval [0, nSweeps); default is 0
-
-    Alternatively, the sweep can already be a digital bit pattern tuple |nbsp|
-    (or ABFDigitalPattern named tuple) — useful to avoid querying the bit |nbsp|
-    pattern twice in code that calls this method — but CAUTION on what it |nbsp|
-    is passed here! While it may be tempting to pass directly an entry |nbsp|
-    from the self.digitalPatterns dictionary, doing so would not take into |nbsp|
-    account the fact that the original order of the DIG channel indexes |nbsp|
-    are not stored in natural (ie. increasing) order, in the entry. This |nbsp|
-    would result in reporting the wrong DIG channel indexes!
-
-    The correct approach, therefore, is:
-
-    # 1. get the digital bit pattern in natural order, as 2-tuple with |nbsp|
-    main and alternate patterns, e.g.:
-
-::
-    digPattern = self.getEpochDigitalPattern(sweep, epoch, main=None,
-                                        natural=True, separateBanks=False)
-
-
-    # 2. pass the result here, to get the DIG channel indexes used
-
-::
-    usedDigs = self.getDigitalChannelsUsage(digPattern)
-
-    • NOTE that the parameters listed below are ignored in this syntax |nbsp|
-    variant.
+:sweep: int, in the semi-open interval [0, nSweeps); default is None (queries all |nbsp|
+    sweeps).
 
 :epoch: and ABFEpoch object, an int (epoch number) or a str (epoch "letter")
 
@@ -2995,9 +2967,9 @@ True                epoch_letter ↦ a tuple as above
         elif not isinstance(trains, Tribool):
             raise TypeError(f"'trains' expected a bool, Tribool, or None; instead got a {type(trains).__name__}")
 
-        comparator = lambda x: (x in ("*", 1) if trains.value is None else x == "*" if trains.value else x == 1)
+        comparator = lambda x: (x != 0 if trains.value is None else x == "*" if trains.value else x == 1)
 
-        index =
+        index = lambda p: tuple(map(lambda i: i[0], filter(lambda i: comparator(i[1]), enumerate(p))))
 
         # index = lambda p: tuple(sorted(map(lambda c: p.index(c), ("*", 1)))) if trains.value is None else lambda p: (p.index("*"), ) if trains.value else lambda p: set(p.index(1), )
 
@@ -3020,59 +2992,81 @@ True                epoch_letter ↦ a tuple as above
             raise TypeError(f"'sweep' argument has invalid type {type(sweep).__name__}")
 
 
-        ret = dict()
+        ret = list()
+
+        res = {"sweep": list(), "epoch": list(), "DIG": list(), "main": list()]
 
         for sweep in sweeps:
-            sweep_result = dict()
+            # sweep_result = dict()
+            sweep_result = {"sweep": sweep, "epochs": dict()}
             if epoch is None:
                 for e in self.digitalPatterns:
                     # pattern = self.digitalPatterns[e]
-                    pattern = self.getEpochDigitalPattern(e, main=main) # uses natural=True and separateBanks = False
-                    if all(isinstance(p, tuple) for p in pattern):
-                        value = tuple(map(lambda p: set(filter(comparator, p)), pattern))
-                    else:
-                        value = set(filter(comparator, pattern))
-
-                    print(f"{self.__class__.__name__}.getDigitalChannelsUsage -> pattern = {pattern}")
-
                     key = getEpochLetter(e) if letters else e
-                    sweep_result[key] = value
+                    pattern = self.getEpochDigitalPattern(e, main=main, separateBanks=False) # uses natural=True and separateBanks = False
+                    # print(f"{self.__class__.__name__}.getActiveDigitalChannels epoch {key} -> pattern = {pattern}")
+                    if all(isinstance(p, tuple) for p in pattern):
+                        # value = tuple(map(index, pattern))
+                        ndx = tuple(filter(lambda t: len(t)>0, map(index, pattern)))
+                        if any(len(x) for x in ndx):
+                            sweep_result["epochs"][key] = dict(zip(("main", "alternate"), ndx))
+                            # res["sweep"].append(sweep)
+                            # res["epoch"].append(key)
+                            # res["main"].append()
 
-                ret[sweep] = sweep_result
+                    else:
+                        ndx = index(pattern)
+                        if len(ndx):
+                            which = "main" if main.value == True else "alternate"
+                            sweep_result["epochs"][key] = {which: ndx}
+
+                if len(sweep_result["epochs"]):
+                    ret.append(sweep_result)
 
             else:
                 if isinstance(epoch, int):
                     if epoch not in self.digitalPatterns:
                         raise ValueError(f"Invalid epoch index {epoch}")
 
-                    key = getEpochLetter(epoch)
-                    pattern = self.getEpochDigitalPattern(epoch, main=main)
+                    key = getEpochLetter(epoch) if letters else epoch
+
+                    pattern = self.getEpochDigitalPattern(epoch, main=main, separateBanks=False)
 
                 elif isinstance(epoch, str):
                     e = getEpochNumberFromLetter(epoch)
                     if e not in self.digitalPatterns:
                         raise ValueError(f"Invalid epoch index {e}")
 
-                    key = epoch
-                    pattern = self.getEpochDigitalPattern(e, main=main)
+                    key = epoch if letters else e
+
+                    pattern = self.getEpochDigitalPattern(e, main=main, separateBanks=False)
 
                 elif isinstance(epoch, ABFEpoch):
                     e = epoch.number
                     if e not in self.digitalPatterns:
                         raise ValueError(f"Invalid epoch index {e}")
-                    key = epoch.letter
-                    pattern = self.getEpochDigitalPattern(e, main=main)
+                    key = epoch.letter if letters else epoch.number
+
+                    pattern = self.getEpochDigitalPattern(epoch, main=main, separateBanks=False)
 
                 else:
                     raise TypeError(f"'epoch' has invalid type ({type(epoch).__name__})")
 
+                # print(f"{self.__class__.__name__}.getActiveDigitalChannels epoch {key}-> pattern = {pattern}")
 
                 if all(isinstance(p, tuple) for p in pattern):
-                    pattern = tuple(itertools.chain.from_iterable(pattern))
+                    ndx = tuple(filter(lambda t: len(t)>0, map(index, pattern)))
+                    if any(len(x) for x in ndx):
+                        sweep_result["epochs"][key] = dict(zip(("main", "alternate"), tuple(map(index, pattern))))
 
-                value = set(filter(comparator, pattern))
-                sweep_result[key] = value
-                ret[sweep] = sweep_result
+                else:
+                    ndx = index(pattern)
+                    if len(ndx):
+                        which = "main" if main.value else "alternate"
+                        sweep_result["epochs"][key] = {which: index(pattern)}
+
+                if len(sweep_result["epochs"]) > 0:
+                    ret.append(sweep_result)
 
         return ret
 
@@ -3133,9 +3127,9 @@ True                epoch_letter ↦ a tuple as above
                           main: typing.Optional[
                                             typing.Union[bool, Tribool]
                                             ] = None,
-                          natural:bool=True,
-                          separateBanks:bool=False,
-                          letters:bool=False) -> tuple:
+                          natural: bool = True,
+                          separateBanks: bool = True,
+                          letters: bool = False) -> tuple:
         r"""
         Queries the digital pattern defined in an ABFEpoch.
 
@@ -3199,17 +3193,17 @@ True                epoch_letter ↦ a tuple as above
             When None, report both the "main" or "alternate" pattern wrapped in
             an ABFDigitalPattern¹ object as follows:
 
-            separateBanks:
+        :natural: bool, whether to return the pattern in the "natural" (i.e.,
+            increasing) order of the DIG channel indexes — i.e. 0 ⋯ 7
+                default is True;
+
+        :separateBanks: default is True
             True            ⇒ the "main" and "alternate" fields of the
                             ABFDigitalPattern are each a pair of 4-tuples
 
             False           ⇒ the "main" and "alternate" fields of the
                             ABFDigitalPattern are each a tuple of all digital
                             channels in the pattern (8, in Clampex 11.+)
-
-        :natural: bool, whether to return the pattern in the "natural" (i.e.,
-            increasing) order of the DIG channel indexes — i.e. 0 ⋯ 7
-                default is True;
 
         :separateBanks:bool, whether to return the pattern as two tuples, one for
                 each bank of 4 DIG channels;
@@ -3309,6 +3303,8 @@ True                epoch_letter ↦ a tuple as above
 
             if src != "all":
                 ret = getattr(ret, src)
+                if not separateBanks:
+                    ret = tuple(itertools.chain.from_iterable(ret))
             else:
                 if not separateBanks:
                     ret = tuple(map(lambda x: tuple(itertools.chain.from_iterable(x)), ret[:2]))
@@ -3514,11 +3510,11 @@ True                epoch_letter ↦ a tuple as above
 
         # NOTE: 2024-10-28 17:28:04
         # trick to avoid calling getEpochDigitalPattern twice - see docstring for
-        # self.getDigitalChannelsUsage() - the trick is that getEpochDigitalPattern
+        # self.getActiveDigitalChannels() - the trick is that getEpochDigitalPattern
         # now accepts a digital but pattern tuple (with some caveats!)
         # digPattern = self.getEpochDigitalPattern(sweep, myEpoch) # either main or alternate, depending on the sweep
         digPattern = self.getEpochDigitalPattern(myEpoch, isAlternateDigital) # either main or alternate, depending on the sweep
-        usedDigs = self.getDigitalChannelsUsage(digPattern)
+        usedDigs = self.getActiveDigitalChannels(digPattern)
 
         if isinstance(digChannel, int):
             digChannel = (digChannel,)
@@ -3850,7 +3846,7 @@ True                epoch_letter ↦ a tuple as above
         # a tuple of ABFEpoch numbers where digital outputs are defined:
         digEpochs = self.epochsWithDigitalOutput
 
-        usedDigs = tuple(itertools.chain.from_iterable(map(lambda x: tuple(itertools.chain.from_iterable(x)) if isinstance(x, ABFDigitalPattern) else x, (self.getDigitalChannelsUsage(sweep, e) for e in digEpochs))))
+        usedDigs = tuple(itertools.chain.from_iterable(map(lambda x: tuple(itertools.chain.from_iterable(x)) if isinstance(x, ABFDigitalPattern) else x, (self.getActiveDigitalChannels(sweep, e) for e in digEpochs))))
 
         if isinstance(digChannel, int):
             if digChannel not in usedDigs:
@@ -4432,7 +4428,7 @@ and alternative digital output.
                             itertools.chain.from_iterable(
                                 map(
                                     lambda x: tuple(x.alternate) if isinstance(x, ABFDigitalPattern) else x,
-                                    (self.getDigitalChannelsUsage(sweep, e, alternate = wantsAltOutput) for e in digEpochs)
+                                    (self.getActiveDigitalChannels(sweep, e, alternate = wantsAltOutput) for e in digEpochs)
                                     )
                                 )
                             )
@@ -4441,7 +4437,7 @@ and alternative digital output.
                             itertools.chain.from_iterable(
                                 map(
                                     lambda x: tuple(itertools.chain.from_iterable(x)) if isinstance(x, ABFDigitalPattern) else x,
-                                    (self.getDigitalChannelsUsage(sweep, e) for e in digEpochs)
+                                    (self.getActiveDigitalChannels(sweep, e) for e in digEpochs)
                                     )
                                 )
                             )
@@ -4765,11 +4761,11 @@ digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values |nbs
 
         # NOTE: 2024-10-28 17:28:04
         # trick to avoid calling getEpochDigitalPattern twice - see docstring for
-        # self.getDigitalChannelsUsage() - the trick is that getEpochDigitalPattern
+        # self.getActiveDigitalChannels() - the trick is that getEpochDigitalPattern
         # now accepts a digital but pattern tuple (with some caveats!)
         # digPattern = self.getEpochDigitalPattern(sweep, myEpoch) # either main or alternate, depending on the sweep
         digPattern = self.getEpochDigitalPattern(myEpoch, isAlternateDigital) # either main or alternate, depending on the sweep
-        usedDigs = self.getDigitalChannelsUsage(digPattern)
+        usedDigs = self.getActiveDigitalChannels(digPattern)
 
         if isinstance(digChannel, int):
             digChannel = (digChannel,)
@@ -5540,28 +5536,6 @@ the protocol.
                             physical:bool=False) -> ABFOutputConfiguration:
         r"""Calls self.getDAC(…)"""
         return self.getDAC(index, physical)
-
-#     def getDigitalChannelUsage(self, digChannel:int, dac:typing.Optional[typing.Union[int,str]] = None) -> tuple:
-#         r"""Looks up the sweeps and epochs where a digital channel emits a TTL pulse or train
-#         See ABFOutputConfiguration.getEpochsForDigitalChannel documentation for
-#         details.
-#
-#         Returns a tuple of (sweep index ↔ epochs list) pairs
-#
-#         """
-#         if not isinstance(digChannel, int):
-#             raise TypeError(f"'digChannel' expected an int; instead got {type(digChannel).__name__} ")
-#         if digChannel < 0 or digChannel >= self.nDIGChannels:
-#             raise ValueError(f"Invalid 'digChannel' ({digChannel}); expecting a value in {range(self.nDIGChannels)}")
-#
-#         if isinstance(dac, (int, str)):
-#             dac = self.getDAC(dac, physical=physical)
-#         elif dac is None:
-#             dac = self.activeDACOutput
-#         elif not isinstance(dac, ABFOutputConfiguration):
-#             raise TypeError(f"'dac' expected an ABFOutputConfiguration, a str (DAC name) or int (DAC index); instead, got {type(dac).__name__}")
-#
-#         return tuple(filter(lambda x: len(x[1]), ((k, dac.getEpochsForDigitalChannel(digChannel, k, indexes = epochIndexes, train=train)) for k in range(self.nSweeps))))
 
 
 class ABFInputConfiguration:
@@ -7859,7 +7833,7 @@ class ABFOutputConfiguration:
 
         dac, epoch = self.check_DAC_Epoch(dac, epoch)
         return epoch.epochType == ABFEpochType.Pulse and epoch.firstLevel != 0 and \
-            epoch.deltaLevel == 0 and epoch.deltaDuration == 0 and len(self.getDigitalChannelsUsage(sweep, epoch)) == 0
+            epoch.deltaLevel == 0 and epoch.deltaDuration == 0 and len(self.getActiveDigitalChannels(sweep, epoch)) == 0
 
 # ### BEGIN module-level functions
 
