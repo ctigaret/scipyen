@@ -511,7 +511,7 @@ class SynapticStimulus(__BaseSynStim__):
             dig = bool(dig)
         
         return cls(name, channel, dig)
-    
+
 SynapticStimulus.name.__doc__ = "str: the name of this synaptic simulus; default is 'stim'"
 SynapticStimulus.channel.__doc__ = "int, str: index or name of the output channel sending TTL triggers"
 SynapticStimulus.dig.__doc__ = "bool: indicates if the triggering channel if a digital output (True) or a DAC (False)"
@@ -2430,8 +2430,6 @@ class SynapticPathway:
         ret += [")"]
         
         return "".join(ret)
-        
-        
         
     def __eq__(self, other) -> bool:
         from dataclasses import fields

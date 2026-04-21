@@ -2124,6 +2124,14 @@ class ABFProtocol(ElectrophysiologyProtocol):
             return sweep * self.sweepDuration
         return sweep * self.sweepInterval
 
+    def parseSynapticPathway(self, pathway: SynapticPathway):
+        assert pathway.adc in tuple(map(lambda d: d.physicalIndex, self.ADCs)), f"The pathway's ADC index not {pathway.adc} used in this protocol"
+        assert pathway.dac in tuple(map(lambda d: d.physicalIndex, self.DACs)), f"The pathway's DAC index not {pathway.dac} used in this protocol"
+        if pathway.stimulus.dig:
+            myDigs = self.getActiveDigitalChannels()
+
+
+
     def getSweepwiseDigitalActivationForPathways(self, pathways:typing.Sequence[SynapticPathway],
                                         dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
                                         byFirstStimulus:bool=True,
@@ -2994,7 +3002,7 @@ True                epoch_letter ↦ a tuple as above
 
         ret = list()
 
-        res = {"sweep": list(), "epoch": list(), "DIG": list(), "main": list()]
+        # res = {"sweep": list(), "epoch": list(), "DIG": list(), "main": list()}
 
         for sweep in sweeps:
             # sweep_result = dict()
@@ -3009,10 +3017,8 @@ True                epoch_letter ↦ a tuple as above
                         # value = tuple(map(index, pattern))
                         ndx = tuple(filter(lambda t: len(t)>0, map(index, pattern)))
                         if any(len(x) for x in ndx):
-                            sweep_result["epochs"][key] = dict(zip(("main", "alternate"), ndx))
-                            # res["sweep"].append(sweep)
-                            # res["epoch"].append(key)
-                            # res["main"].append()
+                            val = dict(zip(("main", "alternate"), ndx))
+                            sweep_result["epochs"][key] = val
 
                     else:
                         ndx = index(pattern)
