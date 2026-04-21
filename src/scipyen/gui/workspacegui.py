@@ -71,7 +71,7 @@ class DirectoryFileWatcher(QtCore.QObject):
 
     Currently, the monitor interface is implemented in Scipyen's MainWindow.
     Current implementations of the observer interface are:
-        ephys.ltp._LTPOnlineSupplier_
+        ephys.evokedsynapses._OnlineSynapsesSupplier_
     """
     emitter_sigs = ("sig_newItemsInMonitoredDir",
                     "sig_itemsRemovedFromMonitoredDir",

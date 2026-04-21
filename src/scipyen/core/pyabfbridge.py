@@ -1701,9 +1701,9 @@ class ABFProtocol(ElectrophysiologyProtocol):
 
     @property
     def activeDACChannel(self) -> int:
-        r"""Logical index of the "active" DAC channel as reported in the ABF file protocol.
+        r"""Logical (or physical?) index of the "active" DAC channel as reported in the ABF file protocol.
         """
-        # NOTE: this below doesn't report things correctly
+        # NOTE: this below doesn't (always?) report things correctly
         #
         return self._activeDACChannel_
 
@@ -2123,14 +2123,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
         if self.sweepInterval == 0*pq.s:
             return sweep * self.sweepDuration
         return sweep * self.sweepInterval
-
-    def parseSynapticPathway(self, pathway: SynapticPathway):
-        assert pathway.adc in tuple(map(lambda d: d.physicalIndex, self.ADCs)), f"The pathway's ADC index not {pathway.adc} used in this protocol"
-        assert pathway.dac in tuple(map(lambda d: d.physicalIndex, self.DACs)), f"The pathway's DAC index not {pathway.dac} used in this protocol"
-        if pathway.stimulus.dig:
-            myDigs = self.getActiveDigitalChannels()
-
-
 
     def getSweepwiseDigitalActivationForPathways(self, pathways:typing.Sequence[SynapticPathway],
                                         dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
