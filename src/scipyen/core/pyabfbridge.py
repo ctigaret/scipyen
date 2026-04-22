@@ -2051,11 +2051,10 @@ class ABFProtocol(ElectrophysiologyProtocol):
             )
         # return set(itertools.chain.from_iterable([list(itertools.chain.from_iterable([self.getUsedDigitalOutputChannels(alternate, trains) for e in o.epochs])) for o in self.outputs]))
 
-    def getClampMode(self,
-                     adc:typing.Union[int, str, ABFInputConfiguration] = 0,
-                     dac:typing.Optional[typing.Union[int, str, ABFOutputConfiguration]] = None,
+    def getClampMode(self, adc: typing.Union[int, str, ABFInputConfiguration] = 0,
+                     dac: typing.Optional[typing.Union[int, str, ABFOutputConfiguration]] = None,
                      physicalADC:bool=True,
-                     physicalDAC:bool=True) -> object:
+                     physicalDAC:bool=True) -> TypeEnum:
         r"""Infers the clamping mode used in the experiment run with this protocol.
 
         The inferrence is based on the physical units of the input - output signal
