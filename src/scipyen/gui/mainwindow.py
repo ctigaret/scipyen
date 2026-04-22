@@ -1592,12 +1592,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._wspace_headers_ = [k for k in standard_obj_summary_headers if k != "Icon"]
 
         self._navigateToRecentFileDir_: bool = False
+        self._navigateToDroppedFileDir_: bool = False
 
-        self._useSystemDefaultFont:bool = self._useDefaultQApplicationFont
+        self._useSystemDefaultFont: bool = self._useDefaultQApplicationFont
 
-        self._useLastHistoryCommandSearch_:bool = False
+        self._useLastHistoryCommandSearch_: bool = False
 
-        self._useNativeMenuBar:bool = self._defaultUseNativeMenuBar
+        self._useNativeMenuBar: bool = self._defaultUseNativeMenuBar
 
         # ### END configurables, but see NOTE:2022-01-28 23:16:57 below
 
@@ -1955,6 +1956,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.tbOpen.setToolTip("Open (click on arrow to the right to reveal recently opened files; hold SHIFT to ALSO change to directory of the opened recent file)")
         else:
             self.tbOpen.setToolTip("Open (click on arrow to the right to reveal recently opened files; hold SHIFT to PREVENT changing to the directory of the opened recent file)")
+
+    @property
+    def navigateToDroppedFileDirectory(self) -> bool:
+        return self._navigateToDroppedFileDir_
+
+    @markConfigurable("ChangeDirUponDropFileOpen", "Qt")
+    @navigateToDroppedFileDirectory.setter
+    def navigateToDroppedFileDirectory(self, val:bool):
+        self._navigateToDroppedFileDir_ = val is True
+        sigBlock = QtCore.QSignalBlocker(self.actionSynchronize_working_directory_when_opening_a_dropped_file)
+        self.actionSynchronize_working_directory_when_opening_a_dropped_file.setChecked(self._navigateToDroppedFileDir_ is True)
 
     @property
     def shellAutomagic(self) -> bool:
@@ -5897,8 +5909,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @Slot(bool)
     def _slot_setNavigateToOpenedRecentFileDirectory(self, val: bool):
-        # print(f"{self.__class__.__name__}._slot_setNavigateToOpenedRecentFileDirectory({val})")
         self.navigateToRecentFileDirectory = val is True
+
+    @Slot(bool)
+    def _slot_setNavigateToDroppedFileDirectory(self, val: bool):
+        self.navigateToDroppedFileDirectory = val is True
 
     @Slot()
     @safewrapper
@@ -6510,6 +6525,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.tbOpen = [w for w in self.actionOpen.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
 
         self.actionOpeningARecentFileNavigatesToItsDirectory.toggled.connect(self._slot_setNavigateToOpenedRecentFileDirectory)
+        self.actionSynchronize_working_directory_when_opening_a_dropped_file.toggled.connect(self._slot_setNavigateToDroppedFileDirectory)
 
         self.tbOpen.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.tbOpen.setToolTip("Open (click on arrow to the right to reveal recently opened files; hold SHIFT to ALSO change to directory of the recent file when opening)")
@@ -7489,7 +7505,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot(object, bool, QtCore.QPoint)
     @safewrapper
     def slot_loadDroppedURLs(self, urls, chdirs, pos):
-        # print(f"{self.__class__.__name__}.slot_loadDroppedURLs")
+        # print(f"{self.__class__.__name__}.slot_loadDroppedURLs ({urls})")
         if isinstance(urls, (tuple, list)) and all([isinstance(url, QtCore.QUrl) for url in urls]):
             if len(urls) == 1 and (urls[0].isRelative() or urls[0].isLocalFile()) and os.path.isfile(urls[0].path()):
                 # check if this is a python source file
@@ -7522,6 +7538,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             if target_dir and os.path.isdir(target_dir):
                 url = QtCore.QUrl(pathlib.Path(target_dir).as_uri())
+                self.navigator.setLocationUrl(url)
+                self.navigator.urlChanged.emit(url)
+
+            elif len(file_paths) and os.path.isdir(os.path.dirname(file_paths[-1])) and self._navigateToDroppedFileDir_:
+                url = QtCore.QUrl(pathlib.Path(file_paths[-1]).parent.as_uri())
+                # print(f"\n\t last dropped directory = {url}")
                 self.navigator.setLocationUrl(url)
                 self.navigator.urlChanged.emit(url)
 

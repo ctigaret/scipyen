@@ -2533,6 +2533,11 @@ class SynapticPathway:
         initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
         
         return cls(**initkwargs)
+
+@dataclass
+class PathwayActivationSequence:
+    pathName: str = dataclasses.field(default_factory = str)
+    sweepEpochs: dict[int, list[int]] = dataclasses.field(default_factory = dict)
     
 # FIXME 2025-04-26 14:10:24 
 # Interval.extent True means that:
@@ -6095,8 +6100,4 @@ def getProtocol(x:typing.Union[neo.Block, pab.pyabf.ABF]) -> ElectrophysiologyPr
         scipywarn(f"{type(x).__name__} object does not appear to have been created from an ABF file; cannot parse a protocol")
         return 
     return pab.ABFProtocol(x)
-    
-def getPathwayBySweepActivation(protocol:ElectrophysiologyProtocol, pathways) -> dict:
-    r"""Correspondence between pathway activation and sweep number"""
-    return dict(protocol.getSweepwiseDigitalActivationForPathways(pathways, indices=False))
     

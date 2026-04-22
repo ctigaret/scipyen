@@ -1510,9 +1510,10 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
     @safewrapper
     def loadFiles(self, filePaths:typing.Sequence[typing.Union[str, pathlib.Path]],
-                       fileLoaderFn:typing.Callable,
-                       ioReaderFn:typing.Optional[typing.Callable]=None,
-                       updateUi:bool=True):
+                       fileLoaderFn: typing.Callable,
+                       ioReaderFn: typing.Optional[typing.Callable] = None,
+                       updateUi: bool = True,
+                       slotFinished: typing.Optional[Slot] = None):
         if len(filePaths) == 0:
             return
 
