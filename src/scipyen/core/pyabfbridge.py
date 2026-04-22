@@ -3263,16 +3263,16 @@ True                epoch_letter ↦ a tuple as above
         if myEpoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
             return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
 
-        durationSamples = self.getEpochDuration(myEpoch, myDac, sweep, samples = True)
+        # durationSamples = self.getEpochDuration(myEpoch, myDac, sweep, samples = True)
         # deltaDurationSamples = self.getEpochDeltaDuration(myEpoch, myDac, samples=True)
-        finalDurationSamples = self.getEpochDuration(myEpoch, myDac, self.nSweeps-1, samples = True)
-        pulsePeriodSamples = self.getEpochPulsePeriod(myEpoch, myDac, True)
+        # finalDurationSamples = self.getEpochDuration(myEpoch, myDac, self.nSweeps-1, samples = True)
+        # pulsePeriodSamples = self.getEpochPulsePeriod(myEpoch, myDac, True)
         # pulseWidthSamples = self.getEpochPulseWidth(myEpoch, myDac, True)
 
         # pulseCount = 0 if pulsePeriodSamples == 0. else int(np.ceil(durationSamples/pulsePeriodSamples))
         # finalPulseCount = 0 if pulsePeriodSamples == 0. else int(np.ceil(finalDurationSamples/pulsePeriodSamples))
 
-        pulseCount = self.getEpochPulseCount(myEpoch, myDac, sweep)
+        # pulseCount = self.getEpochPulseCount(myEpoch, myDac, sweep)
         # # finalPulseCount= self.getEpochPulseCount(myEpoch, myDac, self.nSweeps-1)
 
 
@@ -3320,8 +3320,8 @@ True                epoch_letter ↦ a tuple as above
 
                 if isinstance(trig, TriggerEvent) and trig.size > 0:
                     # see BUG: 2023-10-03 17:57:30 in triggerevent.TriggerEvent.__new__
-                    if isinstance(label, str) and len(label.strip()):
-                        trig.labels = [f"{label}{k}" for k in range(trig.times.size)]
+                    # if isinstance(label, str) and len(label.strip()):
+                    #     trig.labels = [f"{label}{k}" for k in range(trig.times.size)]
 
                     if trig not in trigs:
                         trigs.append(trig)

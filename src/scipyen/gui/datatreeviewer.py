@@ -518,18 +518,20 @@ A lot of things copied from there, EXCEPT that it now uses
     def slot_setInlineTables(self, value: bool):
         if value != self.model.inlineTables:
             self.model.inlineTables = value is True
+            self.slot_refreshDataDisplay()
 
     @Slot()
     @safewrapper
     def slot_expandAll(self):
         self.treeView.expandAll()
         self.treeView.resizeColumnToContents(0)
+
     @Slot()
     @safewrapper
     def slot_viewItem(self: typing.Self):
         # from core.utilities import get_nested_value
-        print(f"{self.__class__.__name__}.slot_viewItem")
-        print(f"\t{self._obj_to_view_}")
+        # print(f"{self.__class__.__name__}.slot_viewItem")
+        # print(f"\t{self._obj_to_view_}")
         if self.scipyenWindow is None or "ScipyenWindow" not in type(self.scipyenWindow).__name__:
             return
 

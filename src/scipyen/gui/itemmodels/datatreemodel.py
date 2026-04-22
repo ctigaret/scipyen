@@ -1687,7 +1687,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         tip = type(obj).__name__
 
-        klass = "Mark" if isinstance(obj, DataMark) else tip
+        klass = "TriggerEvent" if isinstance(obj, TriggerEvent) else "Mark" if isinstance(obj, DataMark) else tip
 
         n = obj.size
         desc = strutils.pluralize('subinterval', n)
@@ -1728,8 +1728,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 objDataAsChild = False
             else:
                 n = obj.size
-                s = " × ".join(list(map(lambda x: f"{x}", obj.shape)))
-                info = f"Quantity array ({obj.units.dimensionality}) with {n} {strutils.pluralize('samples', n)}; shape {s}; dtype {obj.dtype}."
+                # s = " × ".join(list(map(lambda x: f"{x}", obj.shape))) if len(obj.shape) > 1 else f"{obj.shape}"
+                info = f"Quantity array ({obj.units.dimensionality}) with {n} {strutils.pluralize('sample', n)}, shape: {obj.shape},  dtype {obj.dtype}."
                 objDataAsChild = True
                 readOnly = False
 
@@ -1815,7 +1815,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             info = obj
         else:
             objDataAsChild = True
-            info = f"Array with {n} {samples}; shape {s}; dtype {obj.dtype}."
+            info = f"Array with {n} {samples}, shape {s}, dtype {obj.dtype}."
 
         return obj, {
             "indirect": False,
