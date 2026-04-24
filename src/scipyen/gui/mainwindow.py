@@ -6077,22 +6077,26 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @safewrapper
     def slot_copyWorkspaceSelection(self):
         # NOTE: check out keyboard modifier WHEN this slot is called
-        indexList = [i for i in self.workspaceView.selectedIndexes()
-                     if i.column() == 0]
+        selNdx = self.workspaceView.selectedIndexes()
 
-        if len(indexList) == 0:
+        if len(selNdx) == 0:
+            return
+
+        items = list(map(lambda i: self.workspaceModel.item(i.row(), 0), selNdx))
+
+        if len(items) == 0:
             return
 
         # wscol = standard_obj_summary_headers.index("Workspace")
-        wscol = self._wspace_headers_.index("Workspace")
+        # wscol = self._wspace_headers_.index("Workspace")
+        wscol = list(map(lambda c: self.workspaceModel.headerData(c, QtCore.Qt.Horizontal),
+                         range(self.workspaceModel.columnCount()))).index("Workspace")
 
         if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
-            varnames = ["'%s'" % self.workspaceModel.item(i.row(), 0).text(
-            ) for i in indexList if self.workspaceModel.item(i.row(), wscol).text() == "Internal"]
+            varnames = list(map(lambda i: f'"{i.text()}"', filter(lambda i: self.workspaceModel.item(i.row(), wscol).text() == "Internal", items)))
 
         else:
-            varnames = [self.workspaceModel.item(i.row(), 0).text(
-            ) for i in indexList if self.workspaceModel.item(i.row(), wscol).text() == "Internal"]
+            varnames = list(map(lambda i: i.text(), filter(lambda i: self.workspaceModel.item(i.row(), wscol).text() == "Internal", items)))
 
         if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier):
             self.app.clipboard().setText(",\n".join(varnames))

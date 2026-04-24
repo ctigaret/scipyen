@@ -1575,7 +1575,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
     def physicalADCIndex(self, index:int) -> int:
         r"""Returns the physical index of the ADC with specified logical index.
 
-        See also self.logicalADCIndex."""
+        See also self.logicalADCIndex.
+    """
         if not isinstance(index, int):
             raise TypeError(f"Expecting an int; instead, got {type(index).__name__}")
 
@@ -1587,10 +1588,19 @@ class ABFProtocol(ElectrophysiologyProtocol):
 
     @property
     def adcNames(self):
+        r"""Names assigned to the ADCs, in the lab bench.
+
+        This is a read-only property.
+
+    """
         return tuple(i.name for i in self.inputs)
 
     @property
     def adcUnits(self):
+        r"""Physical units associated with the ADCs.
+
+        This is a read-only property.
+    """
         return tuple(i.units for i in self.inputs)
 
     @property
@@ -1603,21 +1613,35 @@ class ABFProtocol(ElectrophysiologyProtocol):
 
     @property
     def dacNames(self):
+        r"""Names assigned to the DACs, in the lab bench.
+
+        This is a read-only property.
+
+    """
         return tuple(o.name for o in self.outputs)
 
     @property
     def dacUnits(self):
+        r"""Physical units associated with the DACs.
+
+        This is a read-only property.
+    """
         return tuple(o.units for o in self.outputs)
 
     @property
     def digitalPatterns(self) -> dict:
+        r"""Mapping of ABF Epochs number to ABFDigitalPattern object.
+        This is empty for protocols where operation mode is not episodic_stimulation.
+
+        This is a read-only property.
+    """
         return self._epochsDigitalPatterns_
 
-    @digitalPatterns.setter
-    def digitalPatterns(self, val:dict):
-        if isinstance(val, dict):
-            if all(isinstance(key, int) and key >=0 and key < self.nDACChannels for key in val.keys()):
-                self._epochsDigitalPatterns_ = val
+    # @digitalPatterns.setter
+    # def digitalPatterns(self, val:dict):
+    #     if isinstance(val, dict):
+    #         if all(isinstance(key, int) and key >=0 and key < self.nDACChannels for key in val.keys()):
+    #             self._epochsDigitalPatterns_ = val
 
     @property
     def physicalDACIndexes(self):
@@ -1682,6 +1706,9 @@ class ABFProtocol(ElectrophysiologyProtocol):
         gap_free = 3
         high_speed_oscilloscope = 4 # Not supported by neo, but supported by pyabf!
         episodic_stimulation = 5
+
+        Read-only property.
+
         """
         return self._acquisitionMode_
 

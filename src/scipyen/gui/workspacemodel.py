@@ -1744,6 +1744,110 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             data.windowTitleChanged.connect(self._slot_itemGuiObjectTitleChanged)
         self.appendRow(v_row)  # append the row to the model
 
+    def mimeData(self, indexes: typing.Sequence[QtCore.QModelIndex]) -> QtCore.QMimeData:
+        import pickle
+        from iolib import jsonio
+        from core import strutils
+        mData = super().mimeData(indexes)
+
+        if len(indexes):
+            wscol = list(map(lambda c: self.headerData(c, QtCore.Qt.Horizontal),
+                               range(self.columnCount()))).index("Workspace")
+
+            items = list(map(lambda i: self.item(i.row(), 0), indexes))
+
+            varnames = list(filter(lambda t: t in self.shell.user_ns,
+                                    map(lambda i: i.data(QtCore.Qt.DisplayRole),
+                                        filter(lambda i: self.item(i.row(), wscol).text() == "Internal",
+                                                items)
+                                        )
+                                    )
+                            )
+
+            if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier):
+                varnames = list(map(lambda s: f'"{s}"', varnames))
+
+            if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier):
+                data = ",\n".join(varnames)
+            else:
+                data = ", ".join(varnames)
+
+            mData.setText(data)
+
+            # ### BEGIN 2026-04-24 22:23:57 DO NOT DELETE
+            # objects = list(map(lambda v: (v, self.shell.user_ns[v]), varnames))
+            #
+            # objs = dict(zip(varnames, objects))
+            #
+            # # objs = dict(map(lambda v: (v, self.shell.user_ns[v]),
+            # #                 list(filter(lambda t: t in self.shell.user_ns,
+            # #                             map(lambda i: i.text(),
+            # #                                 filter(lambda i: self.workspaceModel.item(i.row(), wscol).text() == "Internal",
+            # #                                         items))))
+            # #                 )
+            # #             )
+            #
+            # if len(varnames) == 1:
+            #     obj = objs[varnames[0]]
+            #
+            #     if isinstance(obj, (QtWidgets.QWidget, mpl.figure.Figure)):
+            #         return mData
+            #
+            #     elif isinstance(obj, QtGui.QPixmap):
+            #         data = obj.toImage()
+            #         mData = QtCore.QMimeData()
+            #         mData.setImageData(data)
+            #
+            #     elif isinstance(obj, QtGui.QImage):
+            #         data = objs[varnames[0]]
+            #         mData = QtCore.QMimeData()
+            #         mData.setImageData(data)
+            #
+            #     elif isinstance(obj, str):
+            #         mData = QtCore.QMimeData()
+            #         if strutils.is_html(obj):
+            #             mData.setHtml(data)
+            #
+            #         elif strutils.is_latex(obj):
+            #             data = strutils.render_latex(obj, out="bytes")
+            #             mData.setImageData(data)
+            #
+            #         else:
+            #             mData.setText(obj)
+            #
+            #     else:
+            #         mData = QtCore.QMimeData()
+            #         data = pickle.dumps(obj)
+            #         mData.setData("application/octet-stream", data)
+            #         # try:
+            #         #     data = jsonio.dumps(obj)
+            #         #     mData.setData("application/json", data)
+            #         # except:
+            #         #     data = pickle.dumps(obj)
+            #         #     mData.setData("application/octet-stream", data)
+            #
+            # elif len(varnames) > 1:
+            #     oo = dict(map(filter(lambda i: not isinstance(i[1], (QtWidgets.QWidget, mpl.figure.Figure)),
+            #                          objs.items()
+            #                          )
+            #                   )
+            #               )
+            #
+            #     if len(oo):
+            #         mData = QtCore.QMimeData()
+            #         try:
+            #             data = jsonio.dumps(oo)
+            #             mData.setData("application/json", data)
+            #         except:
+            #             data = pickle.dumps(oo)
+            #             mData.setData("application/octet-stream", data)
+            # ### END   2026-04-24 22:23:57 DO NOT DELETE
+
+
+
+        return mData
+
+
     def clearTable(self):
         self.removeRows(0, self.rowCount())
 

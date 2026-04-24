@@ -942,10 +942,10 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QToolButton" name="selDirBtn">
          <property name="toolTip">
-          <string>Select working directory</string>
+          <string>Select working directory or click on down arrow for recent directories</string>
          </property>
          <property name="statusTip">
-          <string>Select working directory</string>
+          <string>Select working directory or click on down arrow for recent directories</string>
          </property>
          <property name="whatsThis">
           <string>Select working directory</string>
@@ -964,10 +964,10 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QToolButton" name="systemOpenFolderBtn">
          <property name="toolTip">
-          <string>Open current folder in system file manager</string>
+          <string>Open current folder in the system file manager</string>
          </property>
          <property name="statusTip">
-          <string>Open current folder in system file manager</string>
+          <string>Open current folder in the system file manager</string>
          </property>
          <property name="whatsThis">
           <string>Open current folder in system file manager</string>
@@ -986,10 +986,10 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QToolButton" name="systemOpenParentFolderBtn">
          <property name="toolTip">
-          <string>Opens parent directory of working directory in system file manager</string>
+          <string>Opens parent of working directory in the system file manager</string>
          </property>
          <property name="statusTip">
-          <string>Opens parent directory of working directory in system file manager</string>
+          <string>Opens parent directory of working directory in the system file manager</string>
          </property>
          <property name="whatsThis">
           <string>Opens parent directory of working directory in system file manager</string>
