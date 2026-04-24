@@ -145,8 +145,8 @@ V. Generic indexing for the neo framework (provisional)
 
 """
 # TODO: 2025-04-28 11:30:18
-# revisit make_neo_object - augment with carrying over the 
-# array_annotations, annotations dict, file_origin, 
+# revisit make_neo_object - augment with carrying over the
+# array_annotations, annotations dict, file_origin,
 # file_datetime, rec_datetime where appropriate
 
 #### BEGIN core python modules
@@ -216,7 +216,7 @@ from .constants import (
 )
 
 import core.scipyen_quantities as scq
-from .scipyen_quantities import (unitsConvertible, checkTimeUnits, unitFamilyName, 
+from .scipyen_quantities import (unitsConvertible, checkTimeUnits, unitFamilyName,
                                  unitQuantityFromNameOrSymbol)
 from .datasignal import (
     DataSignal,
@@ -226,6 +226,7 @@ from .datazone import (DataZone, Interval)
 
 from .triggerevent import (
     DataMark,
+    MarkType,
     TriggerEvent,
     TriggerEventType,
 )
@@ -306,7 +307,7 @@ if __debug__:
 
     __debug_count__ = 0
 
-# NOTE: 2025-05-29 13:31:13 
+# NOTE: 2025-05-29 13:31:13
 # forward declarations needed to avoid importing pyabfbridge whivh would cause
 # circular import; both classes needed for getEpochStartStop, and these dummy
 # definitions will be overwritten by import pyabfbridge inside that function
@@ -371,12 +372,12 @@ def segment_stop(data: neo.Segment):
 
 def block_duration(x: neo.Block):
     r"""Returns the duration of a neo.Block.
-    This is the time interval between the start time of the first and the last 
+    This is the time interval between the start time of the first and the last
     sweep in the trial, plus the duration of the last sweep.
-    
+
     NOTE 1: This is calculated based on the data stored in the neo.Block,
     irrespective of the protocol.
-    
+
     NOTE 2: Remember: a "trial" is represented as a neo.Block object; each trial
     "sweep" is represented as a neo.Segment object.
     """
@@ -458,7 +459,7 @@ def _(data, t=0):
         units=data.units,
         name=data.name,
         description = data.desscription,
-        segment = data.segment, 
+        segment = data.segment,
         array_annotations = data.array_annotations,
         **annotations
     )
@@ -487,7 +488,7 @@ def _(data, t=0):
         segment = data.segment,
         array_annotations = data.array_annotations,
         **data.annotations
-        
+
     )
     ret.annotations.update(data.annotations)
     return ret
@@ -791,7 +792,7 @@ def _(obj, /, **kwargs):
 
     # NOTE: 2024-06-18 08:52:02
     # more recent verison of neo library enforce against the use of int as annotations keys
-    
+
     # print(f"neoutils.make_neo_object({type(obj).__name__}): factory_pos_params = {factory_pos_params}")
     factory = partial(type(obj), *factory_pos_params)
 
@@ -1219,7 +1220,7 @@ def assign_to_signal(
 
     """
     from . import datatypes
-    
+
     if not isinstance(dest, neo.AnalogSignal):
         raise TypeError(
             "dest expected to be an AnalogSignal; got %s instead"
@@ -1478,14 +1479,14 @@ def get_signal_names_indices(
 #     silent:bool=False
 # ):
 #     r"""Returns integral indices of a Segment in a neo.Block or list of Segments."""
-# 
+#
 #     if isinstance(src, neo.Block):
 #         src = src.groups
-# 
+#
 #     elif isinstance(src, neo.Group):
 #         # a bit useless, innit ?!?
 #         src = [src]
-# 
+#
 #     elif not isinstance(src, (tuple, list)) or not all(
 #         [isinstance(s, neo.Group) for s in src]
 #     ):
@@ -1493,37 +1494,37 @@ def get_signal_names_indices(
 #             "src expected to be a neo.Block, a sequence of neo.Group, or a neo.Group; got %s instead"
 #             % type(src).__name__
 #         )
-# 
+#
 #     data_len = len(src)
-# 
+#
 #     if isinstance(index, (int, range, slice, np.ndarray, type(None))):
 #         return utilities.normalized_index(data_len, index)
-# 
+#
 #     elif isinstance(index, str):
 #         if silent:
 #             return tuple(filter_attr(src, indices_only=True, name=index))
 #             # return utilities.silentindex([i.name for i in src], index)
 #         return tuple(map(lambda x: x.name, src)).index(index)
-# 
+#
 #     elif isinstance(index, (tuple, list)):
 #         indices = list()
-# 
+#
 #         for ndx in index:
 #             if isinstance(ndx, int):
 #                 indices.append(utilities.normalized_index(data_len, ndx))
-# 
+#
 #             elif isinstance(ndx, str):
 #                 if silent:
 #                     indices.append(tuple(utilities.silentindex([i.name for i in src]), ndx))
 #                     # indices.append(utilities.silentindex([i.name for i in src], ndx))
-# 
+#
 #                 else:
 #                     indics.append([i.name for i in src].index(ndx))
-# 
+#
 #             else:
 #                 raise TypeError("Invalid index element type %s" % type(ndx).__name__)
 #         return indices
-# 
+#
 #     else:
 #         raise TypeError("Invalid indexing: %s" % index)
 
@@ -1534,14 +1535,14 @@ def get_signal_names_indices(
 #     r"""Returns integral indices of a Segment in a neo.Block or list of Segments.
 #     DEPRECATED Use neoutils.normalized_index instead
 #     """
-# 
+#
 #     if isinstance(src, neo.Block):
 #         src = src.segments
-# 
+#
 #     elif isinstance(src, neo.Segment):
 #         # a bit useless, innit ?!?
 #         src = [src]
-# 
+#
 #     elif not isinstance(src, (tuple, list)) or not all(
 #         [isinstance(s, neo.Segment) for s in src]
 #     ):
@@ -1549,41 +1550,41 @@ def get_signal_names_indices(
 #             "src expected to be a neo.Block, a sequence of neo.Segments, or a neo.Segment; got %s instead"
 #             % type(src).__name__
 #         )
-# 
+#
 #     data_len = len(src)
-# 
+#
 #     if isinstance(index, (int, range, slice, np.ndarray, type(None))):
 #         return utilities.normalized_index(data_len, index)
-# 
+#
 #     elif isinstance(index, str):
 #         if silent:
 #             return tuple(filter_attr(src, indices_only=True, name=index))
 #             # return utilities.silentindex([i.name for i in src], index)
 #         names = tuple(map(lambda x: x.name, src))
 #         return names.index(index)
-# 
+#
 #     elif isinstance(index, (tuple, list)):
 #         indices = list()
-# 
+#
 #         for ndx in index:
 #             if isinstance(ndx, int):
 #                 indices.append(utilities.normalized_index(data_len, ndx))
-# 
+#
 #             elif isinstance(ndx, str):
 #                 if silent:
 #                     indices.append(tuple(utilities.silentindex([i.name for i in src]), ndx))
 #                     # indices.append(utilities.silentindex([i.name for i in src], ndx))
-# 
+#
 #                 else:
 #                     indics.append([i.name for i in src].index(ndx))
-# 
+#
 #             else:
 #                 raise TypeError("Invalid index element type %s" % type(ndx).__name__)
 #         return indices
-# 
+#
 #     else:
 #         raise TypeError("Invalid indexing: %s" % index)
-# 
+#
 
 def neo_child_container_name(type_or_obj):
     r"""Provisional: name of member collection.
@@ -2371,19 +2372,19 @@ def normalized_index(
         NOTE: When neo.Block, the function descends recursively into the Block's
         segments, unless 'ingroups' is set to True
 
-    index: int, str, tuple, list, range, or slice; 
+    index: int, str, tuple, list, range, or slice;
         any valid form of indexing;
         WARNING: when a str, this requires that the objects of 'childtype' have
         an attribute 'name' of type str
 
-    silent: bool, default is False 
+    silent: bool, default is False
         Determines what happens when 'index' parameter is a str, and the elements
         in the collection do not have a 'name' attribute of type 'str':
-    
+
         'silent' is Fale -> the function will raise an exception
         'silent' is True -> the function will ignore elements without a 'name':str
             attribute
-    
+
     childtype: type object; the type of signal to index; valid signal types are
         neo.AnalogSignal, neo.IrregularlySampledSignal,
         neo.Event, neo.Epoch, neo.SpikeTrain, neo.ImageSequence, neo.Unit,
@@ -2398,13 +2399,13 @@ def normalized_index(
             epochs, spike trains, channel indexes, and image sequences.
 
         Unit objects contain only spike trains.
-    
+
     ingroups:bool, default is False
         NOTE: Since 2025-03-26 09:24:15
-    
-        When True, and src is a neo.Block, the function descends into the 
+
+        When True, and src is a neo.Block, the function descends into the
         'groups' attribute (which may be empty!)
-    
+
 
     Returns:
     --------
@@ -2415,7 +2416,7 @@ def normalized_index(
 
 @normalized_index.register(neo.core.container.Container) # neo.Block, neo.Segment, neo.Group
 def _(src: neo.core.container.Container,
-    index: typing.Union[int, str, range, slice, typing.Sequence], /, 
+    index: typing.Union[int, str, range, slice, typing.Sequence], /,
     silent: bool = False,
     ingroups: bool = False,
     childtype: type = neo.AnalogSignal,
@@ -2429,12 +2430,12 @@ def _(src: neo.core.container.Container,
             # incorporate code for normalized_segment/group_index here and get rid of those functions
             if childtype is neo.Block:
                 raise ValueError("'childtype' cannot be a neo.Block which is at the top of container hierarchy")
-            
+
             if childtype is neo.Segment:
                 collection = src.segments
             else:
                 collection = src.groups
-                
+
             if isinstance(index, (int, range, slice, np.ndarray, type(None))):
                 ret = utilities.normalized_index(len(collection), index)
                 return ret[0] if len(ret) == 1 else ret
@@ -2461,20 +2462,20 @@ def _(src: neo.core.container.Container,
 
                     else:
                         raise TypeError("Invalid index element type %s" % type(ndx).__name__)
-                    
+
                 return indices[0] if len(indices) == 1 else indices
 
             else:
                 raise TypeError("Invalid indexing: %s" % index)
         else:
             collection = src.groups if ingroups else src.segments
-        # NOTE: groups collect data objects of similar type with the same index 
-        # in their corresponding objectlists, across segments; in a trial, such 
+        # NOTE: groups collect data objects of similar type with the same index
+        # in their corresponding objectlists, across segments; in a trial, such
         # dataobjects will also have the same name (ADC name), even if they are
-        # likely to differ numerically; therefore getting the index of a named 
+        # likely to differ numerically; therefore getting the index of a named
         # data object (say and AnalogSignal) in a neo.Group's objectlist member
-        # (in this examplel ,'analogsignals') does NOT make sense at all (all 
-        # signals have the same name)! This applies to all other types of data 
+        # (in this examplel ,'analogsignals') does NOT make sense at all (all
+        # signals have the same name)! This applies to all other types of data
         # objects in any objectlisyt member of a neo.Group:
         #     collection = src.groups
         # else:
@@ -2484,7 +2485,7 @@ def _(src: neo.core.container.Container,
     # print(f"neoutils.normalized_index: src is a {type(src)}")
     if not isinstance(src, (neo.Segment, neo.Group)):
         raise TypeError("Expecting a neo.Segment; got %s instead" % type(src).__name__)
-    
+
     if childtype.__name__ not in src._child_objects:
         raise TypeError(f"{childtype.__name__} is not a child object of {type(src).__name__}")
 
@@ -2535,15 +2536,15 @@ def _(src: neo.core.container.Container,
 
     if signal_collection is None or len(signal_collection) == 0:
         return range(0)
-    
+
     return normalized_index(signal_collection, index, silent=silent, ingroups=ingroups, childtype=childtype)
 
 @normalized_index.register(NeoObjectList) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
 @normalized_index.register(list) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
 @normalized_index.register(tuple) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
 @normalized_index.register(deque) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
-def _(src: typing.Union[NeoObjectList, list, tuple, deque], 
-    index: typing.Union[int, str, range, slice, typing.Sequence], /, 
+def _(src: typing.Union[NeoObjectList, list, tuple, deque],
+    index: typing.Union[int, str, range, slice, typing.Sequence], /,
     silent: bool = False,
     ingroups: bool = False, # not used
     childtype: type = neo.AnalogSignal # not used
@@ -2553,7 +2554,7 @@ def _(src: typing.Union[NeoObjectList, list, tuple, deque],
     # print(f" silent = {silent} ({type(silent).__name__}):")
     # print(f" ingroups = {ingroups} ({type(ingroups).__name__}):")
     # print(f" ingroups = {childtype} ({type(childtype).__name__}):")
-    
+
     if isinstance(index, (int, range, slice, np.ndarray, type(None))):
         return utilities.normalized_index(len(src), index)
 
@@ -2664,7 +2665,7 @@ Returns a list of indices of signals named as specified by 'names', and containe
 
     Such signals will be skipped / missed!
     """
-    
+
     scipywarn("WARNING: This function is DEPRECATED and will be removed in future Scipyen versions; plase use neoutils.normalized_index instead")
     # signal_collection = "%ss" % stype.__name__.lower()
     signal_collection = pluralize(stype.__name__.lower(), 2)
@@ -2852,80 +2853,80 @@ def epoch_has_interval(
 #     duration: bool = False,
 # ) -> tuple:
 #     r"""Returns the time stamps for an epoch interval.
-#     
+#
 #     These are the (time, duration, <label>) or (time, time+duration, <label>),
 #     depending on the 'duration' flag. The term in angle brackets is optional and
 #     is returned only when the epoch's intervals are labeled
-# 
+#
 #     Parameters:
 #     ----------
 #     epoch: neo.Epoch
-# 
+#
 #     index: str, bytes, numpy.str_, or int
 #         When a str, or bytes, this specifies the interval by its label
 #         (NOTE: this only works when the epoch's `labels` attribute, an numpy
 #         array, is not empty)
 #         When bytes, it must an utf-8 - encoded bytes string (i.e., identical to
 #             the result of calling bytes("xx", "utf-8") where "xx" is a str.
-# 
+#
 #         This must not be empty, and must be present in the epoch's "labels" array.
 #         This implies epoch.labels.size == epoch.times.size == epoch.size
-# 
+#
 #         When an int, this is the index of the interval in the epoch.
-# 
+#
 #         NOTE: The kᵗʰ interval of an epoch is defined by two quantities:
 #         epoch[k] or epoch.times[k]  ⇾ start of the kᵗʰ interval
 #         epoch.durations[k]          ⇾ duration of the kᵗʰ interval
-# 
+#
 #     duration: bool Optional (default is False)
 #         When True, returns the (time, duration) tuple for the specified interval
 #         (see above)
-# 
+#
 #         When False (default), returns the (time, time + duration) tuple corresponding
 #         to the specified interval (i.e., start & stop).
-# 
+#
 #     Returns:
 #     --------
-# 
+#
 #     A tuple:
-# 
+#
 #     (time, duration, <label>) when duration is True
-# 
+#
 #     or:
-# 
+#
 #     (time, time + duration, <label>), when duration is False (the default)  -
 #         this tuple is useful for time slicing of neo-style data arrays;
-# 
+#
 #     NOTE: <label> is optional, and is included ONLY when the epoch.labels is
 #     non-empty.
-# 
+#
 #     """
 #     if not isinstance(epoch, (neo.Epoch, DataZone)):
 #         raise TypeError(
 #             f"'epoch' expected to be a neo.Epoch; got {type(epoch).__name__} instead"
 #         )
-# 
+#
 #     if isinstance(index, (str, np.str_, bytes)):
 #         if isinstance(index, bytes):
 #             index = index.decode()
-# 
+#
 #         if index not in epoch.labels:
 #             raise ValueError(f"Interval label {index} not found")
-# 
+#
 #         ndx = np.flatnonzero(epoch.labels == index)
-# 
+#
 #     elif isinstance(index, int):
 #         if index not in range(-len(epoch), len(epoch)):
 #             raise ValueError(
 #                 f"Invalid index {index} for an epoch with {len(epoch)} intervals"
 #             )
 #         ndx = index
-# 
+#
 #     else:
 #         raise TypeError(
 #             f"Index expected to be a bytes, str, or int; got {type(index).__name__} instead"
 #         )
-# 
+#
 #     if duration:
 #         intvl = (
 #             (
@@ -2954,7 +2955,7 @@ def epoch_has_interval(
 #                 flatten()[0] + epoch.durations[ndx].flatten()[0],
 #             )
 #         )
-# 
+#
 #     return Interval(*intvl, extent=duration)
 
 
@@ -3663,7 +3664,7 @@ def splice_signals(*args, times=None):
     """
     if len(args) == 1:
         return args[0]
-    
+
     if all(isinstance(s, (neo.AnalogSignal, DataSignal)) for s in args):
         if len(args) == 1:
             return args[0]  # no splice
@@ -3679,7 +3680,7 @@ def splice_signals(*args, times=None):
 
         if any(args[0].shape[1] != s.shape[1] for s in args[1:]):
             raise ValueError("Signals have incompatible sizes on the 2ⁿᵈ dimension")
-        
+
         # print(f"neoutils.splice_signals: signals shapes = {list((s.shape for s in args))}")
 
         sp = args[0].sampling_period
@@ -3699,7 +3700,7 @@ def splice_signals(*args, times=None):
 
         # print(f"neoutils.splice_signals: tt.shape = {tt.shape}")
         y = np.full((tt.shape[0], args[0].shape[1]), fill_value=np.nan * args[0].units)
-        
+
         # print(f"neoutils.splice_signals: y.shape = {y.shape}")
 
         for k, s in enumerate(args):
@@ -3784,102 +3785,186 @@ def splice_signals(*args, times=None):
     else:
         raise TypeError(f"Expecting signal objects; instead got {list(type(v).__name__ for v in args)}")
 
+def concatenate_events( *args) -> neo.Event:
+    r""" Concatenates event objects.
+
+Event objects are instances of ``neo.Event`` or of one of its subclasses defined in Scipyen: ``DataMark``, ``TriggerEvent``
+
+.. |nbsp| unicode:: 0xA0
+    :trim:
+
+Variadic Parameters:
+--------------------
+    :args: comma-separated sequence of ``neo.Event`` objects, or a single sequence of |nbsp|
+        ``neo.Event`` objects, with the following **preconditions**:
+
+
+* ``args`` must be homogeneous, i.e., **all elements** are instances of the *same* class (either neo.Event, DataMark, or TriggerEvent, but **not** any combination of these)
+
+* the physical units of the ``times`` attribute must be identical across all elements of ``args``, or convertible to the units of the first element in ``args``.
+
+* if elements of ``args`` are either DataMark or TriggerEvent classes, they **must** have the same value for the ``type`` attribute. For example, one cannot concatenate presynaptic TriggerEvents with postsynaptic TriggerEvents.
+
+Returns:
+--------
+    A new neo.Event | DataMark | TriggerEvent, with concatenated times, labels, |nbsp|
+    and array annotations. The class of the returned object is the same as that of the first element in ``args``.
+
+
+See also:
+
+::
+
+    core.triggerevent.DataMark.append_marks(...)
+
+    core.triggerevent.TriggerEvent.append_times(...)
+
+"""
+    if len(args) == 1:
+        if isinstance(args[0], (tuple, list)):
+            args = args[0]
+
+        elif isinstance(args[0], neo.Event):
+            args = [args]
+
+        else:
+            raise TypeError(
+                f"Expecting a sequence (tuple, or list) of neo.Events; got {type(args[0]).__name__} instead"
+            )
+    # else:
+    #     signals = args
+    assert all(isinstance(a, neo.Event) for a in args), "Expecting neo.Event objects"
+
+    assert all(
+        isinstance(a, type(args[0])) and scq.unitsConvertible(a.times.units, args[0].times.units) for a in args[1:]
+        ), "Cannot concatenate a mix of neo.Event subclasses or events with incompatible domain units"
+
+    e0 = args[0]
+    times = [e0.times.copy()]
+    labels = [e0.labels.copy()]
+    ann = e0.array_annotations.copy()
+
+    for e in args[1:]:
+        te = e.times.copy()
+        if e.times.units != times[0].units:
+            te = te.rescale(times[0].units)
+
+        times.append(te)
+
+        labels.append(e.labels.copy())
+
+        ann.update(e.array_annotations.copy())
+
+    times = np.concatenate(times)
+    labels = np.concatenate(labels) # BUG 2026-04-24 00:38:25 FIXME: likely to generate duplicate labels
+
+    result = e0.__class__(times = times, units = e0.units, labels = labels)
+
+    result.array_annotate(**ann)
+
+    if isinstance(result, DataMark):
+        result.type = e0.type
+
+    return result
+
 
 @safewrapper
-def concatenate_signals(
-    *args,
-    axis: int = 1,
-    ignore_domain: bool = False,
-    ignore_units: bool = False,
-    ignore_annotations: bool = True,
-    ignore_array_annotations: bool = True,
-    set_domain_start: typing.Optional[float] = None,
-    force_contiguous: bool = True,
-    padding: typing.Optional[typing.Union[bool, pq.Quantity]] = False,
-    overwrite: bool = False,
-    name: typing.Optional[str] = None,
+def concatenate_signals( *args,  axis: int = 1, ignore_domain: bool = False,
+                        ignore_units: bool = False,
+                        ignore_annotations: bool = True,
+                        ignore_array_annotations: bool = True,
+                        set_domain_start: typing.Optional[float] = None,
+                        force_contiguous: bool = True,
+                        padding: typing.Optional[
+                            typing.Union[bool, pq.Quantity]
+                            ] = False,
+                        overwrite: bool = False,
+                        name: typing.Optional[str] = None,
 ):
     r"""Concatenates regularly sampled signals.
 
-    Implements the functionality of neo.AnalogSignal's merge() and concatenate()
-    methods, but allows a sequence of signal objects, instead of being restricted 
-    to two signal objects.
+.. |nbsp| unicode:: 0xA0
+    :trim:
 
-    When the 'axis' parameters is the default (1) this is useful to collapse
-    several analog signals into a single multi-channel signal (a.k.a 'merging',
-    see also ``neo.AnalogSignal.merge``).
+Implements the functionality of neo.AnalogSignal's merge() and concatenate()
+methods, but allows a sequence of signal objects, instead of being restricted
+to two signal objects.
 
-    Here a "channel" is one data column in the signal.
+When the 'axis' parameters is the default (1) this is useful to collapse
+several analog signals into a single multi-channel signal (a.k.a 'merging',
+see also ``neo.AnalogSignal.merge``).
 
-    When the 'axis' parameter is 0, this simply collates the signals 'end-to-end'
-    (a.k.a 'concatenating').
+Here a "channel" is one data column in the signal.
 
-    Source signals should have identical units, and compatible domains.
+When the 'axis' parameter is 0, this simply collates the signals 'end-to-end'
+(a.k.a 'concatenating').
 
-    Concatenating signals brings a few restrictions in addition to those derived
-    from concatenating numpy arrays; these restrictions can be relaxed by setting
-    the 'ignore_domain' and 'ignore_units' flags to True.
+Source signals should have identical units, and compatible domains.
 
-    1) all signals should have the same sampling rate
-    2) all signals should have the same units or their units should be compatible
-        (i.e., convertible to each other)
-    2) all signals should have identical domains (units, origin e.g. 't_start',
-        and sampling_rate)
+Concatenating signals brings a few restrictions in addition to those derived
+from concatenating numpy arrays; these restrictions can be relaxed by setting
+the 'ignore_domain' and 'ignore_units' flags to True.
 
-    This function can concatenate signals belonging to different segments (in
-    this case, the resulting signal's segment attribute is set to None!)
+1) all signals should have the same sampling rate
+2) all signals should have the same units or their units should be compatible
+    (i.e., convertible to each other)
+2) all signals should have identical domains (units, origin e.g. 't_start',
+    and sampling_rate)
+
+This function can concatenate signals belonging to different segments (in
+this case, the resulting signal's segment attribute is set to None!)
 
 
-    Var-positional parameters:
-    -------------------------
+Var-positional parameters:
+-------------------------
 
-    a sequence of signals, or a comma-separated list of signals.
+a sequence of signals, or a comma-separated list of signals.
 
-    All signals must have the same shape except for the dimension of the
-    concatenating axis.
+All signals must have the same shape except for the dimension of the
+concatenating axis.
 
-    Named parameters:
-    ----------------
-    axis: int; default is 1
-        The concatenation axis
+Named parameters:
+----------------
+:axis: int; default is 1
+    The concatenation axis
 
-    ignore_domain: bool, default is False
-        When False (default) all signals must have identical time domains
-        (t_start, units and sampling_rate)
+:ignore_domain: bool, default is False
+    When False (default) all signals must have identical time domains
+    (t_start, units and sampling_rate)
 
-        When True, the data will be concatenated and a new time domain will be
-        generated with the units, t_start and sampling_rate taken from the first
-        signal in the sequence.
+    When True, the data will be concatenated and a new time domain will be
+    generated with the units, t_start and sampling_rate taken from the first
+    signal in the sequence.
 
-    ignore_units = bool, default False
-        When True, will skip checks for units compatibilty among signals.
+:ignore_units: bool, default False
+    When True, will skip checks for units compatibilty among signals.
 
-    ignore_annotations = bool, default True
-        When False, the annotations will be merged.
+:ignore_annotations: bool, default True
+    When False, the annotations will be merged.
 
-        WARNING: When True, the result will LACK annotations; the caller should
-        assign new annotations, as needed, to the new signal.
+    WARNING: When True, the result will LACK annotations; the caller should
+    assign new annotations, as needed, to the new signal.
 
-        NOTE/FIXME: This needs more work, therefore by default this is True
+    NOTE/FIXME: This needs more work, therefore by default this is True
 
-    ignore_array_annotations = bool, default True
-        When False, the array_annotations will be merged.
+:ignore_array_annotations: bool, default True
+    When False, the array_annotations will be merged.
 
-        WARNING: When True, the result will LACK array annotations; the caller
-        should assign new array annotations, as needed, to the new signal.
+    WARNING: When True, the result will LACK array annotations; the caller
+    should assign new array annotations, as needed, to the new signal.
 
-        NOTE/FIXME: This needs more work, therefore by default this is True
+    NOTE/FIXME: This needs more work, therefore by default this is True
 
-    force_contiguous:bool, default True
-        When concatenating signals across the domain axis, assign new domain
-        values when signals' domains overlap
+:force_contiguous: bool, default True
+    When concatenating signals across the domain axis, assign new domain
+    values when signals' domains overlap
 
-    padding, overwrite: parameters used when signals are concatenated across the
-        domain axis (typically thsi is axis 0).
+:padding, overwrite: parameters used when signals are concatenated across the
+    domain axis (typically this is axis 0).
 
-        See neo.AnalogSignal.concatenate() for details
+See neo.AnalogSignal.concatenate() for details
 
-    """
+"""
 
     def __get_default_attr__(val, default):
         return default if val is None else val
@@ -3899,7 +3984,7 @@ def concatenate_signals(
     if len(args) == 1:
         if isinstance(args[0], (tuple, list)):
             signals = args[0]
-            
+
         elif isinstance(args[0], (neo.AnalogSignal, DataSignal)):
             signals = args
 
@@ -4802,9 +4887,9 @@ def concatenate_blocks(*args, **kwargs):
 
     reverse = not ascending
 
-    
+
     # ### BEGIN parse args
-    
+
     # print(f"args: {type(args).__name__}: {len(args)} elements")
 
     if len(args) == 0:
@@ -5749,7 +5834,7 @@ def clear_events(
     match: str = "==",
 ):
     r"""Shorthand for clearing neo.Event objects embedded in src.
-    
+
     WARNING: 2025-10-24 22:35:13 BUG/FIXME DO NOT USE
 
     This includes TriggerEvent objects!
@@ -5859,7 +5944,7 @@ def clear_events(
         For the meaning of 'primitive' and 'composite' TriggerEventType objects,
         ans their inclusion relationships,  see the documentation for
         triggerevent.TriggerEventType
-    
+
     See also: get_events, remove_events
 
 
@@ -6191,35 +6276,35 @@ def remove_spiketrain(
     return segment
 
 def detect_trigger_events(data: neo.Block) -> bool:
-    r"""Adds trigger events to each Segment in the 'data' Block. 
+    r"""Adds trigger events to each Segment in the 'data' Block.
     Trigger events (core.triggerevent.TriggerEvent objects) are created as follows:
-    
-    • if the neo.Block represents a recorded trial that associates an acquisition 
+
+    • if the neo.Block represents a recorded trial that associates an acquisition
         protocol which can be accessed, the information embedded in the protocol
-        is used to create trigger events in each sweep (i.e. neo.Segment) of the 
+        is used to create trigger events in each sweep (i.e. neo.Segment) of the
         'data'
-    
-    • else, the function will try to use the heuristic defined in the module 
+
+    • else, the function will try to use the heuristic defined in the module
         `core.triggerprotocols`, which requires that, in addition to the relevant
-        analogsignals such as recorded current or voltage, the 'data' neo.Block 
-        also contains analogsignals representing the record of the used trigger 
+        analogsignals such as recorded current or voltage, the 'data' neo.Block
+        also contains analogsignals representing the record of the used trigger
         signals (i.e., TTL-like waveforms)
-    
+
     The function returns True if trigger event creation was successful, and False
     otherwise.
 """
     # NOTE: 2025-10-19 11:10:37
-    # avoid circular imports by importing these here and NOT at module level. 
+    # avoid circular imports by importing these here and NOT at module level.
     import ephys.ephys as ephys
     import core.pyabfbridge as pab
-    
+
     if not isinstance(data, neo.Block):
         raise TypeError(f"Expecting a neo.Block; instead got a {type(data).__name__} object")
-    
+
     protocol = ephys.getProtocol(data)
     if protocol is None:
         return False
-    
+
 def remove_epochs(data:typing.Union[neo.Block, neo.Segment, typing.Sequence[typing.Union[neo.Block, neo.Segment]]]):
     if isinstance(data, neo.Segment):
         data.epochs.clear()
@@ -6231,7 +6316,7 @@ def remove_epochs(data:typing.Union[neo.Block, neo.Segment, typing.Sequence[typi
     elif isinstance(data, typing.Sequence) and all(isinstance(d, (neo.Block, neo.Segment))):
         for d in data:
             remove_epochs(d)
-            
+
 def remove_epoch(data:typing.Union[neo.Block, neo.Segment, typing.Sequence[typing.Union[neo.Block, neo.Segment]]],
                  epoch:typing.Optional[typing.Union[neo.Epoch, typing.Sequence[neo.Epoch]]],
                  block_index:typing.Optional[int]=None, segment_index:typing.Optional[int]=None,
@@ -6253,10 +6338,10 @@ def remove_events(segment, event:typing.Optional[typing.Union[neo.Event, str, in
 
         Optional, default is None, in which case ALL instances of neo.Event will
         be removed.
-        
-        When 'event' is a neo.Event or TriggerEvent instance, the function will 
+
+        When 'event' is a neo.Event or TriggerEvent instance, the function will
         try to remove the reference to that event, if found, or to any event that
-        is identical to the specified one, if found (i.e., with identical time 
+        is identical to the specified one, if found (i.e., with identical time
         stamps, event type, event labels, and name).
 
         NOTE: Two event objects can have identical time stamps, labels,
@@ -6266,7 +6351,7 @@ def remove_events(segment, event:typing.Optional[typing.Union[neo.Event, str, in
         When 'event' is the type neo.Event, all events will eb removed (same as
         passing 'event=None')
 
-        When 'event' is the type triggerevent.TriggerEvent, all instances of 
+        When 'event' is the type triggerevent.TriggerEvent, all instances of
         TriggerEvent will be removed.
 
         When 'event' is an int, the function removes the event at index "event" in the
@@ -6298,10 +6383,10 @@ def remove_events(segment, event:typing.Optional[typing.Union[neo.Event, str, in
 
     if len(segment.events) == 0:
         return
-    
+
     if event is None:
         segment.events.clear()
-    
+
     elif isinstance(event, type):
         if event == neo.Event:
             segment.events.clear()
@@ -6309,7 +6394,7 @@ def remove_events(segment, event:typing.Optional[typing.Union[neo.Event, str, in
             keep_events = list(filter(lambda e: not isinstance(e, TriggerEvent), segment.events))
             segment.events.clear()
             segment.events.extend(keep_events)
-            
+
     elif isinstance(event, neo.Event):
         if event in segment.events:  # find event reference stored in events list
             evindex = segment.events.index(event)
@@ -6365,14 +6450,14 @@ def remove_events(segment, event:typing.Optional[typing.Union[neo.Event, str, in
             keep_events = [segment.events[k] for k in all_events_ndx if k not in evndx]
 
             segment.events[:] = keep_events
-            
+
     elif isinstance(event, typing.Sequence) and all(isinstance(e, TriggerEventType) for e in event):
         evs = [
             (k, e)
             for (k, e) in segment.events
             if isinstance(e, TriggerEvent) and any(e.type & e_ for e_ in event)
         ]
-        
+
         if len(evs):
             (evndx, events) = zip(*evs)
             all_events_ndx = range(len(segment.events))
@@ -6380,7 +6465,7 @@ def remove_events(segment, event:typing.Optional[typing.Union[neo.Event, str, in
             keep_events = [segment.events[k] for k in all_events_ndx if k not in evndx]
 
             segment.events[:] = keep_events
-            
+
 
     else:
         raise TypeError(
@@ -6961,15 +7046,15 @@ def inverse_lookup(
     return ret, index, sigvals
 
 
-def extract_spike_train_waveforms(x: neo.SpikeTrain, 
-                                  waveunits: typing.Optional[pq.Quantity] = None, 
+def extract_spike_train_waveforms(x: neo.SpikeTrain,
+                                  waveunits: typing.Optional[pq.Quantity] = None,
                                   **kwargs):
     r"""Constructs neo signal objects from the waveforms embedded in a spike train.
     The waveforms represent the events with time stamps stored in the spike train.
-    There seems to be no real convention as to what event-related time stamp is 
+    There seems to be no real convention as to what event-related time stamp is
     stored:
     • the waveform start (onset)
-    • the actual event onset (at some time interval AFTER or BEFORE the waveform 
+    • the actual event onset (at some time interval AFTER or BEFORE the waveform
     starts)
 
     Scipyen uses the following convention:
@@ -6979,7 +7064,7 @@ def extract_spike_train_waveforms(x: neo.SpikeTrain,
 
     • if the "left_sweep" is a NEGATIVE scalar quantity, then the time stamps of
         the train are actual event ONSET times, and the waveforms start at
-        spike time - abs(left_sweep) (i.e., BEFORE the spike train time 
+        spike time - abs(left_sweep) (i.e., BEFORE the spike train time
         stamp)
 
     • if the "left_sweep" is zero or None, then the waveform onsets are taken to
@@ -6990,7 +7075,7 @@ def extract_spike_train_waveforms(x: neo.SpikeTrain,
     x:neo.SpikeTrain
     waveunits: units for the waveform signal (the spike trains store waveforms
             as plain numpy arrays).
-    
+
         Optional; default is None, in which case the units for the generated signal
         are taken from the spike train array annotation ["signal_units"] asssociated
         with the corresponding time stamp; if that is not found, the generated
@@ -7099,14 +7184,14 @@ def extract_spike_train_waveforms(x: neo.SpikeTrain,
             if keep_time:
                 # NOTE: 2025-11-07 22:44:30
                 # propagate the actual time stamps (adjusted with left_sweep) => the actual start time of the wave
-                t_start = x[k] + left_sweep # x[κ] is a Quantity: κᵗʰ time stamp in the SpikeTrain — 
+                t_start = x[k] + left_sweep # x[κ] is a Quantity: κᵗʰ time stamp in the SpikeTrain —
             else:
                 # NOTE: 2025-11-07 22:45:48
                 # relative time: the wave starts at time 0
                 t_start = 0 * x.units
 
             # NOTE: 2025-11-07 22:46:39
-            # the wave for event (time stamp) κ MUST be a column vector (albeit 
+            # the wave for event (time stamp) κ MUST be a column vector (albeit
             # possibly with more than one channel, hence 𝑛 column vectors for 𝑛 channels)
             # therefore it must be transposed
             if isinstance(waveunits, pq.Quantity):
@@ -7114,17 +7199,17 @@ def extract_spike_train_waveforms(x: neo.SpikeTrain,
             else:
                 if "signal_units" in x.array_annotations:
                     # NOTE: 2025-11-09 15:43:33
-                    # Re-construct the units form their symnbols stored in the 
+                    # Re-construct the units form their symnbols stored in the
                     # array annotations
-                    # see NOTE: 2025-11-09 15:42:12 in Scipyen's ephys.membrane 
+                    # see NOTE: 2025-11-09 15:42:12 in Scipyen's ephys.membrane
                     # module for why I need this gymnastics
                     units = unitQuantityFromNameOrSymbol(x.array_annotations["signal_units"][k])
                 else:
                     units = pq.dimensionless
-                    
-                    
+
+
             print(f"neoutils.extract_event_waveforms: units = {units}")
-                    
+
             wave = neo.AnalogSignal(
                 w.T,
                 units = units,
@@ -7737,18 +7822,18 @@ def average_signals(*args, fun=np.mean, reltimes:bool=False,
     In addition, signals SHOULD have identical domains (times).
     To allow averageing signals with the same sampling rate and duration but with
     different start times ('t_start' attribute) then pass 'reltimes=True'.
-    
+
     WARNING: when 'reltimes' is True, this will modify the signal's domain for each
     signal in args.
-    
+
     You shuld therefore pass COPIES of signals, rather than references to those
     signals!
-    
+
     For example given a neo.Block 'b', obtain signal copies as follows:
-    
+
     signals = list(map(lambda s: s.analogsignals[0].copy(), b.segments))
-    
-    
+
+
     """
 
     if len(args) == 0:
@@ -7783,11 +7868,11 @@ def average_signals(*args, fun=np.mean, reltimes:bool=False,
 
     if any([s.shape[1] > 1 for s in args]):
         raise ValueError("Expecting single-channel signals only")
-    
+
     if reltimes:
         if not all(s.t_stop == args[0].t_stop for s in args):
             raise ValueError("Signal must have identical domains")
-        
+
         if not all(s.t_start == args[0].t_start for s in args):
             for s in args:
                 s.t_start = 0 * args[0].times.units
@@ -8385,7 +8470,7 @@ Var-keyword parameters:
 "count", "every" → see average_segments(…)
     Additional segment selectors - WARNING: these apply to the segments
     already selected by the 'segments' parameter:
-    
+
     "count" specifies how many successive segments should be taken into the average
     "every" specifies how many segment to skip between successive averages
 
@@ -8405,7 +8490,7 @@ Returns:
 A neo.Block with segments containing the average of the corresponding analog
 signals² in the segments in "data" (either all segments, or of those
 selected by "segments").
-    
+
 Irregularly sampled signals, events and epochs are EXCLUDED from the average
 
 ¹ See average_segments for details
@@ -9472,7 +9557,7 @@ def plot_spiketrain_waveforms(x:neo.SpikeTrain,
                               **kwargs):
     if not isinstance(x.waveforms, np.ndarray) or x.waveforms.size == 0:
         return
-    
+
     if isinstance(fig, (mpl.figure.Figure, int)):
         if isinstance(fig, int):
             plt.figure(fig)
@@ -9481,25 +9566,25 @@ def plot_spiketrain_waveforms(x:neo.SpikeTrain,
 
     else:
         plt.gcf()
-        
+
     waveform_units = x.annotations.get("waveform_units", None)
-    
+
     w_start = 0 * x.units
     w_stop = x.sampling_period.rescale(x.units) * x.waveforms.shape[-1]
     w_times = np.linspace(w_start, w_stop, x.waveforms.shape[-1])
-        
+
     for k in range(x.waveforms.shape[0]):
         pfun(w_times, x.waveforms[k,:,:].T, label=f"Wave {k}", **kwargs)
-        
+
     plt.xlabel(f"{unitFamilyName(x.units)} ({x.units.dimensionality})")
-    
+
     if isinstance(waveform_units, pq.Quantity):
         ylabel = f"{x.name} ({waveform_units.dimensionality})"
     else:
         ylabel = f"{x.name}"
-        
+
     plt.ylabel(ylabel)
-        
+
     plt.title("Waveforms")
     plt.legend()
     # if pfun == plt.plot and len(kwargs) == 0:
@@ -9507,7 +9592,7 @@ def plot_spiketrain_waveforms(x:neo.SpikeTrain,
     #         obj, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)
     #     ):
     #         args = ["o"]
-    
+
 def plot_neo(obj: neo.core.basesignal.BaseSignal,
     fig: typing.Optional[typing.Union[mpl.figure.Figure, int]] = None,
     pfun: typing.Callable = plt.plot,
@@ -9601,7 +9686,7 @@ def plot_neo(obj: neo.core.basesignal.BaseSignal,
         plt.title(sig_name)
 
     plt.legend()
-    
+
 def isABFTrial(data:neo.Block):
     return isinstance(data.annotations.get("generator", None), dict) and (data.annotations["generator"].get("abf_version", None) is not None)
 
@@ -9613,37 +9698,37 @@ def getEpochStartStop(epoch:typing.Union[neo.Epoch, DataZone, Interval, typing.S
 These are neo.Epoch, datazone.DataZone, datazone.Interval, pyabfbridge.ABFEpoch
 """
     from core.pyabfbridge import (ABFEpoch, ABFProtocol)
-    
+
     if isinstance(epoch, (int, str, ABFEpoch)):
         if not isinstance(protocol, ABFProtocol):
             raise TypeError(f"When epoch is a str or int, protocol is expected to be an ABFProtocol; instead, got {type(protocol).__name__}")
-        
+
         dac, epoch = protocol.check_DAC_Epoch(dac, epoch)
-        
+
         if not isinstance(sweep, int):
             raise TypeError(f"When epoch is a str or int, sweep is expected to be an int; instead, got {type(sweep).__name__}")
-        
+
         if sweep not in range(protocol.nSweeps):
             raise ValueError(f"Invalid sweep index for a protocol with {protocol.nSweeps} sweeps")
-        
+
         t0, t1 = (protocol.getEpochStart(epoch, dac, sweep), protocol.getEpochDuration(epoch, dac, sweep))
         t1 += t0
-        
+
     elif isinstance(epoch, (neo.Epoch, DataZone)):
         if isinstance(epoch, DataZone):
             assert(scq.unitsConvertible(epoch.times.units, pq.s)), f"'epoch' {epoch} expected to have been defined in the time domain; instead it has {epoch.times.units}"
         assert len(epoch) == 1, f"Too many intervals ({len(epoch)}) in 'epoch' {epoch}, when only one was expected"
         t0, t1 = epoch.times[0], epoch.times[0]+epoch.durations[0]
-        
+
     elif isinstance(epoch, Interval):
         t0, t1 = (epoch,t0, epoch.t1) if epoch.extent else (epoch.t0, epoch.t0+epoch.t1)
-        
+
     elif isinstance(epoch, typing.Sequence):
         if len(epoch) != 2:
             raise ValueError(f"The 'epoch' sequence is expected to have exacly two elements; instead, got a sequence with {len(epoch)} elements.")
         if not all(isinstance(v, pq.Quantity) and scq.unitsConvertible(v, pq.s) and scq.isScalar(v) for v in epoch):
             raise TypeError(f"The 'epoch' sequence is expectd to contain scalar quantities with units of time")
-        
+
         t0, t1 = min(epoch), max(epoch)
-        
+
     return (t0, t1)
