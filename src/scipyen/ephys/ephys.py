@@ -794,16 +794,6 @@ def auxoutput(name:str, channel:typing.Optional[int]=None, digttl:typing.Optiona
 
     return AuxiliaryOutput(name, channel, digttl)
 
-# class __BaseSource__(typing.NamedTuple):
-#     name: str = "cell"
-#     adc: int = 0
-#     dac: typing.Optional[int] = None
-#     syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]] = None
-#     auxin: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]   = None
-#     auxout: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]  = None
-#     electrodeMode: ElectrodeMode = ElectrodeMode.Null
-
-# class RecordingSource(__BaseSource__):
 @dataclass
 class RecordingSource():
     name: str = "cell"
@@ -2318,10 +2308,10 @@ class RecordingSchedule(Schedule):
         return cls(name, episodes=episodes)
 
 
-# @with_doc(BaseScipyenData, use_header=True)
 @dataclass
 class SynapticPathway:
     r"""Logical association of a SynapticStimulus with a recording configuration.
+
     Also specifies the "type" of the SynapticPathway, which represents the role
     of the SynapticPathway in an experiment.
 

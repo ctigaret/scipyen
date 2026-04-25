@@ -2863,14 +2863,20 @@ True                epoch_letter ↦ a tuple as above
 
     @property
     def epochsWithDigitalOutput(self) -> tuple:
-        r"""A tuple of all ABFEpoch numbers where a digital output is defined"""
+        r"""A tuple of all ABFEpoch numbers where a digital output is defined.
+
+    Read-only.
+    """
         return tuple(map(lambda x: x[0],
                          filter(lambda x: not all (x_ ==0 for x_ in x[1]),
                                 map(lambda i: (i[0], tuple(itertools.chain.from_iterable(i[1].main + i[1].alternate))),
                                     self.digitalPatterns.items()))))
 
     def getDACsWithDigitalOutput(self) -> list:
-        r"""List of DACs that emit digital outputs"""
+        r"""List of DACs that emit digital outputs.
+
+    Read-only.
+    """
         digEpochs = self.epochsWithDigitalOutput
         ret = set() # DAC physical indexes
         for epoch in digEpochs:
@@ -2881,7 +2887,8 @@ True                epoch_letter ↦ a tuple as above
 
     @property
     def digitalOutputDACs(self) -> list:
-        r"""Property version of self.getDACsWithDigitalOutput; read-only"""
+        r"""Property version of self.getDACsWithDigitalOutput; read-only.
+    """
         return self.getDACsWithDigitalOutput()
 
 
@@ -3115,7 +3122,89 @@ True                epoch_letter ↦ a tuple as above
 
             return (0,) * self.nDIGChannels
 
-    def getEpochDigitalTriggers(self, epoch:typing.Union[ABFEpoch, str, int], /,
+    def getActiveDigitalChannelsInEpoch(self, epoch:typing.Union[
+                                            ABFEpoch, int, str, typing.Sequence
+                                            ],
+                                        /,
+                                        main: typing.Optional[
+                                                    typing.Union[bool, Tribool]
+                                                            ] = None
+                                        ) -> tuple:
+        r"""Obtain the indexes of active digital channels in an ABFEpoch.
+
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+    Parameters:
+    -----------
+
+    :epoch: An ``ABFEpoch`` or the number or letter of the ABFEpoch to be queried.
+
+    :main: Flag indicating whether rthe method queries the *main* (``True``), |nbsp|
+        *alternate*, or *both* digital patterns in the epoch (if there are any)
+
+    Returns:
+    --------
+        When ``main`` is ``None`` or a ``Tribool`` with value of ``None``, returns |nbsp|
+        a pair of tuples (one each, for the *main* and the *alternate* digital |nbsp|
+        pattern), containing the indexes of the DIG channel active in the Epoch, |nbsp|
+        when either of these patterns would be enacted.
+
+        Either of these tuples may be empty of not DIG channel is active in the |nbsp|
+        corresponding digital pattern.
+
+        When ``main`` a ``bool`` or a ``Tribool`` with value ``True`` or ``False``, |nbsp|
+        returns a single tuple with the indexes of the DIG channels that are active when |nbsp|
+        the *main* (``True``) or *alternate* (``False``) digital pattern is enacted.
+
+        This tuple may be empty if no DIG channel is active in the selected digital |nbsp| pattern.
+
+
+    .. note::
+
+        The enacting of the *main* or *alternate* digital pattern during an |nbsp|
+        ABFEpoch depends on whether the protocol has alternate digital outputs |nbsp|
+        enabled, and on whether the sweep index is odd or even.
+
+        While this method operates independently of these criteria, it allows |nbsp|
+        for the queried digital pattern to be specified by prior decision based on |nbsp|
+        these criteria.
+
+    """
+
+        if main is None:
+            main = Tribool()
+
+        elif isinstance(main, bool):
+            main = Tribool(main)
+
+        elif not isinstance(main, Tribool):
+            raise TypeError(f"'main' expected a bool, Tribool, or None; instead, got a {type(main).__name__}")
+
+
+        digPattern = self.getEpochDigitalPattern(epoch, main = main,
+                                                 separateBanks=False) # either main or alternate, depending on the sweep
+        if main.value is None:
+            return tuple(
+                            map(
+                                lambda t: tuple(
+                                                map(lambda x: x[0],
+                                                    filter(
+                                                            lambda x: x[1] !=0,
+                                                            enumerate(t)
+                                                           )
+                                                    )
+                                                ),
+                                digPattern
+                                )
+                         )
+        else:
+            return tuple(map(lambda x: x[0], filter(lambda x: x[1] !=0, enumerate(digPattern))))
+
+
+
+    def getEpochDigitalTriggers(self, epoch: typing.Union[ABFEpoch, str, int], /,
                              sweep:int = 0,
                              dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]] = None,
                              digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
@@ -3124,7 +3213,7 @@ True                epoch_letter ↦ a tuple as above
                              name:typing.Optional[str] = None,
                              enableEmptyEvent:bool=True,
                              holding:bool=True,
-                             fromRunStart:bool=False):
+                             fromRunStart:bool=False) -> typing.Optional[TriggerEvent | typing.Sequence[TriggerEvent]]:
         r""" TriggerEvent emitted by digital output channels (TTLs) during an ABF Epoch.
 
         For an Epoch of type Step or Pulse AND where digital output is enabled (i.e.
@@ -3289,19 +3378,6 @@ True                epoch_letter ↦ a tuple as above
 
         if myEpoch.type not in (ABFEpochType.Step, ABFEpochType.Pulse):
             return TriggerEvent(event_type = eventType, name=name, labels = label) if enableEmptyEvent else None
-
-        # durationSamples = self.getEpochDuration(myEpoch, myDac, sweep, samples = True)
-        # deltaDurationSamples = self.getEpochDeltaDuration(myEpoch, myDac, samples=True)
-        # finalDurationSamples = self.getEpochDuration(myEpoch, myDac, self.nSweeps-1, samples = True)
-        # pulsePeriodSamples = self.getEpochPulsePeriod(myEpoch, myDac, True)
-        # pulseWidthSamples = self.getEpochPulseWidth(myEpoch, myDac, True)
-
-        # pulseCount = 0 if pulsePeriodSamples == 0. else int(np.ceil(durationSamples/pulsePeriodSamples))
-        # finalPulseCount = 0 if pulsePeriodSamples == 0. else int(np.ceil(finalDurationSamples/pulsePeriodSamples))
-
-        # pulseCount = self.getEpochPulseCount(myEpoch, myDac, sweep)
-        # # finalPulseCount= self.getEpochPulseCount(myEpoch, myDac, self.nSweeps-1)
-
 
         digPattern = self.getEpochDigitalPattern(myEpoch, main = not isAlternateDigital) # either main or alternate, depending on the sweep
 
@@ -3907,8 +3983,6 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
         # HO DAC is a "high-order" DAC: a DAC with index > 1
         hoDACActive = self.activeDACChannel not in (0,1)
 
-        # isAlternateDigital = self.getIsAlternateDigital(sweep, dac)
-
         # ### BEGIN set up row labels for output data frame
         if sweep not in range(self.nSweeps):
             raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
@@ -3960,12 +4034,7 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
 
             result = dict()
 
-            # print(f"{self.__class__.__name__}.getEpochsTable: isAlternateDigital = {isAlternateDigital}")
-
-            # hoDACActive = self.activeDACChannel not in (0,1)
-
         for i, epoch in enumerate(dac.epochs):
-            # print(f"\n{self.__class__.__name__}.getEpochsTable: epoch {epoch.letter}:")
 
             myDac = dac # allocate early — use the given dac
 
@@ -3977,10 +4046,8 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
                 if self.alternateDigitalOutputsEnabled and epoch.number in digEpochs:
                     # get the dac where the alternative digital bit pattern was defined:
                     digDACs = self.getDACsForEpoch(epoch.number)
-                    # print(f"{self.__class__.__name__}.getEpochsTable: digDACs = {digDACs}")
 
                     if len(digDACs) > 1 and dac.physicalIndex in digDACs:
-
                         if hoDACActive:
                             if 1 in digDACs and wantsAltOutput:
                                 myDac = self.getDAC(1)
@@ -4017,13 +4084,9 @@ See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
                 myDac = dac
                 myEpoch = epoch
 
-            # isAlternateDigital = self.getIsAlternateDigital(sweep, myDac)
-
             epochDigPattern = self.getEpochDigitalPattern(epoch.epochNumber,
                                                     main = not wantsAltOutput,
                                                     natural=False, separateBanks=True)
-
-            # print(f"{self.__class__.__name__}.getEpochsTable: active DAC is {self.activeDACChannel}; myDac is {myDac.physicalIndex}; showing actual output: {actualOutput}")
 
             duration = self.getEpochDuration(myEpoch, myDac, sweep, samples = False)
             durationSamples = scq.nSamples(duration, self.samplingRate)
@@ -7912,7 +7975,7 @@ def getDIGPatterns(o:typing.Union[neo.Block, pyabf.ABF], reverse_banks:bool=Fals
     raise NotImplementedError(f"This function does not support objects of {type(o).__name__} type")
 
 @getDIGPatterns.register(neo.Block)
-def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False,
+def _getDIGPatterns_(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False,
       pack_str:bool=False, epoch_num:typing.Optional[int]=None) -> dict:
     from core.neoutils import getAcquisitionInfo
 
@@ -7974,7 +8037,7 @@ def _(obj:neo.Block, reverse_banks:bool=False, wrap:bool=False,
     return epochsDigitalPattern #, epochNumbers, epochDigital, epochDigitalStarred, epochDigitalAlt, epochDigitalStarredAlt
 
 @getDIGPatterns.register(pyabf.ABF)
-def _(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False,
+def _getDIGPatterns_(abf:pyabf.ABF, reverse_banks:bool=False, wrap:bool=False,
       pack_str:bool=False, epoch_num:typing.Optional[int]=None) -> dict:
     r"""Creates a representation of the digital pattern associated with a DAC channel.
 
@@ -8237,14 +8300,14 @@ def getABFHoldDelay(obj):
     raise NotImplementedError(f"not implemented for {type(obj).__name__} objects")
 
 @getABFHoldDelay.register(pyabf.ABF)
-def _(abf:pyabf.ABF):
+def _getABFHoldDelay_(abf:pyabf.ABF):
     isABF2 = abf.abfVersion["major"] == 2
     protocol = getABFsection(abf,"protocol")
     samplingPeriod = (1/(abf.sampleRate*pq.Hz)).rescale(pq.s)
     return int(abf.sweepPointCount/64) * samplingPeriod
 
 @getABFHoldDelay.register(neo.Block)
-def _(data:neo.Block):
+def _getABFHoldDelay_(data:neo.Block):
     try:
         isABF2 = data.annotations["generator"]["fFileSignature"].decode() == "ABF2"
         if not isABF2:
@@ -8624,11 +8687,11 @@ def getABFversion(obj) -> int:
     raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
 
 @getABFversion.register(pyabf.ABF)
-def _(obj:pyabf.ABF) -> int:
+def _getABFversion_(obj:pyabf.ABF) -> int:
     return abf.abfVersion["major"]
 
 @getABFversion.register(neo.Block)
-def _(obj:neo.Block) -> int:
+def _getABFversion_(obj:neo.Block) -> int:
     from core.neoutils import getAcquisitionInfo
 
     info_dict = getAcquisitionInfo(obj)
@@ -8669,12 +8732,12 @@ def usedADCs(obj, useQuantities:bool=True) -> dict:
     raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
 
 @usedADCs.register(pyabf.ABF)
-def _(obj:pyabf.ABF, useQuantities:bool=True) -> dict:
+def _usedADCs_(obj:pyabf.ABF, useQuantities:bool=True) -> dict:
     return dict(map(lambda x: (x, __wrap_to_quantity__(obj._getAdcNameAndUnits(x), useQuantities)),
                     obj._adcSection.nADCNum))
 
 @usedADCs.register(neo.Block)
-def _(obj:neo.Block, useQuantities:bool=True) -> dict:
+def _usedADCs_(obj:neo.Block, useQuantities:bool=True) -> dict:
     from core.neoutils import getAcquisitionInfo
 
     assert sourcedFromABF(obj), "Object does not appear to be sourced from ABF"
@@ -8682,9 +8745,6 @@ def _(obj:neo.Block, useQuantities:bool=True) -> dict:
     return dict(map(lambda x: (x, (info_dict["listADCInfo"][x]["ADCChNames"].decode(),
                                    unitStrAsQuantity(info_dict["listADCInfo"][x]["ADCChUnits"].decode(), useQuantities))),
                     range(info_dict["sections"]["ADCSection"]["llNumEntries"])))
-    # return dict(map(lambda x: (x, (obj.annotations["listADCInfo"][x]["ADCChNames"].decode(),
-    #                                unitStrAsQuantity(obj.annotations["listADCInfo"][x]["ADCChUnits"].decode(), useQuantities))),
-    #                 range(obj.annotations["sections"]["ADCSection"]["llNumEntries"])))
 
 @singledispatch
 def usedDACs(obj, useQuantities:bool=True) -> dict:
@@ -8696,27 +8756,25 @@ def usedDACs(obj, useQuantities:bool=True) -> dict:
     raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
 
 @usedDACs.register(pyabf.ABF)
-def _(obj:pyabf.ABF, useQuantities:bool=True) -> dict:
+def _usedDACs_(obj:pyabf.ABF, useQuantities:bool=True) -> dict:
     return dict(map(lambda d: (d, __wrap_to_quantity__(obj._getDacNameAndUnits(d), useQuantities)),
                     filter(lambda x: obj._dacSection.nWaveformEnable[x] and obj._dacSection.nWaveformSource[x] > 0, obj._dacSection.nDACNum)))
 
 @usedDACs.register(neo.Block)
-def _(obj:neo.Block, useQuantities:bool=True) -> dict:
+def _usedDACs_(obj:neo.Block, useQuantities:bool=True) -> dict:
     from core.neoutils import getAcquisitionInfo
 
     assert sourcedFromABF(obj), "Object does not appear to be sourced from ABF"
     info_dict = getAcquisitionInfo(obj)
     return dict(map(lambda d: (d["nDACNum"], (d["DACChNames"].decode(), unitStrAsQuantity(d["DACChUnits"].decode(), useQuantities))),
                     filter(lambda x: x["nWaveformEnable"] > 0 and x["nWaveformSource"] > 0, info_dict["listDACInfo"])))
-    # return dict(map(lambda d: (d["nDACNum"], (d["DACChNames"].decode(), unitStrAsQuantity(d["DACChUnits"].decode(), useQuantities))),
-    #                 filter(lambda x: x["nWaveformEnable"] > 0 and x["nWaveformSource"] > 0, obj.annotations["listDACInfo"])))
 
 @singledispatch
 def isDACWaveformEnabled(obj, channel:int) -> bool:
     raise NotImplementedError(f"Not implemented for {type(obj).__name__} objects")
 
 @isDACWaveformEnabled.register(pyabf.ABF)
-def _(obj, dacChannel:int) -> bool:
+def _isDACWaveformEnabled_(obj, dacChannel:int) -> bool:
     abf_version = getABFversion(obj)
     assert abf_version in (1,2), f"Unsupported ABF version {abf_version}"
 
@@ -8725,7 +8783,7 @@ def _(obj, dacChannel:int) -> bool:
     return obj._dacSection.nWaveformEnable[dacChannel] == 1
 
 @isDACWaveformEnabled.register(neo.Block)
-def _(obj, channel:int) -> bool:
+def _isDACWaveformEnabled_(obj, channel:int) -> bool:
     assertFromABFmsg = "Object does not seem to be created from an ABF file"
     abf_version = getABFversion(obj)
     assert abf_version in (1,2), f"Unsupported ABF version {abf_version}"
@@ -8741,6 +8799,14 @@ def _(obj, channel:int) -> bool:
 
 def showEpochsTable(p: ABFProtocol):
     pass # TODO: 2026-03-31 08:55:59 use interact.packInputs(…)
+
+# def isFlatEpoch(e:ABFEPoch) -> bool:
+#     r"""Returns ``True`` if the epoch ``e`` does nothing.
+#
+# .. note::
+#     A *flat* epoch if an epoch during which no command waveforms or digital TTLs
+# are emitted for a specific DAC during a specific sweep
+# """
 
 # ### END module-level functions
 
