@@ -3531,9 +3531,36 @@ True                epoch_letter ↦ a tuple as above
 
         return ret
 
+    def getTTLEmittingEpochsForDAC(self, dac: typing.Union[
+                                                    ABFOutputConfiguration, int, str
+                                                    ],
+                                    digChannel: int, /,
+                                    sweep: typing.Optional[int] = 0) -> list:
+        if isinstance(dac, (int, str)):
+            dac = self.getDAC(dac)
+        digTriggerEpochs = list()
+        wantsAltDIGOutput = sweep % 2 > 0
+        protocolSEDs = list(filter(lambda s: s["sweep"] == sweep, self.getActiveDigitalChannels()))
+
+        if len(protocolSEDs):
+            sed = protocolSEDs[0]
+            if self.alternateDigitalOutputsEnabled:
+                # we want the pattern ACTUALLY being output, NOT the one defined in the DAC tab
+                dp_variant = "alternate" if wantsAltDIGOutput else "main"
+            else:
+                dp_variant = "main"
+
+            for epoch, dp in sed["epochs"].items():
+                digDACs = self.getDACsForEpoch(epoch)
+                if dac.physicalIndex in digDACs and digChannel in dp[dp_variant]:
+                    digTriggerEpochs.append(epoch)
+
+        return digTriggerEpochs
+
+
     def getDigitalTriggers(self, sweep:int = 0,
-                    dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
-                    digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
+                    dac: typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
+                    digChannel: typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
                     byDIGIndex:bool=False,
                     relativeToRunStart:typing.Optional[bool]=True,
                     useHoldingTime:bool=False,
