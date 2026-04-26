@@ -940,7 +940,7 @@ def hmake_info_unformatted(obj:object, info:oinspect.InfoDict, detail_level:int,
 
     # WARNING: 2026-03-15 17:13:55
     # comment-out the next line when NOT debugging
-    shell.user_ns["info_obj"] = info
+    # shell.user_ns["info_obj"] = info
 
     # latex_formatter = partial(format_latex, imgdir=imgdir)
     rst_latex_fmt = partial(rst_latex_2_html, imgdir=imgdir)

@@ -861,7 +861,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                 if self._delete_on_close_ or getattr(self.appWindow, "autoRemoveViewers", False):
                     if any([v is self for v in self.appWindow.workspace.values()]):
                         self.appWindow.deRegisterWindow(self)
-                        self.appWindow.removeFromWorkspace(self, by_name=False)
+                        # self.appWindow.removeFromWorkspace(self, by_name=False)
 
             super().closeEvent(evt)
             evt.accept()

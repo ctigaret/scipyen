@@ -3783,8 +3783,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         return win
 
     @safewrapper
-    def deRegisterWindow(self, win):
-        r"""Removes references to the viewer window 'win' from the manager.
+    def deRegisterWindow(self, win: typing.Union[QtWidgets.QMainWindow, mpl.figure.Figure]):
+        r"""Removes references to the viewer window 'win'.
 
         Parameters:
         -----------
@@ -3794,38 +3794,25 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         ATTENTION: This function neither removes the viewer object from the
         workspace, nor unbinds it from its symbol in the workspace!!!
         """
-        # print(f"\n***\n{self.__class__.__name__}.deRegisterWindow({type(win).__name__})")
         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             return
 
-        # print(f"{self.__class__.__name__}.deRegisterWindow: {win}")
-
         viewer_type = type(win)
 
-        old_viewer_index = None
-
         if viewer_type in self.viewers.keys():
-            # print(f"{self.__class__.__name__}.deRegisterWindow: {viewer_type.__name__} found in self.viewers.keys()")
             if win in self.viewers[viewer_type]:
-                # print(f"{self.__class__.__name__}.deRegisterWindow: {win} found in self.viewers[{viewer_type.__name__}]")
-                old_viewer_index = self.viewers[viewer_type].index(win)
-                # print(f"{self.__class__.__name__}.deRegisterWindow: old_viewer_index = {old_viewer_index}")
                 self.viewers[viewer_type].remove(win)
 
-        # print(f"{self.__class__.__name__}.deRegisterWindow: viewers left: {len(self.viewers[viewer_type])}")
-
-
         if viewer_type in self.currentViewers:
-            # print(f"{self.__class__.__name__}.deRegisterWindow: currentViewers[{viewer_type.__name__}]  = {self.currentViewers[viewer_type]}")
-            # print(f"{self.__class__.__name__}.deRegisterWindow: {viewer_type.__name__} found in self.currentViewers")
-
             if self.currentViewers[viewer_type] is win:
                 self.currentViewers[viewer_type] = None
 
             if len(self.viewers[viewer_type]):
                 self.currentViewers[viewer_type] = self.viewers[viewer_type][-1]
 
-    def raiseWindow(self, obj):
+        self.removeFromWorkspace(win)
+
+    def raiseWindow(self, obj: typing.Union[QtWidgets.QMainWindow, mpl.figure.Figure]):
         r"""Sets obj to be the current window and raises it.
         Steals focus.
         """
@@ -3849,9 +3836,21 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 obj.show()  # steals focus!
 
         else:
-            if os.getenv("XDG_SESSION_TYPE").lower() != "wayland":
-                obj.activateWindow()
-                obj.raise_()
+            # NOTE: 2026-04-26 14:06:28
+            # this seems to have been resolved on wayland side...
+            # at least on:
+            # Operating System: openSUSE Tumbleweed 20260423
+            # KDE Plasma Version: 6.6.4
+            # KDE Frameworks Version: 6.25.0
+            # Qt Version: 6.11.0
+            # Kernel Version: 6.19.12-1-default (64-bit)
+            # Graphics Platform: Wayland
+
+            # if os.getenv("XDG_SESSION_TYPE").lower() != "wayland":
+            #     obj.activateWindow()
+            #     obj.raise_()
+            obj.activateWindow()
+            obj.raise_()
             obj.setVisible(True)
 
     def setCurrentWindow(self, obj):
@@ -4698,14 +4697,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # possibly redundant with self.removeWorkspaceSymbol
         if by_name and isinstance(value, str):
             obj = self.workspaceModel.unbindFromNamespace(value) # one-shot
-            # if isinstance(obj, QtCore.QObject):
-            #     obj.deleteLater()
+            if isinstance(obj, QtCore.QObject):
+                del obj
         else:
             named_objects = list(filter(lambda i: i[1] is value, self.workspace.items()))
             for n_o in named_objects:
                 obj = self.workspaceModel.unbindFromNamespace(n_o[0])
-                # if isinstance(obj, QtCore.QObject):
-                #     obj.deleteLater()
+                if isinstance(obj, QtCore.QObject):
+                    del obj
             # named_objects = [(name, obj)
             #            for (name, obj) in self.workspace.items() if obj is value]
             #

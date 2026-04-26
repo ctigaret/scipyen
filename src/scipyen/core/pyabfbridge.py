@@ -2429,7 +2429,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
     extent (False); see Interval documentation
     merge (False); when True, the result holds one (t0, t1) interval.
 
-    See also dacEpochsToNeoEpoch, getEpochAsNeoEpoch, getEpochsTable with asNeoEpoch = True
+    See also dacEpochsToNeoEpoch, getNeoEpoch, getEpochsTable with asNeoEpoch = True
     """
         if isinstance(dac, (int, str)):
             dac = self.getDAC(dac)
@@ -2476,13 +2476,17 @@ class ABFProtocol(ElectrophysiologyProtocol):
                             name:typing.Optional[str] = None,
                             description:typing.Optional[str] = None,
                             durations:bool=False) -> neo.Epoch:
-        r"""
-    Constructs a neo.Epoch object based on the ABFEpochs defined for the given DAC.
-    The neo.Epoch object 'times' and 'durations' attributes are derived from the
-    ABF epochs' start times and actual durations.
+        r"""Constructs a neo.Epoch object based on the ABFEpochs defined for the given DAC.
 
-    See also getEpochAsNeoEpoch and getEpochsTable with asNeoEpoch = True
-    """
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+The neo.Epoch object 'times' and 'durations' attributes are derived from the |nbsp|
+ABF epochs' start times and actual durations, adjusted to reflect their actual values, |nbsp| .
+given the DAC, sweep, and whether alternate command waveforms are enabled in the protocol.
+
+See also getNeoEpoch and getEpochsTable with asNeoEpoch = True
+"""
         if isinstance(dac, (int, str)):
             dac = self.getDAC(dac)
 
@@ -3806,20 +3810,43 @@ True                epoch_letter ↦ a tuple as above
             triggers = tuple(triggers.values())
             return triggers[0] if len(triggers) == 1 else triggers if len(triggers) > 1 else None
 
-    def getEpochAsNeoEpoch(self, epoch:typing.Union[ABFEpoch, str, int],
+    def getNeoEpoch(self, epoch:typing.Union[ABFEpoch, str, int],
                             dac:typing.Union[ABFOutputConfiguration, int, str],
                             sweep:int = 0,
                             holding:bool=True,
                             fromRunStart:bool=False) -> neo.Epoch:
-        r"""Construct a neo.Epoch object from a specified *single* ABFEpoch
-        See also dacEpochsToNeoEpoch and getEpochsTable with asNeoEpoch = True
-    """
+        r"""Construct a neo.Epoch object from a *single* ABFEpoch.
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+The ``dac`` and ``sweep`` parameters are necessary to determine the correct |nbsp|
+timings, within the trial, for the epoch taking into account preceding epochs, |nbsp|
+the possibility that epochs may have changed duration (`deltaDuration`) and that |nbsp|
+alternative command waveforms may have been enabled in the protocol.
+
+The annotations of the neo.Epoch result will be updated with the following mapping:
+
+    :"epochType": type of the ABFEpoch
+
+    :"digital": the ABFDigitalPattern associated with the ABFEpoch
+
+    :"epochLetter": the letter of the ABFEpoch, in the epochs table
+
+    :"epochNumber: the number (index) of the ABFEoch in the epochs table
+
+See also ``dacEpochsToNeoEpoch`` and ``getEpochsTable`` with ``asNeoEpoch = True``
+"""
+        dac, epoch = self.check_DAC_Epoch(dac, epoch)
+
         t0, t1 = (self.getEpochStart(epoch, dac, sweep, holding, fromRunStart, False),
                   self.getEpochDuration(epoch, dac, sweep, False))
 
         return neo.Epoch(times = [t0], durations = [t1],
-                         labels = [epoch.letter], name = f"{dac.name}_epoch",
+                         labels = [epoch.letter], name = f"{dac.name}_epoch_{epoch.letter}",
                          epochType = epoch.type, units = t0.units,
+                         epochLetter = epoch.letter,
+                         epochNumber = epoch.number,
                          digital = self.getEpochDigitalPattern(epoch.epochNumber,
                                                                self.getIsAlternateDigital(sweep, dac)))
 
@@ -3883,7 +3910,7 @@ True                epoch_letter ↦ a tuple as above
             epoch = dac.getEpoch(epochIndex)
 
         if asNeoEpoch:
-            return self.getEpochAsNeoEpoch(epoch, dac, sweep, holding, fromRunStart)
+            return self.getNeoEpoch(epoch, dac, sweep, holding, fromRunStart)
 
     def getEpochsTable(self, sweep:int = 0, /,
                        dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
@@ -3989,7 +4016,7 @@ Sample rate (Fast vs Slow)
     This needs to be confirmed with actual recordings of outputs when |nbsp|
     running a protocol that generates such conditions.
 
-See also dacEpochsToNeoEpoch and getEpochAsNeoEpoch
+See also dacEpochsToNeoEpoch and getNeoEpoch
 
 """
         # NOTE: 2024-10-30 21:30:47

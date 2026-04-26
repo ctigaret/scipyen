@@ -60,8 +60,12 @@ from core.scipyen_quantities import checkTimeUnits
 @dataclass
 class DataCursor:
     r"""Convenience structure for notional 1D cursor with a coordinate and span.
-Perform similar function as Interval with extent=True (i.e. the coordinate is at
-the center of the span, and the span extends symmetrically around the coordinate)
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+Performs a similar function as Interval with extent=True (i.e. the coordinate is at |nbsp|
+the center of the span, and the span extends symmetrically around the coordinate) |nbsp|
 EXCEPT that the coordinates may not necessarily associate a physical quantity.
 """
     coord:typing.Union[float, pq.Quantity]

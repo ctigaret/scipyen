@@ -2530,160 +2530,197 @@ class SynapticPathway:
 # interval.t1 is the symmetric window around the mid point!
 @dataclass
 class LocationMeasure:
+    r"""Calculates a signal measure at a location using a suitable function or functor.
 
-    r"""Functor to calculate a signal measure at a location using a suitable function or functor.
+.. |nbsp| unicode:: 0xA0
+   :trim:
 
-    In turn, a `location` is an object with one of the following types ('locator' types):
-    • SignalCursor
-    • DataCursor (abstraction of SignalCursor; stores only the cursor's coordinates, NOT type;
-                    depending on the axis it applied to it MAY represent a vertical or horizontal
-                    signal cursor; this class is useful when no SignalViewer axes are present yet)
-    • neo.Epoch
-    • DataZone
-    • Interval
+A *location* is an object with one of the following types ('locator' types):
+* SignalCursor
 
-    or a sequence (tuple, list) of such (SignalCursor, DataCursor, neo.Epoch, DataZone or Interval)
+* ``DataCursor`` This is an abstraction of a SignalCursor, which stores only the cursor's coordinates, NOT its type. |nbsp|
+    It *may* represent a vertical or horizontal signal cursor; useful when no SignalViewer axes are available.
 
-    The LocationMeasure object is callable, taking as first argument a signal-like
-        object, which will be passed at the functor or function encapsulated by
-        its `func` field, together with the locators specified in the constructor.
-        This call also accepts additional parameters to the `func`.
+* ``DataZone``
 
+* ``Interval``
 
-    A suitable functor takes a primitive numeric function as argument and uses it
-    to calculate a measure in a neo signal-like object, using ALL the supplied
-    locators. Likewise, a suitable function applies a hard-coded function to
-    calculate a signal measure at the supplied locators.
+* ``neo.Epoch``
 
-    The `ephys` module provides several such functors and functions:
-    1) cursor-based functors and functions — these use gui.SignalCursor objects
-    of vertical type:
-    • measuring at a single cursor, named as `cursor_<abc>` as shown below:
-        ∘ returning a single value:
-            ⋆ cursor_value(signal, cursor, channel): value of the signal at the
-                horizontal coordinate of a vertical SignalCursor, in the specified
-                signal channel¹ (subject to sampling rate)
+* A ``typing.Sequence[typing.Union[SignalCursor, DataCursor, neo.Epoch, DataZone, Interval]]`` |nbsp|
+e.g., a ``tuple`` or ``list`` of any of the above, and homogeneous in the type of its elements.
 
-            ⋆ cursor_index(signal, cursor): index of the signal sample(s)¹ at the
-                horizontal coordinate of the cursor.
-
-            ⋆ cursor_chord_slope(signal, cursor, channel): the slope of the line
-                through the signal samples (in the specified channel) at the
-                boundaries of the horizontal window of a vertical cursor
-
-            ⋆ cursor_reduce(func, signal, cursor, channel) → applies a reducing
-                numpy function to the specified channel the signal, over the
-                horizontal extent of a vertical SignalCursor; a reducing function
-                calculates a value based on several
-                data samples (e.g. `mean`, `sum`, `min`, `max`, etc)
-
-            Functors that are a particular case of `cursor_reduce` are listed
-            here:
-
-            ⋆ cursor_average(signal, cursor, channel) → applied np.mean (or
-                np.nanmean) to calculate the average of signal in the specified
-                channel, over the horizontal extent of the cursor
-
-            ⋆ cursor_mean → alias for cursor_average
-
-            ⋆ cursor_min, cursor_max, cursor_argmin, cursor_argmax
-
-        ∘ returning a tuple of values:
-            ⋆ cursor_minmax, cursor_maxmin, cursor_argminmax, cursor_argmaxmin
-
-    • measuring at two cursors, named as `cursors_<abc>` as shown below:
-        ∘ returning a single value:
-            ⋆ cursors_difference(signal, cursor0, cursor1, func, channel, subfun)
-                → returns the difference in signal values at the cursors, in the
-                specified channel
-
-                `func` is a single cursor functor returning a single value (see above)
-                `subfun` is the actual numeric reducing function used for the `func`
-                    (see examples above)
-
-            ⋆ cursors_distance(signal, cursor0, cursor1, channel) → measures the
-                distance, in samples (or axis 0 coordinates, see ¹) between the
-                vertical coordinates of two vertical SignalCursor objects.
-
-            ⋆ cursors_chord_slope(signal, cursor0, cursor1, channel) → calculates
-                the chord slope between the cursor_average at the two cursors.
-
-    2) interval-based functors and functions — these are similar to the cursor-based
-        functions listed above, but use datazone.Interval instead of gui.SignalCursor
-        objects.
-
-    3) epoch-based functors and functions — similar to cursor-based functions,
-        using neo.Epoch or datazone.DataZone objects as locations.
-
-    NOTE:
-        ¹ A signal `channel` is a numeric data vector, not to be confused with
-        the `input` or `output` hardware channel that carries the signal in your
-        experimental setup. All signals in Scipyen are represented as `neo`
-        objects (essentially, 'enhanced' numpy arrays), that store data in
-        memory as columns of a matrix: each column (a 1D array, or 'vector') is
-        a signal `channel`.
-
-        Normally, all neo signal-like objects have just one such channel (thus
-        having shape (M,1) where M is the number of samples in the
-        signal, same as the number of rows in the data matrix).
-
-        However, there is no restriction to the number of channels a signal can
-        have, and Scipyen frequently uses this feature to store additional data
-        (e.g., a "filtered" signal alongside the "raw", unfiltered version of the
-        signal as it was recorded). It follows that ALL the channels of a signal
-        share the signal's domain (usually, time).
-
-        Due to this layout, the signal's axes have a very specific meaning:
-
-        axis 0 ↦ the domain axis (e.g. time). All channels are aligned to this
-                this axis, hence an index `𝑚` along this axis points to the
-                𝑚ᵗʰ "row" of data spanning ALL channels. For a signal `sig`,
-                this is sig[𝑚,:].
-
-        axis 1 ↦ the channel axis. An index `𝑛` along this axis points to the
-                𝑛ᵗʰ "column" of data (i.e., channel `𝑛`) spanning the entire domain
-                of the signal. For a signal `sig`, this is sig[:,𝑛]
-
-        Given a signal `sig`, the sample at sig[𝑚,𝑛] is the unique data sample
-            at domain index `𝑚` in channel `𝑛`.
+The ``LocationMeasure`` object is callable, taking as first argument a signal-like |nbsp|
+    object, which will be passed at the *functor* or *function* encapsulated by |nbsp|
+    its `func` field, together with the locators specified in the constructor. |nbsp|
+    The call also accepts additional parameters to the `func`.
 
 
+A "suitable" *functor* takes a primitive numeric function as argument and uses it |nbsp|
+to calculate a measure in a ``neo`` signal-like object, using ALL the supplied |nbsp|
+locators. Likewise, a "suitable" *function* applies a hard-coded code to |nbsp|
+calculate a signal measure at the supplied locators (see examples, below).
 
-    Examples:
-    ---------
+The ``ephys`` module provides several such functors and functions:
+
+Cursor-based functors and functions
+-----------------------------------
+
+These use ``gui.SignalCursor`` objects of **vertical** type, or DataCursor objects.
+
+Using a single cursor
+=====================
+
+These are named according to the scheme "cursor_<abc>", and perform a measurement |nbsp|
+at a single cursor, returning a single value (scalar)
+
+* `cursor_value(signal, cursor, channel)`
+    Returns the value of the signal at the horizontal coordinate of a vertical |nbsp|
+    SignalCursor, in the specified signal channel¹ (subject to sampling rate)
+
+* `cursor_index(signal, cursor)`
+    Returns the index of the signal sample(s)¹ at the horizontal coordinate of |nbsp|
+    the cursor.
+
+* `cursor_chord_slope(signal, cursor, channel)`
+    Returns the slope of the line through the signal samples (in the specified |nbsp|
+    channel) at the boundaries of the horizontal window of a vertical cursor.
+
+* `cursor_reduce(func, signal, cursor, channel)`
+    Applies a reducing ``numpy`` function to the specified channel the signal, |nbsp|
+    over the horizontal extent of a vertical SignalCursor; a reducing function |nbsp|
+    calculates a value based on several data samples (e.g. `mean`, `sum`, `min`, `max`, etc) |nbsp|
+    and returns a scalar.
+
+Functors that are a particular case of `cursor_reduce` are listed below:
+
+* `cursor_average(signal, cursor, channel)`
+    Applies ``np.mean`` or ``np.nanmean`` to calculate the average of signal in |nbsp|
+    the specified channel, over the horizontal extent of the cursor.
+
+* `cursor_mean`
+    alias for cursor_average
+
+* `cursor_min`, `cursor_max`, `cursor_argmin`, `cursor_argmax`
+    All return scalars.
+
+* `cursor_minmax`, `cursor_maxmin`, `cursor_argminmax`, `cursor_argmaxmin`
+    All return a tuple of scalars
+
+Using two cursors
+=================
+
+These are named as "cursors_<abc>" (note the plural form) and return a scalar.
+
+* `cursors_difference(signal, cursor0, cursor1, func, channel, subfun)`
+    returns the difference in signal values at the cursors, in the specified channel. |nbsp|
+    The `func` parameter is a single cursor functor returning a single value (see above); |nbsp|
+    the `subfun` parameter is the actual numeric reducing function used by `func` |nbsp|
+    (see examples above)
+
+* `cursors_distance(signal, cursor0, cursor1, channel)`
+    measures the distance, in samples (or axis 0 coordinates, see ¹) between the |nbsp|
+    vertical coordinates of two vertical SignalCursor objects.
+
+* `cursors_chord_slope(signal, cursor0, cursor1, channel)`
+    calculates the chord slope between the `cursor_average` at the two cursors.
+
+Interval-based functors and functions
+-------------------------------------
+
+These are similar to the cursor-based functions listed above, but use |nbsp|
+`datazone.Interval` instead of `gui.SignalCursor` or `DataCursor` objects. |nbsp|
+They are named according to the scheme "interval_<abc>".
+
+Epoch-based functors and functions
+----------------------------------
+Similar to cursor-based functions, using `neo.Epoch` or `datazone.DataZone` objects |nbsp|
+as locations; named as "epoch_<abc>"
+
+.. note::
+    ¹ A signal `channel` is a numeric data vector, not to be confused with |nbsp|
+    the `input` or `output` hardware channel that carries the signal in your |nbsp|
+    experimental setup. All signals in Scipyen are represented as `neo` |nbsp|
+    objects (essentially, 'enhanced' numpy arrays), that store data in |nbsp|
+    memory as columns of a matrix: each column (a 1D array, or 'vector') is |nbsp|
+    a signal `channel`.
+
+    Normally, all neo signal-like objects have just one such channel (thus |nbsp|
+    having shape (M,1) where M is the number of samples in the |nbsp|
+    signal, same as the number of rows in the data matrix).
+
+    However, there is no restriction to the number of channels a signal can |nbsp|
+    have, and Scipyen frequently uses this feature to store additional data |nbsp|
+    (e.g., a "filtered" signal alongside the "raw", unfiltered version of the |nbsp|
+    signal as it was recorded). It follows that ALL the channels of a signal |nbsp|
+    share the signal's domain (usually, time).
+
+    Due to this layout, the axes of a signal have a very specific meaning:
+
+    axis 0: the domain axis (the signal's **domain** e.g., time).
+            All channels in a signal are aligned to this axis, hence an index `𝑚` along this |nbsp|
+            axis points to the 𝑚ᵗʰ "row" of data spanning ALL channels. For a signal `sig`, |nbsp|
+            this is sig[𝑚,:]. In signal object types supplied by thre ``neo`` package, |nbsp|
+            axis 0 is *always* time.
+
+    axis 1: the channel axis.
+            An index `𝑛` along this axis points to the |nbsp|
+            𝑛ᵗʰ "column" of data (i.e., channel `𝑛`) spanning the entire domain |nbsp|
+            of the signal. For a signal `sig`, this is sig[:,𝑛].
+
+    Given a signal `sig`, the sample at sig[𝑚,𝑛] is the unique data sample |nbsp|
+        at domain index `𝑚` in channel `𝑛`.
+
+
+Examples
+--------
+
+::
+
     from ephys import (LocationMeasure, cursor_average, interval_average,
                         cursors_difference, intervals_difference)
 
-    from datazone import Interval
+    from datazone import Interval, epoch2intervals
 
-    from neoutils import get_epoch_interval
 
-    We assume a neo.AnalogSignal object is bound to the symbol 'signal' in the
-    workspace, and that 'signal' is a voltage-clamp record of the membrane current
-    containing, say, and evoked excitatory synaptic current (EPSC).
 
-    1) Calculate the average of signal samples at a vertical cursor, which marks
-    the signal region corresponding to the cursor's x window extended symmetrically
-    around the cursor's x coordinate. The cursors is bound to a symbol 'cursor' in
-    the workspace.
+We assume a neo.AnalogSignal object is bound to the symbol 'signal' in the |nbsp|
+workspace, and that 'signal' is a voltage-clamp record of the membrane current |nbsp|
+containing, say, and evoked excitatory synaptic current (EPSC).
+
+Example 1:
+==========
+
+Calculate the average of signal samples at a vertical cursor, which marks |nbsp|
+the signal region corresponding to the cursor's x window extended symmetrically |nbsp|
+around the cursor's x coordinate. The cursors is bound to a symbol 'cursor' in |nbsp|
+the workspace.
+
+::
 
     c_measure = LocationMeasure(cursor_average, cursor, "c_measure")
 
-    a = c_measure(signal) → a quantity array
+    a = c_measure(signal) # → a quantity array with as many elements as channels in the signal
 
-    2) Same as (1) but using datazone.Interval objects; we assume there is a
-    neo.Epoch bound to the symbol 'epoch' in the workspace.
 
-    To demonstrate, the following two lines generate two intervals based on an
-    epoch interval labeled "EPSC0Base"; one Interval encapsulates a start time and a
-    duration; the other encapsulates a start and a stop time (see datazone.Interval)
+Example 2:
+==========
 
-    intvl = get_epoch_interval(epoch, "EPSC0Base", duration=True)
-    intvl2 = get_epoch_interval(epoch, "EPSC0Base")
+Same as **Example 1** but using datazone.Interval objects; we assume there is a |nbsp|
+neo.Epoch bound to the symbol 'epoch' in the workspace.
+
+To demonstrate, the following two lines generate two intervals based on an |nbsp|
+epoch interval labeled "EPSC0Base"; one Interval (`intvl`) encapsulates a start time and a |nbsp|
+duration; the other (`intvl2`) encapsulates a start and a stop time (see ``datazone.Interval``)
+
+::
+
+    intvl = epoch2intervals(epoch, "EPSC0Base", duration=True)[0]
+    intvl2 = epoch2intervals(epoch, "EPSC0Base")[0]
 
     i_measure_1 = LocationMeasure(interval_average, intvl, "i_measure_1")
 
-    i_measure_2 = LocationMeasure(interval_average, intvl, "i_measure_2")
+    i_measure_2 = LocationMeasure(interval_average, intvl2, "i_measure_2")
 
     b = i_measure_1(signal)
 
@@ -2692,64 +2729,73 @@ class LocationMeasure:
     assert np.all(a == b) # see example (1) regarding 'a'
     assert np.all(a == c)
 
-    3) Obtain a measure at a pair of locations of the same type.
 
-    We want to calculate the amplitude of an EPSC elicited as a difference between
-    averages of the membrane current signal around the "peak" (or nadir) of the EPSC
-    and a baseline BEFORE the stimulus that elicited the EPSC.
+Example 3:
+==========
+Obtain a measure at a pair of locations of the same type.
 
-    For this example we assume that there are two intervals inside 'epoch' that
-    correspond to baseline and EPSC peak regions of the signal, labeled "EPSC0Base"
-    "EPSC0Peak".
+We want to calculate the amplitude of an elicited EPSC, as the difference between |nbsp|
+the average membrane current around the "peak" (or nadir) of the EPSC |nbsp|
+and the average membrane current BEFORE the stimulus that elicited the EPSC |nbsp|
+(i.e., the local baseline).
 
-    From this epoch we generate two Interval objects (one each, for baseline and
-    peak; note how we access the corresponding epoch intervals by using their labels):
+For this example we assume that 'epoch' contains two intervals, labeled |nbsp|
+"EPSC0Base" and "EPSC0Peak", corresponding to the "baseline" and the "peak" regions |nbsp|
+as explained. Obviously, the "baseline" occurs BEFORE the "peak".
+
+From this epoch we generate two Interval objects (one each, for "baseline" and |nbsp|
+"peak"; note how we access the corresponding epoch intervals by using their labels):
+
+::
 
     # 'intervals' will be a list of Interval objects
-    intervals = [get_epoch_interval(epoch, i, duration=True) for i in ("EPSC0Base",
-    "EPSC0Peak")]
+    intervals = [get_epoch_interval(epoch, i, duration=True) for i in ("EPSC0Base", "EPSC0Peak")]
 
-    We also assume that there are two vertical cursors available (c0, c1),
-    indicating the baseline and the peak regions of the signal.
+    # For comparison, we also consider two available vertical cursors ("c0", "c1"),
+    # indicating the "baseline" and the "peak" regions of the signal.
 
-    We calculate this measure using the intervals (note we construct the LocationMeasure
-    and we call it with the signal in a one-line code):
+    # We calculate this measure using the intervals (note we construct the
+    # LocationMeasure and we call it with the signal in a one-line code):
 
     a = LocalMeasure(intervals_difference, intervals, "i_diff") (signal)
 
-    For demonstration, we do the same using the cursors:
+    # For demonstration, we do the same using the cursors:
 
-    b = LocationMeasure(cursors_difference, [c0,c1], "c_diff")(signal)
+    b = LocationMeasure(cursors_difference, [c0, c1], "c_diff")(signal)
 
     assert np.all(a == b)
 
-    4) To calculate the same measure at the same location in several signals,
-    you can call the LocationMeasure on each signal.
 
-    Say you want to calculate the input resistance during a voltage-clamp recording,
-    based on a recorded membrane current (the 'signal') and a recorded analog command
-    signal (here, the command voltage, i.e. 'command').
+Example 4:
+==========
+To calculate the same measure at the same location in several signals, |nbsp|
+you can call the LocationMeasure on each signal.
 
-    For this purpose, the command signal contains a boxcar waveform (a hyperpolarizing
-    or depolarizing change in the membrane potential) - the "membrane test".
+Say you want to calculate the input resistance during a *voltage-clamp* recording, |nbsp|
+based on a recorded membrane current (the 'signal') and a recorded proxy of the analog command |nbsp|
+signal which triggered a boxcar-like change in the membrane potential (the |nbsp|
+command voltage, i.e. 'command'). This boxcar waveform (a hyperpolarizing |nbsp|
+or depolarizing change in the membrane potential) is the "membrane test".
 
-    If no whole-cell compensation is applied, then the membrane current recorded
-    during the membrane test undergoes a rapid transient change (the "capacitive
-    transient") before it settles to a new steady-state value, different from the
-    baseline before the membrane test).
+If no whole-cell compensation is applied, then the membrane current recorded |nbsp|
+during the membrane test undergoes a rapid transient change (the "capacitive |nbsp|
+transient") before it settles to a new steady-state value, different from the |nbsp|
+baseline before the membrane test).
 
-    We calculate Rin by applying Ohm's law:
+We calculate `Rin` by applying Ohm's law:
 
-    V = I×R ⇒ R = V / I
+V = I×R
 
-    In this case:
-    V = the amplitude of the boxcar;
-    I = the difference between the membrane current during the steady-state and that
-    during the baseline before the membrane test boxcar.
+⇒ R = V / I
 
-    Therefore we need two LocationMeasure objects.
+In this case:
+V = the amplitude of the boxcar;
+I = the *difference* between the membrane current during the steady-state and that |nbsp|
+during the baseline before the membrane test boxcar.
 
-    If we were to use two appropriately-placed cursors as locators:
+We need two LocationMeasure objects, and two appropriately-placed cursors as locators:
+
+::
 
     baseline = LocationMeasure(cursor_average, baseline_cursor, "baseline")
 
@@ -2757,6 +2803,7 @@ class LocationMeasure:
 
     # next line calculates the average baseline membrane current before the membrane test boxcar
     i0 = baseline(signal)
+
     # next line calculates the average baseline potential before the membrane test boxcar
     v0 = baseline(command) # return
 
@@ -2764,12 +2811,14 @@ class LocationMeasure:
     i1 = steady_state(signal)
     v1 = steady_state(command)
 
-    finally we calculate Rin as (v1 - v0) / (i1 - i0)
+    # finally, we calculate Rin as (v1 - v0) / (i1 - i0)
 
-    Note that in both cases we used cursor_average as the function passed to the
-    LocationMeasure functor. Since we are taking a difference between the averages
-    of signals at two locations, we can be more direct and use just one
-    LocationMeasure object (see example (3) above):
+Note that in both cases we used cursor_average as the function passed to the |nbsp|
+LocationMeasure functor. Since we are taking a difference between the averages |nbsp|
+of signals at two locations, we can be more direct and use just one |nbsp|
+LocationMeasure object (see example (3) above):
+
+::
 
     delta = LocationMeasure(cursors_difference, (baseline_cursor, steady_state_cursor), "delta")
 
@@ -2783,51 +2832,41 @@ class LocationMeasure:
 
     Rin = (V/I).rescale(pq.MOhm)
 
-    Finally, a few reminders:
 
-    • Signals are 2D Quantity arrays (with the data represented as column vectors)
-    and MAY have more than one trace (a.k.a "signal channel", not to be confused
-    with a "recording channel"). A trace, therefore is a column in the signal array.
+Finally, a few reminders:
+=========================
+* Signals are 2D Quantity arrays (with the data represented as column vectors). They MAY have more than one trace (a.k.a "signal channel", not to be confused with a "recording channel"). A trace, therefore is a column in the signal array.
 
-    • Functions that calculate a measure at a single location return a Quantity
-    array.
-        ∘ For signals with just one trace, the result has only one element, so
-        in cases where just a scalar Quantity is needed, this value can be accessed
-        by indexing, e.g.:
+* Functions that calculate a measure at a single location return a Quantity array.
 
-            result[0], or more directly np.squeeze(result)
+* For signals with just one trace (or `channel`), the result has only one element.
 
-        ∘ For signals with more than one trace, the result is a subdimensional (1D)
-        Quantity array, with one value per trace. Since the traces are indexed along
-        the second axis (axis 1) of the original signal, one may want to restrict the
-        calculations to the desired trace only, by passing the "channel" keyword to
-        the call by the functor.
+``result[0]`` or, more directly, ``np.squeeze(result)``
 
-        • For situations where a numpy array is constructed from a list comprehension
-        (such as is the case for cursors_difference, intervals_difference) the final
-        result will gain a second axis (hence it will be 2D), even though it only
-        contains one value.
+* For signals with more than one trace, the result is a subdimensional (1D) Quantity array.
 
-        I all these situation it is recommended to drop the singleton axes.
+* For situations where a numpy array is constructed from a list comprehension (such as is the case for cursors_difference, intervals_difference) the final result will gain a second axis (hence it will be 2D), even though it only contains one value. In such situation it is recommended to drop the singleton axes.
 
-    So, we can finish the last example:
+We can now finish the last example:
+
+::
 
     Rin = np.squeeze((V/I).rescale(pq.MOhm))  # ⇒ e.g. array(90.1997, dtype=float32) * Mohm
 
-    This is a SCALAR Quantity (even though it is described as an array, but note the
-    absence of square brackets in its string representation).
-
-    Indeed:
+    # This is a SCALAR Quantity (even though it is described as an array, but note the
+    # absence of square brackets in its string representation).
+    #
+    # Indeed:
 
     assert (Rin.ndim == 0) # ⇒ is True
 
-    Changelog:
-    ----------
-    2024-02-09 09:41:11 made this a DataClass to enable mutations
-        WARNING: In order to be fully mutable when locations are specified as
-        sequences of scalars, the sequences must also be mutable
+Changelog:
+----------
+2024-02-09 09:41:11 made this a DataClass to enable mutations |nbsp|
+    WARNING: In order to be fully mutable when locations are specified as |nbsp|
+    sequences of scalars, the sequences must also be mutable
 
-    """
+"""
     # NOTE: 2024-02-29 22:37:54
     # mandatory signature for func:
     # func(*args, **kwargs) where:
@@ -4568,7 +4607,7 @@ def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
 
     epoch: neo.Epoch
 
-    intervals: optional - when present, specified which epoch intervals to use
+    intervals: optional - when present, specifies which epoch intervals to use
         This can be:
         • int (interval index)
         • str (interval name)

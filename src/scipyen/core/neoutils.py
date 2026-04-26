@@ -25,7 +25,6 @@ clear_events
 remove_events
 clear_spiketrains
 remove_spiketrain
-get_epoch_interval
 get_non_empty_epochs
 get_non_empty_events
 get_non_empty_spike_trains
@@ -308,7 +307,7 @@ if __debug__:
     __debug_count__ = 0
 
 # NOTE: 2025-05-29 13:31:13
-# forward declarations needed to avoid importing pyabfbridge whivh would cause
+# forward declarations needed to avoid importing pyabfbridge which would cause
 # circular import; both classes needed for getEpochStartStop, and these dummy
 # definitions will be overwritten by import pyabfbridge inside that function
 class ABFEpoch: pass

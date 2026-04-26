@@ -17,6 +17,7 @@ import pyqtgraph as pg
 from core import scipyen_quantities as cq
 from core.scipyen_quantities import (checkTimeUnits, unitsConvertible)
 from core.scipyendataclasses import ScipyenDataclass
+from core import strutils
 # from core.utilities import counter_suffix
 from .prog import (safewrapper, with_doc, scipywarn)
 
@@ -508,52 +509,60 @@ def _newInterval_(cls, times = None, durations = None, units=None, labels=None,
         
 class Interval(DataObject):
     r"""
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
 Class similar to **neo.Epoch** and **DataZone** with the following characteristics:
         
-1. As neo.Epoch and DataZone, the domain coordinates are stored as two Quantity
-1D arrays (vectors) of the same size and physical units, and with as many elements
+1. As neo.Epoch and DataZone, the domain coordinates are stored as two Quantity |nbsp|
+1D arrays (vectors) of the same size and physical units, and with as many elements |nbsp|
 as there are sub-intervals.
         
-These coordinates are accessible via the `times` and `durations` attributes,
-with the same semantics as in neo.Epoch and in DataZone. To avoid confusion, an
-Interval does NOT have `places` and `extents` attributes of DataZone (which are
+These coordinates are accessible via the `times` and `durations` attributes, |nbsp|
+with the same semantics as in neo.Epoch and in DataZone. To avoid confusion, an |nbsp|
+Interval does NOT have the `places` and `extents` attributes of DataZone (which are |nbsp|
 effectively aliased `times` and `durations`).
         
-2. In addition, an Interval objects has the dynamic properties `t0` and `t1`, 
-and the bool attribute `extent` which defines how `t0` and `t1` are calculated
+2. In addition, an Interval object has the dynamic properties `t0` and `t1`,  |nbsp|
+and the bool attribute `extent` which defines how `t0` and `t1` are calculated |nbsp|
 from the `times` and `durations` attributes:
         
-When `extent` is True, the object behaves like a SignalCursor, which is
-defined by a central coordinate and a symmetric window around it, *i.e.*,
+When `extent` is True, the object behaves like a SignalCursor, which is |nbsp|
+defined by a central coordinate and a symmetric window around it, *i.e.*, |nbsp|
 a sub-interval 𝒌 is defined as :
+
+::
 
     self[𝒌] - self.durations[𝒌]/2 ⋯ self[𝒌] ⋯ self[𝒌] + self.durations[𝒌]/2
         
-    i.e., self[𝒌] is the MID-point of an interval with size = self.durations[𝒌]
+i.e., self[𝒌] is the MID-point of an interval with size = self.durations[𝒌]
 
-    Therefore:
+Therefore:
+
+`t0` is calculated as self - self.durations/2 — i.e., this is the *first* domain coordinate
+
+`t1` is calculated as self + self.durations/2 — i.e., this is the *last* domain coordinate
         
-    `t0` is calculated as self - self.durations/2 — i.e., this is the *first* domain coordinate
-    `t1` is calculated as self + self.durations/2 — i.e., this is the *last* domain coordinate
-        
-When `extent` is False, the object behaves like a neo.Epoch, *i.e.*,
+When `extent` is False, the object behaves like a neo.Epoch, *i.e.*, |nbsp|
 a sub-interval 𝒌 is defined as:
+
+::
 
     self[𝒌] ⋯ self[𝒌] + self.durations[𝒌]
 
-    i.e., self[𝒌] is the start of the sub-interval, whwereas the end of the 
+i.e., self[𝒌] is the start of the sub-interval, whwereas the end of the |nbsp|
 sub-interval is the start + the sub-interval's duration. 
 
-    Therefore:
-    
-    `t0` is self
-    `t1` is calculated as self + self.durations
+Therefore:
+
+`t0` is self
+`t1` is calculated as self + self.durations
         
-The advantage of this is that one can switch the behaviour by setting the `extent`
-attribute to True or False and query `t0` and `t1` without any changes to the 
+The advantage of this is that one can switch the behaviour by setting the `extent` |nbsp|
+attribute to True or False and query `t0` and `t1` without any changes to the  |nbsp|
 underlying domain coordinates `times` and `durations`.
 
-3. As for DataZone, the physical units (or dimensionality) of the domain 
+3. As for DataZone, the physical units (or dimensionality) of the domain  |nbsp|
 coordinates are NOT restricted to time units.
 
 
@@ -577,7 +586,9 @@ coordinates are NOT restricted to time units.
                 segment: typing.Optional[int] = None,
                 array_annotations = None, 
                 **annotations):
+        from core import datatypes as dt
         units_ = None
+
         if isinstance(times, np.ndarray):
             assert(times.ndim <= 1), "times must be a 1D array"
             if isinstance(times, pq.Quantity):
@@ -644,18 +655,75 @@ coordinates are NOT restricted to time units.
         
         if not isinstance(extent, bool):
             extent = False
+
         if extent:
             if np.any(durations < 0):
                 # because the window around times cannot be negative
                 raise ValueError("durations must contain only values > = 0")
             
         if labels is None:
-            labels = np.array([], dtype='U')
+            labels = "interval"
 
-        elif not isinstance(labels, np.ndarray):
-            labels = np.array(labels)
-            if labels.size != times.size and labels.size:
-                raise ValueError("Labels array has different length to times")
+        elif isinstance(labels, str):
+            pfx, sfx = strutils.get_int_sfx(labels, sep="", use_re=True)
+            # print(f"{cls.__name__}.prep_labels: pfx = {pfx}, sfx = {sfx}\n")
+            if dt.is_numeric(sfx):
+                sfx = int(sfx) + 1
+            else:
+                sfx = 0
+
+            labels = np.array(list(map(lambda k: f"{pfx}{k}", range(sfx, times.size))))
+
+        elif isinstance(labels, typing.Sequence):
+            if all(isinstance(l, str) for l in labels):
+                if len(labels) < times.size:
+                    pfx, sfx = strutils.get_int_sfx(labels[-1], sep="", use_re=True)
+                    if dt.is_numeric(sfx):
+                        sfx = int(sfx)+1
+                    else:
+                        sfx = len(labels)
+                    new_labels = list(map(lambda k: f"{pfx}{k}", range(sfx, times.size)))
+                    labels = labels.extend(new_labels)
+
+                elif len(labels) > times.size:
+                    labels = labels[:times.size]
+
+                labels = np.array(labels)
+
+            else:
+                def_label = "interval"
+
+                labels = np.array(list(map(lambda k: f"{def_label}{k}", range(times.size))))
+
+        elif isinstance(labels, np.ndarray):
+            if labels.size == 0:
+                def_label = "interval"
+                labels = np.array(list(map(lambda k: f"{def_label}{k}", range(n))))
+
+            elif not dt.is_string(labels):
+                raise TypeError(f"Expecting an array-like of strings; instead, got {labels} ({type(labels).__name__})")
+
+            if labels.flatten().size != times.size:
+                if labels.flatten().size < times.size:
+                    ll = str(labels.flatten()[-1])
+                    pfx, sfx = strutils.get_int_sfx(ll, sep="", use_re=True)
+
+                    if dt.is_numeric(sfx):
+                        sfx = int(sfx)+1
+                    else:
+                        sfx = labels.flatten().size
+
+                    new_labels = np.array(list(map(lambda k: f"{pfx}{k}", range(sfx, times.size))))
+
+                    # print(f"{cls.__name__}.prep_labels from array: new_labels = {new_labels}\n")
+                    labels = np.concat([labels.flatten(), new_labels], axis=0)
+                    # print(f"{cls.__name__}.prep_labels from array -> {labels}\n")
+
+                elif labels.flatten().size > times.size:
+                    labels = labels.flatten()[:times.size]
+
+        else:
+            raise TypeError("Expecting a string or an array-like of strings for labels")
 
         if not isinstance(segment, (neo.Segment, type(None))):
             raise TypeError(f"'segment' expected to be a neo.Segment or None; instead, got {type(segment).__name__}")
@@ -701,6 +769,9 @@ coordinates are NOT restricted to time units.
         self.__domain_name__ = cq.unitFamilyName(self.units)
         
     def __repr__(self):
+        return str(self)
+
+    def __str__(self) -> str:
         times = list(self.times)
         durations = list(self.durations)
         # print(f"{self.__class__.__name__}.__repr__: labels = {self.labels}")
@@ -708,7 +779,7 @@ coordinates are NOT restricted to time units.
             labels = list(self.labels)
         else:
             labels = [""]
-        objs = ['%s@%s for %s' % (label, str(time), str(dur)) for label, time, dur in
+        objs = ['%s @%s for %s' % (label, str(time), str(dur)) for label, time, dur in
                 zip(labels, times, durations)]
         return f"<{self.__class__.__name__}:{', '.join(objs)}>"
 
@@ -1343,10 +1414,18 @@ def epoch2intervals(epoch: typing.Union[neo.Epoch, DataZone], keep_units:bool = 
         labels = [f"Interval_{k}" for k in range(len(epoch))]
         
     if keep_units:
-        return [Interval(t, d if duration else t+d, l, duration) for (t,d,l) in zip(epoch.times, epoch.durations, labels)]
-        
+        return [Interval(times=t,
+                         durations=d,
+                         labels=l,
+                         name = epoch.name,
+                         extent=duration) for (t,d,l) in zip(epoch.times, epoch.durations, labels)]
+
     else:
-        return [Interval(t, d if duration else t+d, l, duration) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, labels)]
+        return [Interval(times=t,
+                         durations=d,
+                         labels=l,
+                         name=epoch.name,
+                         extent=duration) for (t,d,l) in zip(epoch.times.magnitude, epoch.durations.magnitude, labels)]
     
 @safewrapper
 def intervals2epoch(*args, **kwargs):
@@ -1438,7 +1517,6 @@ def intervals2epoch(*args, **kwargs):
     
 @safewrapper
 def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone], 
-                  signal_viewer: typing.Optional[QtWidgets.QMainWindow] = None, 
                   axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None, 
                   **kwargs):
     r"""Creates vertical signal cursors from a neo.Epoch.
@@ -1447,28 +1525,28 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
     ----------
     epoch: neo.Epoch
     
-    signal_viewer:SignalViewer instance, or None (the default)
-        When given, the cursors will also be registered with the signal viewer
-        instance that owns the axis.
-    
-        Prerequisite: the axis must be owned by the signal viewer instance.
-    
     axis: (optional) pyqtgraph.PlotItem, pyqtgraph.GraphicsScene, or None.
-    
+
         Default is None, in which case the function returns cursor parameters.
-    
-        When not None, the function populates 'axis' with a sequence of 
+
+        When not None, the function populates 'axis' with a sequence of
         vertical SignalCursor objects and returns their references in a list.
-        
+
     Var-keyword parameters:
     ----------------------
     keep_units: bool, optional default is False
         When True, the numeric cursor parameters are python Quantities with the
         units borrowed from 'epoch'
-        
+
     Other keyword parameters are passed to the cursor constructors:
     parent, follower, xBounds, yBounds, pen, linkedPen, hoverPen
-    
+
+    signal_viewer:SignalViewer instance, or None (the default)
+        When given, the cursors will also be registered with the signal viewer
+        instance that owns the axis.
+
+        Prerequisite: the axis must be owned by the signal viewer instance.
+
     See the documentation of gui.cursors.SignalCursor.__init__ for details.
     
     Returns:
@@ -1491,25 +1569,29 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
     """
     
     from gui.signalviewer import SignalViewer
-    from gui.cursors import SignalCursor, SignalCursorTypes
+    from gui.cursors import SignalCursor, SignalCursorTypes, DataCursor
 
     keep_units = kwargs.pop("keep_units", False)
     if not isinstance(keep_units, bool):
         keep_units = False
         
-    epoch_name = epoch.name if isinstance(epoch.name, str) and len(epoch.name.strip()) else "i"
+    epoch_name = epoch.name if isinstance(epoch.name, str) and len(epoch.name.strip()) else "epoch_interval"
         
     if keep_units:
-        ret = [(t + d/2. if d else t, d if d else 0*t.units, l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times, epoch.durations, epoch.labels, range(len(epoch)))]
-        
+        ret = [(t + d/2. if d else t,
+                d if d else 0*t.units,
+                l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times, epoch.durations, epoch.labels, range(len(epoch)))]
+
     else:
-        ret = [(t + d/2. if d else t, d if d else 0, l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels, range(len(epoch)))]
+        ret = [(t + d/2. if d else t,
+                d if d else 0,
+                l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels, range(len(epoch)))]
         
-    # signal_viewer = kwargs.pop("signal_viewer", None)
+    signal_viewer = kwargs.pop("signal_viewer", None)
     
     if isinstance(axis, (int, str)):
         if not isinstance(signal_viewer, SignalViewer):
-            raise TypeError(f"When axis is indicated by its index or name ({axis}) then signal_viewer must be a SignalViewer instance")
+            raise TypeError(f"When axis is indicated by its index or name ({axis}) then a SignalViewer instance must be passed to the 'sugbal_viewer' keyword parameter")
         
         if isinstance(axis, str) and axis.lower() == "all":
             axis = signal_viewer.signalsLayout.scene()
@@ -1588,19 +1670,20 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
         
         return cursors
     
-    return ret
+    else:
+        return list(map(lambda tdl: DataCursor(*tdl), ret))
+
+    # return ret
 
 def intervals2cursors(*args,
-                      axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None, 
+                      axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None,
                       **kwargs):
     r"""Creates a sequence of SignalCursor objects from a sequence of intervals.
     The intervals in `args` are NOT Interval objects - please see Interval.toSignalCursors()
     
-    WARNING: This function will be DEPRECATED
-    
 """
     from gui.signalviewer import SignalViewer
-    from gui.cursors import SignalCursor, SignalCursorTypes
+    from gui.cursors import SignalCursor, SignalCursorTypes, DataCursor
 
     keep_units = kwargs.pop("keep_units", False)
     cursor_type = kwargs.pop("cursor_type", "vertical")
@@ -1611,22 +1694,45 @@ def intervals2cursors(*args,
     else:
         intervals = args
     
-    
-    # print(f"intervals2epoch intervals: {[(i, type(i)) for i in intervals]}")
-    
     if not all(isinstance(a, Interval) for a in intervals):
         raise TypeError(f"Expecting a sequence of Interval objects")
+
+    assert all(i.size == 1 for i in intervals), "Intervals with more than one sub-interval are not yet supported"
 
     if not isinstance(keep_units, bool):
         keep_units = False
         
     def __strip_units__(v):
-        return float(v.magnitude) if (isinstance(v, pq.Quantity) and not keep_units) else v
+        return float(v.magnitude[0]) if (isinstance(v, pq.Quantity) and not keep_units) else v
+
+    ret = list(map(
+                    lambda i: (__strip_units__(i.t0+i.t1/2) if i.extent else __strip_units__(i.t0 + (i.t1 - i.t0)/2),
+                               __strip_units__(i.t1) if i.extent else __strip_units__(i.t1-i.t0),
+                               i.name if isinstance(i.name, str) else i.labels[0] ),
+                    intervals
+                  )
+              )
         
-    ret = [(__strip_units__(i.t0+i.t1/2) if i.extent else __strip_units__(i.t0 + (i.t1 - i.t0)/2), __strip_units__(i.t1) if i.extent else __strip_units__(i.t1-i.t0), i.name) for i in intervals]
+    # ret = [(__strip_units__(i.t0+i.t1/2) if i.extent else __strip_units__(i.t0 + (i.t1 - i.t0)/2),
+    #         __strip_units__(i.t1) if i.extent else __strip_units__(i.t1-i.t0),
+    #         i.name) for i in intervals]
 
     signal_viewer = kwargs.pop("signal_viewer", None)
     
+    if isinstance(axis, (int, str)):
+        if not isinstance(signal_viewer, SignalViewer):
+            raise TypeError(f"When axis is indicated by its index or name ({axis}) then a SignalViewer instance must be passed to the 'sugbal_viewer' keyword parameter")
+
+        if isinstance(axis, str) and axis.lower() == "all":
+            axis = signal_viewer.signalsLayout.scene()
+
+        else:
+            if isinstance(axis, (int, str)):
+                axis = signal_viewer.axis(axis)
+
+    if axis is None and isinstance(signal_viewer, SignalViewer):
+        axis = signal_viewer.currentAxis()
+
     if isinstance(axis, (pg.PlotItem, pg.GraphicsScene)):
         cursors = [SignalCursor(axis, x = t, window = d, cursorID=l,
                                 cursor_type=SignalCursorTypes.vertical,
@@ -1664,6 +1770,9 @@ def intervals2cursors(*args,
                                              showValue = signal_viewer.cursorsShowValue)
         
         return cursors
+
+    else:
+        return list(map(lambda tdl: DataCursor(*tdl), ret))
     
-    return ret
+    # return ret
     

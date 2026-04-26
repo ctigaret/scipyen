@@ -3101,56 +3101,60 @@ anything else       anything else       ❌
     def addCursors(self, /, *args, **kwargs):
         r"""Manually adds a set of cursors to the selected axes in the SignalViewer window.
 
-        Requires at least one Axis object, therefore some data must be plotted first.
+.. |nbsp| unicode:: 0xA0
+   :trim:
 
-        Var-positional parameters (args):
-        =================================
-        Comma-separated coordinates, or numpy array of cursor coordinates:
+Requires at least one ``Axis`` object, therefore some data must be plotted first.
 
-        • for crosshair cursors the coordinates of ONE cursor must be
-            given as (x,y) pair: comma-separated sequence of two-element tuples,
-            of a float 2D numpy array with shape = (N,2) where N is the number
-            of cursors.
+Var-positional parameters (args):
+=================================
+Comma-separated coordinates, or numpy array of cursor coordinates:
 
-        • for vertical and horizontal cursors the coordinates must be
-            given as a comma-separated sequence of floats, or a float numpy array
-            with shape (N,) or (N,1) where N is the number of cursors.
+* for **crosshair** cursors, the coordinates of *each* cursor must be |nbsp|
+    given as ``(x,y)`` pair: comma-separated sequence of two-element tuples, |nbsp|
+    or a 2D numpy array (``float` dtype) with shape ``(N,2)``, where N is the number |nbsp|
+    of cursors.
 
-        • alternatively, each "cursor" above can be specified by DataCursor objects.
+* for **vertical** and **horizontal** cursors the coordinates must be |nbsp|
+    given as a comma-separated sequence of floats, or a 1D numpy array (``float`` dtype) |nbsp|
+    with shape ``(N,)`` or ``(N,1)``,  where N is the number of cursors.
 
-        Var-keyword arguments ("name=value" pairs):
-        ===========================================
-        cursorType: str or SignalCursorTypes enum value
-                    When a str it should be one of "c", "v", "h", respectively,
-                    for crosshair, vertical, horizontal cursors.
+* alternatively, each "cursor" above can be specified by DataCursor objects.
 
-                    All cursors created with this method will have the same type
+Var-keyword arguments ("name=value" pairs):
+===========================================
+:cursorType: ``str`` or ``SignalCursorTypes`` enum value
+            When a ``str`` it should be one of "c", "v", "h", respectively, |nbsp|
+            for crosshair, vertical, horizontal cursors.
 
-                    Optional, default is "c".
+            All cursors created with this method will have the same type.
 
-        xwindow = 1D sequence of floats with the horizontal extent of the cursor window
-            (for crosshair and vertical cursors); must have as many elements as
-            coordinates supplied in the *where argument
+            Optional, default is "v".
 
-        ywindow   = as above, for crosshair and horizontal cursors
+:xwindow: 1D sequence of ``float`` scalars with the horizontal extent of the cursor window |nbsp|
+    (for crosshair and vertical cursors); must have as many elements as |nbsp|
+    coordinates supplied in the ``*where`` parameter.
 
-        labels    = 1D sequence of str for cursor IDs; must have as many
-            elements as supplied through the *where argument
-            NOTE: the display of cursor values is controlled by
-            self.setCursorsShowValue property (and its checkbox in the settings
-            menu).`
+:ywindow: As above, for crosshair and horizontal cursors
 
-        axis: int, or str, pyqtgraph.PlotItem, or None (default)
-            ∘   When an int this is a valid axis index in the current instance
-                of ScipyenViewer (from top to bottom, 0 -> number of axes - 1)
+:labels: 1D sequence of ``str`` for cursor IDs; must have as many elements as supplied |nbsp|
+    in the ``*where`` parameter.
 
-            ∘   When a str, this can only be "all" or "a", meaning that the new
-                cursors will span all axes (multi-axis cursors)
+    .. note::
+        The display of cursor values is controlled by the ``setCursorsShowValue`` |nbsp|
+        property (and its checkbox in the settings menu).
 
-            ∘   When None (default) the cursors will be created in the axis that
-                is currently selected, or axis 0 is no axis is selected.
+:axis: ``int``, or ``str``, ``pyqtgraph.PlotItem``, or ``None`` (default)
+    ∘   When an ``int`` this is a valid axis index in the current instance
+        of ScipyenViewer (from top to bottom, 0 -> number of axes - 1)
 
-        """
+    ∘   When a ``str``, this can only be "all" or "a", meaning that the new
+        cursors will span all axes (**multi-axis** cursors)
+
+    ∘   When ``None`` (default) the cursors will be created in the axis that
+        is currently selected, or axis 0 is no axis is selected.
+
+"""
         xwindow = kwargs.pop("xwindow", self.defaultCursorWindowSizeX)
         ywindow = kwargs.pop("ywindow", self.defaultCursorWindowSizeY)
         labels  = kwargs.pop("labels",  None)
@@ -3210,7 +3214,7 @@ anything else       anything else       ❌
         cursorType = kwargs.pop("cursorType", None)
 
         if cursorType is None:
-            cursorType = kwargs.pop("type", "c")
+            cursorType = kwargs.pop("type", "v")
 
         if isinstance(cursorType, str):
             if cursorType.lower() in ("h", "horiz", "horizontal"):
@@ -3249,8 +3253,6 @@ anything else       anything else       ❌
             elif all(isinstance(a, DataCursor) for a in args):
                 if len(args) > 2:
                     raise SyntaxError(f"Too many DataCursor objects passed: expecting at most two, got {len(args)}")
-
-
 
         self.addCursor(cursorType=cursorType, x=x, y=y,
                        xwindow=xwindow, ywindow=ywindow,
@@ -3417,29 +3419,48 @@ anything else       anything else       ❌
             super().keyPressEvent(keyevt)
 
     @safewrapper
-    def setupCursors(self, cursorType="c", *where, **kwargs):
+    def setupCursors(self, cursorType: typing.Union[str , SignalCursorTypes] ="v",
+                     *where, **kwargs):
         r"""Removes whatever cursors are already there then add new ones from the arguments.
-        cursorType "c" (default), "h" or "v"
-        *where = a sequence of X coordinates
-        Requires at least one Axis object, therefore some data must be plotted first.
 
-        Arguments:
-        cursorType : string, one of "c" for crosshair, "v" for vertical, "h" for horizontal cursors
-                    -- optional (default is "c")
+.. |nbsp| unicode:: 0xA0
+   :trim:
 
-        where      : comma-separated list or a sequence of cursor coordinates:
-                        * for crosshair cursors, the coordinates are given as two-element tuples;
-                        * for vertical and horizontal cursors, the coordinates are floats
+Requires at least one Axis object, therefore some data must be plotted first.
 
-        keyword arguments ("name=value" pairs):
-                    xwindow = 1D sequence of floats with the horizontal extent of the cursor window
-                        (for crosshair and vertical cursors); must have as many elements as
-                        coordinates supplied in the *where argument
-                    ywindow   = as above, for crosshair and horizontal cursors
-                    labels         = 1D sequence of str for cursor IDs; must have as many
-                        elements as supplied through the *where argument
-                    axis = index of the axis where the cursors are to be shown (default is 0)
-        """
+Removes all cursors then calls self.addCursors(*where, cursorType, **kwargs).
+
+Parameters:
+-----------
+
+:cursorType: One of "c", "v", "h", respectively, for crosshair, vertical, horizontal cursors |nbsp|
+        or a SignalCursorTypes enum value.
+
+        Optional; default is "v".
+
+
+:*where: Comma-separated list or a sequence of cursor coordinates or numpy arrays |nbsp|
+    (``float`` dtype).
+
+    * for crosshair cursors, the coordinates are given as two-element tuples;
+    * for vertical and horizontal cursors, the coordinates are floats
+
+Var-keyword parameters ("name=value" pairs):
+--------------------------------------------
+:xwindow: 1D sequence of floats with the extent of the cursor's *horizontal* window |nbsp|
+    (for crosshair and vertical cursors). Must have as many elements as |nbsp|
+    coordinates supplied in the ``*where`` argument.
+
+:ywindow: As above, for *crosshair* and *horizontal* cursors
+
+:labels:  1D sequence of str for cursor IDs; must have as many
+    elements as supplied in the ``*where`` argument
+
+:axis: Index of the axis where the cursors are to be shown. Optional, the |nbsp|
+    default is the currently selected axis, or 0 (first axis) if no axis is |nbsp|
+    selected.
+
+"""
         xwindow = self.defaultCursorWindowSizeX
         ywindow = self.defaultCursorWindowSizeY
         labels  = None
