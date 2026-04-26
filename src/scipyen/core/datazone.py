@@ -781,6 +781,8 @@ coordinates are NOT restricted to time units.
             labels = [""]
         objs = ['%s @%s for %s' % (label, str(time), str(dur)) for label, time, dur in
                 zip(labels, times, durations)]
+        if isinstance(self.name, str) and len(self.name.strip()):
+            objs.append(self.name)
         return f"<{self.__class__.__name__}:{', '.join(objs)}>"
 
     def _repr_pretty_(self, pp, cycle):
@@ -1518,7 +1520,7 @@ def intervals2epoch(*args, **kwargs):
 @safewrapper
 def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone], 
                   axis: typing.Optional[typing.Union[int, str, pg.PlotItem, pg.GraphicsScene]] = None, 
-                  **kwargs):
+                  **kwargs) -> typing.Sequence[SignalCursor | DataCursor]:
     r"""Creates vertical signal cursors from a neo.Epoch.
     
     Parameters:
@@ -1677,7 +1679,7 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
 
 def intervals2cursors(*args,
                       axis: typing.Optional[typing.Union[pg.PlotItem, pg.GraphicsScene]] = None,
-                      **kwargs):
+                      **kwargs) -> typing.Sequence[SignalCursor | DataCursor]:
     r"""Creates a sequence of SignalCursor objects from a sequence of intervals.
     The intervals in `args` are NOT Interval objects - please see Interval.toSignalCursors()
     

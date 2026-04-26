@@ -3814,7 +3814,8 @@ True                epoch_letter ↦ a tuple as above
                             dac:typing.Union[ABFOutputConfiguration, int, str],
                             sweep:int = 0,
                             holding:bool=True,
-                            fromRunStart:bool=False) -> neo.Epoch:
+                            fromRunStart:bool=False,
+                            name: typing.Optional[str] = None) -> neo.Epoch:
         r"""Construct a neo.Epoch object from a *single* ABFEpoch.
 
 .. |nbsp| unicode:: 0xA0
@@ -3842,8 +3843,11 @@ See also ``dacEpochsToNeoEpoch`` and ``getEpochsTable`` with ``asNeoEpoch = True
         t0, t1 = (self.getEpochStart(epoch, dac, sweep, holding, fromRunStart, False),
                   self.getEpochDuration(epoch, dac, sweep, False))
 
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name = f"{dac.name}_epoch_{epoch.letter}"
+
         return neo.Epoch(times = [t0], durations = [t1],
-                         labels = [epoch.letter], name = f"{dac.name}_epoch_{epoch.letter}",
+                         labels = [epoch.letter], name = name,
                          epochType = epoch.type, units = t0.units,
                          epochLetter = epoch.letter,
                          epochNumber = epoch.number,
