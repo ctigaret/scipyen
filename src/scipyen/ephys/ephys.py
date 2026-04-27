@@ -3361,7 +3361,6 @@ def epoch_reduce(func:types.FunctionType,
 def interval_reduce(func:typing.Callable,
                     signal: typing.Union[neo.AnalogSignal, DataSignal],
                     interval: Interval,
-                    # interval: typing.Union[Interval, typing.Sequence[typing.Union[numbers.Number, pq.Quantity]]],
                     channel:typing.Optional[int] = None,
                     duration:bool=False) -> pq.Quantity:
     r"""As cursor_reduce, but using an interval instead.
