@@ -2676,7 +2676,7 @@ See also getNeoEpoch and getEpochsTable with asNeoEpoch = True
                                epoch:typing.Optional[
                                                 typing.Union[ABFEpoch, int, str]
                                                     ] = None,
-                               letters:bool=False,
+                               letters: bool = False,
                                main: typing.Optional[
                                                     typing.Union[bool, Tribool]
                                                     ] = None,
@@ -2790,8 +2790,6 @@ True                epoch_letter ↦ a tuple as above
 
 
         ret = list()
-
-        # res = {"sweep": list(), "epoch": list(), "DIG": list(), "main": list()}
 
         for sweep in sweeps:
             # sweep_result = dict()
@@ -3346,7 +3344,7 @@ True                epoch_letter ↦ a tuple as above
                 digDACs = self.getDACsForEpoch(epoch.number)
                 if len(digDACs) > 1:
                     assert dac.physicalIndex in digDACs, f"DAC {dac.physicalIndex} not in digital-emitting DACs"
-                    thisDacNdx = digDACs.index(dac.physicalIndex)
+                    # thisDacNdx = digDACs.index(dac.physicalIndex)
                     if self.activeDACChannel == 0:
                         myDac = self.getDAC(1 if isAlternateDigital else 0)
                     elif self.activeDACChannel == 1:
@@ -3539,12 +3537,14 @@ True                epoch_letter ↦ a tuple as above
                                                     ABFOutputConfiguration, int, str
                                                     ],
                                     digChannel: int, /,
-                                    sweep: typing.Optional[int] = 0) -> list:
+                                    sweep: typing.Optional[int] = None) -> list[int]:
         if isinstance(dac, (int, str)):
             dac = self.getDAC(dac)
+
         digTriggerEpochs = list()
         wantsAltDIGOutput = sweep % 2 > 0
-        protocolSEDs = list(filter(lambda s: s["sweep"] == sweep, self.getActiveDigitalChannels()))
+
+        protocolSEDs = list(filter(lambda s: s["sweep"] == sweep, self.getActiveDigitalChannels(sweep)))
 
         if len(protocolSEDs):
             sed = protocolSEDs[0]
@@ -3559,7 +3559,7 @@ True                epoch_letter ↦ a tuple as above
                 if dac.physicalIndex in digDACs and digChannel in dp[dp_variant]:
                     digTriggerEpochs.append(epoch)
 
-        return digTriggerEpochs
+        return digTriggerEpochs # sequence of epoch numbers
 
 
     def getDigitalTriggers(self, sweep:int = 0,
@@ -3720,18 +3720,23 @@ True                epoch_letter ↦ a tuple as above
                 # digDACs = self.getDACsForEpoch(epoch.number)
                 if len(digDACs) > 1:
                     # assert dac.physicalIndex in digDACs, f"DAC {dac.physicalIndex} not in digital-emitting DACs"
-                    thisDacNdx = digDACs.index(dac.physicalIndex)
+                    # thisDacNdx = digDACs.index(dac.physicalIndex)
                     if self.activeDACChannel == 0:
                         myDac = self.getDAC(1 if isAlternateDigital else 0)
+
                     elif self.activeDACChannel == 1:
                         myDac = self.getDAC(0 if isAlternateDigital else 1)
+
                     else:
                         assert hoDACActive, f"Active DAC index expected to be > 1; got {self.activeDACChannel}"
+
                         # activeDAC is a HO DAC
                         if sweep % 2 == 0 and 0 in digDACs: # "even" sweeps => query DAC0
                             myDac = self.getDAC(0)
+
                         elif sweep % 2 > 0 and 1 in digDACs: # "odd" sweeps => query DAC1
                             myDac = self.getDAC(1)
+
                         else:
                             myDac = dac
                 else:
@@ -3747,7 +3752,26 @@ True                epoch_letter ↦ a tuple as above
         # a tuple of ABFEpoch numbers where digital outputs are defined:
         digEpochs = self.epochsWithDigitalOutput
 
-        usedDigs = tuple(itertools.chain.from_iterable(map(lambda x: tuple(itertools.chain.from_iterable(x)) if isinstance(x, ABFDigitalPattern) else x, (self.getActiveDigitalChannels(sweep, e) for e in digEpochs))))
+        activeDigChannels = (self.getActiveDigitalChannels(sweep, e)[0] for e in digEpochs)
+
+        # usedDigs = tuple(itertools.chain.from_iterable(map(lambda x: tuple(itertools.chain.from_iterable(x)) if isinstance(x, ABFDigitalPattern) else x,
+        #                                                    (self.getActiveDigitalChannels(sweep, e) for e in digEpochs))))
+        usedDigs = tuple(itertools.chain.from_iterable(map(
+                                                            lambda x: (tuple(itertools.chain.from_iterable(x)) if isinstance(x, ABFDigitalPattern)
+                                                                       else tuple(
+                                                                                    itertools.chain.from_iterable(map(
+                                                                                                                        lambda e: e["main"] + e["alternate"],
+                                                                                                                        x["epochs"].values()
+                                                                                                                      )
+                                                                                                                  )
+                                                                                  )
+                                                                        ),
+                                                            activeDigChannels
+                                                            )
+                                                        )
+                        )
+
+        # print(f"{self.__class__.__name__}.getDigitalTriggers: usedDigs = {usedDigs}")
 
         if isinstance(digChannel, int):
             if digChannel not in usedDigs:
@@ -4212,12 +4236,16 @@ See also dacEpochsToNeoEpoch and getNeoEpoch
 
         return result
 
-    def getDigitalWaveform(self, sweep:int = 0,
-                           dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
-                           digChannel:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
-                           separateWaves:bool=True,
-                           normalized:bool=False,
-                           asSignals:bool=True) -> typing.Optional[
+    def getDigitalWaveform(self, sweep: int = 0,
+                           dac: typing.Optional[
+                               typing.Union[ABFOutputConfiguration, int, str]
+                               ] = None,
+                           digChannel: typing.Optional[
+                               typing.Union[int, typing.Sequence[int]]
+                               ] = None,
+                           separateWaves: bool = True,
+                           normalized: bool = False,
+                           asSignals: bool = True) -> typing.Optional[
                                typing.Union[
                                             typing.Sequence[
                                                 np.ndarray | neo.AnalogSignal
@@ -4311,14 +4339,14 @@ and alternative digital output.
 
         myDac = dac
 
-        wantsAltOutput = sweep % 2 > 0
+        wantsAltDIGOutput = sweep % 2 > 0
 
         if actualOutput:
             if self.alternateDigitalOutputsEnabled:
                 if hoDACActive:
-                    if 1 in digDACs and wantsAltOutput:
+                    if 1 in digDACs and wantsAltDIGOutput:
                         myDac = delf.getDAC(1)
-                    elif 0 in digDACs and not wantsAltOutput:
+                    elif 0 in digDACs and not wantsAltDIGOutput:
                         myDac = self.getDAC(0)
 
                 else:
@@ -4332,27 +4360,46 @@ and alternative digital output.
                         if altDacNdx < len(digDACs):
                             altDac = self.getDAC(digDACs[altDacNdx])
 
-                    myDac = altDac if wantsAltOutput else self.activeDAC
+                    myDac = altDac if wantsAltDIGOutput else self.activeDAC
 
 
         # a tuple of ABFEpoch numbers where digital outputs are defined:
         digEpochs = self.epochsWithDigitalOutput
 
         if actualOutput and self.alternateDigitalOutputsEnabled:
+            activeDigChannels = (self.getActiveDigitalChannels(sweep, e, main = not wantsAltDIGOutput)[0] for e in digEpochs)
+            key = "alternate" if wantsAltDIGOutput else "main"
             usedDigs = tuple(
                             itertools.chain.from_iterable(
                                 map(
-                                    lambda x: tuple(x.alternate) if isinstance(x, ABFDigitalPattern) else x,
-                                    (self.getActiveDigitalChannels(sweep, e, alternate = wantsAltOutput) for e in digEpochs)
+                                    lambda x: (tuple(x.alternate) if isinstance(x, ABFDigitalPattern)
+                                               else tuple(
+                                                        itertools.chain.from_iterable(map(
+                                                                                            lambda e: e[key],
+                                                                                            x["epochs"].values()
+                                                                                            )
+                                                                                        )
+                                                        )
+                                                ),
+                                    activeDigChannels
                                     )
                                 )
                             )
         else:
+            activeDigChannels = (self.getActiveDigitalChannels(sweep, e)[0] for e in digEpochs)
             usedDigs = tuple(
                             itertools.chain.from_iterable(
                                 map(
-                                    lambda x: tuple(itertools.chain.from_iterable(x)) if isinstance(x, ABFDigitalPattern) else x,
-                                    (self.getActiveDigitalChannels(sweep, e) for e in digEpochs)
+                                    lambda x: (tuple(itertools.chain.from_iterable(x)) if isinstance(x, ABFDigitalPattern)
+                                               else tuple(
+                                                        itertools.chain.from_iterable(map(
+                                                                                            lambda e: e["main"] + e["alternate"],
+                                                                                            x["epochs"].values()
+                                                                                            )
+                                                                                        )
+                                                        )
+                                               ),
+                                    activeDigChannels
                                     )
                                 )
                             )
@@ -4630,7 +4677,7 @@ digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values |nbs
                 digDACs = self.getDACsForEpoch(epoch.number)
                 if len(digDACs) > 1:
                     assert dac.physicalIndex in digDACs, f"DAC {dac.physicalIndex} not in digital-emitting DACs"
-                    thisDacNdx = digDACs.index(dac.physicalIndex)
+                    # thisDacNdx = digDACs.index(dac.physicalIndex)
                     if self.activeDACChannel == 0:
                         myDac = self.getDAC(1 if isAlternateDigital else 0)
                     elif self.activeDACChannel == 1:
@@ -4680,7 +4727,25 @@ digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values |nbs
         # now accepts a digital but pattern tuple (with some caveats!)
         # digPattern = self.getEpochDigitalPattern(sweep, myEpoch) # either main or alternate, depending on the sweep
         digPattern = self.getEpochDigitalPattern(myEpoch, isAlternateDigital) # either main or alternate, depending on the sweep
-        usedDigs = self.getActiveDigitalChannels(digPattern)
+        activeDigChannels = self.getActiveDigitalChannels(sweep, myEpoch, main = not isAlternateDigital)
+        key = "alternate" if isAlternateDigital else "main"
+        # usedDigs = self.getActiveDigitalChannels(sweep, myEpoch, main = not isAlternateDigital)# digPattern)
+        usedDigs = tuple(
+                        itertools.chain.from_iterable(
+                            map(
+                                lambda x: (tuple(itertools.chain.from_iterable(x)) if isinstance(x, ABFDigitalPattern)
+                                            else tuple(
+                                                    itertools.chain.from_iterable(map(
+                                                                                        lambda e: e[key],
+                                                                                        x["epochs"].values()
+                                                                                        )
+                                                                                    )
+                                                    )
+                                            ),
+                                activeDigChannels
+                                )
+                            )
+                        )
 
         if isinstance(digChannel, int):
             digChannel = (digChannel,)
@@ -4756,57 +4821,40 @@ digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values |nbs
     def waveformPreview(self, continuous: typing.Optional[
                                             typing.Union[bool, Tribool]
                                             ]=None) -> neo.Block:
-        r"""Generates a waveform preview, Clampex-style.
-        Returns a neo.Block with output waveforms per sweep, for all DAC and DIG
-        channels in the protocol, taking into account which waveform is generated
-        in what sweep (when alternative analog or digital outputs are enabled).
-        This is similar to Clampex's default "Sweeps Display" mode in Waveform
-        Preview.
+        r"""Generates a neo.Blocm with the protocol's analog command waveforms and digital TTLs.
 
-        When the optional 'continuous' parameter is set to a bool, the neo.Block
-        has only one segment with the per-sweep waveforms continuous.
+.. |nbsp| unicode:: 0xA0
+   :trim:
 
-        By default, 'continuous' is None.
+Returns a neo.Block with output waveforms per sweep, for all DAC and DIG |nbsp|
+channels in the protocol.
 
-        When 'continuous' is True: the corresponding waveforms across ALL sweeps
-        are concatenated, discarding the inter-sweep interval.
+When alternative analog or digital outputs are enabled, takes into account |nbsp|
+which waveform is generated in the displayed sweep.
 
-        NOTE: This is the same as Clampex's "Continuous Display" mode in the
-        Waveform Preview, and similar to the "Concatenated Display" mode.
+When the optional 'continuous' parameter is set to a bool, the neo.Block |nbsp|
+has only one segment with the per-sweep waveforms continuous.
 
-        When 'continuous' is False, the inter-sweep interval is taken into account.
-        Therefore the waveform preview shows the actual time-course of the waveforms
-        during a trial.
+By default, 'continuous' is None.
 
-        The main differences to Clampex Waveform Preview are in the cases where
-        either Alternate Waveforms or Alternate Digital Output are enabled in the
-        protocol:
+When 'continuous' is True: the corresponding waveforms across ALL sweeps |nbsp|
+are concatenated, discarding the inter-sweep interval.
 
-        • in "Sweeps Display" mode, Clampex actually plots waveforms for ALL sweeps,
-         (with the waveforms of the "first" swep in the alternative mode plotted
-          in red, and those of the "second" sweep, in black)
+When 'continuous' is False, the inter-sweep interval is taken into account.
 
-        • in "Concatenated Display" mode, Clampex disregards the inter-sweep interval.
+Therefore the waveform preview shows the actual time-course of the waveforms |nbsp|
+during a trial.
 
-        • in all display modes, in Clampex, the time boundaries of the sweeps and
-            the Wave Start and Wave End are indicated by vertical bars (corresponding
-            to the protocol's holding time intervals after the sweep start and
-            before the sweep end).
+NOTE: Multiple sweeps are displayed only when at least one of the following |nbsp|
+conditions are met:
+* either Alternate Waveforms or Alternate Digital Outputs are enabled
+* there is at least one epoch with delta duration or delta level != 0
 
-        NOTE: Multiple sweeps are displayed only when at least one of the following
-        conditions are met:
-        • either Alternate Waveforms or Alternate Digital Outputs are enabled
-        • there is at least one epoch with delta duration or delta level != 0
+Furthermore, when either Alternate Waveforms or Alternate Digital Outputs |nbsp|
+are enabled, only two sweep "prototypes" are shown, unless there is at |nbsp|
+least one epoch with delta duration or delta level != 0.
 
-        Furthermore, when either Alternate Waveforms or Alternate Digital Outputs
-        are enabled, only two sweep "prototypes" are shown, unless there is at
-        least one epoch with delta duration or delta level != 0.
-
-        BUG: 2024-11-10 01:12:24 FIXME
-        When alternate ouytuts are all disabled, the display is messed up, see
-        BUG: 2024-11-10 01:12:01 FIXME
-
-        """
+"""
         from core import neoutils
         ret = neo.Block(name=f"{self.name} Waveforms")
         if self.alternateWaveformsEnabled or self.alternateDigitalOutputsEnabled:

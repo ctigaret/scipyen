@@ -862,6 +862,7 @@ class DataMark(neo.Event):
         Value must be a pq.Quantity with the same units as the times attribute,
         or a scalar
         """
+        from core.datatypes import Real
         if copy:
             ret = self.copy()
 
