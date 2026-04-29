@@ -8123,6 +8123,11 @@ Var-keyword parameters ("name=value" pairs):
         """
         return self.plotItems
 
+    @property
+    def visibleAxes(self) -> tuple:
+        r"""Tuple of visible pg.PlotItem objects"""
+        return tuple(filter(lambda ax: ax.isVisible(), self.axes))
+
     @safewrapper
     def plotItem(self, index: int):
         r"""Returns the axis (PlotItem) at the specified index.
@@ -8981,10 +8986,12 @@ Var-keyword parameters ("name=value" pairs):
 
         # relative = getattr(epoch, "relative", False)
 
-        epoch_units = epoch.units
+        # epoch_units = epoch.units
 
         x0 = epoch.times.flatten().magnitude
         x1 = x0 + epoch.durations.flatten().magnitude
+
+        labels = epoch.labels
 
         # brush = next(brushes)
 
@@ -9011,11 +9018,19 @@ Var-keyword parameters ("name=value" pairs):
                                         orientation=pg.LinearRegionItem.Vertical,
                                         movable=False, **kwargs) for value in regions]
 
+            labelsAxis = self.selectedAxis if isinstance(self.selectedAxis, pg.PlotItem) and self.selectedAxis.isVisible() else self.visibleAxes[0] if len(self.visibleAxes) else None
+
             for kl, lri in enumerate(lris):
                 self.axes[k].addItem(lri)
                 lri.setZValue(10)
                 lri.setVisible(True)
                 lri.setRegion(regions[kl])
+                if isinstance(labelsAxis, pg.PlotItem) and kl < len(labels):
+                    labelItem = pg.TextItem(labels[kl], color = (0,0,0),
+                                            ensureInBounds = True)
+                    # labelItem.setPos()
+                    if isinstance(labelsAxis, pg.PlotItem):
+                        labelsAxis.addItem(labelItem)
 
 
     def _plot_epochs_sequence_(self, *args, **kwargs):

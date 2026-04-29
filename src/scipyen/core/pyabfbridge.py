@@ -2370,7 +2370,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                  name:typing.Optional[str] = None,
                  description:typing.Optional[str] = None) -> neo.Epoch:
         """
-    Creates a neo.Epoch based on ABFEpoch(s) defined for a DAC at a specific sweep.
+    Creates a neo.Epoch based on *all* ABFEpoch(s) defined for a DAC at a specific sweep.
     DEPRECATED — use dacEpochsToNeoEpoch
     """
         if dac is None:
@@ -2476,7 +2476,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                             name:typing.Optional[str] = None,
                             description:typing.Optional[str] = None,
                             durations:bool=False) -> neo.Epoch:
-        r"""Constructs a neo.Epoch object based on the ABFEpochs defined for the given DAC.
+        r"""Constructs a neo.Epoch object based on *all* ABFEpochs of a DAC for a particular sweep.
 
 .. |nbsp| unicode:: 0xA0
    :trim:
@@ -2512,6 +2512,9 @@ See also getNeoEpoch and getEpochsTable with asNeoEpoch = True
         else:
             raise TypeError(f"Invalid epochs specification: {epochs}")
 
+        if len(epochs) == 0:
+            return
+
         times, durations, labels = zip(*list(map(lambda epoch: (self.getEpochStart(epoch, dac, sweep, holding=holding, fromRunStart=fromRunStart),
                                                            self.getEpochDuration(epoch, dac, sweep),
                                                            epoch.letter), epochs)))
@@ -2524,7 +2527,7 @@ See also getNeoEpoch and getEpochsTable with asNeoEpoch = True
 
         ret = neo.Epoch(times = times, durations = durations, labels = labels,
                         units = times[0].units, name = name,
-                        description = description)
+                        description = description, axis=name)
 
         return ret
 
@@ -4659,6 +4662,7 @@ digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values |nbs
         hoDACActive = self.activeDACChannel not in (0,1)
 
         isAlternateDigital = False
+
         if self.alternateDigitalOutputsEnabled:
             if actualOutput:
                 if hoDACActive:
@@ -4712,13 +4716,13 @@ digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values |nbs
         waveUnits = pq.dimensionless if normalized else pq.V
 
         durationSamples = self.getEpochDuration(myEpoch, myDac, sweep, samples = True)
-        deltaDurationSamples = self.getEpochDeltaDuration(myEpoch, myDac, samples=True)
-        finalDurationSamples = self.getEpochDuration(myEpoch, myDac, self.nSweeps-1, samples = True)
+        # deltaDurationSamples = self.getEpochDeltaDuration(myEpoch, myDac, samples=True)
+        # finalDurationSamples = self.getEpochDuration(myEpoch, myDac, self.nSweeps-1, samples = True)
         pulsePeriodSamples = self.getEpochPulsePeriod(myEpoch, myDac, True)
         pulseWidthSamples = self.getEpochPulseWidth(myEpoch, myDac, True)
 
         pulseCount = 0 if pulsePeriodSamples == 0. else int(np.ceil(durationSamples/pulsePeriodSamples))
-        finalPulseCount = 0 if pulsePeriodSamples == 0. else int(np.ceil(finalDurationSamples/pulsePeriodSamples))
+        # finalPulseCount = 0 if pulsePeriodSamples == 0. else int(np.ceil(finalDurationSamples/pulsePeriodSamples))
 
 
         # NOTE: 2024-10-28 17:28:04
@@ -4726,7 +4730,7 @@ digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values |nbs
         # self.getActiveDigitalChannels() - the trick is that getEpochDigitalPattern
         # now accepts a digital but pattern tuple (with some caveats!)
         # digPattern = self.getEpochDigitalPattern(sweep, myEpoch) # either main or alternate, depending on the sweep
-        digPattern = self.getEpochDigitalPattern(myEpoch, isAlternateDigital) # either main or alternate, depending on the sweep
+        digPattern = self.getEpochDigitalPattern(myEpoch, not isAlternateDigital) # either main or alternate, depending on the sweep
         activeDigChannels = self.getActiveDigitalChannels(sweep, myEpoch, main = not isAlternateDigital)
         key = "alternate" if isAlternateDigital else "main"
         # usedDigs = self.getActiveDigitalChannels(sweep, myEpoch, main = not isAlternateDigital)# digPattern)
@@ -4747,6 +4751,8 @@ digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values |nbs
                             )
                         )
 
+        # print(f"{self.__class__.__name__}.getEpochDigitalWaveform: epoch = {epoch}, myDac = {myDac}, sweep = {sweep}\n->\n\tdigPattern = {digPattern}\n\tactiveDigChannels = {activeDigChannels}\n\tusedDigs = {usedDigs}")
+
         if isinstance(digChannel, int):
             digChannel = (digChannel,)
 
@@ -4766,7 +4772,10 @@ digOFF, digON, trainOFF, trainON - scalar Python Quantities with the values |nbs
             waves = [np.full([durationSamples, 1], 0) * waveUnits for k in range(len(digChannel))]
 
         else:
-            digChannelValue = tuple(digPattern[chnl] for chnl in digChannel)
+            dp = tuple(itertools.chain.from_iterable(digPattern))
+            digChannelValue = tuple(map(lambda c: dp[c], digChannel))
+            # digChannelValue = tuple(digPattern[chnl] for chnl in digChannel)
+            # print(f"digChannelValue = {digChannelValue}")
             if lastLevelOnly:
                 return tuple(map(lambda k, chnl: self.getDigitalLogicLevels(chnl, lambda k: True if digChannelValue[k] == "*" else False if digChannelValue[k]==1 else None)[0] , digChannel))
 
@@ -4883,11 +4892,20 @@ least one epoch with delta duration or delta level != 0.
             segment = neo.Segment(name=f"{pfx} sweeps")
             analogWaveforms = list()
             digitalWaveforms = list()
+            neoEpochs = dict()
             for sweep in range(maxSweeps):
-                sweepAnalogs = [self.getCommandWaveform(sweep, dac) for dac in self.DACs]
-                sweepDigital = [self.getDigitalWaveform(sweep, digChannel=d,
-                                                        asSignals=True,
-                                                        separateWaves=False) for d in range(self.nDIGChannels)]
+                sweepAnalogs = list(map(lambda dac: self.getCommandWaveform(sweep, dac), self.DACs))
+                # sweepAnalogs = [self.getCommandWaveform(sweep, dac) for dac in self.DACs]
+                sweepDigital = list(map(lambda d: self.getDigitalWaveform(sweep,
+                                                                          digChannel=d,
+                                                                          asSignals=True,
+                                                                          separateWaves=False),
+                                        range(self.nDIGChannels)
+                                        )
+                                    )
+                # sweepDigital = [self.getDigitalWaveform(sweep, digChannel=d,
+                #                                         asSignals=True,
+                #                                         separateWaves=False) for d in range(self.nDIGChannels)]
                 if sweep == 0:
                     analogWaveforms.extend(sweepAnalogs)
                     digitalWaveforms.extend(sweepDigital)
@@ -4903,11 +4921,38 @@ least one epoch with delta duration or delta level != 0.
 
                     for k, sig in enumerate(sweepDigital):
                         sig.t_start = new_t_start
-                        digitalWaveforms[k] = neoutils.concatenate_signals(digitalWaveforms[k], sig, axis=0,
+                        digitalWaveforms[k] = neoutils.concatenate_signals(digitalWaveforms[k],
+                                                                           sig,
+                                                                           axis=0,
                                                                            name = digitalWaveforms[k].name,
-                                                                          force_contiguous = continuous.value)
+                                                                           force_contiguous = continuous.value)
+                sweepNeoEpochs = dict(map(
+                                            lambda d: (d.name, [self.dacEpochsToNeoEpoch(dac=d, sweep=sweep)]),
+                                            list(filter(lambda d: len(d.epochs),
+                                                        self.DACs)
+                                                )
+                                          )
+                                     )
+                for d, ee in sweepNeoEpochs.items():
+                    if d in neoEpochs:
+                        neoEpochs[d].extend(ee)
+                    else:
+                        neoEpochs[d] = ee
+
+
+            for d, ee in neoEpochs.items():
+                if len(ee)>1:
+                    eTimes = np.hstack(list(map(lambda e: e.times, ee))) * ee[0].units
+                    eDurations = np.hstack(list(map(lambda e: e.durations, ee))) * ee[0].units
+                    eLabels = np.hstack(list(map(lambda e: e.labels, ee)))
+                    dacEpoch = neo.Epoch(eTimes, eDurations, eLabels, axis = ee[0].annotations.get("axis", d))
+                elif len(ee) == 1:
+                    dacEpoch = ee[0]
+
+                segment.epochs.append(dacEpoch)
 
             segment.analogsignals += analogWaveforms + digitalWaveforms
+
 
             if self.holdingTime > 0:
                 segment.events.append(neo.Event([self.holdingTime,
@@ -4931,6 +4976,11 @@ least one epoch with delta duration or delta level != 0.
                                                     self.sweepDuration - self.holdingTime],
                                                     units = self.sweepDuration.units,
                                                     labels = ["Wave start","Wave end"]))
+
+                dacEpochs = list(map(lambda d: self.dacEpochsToNeoEpoch(dac=d, sweep=sweep),
+                                     list(filter(lambda d: len(d.epochs), self.DACs))))
+
+                segment.epochs.extend(dacEpochs)
 
                 ret.segments.append(segment)
 
