@@ -4345,7 +4345,7 @@ and alternative digital output.
             if self.alternateDigitalOutputsEnabled:
                 if hoDACActive:
                     if 1 in digDACs and wantsAltDIGOutput:
-                        myDac = delf.getDAC(1)
+                        myDac = self.getDAC(1)
                     elif 0 in digDACs and not wantsAltDIGOutput:
                         myDac = self.getDAC(0)
 
