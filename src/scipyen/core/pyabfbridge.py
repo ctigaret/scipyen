@@ -2404,7 +2404,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
                 name = f"Epochs for dac {dac.name} in protocol {self.name}"
 
         return neo.Epoch(times = times, durations = durations, units=units,
-                         labels = labels, name=name, description=description)
+                         labels = labels, name=name, description=description,
+                         axis = dac.name, sweep = sweep)
 
     def dacEpochsToInterval(self,
                             dac:typing.Union[ABFOutputConfiguration, int, str],
@@ -2485,6 +2486,10 @@ The neo.Epoch object 'times' and 'durations' attributes are derived from the |nb
 ABF epochs' start times and actual durations, adjusted to reflect their actual values, |nbsp| .
 given the DAC, sweep, and whether alternate command waveforms are enabled in the protocol.
 
+Returns:
+--------
+    A neo.Epoch annotated with the name of the DAC where it is defined and the sweep index where the actual values were obtained.
+
 See also getNeoEpoch and getEpochsTable with asNeoEpoch = True
 """
         if isinstance(dac, (int, str)):
@@ -2515,9 +2520,14 @@ See also getNeoEpoch and getEpochsTable with asNeoEpoch = True
         if len(epochs) == 0:
             return
 
-        times, durations, labels = zip(*list(map(lambda epoch: (self.getEpochStart(epoch, dac, sweep, holding=holding, fromRunStart=fromRunStart),
-                                                           self.getEpochDuration(epoch, dac, sweep),
-                                                           epoch.letter), epochs)))
+        times, durations, labels = zip(*list(map(
+            lambda epoch: (
+                            self.getEpochStart(epoch, dac, sweep, holding=holding,
+                                               fromRunStart=fromRunStart).rescale(self.sweepDuration.units),
+                            self.getEpochDuration(epoch, dac, sweep).rescale(self.sweepDuration.units),
+                            epoch.letter
+                            ),
+            epochs)))
 
         if not isinstance(name, str) or len(name.strip()) == 0:
             name = f"{dac.name}_sweep_{sweep}_ABFEpochs"
@@ -2527,7 +2537,9 @@ See also getNeoEpoch and getEpochsTable with asNeoEpoch = True
 
         ret = neo.Epoch(times = times, durations = durations, labels = labels,
                         units = times[0].units, name = name,
-                        description = description, axis=name)
+                        description = description,
+                        axis = dac.name,
+                        sweep = sweep)
 
         return ret
 
@@ -3795,7 +3807,9 @@ True                epoch_letter ↦ a tuple as above
             raise TypeError(f"Expecting digChannel an int or sequence of int; instead got {digChannel}")
 
         t0 = t1 = self.holdingTime.rescale(pq.s)
-        shift = 0 if not isinstance(relativeToRunStart, bool) else self.sweepInterval if relativeToRunStart else self.sweepDuration
+        shift = (0 if not isinstance(relativeToRunStart, bool)
+                 else self.sweepInterval if relativeToRunStart
+                 else self.sweepDuration)
         shift *= sweep
         if useHoldingTime:
             shift += self.holdingTime
@@ -3875,6 +3889,7 @@ See also ``dacEpochsToNeoEpoch`` and ``getEpochsTable`` with ``asNeoEpoch = True
 
         return neo.Epoch(times = [t0], durations = [t1],
                          labels = [epoch.letter], name = name,
+                         axis = dac.name, sweep = sweep,
                          epochType = epoch.type, units = t0.units,
                          epochLetter = epoch.letter,
                          epochNumber = epoch.number,

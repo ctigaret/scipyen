@@ -8977,27 +8977,20 @@ Var-keyword parameters ("name=value" pairs):
         else:
             self._events_axis_.setVisible(False)
 
-        # events_dict = self._prep_entity_dict_(events, (neo.Event, DataMark))
-
-
     def _plot_epoch_data_(self, epoch:typing.Union[neo.Epoch, DataZone], **kwargs):
         r""" Plots the time intervals defined in a single neo.Epoch or DataZone """
+        # print(f"{self.__class__.__name__}._plot_epoch_data_({epoch})")
         brush = kwargs.pop("brush", self.epoch_plot_options["epoch_brush"])
-
-        # relative = getattr(epoch, "relative", False)
-
-        # epoch_units = epoch.units
+        epochAxis = kwargs.pop("axis", None)
 
         x0 = epoch.times.flatten().magnitude
         x1 = x0 + epoch.durations.flatten().magnitude
 
         labels = epoch.labels
 
-        # brush = next(brushes)
-
-
         for k in range(len(self.axes)):
-            self.axes[k].update() # to update its viewRange()
+            plotItem = self.axes[k]
+            plotItem.update() # to update its viewRange()
 
             # NOTE: 2024-07-27 23:00:23
             # see TODO: 2024-07-27 22:46:05
@@ -9020,18 +9013,31 @@ Var-keyword parameters ("name=value" pairs):
 
             labelsAxis = self.selectedAxis if isinstance(self.selectedAxis, pg.PlotItem) and self.selectedAxis.isVisible() else self.visibleAxes[0] if len(self.visibleAxes) else None
 
+            # allow plottimg the epoch on a specific axis
+            if isinstance(epochAxis, str) and len(epochAxis.strip()):
+                if plotItem.vb.name == epochAxis:
+                    labelAxis = plotItem
+                else:
+                    continue
+
+            elif isinstance(epochAxis, int):
+                if epochAxis == k:
+                    labelAxis = plotItem
+                else:
+                    continue
+
             for kl, lri in enumerate(lris):
                 self.axes[k].addItem(lri)
                 lri.setZValue(10)
                 lri.setVisible(True)
                 lri.setRegion(regions[kl])
-                if isinstance(labelsAxis, pg.PlotItem) and kl < len(labels):
-                    labelItem = pg.TextItem(labels[kl], color = (0,0,0),
+                if labelsAxis == plotItem and kl < len(labels):
+                    labelItem = pg.TextItem(labels[kl],
+                                            color = lri.currentBrush.color().darker().name(),
                                             ensureInBounds = True)
-                    # labelItem.setPos()
-                    if isinstance(labelsAxis, pg.PlotItem):
-                        labelsAxis.addItem(labelItem)
-
+                    labelItem.setPos(regions[kl][0], labelsAxis.vb.viewRange()[1][-1])
+                    # print(f"labelItem pos = {labelItem.pos()}")
+                    labelsAxis.addItem(labelItem)
 
     def _plot_epochs_sequence_(self, *args, **kwargs):
         r"""Plots data from a sequence of neo.Epochs.
@@ -9227,9 +9233,11 @@ Var-keyword parameters ("name=value" pairs):
         epoch_hoverPen = kwargs.pop("epoch_hoverPen", self.epoch_plot_options["epoch_hoverPen"])
         epoch_hoverBrush = kwargs.pop("epoch_hoverBrush", self.epoch_plot_options["epoch_hoverBrush"])
 
+        epochAxis = epoch.annotations.get("axis", None)
         self._plot_epoch_data_(epoch, brush=epoch_brush, pen=epoch_pen,
                                hoverBrush=epoch_hoverBrush,
-                               hoverPen = epoch_hoverPen)
+                               hoverPen = epoch_hoverPen,
+                               axis=epochAxis)
 
         self.currentFrameAnnotations = {type(obj).__name__: obj.annotations}
 
