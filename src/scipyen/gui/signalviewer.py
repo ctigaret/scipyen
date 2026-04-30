@@ -78,7 +78,7 @@ quantities (for python 3)
 mpldatacursor (for python 3)
 
 '''
-
+#### BEGIN
 # TODO: 2025-05-02 14:20:33
 # • when viewing a neo object:
 #   ∘ hide the frame navigation ui when viewing:
@@ -110,6 +110,7 @@ mpldatacursor (for python 3)
 # should assume a notional signal domain "start" at 0 (i.e., treat the landmarks
 # as if "relative" was False, in such cases).
 #
+#### END
 
 
 #### BEGIN core python modules
@@ -170,7 +171,7 @@ else:
 import numpy as np
 import pandas as pd
 from pandas import NA
-# import pyqtgraph as pg
+# import pyqtgraph as pg # see core.pyqtgraph_patch
 import quantities as pq
 import matplotlib as mpl
 from matplotlib import pyplot as plt
@@ -8606,34 +8607,35 @@ Var-keyword parameters ("name=value" pairs):
             to pass new-data=False to avoid unnecessary function calls related
             to plotting the same data again
 
-
-        Delegates plotting as follows:
-        ------------------------------
-        neo.Segment                     ↦ _plotSegment_ # needed to pick up which signal from segment
-        neo.AnalogSignal                ↦ _plot_signal_
-        neo.IrregularlySampledSignal    ↦ _plot_signal_
-        neo.Epoch                       ↦ _plot_signal_
-        neo.SpikeTrain                  ↦ _plot_signal_
-        neo.Event                       ↦ _plot_signal_
-        datasignal.DataSignal           ↦ _plot_signal_
-        vigra.Kernel1D, vigra.Kernel2D  ↦ _plotNumpyArray_
-            NOTE: These are converted to numpy.ndarray
-        numpy.ndarray                   ↦ _plotNumpyArray_
-            NOTE: This includes vigra.VigraArray and quantities.Quantity arrays
-            The meta-information in VigarArray objects is ignored here.
-
-
-        sequence (iterable)             ↦ _plotSequence_
-            NOTE: The sequence can contain these types:
-                neo.AnalogSignal,
-                neo.IrregularlySampledSignal,
-                datasignal.DataSignal,
-                np.ndarray
-                vigra.filters.Kernel1D  (NOTE  this is converted to two numpy arrays)
-
-        Anything else                   ↦ ignored
-
         """
+
+        # Delegates plotting as follows:
+        # ------------------------------
+        # neo.Segment                     ↦ _plotSegment_ # needed to pick up which signal from segment
+        # neo.AnalogSignal                ↦ _plot_signal_
+        # neo.IrregularlySampledSignal    ↦ _plot_signal_
+        # neo.Epoch                       ↦ _plot_signal_
+        # neo.SpikeTrain                  ↦ _plot_signal_
+        # neo.Event                       ↦ _plot_signal_
+        # datasignal.DataSignal           ↦ _plot_signal_
+        # vigra.Kernel1D, vigra.Kernel2D  ↦ _plotNumpyArray_
+        #     NOTE: These are converted to numpy.ndarray
+        # numpy.ndarray                   ↦ _plotNumpyArray_
+        #     NOTE: This includes vigra.VigraArray and quantities.Quantity arrays
+        #     The meta-information in VigarArray objects is ignored here.
+        #
+        #
+        # sequence (iterable)             ↦ _plotSequence_
+        #     NOTE: The sequence can contain these types:
+        #         neo.AnalogSignal,
+        #         neo.IrregularlySampledSignal,
+        #         datasignal.DataSignal,
+        #         np.ndarray
+        #         vigra.filters.Kernel1D  (NOTE  this is converted to two numpy arrays)
+        #
+        # Anything else                   ↦ ignored
+
+
         # print("###")
         # traceback.print_stack()
         # print("###")
@@ -8690,8 +8692,8 @@ Var-keyword parameters ("name=value" pairs):
 
         # Check if cursors want to stay in axis or stay with the domain
         # and act accordingly
-        mfun = lambda x: -np.inf if x is None else x
-        pfun = lambda x: np.inf if x is None else x
+        # mfun = lambda x: -np.inf if x is None else x
+        # pfun = lambda x: np.inf if x is None else x
 
         for k, ax in enumerate(self.axes):
             # NOTE: 2025-07-13 22:21:02 potentia BUG / FIXME
@@ -8709,7 +8711,6 @@ Var-keyword parameters ("name=value" pairs):
 
                 if not c.isVertical:
                     # print(f"{self.__class__.__name__}.displayFrame for cursor in axis {k}: cursor type {c.cursorType}, coordinates: {c.y}; bounds: {c.yBounds()}")
-                    yBounds = c.yBounds()
                     relY = c.y - c.yBounds()[0]
                     c.setBounds()
                     c.y = dataymin+relY
@@ -8980,7 +8981,10 @@ Var-keyword parameters ("name=value" pairs):
     def _plot_epoch_data_(self, epoch:typing.Union[neo.Epoch, DataZone], **kwargs):
         r""" Plots the time intervals defined in a single neo.Epoch or DataZone """
         # print(f"{self.__class__.__name__}._plot_epoch_data_({epoch})")
-        brush = kwargs.pop("brush", self.epoch_plot_options["epoch_brush"])
+        epoch_pen = kwargs.pop("epoch_pen", self.epoch_plot_options["epoch_pen"])
+        epoch_brush = kwargs.pop("epoch_brush", self.epoch_plot_options["epoch_brush"])
+        epoch_hoverPen = kwargs.pop("epoch_hoverPen", self.epoch_plot_options["epoch_hoverPen"])
+        epoch_hoverBrush = kwargs.pop("epoch_hoverBrush", self.epoch_plot_options["epoch_hoverBrush"])
         epochAxis = kwargs.pop("axis", None)
 
         x0 = epoch.times.flatten().magnitude
@@ -9007,14 +9011,17 @@ Var-keyword parameters ("name=value" pairs):
             regions = [v for v in zip(x0, x1)]
 
             lris = [pg.LinearRegionItem(values=value,
-                                        brush=brush,
+                                        hoverBrush=epoch_hoverBrush,
+                                        pen=epoch_pen,
+                                        hoverPen=epoch_hoverPen,
                                         orientation=pg.LinearRegionItem.Vertical,
                                         movable=False, **kwargs) for value in regions]
 
             labelsAxis = self.selectedAxis if isinstance(self.selectedAxis, pg.PlotItem) and self.selectedAxis.isVisible() else self.visibleAxes[0] if len(self.visibleAxes) else None
 
             # allow plottimg the epoch on a specific axis
-            if isinstance(epochAxis, str) and len(epochAxis.strip()):
+            isAxisSpecific = isinstance(epochAxis, str) and len(epochAxis.strip())
+            if isAxisSpecific:
                 if plotItem.vb.name == epochAxis:
                     labelAxis = plotItem
                 else:
@@ -9031,13 +9038,12 @@ Var-keyword parameters ("name=value" pairs):
                 lri.setZValue(10)
                 lri.setVisible(True)
                 lri.setRegion(regions[kl])
-                if labelsAxis == plotItem and kl < len(labels):
-                    labelItem = pg.TextItem(labels[kl],
-                                            color = lri.currentBrush.color().darker().name(),
-                                            ensureInBounds = True)
-                    labelItem.setPos(regions[kl][0], labelsAxis.vb.viewRange()[1][-1])
-                    # print(f"labelItem pos = {labelItem.pos()}")
-                    labelsAxis.addItem(labelItem)
+                if kl < len(labels) and (labelsAxis == plotItem or isAxisSpecific):
+                    lri.lines[0].label = pg.InfLineLabel(lri.lines[0], text=str(labels[kl]),
+                                                         position = 0.8,
+                                                         color = lri.currentBrush.color().darker().name(),
+                                                         # color = lri.lines[0].pen.color(),
+                                                         )
 
     def _plot_epochs_sequence_(self, *args, **kwargs):
         r"""Plots data from a sequence of neo.Epochs.
@@ -9090,7 +9096,8 @@ Var-keyword parameters ("name=value" pairs):
 
         for epoch in args:
             brush = next(brushes)
-            self._plot_epoch_data_(epoch, brush)
+            hoverBrush = QtGui.QBrush(QtGui.QColor(brush.color().lighter()))
+            self._plot_epoch_data_(epoch, epoch_brush = brush, epoch_hoverBrush = hoverBrush)
 
     @singledispatchmethod
     def _plot_data_(self, obj, *args, **kwargs):
