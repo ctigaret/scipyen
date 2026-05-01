@@ -389,7 +389,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
                                     )
                                     and len(objDict.get("choices", dict())) == 0
                                 ):
-                # if readOnly:
                     item.setData(readOnlyBrush, QtCore.Qt.ForegroundRole)
                     item.setData(readOnlyFont, QtCore.Qt.FontRole)
                     item.setFlags(readOnlyFlags)
