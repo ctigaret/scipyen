@@ -2536,7 +2536,8 @@ class LocationMeasure:
    :trim:
 
 A *location* is an object with one of the following types ('locator' types):
-* SignalCursor
+
+* ``SignalCursor``
 
 * ``DataCursor`` This is an abstraction of a SignalCursor, which stores only the cursor's coordinates, NOT its type. |nbsp|
     It *may* represent a vertical or horizontal signal cursor; useful when no SignalViewer axes are available.
