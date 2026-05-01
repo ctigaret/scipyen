@@ -717,13 +717,12 @@ def get_standard_desktop_places(all_folder_icons: bool = False) -> PlacesMap:
     return ret
 
 
-def get_desktop_places(
-    schema: typing.Optional[str] = None,
-    all_folder_icons: bool = False,
-    include_hidden: bool = False,
-    include_system: bool = True,
-    intKeys: bool = False,
-) -> PlacesMap:
+def get_desktop_places(schema: typing.Optional[str] = None,
+                       all_folder_icons: bool = False,
+                       include_hidden: bool = False,
+                       include_system: bool = True,
+                       intKeys: bool = False,
+                       ) -> PlacesMap:
     r"""Collect user places as defined in the freedesktop.org XDG framework.
     Useful for xdg-compliant Linux desktops.
 

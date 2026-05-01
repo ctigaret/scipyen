@@ -1925,15 +1925,21 @@ class PlacesButton(UrlNavigatorButtonBase):
                     'Shared Cache',
                     'Application Configuration'
                     ]
-        places = dict(filter(lambda x: x[1].name not in ignored, dutils.get_desktop_places("file").items())) # I only use file:// locations, for now, but see below
+
+        # NOTE: 2026-05-01 09:26:55
+        # I only use file:// locations, for now, but see below
+        places = dict(filter(lambda x: x[1].name not in ignored, dutils.get_desktop_places("file").items()))
+
+        # NOTE: 2026-05-01 09:28:54
+        # includes icon name as well, so this becomes place.name ↦ (place.url, place.icon)
         actionsDataMap = dict()
 
         for placeLoc, place in places.items():
             text = place.name
             if placeLoc.startswith("separator"):
-                actionsDataMap[text] = "separator"
+                actionsDataMap[text] = ("separator", "")
             else:
-                actionsDataMap[text] = place.url
+                actionsDataMap[text] = (place.url, place.icon)
 
         navigator = self.parent()
         assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
@@ -1977,9 +1983,17 @@ class PlacesButton(UrlNavigatorButtonBase):
         lastIndex = min(nAvailableItems, maxIndex)
 
         for k, (key, val) in enumerate(actionsMap.items()):
+            if k >= maxIndex or k < startIndex:
+                continue
             action = QAction(key, menu)
-            if isinstance(val, QtCore.QUrl):
-                action.setData(val.toString())
+            if isinstance(val[0], QtCore.QUrl):
+                action.setData(val[0].toString())
+                if isinstance(val[1], str) and len(val[1].strip()):
+                    try:
+                        action.setIcon(QtGui.QIcon.fromTheme(val[1]))
+                    except:
+                        pass
+
                 if val == navigator.locationUrl():
                     font = QtGui.QFont(action.font())
                     font.setBold(True)
@@ -1988,25 +2002,6 @@ class PlacesButton(UrlNavigatorButtonBase):
                 action.setSeparator(True)
 
             menu.addAction(action)
-#             if k == 0:# and sys.platform.startswith("linux"):
-#                 action0 = QAction("Places", menu)
-#                 action0.setSeparator(True)
-#                 menu.addAction(action0)
-#             if k in range(startIndex, lastIndex):
-#                 if key.lower().startswith("separator"):
-#                     menu.addSeparator()
-#                 else:
-#                     action = QAction(key, menu)
-#                     if isinstance(val, QtCore.QUrl):
-#                         action.setData(val.toString())
-#                         if val == navigator.locationUrl():
-#                             font = QtGui.QFont(action.font())
-#                             font.setBold(True)
-#                             action.setFont(font)
-#                     else:
-#                         action.setSeparator(True)
-#
-#                     menu.addAction(action)
 
         if nAvailableItems > maxIndex:
             menu.addSeparator()

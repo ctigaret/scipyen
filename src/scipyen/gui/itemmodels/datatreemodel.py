@@ -898,7 +898,13 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 choices = dict()
         tip = f"{obj}"
         word = "Function" if isinstance(obj, (types.FunctionType, types.BuiltinFunctionType)) else "Method"
-        info = f"{word} {obj.__qualname__}{inspect.signature(obj)} from module {obj.__module__}"
+        try:
+            # NOTE: 2026-05-01 09:24:50
+            # because signature of builtin functions e.g. on PyQt side) cannot be inspected
+            signature = f"{inspect.signature(obj)}"
+        except:
+            signature = ""
+        info = f"{word} {obj.__qualname__}{signature} from module {obj.__module__}"
 
         return obj, {
             "indirect": False,
