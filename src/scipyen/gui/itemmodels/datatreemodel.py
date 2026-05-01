@@ -199,13 +199,13 @@ class DataTreeModel(QtGui.QStandardItemModel):
     sig_modelDataChanged = Signal(name="sig_modelDataChanged")
 
     @staticmethod
-    def _check_private_member_(x: object, y: typing.Optional[object] = None):
+    def _check_public_member_(x: object, y: typing.Optional[object] = None):
         return (not isinstance(x[0], str)
                 or not x[0].startswith("_"))
 
     # @staticmethod
     # def _check_private_member_2_(x: object, y: object):
-    #     return self._check_private_member_(x)
+    #     return self._check_public_member_(x)
 
     def __init__(self: typing.Self, data: typing.Optional[typing.Any] = None,
                  dataName: str = None,
@@ -279,6 +279,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         info = objDict["objInfo"]
         if isinstance(info, bool):
             info = f"{info}"
+
         memberAccess = objDict["memberAccess"]
 
         if isinstance(objKey, str):
@@ -359,10 +360,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 item2.setData(obj, QtCore.Qt.EditRole)
             else:
                 item2.setData(info, QtCore.Qt.EditRole)
-        # NOTE: 2026-02-10 09:33:22
-            # execute the code line below NOT here, but conditionally in
-            # self._buildBranch_:
-            # item2.setData(QtCore.QVariant(obj), ObjectDataRole)
+
             choices = objDict.get("choices", dict())
             item2.setData(choices, DataChoicesRole) # noqa
 
@@ -371,6 +369,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         readOnlyFlags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
 
         readOnly = objDict.get("readOnly", False)
+        readOnlyChildren = objDict.get("readOnlychildren", False)
 
         palette = QtWidgets.QApplication.palette()
         font = QtWidgets.QApplication.font()
@@ -381,6 +380,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         for k, item in enumerate((item0, item1, item2)):
             item.setData(readOnly, ReadOnlyRole)
+            item.setData(readOnlyChildren, ReadOnlyChildrenRole)
             if k == 2:
                 if readOnly or (
                                     (
@@ -389,6 +389,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                                     )
                                     and len(objDict.get("choices", dict())) == 0
                                 ):
+                # if readOnly:
                     item.setData(readOnlyBrush, QtCore.Qt.ForegroundRole)
                     item.setData(readOnlyFont, QtCore.Qt.FontRole)
                     item.setFlags(readOnlyFlags)
@@ -543,12 +544,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
                     type(obj), NOTMEMOIZED + PODS
                 ):
                     if objId not in self._visited_:
-                        # itemPath = self._getPathForItemOrIndex_(pItem)
                         itemPath = f"{self._rootTitle_}{self.getPathForLeaf(pItem)}"
                         self._memoize_(obj, itemPath, objDict)
-                        # self._memoize_(obj, itemPath, objDict["objType"], objId)
-                    # else:
-
 
         if len(visited):
             return pItem
@@ -575,7 +572,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 if type in inspect.getmro(valDict["objType"]):
                     continue
 
-            if objDict.get("readOnly", False) is True:
+            if objDict.get("readOnlyChildren", False) is True:
                 valDict["readOnly"] = True
 
             self._buildBranch_(pValue, valDict, keyName, type(key), pItem, k)
@@ -698,6 +695,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
                 choices = dict()
         readOnly = False
+        readOnlyChildren = False
 
         if isDataclass(obj):
             datafields = dataclasses.fields(obj)
@@ -717,11 +715,13 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 pData = dict(
                     list(
                         filter(
-                            self._check_private_member_,
+                            self._check_public_member_,
                             pData.items()
                         )
                     )
                 )
+            else:
+                readOnlyChildren = True
 
             n = len(pData)
 
@@ -755,6 +755,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             memberAccess = tuple()
             accessType = None
             readOnly = True
+            readOnlyChildren = True
 
         elif self._introspect_ and self.introspectable(obj) :
             pData = datatypes.inspect_members(obj, self._predicate_)
@@ -763,7 +764,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 pData = dict(
                     list(
                         filter(
-                            self._check_private_member_,
+                            self._check_public_member_,
                             pData.items()
                         )
                     )
@@ -778,6 +779,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             memberAccess = (".", )
             accessType = "attribute"
             readOnly = True
+            readOnlyChildren = True
 
         else:
             pData = obj
@@ -803,6 +805,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "objType": objType,
             "choices": choices,
             "readOnly": readOnly,
+            "readOnlyChildren": readOnlyChildren,
             "objId": objId
             }
 
@@ -828,6 +831,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # TODO/FIXME: 2026-03-28 16:57:15
         # mechanism to see if a new object of another type is acceptable here, in which case call a UI c'tor'
         readOnly = True
+        readOnlyChildren = True
 
         return pData, {
             "indirect": indirect,
@@ -839,6 +843,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "objType": objType,
             "choices": choices,
             "readOnly": readOnly,
+            "readOnlyChildren": readOnlyChildren,
             "objId": objId
             }
 
@@ -854,6 +859,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                                                datetime.timezone],
           choices: dict = dict(),
           _:bool = False) -> tuple:
+
         objType = type(obj)
         objId = id(obj)
         pData = obj
@@ -929,7 +935,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
                                                enum.Flag, TypeEnum],
           choices: dict = dict(),
           includePrivateMembers: bool = False) -> tuple:
-        readOnly = False
+        readOnly = True
+        readOnlyChildren = True
         objType = type(obj)
         objId = id(obj)
         info = obj
@@ -945,6 +952,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
             enum.EnumType, TypeEnum, enum.Enum, enum.IntEnum, enum.Flag)):
             memberAccess = (".", )
             accessType = "attribute"
+            readOnly = False
+            readOnlyChildren = False
             if isinstance(obj, (enum.Enum, enum.IntEnum, TypeEnum, enum.Flag)):
                 info = obj.name
             if hasattr(obj, "__members__"):
@@ -960,7 +969,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 except:
                     scipywarn(f"Cannot access enumeration values for {type(obj).__name__}")
                     choices = dict()
-                readOnly = True
+                # readOnly = True
 
         return obj, {
             "indirect": False,
@@ -972,6 +981,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "accessType": accessType,
             "choices": choices,
             "readOnly": readOnly,
+            "readOnlyChildren": readOnlyChildren,
             "objId": objId
             }
 
@@ -997,6 +1007,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "accessType": "attribute",
             "choices": choices,
             "readOnly": True,
+            "readOnlyChildren": True,
             "objId": objId
             }
 
@@ -1025,7 +1036,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             pData = dict(
                 list(
                     filter(
-                        self._check_private_member_,
+                        self._check_public_member_,
                         pData.items()
                     )
                     )
@@ -1042,6 +1053,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "accessType": "attribute",
             "choices": choices,
             "readOnly": True,
+            "readOnlyChildren": True,
             "objId": objId
             }
 
@@ -1061,7 +1073,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             pData = dict(
                 list(
                     filter(
-                        self._check_private_member_,
+                        self._check_public_member_,
                         pData.items()
                     )
                     )
@@ -1085,6 +1097,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "accessType": "attribute",
             "choices": choices,
             "readOnly": True,
+            "readOnlyChildren": True,
             "objId": objId
             }
 
@@ -1133,7 +1146,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             pData = dict(
                 list(
                     filter(
-                        self._check_private_member_,
+                        self._check_public_member_,
                         pData.items()
                     )
                     )
@@ -1153,6 +1166,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "accessType": "key",
             "choices": choices,
             "readOnly": True,
+            "readOnlyChildren": False,
             "objId": objId
             }
 
@@ -1162,7 +1176,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(NeoObjectList)
     @_parseObject_.register(set)
     @_parseObject_.register(frozenset)
-    # @_parseObject_.register(TriggerProtocolList)
     def __parseObject_(self: typing.Self, obj: typing.Union[list, tuple, deque, set,
                                                NeoObjectList, frozenset],
             choices: dict = dict(),
@@ -1173,24 +1186,25 @@ class DataTreeModel(QtGui.QStandardItemModel):
             if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
                 choices = dict()
         tip = objType.__name__
-        readOnly = False
+        readOnly = True
+        readOnlyChildren = False
 
         if isinstance(obj, (tuple, frozenset)):
-            readOnly = True
+            readOnlyChildren = True
 
         if is_namedtuple(obj):
             pData = obj._asDict() if hasattr(obj, "_asDict") else obj._asdict()
             tip += "(namedtuple)"
             memberAccess = (".",)
             accessType = "attribute"
-            readOnly = True
+            readOnlyChildren = True
 
         elif isinstance(obj, os.stat_result):
             pData = dict(filter(lambda t: any(t[0].startswith(s) for s in ("n_", "st_")), inspect.getmembers(obj)))
             tip += "(stat result)"
             memberAccess = (".",)
             accessType = "attribute"
-            readOnly = True
+            readOnlyChildren = True
 
         else:
             pData = dict(enumerate(obj))
@@ -1201,12 +1215,13 @@ class DataTreeModel(QtGui.QStandardItemModel):
             pData = dict(
             list(
                     filter(
-                        self._check_private_member_,
+                        self._check_public_member_,
                         pData.items()
                     )
                 )
             )
-            readOnly = True
+        # else:
+        #     readOnly = True
 
         n = len(pData)
         info = f"{n} {strutils.pluralize('element', n)}"
@@ -1221,6 +1236,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "accessType": accessType,
             "choices": choices,
             "readOnly": readOnly,
+            "readOnlyChildren": readOnlyChildren,
             "objId": objId
             }
 
@@ -1236,6 +1252,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
                 choices = dict()
         readOnly = False
+        readOnlyChildren = False
         objDataAsChild = False
         tip = objType.__name__
         n = len(obj)
@@ -1250,6 +1267,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         if isinstance(obj, (bytes, bytearray)):
             readOnly = True
+            readOnlyChildren = True
 
         return  obj, {
             "indirect": False,
@@ -1261,6 +1279,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "accessType": None,
             "choices": choices,
             "readOnly": readOnly,
+            "readOnlyChildren": readOnlyChildren,
             "objId": objId
             }
 
@@ -1343,7 +1362,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             pData = dict(
             list(
                     filter(
-                        self._check_private_member_,
+                        self._check_public_member_,
                         pData.items()
                     )
                 )
@@ -1362,6 +1381,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "accessType": "attribute",
             "choices": choices,
             "readOnly": True,
+            "readOnlyChildren": False,
             "objId": objId
             }
 
@@ -1395,7 +1415,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             pData = dict(
                         list(
                                 filter(
-                                    self._check_private_member_,
+                                    self._check_public_member_,
                                     pData.items()
                                 )
                             )
@@ -1411,6 +1431,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "accessType": "attribute",
             "choices": choices,
             "readOnly": True,
+            "readOnlyChildren": True,
             "objId": objId
             }
 
