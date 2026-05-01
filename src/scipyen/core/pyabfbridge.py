@@ -2474,6 +2474,7 @@ class ABFProtocol(ElectrophysiologyProtocol):
                             sweep:int = 0,
                             holding:bool=True,
                             fromRunStart:bool=False,
+                            skipInterSweepInterval:bool=False,
                             name:typing.Optional[str] = None,
                             description:typing.Optional[str] = None,
                             durations:bool=False) -> neo.Epoch:
@@ -2522,8 +2523,10 @@ See also getNeoEpoch and getEpochsTable with asNeoEpoch = True
 
         times, durations, labels = zip(*list(map(
             lambda epoch: (
-                            self.getEpochStart(epoch, dac, sweep, holding=holding,
-                                               fromRunStart=fromRunStart).rescale(self.sweepDuration.units),
+                            self.getEpochStart(epoch, dac, sweep,
+                                               holding=holding,
+                                               fromRunStart=fromRunStart,
+                                               skipInterSweepInterval=skipInterSweepInterval).rescale(self.sweepDuration.units),
                             self.getEpochDuration(epoch, dac, sweep).rescale(self.sweepDuration.units),
                             epoch.letter
                             ),
@@ -2548,24 +2551,30 @@ See also getNeoEpoch and getEpochsTable with asNeoEpoch = True
                             sweep:int = 0,
                             holding:bool=True,
                             fromRunStart:bool=False,
+                            skipInterSweepInterval:bool=False,
                             samples:bool=False) -> pq.Quantity:
         r"""Starting time of the epoch (in time units or samples) relative to run or sweep.
-        Parameters:
-        -----------
-        epoch: ABFEpoch, str (epoch letter) or int (epoch index, 0-based)
-        dac: ABFOutputConfiguration (i.e. a DAC output), str (DAC name), or
-            int (DAC physical index)
-        sweep: index of the sweep; must be in the half-open interval [0, nSweeps)
-        holding: When True (default), timings include the sweep holding time,
-            equivalent to the 1/64 × the number of samples in a sweep
-        fromRunStart: When True, the ABFEpoch start time is calculated from the
-            start of the run (thus taking into account the time elapsed during
-            previous sweeps and including any inter-sweep interval)
-            Default is False.
-        samples:bool When True, return the start of Epoch in samples, rather than
-            time units.
-            Default is False.
-        """
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+Parameters:
+-----------
+:epoch: ABFEpoch, str (epoch letter) or int (epoch index, 0-based)
+:dac: ABFOutputConfiguration (i.e. a DAC output), str (DAC name), or
+    int (DAC physical index)
+:sweep: index of the sweep; must be in the half-open interval [0, nSweeps)
+:holding: When True (default), timings include the sweep holding time,
+    equivalent to the 1/64 × the number of samples in a sweep
+:fromRunStart: When True, the ABFEpoch start time is calculated from the
+    start of the run (thus taking into account the time elapsed during
+    previous sweeps and including any inter-sweep interval)
+    Default is False.
+:skipInterSweepInterval: Used when fromRunStart is True. When True, the sweep start to sweep start interval will be skipped
+:samples:bool When True, return the start of Epoch in samples, rather than
+    time units.
+    Default is False.
+"""
         dac, epoch = self.check_DAC_Epoch(dac, epoch)
         units = epoch.firstDuration.units
 
@@ -2585,7 +2594,10 @@ See also getNeoEpoch and getEpochsTable with asNeoEpoch = True
                 # only useful is representing data as a continuous signal !!!
                 sweepInterval = self.sweepSampleCount
             else:
-                sweepInterval = self.sweepInterval
+                if skipInterSweepInterval:
+                    sweepInterval = self.sweepDuration
+                else:
+                    sweepInterval = self.sweepInterval
 
             ret += sweepInterval * sweep
 
@@ -4910,7 +4922,6 @@ least one epoch with delta duration or delta level != 0.
             neoEpochs = dict()
             for sweep in range(maxSweeps):
                 sweepAnalogs = list(map(lambda dac: self.getCommandWaveform(sweep, dac), self.DACs))
-                # sweepAnalogs = [self.getCommandWaveform(sweep, dac) for dac in self.DACs]
                 sweepDigital = list(map(lambda d: self.getDigitalWaveform(sweep,
                                                                           digChannel=d,
                                                                           asSignals=True,
@@ -4918,9 +4929,6 @@ least one epoch with delta duration or delta level != 0.
                                         range(self.nDIGChannels)
                                         )
                                     )
-                # sweepDigital = [self.getDigitalWaveform(sweep, digChannel=d,
-                #                                         asSignals=True,
-                #                                         separateWaves=False) for d in range(self.nDIGChannels)]
                 if sweep == 0:
                     analogWaveforms.extend(sweepAnalogs)
                     digitalWaveforms.extend(sweepDigital)
@@ -4932,23 +4940,38 @@ least one epoch with delta duration or delta level != 0.
                         sig.t_start = new_t_start
                         analogWaveforms[k] = neoutils.concatenate_signals(analogWaveforms[k], sig, axis=0,
                                                                           name=analogWaveforms[k].name,
-                                                                          force_contiguous = continuous.value)
+                                                                          force_contiguous=continuous.value)
 
                     for k, sig in enumerate(sweepDigital):
                         sig.t_start = new_t_start
                         digitalWaveforms[k] = neoutils.concatenate_signals(digitalWaveforms[k],
                                                                            sig,
                                                                            axis=0,
-                                                                           name = digitalWaveforms[k].name,
-                                                                           force_contiguous = continuous.value)
+                                                                           name=digitalWaveforms[k].name,
+                                                                           force_contiguous=continuous.value)
+                fromRunStart, skipInterSweepInterval = (True, True) if continuous.value else (True, False)
                 sweepNeoEpochs = dict(map(
-                                            lambda d: (d.name, [self.dacEpochsToNeoEpoch(dac=d, sweep=sweep)]),
+                                            lambda d: (d.name, [
+                                                self.dacEpochsToNeoEpoch(dac=d,
+                                                                         sweep=sweep,
+                                                                         fromRunStart=fromRunStart,
+                                                                         skipInterSweepInterval=skipInterSweepInterval)
+                                                ]),
                                             list(filter(lambda d: len(d.epochs),
                                                         self.DACs)
                                                 )
                                           )
                                      )
+                # if sweep > 0 and continuous.value:
+                #     elapsedTime = self.sweepDuration * sweep
+                # else:
+                #     elapsedTime = 0 * self.sweepDuration.units
+
                 for d, ee in sweepNeoEpochs.items():
+                    # if elapsedTime > 0:
+                    #     for e in ee:
+                    #         e.times = e.times + elapsedTime
+
                     if d in neoEpochs:
                         neoEpochs[d].extend(ee)
                     else:
@@ -4961,6 +4984,7 @@ least one epoch with delta duration or delta level != 0.
                     eDurations = np.hstack(list(map(lambda e: e.durations, ee))) * ee[0].units
                     eLabels = np.hstack(list(map(lambda e: e.labels, ee)))
                     dacEpoch = neo.Epoch(eTimes, eDurations, eLabels, axis = ee[0].annotations.get("axis", d))
+
                 elif len(ee) == 1:
                     dacEpoch = ee[0]
 

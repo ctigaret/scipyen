@@ -280,6 +280,9 @@ A lot of things copied from there, EXCEPT that it now uses
 
         self.treeView.setAlternatingRowColors(True)
 
+        self.treeView.expanded.connect(self._slot_indexExpanded)
+        self.treeView.collapsed.connect(self._slot_indexCollapsed)
+
         # NOTE: 2025-03-12 13:25:01 treeView ultimately inherits from QTreeWidget
         # and itemDoubleClicked is a Signal emitted by QTreeWidget
         self.treeView.sig_itemDoubleClicked[QtGui.QStandardItem].connect(self.slot_itemDoubleClicked)
@@ -495,9 +498,20 @@ A lot of things copied from there, EXCEPT that it now uses
         for col in range(self.model.columnCount()):
             self.treeView.resizeColumnToContents(col)
 
+    @Slot(QtCore.QModelIndex)
+    def _slot_indexExpanded(self, index: QtCore.QModelIndex):
+        # print(f"{self.__class__.__name__}._slot_indexExpanded(index={index})")
+        self.treeView.resizeColumnToContents(index.column())
+
+    @Slot(QtCore.QModelIndex)
+    def _slot_indexCollapsed(self, index: QtCore.QModelIndex):
+        # print(f"{self.__class__.__name__}._slot_indexCollapsed(index={index})")
+        self.treeView.resizeColumnToContents(index.column())
+
     @Slot()
     @safewrapper
     def slot_collapseAll(self):
+        sigBlock = QtCore.QSignalBlocker(self.treeView)
         self.treeView.collapseAll()
 
     @Slot(bool)

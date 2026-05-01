@@ -424,19 +424,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
        ChannelIndex, Unit -- see the documentation of neo package
 
 
-    CHANGELOG
-    =========
-    NOTE: 2025-07-14 21:52:45 to developers
-    Since the plotItems are pg.PlotItem objects thatinherit from Qt QGraphicsItem,
-    we can store user-specific data to these as a mapping key:int ↦ object
-    In sSignalViewer I use this mechanism to store python quantities associated
-    with the plotted data (e.g., time units and signal.units for analog signals, etc)
-    as follows:
-    key 0 ↦ domain (e.g. time) units of the plotted data or None
-    key 1 ↦ data units or None
-    NOTE: 2019-02-11 13:52:30
-    heavily based on pyqtgraph package
-
     TODO: ability to use the modifiable LinearRegionItem objects to edit epochs
     in neo.Segment data (if / when plotted)
 
@@ -445,44 +432,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     TODO: write the documentation
 
     """
-    # NOTE: 2023-01-01 15:29:48
-    # Radical API change:
-    #
-    # • Current approach using dynamically created PlotItems (and deleting them
-    #   wich each data frame) does not quite cut it, because of issues with
-    #   delected C++ pointer (PlotItem instance) and with managing cursors linked
-    #   to that PlotItem instance.
-    #
-    # • Instead, we need need to pre-determine the maximum number of PlotItems
-    #   based on the data type  - delegate to _parse_data_
-    #   Axis selection form the GUI should then only set which PlotItem is visible
-    #
-    #
-    # • The number of axes should be set as follows:
-    #
-    #   ∘ for neo.Block: the maximum number of signals in all sweeps (analog AND
-    #       irregular) + 2 (one axis for events, one for spike trains)
-    #
-    #   ∘ for a neo.Segment: the number of signals (analog + irregular)
-    #       PLUS one axis for spike trains + 2 (see above)
-    #
-    #   ∘ for a sequence of Segments  - treat as for Block
-    #
-    #   ∘ for a sequence of signals (analog or irregular): the number of axes is
-    #       the number of signals in the sequence, or 1 (one) is signals are to
-    #       be shown as separate frames
-    #
-    #   ∘ for numpy arrays: number of axes is determined by the signalChannelAxis
-    #       and frameAxis
-    #
-    #   ∘ for a sequence of numpy arrays: determined according to the signalChannelAxis
-    #
-    #   ∘ for a sequence of DataZone, DataMarker, events, epochs, spiketrains:
-    #       one axis for eech of this type, per frame
-
-
-
-
     #dockedWidgetsNames = ["cursorsDockWidget"]
 
     sig_activated = Signal(int, name="sig_activated")
@@ -516,8 +465,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                         tuple: 99,
                         list: 99}
 
-    # view_action_name = "Signal"
-
     defaultCursorWindowSizeX = 0.001
     defaultCursorWindowSizeY = 0.001
 
@@ -531,10 +478,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     mpl_prop_cycle = plt.rcParams['axes.prop_cycle']
 
-    defaultLineColorsList = ["#000000"] + ["blue", "red", "green", "cyan", "magenta", "yellow"]  + mpl_prop_cycle.by_key()['color']
-    #defaultLineColorsList = ["#000000"] + list((QtGui.QColor(c).name(QtGui.QColor.HexArgb) for c in ("blue", "red", "green", "cyan", "magenta", "yellow")))  + mpl_prop_cycle.by_key()['color']
+    defaultLineColorsList = ["#000000"] + [
+        "blue", "red", "green",
+        "cyan", "magenta", "yellow"] + mpl_prop_cycle.by_key()['color']
 
-    defaultOverlaidLineColorList = (mpl.colors.rgb2hex(mpl.colors.to_rgba(c, alpha=0.5)) for c in defaultLineColorsList)
+    defaultOverlaidLineColors = (mpl.colors.rgb2hex(mpl.colors.to_rgba(c, alpha=0.5)) for c in defaultLineColorsList)
 
     defaultSpikeColor    = mpl.colors.rgb2hex(mpl.colors.to_rgba("xkcd:navy"))
     defaultEventColor    = mpl.colors.rgb2hex(mpl.colors.to_rgba("xkcd:crimson"))
@@ -843,12 +791,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # also, there is no mention of "hoverBrush" or "hoverPen" anywhere in the
         # source code for LinearRegionItem or its superclass UIGraphicsItem
         # in fact, hovering just modifes the brush by doubling its alpha value
-        self.epoch_plot_options["epoch_pen"] = None
-        self.epoch_plot_options["epoch_brush"] = None
+        #
+        self.epoch_plot_options["epoch_pen"] = None   # use the pg default
+        self.epoch_plot_options["epoch_brush"] = None # use the pg default
 
         # for future use, maybe (see NOTE: 2019-04-28 18:03:20)
-        self.epoch_plot_options["epoch_hoverPen"] = None
-        self.epoch_plot_options["epoch_hoverBrush"] = None
+        self.epoch_plot_options["epoch_hoverPen"] = None # use the pg default
+        self.epoch_plot_options["epoch_hoverBrush"] = None # use the pg default
 
         self.epoch_plot_options["epochs_color_set"] = [(255, 0, 0, 50),
                                                        (0, 255, 0, 50),
@@ -9006,11 +8955,10 @@ Var-keyword parameters ("name=value" pairs):
 #                 x0_ = x0
 #                 x1_ = x1
 
-            # regions = [v for v in zip(x0_, x1_)]
-
             regions = [v for v in zip(x0, x1)]
 
             lris = [pg.LinearRegionItem(values=value,
+                                        brush=epoch_brush,
                                         hoverBrush=epoch_hoverBrush,
                                         pen=epoch_pen,
                                         hoverPen=epoch_hoverPen,
@@ -9019,7 +8967,8 @@ Var-keyword parameters ("name=value" pairs):
 
             labelsAxis = self.selectedAxis if isinstance(self.selectedAxis, pg.PlotItem) and self.selectedAxis.isVisible() else self.visibleAxes[0] if len(self.visibleAxes) else None
 
-            # allow plottimg the epoch on a specific axis
+            # NOTE: 2026-05-01 10:15:39
+            # allow plotting the epoch on a specific axis
             isAxisSpecific = isinstance(epochAxis, str) and len(epochAxis.strip())
             if isAxisSpecific:
                 if plotItem.vb.name == epochAxis:
@@ -9034,11 +8983,17 @@ Var-keyword parameters ("name=value" pairs):
                     continue
 
             for kl, lri in enumerate(lris):
-                self.axes[k].addItem(lri)
+                plotItem.addItem(lri)
+                # self.axes[k].addItem(lri)
                 lri.setZValue(10)
                 lri.setVisible(True)
                 lri.setRegion(regions[kl])
                 if kl < len(labels) and (labelsAxis == plotItem or isAxisSpecific):
+                    labelText = str(labels[kl])
+                    labelTextHeight = guiutils.get_text_height(labelText)
+                    lriBoundingRect = lri.boundingRect()
+                    yPos = (lriBoundingRect.height() - 2 * labelTextHeight) / lriBoundingRect.height()
+
                     lri.lines[0].label = pg.InfLineLabel(lri.lines[0], text=str(labels[kl]),
                                                          position = 0.8,
                                                          color = lri.currentBrush.color().darker().name(),
@@ -9414,7 +9369,10 @@ Var-keyword parameters ("name=value" pairs):
 
             for epoch in obj:
                 brush = next(brushes)
-                self._plot_epoch_data_(epoch, brush=brush,**kwargs)
+                hoverBrush = brush.color().lighter()
+                self._plot_epoch_data_(epoch, epoch_brush=brush,
+                                       epoch_hoverBrush=hoverBrush,
+                                       **kwargs)
 
             self.currentFrameAnnotations = {type(obj).__name__: [getattr(y_, "annotations", dict()) for y_ in obj]}
 
