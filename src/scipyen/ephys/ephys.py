@@ -3447,44 +3447,55 @@ def interval_reduce(func:typing.Callable,
     if not isinstance(func, types.FunctionType):
         raise TypeError(f"Expecting a function as first argument; got {type(func).__name__} instead")
 
+    intervals = list(sorted(list(map(lambda k: interval[k], range(interval.size))),
+                            key = lambda i: i.t0))
+    result = list()
 
-    t0, t1 = interval[0:2]
-    x0, x1 = t0, t1
-    # NOTE: Must convert to scalars, i.e., unsized arrays
-    if t0.ndim > 0:
-        x0 = t0[0]
 
-    if t1.ndim > 0:
-        x1 = t1[0]
+    for i in intervals:
+        # NOTE: 2026-05-02 14:21:39 do NOT modify Interval in-place !!!
+        t0, t1 = i.t0.copy(), i.t1.copy()
+        x0, x1 = t0, t1
+        # NOTE: Must convert to scalars, i.e., unsized arrays
+        if t0.ndim > 0:
+            x0 = t0[0]
 
-    if not isinstance(t0, pq.Quantity):
-        x0 = t0 * signal.times.units
+        if t1.ndim > 0:
+            x1 = t1[0]
 
-    if not isinstance(t1, pq.Quantity):
-        x1 = t1 * signal.times.units
+        if not isinstance(t0, pq.Quantity):
+            x0 = t0 * signal.times.units
 
-    if isinstance(interval, Interval):
-        duration = interval.extent
+        if not isinstance(t1, pq.Quantity):
+            x1 = t1 * signal.times.units
 
-    if duration:
-        # t1 += t0 # BUG: 2023-06-18 14:18:16 → modified Interval in-place !!!
-        x1 = t0 + t1
+        if isinstance(interval, Interval):
+            duration = interval.extent
 
-    # print(f"interval_reduce: interval = {interval} ⇒ t0 = {t0}, t1 = {t1}")
+        if duration:
+            # NOTE: 2026-05-02 14:21:39 do NOT modify Interval in-place !!!
+            x1 = t0 + t1
 
-    if x0 == x1:
-        ret = signal[signal.time_index(x0),:]
+        # print(f"interval_reduce: interval = {interval} ⇒ t0 = {t0}, t1 = {t1}")
 
-    elif x0 > x1:
-        raise ValueError(f"The interval cannot have negative size")
-    else:
-        # print(f"t0 = {t0}, t1 = {t1}")
-        ret = func(signal.time_slice(x0,x1), axis=0)
+        if x0 == x1:
+            ret = signal[signal.time_index(x0),:]
 
-    if isinstance(channel, int):
-        return ret[channel].flatten()
+        elif x0 > x1:
+            raise ValueError(f"The interval cannot have negative size")
+        else:
+            # print(f"t0 = {t0}, t1 = {t1}")
+            ret = func(signal.time_slice(x0,x1), axis=0)
 
-    return ret
+        if isinstance(channel, int):
+            ret = ret[channel].flatten()
+
+        result.append(ret)
+
+    if len(result) == 0:
+        return result[0]
+
+    return np.vstack(result) * signal.units
 
 def interval_average(signal, interval, channel=None, duration=False):
     return interval_reduce(np.mean, signal, interval, channel=channel, duration=duration)
@@ -3498,8 +3509,16 @@ def interval_min(signal, interval, channel=None, duration=False):
 def interval_argmax(signal, interval, channel=None, duration=False):
     return interval_reduce(np.argmax, signal, interval, channel=channel, duration=duration)
 
+def interval_domain_max(signal, interval, channel=None, duration=False):
+    ndx = interval_argmax(signal, interval, channel, duration)
+    return signal.times[ndx]
+
 def interval_argmin(signal, interval, channel=None, duration=False):
     return interval_reduce(np.argmin, signal, interval, channel=channel, duration=duration)
+
+def interval_domain_min(signal, interval, channel=None, duration=False):
+    ndx = interval_argmin(signal, interval, channel, duration)
+    return signal.times[ndx]
 
 def interval_maxmin(signal, interval, channel=None, duration=False):
     return interval_reduce(sigp.maxmin, signal, interval, channel=channel, duration=duration)
@@ -3510,8 +3529,16 @@ def interval_minmax(signal, interval, channel=None, duration=False):
 def interval_argmaxmin(signal, interval, channel=None, duration=False):
     return interval_reduce(sigp.argmaxmin, signal, interval, channel=channel, duration=duration)
 
+def interval_domain_maxmin(signal, interval, channel=None, duration=False):
+    ndx = interval_argmaxmin(signal, interval, channel, duration)
+    return tuple(map(lambda x: signal.times[x], ndx))
+
 def interval_argminmax(signal, interval, channel=None, duration=False):
     return interval_reduce(sigp.argminmax, signal, interval, channel=channel, duration=duration)
+
+def interval_domain_minmax(signal, interval, channel=None, duration=False):
+    ndx = interval_argminmax(signal, interval, channel, duration)
+    return tuple(map(lambda x: signal.times[x], ndx))
 
 def interval_slice(signal, interval, duration=False):
     t0, t1 = interval[0:2]
@@ -3530,7 +3557,7 @@ def interval_slice(signal, interval, duration=False):
     return signal.time_slice(t0, t1)
 
 def interval_mid_point(interval:tuple, duration:bool=False):
-    r"""Calculated the mid-point of a interval tuple
+    r"""Calculates the mid-point of a interval tuple
 """
     i0, i1 = interval[0:2]
 
@@ -3738,6 +3765,9 @@ def cursor_slice(signal: typing.Union[neo.AnalogSignal, DataSignal],
 
     return ret
 
+# @singledispatch
+# def signal_reduce(loc:)
+
 def cursor_reduce(func:types.FunctionType,
                   signal: typing.Union[neo.AnalogSignal, DataSignal],
                   cursor: typing.Union[SignalCursor, tuple, DataCursor, Interval],
@@ -3845,11 +3875,11 @@ def cursor_reduce(func:types.FunctionType,
 
     else:
         if t0 < signal.t_start or t0 > signal.t_stop:
-            scipywarn(f"t0 {t0} fals outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
+            scipywarn(f"t0 {t0} falls outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
             return np.nan
 
         if t1 < signal.t_start or t1 > signal.t_stop:
-            scipywarn(f"t1 {t1} fals outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
+            scipywarn(f"t1 {t1} falls outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
             return np.nan
 
     if t0 == t1:
@@ -3919,12 +3949,11 @@ def cursor_min(signal: typing.Union[neo.AnalogSignal, DataSignal],
     """
     return cursor_reduce(np.min, signal, cursor, channel, relaive)
 
-
 @safewrapper
 def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
                   cursor: typing.Union[SignalCursor, tuple, DataCursor],
                   channel: typing.Optional[int] = None,
-                  relative: bool=True) -> int:
+                  relative: bool=True) -> np.ndarray:
     r"""The index of maximum value of the signal across the cursor's window.
 
     Parameters:
@@ -3947,11 +3976,19 @@ def cursor_argmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
 
     return cursor_reduce(np.argmax, signal, cursor, channel, relative)
 
+def cursor_domain_max(signal: typing.Union[neo.AnalogSignal, DataSignal],
+                  cursor: typing.Union[SignalCursor, tuple, DataCursor],
+                  channel: typing.Optional[int] = None,
+                  relative: bool=True) -> pq.Quantity:
+    r"""Returns the domain position for the maximum value of the signal"""
+    ndx = cursor_argmax(signal, cursor, channel, relative)
+    return signal.times[ndx]
+
 @safewrapper
 def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
                   cursor: typing.Union[tuple, SignalCursor, DataCursor],
                   channel: typing.Optional[int] = None,
-                  relative: bool=True) -> int:
+                  relative: bool=True) -> np.ndarray:
     r"""The index of minimum value of the signal across the cursor's window.
 
     Parameters:
@@ -3974,11 +4011,18 @@ def cursor_argmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
 
     return cursor_reduce(np.argmin, signal, cursor, channel, relative)
 
+def cursor_domain_min(signal: typing.Union[neo.AnalogSignal, DataSignal],
+                  cursor: typing.Union[tuple, SignalCursor, DataCursor],
+                  channel: typing.Optional[int] = None,
+                  relative: bool=True) -> pq.Quantity:
+    ndx = cursor_argmin(signal, cursor, channel, relative)
+    return signal.times[ndx]
+
 @safewrapper
 def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
                   cursor: typing.Union[tuple, SignalCursor, DataCursor],
                   channel: typing.Optional[int] = None,
-                  relative: bool=True) -> tuple:
+                  relative: bool=True) -> tuple[np.ndarray]:
     r"""The maximum and minimum value of the signal across the cursor's window.
 
     Parameters:
@@ -4007,24 +4051,39 @@ def cursor_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
 def cursor_minmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
                   cursor: typing.Union[tuple, SignalCursor, DataCursor],
                   channel: typing.Optional[int]=None,
-                  relative: bool=True) -> tuple:
+                  relative: bool=True) -> tuple[np.ndarray]:
     return cursor_reduce(sigp.minmax, signal, cursor, channel, relative)
 
 @safewrapper
 def cursor_argmaxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
                      cursor: typing.Union[tuple, SignalCursor, DataCursor],
                      channel: typing.Optional[int] = None,
-                     relative: bool=True) -> tuple:
+                     relative: bool=True) -> tuple[np.ndarray]:
     r"""The indices of signal maximum and minimum across the cursor's window.
     """
     return cursor_reduce(sigp.argmaxmin, signal, cursor, channel, relative)
+
+def cursor_domain_maxmin(signal: typing.Union[neo.AnalogSignal, DataSignal],
+                     cursor: typing.Union[tuple, SignalCursor, DataCursor],
+                     channel: typing.Optional[int] = None,
+                     relative: bool=True) -> tuple[pq.Quantity]:
+
+    ndx = cursor_argmaxmin(signal, cursor, channel, relative)
+    return tuple(map(lambda x: signal.times[x], ndx))
 
 @safewrapper
 def cursor_argminmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
                      cursor: typing.Union[tuple, SignalCursor, DataCursor],
                      channel: typing.Optional[int]=None,
-                     relative:bool = True) -> tuple:
+                     relative:bool = True) -> tuple[np.ndarray]:
     return cursor_reduce(sigp.argminmax, signal, cursor, channel, relative)
+
+def cursor_domain_minmax(signal: typing.Union[neo.AnalogSignal, DataSignal],
+                     cursor: typing.Union[tuple, SignalCursor, DataCursor],
+                     channel: typing.Optional[int]=None,
+                     relative:bool = True) -> tuple[pq.Quantity]:
+    ndx = cursor_argminmax(signal, cursor, channel, relative)
+    return tuple(map(lambda x: signal.times[x], ndx))
 
 @safewrapper
 def cursor_average(signal: typing.Union[neo.AnalogSignal, DataSignal],

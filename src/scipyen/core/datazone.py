@@ -161,11 +161,66 @@ class DataZone(neo.Epoch):
                 extents = extents * places.units
 
         if labels is None:
-            labels = np.array([], dtype='U')
+            labels = np.array(list(map(lambda k: f"zone{k}", range(places.size))))
+            # labels = np.array([], dtype='U')
+        elif isinstance(labels, str):
+            pfx, sfx = strutils.get_int_sfx(labels, sep="", use_re=True)
+            if dt.is_numeric(sfx):
+                sfx = int(sfx) + 1
+            else:
+                sfx = 0
+
+            labels = np.array(list(map(lambda k: f"{pfx}{k}", range(sfx, places.size))))
+
+
+        elif isinstance(labels, typing.Sequence):
+            if all(isinstance(l, str) for l in labels):
+                if len(labels) < places.size:
+                    pfx, sfx = strutils.get_int_sfx(labels[-1], sep="", use_re=True)
+                    if dt.is_numeric(sfx):
+                        sfx = int(sfx)+1
+                    else:
+                        sfx = len(labels)
+                    new_labels = list(map(lambda k: f"{pfx}{k}", range(sfx, places.size)))
+                    labels = labels.extend(new_labels)
+
+                elif len(labels) > places.size:
+                    labels = labels[:places.size]
+
+                labels = np.array(labels)
+
+            else:
+                def_label = "zone"
+
+                labels = np.array(list(map(lambda k: f"{def_label}{k}", range(places.size))))
+
+        elif isinstance(labels, np.ndarray):
+            if labels.size == 0:
+                def_label = "zone"
+                labels = np.array(list(map(lambda k: f"{def_label}{k}", range(places.size))))
+
+            elif not dt.is_string(labels):
+                raise TypeError(f"Expecting an array-like of strings; instead, got {labels} ({type(labels).__name__})")
+
+            if labels.flatten().size != places.size:
+                if labels.flatten().size < places.size:
+                    ll = str(labels.flatten()[-1])
+                    pfx, sfx = strutils.get_int_sfx(ll, sep="", use_re=True)
+
+                    if dt.is_numeric(sfx):
+                        sfx = int(sfx)+1
+                    else:
+                        sfx = labels.flatten().size
+
+                    new_labels = np.array(list(map(lambda k: f"{pfx}{k}", range(sfx, places.size))))
+
+                    labels = np.concat([labels.flatten(), new_labels], axis=0)
+
+                elif labels.flatten().size > places.size:
+                    labels = labels.flatten()[:places.size]
+
         else:
-            labels = np.array(labels)
-            if labels.size != places.size and labels.size:
-                raise ValueError("Labels array has different length to times")
+            raise TypeError("Expecting a string or an array-like of strings for labels")
 
         if not isinstance(relative, bool):
             relative = False
@@ -587,7 +642,7 @@ coordinates are NOT restricted to time units.
                 units_ = times.units
                 times = times.flatten()
 
-        elif isinstance(times, typing.Sequence) and alltimes(isinstance(v, numbers.Number) for v in times):
+        elif isinstance(times, typing.Sequence) and all(isinstance(v, numbers.Number) for v in times):
             times = np.array(times).flatten()
 
         elif isinstance(times, numbers.Number):
@@ -654,7 +709,7 @@ coordinates are NOT restricted to time units.
                 raise ValueError("durations must contain only values > = 0")
 
         if labels is None:
-            labels = "interval"
+            labels = np.array(list(map(lambda k: f"interval{k}", range(times.size))))
 
         elif isinstance(labels, str):
             pfx, sfx = strutils.get_int_sfx(labels, sep="", use_re=True)
@@ -690,7 +745,7 @@ coordinates are NOT restricted to time units.
         elif isinstance(labels, np.ndarray):
             if labels.size == 0:
                 def_label = "interval"
-                labels = np.array(list(map(lambda k: f"{def_label}{k}", range(n))))
+                labels = np.array(list(map(lambda k: f"{def_label}{k}", range(times.size))))
 
             elif not dt.is_string(labels):
                 raise TypeError(f"Expecting an array-like of strings; instead, got {labels} ({type(labels).__name__})")
@@ -827,13 +882,39 @@ coordinates are NOT restricted to time units.
         '''
         Get the item or slice :attr:`i`.
         '''
-        obj = super().__getitem__(i)
-        obj._t0 = self.t0[i]
-        obj._t1 = self.t1[i]
+
+        if isinstance(i, int):
+            t0 = super().__getitem__(i) # this is a scalar quantity i.e. with size=1 and ndim=0
+            t1 = self.t1[i]
+            if self._labels is not None and self._labels.size > 0:
+                labels = self.labels[i]
+            else:
+                labels = self.labels
+
+            obj = self.__class__(times=t0, durations=t1, units=self.units,
+                                 labels=labels,
+                                 extent=self._extent)
+
+            obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
+            obj._copy_data_complement(self)
+            return obj
+
+        obj = super().__getitem__(i) # when i is int this is a scalar quantity i.e. with size=1 and ndim=0 hence the above
+
         if self._labels is not None and self._labels.size > 0:
             obj._labels = self.labels[i]
         else:
             obj._labels = self.labels
+
+
+        obj._t0 = self.t0[i]
+        obj._t1 = self.t1[i]
+
+        if self._labels is not None and self._labels.size > 0:
+            obj._labels = self.labels[i]
+        else:
+            obj._labels = self.labels
+
         try:
             # Array annotations need to be sliced accordingly
             obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))

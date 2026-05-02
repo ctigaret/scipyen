@@ -358,7 +358,7 @@ from .widgets import gradientwidgets
 from .widgets import stylewidgets
 from .widgets import colorwidgets
 from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver)
-from .workspacemodel import WorkspaceModel
+from gui.itemmodels.workspacemodel import WorkspaceModel
 
 
 from iolib import h5io, jsonio, network, navigation
@@ -3035,17 +3035,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def _updateHistoryViewFont(self):
         font = self._defaultUIFont if self._useSystemDefaultFont else self._commandHistoryFont
         for item in treeWidgetItems(self.historyTreeWidget):
+            # NOTE: 2026-05-02 15:27:51
+            # see gui.guiutils.treeWidgetItems()
             for col in range(item.columnCount()):
                 item.setFont(col, font)
-
-        # NOTE: 2025-04-30 10:04:57
-        # moved to gui.guiutils.treeWidgetItems()
-        # it = QtWidgets.QTreeWidgetItemIterator(self.historyTreeWidget)
-        # while isinstance(it.value(), QtWidgets.QTreeWidgetItem):
-        #     item = it.value()
-        #     for col in range(item.columnCount()):
-        #         item.setFont(col, font)
-        #     it += 1 # advance the iterator
 
     @property
     def currentDir(self) -> str | pathlib.Path:
@@ -7829,10 +7822,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
                 childCount = topLevelItem.childCount()
 
-                # for c in range(childCount):
-                #     child = self.historyTreeWidget.topLevelItem(k).child(c)
-                #     child.setSelected(False)
-
                 items_text_list = list(zip(
                     *[(topLevelItem.child(k).text(0), topLevelItem.child(k).text(1)) for k in range(childCount)]))
 
@@ -7855,9 +7844,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
                 else:
                     topLevelItem.setExpanded(False)
-
-            # else:
-            #     topLevelItem.setExpanded(False)
 
             self.historyTreeWidget.setSelectionMode(original_selection_mode)
 

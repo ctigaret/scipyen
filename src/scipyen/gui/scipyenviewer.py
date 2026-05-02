@@ -52,7 +52,7 @@ from core.utilities import safewrapper
 #                            saveWindowSettings, loadWindowSettings)
 from gui.workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
 from gui.widgets.spinboxslider import SpinBoxSlider
-from gui.workspacemodel import WorkspaceModel
+from gui.itemmodels.workspacemodel import WorkspaceModel
 from gui.pictgui import WorkerThread
 from core import sysutils, desktoputils
 from iolib import pictio as pio

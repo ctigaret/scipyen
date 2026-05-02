@@ -44,7 +44,7 @@ import json
 
 from traitlets import Bunch
 
-from .guiutils import (get_text_width, get_elided_text)
+from gui.guiutils import (get_text_width, get_elided_text)
 from gui import pictgui as pgui
 from core.traitcontainers import DataBag
 from core.utilities import (summarize_object_properties,

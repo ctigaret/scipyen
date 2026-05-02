@@ -1283,7 +1283,7 @@ def argmaxmin(x: np.ndarray, **kwargs):
 
     """
     axis = kwargs.pop("axis", None)
-    max_first = kwargs.op("max_first", True)
+    max_first = kwargs.pop("max_first", True)
 
     amx, amn = np.argmax(x, axis=axis), np.argmin(x, axis=axis)
     return (amx, amn) if max_first else (amn, amx)
