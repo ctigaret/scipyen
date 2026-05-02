@@ -3269,7 +3269,7 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable],
 @safewrapper
 def epoch_reduce(func:types.FunctionType,
                  signal: typing.Union[neo.AnalogSignal, DataSignal],
-                 epoch: typing.Union[neo.Epoch, tuple],
+                 epoch: typing.Union[neo.Epoch, DataZone],
                  channel: typing.Optional[int] = None) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
     r"""
     Applies a reducing function to a signal, within the epoch's intervals.
@@ -3296,15 +3296,24 @@ def epoch_reduce(func:types.FunctionType,
     it to np.array(…) constructor, but REMEMBER to re-apply the units!
 
     """
-    assert isinstance(epoch, (neo.Epoch, DataZone)), f"'epoch' expected to be a datazone.DataZone or neo.Epoch; instead got a {type(epoch).__name__}"
+    assert isinstance(epoch, (neo.Epoch, DataZone, Interval)), f"'epoch' expected to be a datazone.DataZone, datazone.Interval, or neo.Epoch; instead got a {type(epoch).__name__}"
 
-    intervals = list(sorted(list(map(lambda k: epoch[k], range(epoch.size))),
-                            key = lambda i: i.times))
+    # make sure sub-intervals are monotonically increasing
+    if isinstance(epoch, (neo.Epoch, DataZone)):
+        intervals = list(sorted(list(map(lambda k: epoch[k], range(epoch.size))),
+                                key = lambda i: i.times))
+    else:
+        intervals = list(sorted(list(map(lambda k: epoch[k], range(epoch.size))),
+                                key = lambda i: i.t0))
 
     result = list()
 
     for i in intervals:
-        t0, t1 = i.times.copy(), i.durations.copy()
+        if isinstance(i, Interval):
+            t0, t1 = i.t0.copy(), i.t1.copy()
+        else:
+            t0, t1 = i.times.copy(), i.durations.copy()
+
         x0, x1 = t0, t1
         # NOTE: Must convert to scalars, i.e., unsized arrays
         if t0.ndim > 0:
@@ -3313,7 +3322,8 @@ def epoch_reduce(func:types.FunctionType,
         if t1.ndim > 0:
             x1 = t1[0]
 
-        x1 = t0 + t1
+        if not isinstance(i, Interval):
+            x1 = t0 + t1
 
         if x0 == x1:
             ret = signal[signal.time_index(x0),:]
@@ -3332,65 +3342,15 @@ def epoch_reduce(func:types.FunctionType,
     if len(result) == 0:
         return result[0]
 
-    return np.vstack(result) * signal.units
-
-    #
-    #
-    # if isinstance(epoch, (neo.Epoch, DataZone)):
-    #     if len(epoch) == 0:
-    #         return np.nan * signal.units
-    #
-    #     if len(epoch) > 1:
-    #         if intervals is None or isinstance(intervals, type(MISSING)):
-    #             intervals = Interval.fromNeoEpoch(epoch)
-    #             slices = intervals.sliceSignal(signal)
-    #             if isinstance(intervals, type(MISSING)):
-    #                 # create a new signal by concatenating the slices
-    #                 # then apply the function 'fun' on axis 0 of the new signal
-    #                 new_sig = neoutils.concatenate_signals(slices, axis=0)
-    #                 ret = fun(new_sig, axis=0)
-    #
-    #             else:
-    #                 # apply fun on axis 0 of each slice individually
-    #                 ret = tuple(map(lambda x: fun(x, axis=0), slices))
-    #
-    #             if isinstance(channel, int):
-    #                 return ret[channel].flatten()
-    #             return ret
-    #
-    #         elif isinstance(intervals, (int, str, np.str_, bytes)):
-    #             intervals = Interval.fromNeoEpoch(epoch, intervals)
-    #
-    #         elif isinstance(intervals, (tuple, list)):
-    #             if all(isinstance(i, (int, str, np.str_, bytes)) for i in intervals):
-    #                 intervals = Interval.fromNeoEpoch(epoch, intervals)
-    #             else:
-    #                 raise TypeError(f"The 'intervals' sequence has elements of unexpected type")
-    #
-    #         elif not isinstance(intervals, Interval):
-    #             raise TypeError(f"Unexpected index type: {type(intervals).__name__}")
-    #
-    #     else:
-    #         intervals = Interval.fromNeoEpoch(epoch)
-    #
-    # else:
-    #     raise TypeError(f"epoch expected to be a tuple (t0, duration) or a neo.Epoch; got {epoch} instead")
-    #
-    # ret = [interval_reduce(func, signal, interval, channel=channel) for interval in intervals]
-    #
-    # if len(ret)== 1:
-    #     ret = ret[0]
-    #     return ret
-    #
-    # return ret
+    return np.vstack(result)# * signal.units
 
 def interval_reduce(func:typing.Callable,
                     signal: typing.Union[neo.AnalogSignal, DataSignal],
-                    interval: Interval,
+                    interval: typing.Union[neo.Epoch, DataZone, Interval],
                     channel:typing.Optional[int] = None,
                     ) -> pq.Quantity:
                     # duration:bool=False) -> pq.Quantity:
-    r"""As cursor_reduce, but using a datazone.Interval instead.
+    r"""Alias to epoch_reduce
 
 .. |nbsp| unicode:: 0xA0
    :trim:
@@ -3439,118 +3399,68 @@ A python Quantity.
     One can supply only a sub-interval to the 'interval' parameter, obtained through indexing.
 """
     assert isinstance(interval, Interval), f"'interval' expected to be a datazone.Interval; instead got a {type(interval).__name__}"
-    # make sure sub-intervals are monotonically increasing
-    intervals = list(sorted(list(map(lambda k: interval[k], range(interval.size))),
-                            key = lambda i: i.t0))
-    result = list()
 
-    for i in intervals:
-        # NOTE: 2026-05-02 14:21:39 do NOT modify Interval in-place !!!
-        t0, t1 = i.t0.copy(), i.t1.copy()
-        x0, x1 = t0, t1
-        # NOTE: Must convert to scalars, i.e., unsized arrays
-        if t0.ndim > 0:
-            x0 = t0[0]
+    return epoch_reduce(func, signal, interval, channel)
 
-        if t1.ndim > 0:
-            x1 = t1[0]
+def interval_average(signal, interval, channel=None):
+    return interval_reduce(np.mean, signal, interval, channel)
 
-        if not isinstance(t0, pq.Quantity):
-            x0 = t0 * signal.times.units
+def interval_max(signal, interval, channel=None):
+    return interval_reduce(np.max, signal, interval, channel)
 
-        if not isinstance(t1, pq.Quantity):
-            x1 = t1 * signal.times.units
+def interval_min(signal, interval, channel=None):
+    return interval_reduce(np.min, signal, interval, channel)
 
-        if i.extent:
-            # NOTE: 2026-05-02 14:21:39 do NOT modify Interval in-place !!!
-            x1 = t0 + t1
+def interval_argmax(signal, interval, channel=None):
+    return interval_reduce(np.argmax, signal, interval, channel)
 
-        # print(f"interval_reduce: interval = {interval} ⇒ t0 = {t0}, t1 = {t1}")
-
-        if x0 == x1:
-            ret = signal[signal.time_index(x0),:]
-
-        elif x0 > x1:
-            raise ValueError(f"The interval cannot have negative size")
-        else:
-            # print(f"t0 = {t0}, t1 = {t1}")
-            ret = func(signal.time_slice(x0,x1), axis=0)
-
-        if isinstance(channel, int):
-            ret = ret[channel].flatten()
-
-        result.append(ret)
-
-    if len(result) == 0:
-        return result[0]
-
-    return np.vstack(result)
-
-def interval_average(signal, interval, channel=None, duration=False):
-    return interval_reduce(np.mean, signal, interval, channel=channel, duration=duration)
-
-def interval_max(signal, interval, channel=None, duration=False):
-    return interval_reduce(np.max, signal, interval, channel=channel, duration=duration)
-
-def interval_min(signal, interval, channel=None, duration=False):
-    return interval_reduce(np.min, signal, interval, channel=channel, duration=duration)
-
-def interval_argmax(signal, interval, channel=None, duration=False):
-    return interval_reduce(np.argmax, signal, interval, channel=channel, duration=duration)
-
-def interval_domain_max(signal, interval, channel=None, duration=False):
-    ndx = interval_argmax(signal, interval, channel, duration)
+def interval_domain_max(signal, interval, channel=None):
+    ndx = interval_argmax(signal, interval, channel)
     return signal.times[ndx]
 
-def interval_argmin(signal, interval, channel=None, duration=False):
-    return interval_reduce(np.argmin, signal, interval, channel=channel, duration=duration)
+def interval_argmin(signal, interval, channel=None,):
+    return interval_reduce(np.argmin, signal, interval, channel)
 
-def interval_domain_min(signal, interval, channel=None, duration=False):
-    ndx = interval_argmin(signal, interval, channel, duration)
+def interval_domain_min(signal, interval, channel=None):
+    ndx = interval_argmin(signal, interval, channel)
     return signal.times[ndx]
 
-def interval_maxmin(signal, interval, channel=None, duration=False):
-    return interval_reduce(sigp.maxmin, signal, interval, channel=channel, duration=duration)
+def interval_maxmin(signal, interval, channel=None):
+    return interval_reduce(sigp.maxmin, signal, interval, channel)
 
-def interval_minmax(signal, interval, channel=None, duration=False):
-    return interval_reduce(sigp.minmax, signal, interval, channel=channel, duration=duration)
+def interval_minmax(signal, interval, channel=None):
+    return interval_reduce(sigp.minmax, signal, interval, channel)
 
-def interval_argmaxmin(signal, interval, channel=None, duration=False):
-    return interval_reduce(sigp.argmaxmin, signal, interval, channel=channel, duration=duration)
+def interval_argmaxmin(signal, interval, channel=None):
+    return interval_reduce(sigp.argmaxmin, signal, interval, channel)
 
-def interval_domain_maxmin(signal, interval, channel=None, duration=False):
-    ndx = interval_argmaxmin(signal, interval, channel, duration)
+def interval_domain_maxmin(signal, interval, channel=None):
+    ndx = interval_argmaxmin(signal, interval, channel)
     return tuple(map(lambda x: signal.times[x], ndx))
 
-def interval_argminmax(signal, interval, channel=None, duration=False):
-    return interval_reduce(sigp.argminmax, signal, interval, channel=channel, duration=duration)
+def interval_argminmax(signal, interval, channel=None):
+    return interval_reduce(sigp.argminmax, signal, interval, channel)
 
-def interval_domain_minmax(signal, interval, channel=None, duration=False):
-    ndx = interval_argminmax(signal, interval, channel, duration)
+def interval_domain_minmax(signal, interval, channel=None):
+    ndx = interval_argminmax(signal, interval, channel)
     return tuple(map(lambda x: signal.times[x], ndx))
 
-def interval_slice(signal, interval, duration=False):
-    t0, t1 = interval[0:2]
-    if not isinstance(t0, pq.Quantity):
-        t0 *= signal.times.units
-
-    if not isinstance(t1, pq.Quantity):
-        t1 *= signal.times.units
-
-    if duration:
-        t1 += t0
+def interval_slice(signal, interval):
+    r"""Signal slice according to the first sub-interval in 'interval'"""
+    t0, t1 = interval[0].t0, interval[0].t1
 
     if t1 == t0:
         return signal[signal.time_index(t0),:]
 
     return signal.time_slice(t0, t1)
 
-def interval_mid_point(interval:tuple, duration:bool=False):
-    r"""Calculates the mid-point of a interval tuple
+def interval_mid_point(interval: Interval):
+    r"""Calculates the mid-point of an interval.
+Uses the first sub-interval of 'interval'
 """
-    i0, i1 = interval[0:2]
+    i0, i1 = interval[0].t0, interval[0].t1
 
-    return i0 + i1/2 if duration else i0 + (i1-i0)/2
+    return i0 + (i1-i0)/2
 
 
 def interval_chord_slope(signal, interval, channel = None, duration = False):

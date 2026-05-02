@@ -895,7 +895,7 @@ coordinates are NOT restricted to time units.
         else:
             labels = self.labels
 
-        obj = self.__class__(times=t0, durations=t1, units=self.units,
+        obj = self.__class__(times=t0, durations=t1-t0, units=self.units,
                                 labels=labels,
                                 extent=self._extent)
 
