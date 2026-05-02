@@ -3265,11 +3265,275 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable],
         stamps = data[start:(start+span+1)]
         return (1/(stamps[-1]-stamps[start])).rescale(pq.Hz)
 
+@safewrapper
+@singledispatch
+def signal_reduce(loc: object,
+                  func:types.FunctionType,
+                  signal: typing.Union[neo.AnalogSignal, DataSignal],
+                  channel: typing.Optional[int] = None,
+                  relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+    r""" Applies a reducing function to a signal, within the location's intervals.
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+Positional parameters:
+----------------------
+:loc: the location: a neo.Epoch, datazone.DataZone or datazone.Interval; each of these can have more than one sub-interval.
+    Alternatively, 'loc' can be a SignalCursor or a DataCursor.
+
+:func: the reducing function, taking a numpy array argument and returning a scalar (e.g., np.min, np.argmin , etc)
+
+:signal: neo.AnalogSignal, DataSignal
+
+Named parameters:
+-----------------
+:channel: optional, default is None.
+    When specified, 'channel' must be a single int value and normal python |nbsp|
+    indexing rules apply (i.e. negative values are reverse indices).
+
+    This is used with multi-channel signals (i.e. signals having more than
+    one trace) and selects the trace (channel) to which 'func' is applied. |nbsp|
+
+    NOTE: Signal objects (neo.AnalogSignal, DataSignal) are essentially 2D |nbsp|
+    numpy arrays with the data organized in COLUMNS.
+
+    In this context, a 'channel' is one column of the signal array, hence it |nbsp|
+    is indexed on the second axis (axis 1) of the array.
+
+    Therefore, 'channel' must be in range(-signal.shape[1], signal.shape[1])
+
+:relative: When True (default) all times in the 'loc' are set to be relative to the signal.t_start.
+
+Returns:
+--------
+A python quantity, or numpy array.
+
+* When 'loc' is a DataZone, Interval, or neo.Epoch:
+    * with a single *sub-interval* (loc.size == 1):
+        * For a single-channel signal, returns a scalar quantity
+        * For a multi-channel signal returns a scalar quantity if 'channel' is specified, else a subdimensional array with (signal.ndim - 1) dimensions
+
+    * with loc.size > 1 (i.e. has several *sub-intervals*), returns a 2D Quantity array where each *row* contains the result from a *sub-interval*, as above
+
+    For multi-channel signals the returned value are subdimensional arrays, unless a channel index is specified using the 'channel' parameter.
+
+When there is more than one interval specified, the function returns a list
+of quantities as above. This can be converted to a quantity array by passing
+it to np.array(…) constructor, but REMEMBER to re-apply the units!
+
+"""
+    raise NotImplementedError(f"Locations of type {type(loc).__name__} are not supported")
+
+@signal_reduce.register(tuple)
+@signal_reduce.register(list)
+@signal_reduce.register(collections.deque)
+def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
+                                      typing.Sequence[pq.Quantity],
+                                      typing.Sequence[typing.Sequence[numbers.Number]],
+                                      typing.Sequence[typing.Sequence[pq.Quantity]],
+                                      ],
+                    func: types.FunctionType,
+                    # func: typing.Union[types.FunctionType, np._ArrayFunctionDispatcher],
+                    signal: typing.Union[neo.AnalogSignal, DataSignal],
+                    channel: typing.Optional[int] = None,
+                    relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+    assert len(loc) %2 == 0, f"Expecting a sequence of containing an even number of elements; got {len(loc)} instead."
+
+    def _do_reduce_(t0, t1, fn, sg, ch, rel):
+        if not isinstance(t0, pq.Quantity):
+            t0 *= sg.times.units
+
+        else:
+            t0 = checkRescale(t0, sg.times.units)
+
+        if not isinstance(t1, pq.Quantity):
+            t1 *= sg.times.units
+
+        else:
+            t1 = checkRescale(t1, sg.times.units)
+
+        t0, t1 = min(t0,t1), max(t0,t1)
+
+        if rel:
+            t0, t1 = adjust_times_relative_to_signal(sg, t0, t1)
+
+        elif t0 < sg.t_start or t0 > sg.t_stop:
+            scipywarn(f"t0 {t0} falls outside signal's domain with start {sg.t_start} and stop {sg.t_stop}")
+            return np.nan
+
+        elif t1 < sg.t_start or t1 > sg.t_stop:
+            scipywarn(f"t1 {t1} falls outside signal's domain with start {sg.t_start} and stop {sg.t_stop}")
+            return np.nan
+
+        if t0 == t1:
+            ret = signal[signal.time_index(t0),:]
+
+        else:
+            ret = func(signal.time_slice(t0,t1), axis=0)
+
+        if isinstance(channel, int):
+            return ret[channel].flatten()
+
+        return ret
+
+    if len(loc) == 2 and all(isinstance(l, (numbers.Number, pq.Quantity)) for l in loc):
+        t0, t1 = loc
+        return _do_reduce_(t0, t1, func, signal, channel, relative)
+
+    elif all(isinstance(l, (tuple, list, collections.deque)) and all(isinstance(ll, (number.Number, pq.Quanity)) for ll in l) for l in loc):
+        result = list()
+        for l in loc:
+            t0, t1 = l
+            ret = _do_reduce_(t0, t1, func, signal, channel, relative)
+
+        return np.vstack(result)
+
+
+    else:
+        raise ValueError(f"'loc' must be a sequencd of two scalars or a sequence of scalar pairs")
+
+
+@signal_reduce.register(neo.Epoch)
+@signal_reduce.register(DataZone)
+@signal_reduce.register(Interval)
+def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval],
+                    func: types.FunctionType,
+                    # func: typing.Union[types.FunctionType, np._ArrayFunctionDispatcher],
+                    signal: typing.Union[neo.AnalogSignal, DataSignal],
+                    channel: typing.Optional[int] = None,
+                    relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+    if isinstance(loc, (neo.Epoch, DataZone)):
+        intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
+                                key = lambda i: i.times))
+    else:
+        intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
+                                key = lambda i: i.t0))
+
+    result = list()
+
+    for i in intervals:
+        if isinstance(i, Interval):
+            t0, t1 = i.t0.copy(), i.t1.copy()
+        else:
+            t0, t1 = i.times.copy(), i.durations.copy()
+
+        # x0, x1 = t0, t1
+        # NOTE: Must convert to scalars, i.e., unsized arrays
+        if t0.ndim > 0:
+            t0 = t0[0]
+
+        if t1.ndim > 0:
+            t1 = t1[0]
+
+        if not isinstance(i, Interval):
+            t1 = t0 + t1
+
+        ret = signal_reduce([t0, t1], func, signal, channel, relative)
+
+        # if relative:
+        #     t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
+        #
+        # else:
+        #     if t0 < signal.t_start or t0 > signal.t_stop:
+        #         scipywarn(f"t0 {t0} falls outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
+        #         return np.nan
+        #
+        #     if t1 < signal.t_start or t1 > signal.t_stop:
+        #         scipywarn(f"t1 {t1} falls outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
+        #         return np.nan
+        #
+        # if t0 == t1:
+        #     ret = signal[signal.time_index(t0),:]
+        #
+        # elif t0 > t1:
+        #     raise ValueError(f"The interval cannot have negative size")
+        # else:
+        #     # print(f"t0 = {t0}, t1 = {t1}")
+        #     ret = func(signal.time_slice(t0,t1), axis=0)
+        #
+        # if isinstance(channel, int):
+        #     ret = ret[channel].flatten()
+
+        result.append(ret)
+
+    # if len(result) == 0:
+    #     return result[0]
+
+    return np.vstack(result)# * signal.units
+
+@signal_reduce.register(DataCursor)
+@signal_reduce.register(SignalCursor)
+def _signal_reduce_(loc: typing.Union[DataCursor, SignalCursor],
+                    func: types.FunctionType,
+                    # func: typing.Union[types.FunctionType, np._ArrayFunctionDispatcher],
+                    signal: typing.Union[neo.AnalogSignal, DataSignal],
+                    channel: typing.Optional[int] = None,
+                    relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+    if isinstance(cursor, SignalCursor):
+        coord = float(cursor.x)
+        span = float(cursor.xwindow)
+        if isinstance(cursor.xUnits, pq.Quantity):
+            coord *= cursor.xUnits
+            span *= cursor.xUnits
+
+    elif isinstance(cursor, DataCursor):
+        # need copies here, because of possible readjustment
+        coord = cursor.coord.copy() if isinstance(cursor.coord, np.ndarray) else float(cursor.coord)
+        span = cursor.span.copy() if isinstance(cursor.span, np.ndarray) else float(cursor.span)
+
+    else:
+        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {cursor} instead")
+
+    t0, t1 = (coord - span/2, coord + span/2)
+
+    return signal_reduce([t0,t1], func, signal, channel, relative)
+
+def signal_max(loc, signal, channel = 0, relative = True):
+    return signal_reduce(loc, np.max, signal, channel, relative) * signal.units
+
+def signal_argmax(loc, signal, channel = 0, relative = True):
+    return signal_reduce(loc, np.argmax, signal, channel, relative)
+
+def signal_domain_max(loc, signal, channel = 0, relative = True):
+    ndx = signal_argmax(loc, signal, channel, relative)
+    return signal.times[ndx]
+
+def signal_min(loc, signal, channel = 0, relative = True):
+    return signal_reduce(loc, np.min, signal, channel, relative) * signal.units
+
+def signal_argmin(loc, signal, channel = 0, relative = True):
+    return signal_reduce(loc, np.argmin, signal, channel, relative)
+
+def signal_domain_min(loc, signal, channel = 0, relative = True):
+    ndx = signal_argmin(loc, signal, channel, relative)
+    return signal.times[ndx]
+
+def signal_maxmin(loc, signal, channel = 0, relative = True):
+    return signal_reduce(loc, sigp.maxmin, signal, channel, relative) * signal.units
+
+def signal_argmaxmin(loc, signal, channel = 0, relative = True):
+    return signal_reduce(loc, sigp.maxmin, signal, channel, relative)
+
+def signal_domain_maxmin(loc, signal, channel = 0, relative = True):
+    ndx = signal_argmaxmin(loc, signal, channel, relative)
+    return signal.times[ndx]
+
+def signal_minmax(loc, signal, channel = 0, relative = True):
+    return signal_reduce(loc, sigp.minmax, signal, channel, relative) * signal.units
+
+def signal_argminmax(loc, signal, channel = 0, relative = True):
+    return signal_reduce(loc, sigp.maxmin, signal, channel, relative)
+
+def signal_domain_minmax(loc, signal, channel = 0, relative = True):
+    ndx = signal_argminmax(loc, signal, channel, relative)
+    return signal.times[ndx]
+
 
 @safewrapper
 def epoch_reduce(func:types.FunctionType,
                  signal: typing.Union[neo.AnalogSignal, DataSignal],
-                 epoch: typing.Union[neo.Epoch, DataZone],
+                 epoch: typing.Union[neo.Epoch, DataZone, Interval],
                  channel: typing.Optional[int] = None) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
     r"""
     Applies a reducing function to a signal, within the epoch's intervals.
@@ -3314,33 +3578,33 @@ def epoch_reduce(func:types.FunctionType,
         else:
             t0, t1 = i.times.copy(), i.durations.copy()
 
-        x0, x1 = t0, t1
+        # x0, x1 = t0, t1
         # NOTE: Must convert to scalars, i.e., unsized arrays
         if t0.ndim > 0:
-            x0 = t0[0]
+            t0 = t0[0]
 
         if t1.ndim > 0:
-            x1 = t1[0]
+            t1 = t1[0]
 
         if not isinstance(i, Interval):
-            x1 = t0 + t1
+            t1 = t0 + t1
 
-        if x0 == x1:
-            ret = signal[signal.time_index(x0),:]
+        if t0 == t1:
+            ret = signal[signal.time_index(t0),:]
 
-        elif x0 > x1:
+        elif t0 > t1:
             raise ValueError(f"The interval cannot have negative size")
         else:
             # print(f"t0 = {t0}, t1 = {t1}")
-            ret = func(signal.time_slice(x0,x1), axis=0)
+            ret = func(signal.time_slice(t0,t1), axis=0)
 
         if isinstance(channel, int):
             ret = ret[channel].flatten()
 
         result.append(ret)
 
-    if len(result) == 0:
-        return result[0]
+    # if len(result) == 0:
+    #     return result[0]
 
     return np.vstack(result)# * signal.units
 
@@ -3398,18 +3662,18 @@ A python Quantity.
 .. note::
     One can supply only a sub-interval to the 'interval' parameter, obtained through indexing.
 """
-    assert isinstance(interval, Interval), f"'interval' expected to be a datazone.Interval; instead got a {type(interval).__name__}"
+    assert isinstance(interval, (DataZone, Interval, neo.Epoch)), f"'interval' expected to be a datazone.Interval, datazone.DataZone or neo.Epoch; instead got a {type(interval).__name__}"
 
     return epoch_reduce(func, signal, interval, channel)
 
 def interval_average(signal, interval, channel=None):
-    return interval_reduce(np.mean, signal, interval, channel)
+    return interval_reduce(np.mean, signal, interval, channel) * signal.units
 
 def interval_max(signal, interval, channel=None):
-    return interval_reduce(np.max, signal, interval, channel)
+    return interval_reduce(np.max, signal, interval, channel) * signal.units
 
 def interval_min(signal, interval, channel=None):
-    return interval_reduce(np.min, signal, interval, channel)
+    return interval_reduce(np.min, signal, interval, channel) * signal.units
 
 def interval_argmax(signal, interval, channel=None):
     return interval_reduce(np.argmax, signal, interval, channel)
@@ -3426,10 +3690,10 @@ def interval_domain_min(signal, interval, channel=None):
     return signal.times[ndx]
 
 def interval_maxmin(signal, interval, channel=None):
-    return interval_reduce(sigp.maxmin, signal, interval, channel)
+    return interval_reduce(sigp.maxmin, signal, interval, channel) * signal.units
 
 def interval_minmax(signal, interval, channel=None):
-    return interval_reduce(sigp.minmax, signal, interval, channel)
+    return interval_reduce(sigp.minmax, signal, interval, channel) * signal.units
 
 def interval_argmaxmin(signal, interval, channel=None):
     return interval_reduce(sigp.argmaxmin, signal, interval, channel)
@@ -3727,7 +3991,7 @@ def cursor_reduce(func:types.FunctionType,
     cursors, just call max(), min(), argmax() argmin() on a signal time slice
     obtained using the two cursor's x values.
     """
-    from copy import deepcopy
+    # from copy import deepcopy
     if isinstance(cursor, tuple) and len(cursor) == 2:
         t0, t1 = cursor
 
