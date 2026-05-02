@@ -110,7 +110,7 @@ class DataZone(neo.Epoch):
             elif isinstance(times, pq.Quantity):
                 places = times.flatten()
 
-        elif instance(places, (tuple, list)):
+        elif isinstance(places, (tuple, list)):
             places = np.array(places)
 
         elif not isinstance(places, (pq.Quantity, np.ndarray)):
@@ -816,21 +816,26 @@ coordinates are NOT restricted to time units.
         self.__domain_name__ = cq.unitFamilyName(self.units)
 
     def __repr__(self):
-        return str(self)
+        objs = ['%s@%s for %s' % (label, str(time), str(dur)) for label, time, dur in
+                zip(self.labels, self.times, self.durations)]
+        return f"<{self.__class___.__name__}:{', '.join(objs)}>"
 
-    def __str__(self) -> str:
-        times = list(self.times)
-        durations = list(self.durations)
-        # print(f"{self.__class__.__name__}.__repr__: labels = {self.labels}")
-        if isinstance(self.labels, np.ndarray) and self.labels.ndim>0 and self.labels.size>0:
-            labels = list(self.labels)
-        else:
-            labels = [""]
-        objs = ['%s @%s for %s' % (label, str(time), str(dur)) for label, time, dur in
-                zip(labels, times, durations)]
-        if isinstance(self.name, str) and len(self.name.strip()):
-            objs.append(self.name)
-        return f"<{self.__class__.__name__}:{', '.join(objs)}>"
+    def _repr_pretty_(self, pp, cycle):
+        super()._repr_pretty_(pp, cycle)
+    #
+    # def __str__(self) -> str:
+    #     times = list(self.times)
+    #     durations = list(self.durations)
+    #     # print(f"{self.__class__.__name__}.__repr__: labels = {self.labels}")
+    #     if isinstance(self.labels, np.ndarray) and self.labels.ndim>0 and self.labels.size>0:
+    #         labels = list(self.labels)
+    #     else:
+    #         labels = [""]
+    #     objs = ['%s @%s for %s' % (label, str(time), str(dur)) for label, time, dur in
+    #             zip(labels, times, durations)]
+    #     if isinstance(self.name, str) and len(self.name.strip()):
+    #         objs.append(self.name)
+    #     return f"<{self.__class__.__name__}:{', '.join(objs)}>"
 
     def _repr_pretty_(self, pp, cycle):
         super()._repr_pretty_(pp, cycle)
@@ -883,47 +888,61 @@ coordinates are NOT restricted to time units.
         Get the item or slice :attr:`i`.
         '''
 
-        if isinstance(i, int):
-            t0 = super().__getitem__(i) # this is a scalar quantity i.e. with size=1 and ndim=0
-            t1 = self.t1[i]
-            if self._labels is not None and self._labels.size > 0:
-                labels = self.labels[i]
-            else:
-                labels = self.labels
-
-            obj = self.__class__(times=t0, durations=t1, units=self.units,
-                                 labels=labels,
-                                 extent=self._extent)
-
-            obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
-            obj._copy_data_complement(self)
-            return obj
-
-        obj = super().__getitem__(i) # when i is int this is a scalar quantity i.e. with size=1 and ndim=0 hence the above
-
+        t0 = self.t0[i] # super().__getitem__(i) # this is a scalar quantity i.e. with size=1 and ndim=0
+        t1 = self.t1[i]
         if self._labels is not None and self._labels.size > 0:
-            obj._labels = self.labels[i]
+            labels = self.labels[i]
         else:
-            obj._labels = self.labels
+            labels = self.labels
 
+        obj = self.__class__(times=t0, durations=t1, units=self.units,
+                                labels=labels,
+                                extent=self._extent)
 
-        obj._t0 = self.t0[i]
-        obj._t1 = self.t1[i]
-
-        if self._labels is not None and self._labels.size > 0:
-            obj._labels = self.labels[i]
-        else:
-            obj._labels = self.labels
-
-        try:
-            # Array annotations need to be sliced accordingly
-            obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
-            obj._copy_data_complement(self)
-        except AttributeError:  # If Quantity was returned, not Epoch
-            obj.times = obj
-            obj.durations = obj._durations
-            obj.labels = obj._labels
+        obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
+        obj._copy_data_complement(self)
         return obj
+        # if isinstance(i, int):
+        #     t0 = self.t0[i] # super().__getitem__(i) # this is a scalar quantity i.e. with size=1 and ndim=0
+        #     t1 = self.t1[i]
+        #     if self._labels is not None and self._labels.size > 0:
+        #         labels = self.labels[i]
+        #     else:
+        #         labels = self.labels
+        #
+        #     obj = self.__class__(times=t0, durations=t1, units=self.units,
+        #                          labels=labels,
+        #                          extent=self._extent)
+        #
+        #     obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
+        #     obj._copy_data_complement(self)
+        #     return obj
+        #
+        # obj = super().__getitem__(i) # when i is int this is a scalar quantity i.e. with size=1 and ndim=0 hence the above
+        #
+        # if self._labels is not None and self._labels.size > 0:
+        #     obj._labels = self.labels[i]
+        # else:
+        #     obj._labels = self.labels
+        #
+        #
+        # obj._t0 = self.t0[i]
+        # obj._t1 = self.t1[i]
+        #
+        # if self._labels is not None and self._labels.size > 0:
+        #     obj._labels = self.labels[i]
+        # else:
+        #     obj._labels = self.labels
+        #
+        # try:
+        #     # Array annotations need to be sliced accordingly
+        #     obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
+        #     obj._copy_data_complement(self)
+        # except AttributeError:  # If Quantity was returned, not Epoch
+        #     obj.times = obj
+        #     obj.durations = obj._durations
+        #     obj.labels = obj._labels
+        # return obj
 
     def __getslice__(self, i, j):
         '''
