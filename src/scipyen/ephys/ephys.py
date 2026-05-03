@@ -3267,8 +3267,140 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable],
 
 @safewrapper
 @singledispatch
+def get_loc_boundary(loc: object, start: bool,
+                     outer: bool = True) -> typing.Union[
+                        numbers.Number, pq.Quantity,
+                        typing.Sequence[numbers.Number],
+                        typing.Sequence[pq.Quantity]
+                        ]:
+    r"""Returns the left or reight bouundary of the location object.
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+Parameters:
+-----------
+
+:loc:
+    A "location" object.
+
+    This can be:
+    * a pair of two coordinates on a signal domain,
+    * a sequence of coordinate pairs
+    * a neo.Epoch
+    * a datazone.DataZone
+    * a datazone.Interval
+    * a cursors.DataCursor
+    * a cursors.SignalCursor
+
+.. note::
+    When 'loc' is a sequence of coordinate pairs, each pair is assumed to be sorted in ascending order. |nbsp|
+In addition, if the coordinates are Quantity objects, they must all have the same units.
+
+:start:
+    When True, returns the left boundary; otherwise, returns the right boundary.
+
+:outer:
+    When ``True`` (the default) and 'loc' has more than one *sub-interval* |nbsp|
+    returns the *outer* left or right boundary (depending on the 'start' parameter) |nbsp|
+    i.e., the "left-most" or "right-most" boundary.
+
+    When ``False``, returns the left or right boundary for each sub-interval.
+
+.. note::
+    The 'outer' parameter is ignored when 'loc' is a DataCursor or a SignalCursor |nbsp|
+because these objects encapsulate only one sub-interval.
+
+
+"""
+    raise NotImplementedError(f"Locations of type {type(loc).__name__} are not supported")
+
+@get_loc_boundary.register(tuple)
+@get_loc_boundary.register(list)
+@get_loc_boundary.register(collections.deque)
+def _get_loc_boundary_(loc: typing.Union[typing.Sequence[numbers.Number],
+                                      typing.Sequence[pq.Quantity],
+                                      typing.Sequence[typing.Sequence[numbers.Number]],
+                                      typing.Sequence[typing.Sequence[pq.Quantity]],
+                                      ],
+                       start: bool,
+                       outer: bool = True
+                   ) -> typing.Union[numbers.Number, pq.Quantity,
+                                     typing.Sequence[numbers.Number],
+                                     typing.Sequence[pq.Quantity]]:
+    if all(isinstance(l, (numbers.Number, pq.Quantity)) for l in loc):
+        assert len(loc) == 2, f"Expecting a pair of scalars; got {len(loc)} elements instead."
+        return loc[0] if start else loc[1]
+
+    elif all(isinstance(l, (tuple, list, collections.deque)) and all(isinstance(ll, (number.Number, pq.Quantity)) for ll in l) for l in loc):
+        if outer:
+            return loc[0][0] if start else loc[-1][-1]
+        else:
+            return list(map(lambda l: l[0] if start else l[1], loc))
+
+    else:
+        raise ValueError(f"'loc' must be a sequence of two scalars or a sequence of scalar pairs")
+
+@get_loc_boundary.register(neo.Epoch)
+@get_loc_boundary.register(DataZone)
+@get_loc_boundary.register(Interval)
+def _get_loc_boundary_(loc: typing.Union[neo.Epoch, DataZone, Interval],
+                       start: bool,
+                       outer: bool = True
+                   ) -> typing.Union[numbers.Number, pq.Quantity,
+                                     typing.Sequence[numbers.Number],
+                                     typing.Sequence[pq.Quantity]]:
+    intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
+                            key = lambda i: i.times if isinstance(loc, (neo.Epoch, DataZone)) else i.t0))
+
+    get_boundary = lambda i: (
+        (
+            i.t0.copy().flatten()[0] if isinstance(i, Interval)
+            else i.times.copy().flatten()[0]
+        ) if start
+        else (
+                i.t1.copy().flatten()[-1] if isinstance(i, Interval)
+                else i.times.copy().flatten()[-1] + i.durations.copy().flatten()[-1]
+             )
+        )
+
+    if outer:
+        return get_boundary(loc)
+    else:
+        return list(map(get_boundary, intervals))
+
+@get_loc_boundary.register(DataCursor)
+@get_loc_boundary.register(SignalCursor)
+def _get_loc_boundary_(loc: typing.Union[DataCursor, SignalCursor],
+                       start: bool,
+                       _: bool = True
+                   ) -> typing.Union[numbers.Number, pq.Quantity,
+                                     typing.Sequence[numbers.Number],
+                                     typing.Sequence[pq.Quantity]]:
+
+    if isinstance(cursor, SignalCursor):
+        coord = float(cursor.x)
+        span = float(cursor.xwindow)
+        if isinstance(cursor.xUnits, pq.Quantity):
+            coord *= cursor.xUnits
+            span *= cursor.xUnits
+
+    elif isinstance(cursor, DataCursor):
+        # need copies here, because of possible readjustment
+        coord = cursor.coord.copy() if isinstance(cursor.coord, np.ndarray) else float(cursor.coord)
+        span = cursor.span.copy() if isinstance(cursor.span, np.ndarray) else float(cursor.span)
+
+    else:
+        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {cursor} instead")
+
+    t0, t1 = (coord - span/2, coord + span/2)
+
+    return t0 if start else t1
+
+@safewrapper
+@singledispatch
 def signal_reduce(loc: object,
-                  func:types.FunctionType,
+                  func: typing.Callable,
                   signal: typing.Union[neo.AnalogSignal, DataSignal],
                   channel: typing.Optional[int] = None,
                   relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
@@ -3333,14 +3465,11 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
                                       typing.Sequence[typing.Sequence[numbers.Number]],
                                       typing.Sequence[typing.Sequence[pq.Quantity]],
                                       ],
-                    func: types.FunctionType,
-                    # func: typing.Union[types.FunctionType, np._ArrayFunctionDispatcher],
+                    func: typing.Callable,
                     signal: typing.Union[neo.AnalogSignal, DataSignal],
                     channel: typing.Optional[int] = None,
                     relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
-    assert len(loc) %2 == 0, f"Expecting a sequence of containing an even number of elements; got {len(loc)} instead."
-
-    def _do_reduce_(t0, t1, fn, sg, ch, rel):
+    def __do_reduce__(t0, t1, fn, sg, ch, rel):
         if not isinstance(t0, pq.Quantity):
             t0 *= sg.times.units
 
@@ -3366,50 +3495,54 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
             scipywarn(f"t1 {t1} falls outside signal's domain with start {sg.t_start} and stop {sg.t_stop}")
             return np.nan
 
+        kw = dict()
+
+        if not inspect.isbuiltin(func):
+            signature = inspect.signature(func)
+            if "axis" in signature.parameters:
+                kw["axis"] = 0
+
+
         if t0 == t1:
-            ret = signal[signal.time_index(t0),:]
+            ret = func(signal[signal.time_index(t0),:], **kw)
 
         else:
-            ret = func(signal.time_slice(t0,t1), axis=0)
+            ret = func(signal.time_slice(t0,t1), **kw)
 
         if isinstance(channel, int):
             return ret[channel].flatten()
 
         return ret
 
-    if len(loc) == 2 and all(isinstance(l, (numbers.Number, pq.Quantity)) for l in loc):
+    if all(isinstance(l, (numbers.Number, pq.Quantity)) for l in loc):
+        assert len(loc) == 2, f"Expecting a pair of scalars; got {len(loc)} elements instead."
         t0, t1 = loc
-        return _do_reduce_(t0, t1, func, signal, channel, relative)
+        return __do_reduce__(t0, t1, func, signal, channel, relative)
 
     elif all(isinstance(l, (tuple, list, collections.deque)) and all(isinstance(ll, (number.Number, pq.Quanity)) for ll in l) for l in loc):
         result = list()
         for l in loc:
             t0, t1 = l
-            ret = _do_reduce_(t0, t1, func, signal, channel, relative)
+            ret = __do_reduce__(t0, t1, func, signal, channel, relative)
 
         return np.vstack(result)
 
 
     else:
-        raise ValueError(f"'loc' must be a sequencd of two scalars or a sequence of scalar pairs")
+        raise ValueError(f"'loc' must be a sequence of two scalars or a sequence of scalar pairs")
 
 
 @signal_reduce.register(neo.Epoch)
 @signal_reduce.register(DataZone)
 @signal_reduce.register(Interval)
 def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval],
-                    func: types.FunctionType,
-                    # func: typing.Union[types.FunctionType, np._ArrayFunctionDispatcher],
+                    func: typing.Callable,
                     signal: typing.Union[neo.AnalogSignal, DataSignal],
                     channel: typing.Optional[int] = None,
                     relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
-    if isinstance(loc, (neo.Epoch, DataZone)):
-        intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
-                                key = lambda i: i.times))
-    else:
-        intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
-                                key = lambda i: i.t0))
 
+    intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
+                            key = lambda i: i.times if isinstance(loc, (neo.Epoch, DataZone)) else i.t0))
     result = list()
 
     for i in intervals:
@@ -3431,34 +3564,7 @@ def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval],
 
         ret = signal_reduce([t0, t1], func, signal, channel, relative)
 
-        # if relative:
-        #     t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
-        #
-        # else:
-        #     if t0 < signal.t_start or t0 > signal.t_stop:
-        #         scipywarn(f"t0 {t0} falls outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
-        #         return np.nan
-        #
-        #     if t1 < signal.t_start or t1 > signal.t_stop:
-        #         scipywarn(f"t1 {t1} falls outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
-        #         return np.nan
-        #
-        # if t0 == t1:
-        #     ret = signal[signal.time_index(t0),:]
-        #
-        # elif t0 > t1:
-        #     raise ValueError(f"The interval cannot have negative size")
-        # else:
-        #     # print(f"t0 = {t0}, t1 = {t1}")
-        #     ret = func(signal.time_slice(t0,t1), axis=0)
-        #
-        # if isinstance(channel, int):
-        #     ret = ret[channel].flatten()
-
         result.append(ret)
-
-    # if len(result) == 0:
-    #     return result[0]
 
     return np.vstack(result)# * signal.units
 
@@ -3493,7 +3599,12 @@ def signal_max(loc, signal, channel = 0, relative = True):
     return signal_reduce(loc, np.max, signal, channel, relative) * signal.units
 
 def signal_argmax(loc, signal, channel = 0, relative = True):
-    return signal_reduce(loc, np.argmax, signal, channel, relative)
+    # CAUTION: 2026-05-03 09:25:45
+    # np.argmax will report the sample of the max WITHIN the boundaries of loc!
+    # therefore, this HAS to be added to the number of samples UP TO the earliest
+    # boundary of 'loc'
+    starts = signal.time_index(get_loc_boundary(loc, True, True))
+    return starts + signal_reduce(loc, np.argmax, signal, channel, relative)
 
 def signal_domain_max(loc, signal, channel = 0, relative = True):
     ndx = signal_argmax(loc, signal, channel, relative)
@@ -3503,7 +3614,8 @@ def signal_min(loc, signal, channel = 0, relative = True):
     return signal_reduce(loc, np.min, signal, channel, relative) * signal.units
 
 def signal_argmin(loc, signal, channel = 0, relative = True):
-    return signal_reduce(loc, np.argmin, signal, channel, relative)
+    starts = signal.time_index(get_loc_boundary(loc, True, True))
+    return starts + signal_reduce(loc, np.argmin, signal, channel, relative)
 
 def signal_domain_min(loc, signal, channel = 0, relative = True):
     ndx = signal_argmin(loc, signal, channel, relative)
@@ -3513,7 +3625,8 @@ def signal_maxmin(loc, signal, channel = 0, relative = True):
     return signal_reduce(loc, sigp.maxmin, signal, channel, relative) * signal.units
 
 def signal_argmaxmin(loc, signal, channel = 0, relative = True):
-    return signal_reduce(loc, sigp.maxmin, signal, channel, relative)
+    starts = signal.time_index(get_loc_boundary(loc, True, True))
+    return starts + signal_reduce(loc, sigp.maxmin, signal, channel, relative)
 
 def signal_domain_maxmin(loc, signal, channel = 0, relative = True):
     ndx = signal_argmaxmin(loc, signal, channel, relative)
@@ -3523,7 +3636,8 @@ def signal_minmax(loc, signal, channel = 0, relative = True):
     return signal_reduce(loc, sigp.minmax, signal, channel, relative) * signal.units
 
 def signal_argminmax(loc, signal, channel = 0, relative = True):
-    return signal_reduce(loc, sigp.maxmin, signal, channel, relative)
+    starts = signal.time_index(get_loc_boundary(loc, True, True))
+    return starts + signal_reduce(loc, sigp.maxmin, signal, channel, relative)
 
 def signal_domain_minmax(loc, signal, channel = 0, relative = True):
     ndx = signal_argminmax(loc, signal, channel, relative)

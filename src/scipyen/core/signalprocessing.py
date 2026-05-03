@@ -1303,6 +1303,15 @@ def argminmax(x: np.ndarray, **kwargs):
     axis = kwargs.pop("axis", None)
     return argmaxmin(x, axis=axis, max_first=False)
 
+def max_argmax(x: np.ndarray, **kwargs):
+    r"""Returns the tuple (max value, index of max value)"""
+    axis = kwargs.pop("axis", None)
+    return np.max(x, axis=axis), np.argmax(x, axis=axis)
+
+def min_argmin(x: np.ndarray, **kwargs):
+    r"""Returns the tuple (min value, index of min value)"""
+    axis = kwargs.pop("axis", None)
+    return np.min(x, axis=axis), np.argmin(x, axis=axis)
 
 def sem(x: np.ndarray, **kwargs):
     r"""Standard error of the mean (SEM) for array x
