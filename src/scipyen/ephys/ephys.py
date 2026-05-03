@@ -1946,7 +1946,7 @@ class RecordingEpisode(Episode):
 
         if len(val):
             if not all(isinstance(v, neo.Block) for v in val):
-                raise TypeError("All elements of the sequence must be neo.Block obejcts")
+                raise TypeError("All elements of the sequence must be neo.Block objects")
 
             self._blocks_[:] = sorted(list(val), key = lambda x: x.rec_datetime)
 
@@ -3265,15 +3265,111 @@ def isiFrequency(data:typing.Union[typing.Sequence, collections.abc.Iterable],
         stamps = data[start:(start+span+1)]
         return (1/(stamps[-1]-stamps[start])).rescale(pq.Hz)
 
-@safewrapper
 @singledispatch
-def get_loc_boundary(loc: object, start: bool,
-                     outer: bool = True) -> typing.Union[
-                        numbers.Number, pq.Quantity,
-                        typing.Sequence[numbers.Number],
-                        typing.Sequence[pq.Quantity]
-                        ]:
-    r"""Returns the left or reight bouundary of the location object.
+def mid_point(loc: object,
+              outer: bool = True):
+    r"""Mid point across a location object.
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+Parameters:
+-----------
+
+:loc:
+    A "location" object.
+
+    This can be:
+    * a pair of two coordinates on a signal domain,
+    * a sequence of coordinate pairs
+    * a neo.Epoch
+    * a datazone.DataZone
+    * a datazone.Interval
+    * a cursors.DataCursor
+    * a cursors.SignalCursor
+
+    The mid-point of a DataCursor or SignalCursor is their coordinate!
+
+:outer:
+    When ``True`` (the default) and 'loc' has more than one *sub-interval* |nbsp|
+    returns the mid-point across *all* sub-intervals. When ``False``, returns the |nbsp|
+    mid-point for each *sub-interval*.
+
+    When 'loc' is a DataCursor or a SignalCursor, this parameter is ignored as |nbsp|
+these objects encapsulate a single interval.
+
+.. attention::
+    The *sub-intervals* in Interval, DataZone and neo.Epoch objects are not necessarily contiguous!
+"""
+    raise NotImplementedError(f"Locations of type {type(loc).__name__} are not supported")
+
+@mid_point.register(tuple)
+@mid_point.register(list)
+@mid_point.register(collections.deque)
+def _mid_point_(loc: typing.Union[typing.Sequence[numbers.Number],
+                                      typing.Sequence[pq.Quantity],
+                                      typing.Sequence[typing.Sequence[numbers.Number]],
+                                      typing.Sequence[typing.Sequence[pq.Quantity]],
+                                      ],
+                outer: bool = True):
+    if all(isinstance(l, (numbers.Number, pq.Quantity)) for l in loc):
+        assert len(loc) == 2, f"Expecting a pair of scalars; got {len(loc)} elements instead."
+        loc = (min(loc), max(loc))
+        return loc[0] + (loc[1]-loc[0])/2
+
+    elif all(isinstance(l, (tuple, list, collections.deque)) and all(isinstance(ll, (number.Number, pq.Quantity)) for ll in l) for l in loc):
+        if outer:
+            t0, t1 = min(loc[0][0], loc[-1][-1]), max(loc[0][0], loc[-1][-1])
+            return t0 + (t1-t0)/2
+        else:
+            mp = lambda xx: xx[0] + (xx[1]-xx[0])/2
+            return list(map(lambda l: mp(sorted(l)), loc))
+
+    else:
+        raise ValueError(f"'loc' must be a sequence of two scalars or a sequence of scalar pairs")
+
+@mid_point.register(neo.Epoch)
+@mid_point.register(DataZone)
+@mid_point.register(Interval)
+def _mid_point_(loc: typing.Union[neo.Epoch, DataZone, Interval],
+                outer: bool = True):
+
+    if outer:
+        t0 = loc.t0.flatten()[0] if isinstance(loc, Interval) else loc.times.flatten()[0]
+        dt = loc.t1.flatten()[-1] - t0 if isinstance(loc, Interval) else np.sum(loc.durations.flatten())
+
+        return t0 + dt/2
+
+    else:
+        intervals = list(map(lambda k: (
+                                        loc[k] if isinstance(loc, Interval)
+                                        else (loc[k].times, loc[k].times+loc[k].durations)
+                                        ),
+                             range(loc.size)
+                            )
+                        )
+
+        return list(map(lambda i: mid_point(i, True), intervals))
+
+@mid_point.register(DataCursor)
+@mid_point.register(SignalCursor)
+def _mid_point_(loc: typing.Union[DataCursor, SignalCursor],
+                _: bool = True):
+    ret = loc.x if isinstance(loc, SignalCursor) else loc.coord
+
+    if isinstance(ret, pq.Quantity):
+        return ret.copy()
+
+    return ret
+
+@singledispatch
+def get_location_boundary(loc: object, start: bool,
+                          outer: bool = True) -> typing.Union[
+                            numbers.Number, pq.Quantity,
+                            typing.Sequence[numbers.Number],
+                            typing.Sequence[pq.Quantity]
+                            ]:
+    r"""Returns the left or reight boundary of the location object.
 
 .. |nbsp| unicode:: 0xA0
    :trim:
@@ -3315,10 +3411,10 @@ because these objects encapsulate only one sub-interval.
 """
     raise NotImplementedError(f"Locations of type {type(loc).__name__} are not supported")
 
-@get_loc_boundary.register(tuple)
-@get_loc_boundary.register(list)
-@get_loc_boundary.register(collections.deque)
-def _get_loc_boundary_(loc: typing.Union[typing.Sequence[numbers.Number],
+@get_location_boundary.register(tuple)
+@get_location_boundary.register(list)
+@get_location_boundary.register(collections.deque)
+def _get_location_boundary_(loc: typing.Union[typing.Sequence[numbers.Number],
                                       typing.Sequence[pq.Quantity],
                                       typing.Sequence[typing.Sequence[numbers.Number]],
                                       typing.Sequence[typing.Sequence[pq.Quantity]],
@@ -3341,18 +3437,15 @@ def _get_loc_boundary_(loc: typing.Union[typing.Sequence[numbers.Number],
     else:
         raise ValueError(f"'loc' must be a sequence of two scalars or a sequence of scalar pairs")
 
-@get_loc_boundary.register(neo.Epoch)
-@get_loc_boundary.register(DataZone)
-@get_loc_boundary.register(Interval)
-def _get_loc_boundary_(loc: typing.Union[neo.Epoch, DataZone, Interval],
+@get_location_boundary.register(neo.Epoch)
+@get_location_boundary.register(DataZone)
+@get_location_boundary.register(Interval)
+def _get_location_boundary_(loc: typing.Union[neo.Epoch, DataZone, Interval],
                        start: bool,
                        outer: bool = True
                    ) -> typing.Union[numbers.Number, pq.Quantity,
                                      typing.Sequence[numbers.Number],
                                      typing.Sequence[pq.Quantity]]:
-    intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
-                            key = lambda i: i.times if isinstance(loc, (neo.Epoch, DataZone)) else i.t0))
-
     get_boundary = lambda i: (
         (
             i.t0.copy().flatten()[0] if isinstance(i, Interval)
@@ -3367,28 +3460,30 @@ def _get_loc_boundary_(loc: typing.Union[neo.Epoch, DataZone, Interval],
     if outer:
         return get_boundary(loc)
     else:
+        intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
+                                key = lambda i: i.times if isinstance(loc, (neo.Epoch, DataZone)) else i.t0))
         return list(map(get_boundary, intervals))
 
-@get_loc_boundary.register(DataCursor)
-@get_loc_boundary.register(SignalCursor)
-def _get_loc_boundary_(loc: typing.Union[DataCursor, SignalCursor],
+@get_location_boundary.register(DataCursor)
+@get_location_boundary.register(SignalCursor)
+def _get_location_boundary_(loc: typing.Union[DataCursor, SignalCursor],
                        start: bool,
                        _: bool = True
                    ) -> typing.Union[numbers.Number, pq.Quantity,
                                      typing.Sequence[numbers.Number],
                                      typing.Sequence[pq.Quantity]]:
 
-    if isinstance(cursor, SignalCursor):
-        coord = float(cursor.x)
-        span = float(cursor.xwindow)
-        if isinstance(cursor.xUnits, pq.Quantity):
-            coord *= cursor.xUnits
-            span *= cursor.xUnits
+    if isinstance(loc, SignalCursor):
+        coord = float(loc.x)
+        span = float(loc.xwindow)
+        if isinstance(loc.xUnits, pq.Quantity):
+            coord *= loc.xUnits
+            span *= loc.xUnits
 
-    elif isinstance(cursor, DataCursor):
+    elif isinstance(loc, DataCursor):
         # need copies here, because of possible readjustment
-        coord = cursor.coord.copy() if isinstance(cursor.coord, np.ndarray) else float(cursor.coord)
-        span = cursor.span.copy() if isinstance(cursor.span, np.ndarray) else float(cursor.span)
+        coord = loc.coord.copy() if isinstance(loc.coord, np.ndarray) else float(loc.coord)
+        span = loc.span.copy() if isinstance(loc.span, np.ndarray) else float(loc.span)
 
     else:
         raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {cursor} instead")
@@ -3437,6 +3532,8 @@ Named parameters:
 
 :relative: When True (default) all times in the 'loc' are set to be relative to the signal.t_start.
 
+    I.e,, signal.t_start is subtracted from their values.
+
 Returns:
 --------
 A python quantity, or numpy array.
@@ -3454,6 +3551,23 @@ When there is more than one interval specified, the function returns a list
 of quantities as above. This can be converted to a quantity array by passing
 it to np.array(…) constructor, but REMEMBER to re-apply the units!
 
+.. attention::
+    Indexing a neo.Epoch or datazone.DataZone does NOT return an epoch, but a |nbsp|
+Quantity with attributes 'times' and 'durations'. This is likely a bug. |nbsp|
+Therefore, to pass a single neo.Epoch *sub-interval* create a new neo.Epoch or DataZone object first.
+
+Example:
+
+::
+
+    epoch = neo.Epoch(times=[0.25, 0.35], durations=[0.01, 0.01], units=pq.s, labels = ["epoch0", "epoch1"])
+
+    # getting the first interval of ``epoch`` as a new neo.Epoch object:
+
+    sub_epoch = neo.Epoch(epoch[0].times, epoch[0].durations, labels = [epoch.labels[0]])
+
+    # then use the new ``sub_epoch`` object
+
 """
     raise NotImplementedError(f"Locations of type {type(loc).__name__} are not supported")
 
@@ -3466,7 +3580,7 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
                                       typing.Sequence[typing.Sequence[pq.Quantity]],
                                       ],
                     func: typing.Callable,
-                    signal: typing.Union[neo.AnalogSignal, DataSignal],
+                    signal: typing.Union[neo.AnalogSignal, DataSignal], /,
                     channel: typing.Optional[int] = None,
                     relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
     def __do_reduce__(t0, t1, fn, sg, ch, rel):
@@ -3537,12 +3651,17 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
 @signal_reduce.register(Interval)
 def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval],
                     func: typing.Callable,
-                    signal: typing.Union[neo.AnalogSignal, DataSignal],
+                    signal: typing.Union[neo.AnalogSignal, DataSignal], /,
                     channel: typing.Optional[int] = None,
                     relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
 
-    intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
-                            key = lambda i: i.times if isinstance(loc, (neo.Epoch, DataZone)) else i.t0))
+
+    if loc.ndim > 0:
+        intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
+                                key = lambda i: i.times if isinstance(loc, (neo.Epoch, DataZone)) else i.t0))
+    else:
+        intervals = [loc]
+
     result = list()
 
     for i in intervals:
@@ -3572,21 +3691,20 @@ def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval],
 @signal_reduce.register(SignalCursor)
 def _signal_reduce_(loc: typing.Union[DataCursor, SignalCursor],
                     func: types.FunctionType,
-                    # func: typing.Union[types.FunctionType, np._ArrayFunctionDispatcher],
-                    signal: typing.Union[neo.AnalogSignal, DataSignal],
+                    signal: typing.Union[neo.AnalogSignal, DataSignal], /,
                     channel: typing.Optional[int] = None,
                     relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
-    if isinstance(cursor, SignalCursor):
-        coord = float(cursor.x)
-        span = float(cursor.xwindow)
-        if isinstance(cursor.xUnits, pq.Quantity):
-            coord *= cursor.xUnits
-            span *= cursor.xUnits
+    if isinstance(loc, SignalCursor):
+        coord = float(loc.x)
+        span = float(loc.xwindow)
+        if isinstance(loc.xUnits, pq.Quantity):
+            coord *= loc.xUnits
+            span *= loc.xUnits
 
-    elif isinstance(cursor, DataCursor):
+    elif isinstance(loc, DataCursor):
         # need copies here, because of possible readjustment
-        coord = cursor.coord.copy() if isinstance(cursor.coord, np.ndarray) else float(cursor.coord)
-        span = cursor.span.copy() if isinstance(cursor.span, np.ndarray) else float(cursor.span)
+        coord = loc.coord.copy() if isinstance(loc.coord, np.ndarray) else float(loc.coord)
+        span = loc.span.copy() if isinstance(loc.span, np.ndarray) else float(loc.span)
 
     else:
         raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {cursor} instead")
@@ -3595,54 +3713,179 @@ def _signal_reduce_(loc: typing.Union[DataCursor, SignalCursor],
 
     return signal_reduce([t0,t1], func, signal, channel, relative)
 
-def signal_max(loc, signal, channel = 0, relative = True):
+def signal_max(loc, signal, /, channel = None, relative = True):
     return signal_reduce(loc, np.max, signal, channel, relative) * signal.units
 
-def signal_argmax(loc, signal, channel = 0, relative = True):
+def signal_argmax(loc, signal, /, channel = None, relative = True):
     # CAUTION: 2026-05-03 09:25:45
     # np.argmax will report the sample of the max WITHIN the boundaries of loc!
     # therefore, this HAS to be added to the number of samples UP TO the earliest
     # boundary of 'loc'
-    starts = signal.time_index(get_loc_boundary(loc, True, True))
+    starts = signal.time_index(get_location_boundary(loc, True, True))
     return starts + signal_reduce(loc, np.argmax, signal, channel, relative)
 
-def signal_domain_max(loc, signal, channel = 0, relative = True):
+def signal_domain_max(loc, signal, /, channel = None, relative = True):
     ndx = signal_argmax(loc, signal, channel, relative)
     return signal.times[ndx]
 
-def signal_min(loc, signal, channel = 0, relative = True):
+def signal_min(loc, signal, /, channel = None, relative = True):
     return signal_reduce(loc, np.min, signal, channel, relative) * signal.units
 
-def signal_argmin(loc, signal, channel = 0, relative = True):
-    starts = signal.time_index(get_loc_boundary(loc, True, True))
+def signal_argmin(loc, signal, /, channel = None, relative = True):
+    starts = signal.time_index(get_location_boundary(loc, True, True))
     return starts + signal_reduce(loc, np.argmin, signal, channel, relative)
 
-def signal_domain_min(loc, signal, channel = 0, relative = True):
+def signal_domain_min(loc, signal, /, channel = None, relative = True):
     ndx = signal_argmin(loc, signal, channel, relative)
     return signal.times[ndx]
 
-def signal_maxmin(loc, signal, channel = 0, relative = True):
+def signal_maxmin(loc, signal, /, channel =  None, relative = True):
     return signal_reduce(loc, sigp.maxmin, signal, channel, relative) * signal.units
 
-def signal_argmaxmin(loc, signal, channel = 0, relative = True):
-    starts = signal.time_index(get_loc_boundary(loc, True, True))
+def signal_argmaxmin(loc, signal, /, channel = None, relative = True):
+    starts = signal.time_index(get_location_boundary(loc, True, True))
     return starts + signal_reduce(loc, sigp.maxmin, signal, channel, relative)
 
-def signal_domain_maxmin(loc, signal, channel = 0, relative = True):
+def signal_domain_maxmin(loc, signal, /, channel = None, relative = True):
     ndx = signal_argmaxmin(loc, signal, channel, relative)
     return signal.times[ndx]
 
-def signal_minmax(loc, signal, channel = 0, relative = True):
+def signal_minmax(loc, signal, /, channel = None, relative = True):
     return signal_reduce(loc, sigp.minmax, signal, channel, relative) * signal.units
 
-def signal_argminmax(loc, signal, channel = 0, relative = True):
-    starts = signal.time_index(get_loc_boundary(loc, True, True))
+def signal_argminmax(loc, signal, /, channel = None, relative = True):
+    starts = signal.time_index(get_location_boundary(loc, True, True))
     return starts + signal_reduce(loc, sigp.maxmin, signal, channel, relative)
 
-def signal_domain_minmax(loc, signal, channel = 0, relative = True):
+def signal_domain_minmax(loc, signal, /, channel = None, relative = True):
     ndx = signal_argminmax(loc, signal, channel, relative)
     return signal.times[ndx]
 
+def signal_average(loc, signal, /, channel = None, relative = True):
+    return signal_reduce(loc, np.nanmean, signal, channel, relative)
+
+def signal_slice(loc, signal, /, channel = None, outer: bool = True, relative: bool = True):
+    t0 = get_location_boundary(loc, True, outer)
+    t1 = get_location_boundary(loc, False, outer)
+
+    if relative:
+        if all(isinstance(t, pq.Quantity) for t in (t0,t1)):
+            t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
+
+        elif all(isinstance(t, typing.Sequence) for t in (t0, t1)):
+            t0,t1 = zip(*list(map(lambda xx: adjust_times_relative_to_signal(signal, *xx),
+                                  zip(t0, t1))))
+
+    if isinstance(t0, typing.Sequence):
+        if isinstance(channel, int):
+            return list(map(lambda xx: signal.time_slice(*xx)[:,channel], zip(t0, t1)))
+        else:
+            return list(map(lambda xx: signal.time_slice(*xx), zip(t0, t1)))
+    else:
+        ret = signal.time_slice(t0, t1)
+        if isinstance(channel, int):
+            ret = ret[:,channel]
+        return ret
+
+def signal_chord_slope(loc, signal, /, channel = None, outer: bool = True, relative = True):
+    r"""Calculates the chord slope of a signal between two time points t0 and t1.
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+
+                    slope = (y1 - y0) / (t1 - t0)
+
+where t0, t1 are the boundaries of the location 'loc'.
+
+When 'loc' defines several *sub-intervals* the value of 'outer' determines if |nbsp|
+a single slope is calculated on the outer boundaries (when True) or a slope is |nbsp|
+calculated for every sub-interval.
+
+See signal_chord_slope2() for a verison taking two locations.
+
+"""
+    t0 = get_location_boundary(loc, True, outer)
+    t1 = get_location_boundary(loc, False, outer)
+
+    slope = lambda x0, x1, y0, y1: (y1-y0) / (t1-t0)
+
+    if all(isinstance(t, pq.Quantity) for t in (t0,t1)):
+        if relative:
+            t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
+
+        if t1 == t0:
+            raise ValueError(f"The signal slice between t0 = {t0} and t1 = {t1} has zero length")
+
+        v0, v1 = list(map(lambda x: neoutils.get_sample_at_domain_value(signal, x), (t0, t1)))
+
+        # print(f"signal_chord_slope: t0 = {t0}, t1 = {t1}, v0 = {v0}, v1 = {v1}")
+
+        ret = slope(t0, t1, v0, v1).simplified
+
+        if isinstance(channel, int):
+            ret = ret[channel]
+
+        return ret
+
+    elif all(isinstance(t, typing.Sequence) for t in (t0, t1)):
+        if relative:
+            t0,t1 = zip(*list(map(lambda xx: adjust_times_relative_to_signal(signal, *xx),
+                                  zip(t0, t1))))
+
+        eqtimes = list(filter(lambda x: x[1][0] == x[1][1],
+                              enumerate(zip(t0, t1))
+                              )
+                      )
+
+        if len(eqtimes):
+            raise ValueError(f"The following coordinate pairs would result in zero-length arrays: {list(map(lambda x: x[1], eqtimes))}")
+
+        v0, v1 = zip(
+                        *list(
+                                map(lambda xx: tuple(
+                                                        map(
+                                                                lambda x: neoutils.get_sample_at_domain_value(signal, x),
+                                                                xx
+                                                            )
+                                                     ),
+                                    zip(t0, t1))
+                              )
+                     )
+
+        if isinstance(channel, int):
+            return list(map(lambda x: slope(*x).simplified[:,channel], zip(t0, t1, v0, v1)))
+        else:
+            return list(map(lambda x: slope(*x).simplified, zip(t0, t1, v0, v1)))
+
+def signal_chord_slope2(loc0, loc1, signal, /, channel = None, relative = True):
+    r"""Calculate the chord slope of the signal between the mid-points of two locations.
+
+.. attention::
+
+    The location mid-points are calculates over the entire location (thus, including all sub-intervals defined in the location).
+
+    If this is not what is intended, then make sure each location defines a single sub-interval.
+
+Best used with two DataCursor or two SignaCursor objects.
+
+"""
+    t0, t1 = tuple(map(lambda loc: mid_point(loc, True), (loc0, loc1)))
+
+    if isinstance(t0, float):
+        t0 = t0 * signal.times.units
+
+    if isinstance(t1, float):
+        t1 = t1 * signal.times.units
+
+    print(f"signal_chord_slope2: t0 = {t0}, t1 = {t1}")
+
+    if isinstance(channel, int):
+        y0, y1 = tuple(map(lambda x: neoutils.get_sample_at_domain_value(signal[:channel], x), (t0, t1)))
+    else:
+        y0, y1 = tuple(map(lambda x: neoutils.get_sample_at_domain_value(signal, x), (t0, t1)))
+
+    return ((y1-y0)/(t1-t0)).simplified
 
 @safewrapper
 def epoch_reduce(func:types.FunctionType,
@@ -4172,13 +4415,9 @@ def cursor_reduce(func:types.FunctionType,
 
 def adjust_times_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSignal], *args) -> typing.Union[pq.Quantity, typing.List[pq.Quantity]]:
     r"""Adjust the domain values supplied in `args` relative to signal's domain limit.
-    `args` must contain scalar Quantities with (or convertible to) signal's domain units.
+    `args` must contain scalar Quantities with units equal (or convertible to) signal's domain units.
 
-    Although the function's name refers to 'times', in fact it can be used on
-    regularly sampled signals with any domain (i.e., neo.AnalogSignal and Datasignal
-    objects).
-
-    Furthermore, the values WILL be sorted in increasing order!
+    The values WILL be sorted in increasing order!
 
     """
     if len(args) == 0:
@@ -4987,6 +5226,7 @@ def epoch_average(signal: typing.Union[neo.AnalogSignal, DataSignal],
 
 @safewrapper
 def plot_signal_vs_signal(x: typing.Union[neo.AnalogSignal, neo.Segment, neo.Block], *args, **kwargs):
+    r"""Useful for phase plots"""
     from plots import plots
 
     if isinstance(x, neo.Block):
