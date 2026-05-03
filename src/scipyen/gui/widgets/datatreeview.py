@@ -55,15 +55,6 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-try:
-    from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
-except Exception:
-    HAVE_METAARRAY = None
-
-
-
-# from pyqtgraph import (DataTreeWidget, TableWidget, )
-
 import neo
 if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList
@@ -410,7 +401,6 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         evt.setAccepted(True)
 
     def mouseMoveEvent(self: typing.Self, evt: QtGui.QMouseEvent):
-        # TODO: 2026-02-13 00:34:07 FINALIZE ME
         if evt.buttons() & QtCore.Qt.LeftButton:
             if isinstance(self._dragStartPosition_, QtCore.QPoint):
                 items = self.selectedItems()

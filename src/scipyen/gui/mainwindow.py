@@ -133,7 +133,7 @@ except:
 # END PyQtxxx
 
 # BEGIN jupyter, ipython, qtconsole et al
-from jupyter_client.session import Message
+# from jupyter_client.session import Message
 # from IPython.display import set_matplotlib_formats
 from IPython.core.history import HistoryAccessor
 from jupyter_core.paths import jupyter_runtime_dir
@@ -4619,6 +4619,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         item = QtWidgets.QTreeWidgetItem(
             self.currentSessionTreeWidgetItem, [repr(lineno), val])
+
         for col in range(item.columnCount()):
             item.setFont(col, font)
 
