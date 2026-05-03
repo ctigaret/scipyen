@@ -2562,81 +2562,10 @@ to calculate a measure in a ``neo`` signal-like object, using ALL the supplied |
 locators. Likewise, a "suitable" *function* applies a hard-coded code to |nbsp|
 calculate a signal measure at the supplied locators (see examples, below).
 
-The ``ephys`` module provides several such functors and functions:
+The first two arguments of the functions are a location object and a signal object.
 
-Cursor-based functors and functions
------------------------------------
-
-These use ``gui.SignalCursor`` objects of **vertical** type, or DataCursor objects.
-
-Using a single cursor
-=====================
-
-These are named according to the scheme "cursor_<abc>", and perform a measurement |nbsp|
-at a single cursor, returning a single value (scalar)
-
-* `cursor_value(signal, cursor, channel)`
-    Returns the value of the signal at the horizontal coordinate of a vertical |nbsp|
-    SignalCursor, in the specified signal channel¹ (subject to sampling rate)
-
-* `cursor_index(signal, cursor)`
-    Returns the index of the signal sample(s)¹ at the horizontal coordinate of |nbsp|
-    the cursor.
-
-* `cursor_chord_slope(signal, cursor, channel)`
-    Returns the slope of the line through the signal samples (in the specified |nbsp|
-    channel) at the boundaries of the horizontal window of a vertical cursor.
-
-* `cursor_reduce(func, signal, cursor, channel)`
-    Applies a reducing ``numpy`` function to the specified channel the signal, |nbsp|
-    over the horizontal extent of a vertical SignalCursor; a reducing function |nbsp|
-    calculates a value based on several data samples (e.g. `mean`, `sum`, `min`, `max`, etc) |nbsp|
-    and returns a scalar.
-
-Functors that are a particular case of `cursor_reduce` are listed below:
-
-* `cursor_average(signal, cursor, channel)`
-    Applies ``np.mean`` or ``np.nanmean`` to calculate the average of signal in |nbsp|
-    the specified channel, over the horizontal extent of the cursor.
-
-* `cursor_mean`
-    alias for cursor_average
-
-* `cursor_min`, `cursor_max`, `cursor_argmin`, `cursor_argmax`
-    All return scalars.
-
-* `cursor_minmax`, `cursor_maxmin`, `cursor_argminmax`, `cursor_argmaxmin`
-    All return a tuple of scalars
-
-Using two cursors
-=================
-
-These are named as "cursors_<abc>" (note the plural form) and return a scalar.
-
-* `cursors_difference(signal, cursor0, cursor1, func, channel, subfun)`
-    returns the difference in signal values at the cursors, in the specified channel. |nbsp|
-    The `func` parameter is a single cursor functor returning a single value (see above); |nbsp|
-    the `subfun` parameter is the actual numeric reducing function used by `func` |nbsp|
-    (see examples above)
-
-* `cursors_distance(signal, cursor0, cursor1, channel)`
-    measures the distance, in samples (or axis 0 coordinates, see ¹) between the |nbsp|
-    vertical coordinates of two vertical SignalCursor objects.
-
-* `cursors_chord_slope(signal, cursor0, cursor1, channel)`
-    calculates the chord slope between the `cursor_average` at the two cursors.
-
-Interval-based functors and functions
--------------------------------------
-
-These are similar to the cursor-based functions listed above, but use |nbsp|
-`datazone.Interval` instead of `gui.SignalCursor` or `DataCursor` objects. |nbsp|
-They are named according to the scheme "interval_<abc>".
-
-Epoch-based functors and functions
-----------------------------------
-Similar to cursor-based functions, using `neo.Epoch` or `datazone.DataZone` objects |nbsp|
-as locations; named as "epoch_<abc>"
+The ``ephys`` module provides several such functors and functions, all named |nbsp|
+as 'signal_*'
 
 .. note::
     ¹ A signal `channel` is a numeric data vector, not to be confused with |nbsp|
@@ -2675,10 +2604,11 @@ as locations; named as "epoch_<abc>"
 
 Examples
 --------
+CAUTION - needs to be re-written
 
 ::
 
-    from ephys import (LocationMeasure, cursor_average, interval_average,
+    from ephys import (LocationMeasure, signal_average, interval_average,
                         cursors_difference, intervals_difference)
 
     from datazone import Interval, epoch2intervals
@@ -2877,32 +2807,34 @@ Changelog:
     #
     func: typing.Callable
     locations: typing.Union[typing.Sequence, DataCursor, Interval, SignalCursor, DataZone, neo.Epoch]
-    name: str = "measure"
-    channel:int  = 0
+    name: str = dataclasses.field(default = "measure")
+    channel:typing.Optional[int]  = dataclasses.field(default = None)
     relative:bool = True
 
-    # __slots__ = ()
-
     def __call__(self, *args, **kwargs):
-        r"""
-        Var-positional parameters (*args):
-        ----------------------------------
-        Passed to encapsulated function (`func` field); MUST contain a signal or
-        signals PLUS any additional positional parameters EXCEPT locators
+        r"""Executes the location measure object.
 
-        Var-keyword parameters (**kwargs):
-        ---------------------------------
-        Any explicitly named parameters to `func`; NOTE that `channel` and `relative`
-        are passed to the `func` if they are not supplied with kwargs here
+.. |nbsp| unicode:: 0xA0
+   :trim:
 
-        """
+Var-positional parameters (*args):
+----------------------------------
+Passed to encapsulated function (`func` field); MUST contain a signal or
+signals and any additional positional parameters **EXCEPT** locators
+
+Var-keyword parameters (**kwargs):
+---------------------------------
+Any explicitly named parameters to `func`; NOTE that the fields `channel` and `relative`
+are passed to the `func` if they are not supplied with kwargs here
+
+"""
         # *args is a signal or sequence of signals plus any other positional arguments
 
-        if isinstance(self.locations, (list, tuple)):# and not isinstance(self.locations, Interval):
-            args = args + tuple(self.locations)
+        if isinstance(self.locations, (list, tuple)): # and not isinstance(self.locations, Interval):
+            args = tuple(self.locations) + args
 
         else:
-            args = args + (self.locations,)
+            args = (self.locations,) + args
 
         relative = kwargs.get("relative", None)
 
@@ -2910,6 +2842,7 @@ Changelog:
             kwargs["relative"] = self.relative
 
         channel = kwargs.get("channel", None)
+
         if not isinstance(channel, int):
             kwargs["channel"] = self.channel
 
@@ -3492,7 +3425,6 @@ def _get_location_boundary_(loc: typing.Union[DataCursor, SignalCursor],
 
     return t0 if start else t1
 
-@safewrapper
 @singledispatch
 def signal_reduce(loc: object,
                   func: typing.Callable,
@@ -3762,7 +3694,7 @@ def signal_domain_minmax(loc, signal, /, channel = None, relative = True):
     return signal.times[ndx]
 
 def signal_average(loc, signal, /, channel = None, relative = True):
-    return signal_reduce(loc, np.nanmean, signal, channel, relative)
+    return signal_reduce(loc, np.nanmean, signal, channel, relative) * signal.units
 
 def signal_slice(loc, signal, /, channel = None, outer: bool = True, relative: bool = True):
     t0 = get_location_boundary(loc, True, outer)
@@ -3788,7 +3720,7 @@ def signal_slice(loc, signal, /, channel = None, outer: bool = True, relative: b
         return ret
 
 def signal_chord_slope(loc, signal, /, channel = None, outer: bool = True, relative = True):
-    r"""Calculates the chord slope of a signal between two time points t0 and t1.
+    r"""Calculates the signal chord slope between two time points t0 and t1.
 
 .. |nbsp| unicode:: 0xA0
    :trim:
@@ -3859,7 +3791,13 @@ See signal_chord_slope2() for a verison taking two locations.
             return list(map(lambda x: slope(*x).simplified, zip(t0, t1, v0, v1)))
 
 def signal_chord_slope2(loc0, loc1, signal, /, channel = None, relative = True):
-    r"""Calculate the chord slope of the signal between the mid-points of two locations.
+    r"""Calculates signal chord slope between the mid-points of two locations.
+
+.. |nbsp| unicode:: 0xA0
+   :trim:
+
+To calculate the chord slope between the boundaries of a location use the |nbsp|
+signal_chord_slope() function.
 
 .. attention::
 
@@ -3878,7 +3816,10 @@ Best used with two DataCursor or two SignaCursor objects.
     if isinstance(t1, float):
         t1 = t1 * signal.times.units
 
-    print(f"signal_chord_slope2: t0 = {t0}, t1 = {t1}")
+    if relative:
+        t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
+
+   # print(f"signal_chord_slope2: t0 = {t0}, t1 = {t1}")
 
     if isinstance(channel, int):
         y0, y1 = tuple(map(lambda x: neoutils.get_sample_at_domain_value(signal[:channel], x), (t0, t1)))

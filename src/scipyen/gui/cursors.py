@@ -132,14 +132,7 @@ class CursorLine(pg.InfiniteLine):
     sig_double_clicked = Signal()
 
     def _init__(self, **kwargs):
-        # selected = kwargs.pop("selected", False)
-        # selectedPen = kwargs.pop("selectedPen", None)
-
         pg.InfiniteLine.__init__(self, **kwargs)
-
-        # self._selectedPen_ = selectedPen
-        #
-        # self._isSelected_:bool = False
 
 
     # NOTE: 2023-04-26 09:03:25
@@ -174,6 +167,7 @@ class CursorLine(pg.InfiniteLine):
         # print(f"{self.__class__.__name__}.setMouseHover({hover})")
         if self.mouseHovering == hover:
             return
+
         self.mouseHovering = hover
 
         if hover:
@@ -1349,6 +1343,8 @@ class SignalCursor(QtCore.QObject):
         # print(f"host item {self._host_graphics_item_}")
         if evt.button() == QtCore.Qt.MouseButton.RightButton:
             self.sig_lineContextMenuRequested.emit(self.ID)
+        else:
+            self.sig_cursorSelected.emit(self.ID)
 
     @Slot()
     def slot_line_doubleClicked(self):
