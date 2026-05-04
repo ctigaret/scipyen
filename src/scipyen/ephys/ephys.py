@@ -1230,6 +1230,10 @@ class RecordingSource():
         return tuple()
 
     @property
+    def pathway_names(self) -> tuple:
+        return tuple(map(lambda p: p.name), self.pathways)
+
+    @property
     def other_outputs(self) -> tuple:
         if isinstance(self.auxout, AuxiliaryOutput):
             return (self.auxout.channel, ) if self.auxout.digttl is None else (tuple)
@@ -1238,6 +1242,12 @@ class RecordingSource():
             return tuple(o.channel for o in self.auxout if o.digttl is None)
 
         return tuple()
+
+    def getPathway(self, name:str):
+        result = list(filter(lambda p: p.name == name, self.pathways))
+        if len(result) == 1:
+            return result[0]
+        return result
 
     def getPathwaysByStimulationType(self, digital:typing.Optional[bool]=None,
                                      asDict:bool=False) -> typing.Union[tuple, dict[str, tuple]]:
@@ -2530,42 +2540,94 @@ class SynapticPathway:
 # interval.t1 is the symmetric window around the mid point!
 @dataclass
 class LocationMeasure:
-    r"""Calculates a signal measure at a location using a suitable function or functor.
+    r"""Defer calculating a signal measure at a location using a suitable function or functor.
 
 .. |nbsp| unicode:: 0xA0
    :trim:
-
-A *location* is an object with one of the following types ('locator' types):
-
-* ``SignalCursor``
-
-* ``DataCursor`` This is an abstraction of a SignalCursor, which stores only the cursor's coordinates, NOT its type. |nbsp|
-    It *may* represent a vertical or horizontal signal cursor; useful when no SignalViewer axes are available.
-
-* ``DataZone``
-
-* ``Interval``
-
-* ``neo.Epoch``
-
-* A ``typing.Sequence[typing.Union[SignalCursor, DataCursor, neo.Epoch, DataZone, Interval]]`` |nbsp|
-e.g., a ``tuple`` or ``list`` of any of the above, and homogeneous in the type of its elements.
 
 The ``LocationMeasure`` object is callable, taking as first argument a signal-like |nbsp|
     object, which will be passed at the *functor* or *function* encapsulated by |nbsp|
     its `func` field, together with the locators specified in the constructor. |nbsp|
     The call also accepts additional parameters to the `func`.
 
+Attributes:
+-----------
 
-A "suitable" *functor* takes a primitive numeric function as argument and uses it |nbsp|
-to calculate a measure in a ``neo`` signal-like object, using ALL the supplied |nbsp|
-locators. Likewise, a "suitable" *function* applies a hard-coded code to |nbsp|
-calculate a signal measure at the supplied locators (see examples, below).
+:func:
+    The function or functor with specific signature requirements, used to calculate the signal measure.
+
+    The signature requirements are:
+
+::
+
+    func(loc, fn: typing.Callable,
+         signal: typing.Union[neo.AnalogSignal, DataSignal], /,
+         channel: int = None, relative: bool)
+
+
+OR
+
+::
+
+    func(loc0, loc1, fn: typing.Callable,
+         signal: typing.Union[neo.AnalogSignal, DataSignal], /,
+         channel: int = None, relative: bool)
+
+
+A "suitable" *function* (``func`` in the examples above) takes a primitive numeric |nbsp|
+function as argument and uses it to calculate a measure in a ``neo`` signal-like object, |nbsp|
+using ALL the supplied |nbsp| locators.
 
 The first two arguments of the functions are a location object and a signal object.
 
+A ``lambda`` function can also be provided here.
+
 The ``ephys`` module provides several such functors and functions, all named |nbsp|
 as 'signal_*'
+
+See ephys.signal_* family of functions for example of suitable functions
+
+:locations:
+    A location object or a sequence of location objects.
+
+    A *location* is an object with one of the following types ('locator' types):
+
+    * ``SignalCursor``
+
+    * ``DataCursor`` This is an abstraction of a SignalCursor, which stores only the cursor's coordinates, NOT its type. |nbsp|
+        It *may* represent a vertical or horizontal signal cursor; useful when no SignalViewer axes are available.
+
+    * ``DataZone``
+
+    * ``Interval``
+
+    * ``neo.Epoch``
+
+    * A ``typing.Sequence[typing.Union[SignalCursor, DataCursor, neo.Epoch, DataZone, Interval]]`` |nbsp|
+    e.g., a ``tuple`` or ``list`` of any of the above, and homogeneous in the type of its elements.
+
+:name:
+    Name of this LocationMeasure object
+
+:signalNameOrIndex:
+    Name or index of signal in a list-like collection such as a neo.Segment's ``analogsignals`` attribute.
+    Optional, default is None.
+
+    Determines what to do in the case when an *iterable* of signal objects is passed |nbsp|
+    as the first argument when calling LocationMeasure as a function:
+
+    * When None, the measurement will be performed on *all* signals in the iterable.
+
+    * When not None, the measurement will be performed onthe signal with the specified index or name from the iterable, if found.
+
+    This attribute is ignored when several signal objects are passed as a sequence or arguments |nbsp|
+    when calling LocationMeasure as a function.
+
+
+:kwargs:
+    Named and keyword parameters passed to func *after* location and signal parameters
+
+
 
 .. note::
     ¹ A signal `channel` is a numeric data vector, not to be confused with |nbsp|
@@ -2604,7 +2666,7 @@ as 'signal_*'
 
 Examples
 --------
-CAUTION - needs to be re-written
+CAUTION - This section needs to be re-written
 
 ::
 
@@ -2808,10 +2870,13 @@ Changelog:
     func: typing.Callable
     locations: typing.Union[typing.Sequence, DataCursor, Interval, SignalCursor, DataZone, neo.Epoch]
     name: str = dataclasses.field(default = "measure")
+    signalNameOrIndex: typing.Optional[int|str] = dataclasses.field(default = None)
     channel:typing.Optional[int]  = dataclasses.field(default = None)
     relative:bool = True
+    kwargs: dict = dataclasses.field(default_factory=dict)
 
-    def __call__(self, *args, **kwargs):
+
+    def __call__(self, *args, **kwargs) -> object:
         r"""Executes the location measure object.
 
 .. |nbsp| unicode:: 0xA0
@@ -2819,38 +2884,113 @@ Changelog:
 
 Var-positional parameters (*args):
 ----------------------------------
-Passed to encapsulated function (`func` field); MUST contain a signal or
+Passed to encapsulated function (`func` field); MUST contain a signal or |nbsp|
 signals and any additional positional parameters **EXCEPT** locators
 
 Var-keyword parameters (**kwargs):
 ---------------------------------
-Any explicitly named parameters to `func`; NOTE that the fields `channel` and `relative`
-are passed to the `func` if they are not supplied with kwargs here
+Any aditional named or keyword parameters to be passed to `func`.
+
+.. note::
+     This **may override** the named/keyword parameters already included in the |nbsp|
+     ``kwargs`` field passed at the constructor.
+
+    Typical examples are ``channel`` and ``relative``.
 
 """
-        # *args is a signal or sequence of signals plus any other positional arguments
+        # print(f"{self.__class__.__name__}.__call__({args})\n\n\n")
+        if len(args) == 0:
+            raise ValueError("At least one signal, a iterable of signals, or a neo.Segment must be specified")
 
-        if isinstance(self.locations, (list, tuple)): # and not isinstance(self.locations, Interval):
-            args = tuple(self.locations) + args
+        if len(args) == 1:
+            if (isinstance(args[0], (typing.Sequence, typing.Iterable))
+                and len(args[0]) > 0
+                and all(isinstance(s, (neo.AnalogSignal, DataSignal)) for s in args[0])
+                ):
+
+                if isinstance(self.signalNameOrIndex, int):
+                    args = (args[0][self.signalNameOrIndex])
+
+                elif isinstance(self.signalNameOrIndex, str):
+                    ndx = neoutils.normalized_index(args[0], self.signalNameOrIndex, silent=True)
+                    if isinstance(ndx, int):
+                        args = (args[0][ndx])
+                    else:
+                        raise ValueError(f"No signal with name or index {self.signalNameOrIndex} was found in the argument")
+
+                else:
+                    args = args[0]
+
+            elif isinstance(args[0], neo.Segment):
+                if isinstance(self.signalNameOrIndex, int):
+                    args = (args[0].analogsignals[self.signalNameOrIndex])
+
+                elif isinstance(self.signalNameOrIndex, str):
+                    ndx = neoutils.normalized_index(args[0].analogsignals, self.signalNameOrIndex, silent=True)
+                    if isinstance(ndx, int):
+                        args = args[0].analogsignals[ndx]
+                    else:
+                        raise ValueError(f"No signal with name or index {self.signalNameOrIndex} was found in the argument")
+                else:
+                    args = tuple(args[0].analogsignals)
+
+            elif not isinstance(args[0], (neo.AnalogSignal, DataSignal)):
+                raise TypeError(f"Unexpected type of the first argument: {type(args[0]).__name__}")
 
         else:
-            args = (self.locations,) + args
+            if not all(isinstance(a, (neo.AnalogSignal, DataSignal)) for a in args):
+                raise TypeError(f"Expecting all arguments to be signal-like objects")
 
-        relative = kwargs.get("relative", None)
 
-        if not isinstance(relative, bool):
-            kwargs["relative"] = self.relative
+        # NOTE: 2026-05-04 10:42:29
+        # apply the measure to each signal, collect in a list;
+        # when just one sigbnal is measured, return the first result
+        result = list()
 
-        channel = kwargs.get("channel", None)
+        # NOTE: 2026-05-04 21:57:25
+        # make sure there are no duplicate named/keyword parameters, but
+        # allow overriding those in self.kwargs
 
-        if not isinstance(channel, int):
-            kwargs["channel"] = self.channel
+        # ATTENTION: 2026-05-04 22:05:38
+        # kwargs are COMMON to all calls on each element of args
 
-        # print(f"{self.__class__.__name__}.call: relative = {self.relative}")
-        # print(f"{self.__class__.__name__}.call: func = {self.func}")
-        # print(f"{self.__class__.__name__}.__call__ args = {args}")
-        # print(f"{self.__class__.__name__}.__call__ kwargs = {kwargs}")
-        return self.func(*args, **kwargs)
+        # NOTE: 2026-05-04 22:00:49
+        # cache the kwargs parameters that would override those in self.kwargs
+        kw = dict()
+
+        for key in self.kwargs:
+            if key in kwargs:
+                kw[key] = kwargs[key]
+
+        # now, add in the parameters stored at construction
+        kwargs.update(self.kwargs)
+
+        # finally, restore the cached values, possibly overriding those set at
+        # construction
+        kwargs.update(kw)
+
+        for arg in args:
+            # NOTE: 2026-05-04 10:41:03
+            # augment and rearrange arguments to fit the signature of ``func`` i.e.
+            # location(s) THEN signal(s)
+            fargs = (self.locations,) + (arg,) # NOTE: 62026-05-04 22:31:56 DO NOT UNPACK; some funcs expect seq of locs
+            # if isinstance(self.locations, (list, tuple, collections.deque)):
+            #     fargs = tuple(self.locations) + (arg,)
+            #
+            # else:
+            #     fargs = (self.locations,) + (arg,)
+
+
+            # print(f"{self.__class__.__name__}.call: relative = {self.relative}")
+            # print(f"{self.__class__.__name__}.call: func = {self.func}")
+            # print(f"{self.__class__.__name__}.__call__ fargs =\n\t{fargs}\n\n\n")
+            # print(f"{self.__class__.__name__}.__call__ kwargs = {kwargs}")
+            result.append(self.func(*fargs, **kwargs))
+
+        if len(result) == 1:
+            return result[0]
+
+        return result
 
 class DataListener(QtCore.QObject):
     r"""
@@ -3428,13 +3568,15 @@ def _get_location_boundary_(loc: typing.Union[DataCursor, SignalCursor],
 @singledispatch
 def signal_reduce(loc: object,
                   func: typing.Callable,
-                  signal: typing.Union[neo.AnalogSignal, DataSignal],
+                  signal: typing.Union[neo.AnalogSignal, DataSignal], /,
                   channel: typing.Optional[int] = None,
                   relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
     r""" Applies a reducing function to a signal, within the location's intervals.
 
 .. |nbsp| unicode:: 0xA0
    :trim:
+
+Operates on a region (or slice) of the signal.
 
 Positional parameters:
 ----------------------
@@ -3516,6 +3658,12 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
                     channel: typing.Optional[int] = None,
                     relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
     def __do_reduce__(t0, t1, fn, sg, ch, rel):
+        if isinstance(t0, LocationMeasure):
+            t0 = t0(sg, channel=ch, relative=rel)
+
+        if isinstance(t1, LocationMeasure):
+            t1 = t1(sg, channel=ch, relative=rel)
+
         if not isinstance(t0, pq.Quantity):
             t0 *= sg.times.units
 
@@ -3541,6 +3689,10 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
             scipywarn(f"t1 {t1} falls outside signal's domain with start {sg.t_start} and stop {sg.t_stop}")
             return np.nan
 
+        # NOTE: 2026-05-04 22:12:55
+        # make sure t0, t1 are "scalar-like" arrays
+        t0, t1 = tuple(map(lambda x: x.flatten()[0], (t0, t1)))
+
         kw = dict()
 
         if not inspect.isbuiltin(func):
@@ -3560,19 +3712,18 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
 
         return ret
 
-    if all(isinstance(l, (numbers.Number, pq.Quantity)) for l in loc):
-        assert len(loc) == 2, f"Expecting a pair of scalars; got {len(loc)} elements instead."
+    if all(isinstance(l, (numbers.Number, pq.Quantity, LocationMeasure)) for l in loc):
+        assert len(loc) == 2, f"Expecting a pair of elements; got {len(loc)} elements instead."
         t0, t1 = loc
         return __do_reduce__(t0, t1, func, signal, channel, relative)
 
-    elif all(isinstance(l, (tuple, list, collections.deque)) and all(isinstance(ll, (number.Number, pq.Quanity)) for ll in l) for l in loc):
+    elif all(isinstance(l, (tuple, list, collections.deque)) and all(isinstance(ll, (number.Number, pq.Quantity, LocationMeasure)) for ll in l) for l in loc):
         result = list()
         for l in loc:
             t0, t1 = l
             ret = __do_reduce__(t0, t1, func, signal, channel, relative)
 
         return np.vstack(result)
-
 
     else:
         raise ValueError(f"'loc' must be a sequence of two scalars or a sequence of scalar pairs")
@@ -3696,7 +3847,63 @@ def signal_domain_minmax(loc, signal, /, channel = None, relative = True):
 def signal_average(loc, signal, /, channel = None, relative = True):
     return signal_reduce(loc, np.nanmean, signal, channel, relative) * signal.units
 
-def signal_slice(loc, signal, /, channel = None, outer: bool = True, relative: bool = True):
+@singledispatch
+def signal_slice(loc, signal, /, channel = None,
+                 outer: bool = True,
+                 relative: bool = True) -> typing.Union[neo.AnalogSignal,
+                                                        DataSignal]:
+    raise NotImplementedError(f"Locations of type {type(loc).__name__} are not supported")
+
+@signal_slice.register(tuple)
+@signal_slice.register(list)
+@signal_slice.register(collections.deque)
+def _signal_slice_(loc: typing.Union[list, tuple, collections.deque], signal, /,
+                   channel = None,
+                   outer: bool = True,
+                   relative: bool = True) -> typing.Union[neo.AnalogSignal,
+                                                        DataSignal]:
+
+    if len(loc) != 2:
+        raise ValueError("Expecting a sequence of two elements")
+
+    t0, t1 = loc
+
+    if isinstance(t0, LocationMeasure):
+        t0 = t0(signal, channel=channel, relative=relative)
+
+    if isinstance(t1, LocationMeasure):
+        t1 = t1(signal, channel=channel, relative=relative)
+
+    if all(isinstance(x, numbers.Number) for x in (t0,t1)):
+        t0,t1 = tuple(map(lambda x: x*signal.times.units), (t0,t1))
+
+    elif not all(isinstance(x, pq.Quantity) and x.size==1 for x in (t0,t1)):
+        raise ValueError("Expecting a pair of floats or scalar Quanity objects")
+
+    if relative:
+        t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
+
+    # ensure all are scalars (i.e. arrays with ndim = 0) an sorted in ascending order
+    t0, t1 = sorted(tuple(map(lambda x: x.flatten()[0], (t0, t1))))
+
+    # print(f"t0 = {t0}, t1 = {t1}")
+
+    ret = signal.time_slice(t0,t1)
+    if isinstance(channel, int):
+        ret = ret[:,channel]
+    return ret
+
+@signal_slice.register(neo.Epoch)
+@signal_slice.register(DataZone)
+@signal_slice.register(Interval)
+@signal_slice.register(DataCursor)
+@signal_slice.register(SignalCursor)
+def _signal_slice_(loc: typing.Union[neo.Epoch, DataZone, Interval,
+                                     DataCursor, SignalCursor], signal, /,
+                   channel = None,
+                   outer: bool = True,
+                   relative: bool = True) -> typing.Union[neo.AnalogSignal,
+                                                        DataSignal]:
     t0 = get_location_boundary(loc, True, outer)
     t1 = get_location_boundary(loc, False, outer)
 

@@ -1101,7 +1101,7 @@ def exponential(x:np.ndarray | Real,
     :λ: (exponential constant; in (units of "x")⁻¹)
 
     .. note::
-        "rate" constant τ = 1/λ
+        "time" or "rate" constant τ = 1/λ
 
     """
     x = check_independent_variable(x)
@@ -1114,10 +1114,6 @@ def exponential(x:np.ndarray | Real,
                expression = sympy.Eq(sympy.Symbol("y"),
                                      sympy.Symbol("alpha") +
                                      sympy.Symbol("beta") * (1 - sympy.exp(-1 * (sympy.Symbol("x")-sympy.Symbol("x_0"))*sympy.Symbol("lambda")))),
-               # expression = sympy.Eq(sympy.Symbol("y"),
-               #                       sympy.functions.elementary.piecewise.Piecewise((sympy.Symbol("alpha") +
-               #                                                                       sympy.Symbol("beta") * (1 - sympy.exp(-1 * (sympy.Symbol("x")-sympy.Symbol("x_0"))*sympy.Symbol("lambda"))),
-               #                                                                       sympy.Symbol("lambda") > 0))),
                )
 def bounded_exponential_rise(x:np.ndarray | Real, 
                              α:typing.Sequence[Real]|np.ndarray, 
@@ -1126,7 +1122,8 @@ def bounded_exponential_rise(x:np.ndarray | Real,
                              λ:typing.Optional[Real] = None) -> np.ndarray | float:
     r"""Particular case of single exponential rise.
 
-    Realizes
+Realizes
+
     
     $$\\alpha + \\beta \\times \\left[1-e^{\\left(x-x_{0}\\right)\\lambda}\\right]\\textrm{, }\\lambda < 0$$
 
@@ -1135,41 +1132,44 @@ NOTE This is equivalent to the generic exponential
     α₁ + β₁ × exp((x-x₀)λ), 
 
     where:
+
         β₁ = -β
+
         α₁ = α - β₁
+
         and λ < 0
 
 This means you can always use the exponential(…) model function with appropriate
+
 values for α, β, and with appropriate value & sign of λ
 
-    Parameters:
-    ===========
-    x: independent variable (e.g., time): 1D numpy array
+Parameters:
+===========
+x: independent variable (e.g., time): 1D numpy array
 
-    coefficients are given as floats in the following order:
-    
-    α (offset or additive bias, in units of "y"), 
-    β (scale, or multiplicative bias; dimensionless), 
-    x₀ (onset, delay or shift, in units of "x"), 
-    λ (exponential constant; in (units of "x")⁻¹)
+coefficients are given as floats in the following order:
+
+α (offset or additive bias, in units of "y"),
+
+β (scale, or multiplicative bias; dimensionless),
+
+x₀ (onset, delay or shift, in units of "x"),
+
+λ (exponential constant; in (units of "x")⁻¹)
 
 """
     x = check_independent_variable(x)
     α, β, x0, λ = check_unpack_model_coeffs(4, α, β, x0, λ)
     # assert λ < -1., "For this particular model, λ must be < -1"
     
-    xxλ = np.divide(np.subtract(x,x0), λ)
+    # xxλ = np.divide(np.subtract(x,x0), λ)
+    xxλ = np.multiply(np.subtract(x,x0), λ)
     return np.add(α, np.multiply(β, np.subtract(1, np.exp(xxλ))))
     
 # @timefunc # uncomment this for testing 😄
 @modelfunction(coefficients = ("α", "β", "x0", "τ"),
                title="AlphaSynapse",
                expression = "$$f(x) = \\begin{cases} \\alpha + \\frac{\\beta \\left(x - x_{0}\\right) \\times e^{\\frac{\\left(\\tau - x + x_{0}\\right)} {\\tau}} } {\\tau} & \\text{for}\\: \\left(x - x_{0}\\right) \\geq 0 \\textrm{, }\\tau>0 \\\\\\alpha & \\text{otherwise} \\end{cases}$$",
-               # expression = sympy.Eq(sympy.Symbol("y"), 
-               #                       sympy.functions.elementary.piecewise.Piecewise((sympy.Symbol("alpha") + sympy.Symbol("beta") * (sympy.Symbol("x")-sympy.Symbol("x_0"))/sympy.Symbol("tau") * sympy.exp(-(sympy.Symbol("x")-sympy.Symbol("x_0") - sympy.Symbol("tau"))/sympy.Symbol("tau")),
-               #                                                                       sympy.Symbol("x")-sympy.Symbol("x_0") >= 0), 
-               #                                                                      (sympy.Symbol("alpha"), 
-               #                                                                       sympy.Symbol("x")-sympy.Symbol("x_0") < 0))),
                fitting = FittingCoefficientsDict(initial= (0., 1., 0., 0.01), 
                           lower=(-np.inf, -np.inf, 0., 0.),
                           upper=(np.inf, np.inf, np.inf, np.inf)),

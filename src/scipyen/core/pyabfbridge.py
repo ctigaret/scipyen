@@ -3879,15 +3879,54 @@ timings, within the trial, for the epoch taking into account preceding epochs, |
 the possibility that epochs may have changed duration (`deltaDuration`) and that |nbsp|
 alternative command waveforms may have been enabled in the protocol.
 
-The annotations of the neo.Epoch result will be updated with the following mapping:
+Returns:
+--------
+A neo.Epoch object with a *single* sub-interval, and with:
+    * the ``times`` attribute containing a single value (epochs *current* start time)
+    * the ``durations`` attribute containing a single value (the epoch's *current* duration)
+    * the ``labels`` attribute contains a single value (string) with the ABFEpoch's label.
 
-    :"epochType": type of the ABFEpoch
+In addition, the returned neo.Epoch object is annotated with the following data:
 
-    :"digital": the ABFDigitalPattern associated with the ABFEpoch
+    :axis: name of the signal to which this epoch applies. Normally, a neo.Epoch
+        is NOT associated with a particular signal (being a common feature of a |nbsp|
+        neo.Segment, i.e. a sweep). However, this is a useful exception which enables |nbsp|
+        the visualization of the corresponding ABFEpoch with the command waveform |nbsp|
+        emitted by the DAC channel where the ABFEpoch was defined (see the |nbsp|
+        ``self.waveformPreview`` method)
 
-    :"epochLetter": the letter of the ABFEpoch, in the epochs table
+    :sweep: the sweep number where the *actual* epoch values are calculated.
 
-    :"epochNumber: the number (index) of the ABFEoch in the epochs table
+    :epochType: type of the ABFEpoch
+
+    :digital: the ABFDigitalPattern associated with the ABFEpoch
+
+    :epochLetter: the letter of the ABFEpoch, in the epochs table
+
+    :epochNumber: the number (index) of the ABFEoch in the epochs table
+
+    :epochDACs: the index(es) of the DAC channel(s) where this ABFEpoch applies.
+    :epochCurrentLevel: the current level of the command signal set in the ABFEpoch during this sweep
+        (calculated based on the ABFEpoch's "firstLevel" and "deltaLevel" values)
+
+
+and with the following ABFEpoch parameter values, except for its current duration:, which is |nbsp|
+represented by the neo.Epoch ``duration`` attribute and is calculated according |nbsp|
+the ABFEpoch's ``firstDuration``, ``deltaDuration``, and sweep number
+
+
+    :epochFirstLevel:
+    :epochDeltaLevel:
+    :epochFirstDuration:
+    :epochDeltaDuration:
+    :epochPulseCount:
+    :epochPulsePeriod:
+    :epochPulseTimes:
+    :epochPulseWidth:
+
+
+.. note::
+        These values depend on the position of the ABFEpoch in the epochs table, number of sweeps, and the duration of any preceding ABFEpoch in the sweep.
 
 See also ``dacEpochsToNeoEpoch`` and ``getEpochsTable`` with ``asNeoEpoch = True``
 """
@@ -3905,6 +3944,16 @@ See also ``dacEpochsToNeoEpoch`` and ``getEpochsTable`` with ``asNeoEpoch = True
                          epochType = epoch.type, units = t0.units,
                          epochLetter = epoch.letter,
                          epochNumber = epoch.number,
+                         epochDACs = self.getDACsForEpoch(epoch),
+                         epochCurrentLevel = self.getEpochLevel(epoch, dac, sweep),
+                         epochFirstLevel = epoch.firstLevel,
+                         epochDeltaLevel = epoch.deltaLevel,
+                         epochFirstDuration = epoch.firstDuration,
+                         epochDeltaDuration = epoch.deltaDuration,
+                         epochPulseCount = self.getEpochPulseCount(epoch, dac, sweep),
+                         epochPulsePeriod = self.getEpochPulsePeriod(epoch, dac, sweep),
+                         epochPulseTimes = self.getEpochPulseTimes(epoch, dac, sweep),
+                         epochPulseWidth = self.getEpochPulseWidth(epoch, dac, sweep),
                          digital = self.getEpochDigitalPattern(epoch.epochNumber,
                                                                self.getIsAlternateDigital(sweep, dac)))
 

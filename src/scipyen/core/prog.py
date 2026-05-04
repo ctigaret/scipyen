@@ -2194,15 +2194,15 @@ library modules.
 
     if isinstance(x, type):
         visited.add(x)
-        t_set = set(inspect.getmro(t)) if use_mro else {t}
+        t_set = set(inspect.getmro(x)) if use_mro else {x}
         return visited
 
-    elif isinstance(t, (tuple, list, set)) and all(isinstance(t_, type) for t_ in t):
+    elif isinstance(x, (tuple, list, set)) and all(isinstance(t_, type) for t_ in x):
         # sequence of types
-        t_set = set(itertools.chain_from_iterable([inspect.getmro(t_) for t_ in t])) if use_mro else set(t)
+        t_set = set(itertools.chain_from_iterable([inspect.getmro(t_) for t_ in x])) if use_mro else set(x)
 
     elif isinstance(x, TYPING_TYPES) or type(x).__module__ == "typing":
-        t_origin = typing.get_origin(t)
+        t_origin = typing.get_origin(x)
 
         if hasattr(x, "__args__"):
             unwind_type(x.__args__, visited=visited)

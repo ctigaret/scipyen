@@ -1127,122 +1127,130 @@ def fit_nsfa(data, p0, **kwargs):
                      
 def fit_model(data, func, p0, *args, **kwargs):
     r"""Generic fitting function.
-    Applies scipy.optimize.least_squares to minimize the residuals between the 
-    model function `func` and measurements in `data`.
-    
-    WARNING: This function uses scipy.optimize.least_squares directly to perform
-    non-linear least-squares fitting (with or without constraints), and is highly
-    dependent on a good guess of the initial coefficient values.
-    
-    As an alternative for exponential decay fitting, you could try the scikit-guess
-    package.
-    
-    Positional parameters:
-    =====================
-    data: 1D or 2D array-like, numeric - the "dependent" variable to be fitted.
-        When ``data`` is a 2D array, the variables must be arranged in columns,
-        with the number of rows being the number of observations. Think of it
-        as "channels" in a multi-channel signal.
-    
-        This can be a neo.AnalogSignal. If the signal has more than one channel,
-        the index of the channel to be fitted can be specified in the var-keyword 
-        ``channel``.
-    
-    func: python function that takes a scalar ('x') and a sequence ('p') of 
-        model parameters, and returns a scalar; the signature is:
-    
-        func(x, p, /, *args, **kwargs)
-    
-        NOTE: This function *should* be one of the model functions defined in  Scipyen's ``core.models`` module.
-    
-    p0: sequence of initial values for the coefficients in the model realized by
+ .. |nbsp| unicode:: 0xA0
+   :trim:
+
+Applies scipy.optimize.least_squares to minimize the residuals between the |nbsp|
+model function `func` and measurements in `data`.
+
+WARNING: This function uses scipy.optimize.least_squares directly to perform |nbsp|
+non-linear least-squares fitting (with or without constraints), and is highly |nbsp|
+dependent on a good guess of the initial coefficient values.
+
+As an alternative for exponential decay fitting, you could try the scikit-guess |nbsp|
+package.
+
+Positional parameters:
+=====================
+:data:
+    1D or 2D array-like, numeric - the "dependent" variable to be fitted.
+
+    When ``data`` is a 2D array, the variables must be arranged in columns, |nbsp|
+    with the number of rows being the number of observations. Think of it |nbsp|
+    as "channels" in a multi-channel signal.
+
+    This can be a neo.AnalogSignal. If the signal has more than one channel, |nbsp|
+    the index of the channel to be fitted can be specified in the var-keyword  |nbsp|
+    ``channel``.
+
+:func:
+    Python function that takes a scalar ('x') and a sequence ('p') of  |nbsp|
+    model parameters, and returns a scalar; the signature is:
+
+    func(x, p, /, *args, **kwargs)
+
+    NOTE: This function *should* be one of the model functions defined in  |nbsp|
+Scipyen's ``core.models`` module.
+
+:p0:
+    Sequence of initial values for the coefficients in the model realized by |nbsp|
     `func` - in the same order as expected by func
-    
-    Var-keyword parameters (**kwargs):
-    =================================
-    
-    :x: 
-        the independent variable, array-like, with the same shape as `data`.
-        This is mandatory when ``data`` is a generic numpy array or Quantity array.
-    
-        When ``data`` is a neo.AnalogSignal, this can be omitted, because the 
-        signal object provides its own independent data (the "domain") in the 
-        ``times`` attribute.
-    
-    :channel: 
-        int, default is 0; this is useful to select the channel from a multi-channel signal
-    
-        .. note ::
-            You can always "extract" a single channel from a multi-channel signal *before* passing it to this function
-    
-    :fargs: 
-        tuple with var-positional parameters to `func`
-    
-    :fkwargs: 
-        dict with keyword parameters to `func`
-    
-    :coeff_names: 
-        tuple with model parameter names or symbols (str)
-    
-    :willRaise:
-        When ``False`` (the **default**), any exceptions will be just printed to the standard error output stream (typically, on the system console).
-    
-        When ``True`` exceptions will be raised up the call stack
-    
-    The following are passed directly to scipy.optimize.least_squares:
-    bounds, jac, method, ftol, xtol, gtol, x_scale, loss, f_scale, max_nfev,
-    diff_step, tr_solver, tr_options, jac_sparsity, verbose
-    
-    (see scipy documentation for details)
-    
-    Defaults are:
-    
-    bounds       = -np.inf, np.inf
-    jac          = "2-point"
-    method       = "trf"
-    ftol         = 1e-8
-    xtol         = 1e-8
-    gtol         = 1e-8
-    x_scale      = 1.0
-    loss         = "linear"
-    f_scale      = 1.0
-    max_nfev     = None
-    diff_step    = None
-    tr_solver    = None
-    tr_options   = {}
-    jac_sparsity = None
-    verbose      = 0
-    
-    Returns:
-    ========
-    
-    WARNING: Since 2025-05-19 12:09:54 the second element in the tuple is a 
-    types.SimpleNamespace, and NOT a collections.OrderedDict anymore!
-    
-    A tuple: (fitted curve, types.SimpleNamespace) where:
-    
-    • fitted curve is the realization of the model in `func` using the fitted 
-        parameters and the independent variable `x`
-    
-    • the types.SimpleNamespace contains the following fields:
-    
-        ModelFunction   ↦ str, `func` module.name
-        Fit             ↦ scipy.optimize.OptimizeResult, the fit result output 
-                            by scipy.optimize.least_squares
-        Coefficients    ↦ a types.SimpleNamespace, containing:
-                        "Names"     ↦ typing.Sequence[str], model coefficient (or parameter) names,
-                        "Initial"   ↦ types.SimpleNamespace with:
-                                        "values     ↦ typing.Sequence[float], initial coefficient values
-                                        "bounds"    ↦ scipy.optimize.Bounds object with "lo", "up", and "keep_feasible" fields
-                        "Fitted"    ↦ typing,Sequence[float], the fitted coefficient values
-                        "GoF"       ↦ types.SimpleNamespace with:
-                                        "Rsq"       ↦ float, the R²
-                                        "R2adj"     ↦ float, the adjusted R²
-                                        "SSE"       ↦ float, sum of squared errors between data and the fit
-                                        "RMSE"      ↦ float, root mean squared error between data and the fit
+
+Var-keyword parameters (**kwargs):
+=================================
+
+:x:
+    the independent variable, array-like, with the same shape as `data`.
+    This is mandatory when ``data`` is a generic numpy array or Quantity array.
+
+    When ``data`` is a neo.AnalogSignal, this can be omitted, because the
+    signal object provides its own independent data (the "domain") in the
+    ``times`` attribute.
+
+:channel:
+    int, default is 0; this is useful to select the channel from a multi-channel signal
+
+    .. note ::
+        You can always "extract" a single channel from a multi-channel signal *before* passing it to this function
+
+:fargs:
+    tuple with var-positional parameters to `func`
+
+:fkwargs:
+    dict with keyword parameters to `func`
+
+:coeff_names:
+    tuple with model parameter names or symbols (str)
+
+:willRaise:
+    When ``False`` (the **default**), any exceptions will be just printed to the standard error output stream (typically, on the system console).
+
+    When ``True`` exceptions will be raised up the call stack
+
+The following are passed directly to scipy.optimize.least_squares:
+bounds, jac, method, ftol, xtol, gtol, x_scale, loss, f_scale, max_nfev,
+diff_step, tr_solver, tr_options, jac_sparsity, verbose
+
+(see scipy documentation for details)
+
+Defaults are:
+
+bounds       = -np.inf, np.inf
+jac          = "2-point"
+method       = "trf"
+ftol         = 1e-8
+xtol         = 1e-8
+gtol         = 1e-8
+x_scale      = 1.0
+loss         = "linear"
+f_scale      = 1.0
+max_nfev     = None
+diff_step    = None
+tr_solver    = None
+tr_options   = {}
+jac_sparsity = None
+verbose      = 0
+
+Returns:
+========
+
+WARNING: Since 2025-05-19 12:09:54 the second element in the tuple is a
+types.SimpleNamespace, and NOT a collections.OrderedDict anymore!
+
+A tuple: (fitted curve, types.SimpleNamespace) where:
+
+• fitted curve is the realization of the model in `func` using the fitted
+    parameters and the independent variable `x`
+
+• the types.SimpleNamespace contains the following fields:
+
+    ModelFunction   ↦ str, `func` module.name
+    Fit             ↦ scipy.optimize.OptimizeResult, the fit result output
+                        by scipy.optimize.least_squares
+    Coefficients    ↦ a types.SimpleNamespace, containing:
+                    "Names"     ↦ typing.Sequence[str], model coefficient (or parameter) names,
+                    "Initial"   ↦ types.SimpleNamespace with:
+                                    "values     ↦ typing.Sequence[float], initial coefficient values
+                                    "bounds"    ↦ scipy.optimize.Bounds object with "lo", "up", and "keep_feasible" fields
+                    "Fitted"    ↦ typing,Sequence[float], the fitted coefficient values
+                    "GoF"       ↦ types.SimpleNamespace with:
+                                    "Rsq"       ↦ float, the R²
+                                    "R2adj"     ↦ float, the adjusted R²
+                                    "SSE"       ↦ float, sum of squared errors between data and the fit
+                                    "RMSE"      ↦ float, root mean squared error between data and the fit
 
 
-    """
+"""
     from dataclasses import MISSING # flag for badly-formed annotations
     
     channel     = kwargs.pop("channel",     0)
@@ -1519,7 +1527,7 @@ for the biexponential function
     
     
     CAUTION Only use as an initial guess for the time constants when fitting 
-    a biexponential decay model, with τ0 = 1/np.abs(P), and τ1 = 1/np.abs(q)
+    a biexponential decay model, with τ0 = 1/np.abs(p), and τ1 = 1/np.abs(q)
     
     The biexponential decay model is
     
