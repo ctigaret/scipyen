@@ -3580,8 +3580,13 @@ Operates on a region (or slice) of the signal.
 
 Positional parameters:
 ----------------------
-:loc: the location: a neo.Epoch, datazone.DataZone or datazone.Interval; each of these can have more than one sub-interval.
-    Alternatively, 'loc' can be a SignalCursor or a DataCursor.
+:loc:
+    The location where a measure is calculated.
+
+    This can be a neo.Epoch, datazone.DataZone or datazone.Interval, a |nbsp|
+SignalCursor or DataCursor, or a LocationMeasure.
+    ``neo.Epoch``, ``datazone.DataZone`` or ``datazone.Interval`` objects can |nbsp|
+define more than one sub-interval.
 
 :func: the reducing function, taking a numpy array argument and returning a scalar (e.g., np.min, np.argmin , etc)
 

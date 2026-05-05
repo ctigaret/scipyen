@@ -410,7 +410,14 @@ Named Parameters:
 
             elif len(model.coefficients):
                 starred = model.starred_coefficients
-                ret, destarred, starredGroups, all_names = model.generateFitTable(*initial, **lbubkf)
+                if models.isFittingCoefficientsDict(model.fitting):
+                    initial = model.fitting["initial"]
+                    lbubkw = {"lower": model.fitting["lower"], "upper": model.fitting["upper"]}
+                else:
+                    initial = tuple()
+                    lbubkw = dict()
+
+                ret, destarred, starredGroups, all_names = model.generateFitTable(*initial, **lbubkw)
 
                 self._nStarredCoeffs_ = len(model.starred_coefficients)
                 self._destarredCoeffs_= destarred

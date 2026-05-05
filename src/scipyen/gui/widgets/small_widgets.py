@@ -311,13 +311,19 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
                                                    as_string=True,
                                                    indicate_if_directly_found=True)
 
+        # print(f"{self.__class__.__name__}._getUnitFamilyAndUnitFamilyUnits({unit}):")
+        # print(f"\n\t -> family_name = {family_name}, directly_found = {directly_found}")
+
 
         self._currentUnitsFamilyName = family_name
         self._currentUnitsFamily = scq.UNITS_DICT[self._currentUnitsFamilyName]
         self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(family_name)), key = lambda x: x.name)
 
-        if not directly_found:
-            self._currentUnitFamilyUnits.insert(0, unit.units)
+        # if not directly_found:
+        #     if isinstance(unit, pq.UnitQuantity):
+        #         self._currentUnitFamilyUnits.insert(0, unit)
+        #     else:
+
 
         self._familyIndex = list(scq.UNITS_DICT).index(family_name)
 
@@ -345,6 +351,8 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
             self.unitFamilyComboBox.setCurrentIndex(0)
             self._currentUnitsFamily = self._families[self.unitFamilyComboBox.currentIndex()]
             self._currentUnitsFamilyName = self._family_names[self.unitFamilyComboBox.currentIndex()]
+            # print(f"{self.__class__.__name__}._setupFamilyCombo:\n\tself._currentUnitsFamilyName = {self._currentUnitsFamilyName}")
+            # print(f"\n\tfamily units: {scq.familyUnits(self._family_names[self.unitFamilyComboBox.currentIndex()])}")
             self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(self._family_names[self.unitFamilyComboBox.currentIndex()])), key = lambda x: x.name)
 
     def _setupUnitCombo(self):
@@ -353,6 +361,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         # self._generateCurrentFamilyUnits()
         signalBlocker = QtCore.QSignalBlocker(self.unitComboBox)
         self.unitComboBox.clear()
+        # print(f"{self.__class__.__name__}._setupUnitCombo:\n\tself._currentUnitFamilyUnits = {self._currentUnitFamilyUnits}")
         u_names = list(map(lambda x: x.name, self._currentUnitFamilyUnits))
         u_names_display = list(map(lambda x: f"{x.name} ({x.dimensionality.unicode})" if (x != pq.dimensionless and x.name != x.dimensionality.unicode) else x.name, self._currentUnitFamilyUnits))
         self.unitComboBox.addItems(u_names_display)
@@ -1007,8 +1016,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         if len(self._suffix_):
             text = f"{text}{self._suffix_}"
 
-        super().setSpecialValueText(self._specialValueText_)
-        super().setValue(self._magnitude_)
+        # super().setSpecialValueText(self._specialValueText_)
+        # super().setValue(self._magnitude_)
+        # self.setValue(self._magnitude_)
 
         # print(f"{self.objectName()}: {self.__class__.__name__}.units.setter({value}): text -> {text}")
         signalBlock = QtCore.QSignalBlocker(self.lineEdit())

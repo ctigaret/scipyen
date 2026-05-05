@@ -455,7 +455,6 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
         
         setattr(f, "expression", expression)
         
-        setattr(f, "fitting", None)
 
         if isFittingCoefficientsDict(fitting):
             # NOTE: 2026-01-14 11:19:43
@@ -468,7 +467,10 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
 
             else:
                 setattr(f, "fitting", None)
-                
+
+        else:
+            setattr(f, "fitting", None)
+
         setattr(f, "domainUnits", domainUnits.units if isinstance(domainUnits, pq.Quantity) else None)
         
         setattr(f, "units", units.units if isinstance(units, pq.Quantity) else None)
@@ -683,9 +685,9 @@ A tuple (result:pd.Dataframe,
 
 
     if len(f.coefficients):
-        # starred = f.starred_coefficients
+        starred = f.starred_coefficients
         # # starred = list(filter(lambda c: c.endswith("*"), f.coefficients))
-        # unstarred = list(filter(lambda c: not c.endswith("*"), f.coefficients))
+        unstarred = list(filter(lambda c: not c.endswith("*"), f.coefficients))
         destarred = list(map(lambda c: c.strip("*"), f.starred_coefficients))
 
         # order = list(map(lambda c: f.coefficients.index(c), unstarred + starred))
@@ -762,11 +764,11 @@ A tuple (result:pd.Dataframe,
 
         fdict = dict()
 
-        fdict["Names"] = concrete_names
-        fdict["Initial Value"] = initial
-        fdict["Lower Bound"] = lower
-        fdict["Upper Bound"] = upper
-        fdict["Keep Feasible"] = feasible
+        fdict["Names"] = list(concrete_names)
+        fdict["Initial Value"] = list(initial)
+        fdict["Lower Bound"] = list(lower)
+        fdict["Upper Bound"] = list(upper)
+        fdict["Keep Feasible"] = list(feasible)
 
         if not isFittingCoefficientsDict(f.fitting):
             all_names = fdict.pop("Names")
@@ -778,7 +780,8 @@ A tuple (result:pd.Dataframe,
         names       = f.fitting.get("names", list())
         ncoeffs     = len(names)
 
-        assert(ncoeffs >= len(fdict["Names"]) and (ncoeffs-len(unstarred)) % len(starred) ) == 0, f"Unexpected number of coefficients ({ncoeffs}); must be {nStarredCoeffs} × n + {len(unstarred)} for n components"
+        if len(starred):
+            assert(ncoeffs >= len(fdict["Names"]) and (ncoeffs-len(unstarred)) % len(starred) ) == 0, f"Unexpected number of coefficients ({ncoeffs}); must be {nStarredCoeffs} × n + {len(unstarred)} for n components"
 
         init    = initial or f.fitting.get("initial", list())
         lo      = lower or f.fitting.get("lower", list())
@@ -1114,6 +1117,11 @@ def exponential(x:np.ndarray | Real,
                expression = sympy.Eq(sympy.Symbol("y"),
                                      sympy.Symbol("alpha") +
                                      sympy.Symbol("beta") * (1 - sympy.exp(-1 * (sympy.Symbol("x")-sympy.Symbol("x_0"))*sympy.Symbol("lambda")))),
+               fitting = FittingCoefficientsDict(names= ["α", "β", "x0", "λ"],
+                                                 initial= [0., 1., 0., -100],
+                                                 lower=[-np.inf, -np.inf, -np.inf, -np.inf],
+                                                 upper=[np.inf, np.inf, 0, 0],
+                                                 feasible=[True, True, True, True]),
                )
 def bounded_exponential_rise(x:np.ndarray | Real, 
                              α:typing.Sequence[Real]|np.ndarray, 
@@ -1145,17 +1153,22 @@ values for α, β, and with appropriate value & sign of λ
 
 Parameters:
 ===========
-x: independent variable (e.g., time): 1D numpy array
+x:
+    independent variable (e.g., time): 1D numpy array
 
 coefficients are given as floats in the following order:
 
-α (offset or additive bias, in units of "y"),
+:α:
+    (offset or additive bias, in units of "y"),
 
-β (scale, or multiplicative bias; dimensionless),
+:β:
+    (scale, or multiplicative bias; dimensionless),
 
-x₀ (onset, delay or shift, in units of "x"),
+:x₀:
+    (onset, delay or shift, in units of "x"),
 
-λ (exponential constant; in (units of "x")⁻¹)
+:λ:
+    (exponential constant; in (units of "x")⁻¹)
 
 """
     x = check_independent_variable(x)
@@ -1170,9 +1183,12 @@ x₀ (onset, delay or shift, in units of "x"),
 @modelfunction(coefficients = ("α", "β", "x0", "τ"),
                title="AlphaSynapse",
                expression = "$$f(x) = \\begin{cases} \\alpha + \\frac{\\beta \\left(x - x_{0}\\right) \\times e^{\\frac{\\left(\\tau - x + x_{0}\\right)} {\\tau}} } {\\tau} & \\text{for}\\: \\left(x - x_{0}\\right) \\geq 0 \\textrm{, }\\tau>0 \\\\\\alpha & \\text{otherwise} \\end{cases}$$",
-               fitting = FittingCoefficientsDict(initial= (0., 1., 0., 0.01), 
-                          lower=(-np.inf, -np.inf, 0., 0.),
-                          upper=(np.inf, np.inf, np.inf, np.inf)),
+               fitting = FittingCoefficientsDict(
+                   names=["α", "β", "x0", "τ"],
+                   initial= [0., 1., 0., 0.01],
+                   lower=[-np.inf, -np.inf, 0., 0.],
+                   upper=[np.inf, np.inf, np.inf, np.inf],
+                   feasible=[True, True, True, True]),
                domainUnits = pq.s,
                units = pq.pA
                )
@@ -2646,7 +2662,8 @@ def isModelFunction(func:typing.Callable):
     
     return isinstance(getattr(func, "model_function", None), bool) and isinstance(getattr(func, "nvars", None), int)
 
-def get_initial_coefficient_values(func:typing.Callable) -> pd.DataFrame | None: # TODO 2026-01-29 14:50:57
+def get_initial_coefficient_values(func:typing.Callable) -> pd.DataFrame | None:
+    # TODO 2026-01-29 14:50:57
     if not isModelFunction(func):
         raise TypeError(f"{func} is not a model function")
     
