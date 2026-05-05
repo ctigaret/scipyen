@@ -35,6 +35,13 @@ else:
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
 
+if "darwin" in sys.platform:
+    altKeyDescr = "<Option>"
+    ctrlKeyDescr = "<Command>"
+else:
+    altKeyDescr = "<ALT>"
+    ctrlKeyDescr = "<CTRL>"
+
 import matplotlib as mpl
 
 from core.utilities import safewrapper
@@ -1331,12 +1338,26 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 #             return p
 
     @safewrapper
-    def importWorkspaceData(self, dataTypes:typing.Union[typing.Type[typing.Any], typing.Sequence[typing.Type[typing.Any]]], title:str="Import from workspace", single:bool=True, preSelected:typing.Optional[str]=None, with_varName:bool=False):
+    def importWorkspaceData(self, dataTypes: typing.Union[typing.Type[typing.Any],
+                                                         typing.Sequence[typing.Type[typing.Any]]
+                                                         ],
+                            title: str="Import from workspace",
+                            single: bool=True,
+                            preSelected: typing.Optional[str]=None,
+                            with_varName: bool=False,
+                            predicate = None):
         r"""Launches ItemsListDialog to import on or several workspace variables.
 
         Parameters:
         -----------
-        dataTypes: type, or sequence of types
+        :dataTypes: type, or sequence of types.
+        :title: Dialog title.
+        :single: When True (the default), allow selection of only one variable.
+        :preSelected: Pre-selected variable name (if it exists) or None
+        :with_varName: When True, also return the name of the selected variable(s); default is False
+        :predicate: optional callable taking one parameter and returning a bool, for a further selection of what is shown; default is None
+
+        See also core.workspacefunctions.getvarsbytype
         """
         from core.workspacefunctions import getvarsbytype
         #print("dataTypes", dataTypes)
@@ -1352,15 +1373,15 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
         user_ns_visible = dict([(k,v) for k,v in scipyenWindow.workspace.items() if k not in scipyenWindow.workspaceModel.user_ns_hidden])
 
-        name_vars = getvarsbytype(dataTypes, ws = user_ns_visible)
+        name_vars = getvarsbytype(dataTypes, ws = user_ns_visible, predicate=predicate)
 
         if len(name_vars) == 0:
             return list()
 
         name_list = sorted([name for name in name_vars])
 
-        #selectionMode = QtWidgets.QAbstractItemView.SingleSelection if single else QtWidgets.QAbstractItemView.MultiSelection
-        selectionMode = QtWidgets.QAbstractItemView.SingleSelection if single else QtWidgets.QAbstractItemView.ExtendedSelection
+        selectionMode = (QtWidgets.QAbstractItemView.SingleSelection if single
+                         else QtWidgets.QAbstractItemView.ExtendedSelection)
 
         if isinstance(preSelected, str) and len(preSelected.strip()) and preSelected in name_list:
             dialog = ItemsListDialog(parent=self, title=title, itemsList = name_list,

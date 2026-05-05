@@ -3889,7 +3889,7 @@ Implements the functionality of neo.AnalogSignal's merge() and concatenate()
 methods, but allows a sequence of signal objects, instead of being restricted
 to two signal objects.
 
-When the 'axis' parameters is the default (1) this is useful to collapse
+When the 'axis' parameters is 1 (the default) this is useful to collapse
 several analog signals into a single multi-channel signal (a.k.a 'merging',
 see also ``neo.AnalogSignal.merge``).
 

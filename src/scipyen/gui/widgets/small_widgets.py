@@ -358,15 +358,12 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
     def _setupUnitCombo(self):
         r"""Called by _configureUI_ but also when manually setting up a unit
         """
-        # self._generateCurrentFamilyUnits()
         signalBlocker = QtCore.QSignalBlocker(self.unitComboBox)
         self.unitComboBox.clear()
-        # print(f"{self.__class__.__name__}._setupUnitCombo:\n\tself._currentUnitFamilyUnits = {self._currentUnitFamilyUnits}")
         u_names = list(map(lambda x: x.name, self._currentUnitFamilyUnits))
         u_names_display = list(map(lambda x: f"{x.name} ({x.dimensionality.unicode})" if (x != pq.dimensionless and x.name != x.dimensionality.unicode) else x.name, self._currentUnitFamilyUnits))
         self.unitComboBox.addItems(u_names_display)
         u_name = scq.unitName(self._units_)
-        # print(f"{self.__class__.__name__}._setupUnitCombo: u_name -> {u_name}")
         if u_name in u_names:
             self.unitComboBox.setCurrentIndex(u_names.index(u_name))
         else:
@@ -374,10 +371,8 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
 
     @Slot(int)
     def _slot_unitsFamilyChanged(self, value):
-        # print(f"{self.__class__.__name__}._slot_unitsFamilyChanged: value = {value}")
         self._currentUnitsFamilyName = self._family_names[self.unitFamilyComboBox.currentIndex()]
         self._currentUnitsFamily = scq.UNITS_DICT[self._currentUnitsFamilyName]
-        # print(f"\nself._currentUnitsFamily -> {self._currentUnitsFamily}")
         self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(self._currentUnitsFamilyName)), key = lambda x: x.name)
         self._setupUnitCombo()
         self._units_ = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]

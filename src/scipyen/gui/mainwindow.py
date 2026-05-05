@@ -94,41 +94,19 @@ except:
 # BEGIN About QStyle plugins
 # WARNING: 2024-09-26 15:44:57
 #
-# A PtQtxxx stack pulled from PyPi or conda-forge, it is likely ot have a limited
+# A PtQtxxx stack pulled from PyPi or conda-forge, it is likely to have a limited
 # set of Qt styles available. In this case, there is nothing much that can be done.
 # Simply "copying" the style libraries available on the your platform won't do,
 # as this may crash Scipyen because they belong to a different build.
 #
 # The alternative is to build an environment locally (see install.sh) which
-# WILL inolve building a local PyQt wheel. Incidentally, this will also build
-# the vigra libraries loclly, from sources. Howeverm this option has its limitations
+# WILL involve building a local PyQt wheel. Incidentally, this will also build
+# the vigra libraries locally, from sources. However, this option has its limitations
 # due to embedded dependencies on the host platform.
 #
 #
 #
 # END About QStyle plugins
-
-# BEGIN pyqtdarktheme - recommended for Windows
-# hasQDarkTheme = False
-# try:
-#     import qdarktheme
-#     hasQDarkTheme = True
-# except:
-#     pass
-
-# END pyqtdarktheme
-
-# BEGIN qdarkstyle is another possibility (for windows)
-# based entirely on style sheets
-# hasQDarkStyle = False
-
-# try:
-#     import qdarkstyle
-#     hasQDarkStyle = True
-# except:
-#     hasQDarkStyle = False
-
-# END qdarkstyle
 
 # END PyQtxxx
 
@@ -3530,9 +3508,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             else:
                 raise ValueError(f"Unexpected viewer class name {wClass}")
 
-        else:
-            if winClass not in self.viewers:# or winClass != mpl.figure.Figure or not issubclass(winClass, QtWidgets.QMainWindow):
-                raise ValueError(f"Unexpected viewer class {winClass.__name__}")
+        # else:
+        #     if winClass not in self.viewers:# or winClass != mpl.figure.Figure or not issubclass(winClass, QtWidgets.QMainWindow):
+        #         raise ValueError(f"Unexpected viewer class {winClass.__name__}")
 
         if winClass is mpl.figure.Figure:
             fig_kwargs = dict()

@@ -549,7 +549,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
         if len(visited):
             return pItem
 
+        # print(f"{self.__class__.__name__}._buildBranch_")
         for key, value in obj.items():
+            # print(f"\tkey  {key} ->  {type(value)}")
             if isinstance(key, str):
                 keyName = key
             else:
@@ -560,7 +562,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
             # and create choices accordingly
             pValue, valDict = self._parseObject_(value, dict(), self._showPrivate_)
 
-            if not self._showMethods_:
+            if objDict["indirect"] and not self._showMethods_:
+                # NOTE: 2026-05-05 22:33:51
+                # DO show functions & method values in a dict-like object, where
+                # "indirect" is False
                 if valDict["objType"] in (types.FunctionType,
                                           types.BuiltinFunctionType,
                                           types.MethodType,
@@ -896,6 +901,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                                                types.BuiltinMethodType],
           choices: dict = dict(),
           _:bool = False) -> tuple:
+        # print(f"{self.__class__.__name__}._parseObject_(obj: {type(obj)})")
         objType = type(obj)
         objId = id(obj)
         if not isinstance(choices, dict):

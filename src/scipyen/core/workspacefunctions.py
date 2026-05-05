@@ -41,15 +41,15 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
+
     from qtpy import sip
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
-    
-# 
+
+#
 # import qtpy
 # qtpy.API = os.environ["QT_API"]
 # if os.environ["QT_API"] == "pyside6":
@@ -63,64 +63,69 @@ from core.strutils import (is_glob, is_regexp)
 
 try:
     from reprlib import repr
-    
+
 except ImportError:
     pass
 
 def debug_scipyen(arg:typing.Optional[typing.Union[str, bool]] = None):
     r"""Sets or gets the state of scipyen debugging.
-    
+
     The state is a boolean variable SCIPYEN_DEBUG in the user namespace.
-    
+
     When True, then specific "print" messages in the scipyen modules get executed
-    
+
     Parameters:
     -----------
     arg: str, bool, optional (default is None)
         When str, "on" (case-insensitive) turns debugging ON ; anything else
             turns debugging OFF
-            
+
         When bool, True turns debugging ON, False turns it OFF
-        
+
         When None, the function returns the current state of SCIPYEN_DEBUG.
-        
+
         NOTE this is deliberately different from the behaviour of the
         'scipyen_debug' line magic which, whehn called without argument, toggles
         the debugging state ON or OFF
-    
+
     """
     ns = user_workspace()
     if not isinstance(ns, dict):
         return False
-    
+
     if arg is None:
         if "SCIPYEN_DEBUG" not in ns:
             ns["SCIPYEN_DEBUG"] = False
-            
+
         return ns["SCIPYEN_DEBUG"]
-    
+
     if isinstance(arg, str):
         val = arg.strip().lower() == "on"
         ns["SCIPYEN_DEBUG"] = val
         return ns["SCIPYEN_DEBUG"]
-    
+
     elif isinstance(arg, bool):
         ns["SCIPYEN_DEBUG"] = arg
         return ns["SCIPYEN_DEBUG"]
-        
+
     elif not isinstance(arg, bool):
         raise TypeError("Expecting a str ('on' or 'off'), a bool, or None; got %s instead" % arg)
-        
+
 @with_doc((is_regexp, is_glob), use_header = True)
-def lsvars(*args, 
-           glob:typing.Optional[bool]=None, 
-           ws:typing.Union[dict, type(None)]=None, 
-           var_type:typing.Optional[typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]]=None, 
-           sort:bool=False, 
-           sortkey:object=None, 
-           reverse:bool=False) -> typing.Union[typing.List[str], typing.Generator, typing.KeysView]:
+def lsvars(*args,
+           glob:typing.Optional[bool]=None,
+           ws:typing.Union[dict, type(None)]=None,
+           var_type:typing.Optional[typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]]=None,
+           sort:bool=False,
+           sortkey:object=None,
+           reverse:bool=False,
+           predicate = None) -> typing.Union[
+                                                typing.List[str],
+                                                typing.Generator,
+                                                typing.KeysView
+                                            ]:
     r"""List names of variables in a namespace, according to selection criteria.
-    
+
 The selection occurs in stages:
 
 Stage 1 identifies symbols in the 'ws' workspace that match the glob or regular
@@ -129,21 +134,21 @@ Stage 1 identifies symbols in the 'ws' workspace that match the glob or regular
 Stage 2 (optional) narrows down the result by selecting the variables bound to
     the symbols found in Stage 1, based on the type of the variable ('var_type'
     parameter).
-    
+
 Stage 3 (optional) applies a sorting criteria and the ordering mode, which is
     by default, ascending ('sort', 'sortkey' and 'reverse' parameters)
-    
+
 
 Var-positional parameters:
 --------------------------
 args: comma-separated list of strings, types, or sequence of types
 
-    When args contains strings, these define patterns to match against the 
+    When args contains strings, these define patterns to match against the
     variable names in the search namespace.
-    
+
     When args only contain an empty string, or not given, the function
     returns a list with all the variable names in the search namespace.
-    
+
     When args contains types, these identify what type of variables to be listed
     in the search namespace.
 
@@ -151,82 +156,84 @@ Named parameters:
 -----------------
 
 glob: bool (optional default is None)
-    When True, the strings in args are treated as UNIX shell-style globs; 
+    When True, the strings in args are treated as UNIX shell-style globs;
     when False, they are treated as regular expression strings.
 
-    When None, the strings are checked to see if they are regexp-like or 
+    When None, the strings are checked to see if they are regexp-like or
     glob-like, using is_regexp() and is_glob().
-    
+
 ws: dict (default None) = the search namespace
 
     When a dict, its keys must all be strings.
-    
+
     The search namespace. This can be:
     a) a global namespace as returned by globals(),
     b) a local namespace as returned by locals(), or vars()
-    c) an object's namespace as returned by vars([object]) -- technically, 
+    c) an object's namespace as returned by vars([object]) -- technically,
         the object.__dict__
-    
+
     When None, the function tries ot find the user namespace (the "workspace")
     as set up by the Scipyen Main Window in Scipyen application.
 
 var_type: a type, a sequence of types, or None (default)
     When a type, only select the variables of the indicated type
-    
+
+predicate: callable, for further selection
+
 Returns:
 -------
 
 A (possibly sorted) list of variable names if found, or an empty list.
     """
     from fnmatch import translate
-    
+
     if ws is None:
         ws = user_workspace()
-        
+
     if ws is None:
         raise ValueError("No valid workspace has been specified or found")
-        
+
     if len(args) == 0: # no selector arguments: get all variables names in ws
         return ws.keys()
 
     elif len(args) == 1: # one selector argument
         sel = args[0]
-        
+
         if sel is None:
             return ws.keys() # no selector: get all variables names in ws
-            
+
         elif isinstance(sel, str): # select by variable name
             if len(sel.strip()) == 0:# empty selector string: get all variables names in ws
                 return ws.keys()
-            
+
             if glob is None:
                 if is_regexp(sel):
                     glob = False
                 elif is_glob(sel):
                     glob = True
-                    
+
                 else:
                     glob = False # treat non-globs as a plain regexp
-                    
+
             p = _re.compile(translate(sel)) if glob else _re.compile(sel)
-            
+
             var_names_filter = filter(p.match, ws.keys())
             vlist =  [k for k in var_names_filter] # return a list of variable names
-            
+
             if isinstance(var_type, type) or (isinstance(var_type, (tuple, list)) and all([isinstance(v, type) for v in var_type])):
                 ret = [s for s in vlist if isinstance(ws[s], var_type)]
-                
+
             else:
                 ret =  vlist # return a list of variable names
-        
+
         elif isinstance(sel, type) or (isinstance(sel, (list, tuple)) and all([isinstance(k, type) for k in sel])):
             # select by variable type (or types)
             # ignore var_type parameter
             ret = [k for (k,v) in ws.items() if sel is not type(None) and isinstance(v, sel)] # return a list of variable names
-            
+
         else:
             raise TypeError("Unexpected type for the selector argument: got %s" % type(sel).__name__)
-            
+
     else: # comma-separated list of selector arguments
         ret = list()
         for (sk, sel) in enumerate(args):
@@ -237,143 +244,153 @@ A (possibly sorted) list of variable names if found, or an empty list.
                             glob = False
                         elif if_glob(sel):
                             glob = True
-                            
+
                         else:
                             glob = True # treat non-globs as a plain regexp
-                    
+
                     p = _re.compile(translate(sel)) if glob else _re.compile(sel)
-                    
+
                     var_names_filter = filter(p.match, ws.keys())
-                    
-                    vlist = [k for k in var_names_filter] 
-                    
+
+                    vlist = [k for k in var_names_filter]
+
                     if isinstance(var_type, type) or (isinstance(var_type, (tuple, list)) and all([isinstance(v, type) for v in var_type])):
                         ret.extend([s for s in vlist if isinstance(ws[s], var_type)])
-                        
+
                     else:
                         ret.extend(vlist) # return a list of variable names
-                    
+
                 #if len(ret) == 0:
                     #return ws.keys()
-            
+
             elif isinstance(sel, type) or (isinstance(sel, (list, tuple)) and all([isinstance(k, type) for k in sel])):
                 # ignore var_type
                 ret += [k for (k,v) in ws.items() if isinstance(v, sel)] # return a list of variable names
-                
+
             else:
                 raise TypeError("Unexpected type for the selector argument number %d: got %s" % (sk, type(sel).__name__))
-                
-    
+
+
+    if isinstance(predicate, typing.Callable):
+        ret = list(filter(lambda n: predicate(ws[n]), ret))
+
     if sort:
         return sorted(ret, key=sortkey, reverse=reverse)
-    
+
     return ret
-    
-def getvarsbytype(vartype, ws=None):
-    r"""Get variables by type, from a namespace or a dict
+
+def getvarsbytype(vartype, ws=None, predicate = None):
+    r"""Get variables by type, from a namespace or a dict, optionally suibject to predicate
     """
     if not isinstance(vartype, (type, tuple, list)):
         raise TypeError("Expecting  type or a sequence of types as first argument; got %s instead" % (type(vartype).__name__))
-    
+
     if isinstance(vartype, (tuple, list)):
         if len(vartype) == 0:
             return dict()
-        
+
         if not all([isinstance(v, type) for v in vartype]):
             raise TypeError("Sequence in the first argument must contain only types")
-        
+
         if isinstance(vartype, list):
             vartype = tuple(vartype)
-        
+
     if ws is None:
         ws = user_workspace()
     if ws is None:
         raise ValueError("No valid workspace has been specified or found")
-        
-    return dict((name, val) for (name, val) in ws.items() if isinstance(val, vartype) and not name.startswith("_"))
+
+    if isinstance(predicate, typing.Callable):
+        return dict(filter(lambda i: isinstance(i[1], vartype) and not i[0].startswith("_") and predicate(i[1]), ws.items()))
+    else:
+        return dict(filter(lambda i: isinstance(i[1], vartype) and not i[0].startswith("_"), ws.items()))
+    # return dict((name, val) for (name, val) in ws.items() if isinstance(val, vartype) and not name.startswith("_"))
     #lst=[(name, val) for (name, val) in ws.items() if (any([isinstance(val, v_type) for v_type in vartype]) and not name.startswith("_"))]
-    
+
     #return dict(lst)
-        
+
 @with_doc(lsvars, use_header=True)
-def getvars(*args, 
-            glob:typing.Optional[bool]=None, 
-            ws:typing.Union[dict, type(None)]=None, 
-            var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None, 
-            as_dict:bool=False, 
-            sort:bool= False, 
-            sortkey:object=None, 
-            reverse:bool = False) -> typing.Sequence:
+def getvars(*args,
+            glob:typing.Optional[bool]=None,
+            ws:typing.Union[dict, type(None)]=None,
+            var_type:typing.Union[type, type(None), typing.Tuple[type], typing.List[type]]=None,
+            as_dict:bool=False,
+            sort:bool= False,
+            sortkey:object=None,
+            reverse:bool = False,
+            predicate = None) -> typing.Sequence:
     r"""Collects a subset of variabes from a workspace or a dictionary.
 
 Returns a (possibly sorted) list of the variables if found, or an empty list.
 
 Var-positional parameters:
 ==========================
-*args: selection criterion. This may be: 
+*args: selection criterion. This may be:
     1) a string or a sequence of strings, each containing either a shell-type
-        "glob" expression, or a regular expression (a "regexp", see python's 
+        "glob" expression, or a regular expression (a "regexp", see python's
         re module for help about regexps).
-        
+
         For example, to select variables with names beginning with "data",
         the selection string may be either
-        
+
         "data*" (a shell-type glob) or "^data*" (a regexp string)
-        
+
         Whether the selection string is interpreted as a glob or a regexp
         depends on the value of the "glob" parameter (see below).
-    
+
     2) a type, or an iterable (list, tuple) of types
-    
+
         This allows to select all ws variables of the type(s) specified in 'sel'
-        
+
 Named parameters:
 =================
-glob: bool, optional, default is None - see lsvars documentation for details
+:glob: bool, optional, default is None - see lsvars documentation for details
 
-    When True, the selection strings in args are treated these as UNIX 
+    When True, the selection strings in args are treated these as UNIX
         shell-type globs.
-        
+
     Otherwise, they are treated as regular expression strings.
 
-ws : a dictionary or None (default).
+:ws : a dictionary or None (default).
 
     When a dict, its keys must all be strings, and represents the namespace
     where the variables are searched.
-    
+
         This can be:
         a) a global namespace as returned by globals(),
         b) a local namespace as returned by locals(), or vars()
         c) an object's namespace as returned by vars([object]);
             this is technically the __dict__ attribute of the object
-        
+
     When None, the function searches inside the user namespace. This is a
-    reference to the console kernel's namespace and is the same as the 
+    reference to the console kernel's namespace and is the same as the
     "workspace" attribute of Scipyen's main window. In turn, Scipyen
-    main window is referenced as the "mainWindow" variable in the console 
+    main window is referenced as the "mainWindow" variable in the console
     namespace.
-    
-var_type: a type, a sequence of types, or None (default)
+
+:var_type: a type, a sequence of types, or None (default)
     When a type, only select the variables of the indicated type
-    
-as_dict: bool, default False.
+
+:as_dict: bool, default False.
 
     When True, returns an ordered dict with objects stored by their names in
     the search namespace, sorted alphabetically;
-    
+
     Whe False (the default) the function return a list of objects.
-    
-sort:bool, default is False
+
+:sort:bool, default is False
     Sort the variables according to their name (by default) or by sortkey
-    
-sortkey:None or an objetc that is valid as a sort key for list sorting
+
+:sortkey:None or an objetc that is valid as a sort key for list sorting
     (see list.sorted() or sort() python functions)
-    
-reverse:bool, default is False.
-    When sort is True, the data is sorted in reverse order. Otherwise, this 
+
+:reverse:bool, default is False.
+    When sort is True, the data is sorted in reverse order. Otherwise, this
     is ignored.
 
-        
+:predicate: callable, further selection criteria; default is None.
+
+
 Returns:
 ========
 a list or a dict.
@@ -385,19 +402,19 @@ Examples:
 ret = getvars(some_type, ws=globals())
 
     Returns a list of all variables in the user namespace that are instances of some_type
-    
+
 ret = getvars(list_or_tuple_of_type_objects, ws=globals())
 
-    Returns a list of variables in the user namespace that are instances of any of the 
+    Returns a list of variables in the user namespace that are instances of any of the
         types contained in list_or_tuple_of_type_objects
-        
+
 ret = getvars(regexp, glob=False, ws=globals())
 
 ret = getvars(glob_pattern, glob=True, ws=globals())
-    Return a list of variables in the user name space, with names that return a match 
+    Return a list of variables in the user name space, with names that return a match
     for the string in regexp
-    
-    
+
+
 ret = getvars(neo.Block, ws = locals())
 
 # useful idioms:
@@ -414,44 +431,44 @@ ret = getvars(neo.Block, ws = locals())
 NOTE: The function calls lsvars(...) to select the variables.
 
 See also: lsvars(), sorted()
-        
-NOTE: The function was designed to complement the %who, %who_ls and %whos 
+
+NOTE: The function was designed to complement the %who, %who_ls and %whos
         IPython linemagics, which conspicuously lack the facility to filter
         their output according to variable names or types. It is NOT thread
-        safe -- if the contents of the "ws" workspace are concurrently 
+        safe -- if the contents of the "ws" workspace are concurrently
         modified by another thread, it may raise an exception.
-            
+
     """
     if ws is None:
         ws = user_workspace()
-        
+
     if ws is None:
         raise ValueError("No valid workspace has been specified or found")
-        
-    var_names = lsvars(*args, glob=glob, var_type=var_type, ws=ws)
-    
-    
+
+    var_names = lsvars(*args, glob=glob, var_type=var_type, ws=ws, predicate=predicate)
+
+
     if as_dict:
         lst = [(n, ws[n]) for n in var_names]
-        
+
         if not sort:
             if sortkey is not None:
                 sort = True
-        
+
         if sort and sortkey is not None:
             lst.sort(key=sortkey)
-            
+
         if reverse is True:
             lst.reverse()
-        
+
         ret = OrderedDict(lst)
-        
+
     else:
         ret = [ws[n] for n in var_names]
-        
+
         if sort and sortkey is not None:
             ret.sort(key=sortkey)
-        
+
     return ret
 
 def assignin(variable:object, varname:str, ws:typing.Optional[dict]=None):
@@ -461,25 +478,25 @@ def assignin(variable:object, varname:str, ws:typing.Optional[dict]=None):
     user_ws = user_workspace()
     if ws is None:
         ws = user_ws
-        
+
     if ws is None:
         raise ValueError("No valid workspace has been specified or found")
-        
+
     ws[varname] = variable
-    
+
     if ws is user_ws:
         ws["mainWindow"].workspaceModel.update()
-    
+
 assign = assignin # syntactic sugar
 
 def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None):
     r"""Returns a list of symbols to which 'x' is bound in the namespace 'ws'
-    
+
     The  list is empty when the variable 'x' does not exist in ws (e.g when it is
     dynamically created by an expression).
-    
+
     WARNING The same variable may be bound to more than one symbol.
-    
+
     Parameters:
     ----------
     x : a Python object of any type
@@ -488,15 +505,15 @@ def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None):
     """
     if ws is None:
         ws = user_workspace()
-        
+
     elif not isinstance(ws, dict):
         raise TypeError("'ws' expected ot be a dict; got %s instead" % type(ws).__name__)
-        
+
     return [k for k in ws if ws[k] is x and not k.startswith("_")]
 
 def getMainScipyenWindow() -> object:
     r"""Try and retrieve Scipyen's main window instance.
-This is searched in 
+This is searched in
     1) the user's workspace;
     2) the call stack
     3) in the list of top level widgets of the QApplication
@@ -506,9 +523,9 @@ Returns None if the SciyenWindow instance is not found
 .. note::
     This seems redundant, given the existence of ``gui.guiutils.getScipyenMainWindow()``
     In fact, since 2026-01-04 22:38:21 it actually calls that function, and is left here because it is being called in various other places.
-    
+
     """
-    from gui import guiutils 
+    from gui import guiutils
     return guiutils.getScipyenMainWindow()
 # #     # NOTE: 2026-01-04 22:34:17
 # #     # redundant: see gui.guiutils.getScipyenMainWindow
@@ -525,7 +542,7 @@ Returns None if the SciyenWindow instance is not found
 # #                 else:
 # #                     ret = f[0].f_globals["ScipyenWindow"].instance()
 # #                 break
-# #             
+# #
 # #     if ret is None:
 # #         try:
 # #             app = QtWidgets.QApplication.instance()
@@ -535,7 +552,7 @@ Returns None if the SciyenWindow instance is not found
 # #                     ret = ww[0]
 # #         except:
 # #             traceback.print_exc()
-# # 
+# #
 # #     return ret
 
 def getCallSource() -> object:
@@ -565,47 +582,47 @@ def getCallSource() -> object:
                 else:
                     ret = f[0].f_globals["ExternalConsoleWindow"].instance()
                 break
-            
+
     return ret
 
 # def unpack(o, ws:typing.Optional[typing.Union[dict, str]] = None):
 @singledispatch
 def unpack(o, ws:typing.Optional[dict] = None):
     r"""Unpacks the contents of a dict, a named tuple, or a dataclass.
-    
+
     For dict objects (mapping key ↦ values), the values are bound to symbols
 (names) derived from the corresponding key in the mapping. The keys must be either
 str or int; any other type raises an error.
-    
+
     Key type                    Symbol
     -------------------------------------
     str                         the key itself
     int                         "data_" + string representation of the key
-    
+
 For named tuples, the values are bound to the coresponding field name (which, by
 definition, is a str)
 
 For dataclasses, the values are bound to symbols derived from the corresponding
-field (attribute) of the dataclass as retrieved by the dataclasses.fields() 
+field (attribute) of the dataclass as retrieved by the dataclasses.fields()
 function.
-    
+
 Value ↦ symbol binding is done in the target dictionary, typically a namespace
 
 By default the user workspace (or namespace) is used, see below.
-    
+
 WARNING: Symbols are NOT verified for uniqueness in the target. This means that
 unpack may overwrite variables bound to the same symbol in the target namespace.
-    
-    
+
+
 """
     from core.scipyendataclasses import isDataclass
 
     if not isDataclass(o):
         raise NotImplementedError(f"'unpack is not implemented for objects of type {type(o).__name__}")
-    
+
     if ws is None:
         ws = user_workspace()
-        
+
     elif not isinstance(ws, dict):
         raise TypeError(f"'ws': Expected a dict; instead, got a {type(ws).__name__}")
 
@@ -618,15 +635,15 @@ unpack may overwrite variables bound to the same symbol in the target namespace.
                 raise TypeError(f"Key {k} type {type(k).__name__} is NOT supported; expecting a str or an int")
         else:
             name = k
-            
+
         name = validate_varname(name, checkUnique=False)
         assignin(v, name, ws)
-    
+
 @unpack.register(dict)
 def _unpack(x:dict, __ws__:typing.Optional[dict] = None):
     if __ws__ is None:
         __ws__ = user_workspace()
-        
+
     elif not isinstance(ws, dict):
         raise TypeError(f"'ws': Expected a dict; instead, got a {type(ws).__name__}")
         # raise TypeError(f"'ws': Expected a dict or the string 'caller'; instead, got a {type(ws).__name__}")
@@ -639,10 +656,10 @@ def _unpack(x:dict, __ws__:typing.Optional[dict] = None):
                 raise TypeError(f"Key {k} type {type(k).__name__} is NOT supported; expecting a str or an int")
         else:
             name = k
-            
+
         name = validate_varname(name, __ws__, checkUnique=False)
         assignin(v, name, __ws__)
-        
+
 @unpack.register(tuple)
 def _unpack(x:tuple, ws:typing.Optional[dict] = None):
     from core.dataypes import is_namedtuple
@@ -650,7 +667,7 @@ def _unpack(x:tuple, ws:typing.Optional[dict] = None):
         raise TypeError("Expecting a named tuple")
     if ws is None:
         ws = user_workspace()
-        
+
     elif not isinstance(ws, dict):
         raise TypeError(f"'ws': Expected a dict; instead, got a {type(ws).__name__}")
 
@@ -662,7 +679,7 @@ def _unpack(x:tuple, ws:typing.Optional[dict] = None):
                 name = f"{k}"
         else:
             name = k
-            
+
         name = validate_varname(name, checkUnique=False)
         assignin(v, name, ws)
 
@@ -673,111 +690,111 @@ def user_workspace():
     for (n,f) in enumerate(frame_records):
         if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within Scipyen's IPython console
             return f[0].f_globals["mainWindow"].workspace
-        
+
 def scipyentopdir():
     user_ns = user_workspace()
     if user_ns is None: # this sometimes DOES happen - BUG 2024-02-04 10:47:30 FIXME
-        # WARNING 2024-02-04 10:55:53 
+        # WARNING 2024-02-04 10:55:53
         # this dubious for pyinstaller-bundled scipyen
-        
+
         # sys.path contains directories or zip archives!
         # 1.check for top directory in a source (e.g. locally cloned git repo):
         # this should be '<some_path>/scipyen/src/scipyen/' containing 'scipyen.py'
         src = [s for s in sys.path if (s.endswith("scipyen") and "src" in s and os.path.isfile(os.path.join(s, "scipyen.py")))]
-        
+
         if len(src):
             return src[0]
-        
+
         # 2. check if this is a pyinstaller-bundled scipyen: has executable 'scipyen'
         return QtCore.QCoreApplication.applicationDirPath()
 #         app = [s for s in sys.path if (os.path.isfile(os.path.join(s, "scipyen")) and os.access(os.path.join(s, "scipyen"), os.X_OK))]
-#         
+#
 #         if len(app):
 #             return app[0]
-#         
+#
 #         else:
 #             scipwarn("Cannot determine scipyen's top directory", UserWarning)
 #             return
-            
+
     return user_ns["mainWindow"]._scipyendir_
 
 def delvars(*args, glob=True, ws=None):
     r"""Delete variable named in *args from workspace ws
-    CAUTION 
+    CAUTION
     """
     if ws is None:
         ws = user_workspace()
-        
+
     if ws is None:
         raise ValueError("No valid workspace has been specified or found")
-        
+
         #frame_records = inspect.getouterframes(inspect.currentframe())
         #for (n,f) in enumerate(frame_records):
             #if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within the IPython console
                 #ws = f[0].f_globals["mainWindow"].workspace
                 #break
-    
+
     #print(args)
-    
+
     if len(args) == 0:
         raise ValueError("empty argument list")
-    
+
     if len(args) == 1:
         item = args[0]
-        
+
         if item is None:
             raise TypeError("can't delete None object")
-        
+
         if isinstance(item, str):
             if len(item.strip()) == 0:
                 # NOTE: 2019-09-06 22:44:08
                 # item may itself be a str variable which is empty
                 targets = [(k, v) for k,v in ws.items() if v is item]
-                
-                if len(targets) == 0: 
+
+                if len(targets) == 0:
                     raise NameError("can't delete an empty identifier")
-                
+
                 for t in targets:
                     ws.pop(t[0], None)
-                    
+
                 #raise ValueError("can't delete an empty identifier")
             else:
                 varlist = lsvars(item, glob=glob, ws=ws)
-            
+
                 if len(varlist) == 0:
                     # see NOTE: 2019-09-06 22:44:08
                     targets = [(k, v) for k,v in ws.items() if v is item]
-                    
-                    if len(targets) == 0: 
+
+                    if len(targets) == 0:
                         raise NameError("there are no variables with names defined by this pattern: %s" % item)
                         #raise NameError("can't delete an empty identifier")
-                    
+
                     for t in targets:
                         ws.pop(t[0], None)
-                    
+
                 else:
                     for v in varlist:
                         ws.pop(v, None)
-                
+
         elif isinstance(item, type) or (isinstance(item, (list, tuple)) and all([isinstance(k, type) for k in item])):
             varlist = lsvars(item, ws=ws)
             if len(varlist) == 0:
                 raise TypeError("there are no variables with type(s) %s" % item)
-            
+
             for v in varlist:
                 ws.pop(v, None)
-                
+
         elif args[0] is not None:
             targets = [(k, v) for k,v in ws.items() if v is args[0]]
             # NOTE: 2019-09-06 22:32:34
             # this won't happen because passing unbound name to this function
             # will raise NameError anyway
-            #if len(targets) == 0: 
+            #if len(targets) == 0:
                 #raise NameError("specified variables are not defined")
-            
+
             for t in targets:
                 ws.pop(t[0], None)
-                
+
     else:
         for item in args:
             if isinstance(item, (str, type)):
@@ -786,59 +803,59 @@ def delvars(*args, glob=True, ws=None):
                 if len(varlist) == 0:
                     # see NOTE: 2019-09-06 22:44:08
                     targets = [(k, v) for k,v in ws.items() if v is item]
-                    
-                    if len(targets) == 0: 
+
+                    if len(targets) == 0:
                         raise NameError("there are no variables with names defined by this pattern: %s" % item)
                         #raise NameError("can't delete an empty identifier")
-                    
+
                     for t in targets:
                         ws.pop(t[0], None)
-                    
+
                     #raise NameError("there are no variables with name pattern %s" % item)
                 else:
                     for v in varlist:
                         ws.pop(v, None)
-                    
-                
+
+
             elif (isinstance(item, (list, tuple)) and all([isinstance(k, type) for k in item])):
                 varlist = lsvars(item, glob=glob, ws=ws)
 
                 if len(varlist) == 0:
                     # see NOTE: 2019-09-06 22:44:08
                     targets = [(k, v) for k,v in ws.items() if v is item]
-                    
-                    if len(targets) == 0: 
+
+                    if len(targets) == 0:
                         raise NameError("there are no variables with names defined by this pattern: %s" % item)
                         #raise NameError("can't delete an empty identifier")
-                    
+
                     for t in targets:
                         ws.pop(t[0], None)
-                    
+
                     #raise TypeError("there are no variables with type %s" % item)
                 else:
                     for v in varlist:
                         ws.pop(v, None)
-                    
+
             elif item is not None:
                 targets = [(k, v) for k,v in ws.items() if v is item]
                 # see NOTE: 2019-09-06 22:32:34
                 #if len(targets) == 0:
                     #raise ValueError("specified variables are not defined")
-                
+
                 for t in targets:
                     ws.pop(t[0], None)
-                        
-def validate_varname(arg, ws:typing.Optional[dict]=None, 
-                     start_counter:int=0, 
-                     sep = "_", 
+
+def validate_varname(arg, ws:typing.Optional[dict]=None,
+                     start_counter:int=0,
+                     sep = "_",
                      returns_counter:typing.Optional[bool]=None, # tri-state logic!!!
                      checkUnique:bool=True) -> tuple:
     r"""Returns a valid symbol based on an intended variable name.
-    
+
     arg: a string (symbol to be bound to a variable in the namespace `ws`)
-    
+
     ws: a namespace (dict), default None => will search for the topmost workspace
-    
+
     start_counter: int (default is 0) the start value of the counter used in the
 
             suffix to the variable name if an identical symbol already exists in
@@ -862,61 +879,61 @@ def validate_varname(arg, ws:typing.Optional[dict]=None,
 
 
             See also ``strutils.counter_suffix``
-    
+
     Returns:
-    
+
     • When returns_counter is False (default), returns a modified verions of `arg`
         where:
-    
+
         1)  Non-valid characters are replaced with underscores.
-        
-        2)  If arg begins with a digit or is a standard python language keyword, 
+
+        2)  If arg begins with a digit or is a standard python language keyword,
             it will be prefixed with "data_".
-    
+
         3)  If arg already exists in the "ws" namespace it will be sufixes with
             `_<counter>`, where <counter> is a string representation of an int
             starting at `start_counter`; the actual value written to the suffix
             reflects the number of symbols with same base as `arg`
-            
+
             3.a) If a counter suffix already exists, it will be incremented as
                 necessary.
-    
+
     • When returns_counter is True, returns a two-elements tuple containing the
         modified `arg` as above, AND the counter suffix as an int or None (when
         a suffix was not appended to the modified `arg`)
-        
-    
+
+
     """
-    # from core.utilities import 
+    # from core.utilities import
     from core.strutils import str2symbol, counter_suffix
-    
+
     if ws is None:
         frame_records = inspect.getouterframes(inspect.currentframe())
         for (n,f) in enumerate(frame_records):
             if "mainWindow" in f[0].f_globals.keys(): # hack to find out the "global" namespace accessed from within the IPython console
                 ws = f[0].f_globals["mainWindow"].workspace
                 break
-            
+
     if not isinstance(arg, str) or len(arg.strip()) == 0:
         arg = "data"
-        
+
     if keyword.iskeyword(arg):
         arg = "data_" + arg
-        
+
     # check if arg is a valid python variable identifier; adjust accordingly:
-    # replace non-valid characters with 
+    # replace non-valid characters with
     # "_" (underscore) and prepend "data_" if it starts with a digit
     if not arg.isidentifier():
         arg = str2symbol(arg)
         # arg = _re.sub("^(?=\d)","data_", _re.sub("\W", "_", arg))
-        
+
     if checkUnique:
         # NOTE: 2022-12-26 14:35:33
         # no need to add suffix if arg is not already in the workspace symbols
         # HOWEVER, IF arg is already there THEN:
         # • if arg is a symbol bound to a class or a type, then start the counter at
         #   0 (as in <variable of given type>_0, etc)
-        # • otherwise, start the counter at 1 ('cause an instance with same name 
+        # • otherwise, start the counter at 1 ('cause an instance with same name
         # already exists)
         if arg not in ws.keys():
             # not need to append suffix since arg symbol is not in the ws
@@ -928,13 +945,13 @@ def validate_varname(arg, ws:typing.Optional[dict]=None,
             # else:
             #     start_counter = 1
             start_counter = 1
-                
+
             # print(f"validate_varname start_counter = {start_counter}")
-            
+
         arg = counter_suffix(arg, list(ws.keys()), sep=sep,
                              start=start_counter,
                              returns_counter=returns_counter)
         # print(f"validate_varname return {arg}")
-        
+
     return arg
-    
+
