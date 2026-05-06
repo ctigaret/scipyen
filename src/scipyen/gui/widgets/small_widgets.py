@@ -1423,6 +1423,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         if self._magnitude_ is pd.NA:
             self.setMinimum(-math.inf)
             specialText = r"NA"
+            text = specialText
+
             self._specialValueText_ = specialText
 
             if len(self._prefix_):
@@ -1431,14 +1433,15 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             if len(self._suffix_):
                 text = f"{text} {self._suffix_}"
 
-            super().setSpecialValueText(self._specialValueText_)
-            super().setValue(self._magnitude_)
+            # super().setSpecialValueText(self._specialValueText_)
+            # super().setValue(self._magnitude_)
 
-            self.lineEdit().setText(text)
+            # self.lineEdit().setText(text)
 
         elif self._magnitude_ in (math.nan, np.nan):
             self.setMinimum(-math.inf)
             specialText = r"NaN"
+            text = specialText
             self._specialValueText_ = specialText
 
             if len(self._prefix_):
@@ -1447,17 +1450,14 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             if len(self._suffix_):
                 text = f"{text} {self._suffix_}"
 
-            super().setSpecialValueText(self._specialValueText_)
-            super().setValue(self._magnitude_)
-
-            self.lineEdit().setText(text)
-
         elif isinstance(self._magnitude_, (float, int)):
             if self._magnitude_ in (-math.inf, -np.inf):
                 specialText = r"-Inf"
+                text = specialText
 
             elif self._magnitude_ in (math.inf, np.inf):
                 specialText = r"Inf"
+                text = specialText
 
             else:
                 # NOTE: 2026-03-29 12:14:37
@@ -1465,6 +1465,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 # HOWEVER, this does NOT work when the generated text is in scientific format
                 # e.g., '1e-8'
                 text = f"{self._magnitude_:.{self.decimals+1}}"
+
                 mantissa, exponent, decimals = strutils.parse_sci_string(text)
                 if exponent != 0:
                     sign = "+" if exponent > 0 else "" # '-' wil be automatically inserted by Python library
@@ -1491,9 +1492,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
             self._specialValueText_ = specialText
 
-
             if len(self._specialValueText_):
-                # super().setSpecialValueText(specialText)
                 text = self._specialValueText_
 
             if len(self._prefix_):
@@ -1502,20 +1501,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             if len(self._suffix_):
                 text = f"{text} {self._suffix_}"
 
-            super().setSpecialValueText(self._specialValueText_)
-            super().setValue(self._magnitude_)
-
-            # print(f"{self.objectName()}: {self.__class__.__name__}.setValue({value}) -> text = {text}")
-
-            # signalBlock = QtCore.QSignalBlocker(self.lineEdit())
-            # print(f"\tsetting text to {text}")
-            self.lineEdit().setText(text)
-
-            # print(f"\tvalue after update: {self.value()}")
-
         else:
             raise TypeError(f"_magnitude_ expected to be a scalar quantity, a float or pd.NA; instead, got {type(value).__name__}")
 
+        super().setSpecialValueText(self._specialValueText_)
+        super().setValue(self._magnitude_)
+        self.lineEdit().setText(text)
 
     @property
     def disableUnitChange(self) -> bool:

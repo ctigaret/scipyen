@@ -19,6 +19,15 @@
      <layout class="QHBoxLayout" name="horizontalLayout">
       <item>
        <widget class="QLabel" name="modelLabel">
+        <property name="toolTip">
+         <string>Select model function</string>
+        </property>
+        <property name="statusTip">
+         <string>Select model function</string>
+        </property>
+        <property name="whatsThis">
+         <string>Select model function</string>
+        </property>
         <property name="text">
          <string>Model Function:</string>
         </property>
@@ -28,9 +37,56 @@
        <widget class="QComboBox" name="modelFunctionsComboBox"/>
       </item>
       <item>
-       <widget class="QPushButton" name="importDataPushButton">
+       <widget class="QPushButton" name="openDataPushButton">
+        <property name="enabled">
+         <bool>false</bool>
+        </property>
+        <property name="toolTip">
+         <string>Open curve data (numpy array, signal-like)</string>
+        </property>
         <property name="text">
-         <string>Import data</string>
+         <string>Open curve data...</string>
+        </property>
+        <property name="icon">
+         <iconset theme="document-open"/>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="importDataPushButton">
+        <property name="toolTip">
+         <string>Import curve data from the workspace</string>
+        </property>
+        <property name="statusTip">
+         <string>Import curve data from the workspace</string>
+        </property>
+        <property name="whatsThis">
+         <string>Import curve data from the workspace</string>
+        </property>
+        <property name="text">
+         <string>Import...</string>
+        </property>
+        <property name="icon">
+         <iconset theme="document-import"/>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="plotDataPushButton">
+        <property name="toolTip">
+         <string>Plot the curve to be fitted.</string>
+        </property>
+        <property name="statusTip">
+         <string>Plot the curve to be fitted.</string>
+        </property>
+        <property name="whatsThis">
+         <string>Plot the curve to be fitted.</string>
+        </property>
+        <property name="text">
+         <string>Plot</string>
+        </property>
+        <property name="icon">
+         <iconset theme="labplot-xy-curve-segments"/>
         </property>
        </widget>
       </item>
@@ -67,7 +123,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>28</height>
+     <height>27</height>
     </rect>
    </property>
   </widget>

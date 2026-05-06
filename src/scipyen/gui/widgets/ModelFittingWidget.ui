@@ -291,8 +291,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>395</width>
-             <height>139</height>
+             <width>340</width>
+             <height>145</height>
             </rect>
            </property>
            <property name="sizePolicy">
@@ -524,6 +524,19 @@
        </property>
        <property name="icon">
         <iconset theme="labplot-xy-fit-curve"/>
+       </property>
+       <property name="flat">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="exportFitResultPushButton">
+       <property name="text">
+        <string/>
+       </property>
+       <property name="icon">
+        <iconset theme="document-export"/>
        </property>
        <property name="flat">
         <bool>true</bool>

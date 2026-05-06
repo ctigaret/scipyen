@@ -87,7 +87,7 @@ import matplotlib.pyplot as plt
 #### END 3rd party modules
 
 #### BEGIN scipyen.core modules
-import core.datatypes
+from core import datatypes
 
 import imaging.axiscalibration
 from imaging.axiscalibration import AxesCalibration
@@ -166,8 +166,7 @@ class CurveFittingTool(QtWidgets.QMainWindow, __CVTUI_MainWindow__, WorkspaceGui
                  parent=None):
         super().__init__(parent=parent)
         WorkspaceGuiMixin.__init__(self, parent=parent)
-        self.setWindowTitle("Curve Fitting Tool")
-        self._fittingWidget_ = ModelFittingWidget(parent=self)
+        # self._fittingWidget_ = ModelFittingWidget(parent=self)
         if isinstance(data, np.ndarray) and datatypes.is_vector(data):
             self._data_ = data
         else:
@@ -183,7 +182,8 @@ class CurveFittingTool(QtWidgets.QMainWindow, __CVTUI_MainWindow__, WorkspaceGui
 
         self._configureUI_()
 
-        self.waveViewer = SignalViewer(parent=self)
+        self.setWindowTitle("Curve Fitting Tool")
+        self.waveViewer = SignalViewer(parent=self, appWindow=self)
 
     def _configureUI_(self):
         self.setupUi(self)
@@ -196,7 +196,15 @@ class CurveFittingTool(QtWidgets.QMainWindow, __CVTUI_MainWindow__, WorkspaceGui
         self._currentModelFunction_ = self._modelFunctions_[modelNames[self.modelFunctionsComboBox.currentIndex()]]
         self.modelFunctionsComboBox.currentIndexChanged.connect(self._slot_modelFunctionChanged)
 
+        # TODO 2026-05-06 10:48:08
+        # code to open curve data from pickles, HDF5, spreadsheets
+        # until this is ready, hide the openDataPushButton
+        self.openDataPushButton.setVisible(False) # TODO TODO TODO
+
         self.importDataPushButton.clicked.connect(self._slot_importData)
+
+        self.plotDataPushButton.setEnabled(isinstance(self._data_, np.ndarray))
+        self.plotDataPushButton.clicked.connect(self._slot_plotSourceData)
 
         # self.fittingWidget = ModelFittingWidget(parent=self)
         # self.fittingWidget.waveViewer = self.waveViewer
@@ -208,21 +216,39 @@ class CurveFittingTool(QtWidgets.QMainWindow, __CVTUI_MainWindow__, WorkspaceGui
         if isinstance(self._data_, np.ndarray) and datatypes.is_vector(self._data_):
             self.fittingWidget.setData(self._data_)
 
+    @Slot()
+    def _slot_plotSourceData(self):
+        if isinstance(self._data_, np.ndarray):
+            self.waveViewer.view(self._data_)
+
     @Slot(object)
     def _slot_plotWaveforms(self, obj: np.ndarray):
+        # print(f"{self.__class__.__name__}._slot_plotWaveforms({type(obj)})")
         if isinstance(self._data_, (neo.AnalogSignal, DataSignal)):
             if isinstance(obj, (neo.AnalogSignal, DataSignal)):
                 curves = neoutils.concatenate_signals(self._data_, obj)
-                self.waveformViewer.view(curves)
+                # print(f"\n\tcurves ->
+                if curves is not None:
+                    self.waveViewer.view(curves)
         elif isinstance(self._data_, np.ndarray):
             if isinstance(obj, np.ndarray):
                 curves = np.hstack([self._data_, obj])
-                self.waveformViewer.view(curves)
+                if curves is not None:
+                    self.waveViewer.view(curves)
+            elif isinstance(obj, (neo.AnalogSignal, DataSignal)):
+                x = obj.times
+                y = np.hstack([self._data_, obj.magnitude])
+                curves = DataSignal(y, times = x, domain_units = x.units, units = obj.units)
+                if curves is not None:
+                    self.waveViewer.view(curves)
+
+        else:
+            self.waveViewer.view(obj)
 
     @Slot(int)
     def _slot_modelFunctionChanged(self, value: int):
         if value < len(self._modelFunctions_):
-            self._currentModelFunction_ = self._modelFunctions_[value]
+            self._currentModelFunction_ = self._modelFunctions_[list(self._modelFunctions_.keys())[value]]
             try:
                 self.fittingWidget.setModel(self._currentModelFunction_)
             except:
@@ -234,13 +260,16 @@ class CurveFittingTool(QtWidgets.QMainWindow, __CVTUI_MainWindow__, WorkspaceGui
         if len(imported):
             self._data_ = imported[0]
             self.fittingWidget.setData(self._data_)
+            self.plotDataPushButton.setEnabled(True)
 
 
 
 
 def launch():
     try:
-        win = mainWindow.newViewer(CurveFittingTool, parent = mainWindow, win_title="Evoked Synaptic Responses")
+        win = mainWindow.newViewer(CurveFittingTool, parent = mainWindow,
+                                   win_title="Curve Fitting Tool",
+                                   varName="curveFittingToolWindow")
         win.show()
     except:
         traceback.print_exc()

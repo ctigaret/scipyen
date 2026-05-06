@@ -197,6 +197,7 @@
     <addaction name="actionShow_Legends"/>
     <addaction name="actionIgnore_empty_spike_trains"/>
     <addaction name="actionShow_Cursor_Edit_Dialog_When_Created"/>
+    <addaction name="setCursorsShowValue"/>
     <addaction name="menuView"/>
     <addaction name="menuAxes"/>
     <addaction name="menuType_Here"/>
@@ -612,11 +613,17 @@
    <property name="checked">
     <bool>false</bool>
    </property>
+   <property name="icon">
+    <iconset theme="draw-number"/>
+   </property>
    <property name="text">
-    <string>Cursors Show Value</string>
+    <string>Cursor Label Shows Value</string>
    </property>
   </action>
   <action name="setCursorsLabelPrecisionAction">
+   <property name="icon">
+    <iconset theme="format-precision-more"/>
+   </property>
    <property name="text">
     <string>Cursor Label Precision...</string>
    </property>

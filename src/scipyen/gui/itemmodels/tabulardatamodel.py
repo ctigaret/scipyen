@@ -669,7 +669,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                     elif isinstance(self._modelData_.columns, pd.Index):
                         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            if isinstance(self._modelDataHeaderSections_, dict) and len(self._modelDataHeaderSections_):
+                            if (
+                                isinstance(self._modelDataHeaderSections_, dict)
+                                # and len(self._modelDataHeaderSections_)
+                                and section < len(self._modelDataHeaderSections_)
+                                ):
                                 return QtCore.QVariant(self._modelDataHeaderSections_[section])
                             else:
                                 return QtCore.QVariant(str(self._modelData_.columns[section]))

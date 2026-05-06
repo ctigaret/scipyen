@@ -7543,6 +7543,8 @@ Var-keyword parameters ("name=value" pairs):
 
             # print(f"self._set_data_ dataOK = {dataOK}")
 
+            # self._n_signal_axes_ = len(self.signalAxes)
+
             if dataOK:
                 self._clear_lris_() # remove gremlins (i.e. any epochs LinearRegionItem)
 

@@ -3478,7 +3478,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             above (i.e. the value of their __name__ attribute).
 
         *args, **kwargs: passed directly to the constructor (__init__ function)
-            of the winClass
+            of the winClass **except** for 'varName' which sets up the workspace
+            symbol for the newly created window (ignored for matplotlib Figure
+            objects)
+
+
 
         Returns:
         ========
@@ -3533,6 +3537,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         else:
             win_title = kwargs.pop("win_title", winClass.__name__)
+
+            # NOTE: 2026-05-06 09:33:26
+            # allow binding to a used-defined symbol in the workspace
+
+            winVarName = kwargs.pop("varName", win_title)
+
+            # print(f"{self.__class__.__name__}.newViewer: win_title = {win_title}")
             # print(f"{self.__class__.__name__}.newViewer: win_title = {win_title}, counter_suffix = {counter_suffix}")
             if win_title[0].isupper():
                 wt = win_title[0].lower()
@@ -3540,15 +3551,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     wt += win_title[1:]
                 win_title = wt # + f": {win_title}"
 
-            # print(f"{self.__class__.__name__}.newViewer for win_title = {win_title}")
-
             # kwargs["win_title"] = win_title
             if "parent" not in kwargs:
                 kwargs["parent"] = self # needed on X11 platform, but not on Wayland,
                                         # see NOTE: 2024-04-17 11:53:29 in scipyenviewer.py
 
+            # NOTE: 2026-05-06 09:30:20
+            # the viewer is instantiated here:
             win = winClass(*args, **kwargs)
-            # print(f"{self.__class__.__name__}.newViewer for {winClass.__name__} win = {win}")
 
             variables = dict([item for item in self.shell.user_ns.items(
                 ) if item[0] not in self.user_ns_hidden and not item[0].startswith("_")])
@@ -3563,11 +3573,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             # print(f"{self.__class__.__name__}.newViewer for {winClass.__name__} listedWindows = {listedWindows}")
 
             if win not in listedWindows:
-                win_title, counter_suffix = validate_varname(win_title, self.workspace)#, returns_counter=None)
+                winVarName, counter_suffix = validate_varname(winVarName, self.workspace)#, returns_counter=None)
+                # win_title, counter_suffix = validate_varname(win_title, self.workspace)#, returns_counter=None)
 
             # print(f"{self.__class__.__name__}.newViewer for {winClass.__name__} win_title = {win_title}")
 
-            workspace_win_varname = strutils.str2symbol(win_title)
+            workspace_win_varname = strutils.str2symbol(winVarName)
+            # workspace_win_varname = strutils.str2symbol(win_title)
             workspace_win_varname = workspace_win_varname[0].lower()+workspace_win_varname[1:]
 
             win.ID = counter_suffix

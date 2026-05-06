@@ -317,7 +317,7 @@ A lot of things copied from there, EXCEPT that it now uses
         resizeColumnsAction.triggered.connect(self.slot_resizeFitColumns)
 
         showCallablesAction = self.toolBar.addAction(
-            QtGui.QIcon.fromTheme("code-function"), "Show Functions and Methods")
+            QtGui.QIcon.fromTheme("code-function"), "Show Function and Method Members")
         showCallablesAction.setCheckable(True)
         showCallablesAction.setChecked(False)
 

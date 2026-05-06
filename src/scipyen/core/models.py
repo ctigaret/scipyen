@@ -822,7 +822,7 @@ def parseCoefficientsFitTable(f: types.FunctionType, df:typing.Union[pd.DataFram
     from core import strutils
     assert isModelFunction(f), f"Expecting a model function ('@modelfunction'-decorated regular Python function); instead, got {f}"
     assert len(f.coefficients) > 0, f"The model function {f.__module__}.{f.__name__} must publish its coefficients"
-    defaultTable, variadics, groups = f.generateFitTable()
+    defaultTable, variadics, groups, coefnames = f.generateFitTable()
     if not np.all(df.columns == defaultTable.columns):
         return False, list(), list(), list()
 
