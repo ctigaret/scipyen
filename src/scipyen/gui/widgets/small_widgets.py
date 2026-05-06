@@ -821,7 +821,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         # self._lineEdit_ = LazyLineEdit(self)
         self._lineEdit_ = LineEdit(self)
 
-        self.setLineEdit(self._lineEdit_)
+        super().setLineEdit(self._lineEdit_)
+        # self.setLineEdit(self._lineEdit_)
 
         self._keepDimensionless_: bool = keepDimensionless
         self._disableUnitChange_: bool = disableUnitChange
@@ -931,7 +932,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         # super().valueChanged.connect(self._slot_valueChanged)
         # self.lineEdit().setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
-        self._lineEdit_.sig_enterPressed.connect(self._slot_valueTextChanged)
+        # self._lineEdit_.sig_enterPressed.connect(self._slot_valueTextChanged)
+        super().lineEdit().sig_enterPressed.connect(self._slot_valueTextChanged)
 
         # self.lineEdit().installEventFilter(self)
 
@@ -985,7 +987,11 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             self._suffix_ = ""
             self._prefix_ = ""
 
-        if np.isnan(self._magnitude_):
+        if self._magnitude_ is pd.NA:
+            text = "<NA>"
+            self._specialValueText_ = text
+
+        elif np.isnan(self._magnitude_):
             text = "NaN"
             self._specialValueText_ = text
             # super().setSpecialValueText(text)
@@ -1376,14 +1382,14 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         from core.regexps import SCIENTIFIC_NUMBER_FORMAT_MATCH
         # traceback.print_stack()
 
-        # print(f"{self.__class__.__name__}.setValue({value})")
+        # print(f"{self.__class__.__name__}[{self.objectName()}].setValue({value})")
 
         if isinstance(value, pq.Quantity):
             if value.size > 1:
                 # return # Only scalar quantities are allowed
-                raise TypeError("Only scalar quantities are allowed")
+                raise TypeError("Only scalar quantities are allowed; Quantity arrays should have size 1")
 
-            fval = float(value.magnitude)
+            fval = float(value.magnitude.flatten()[0])
 
             if not (self._keepDimensionless_ or self._forceDimensionless_):
                 if value.units != self.units:
@@ -1411,6 +1417,15 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             self._magnitude_ = float(value)
             self.units = None
 
+        elif isinstance(value, np.ndarray):
+            if not issubclass(value.dtype.type, np.floating):
+                raise TypeError(f"Only floating point arrays; instead, got {value.dtype.type}")
+
+            if value.size > 1:
+                raise TypeError("Only scalar values are allowed; arrays should have size 1")
+
+            self._magnitude_ = value.flatten()[0]
+
         else:
             raise ValueError(f"Incompatible value: {value} ({type(value).__name__})")
 
@@ -1420,6 +1435,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                  forceSgStep: typing.Optional[typing.Union[int, float]] = None,
                  forceDecimals: typing.Optional[int] = None):
         signalBlockers = list(map(QtCore.QSignalBlocker, (self, self.lineEdit())))
+        # super().setValue(self._magnitude_)
         if self._magnitude_ is pd.NA:
             self.setMinimum(-math.inf)
             specialText = r"NA"
@@ -1467,11 +1483,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 text = f"{self._magnitude_:.{self.decimals+1}}"
 
                 mantissa, exponent, decimals = strutils.parse_sci_string(text)
+                # print(f"{self.__class__.__name__}._update_ -> mantissa = {mantissa}, exponent = {exponent}, decimals = {decimals}")
                 if exponent != 0:
                     sign = "+" if exponent > 0 else "" # '-' wil be automatically inserted by Python library
                     text = f"{mantissa:.{self.decimals}}e{sign}{exponent}"
                 else:
-                    text = f"{mantissa:.{self.decimals}}"
+                    text = f"{self._magnitude_:.{self.decimals}}"
 
                 if not isinstance(forceSgStep, (int, float)):
                     if self._magnitude_ < self._singleStep_:
@@ -1503,9 +1520,14 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         else:
             raise TypeError(f"_magnitude_ expected to be a scalar quantity, a float or pd.NA; instead, got {type(value).__name__}")
-
-        super().setSpecialValueText(self._specialValueText_)
+        # print(f"{self.__class__.__name__}[{self.objectName()}]._update_()")
+        # print(f"\n\t -> decimals {self._decimals_}")
+        super().setDecimals(self._decimals_)
+        # print(f"\n\t -> magnitude {self._magnitude_}")
         super().setValue(self._magnitude_)
+        # print(f"\n\t -> specialValueText {self._specialValueText_}")
+        super().setSpecialValueText(self._specialValueText_)
+        # print(f"\n\t -> text {text}")
         self.lineEdit().setText(text)
 
     @property

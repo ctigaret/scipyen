@@ -329,7 +329,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
         self.loadSettings() # inherited from ScipyenConfigurable (via WorkspaceGuiMixin)
 
-        self._sig_setNewDataBegin.connect(self._slot_beginSetData)
+        # self._sig_setNewDataBegin.connect(self._slot_beginSetData)
 
         # NOTE: 2021-08-17 12:59:02
         # setData ALMOST SURELY needs the ui elements to be initialized - hence
@@ -340,8 +340,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # see e.g., SignalViewer
             # fn = functools.partialmethod(self.setData, data = data, doc_title = doc_title)
             # QtCore.QTimer.singleShot(500, fn)
-            self._sig_setNewDataBegin(data, tuple(), {"doc_title": doc_title})
-            # self.setData(data = data, doc_title = doc_title)
+            # self._sig_setNewDataBegin.emit(data, tuple(), {"doc_title": doc_title})
+            self.setData(data = data, doc_title = doc_title)
 
         else:
             self.update_title(win_title = win_title, doc_title = doc_title)
@@ -578,18 +578,18 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         else:
             return __check_val_type_is_supported__(value)
 
-    @Slot(object, tuple, dict)
-    def _slot_beginSetData(self, obj: object, args = tuple(), kwargs = dict()):
-        if obj is None:
-            return
-
-        if not isinstance(args, tuple):
-            args = (args, )
-
-        if not isinstance(kwargs, dict):
-            kwargs = dict()
-
-        self.setData(obj, *args, **kwargs)
+    # @Slot(object, tuple, dict)
+    # def _slot_beginSetData(self, obj: object, args = tuple(), kwargs = dict()):
+    #     if obj is None:
+    #         return
+    #
+    #     if not isinstance(args, tuple):
+    #         args = (args, )
+    #
+    #     if not isinstance(kwargs, dict):
+    #         kwargs = dict()
+    #
+    #     self.setData(obj, *args, **kwargs)
 
 
     def setData(self, *args, **kwargs):

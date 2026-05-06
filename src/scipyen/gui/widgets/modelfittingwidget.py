@@ -334,6 +334,11 @@ Named Parameters:
             self._waveformSamplingRate_.rescale(1/self._waveformDuration_.units)
 
         signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), [self.startSpinBox, self.durationSpinBox, self.samplingRateSpinBox]))#, self.waveformUnitsChooser])) # noqa
+        # print(f"{self.__class__.__name__}._populate_WaveControls_:")
+        # print(f"\t\tself._waveformStart_ -> {self._waveformStart_}")
+        # print(f"\t\tself._waveformDuration_ -> {self._waveformDuration_}")
+        # print(f"\t\tself._waveformSamplingRate_ -> {self._waveformSamplingRate_}")
+        # print(f"\t\tself._waveformUnits_ -> {self._waveformUnits_}")
         self.startSpinBox.setValue(self._waveformStart_)
         self.durationSpinBox.setValue(self._waveformDuration_)
         self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
@@ -475,7 +480,7 @@ Named Parameters:
                                          ] = None) -> None:
         # print(f"\n{self.__class__.__name__}.setData({type(val).__name__})\n")
         sigBlock = QtCore.QSignalBlocker(self.channelSpinBox)
-        if not isinstance(val, (neo.AnalogSignal, DataSignal)):
+        if not isinstance(val, (neo.AnalogSignal, DataSignal, np.ndarray)):
             self._data_ = None
             self._dataChannel_ = 0
             self.channelSpinBox.setMinimum(0)

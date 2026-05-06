@@ -189,18 +189,12 @@
      <addaction name="actionLeft_Axis_Spacer"/>
      <addaction name="actionEnable_Auto_Range"/>
     </widget>
-    <widget class="QMenu" name="menuType_Here">
-     <property name="title">
-      <string>Type Here</string>
-     </property>
-    </widget>
     <addaction name="actionShow_Legends"/>
     <addaction name="actionIgnore_empty_spike_trains"/>
     <addaction name="actionShow_Cursor_Edit_Dialog_When_Created"/>
     <addaction name="setCursorsShowValue"/>
     <addaction name="menuView"/>
     <addaction name="menuAxes"/>
-    <addaction name="menuType_Here"/>
    </widget>
    <widget class="QMenu" name="cursorsMenu">
     <property name="title">

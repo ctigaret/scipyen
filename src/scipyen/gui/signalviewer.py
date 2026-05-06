@@ -3042,8 +3042,10 @@ anything else       anything else       ❌
             self._events_axis_ = None
 
             self._plot_names_.clear()
+            for plotItem in self.axes:
+                del plotItem
 
-            # self.signalsLayout.clear()
+            self.signalsLayout.clear()
 
         super().closeEvent(evt) # NOTE: 2026-04-12 00:18:02 This is crucial!
         evt.accept()
