@@ -154,21 +154,23 @@ waveform_signal
 """
 
 #### BEGIN core python modules
-import os, sys
+import os
+# import sys
 import collections
 import traceback
 import datetime
 import numbers
 import inspect
 import itertools
-import functools
+# import functools
 from functools import singledispatch
 import warnings
-import typing, types
-import difflib
+import typing
+import types
+# import difflib
 # import re as _re
-from enum import Enum, IntEnum
-from abc import ABC
+# from enum import Enum, IntEnum
+# from abc import ABC
 import dataclasses
 from dataclasses import (dataclass, MISSING)
 #### END core python modules
@@ -188,7 +190,7 @@ import pandas as pd
 
 from scipy import optimize
 
-import qtpy
+# import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
@@ -207,8 +209,8 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    from qtpy import sip # noqa
+    # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -216,12 +218,12 @@ else:
 
 
 import matplotlib as mpl
-from core.pyqtgraph_patch import pyqtgraph as pg
+# from core.pyqtgraph_patch import pyqtgraph as pg
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
 from core.basescipyen import BaseScipyenData
-from core.traitcontainers import DataBag
+# from core.traitcontainers import DataBag
 from core.prog import (safewrapper, with_doc, get_func_param_types, scipywarn)
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import (DataZone, Interval)
@@ -2560,22 +2562,38 @@ Attributes:
          channel: int = None, relative: bool)
 
 
-OR
-
-::
-
     func(loc0, loc1, fn: typing.Callable,
          signal: typing.Union[neo.AnalogSignal, DataSignal], /,
          channel: int = None, relative: bool)
+
+
+    func(loc, fn: typing.Callable, <optional positional parameters> ,
+         signal: typing.Union[neo.AnalogSignal, DataSignal], /,
+         channel: int = None, relative: bool)
+
+
+    func(loc0, loc1, fn: typing.Callable, <optional positional parameters> ,
+         signal: typing.Union[neo.AnalogSignal, DataSignal], /,
+         channel: int = None, relative: bool)
+
+
 
 
 A "suitable" *function* (``func`` in the examples above) takes a primitive numeric |nbsp|
 function as argument and uses it to calculate a measure in a ``neo`` signal-like object, |nbsp|
 using ALL the supplied |nbsp| locators.
 
-The first two arguments of the functions are a location object and a signal object.
+The arguments of ``func`` are:
+
+* one or two location objects,
+
+* a function (Callable) object which operates on ``signal`` **at** the given location ``loc`` or between locations ``loc0`` and ``loc1`` akes the location object and a signal object.
 
 A ``lambda`` function can also be provided here.
+
+Any *<optional positional parameters>* intervening **between** the location arguments |nbsp|
+and the ``signal`` argument are specified in the LocationMeasure's ``posargs`` attribute, |nbsp|
+**in the order and with types expected by ``func``**
 
 The ``ephys`` module provides several such functors and functions, all named |nbsp|
 as 'signal_*'
@@ -2857,17 +2875,19 @@ Changelog:
 """
     # NOTE: 2024-02-29 22:37:54
     # mandatory signature for func:
+    #
     # func(*args, **kwargs) where:
     # *args: signal or signals, and any other positional parameters NOT locators
     # **kwargs: named parameters for func; these MAY be 'relative' and 'channel'
     #   although these two will by supplied in self.__call__ if not present in kwargs
     #
     func: typing.Callable
-    locations: typing.Union[typing.Sequence, DataCursor, Interval, SignalCursor, DataZone, neo.Epoch]
+    locations: typing.Union[typing.Sequence, DataCursor, Interval, SignalCursor, DataZone, neo.Epoch, typing.Self]
     name: str = dataclasses.field(default = "measure")
     signalNameOrIndex: typing.Optional[int|str] = dataclasses.field(default = None)
     channel:typing.Optional[int]  = dataclasses.field(default = None)
     relative:bool = True
+    posargs: tuple = dataclasses.field(default_factory = tuple)
     kwargs: dict = dataclasses.field(default_factory=dict)
 
 
@@ -2968,7 +2988,7 @@ Any aditional named or keyword parameters to be passed to `func`.
             # NOTE: 2026-05-04 10:41:03
             # augment and rearrange arguments to fit the signature of ``func`` i.e.
             # location(s) THEN signal(s)
-            fargs = (self.locations,) + (arg,) # NOTE: 62026-05-04 22:31:56 DO NOT UNPACK; some funcs expect seq of locs
+            fargs = (self.locations,) + self.posargs + (arg,) # NOTE: 62026-05-04 22:31:56 DO NOT UNPACK self.locations; some funcs expect seq of locs
             # if isinstance(self.locations, (list, tuple, collections.deque)):
             #     fargs = tuple(self.locations) + (arg,)
             #
@@ -3380,26 +3400,26 @@ def _mid_point_(loc: typing.Union[typing.Sequence[numbers.Number],
                                       typing.Sequence[typing.Sequence[pq.Quantity]],
                                       ],
                 outer: bool = True):
-    if all(isinstance(l, (numbers.Number, pq.Quantity)) for l in loc):
+    if all(isinstance(l, (numbers.Number, pq.Quantity)) for l in loc): # noqa
         assert len(loc) == 2, f"Expecting a pair of scalars; got {len(loc)} elements instead."
         loc = (min(loc), max(loc))
         return loc[0] + (loc[1]-loc[0])/2
 
-    elif all(isinstance(l, (tuple, list, collections.deque)) and all(isinstance(ll, (number.Number, pq.Quantity)) for ll in l) for l in loc):
+    elif all(isinstance(l, (tuple, list, collections.deque)) and all(isinstance(ll, (numbers.Number, pq.Quantity)) for ll in l) for l in loc): # noqa
         if outer:
             t0, t1 = min(loc[0][0], loc[-1][-1]), max(loc[0][0], loc[-1][-1])
             return t0 + (t1-t0)/2
         else:
-            mp = lambda xx: xx[0] + (xx[1]-xx[0])/2
+            mp = lambda xx: xx[0] + (xx[1]-xx[0])/2 # noqa
             return list(map(lambda l: mp(sorted(l)), loc))
 
     else:
-        raise ValueError(f"'loc' must be a sequence of two scalars or a sequence of scalar pairs")
+        raise ValueError("'loc' must be a sequence of two scalars or a sequence of scalar pairs")
 
 @mid_point.register(neo.Epoch)
 @mid_point.register(DataZone)
 @mid_point.register(Interval)
-def _mid_point_(loc: typing.Union[neo.Epoch, DataZone, Interval],
+def _mid_point_(loc: typing.Union[neo.Epoch, DataZone, Interval], # noqa
                 outer: bool = True):
 
     if outer:
@@ -3421,7 +3441,7 @@ def _mid_point_(loc: typing.Union[neo.Epoch, DataZone, Interval],
 
 @mid_point.register(DataCursor)
 @mid_point.register(SignalCursor)
-def _mid_point_(loc: typing.Union[DataCursor, SignalCursor],
+def _mid_point_(loc: typing.Union[DataCursor, SignalCursor], # noqa
                 _: bool = True):
     ret = loc.x if isinstance(loc, SignalCursor) else loc.coord
 
@@ -3494,18 +3514,18 @@ def _get_location_boundary_(loc: typing.Union[typing.Sequence[numbers.Number],
                                      typing.Sequence[pq.Quantity]]:
 
     # print(f"get_location_boundary(loc = {loc})\n")
-    if all(isinstance(l, (numbers.Number, pq.Quantity)) for l in loc):
+    if all(isinstance(l, (numbers.Number, pq.Quantity)) for l in loc): # noqa
         assert len(loc) == 2, f"Expecting a pair of scalars; got {len(loc)} elements instead."
         return loc[0] if start else loc[1]
 
-    elif all(isinstance(l, (tuple, list, collections.deque)) and all(isinstance(ll, (number.Number, pq.Quantity)) for ll in l) for l in loc):
+    elif all(isinstance(l, (tuple, list, collections.deque)) and all(isinstance(ll, (numbers.Number, pq.Quantity)) for ll in l) for l in loc): # noqa
         if outer:
             return loc[0][0] if start else loc[-1][-1]
         else:
-            return list(map(lambda l: l[0] if start else l[1], loc))
+            return list(map(lambda l: l[0] if start else l[1], loc)) # noqa
 
     else:
-        raise ValueError(f"'loc' must be a sequence of two scalars or a sequence of scalar pairs")
+        raise ValueError("'loc' must be a sequence of two scalars or a sequence of scalar pairs")
 
 @get_location_boundary.register(neo.Epoch)
 @get_location_boundary.register(DataZone)
@@ -3536,7 +3556,7 @@ def _get_location_boundary_(loc: typing.Union[neo.Epoch, DataZone, Interval],
 
 @get_location_boundary.register(DataCursor)
 @get_location_boundary.register(SignalCursor)
-def _get_location_boundary_(loc: typing.Union[DataCursor, SignalCursor],
+def _get_location_boundary_(loc: typing.Union[DataCursor, SignalCursor], # noqa
                        start: bool,
                        _: bool = True
                    ) -> typing.Union[numbers.Number, pq.Quantity,
@@ -3556,7 +3576,7 @@ def _get_location_boundary_(loc: typing.Union[DataCursor, SignalCursor],
         span = loc.span.copy() if isinstance(loc.span, np.ndarray) else float(loc.span)
 
     else:
-        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {cursor} instead")
+        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {loc} instead")
 
     t0, t1 = (coord - span/2, coord + span/2)
 
@@ -3620,7 +3640,7 @@ Returns
 Returns None in case of failure
 
 """
-    print(f"signal_fit({loc})")
+    print(f"signal_fit({loc} : {type(loc)})")
     raise NotImplementedError(f"Locations of type {type(loc).__name__} are not supported")
 
 @signal_fit.register(LocationMeasure)
@@ -3897,11 +3917,24 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
                                       typing.Sequence[typing.Sequence[numbers.Number]],
                                       typing.Sequence[typing.Sequence[pq.Quantity]],
                                       typing.Sequence[typing.Sequence[LocationMeasure]],
+                                      typing.Sequence[
+                                                        typing.Union[
+                                                            numbers.Number,
+                                                            pq.Quantity,
+                                                            LocationMeasure
+                                                            ]
+                                                     ],
                                       types.NoneType],
                     func: typing.Callable,
                     signal: typing.Union[neo.AnalogSignal, DataSignal], /,
                     channel: typing.Optional[int] = None,
                     relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+
+    # print(f"signal_reduce: loc = \n\t{loc}\n\t({type(loc)})")
+
+    # if isinstance(loc, typing.Sequence):
+    #     for k,l in enumerate(loc):
+    #         print(f"\n\tlocation {k} = {type(l)}")
 
     def __do_reduce__(fn, sg, ch):
         kw = dict()
@@ -3954,7 +3987,7 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
         else:
             raise ValueError(f"Expecting a pair of elements; got {len(loc)} elements instead.")
 
-    elif all(isinstance(l, (tuple, list, collections.deque)) and all(isinstance(ll, (number.Number, pq.Quantity, LocationMeasure)) for ll in l) for l in loc):
+    elif all(isinstance(l, (tuple, list, collections.deque)) and all(isinstance(ll, (numbers.Number, pq.Quantity, LocationMeasure)) for ll in l) for l in loc):
         result = list()
         for l in loc:
             t0, t1 = l
@@ -3964,7 +3997,7 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
         return np.vstack(result)
 
     else:
-        raise ValueError(f"'loc' must be a Location Measure, a pair of scalars or Location Measures, or a sequence of such pairs")
+        raise ValueError("'loc' must be a Location Measure, a pair of scalars or Location Measures, or a sequence of such pairs")
 
 
 @signal_reduce.register(neo.Epoch)

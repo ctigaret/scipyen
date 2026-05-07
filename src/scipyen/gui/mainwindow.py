@@ -212,139 +212,140 @@ import colorama # for console output styles
 # END 3rd party modules
 
 # BEGIN scipyen modules
-from core import qtutils
-from core import datazone
-from core import datatypes
-from core import basescipyen
-from core import neoutils
-from core import prog
-from core import pyabfbridge as pab
-from core import scipyen_plugin_loader
-from core import scipyen_config as scipyenconf
-from core import utilities
-from core import svgutils
-from core import (bgbridge, taxonbridge)
+from core import qtutils # noqa
+from core import datazone # noqa
+from core import datatypes # noqa
+from core import basescipyen # noqa
+from core import neoutils # noqa
+from core import prog # noqa
+from core import pyabfbridge as pab # noqa
+from core import scipyen_plugin_loader # noqa
+from core import scipyen_config as scipyenconf # noqa
+from core import utilities # noqa
+from core import svgutils # noqa
+from core import models # noqa
+from core import (bgbridge, taxonbridge) # noqa
 
-from core.basescipyen import BaseScipyenData
+from core.basescipyen import BaseScipyenData # noqa
 
-from core.datazone import (DataZone, Interval,
-                           intervals2cursors, intervals2epoch,
-                           epoch2cursors, epoch2intervals)
+from core.datazone import (DataZone, Interval, # noqa
+                           intervals2cursors, intervals2epoch, # noqa
+                           epoch2cursors, epoch2intervals) # noqa
 
-from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal,) # noqa
 # from core.datatypes import *
-import core.datatypes as datatypes
+import core.datatypes as datatypes # noqa
 
-from core.prog import (safewrapper, deprecation, iter_attribute,
-                       filter_type, filterfalse_type,
-                       filter_attribute, filterfalse_attribute,
-                       timefunc, timeblock, processtimefunc,
-                       processtimeblock, Timer, scipywarn, warn_with_traceback,
-                       get_properties, print_styled)
+from core.prog import (safewrapper, deprecation, iter_attribute, # noqa
+                       filter_type, filterfalse_type, # noqa
+                       filter_attribute, filterfalse_attribute, # noqa
+                       timefunc, timeblock, processtimefunc, # noqa
+                       processtimeblock, Timer, scipywarn, warn_with_traceback, # noqa
+                       get_properties, print_styled) # noqa
 
 # NOTE: 2024-01-30 22:00:13
 # use our own warning - OK for scipyen console
 warnings.showwarning = prog.showwarning
 
-from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, )
-from core.triggerprotocols import TriggerProtocol
-from core.traitcontainers import DataBag
+from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType, ) # noqa
+from core.triggerprotocols import TriggerProtocol # noqa
+from core.traitcontainers import DataBag # noqa
 
-from core.utilities import (summarize_object_properties,
-                            augment_obj_prop_dict,
-                            standard_obj_summary_headers,
-                            safe_identity_test, unique, index_of,
-                            gethash, NestedFinder, normalized_index,
-                            reverse_mapping_lookup)
+from core.utilities import (summarize_object_properties, # noqa
+                            augment_obj_prop_dict, # noqa
+                            standard_obj_summary_headers, # noqa
+                            safe_identity_test, unique, index_of, # noqa
+                            gethash, NestedFinder, normalized_index, # noqa
+                            reverse_mapping_lookup) # noqa
 
-import core.curvefitting as crvf
-import core.data_analysis as anl
-import core.desktoputils as desktoputils
-import core.scipyen_quantities as cq
-import core.strutils as strutils
-from core.strutils import counter_suffix
-import core.signalprocessing as sigp
-import core.sysutils as sysutils
-import core.tiwt as tiwt
-import core.utilities as utilities
-import core.xmlutils as xmlutils
+import core.curvefitting as crvf # noqa
+import core.data_analysis as anl # noqa
+import core.desktoputils as desktoputils # noqa
+import core.scipyen_quantities as cq # noqa
+import core.strutils as strutils # noqa
+from core.strutils import counter_suffix # noqa
+import core.signalprocessing as sigp # noqa
+import core.sysutils as sysutils # noqa
+import core.tiwt as tiwt # noqa
+import core.utilities as utilities # noqa
+import core.xmlutils as xmlutils # noqa
 
-from core.scipyen_config import (markConfigurable, confuse,
-                                 saveWindowSettings, loadWindowSettings, )
-from core.scipyen_config import scipyen_config as scipyen_settings
-from core.scipyenmagics import ScipyenMagics
-from core.strutils import InflectEngine
-from core.scipyen_plugin_loader import reload
-from core.vigra_patches import vigra
-from core.workspacefunctions import *
+from core.scipyen_config import (markConfigurable, confuse, # noqa
+                                 saveWindowSettings, loadWindowSettings, ) # noqa
+from core.scipyen_config import scipyen_config as scipyen_settings # noqa
+from core.scipyenmagics import ScipyenMagics # noqa
+from core.strutils import InflectEngine # noqa
+from core.scipyen_plugin_loader import reload # noqa
+from core.vigra_patches import vigra # noqa
+from core.workspacefunctions import * # noqa
 
-from plots import plots as plots
+from plots import plots as plots # noqa
 
 
-from imaging.axisutils import (axisTypeFromString,
-                               axisTypeName,
-                               axisTypeStrings,
-                               axisTypeSymbol,
-                               axisTypeUnits,
-                               dimEnum,
-                               dimIter,
-                               evalAxisTypeExpression,
-                               getAxisTypeFlagsInt,
-                               getNonChannelDimensions,
-                               hasChannelAxis,
-                               )
+from imaging.axisutils import (axisTypeFromString, # noqa
+                               axisTypeName, # noqa
+                               axisTypeStrings, # noqa
+                               axisTypeSymbol, # noqa
+                               axisTypeUnits, # noqa
+                               dimEnum, # noqa
+                               dimIter, # noqa
+                               evalAxisTypeExpression, # noqa
+                               getAxisTypeFlagsInt, # noqa
+                               getNonChannelDimensions, # noqa
+                               hasChannelAxis, # noqa
+                               ) # noqa
 
-from imaging import axisutils, vigrautils
-from imaging import (imageprocessing as imgp, imgsim,)
-from imaging.scandata import (AnalysisUnit, ScanData,)
-from imaging.axiscalibration import (AxesCalibration,
-                                     AxisCalibrationData,
-                                     ChannelCalibrationData,
-                                     CalibrationData)
-from ephys import (ephys, membrane)
-from systems import *
+from imaging import axisutils, vigrautils # noqa
+from imaging import (imageprocessing as imgp, imgsim,) # noqa
+from imaging.scandata import (AnalysisUnit, ScanData,) # noqa
+from imaging.axiscalibration import (AxesCalibration, # noqa
+                                     AxisCalibrationData, # noqa
+                                     ChannelCalibrationData, # noqa
+                                     CalibrationData) # noqa
+from ephys import (ephys, membrane) # noqa
+from systems import * # noqa
 
-from gui.guiutils import (get_font_style, get_font_weight, treeWidgetItems)
+from gui.guiutils import (get_font_style, get_font_weight, treeWidgetItems) # noqa
 
-from . import delegates
-from . import interact
-from . import scipyen_colormaps as colormaps
-from . import consoles
-from . import guiutils
-from . import scipyenviewer
-from . import quickdialog as qd
+from . import delegates # noqa
+from . import interact # noqa
+from . import scipyen_colormaps as colormaps # noqa
+from . import consoles # noqa
+from . import guiutils # noqa
+from . import scipyenviewer # noqa
+from . import quickdialog as qd # noqa
 # from . import resources_rc #as resources_rc
 # from . import icons_rc
-from . import pictgui as pgui
-from . import xmlviewer as xv
-from . import textviewer as tv
-from . import tableeditor as te
-from . import signalviewer as sv
-from . import matrixviewer as matview
-from . import imageviewer as iv
-from . import datatreeviewer as dv
+from . import pictgui as pgui # noqa
+from . import xmlviewer as xv # noqa
+from . import textviewer as tv # noqa
+from . import tableeditor as te # noqa
+from . import signalviewer as sv # noqa
+from . import matrixviewer as matview # noqa
+from . import imageviewer as iv # noqa
+from . import datatreeviewer as dv # noqa
 # from gui.pythonhelpwidget import PythonHelpWidget
 
-from .consoles import styles, pstyles
-from .cursors import (SignalCursor, SignalCursorTypes,DataCursor,
-                    cursors2epoch, cursors2intervals)
-from .interact import (getInput, getInputs, packInputs, selectWSData)
-from .itemslistdialog import ItemsListDialog
-from .menuproxy import MenuProxy
-from .triggerdetectgui import guiDetectTriggers
-from .widgets import gradientwidgets
-from .widgets import stylewidgets
-from .widgets import colorwidgets
-from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver)
-from gui.itemmodels.workspacemodel import WorkspaceModel
+from .consoles import styles, pstyles # noqa
+from .cursors import (SignalCursor, SignalCursorTypes,DataCursor, # noqa
+                    cursors2epoch, cursors2intervals) # noqa
+from .interact import (getInput, getInputs, packInputs, selectWSData) # noqa
+from .itemslistdialog import ItemsListDialog # noqa
+from .menuproxy import MenuProxy # noqa
+from .triggerdetectgui import guiDetectTriggers # noqa
+from .widgets import gradientwidgets # noqa
+from .widgets import stylewidgets # noqa
+from .widgets import colorwidgets # noqa
+from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver) # noqa
+from gui.itemmodels.workspacemodel import WorkspaceModel # noqa
 
 
-from iolib import h5io, jsonio, network, navigation
-from iolib.navigation import filesystems
-from iolib import pictio as pio
+from iolib import h5io, jsonio, network, navigation # noqa
+from iolib.navigation import filesystems # noqa
+from iolib import pictio as pio # noqa
 
 
-from core.pyqtgraph_patch import pyqtgraph as pg
+from core.pyqtgraph_patch import pyqtgraph as pg # noqa
 
 # from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
 # END scipyen modules
