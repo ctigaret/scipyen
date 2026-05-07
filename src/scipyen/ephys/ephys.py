@@ -3640,7 +3640,7 @@ Returns
 Returns None in case of failure
 
 """
-    print(f"signal_fit({loc} : {type(loc)})")
+    # print(f"signal_fit({loc} : {type(loc)})")
     raise NotImplementedError(f"Locations of type {type(loc).__name__} are not supported")
 
 @signal_fit.register(LocationMeasure)
@@ -3670,7 +3670,7 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
         raise ValueError(f"The supplied {model} function is NOT a model function")
 
     if not isinstance(fitTable, pd.DataFrame):
-        raise TypeError(f"'fitTable' must be a pandas DataFrame")
+        raise TypeError("'fitTable' must be a pandas DataFrame")
 
     def __do_fit__(sg, mdl, fT, ch):
         initial = list(fT["Initial Value"])
