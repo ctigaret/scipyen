@@ -6,7 +6,8 @@
 
 r"""Widget for model parameter inputs
 """
-import math, numbers, typing, os, types, sys, traceback, warnings, itertools
+import math, numbers, typing, os, types, sys, traceback, warnings, itertools, io # noqa
+
 import numpy as np
 import quantities as pq
 import pandas as pd
@@ -1129,7 +1130,16 @@ Named Parameters:
 
         bounds = optimize.Bounds(lb=lb, ub=ub, keep_feasible = kf)
 
-        self._fittedCurve_, self._fitResult_ = crvf.fit_model(data, self._model_, p0, x = x, bounds=bounds)
+        try:
+            self._fittedCurve_, self._fitResult_ = crvf.fit_model(data, self._model_, p0, x = x, bounds=bounds)
+        except Exception as e:
+            print(e)
+            with io.StringIO() as bf:
+                traceback.print_exc(file=bf)
+                msg = bf.getvalue()
+                eType = type(e).__name__
+                eMsg = str(e)
+                self.detailedMessage(f"Curve Fitting {eType}", eMsg, detail = msg)
 
         if self._fitResult_:
             self._model_fit_coefficients_["Fitted"] = self._fitResult_.Coefficients.Fitted
