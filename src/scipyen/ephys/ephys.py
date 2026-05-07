@@ -3563,7 +3563,8 @@ def _get_location_boundary_(loc: typing.Union[DataCursor, SignalCursor],
     return t0 if start else t1
 
 @singledispatch
-def signal_fit(loc:object, model: typing.Callable,
+def signal_fit(loc:object,
+               model: typing.Callable,
                fitTable: pd.DataFrame,
                signal: typing.Union[neo.AnalogSignal, DataSignal],
                /,
