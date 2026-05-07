@@ -1286,7 +1286,22 @@ END
 
 fi
 cat <<END >> ${scriptfile} 
-${python_executable} -Xfrozen_modules=off ${launchcmd} "\$*"
+run_in_debugger=0
+
+for i in "$@" ; do
+    case $i in
+        --debug)
+        run_in_debugger=1
+        shift
+        ;;
+    esac
+done
+
+if [[ $run_in_debugger -eq 1 ]] then
+    ${python_executable} -Xfrozen_modules=off -m pdb ${launchcmd} "\$*"
+else
+    ${python_executable} -Xfrozen_modules=off ${launchcmd} "\$*"
+fi
 END
 shopt -u lastpipe
 # chmod +x ${target_dir}/scipyen 
