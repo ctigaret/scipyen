@@ -1181,7 +1181,8 @@ Var-keyword parameters (**kwargs):
     int, default is 0; this is useful to select the channel from a multi-channel signal
 
     .. note ::
-        You can always "extract" a single channel from a multi-channel signal *before* passing it to this function
+        You can always "extract" a single channel from a multi-channel signal
+        *before* passing it to this function
 
 :fargs:
     tuple with var-positional parameters to `func`
@@ -1198,10 +1199,31 @@ Var-keyword parameters (**kwargs):
     When ``True`` exceptions will be raised up the call stack
 
 The following are passed directly to scipy.optimize.least_squares:
-bounds, jac, method, ftol, xtol, gtol, x_scale, loss, f_scale, max_nfev,
-diff_step, tr_solver, tr_options, jac_sparsity, verbose
+
+:bounds:
+
+:jac:
+
+:method:
+
+:ftol:
+:xtol:
+:gtol:
+:x_scale:
+:loss:
+:f_scale:
+:max_nfev:
+:diff_step:
+:tr_solver:
+:tr_options:
+:jac_sparsity:
+:verbose:
 
 (see scipy documentation for details)
+
+Unless you're trying something special, in the vast majority of cases you only
+
+need to pass values to the ``bounds`` parameter.
 
 Defaults are:
 

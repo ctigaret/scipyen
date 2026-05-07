@@ -185,6 +185,9 @@ import neo
 import h5py
 import pandas as pd
 # import pyabf
+
+from scipy import optimize
+
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -213,17 +216,7 @@ else:
 
 
 import matplotlib as mpl
-# import pyqtgraph as pg
 from core.pyqtgraph_patch import pyqtgraph as pg
-# import qtpy
-# qtpy.API = os.environ["QT_API"]
-# if os.environ["QT_API"] == "pyside6":
-#     import PySide6
-#     from PySide6 import (QtGui, QtCore, QtWidgets)
-#     from PySide6.QtCore import (Signal, Slot, )
-# else:
-#     from qtpy import (QtGui, QtCore, QtWidgets)
-#     from qtpy.QtCore import (Signal, Slot, )
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -244,6 +237,8 @@ from core import signalprocessing as sigp
 from core import utilities
 from core import neoutils
 from core import strutils
+from core import curvefitting as crvf
+from core import models as models
 
 from core.utilities import (safewrapper,
                             reverse_mapping_lookup,
@@ -3497,6 +3492,8 @@ def _get_location_boundary_(loc: typing.Union[typing.Sequence[numbers.Number],
                    ) -> typing.Union[numbers.Number, pq.Quantity,
                                      typing.Sequence[numbers.Number],
                                      typing.Sequence[pq.Quantity]]:
+
+    # print(f"get_location_boundary(loc = {loc})\n")
     if all(isinstance(l, (numbers.Number, pq.Quantity)) for l in loc):
         assert len(loc) == 2, f"Expecting a pair of scalars; got {len(loc)} elements instead."
         return loc[0] if start else loc[1]
@@ -3566,8 +3563,246 @@ def _get_location_boundary_(loc: typing.Union[DataCursor, SignalCursor],
     return t0 if start else t1
 
 @singledispatch
-def signal_reduce(loc: object,
-                  func: typing.Callable,
+def signal_fit(loc:object, model: typing.Callable,
+               fitTable: pd.DataFrame,
+               signal: typing.Union[neo.AnalogSignal, DataSignal],
+               /,
+               channel: typing.Optional[int] = None,
+               relative: bool = True) -> typing.Optional[
+                   typing.Union[
+                       tuple,
+                       typing.Sequence[tuple]
+                       ]
+                   ]:
+    r"""
+Parameters:
+-----------
+:signal: The signal to be fitted
+
+:model: a function decorated with the ``models.modelfunction`` decorator
+
+:fitTable: a DataFrame with intial fit parameters.
+
+    This is expected to have
+    * rows: names of the ``model`` function, in the order expected by it.
+
+    * columns: "Initial Value", "Lower Bound", "Upper Bound" and "Keep Feasible"
+
+    WARNING: the fitTable is NOT checked for compliance to the model!
+
+    See examples in core.models.
+
+
+:channel: for multi-channel signals only, the index of the channel with data to be fit.
+
+    When None, the fitting will proceed through **all** channels
+
+:relative: see signal_reduce function
+
+Returns
+--------
+
+* when fitting single-channel signals, or a single channel of a multi-channel signal,
+    returns a tuple (fitted curve, fit result)
+
+* when fitting all channels returns a list of tuples as above
+
+.. note::
+    The ``model`` and the ``fitTable`` are used for **all** curve fitting operations
+
+(i.e., across **all** channels)
+
+.. warning::
+    The ``fitTable`` should match the parameters expected by ``model``. NO CHECKS are performed by this function.
+
+
+Returns None in case of failure
+
+"""
+    print(f"signal_fit({loc})")
+    raise NotImplementedError(f"Locations of type {type(loc).__name__} are not supported")
+
+@signal_fit.register(LocationMeasure)
+@signal_fit.register(types.NoneType)
+@signal_fit.register(tuple)
+@signal_fit.register(list)
+@signal_fit.register(collections.deque)
+def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
+                                      typing.Sequence[pq.Quantity],
+                                      LocationMeasure,
+                                      typing.Sequence[typing.Sequence[numbers.Number]],
+                                      typing.Sequence[typing.Sequence[pq.Quantity]],
+                                      typing.Sequence[typing.Sequence[LocationMeasure]],
+                                      types.NoneType],
+                 model: typing.Callable,
+                 fitTable: pd.DataFrame,
+                 signal: typing.Union[neo.AnalogSignal, DataSignal],
+                 /,
+                 channel: typing.Optional[int]=None,
+                 relative: bool = True) -> typing.Optional[
+                   typing.Union[
+                       tuple,
+                       typing.Sequence[tuple]
+                       ]
+                   ]:
+    if not models.isModelFunction(model):
+        raise ValueError(f"The supplied {model} function is NOT a model function")
+
+    if not isinstance(fitTable, pd.DataFrame):
+        raise TypeError(f"'fitTable' must be a pandas DataFrame")
+
+    def __do_fit__(sg, mdl, fT, ch):
+        initial = list(fT["Initial Value"])
+        bounds = optimize.Bounds(lb=list(fT["Lower Bound"]),
+                                 ub=list(fT["Upper Bound"]),
+                                 keep_feasible=list(fT["Keep Feasible"]))
+        result = list()
+        if datatypes.is_vector(sg):
+            fC, fR = crvf.fit_model(sg, mdl, initial, bounds=bounds)
+            result.append((fC, fR))
+        else:
+            if isinstance(ch, int):
+                if ch < -sg.shape[1] or ch >= sg.shape[1]:
+                    raise ValueError(f"Invalid channel ({ch}) for a signal with {sg.shape[1]} channels")
+                fC, fR = crvf.fit_model(sg[:,ch], mdl, initial,
+                                        bounds=bounds)
+                result.append((fC, fR))
+
+            elif ch is None:
+                for ch in range(sg.shape[1]):
+                    fC, fR = crvf.fit_model(sg[:,ch], mdl, initial,
+                                            bounds=bounds)
+                    result.append((fC, fR))
+
+            else:
+                raise TypeError(f"'channel' expected to be an int or None; instead, got {type(channel).__name__}")
+
+        if len(result) == 1:
+            return result[0]
+
+        elif len(result) > 1:
+            return result
+
+    if loc is None:
+        return __do_fit__(signal, model, fitTable, channel)
+
+    elif isinstance(loc, LocationMeasure):
+        sg = loc(signal)
+        if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
+            raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
+
+        return __do_fit__(sg, model, fitTable, channel)
+
+    elif all(isinstance(l, (numbers.Number, pq.Quantity, LocationMeasure)) for l in loc):
+        if len(loc) == 1 and isinstance(loc[0], LocationMeasure):
+            sg = loc[0](signal)
+            if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
+                raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
+
+            return __do_fit__(sg, model, fitTable, channel)
+
+        elif len(loc) == 2:
+            t0, t1 = loc
+            sg = __slice_signal__(t0,t1, signal, relative)
+
+            return __do_fit__(sg, model, fitTable, channel)
+
+        else:
+            raise ValueError(f"Expecting a pair of elements; got {len(loc)} elements instead.")
+
+    elif all(isinstance(l, (tuple, list, collections.deque)) and all(isinstance(ll, (number.Number, pq.Quantity, LocationMeasure)) for ll in l) for l in loc):
+        result = list()
+        for l in loc:
+            t0, t1 = l
+            sg = __slice_signal__(t0, t1, signal, relative)
+            ret = __do_fit__(sg, model, fitTable, channel)
+
+        return np.vstack(result)
+
+    else:
+        raise ValueError(f"'loc' must be a Location Measure, a pair of scalars or Location Measures, or a sequence of such pairs")
+
+@signal_fit.register(neo.Epoch)
+@signal_fit.register(DataZone)
+@signal_fit.register(Interval)
+def _signal_fit_(loc: typing.Union[neo.Epoch, DataZone, Interval],
+                 model: typing.Callable,
+                 fitTable: pd.DataFrame,
+                 signal: typing.Union[neo.AnalogSignal, DataSignal],
+                 /,
+                 channel: typing.Optional[int] = None,
+                 relative: bool = True) -> typing.Optional[
+                   typing.Union[
+                       tuple,
+                       typing.Sequence[tuple]
+                       ]
+                   ]:
+    if loc.ndim > 0:
+        intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
+                                key = lambda i: i.times if isinstance(loc, (neo.Epoch, DataZone)) else i.t0))
+    else:
+        intervals = [loc]
+
+    result = list()
+
+    for i in intervals:
+        if isinstance(i, Interval):
+            t0, t1 = i.t0.copy(), i.t1.copy()
+        else:
+            t0, t1 = i.times.copy(), i.durations.copy()
+
+        # x0, x1 = t0, t1
+        # NOTE: Must convert to scalars, i.e., unsized arrays
+        if t0.ndim > 0:
+            t0 = t0[0]
+
+        if t1.ndim > 0:
+            t1 = t1[0]
+
+        if not isinstance(i, Interval):
+            t1 = t0 + t1
+
+        ret = signal_fit([t0, t1], func, signal, channel, relative)
+
+        result.append(ret)
+
+    return np.vstack(result)
+
+@signal_fit.register(DataCursor)
+@signal_fit.register(SignalCursor)
+def _signal_fit_(loc: typing.Union[DataCursor, SignalCursor],
+                 model: types.FunctionType,
+                 fitTable: pd.DataFrame,
+                 signal: typing.Union[neo.AnalogSignal, DataSignal],
+                 /,
+                 channel: typing.Optional[int] = None,
+                 relative: bool = True) -> typing.Optional[
+                   typing.Union[
+                       tuple,
+                       typing.Sequence[tuple]
+                       ]
+                   ]:
+    if isinstance(loc, SignalCursor):
+        coord = float(loc.x)
+        span = float(loc.xwindow)
+        if isinstance(loc.xUnits, pq.Quantity):
+            coord *= loc.xUnits
+            span *= loc.xUnits
+
+    elif isinstance(loc, DataCursor):
+        # need copies here, because of possible readjustment
+        coord = loc.coord.copy() if isinstance(loc.coord, np.ndarray) else float(loc.coord)
+        span = loc.span.copy() if isinstance(loc.span, np.ndarray) else float(loc.span)
+
+    else:
+        raise TypeError(f"Incorrrect cursors specification; expecting a SignalCursor, DataCursor, or a 2-tuple of scalars; got {cursor} instead")
+
+    t0, t1 = (coord - span/2, coord + span/2)
+
+    return signal_fit([t0,t1], func, signal, channel, relative)
+
+@singledispatch
+def signal_reduce(loc: object, func: typing.Callable,
                   signal: typing.Union[neo.AnalogSignal, DataSignal], /,
                   channel: typing.Optional[int] = None,
                   relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
@@ -3653,85 +3888,82 @@ Example:
 @signal_reduce.register(tuple)
 @signal_reduce.register(list)
 @signal_reduce.register(collections.deque)
+@signal_reduce.register(LocationMeasure)
+@signal_reduce.register(types.NoneType)
 def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
                                       typing.Sequence[pq.Quantity],
+                                      LocationMeasure,
                                       typing.Sequence[typing.Sequence[numbers.Number]],
                                       typing.Sequence[typing.Sequence[pq.Quantity]],
-                                      ],
+                                      typing.Sequence[typing.Sequence[LocationMeasure]],
+                                      types.NoneType],
                     func: typing.Callable,
                     signal: typing.Union[neo.AnalogSignal, DataSignal], /,
                     channel: typing.Optional[int] = None,
                     relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
-    def __do_reduce__(t0, t1, fn, sg, ch, rel):
-        if isinstance(t0, LocationMeasure):
-            t0 = t0(sg, channel=ch, relative=rel)
 
-        if isinstance(t1, LocationMeasure):
-            t1 = t1(sg, channel=ch, relative=rel)
-
-        if not isinstance(t0, pq.Quantity):
-            t0 *= sg.times.units
-
-        else:
-            t0 = checkRescale(t0, sg.times.units)
-
-        if not isinstance(t1, pq.Quantity):
-            t1 *= sg.times.units
-
-        else:
-            t1 = checkRescale(t1, sg.times.units)
-
-        t0, t1 = min(t0,t1), max(t0,t1)
-
-        if rel:
-            t0, t1 = adjust_times_relative_to_signal(sg, t0, t1)
-
-        elif t0 < sg.t_start or t0 > sg.t_stop:
-            scipywarn(f"t0 {t0} falls outside signal's domain with start {sg.t_start} and stop {sg.t_stop}")
-            return np.nan
-
-        elif t1 < sg.t_start or t1 > sg.t_stop:
-            scipywarn(f"t1 {t1} falls outside signal's domain with start {sg.t_start} and stop {sg.t_stop}")
-            return np.nan
-
-        # NOTE: 2026-05-04 22:12:55
-        # make sure t0, t1 are "scalar-like" arrays
-        t0, t1 = tuple(map(lambda x: x.flatten()[0], (t0, t1)))
-
+    def __do_reduce__(fn, sg, ch):
         kw = dict()
 
-        if not inspect.isbuiltin(func):
-            signature = inspect.signature(func)
+        if not inspect.isbuiltin(fn):
+            signature = inspect.signature(fn)
             if "axis" in signature.parameters:
                 kw["axis"] = 0
 
-
-        if t0 == t1:
-            ret = func(signal[signal.time_index(t0),:], **kw)
-
-        else:
-            ret = func(signal.time_slice(t0,t1), **kw)
-
-        if isinstance(channel, int):
-            return ret[channel].flatten()
+        ret = fn(sg, **kw)
+        if isinstance(ch, int):
+            return ret[c].flatten()
 
         return ret
 
-    if all(isinstance(l, (numbers.Number, pq.Quantity, LocationMeasure)) for l in loc):
-        assert len(loc) == 2, f"Expecting a pair of elements; got {len(loc)} elements instead."
-        t0, t1 = loc
-        return __do_reduce__(t0, t1, func, signal, channel, relative)
+        # if t0 == t1:
+        #     ret = func(signal[signal.time_index(t0),:], **kw)
+        #
+        # else:
+        #     ret = func(signal.time_slice(t0,t1), **kw)
+        #
+        #
+        # return ret
+
+    if loc is None:
+        return __do_reduce__(func, signal, channel)
+        # return __do_reduce__(t0, t1, func, signal, channel, relative)
+
+    elif isinstance(loc, LocationMeasure):
+        sg = loc(signal)
+        if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
+            raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
+
+        return __do_reduce__(func, sg, channel)
+
+    elif all(isinstance(l, (numbers.Number, pq.Quantity, LocationMeasure)) for l in loc):
+        if len(loc) == 1 and isinstance(loc[0], LocationMeasure):
+            sg = loc[0](signal)
+            if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
+                raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
+
+            return __do_reduce__(func, sg, channel)
+
+        elif len(loc) == 2:
+            t0, t1 = loc
+            sg = __slice_signal__(t0,t1, signal, relative)
+
+            return __do_reduce__(func, sg, channel)
+
+        else:
+            raise ValueError(f"Expecting a pair of elements; got {len(loc)} elements instead.")
 
     elif all(isinstance(l, (tuple, list, collections.deque)) and all(isinstance(ll, (number.Number, pq.Quantity, LocationMeasure)) for ll in l) for l in loc):
         result = list()
         for l in loc:
             t0, t1 = l
-            ret = __do_reduce__(t0, t1, func, signal, channel, relative)
+            sg = __slice_signal__(t0, t1, signal, relative)
+            ret = __do_reduce__(func, sg, channel)
 
         return np.vstack(result)
 
     else:
-        raise ValueError(f"'loc' must be a sequence of two scalars or a sequence of scalar pairs")
+        raise ValueError(f"'loc' must be a Location Measure, a pair of scalars or Location Measures, or a sequence of such pairs")
 
 
 @signal_reduce.register(neo.Epoch)
@@ -3742,7 +3974,6 @@ def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval],
                     signal: typing.Union[neo.AnalogSignal, DataSignal], /,
                     channel: typing.Optional[int] = None,
                     relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
-
 
     if loc.ndim > 0:
         intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
@@ -3809,7 +4040,9 @@ def signal_argmax(loc, signal, /, channel = None, relative = True):
     # np.argmax will report the sample of the max WITHIN the boundaries of loc!
     # therefore, this HAS to be added to the number of samples UP TO the earliest
     # boundary of 'loc'
-    starts = signal.time_index(get_location_boundary(loc, True, True))
+    loc_bounds = get_location_boundary(loc, True, True)
+    # print(f"signal_argmax -> loc_bounds = {loc_bounds}\n")
+    starts = signal.time_index(loc_bounds)
     return starts + signal_reduce(loc, np.argmax, signal, channel, relative)
 
 def signal_domain_max(loc, signal, /, channel = None, relative = True):
@@ -3873,17 +4106,25 @@ def _signal_slice_(loc: typing.Union[list, tuple, collections.deque], signal, /,
 
     t0, t1 = loc
 
+    # WARNING 2026-05-07 12:36:09
+    # this will FAIL WHEN LocationMasure DOES NOT RETURN a domain scalar!
     if isinstance(t0, LocationMeasure):
-        t0 = t0(signal, channel=channel, relative=relative)
+        t0_ = t0(signal, channel=channel, relative=relative)
+        if isinstance(t0_, pq.Quantity) and not scq.unitsConvertible(t0_, signal.times.units):
+            raise ValueError(f"Location measure {t0} generated data with incimplatible physical dimensionality {t0_} ")
+        t0 = t0_
 
     if isinstance(t1, LocationMeasure):
-        t1 = t1(signal, channel=channel, relative=relative)
+        t1_ = t1(signal, channel=channel, relative=relative)
+        if isinstance(t1_, pq.Quantity) and not scq.unitsConvertible(t1_, signal.times.units):
+            raise ValueError(f"Location measure {t1} generated data with incimplatible physical dimensionality {t1_} ")
+        t1 = t1_
 
     if all(isinstance(x, numbers.Number) for x in (t0,t1)):
         t0,t1 = tuple(map(lambda x: x*signal.times.units), (t0,t1))
 
     elif not all(isinstance(x, pq.Quantity) and x.size==1 for x in (t0,t1)):
-        raise ValueError("Expecting a pair of floats or scalar Quanity objects")
+        raise ValueError("Expecting a pair of floats or scalar Quantity objects")
 
     if relative:
         t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
@@ -6854,3 +7095,51 @@ def getProtocol(x:typing.Union[neo.Block, pab.pyabf.ABF]) -> ElectrophysiologyPr
         return
     return pab.ABFProtocol(x)
 
+def __slice_signal__(t0, t1, sg, rel):
+    r"""Helper function for signal_fit & signal_reduce."""
+    if isinstance(t0, LocationMeasure):
+        t0_ = t0(sg, channel=ch, relative=rel)
+        if isinstance(t0_, pq.Quantity) and not scq.unitsConvertible(t0_, signal.times.units):
+            raise ValueError(f"Location measure {t0} generated data with incimplatible physical dimensionality {t0_} ")
+        t0 = t0_
+
+    if isinstance(t1, LocationMeasure):
+        t1 = t1(sg, channel=ch, relative=rel)
+        if isinstance(t1_, pq.Quantity) and not scq.unitsConvertible(t1_, signal.times.units):
+            raise ValueError(f"Location measure {t1} generated data with incimplatible physical dimensionality {t1_} ")
+        t1 = t1_
+
+    if not isinstance(t0, pq.Quantity):
+        t0 *= sg.times.units
+
+    else:
+        t0 = checkRescale(t0, sg.times.units)
+
+    if not isinstance(t1, pq.Quantity):
+        t1 *= sg.times.units
+
+    else:
+        t1 = checkRescale(t1, sg.times.units)
+
+    t0, t1 = min(t0,t1), max(t0,t1)
+
+    if rel:
+        t0, t1 = adjust_times_relative_to_signal(sg, t0, t1)
+
+    elif t0 < sg.t_start or t0 > sg.t_stop:
+        scipywarn(f"t0 {t0} falls outside signal's domain with start {sg.t_start} and stop {sg.t_stop}")
+        return np.nan
+
+    elif t1 < sg.t_start or t1 > sg.t_stop:
+        scipywarn(f"t1 {t1} falls outside signal's domain with start {sg.t_start} and stop {sg.t_stop}")
+        return np.nan
+
+    # NOTE: 2026-05-04 22:12:55
+    # make sure t0, t1 are "scalar-like" arrays
+    t0, t1 = tuple(map(lambda x: x.flatten()[0], (t0, t1)))
+
+    if t0 == t1:
+        return sg[sg.time_index(t0),:]
+
+    else:
+        return sg.time_slice(t0,t1)
