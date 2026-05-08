@@ -38,13 +38,13 @@ A biased, scaled and shifted version of (1) is:
 .. attention:: Please consider decorating all model functions with the ``modelfunction`` decorator.
 This will help identifying these functions easily from other Scipyen components.
 """
-import typing, types, traceback, sys, os, itertools
-import numbers
-import neo
+import typing, types, traceback, sys, os, itertools # noqa
+# import numbers
+# import neo
 import numpy as np
 import PIL
 import sympy
-from sympy import abc as symabc
+# from sympy import abc as symabc
 import quantities as pq
 import pandas as pd
 import dataclasses
@@ -77,8 +77,8 @@ else:
     __has_sip__ = True
 
 from core import scipyen_quantities as scq
-from core.datasignal import DataSignal
-from core.prog import (scipywarn, signature_as_dict, decorator, timefunc)
+# from core.datasignal import DataSignal
+from core.prog import (scipywarn, signature_as_dict, decorator, timefunc) # noqa
 from core import utilities
 # from core import datatypes
 from core.datatypes import (Real, Complex, Number)
@@ -92,6 +92,7 @@ FittingCoefficientsDict = typing.TypedDict("FittingCoefficientsDict", {"names": 
                                                                        "upper": typing.Union[Real, typing.Sequence[Real]],
                                                                        "feasible": typing.Union[bool, typing.Sequence[bool]]
                                                                        })
+
 
 def isFittingCoefficientsDict(x:dict):
     r"""Required because TypedDict does not support instance and class checks"""
@@ -2760,3 +2761,31 @@ def renderModelExpression(expression:typing.Union[sympy.Basic, sympy.Expr, str, 
         ret = None
 
     return ret
+
+def adjustFitTable(model: typing.Callable | pd.DataFrame, name: str, kind:str,
+                   value: object) -> pd.DataFrame:
+    if isModelFunction(model):
+        fitTable = model.generateFitTable()[0]
+
+    elif isinstance(model, pd.DataFrame):
+        if (model.index.dtype.type is not str
+            or len(model.index) == 0
+            or model.columns.dtype.type is not str
+            or list(model.columns) != ['Initial Value', 'Lower Bound', 'Upper Bound', 'Keep Feasible']
+            ):
+            raise ValueError("Incompatible DataFrame")
+
+        fitTable = model
+
+    else:
+        raise TypeError("Expecting a model function or a DataFrame as first positional argument")
+
+    if name not in fitTable.index:
+        raise ValueError(f"Invalid coefficient name {name} for model {model.name}; expecting one of {fitTable.index}")
+
+    if kind not in fitTable.columns:
+        raise ValueError(f"Invalid coefficient kind {kind}; expecting one of {fitTable.columns}")
+
+    fitTable.loc[name, kind] = value
+
+    return fitTable

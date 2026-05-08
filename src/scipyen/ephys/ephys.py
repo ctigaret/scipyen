@@ -3113,6 +3113,7 @@ def signal_fit(loc:object,
                fitTable: pd.DataFrame,
                signal: typing.Union[neo.AnalogSignal, DataSignal],
                /,
+               adjustFitTable: dict = dict(),
                channel: typing.Optional[int] = None,
                relative: bool = True) -> typing.Optional[
                    typing.Union[
@@ -3137,6 +3138,34 @@ Parameters:
     WARNING: the fitTable is NOT checked for compliance to the model!
 
     See examples in core.models.
+
+:adjustFitTable: mapping of coefficient name to a dict (A: B) where
+
+    * the key (A) is the kind of coefficient value: str, one of 'Initial Value', 'Lower Bound', 'Upper Bound', 'Keep Feasible'
+
+    * the value (B) is the value to be set for the specified kind:
+        * when kind is one of 'Initial Value', 'Lower Bound', 'Upper Bound':
+
+            * str: signal attribute that returns a scalar
+
+            * a reducing function (e.g. np.max, etc) which takes a signal as the first argument
+
+            * a scalar number or a scalar pq.Quantity
+
+        * when kind is 'Keep Feasible' this is expected to be a bool
+
+    Example:
+
+::
+
+    {"x0": [("Initial Value", "t_start"), ("Lower Bound", 0)]
+     "λ0": [("Initial Value", lambda x: -100 if <...> else 100),
+            ("Upper Bound", lambda x: 0.0 if <...> else np.inf),
+            ],
+    }
+
+
+    This will allow readjusting the table of fit coefficients dynamically
 
 
 :channel: for multi-channel signals only, the index of the channel with data to be fit.
@@ -3184,6 +3213,7 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
                  fitTable: pd.DataFrame,
                  signal: typing.Union[neo.AnalogSignal, DataSignal],
                  /,
+                 adjustFitTable: dict = dict(),
                  channel: typing.Optional[int]=None,
                  relative: bool = True) -> typing.Optional[
                    typing.Union[
@@ -3194,28 +3224,86 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
     if not models.isModelFunction(model):
         raise ValueError(f"The supplied {model} function is NOT a model function")
 
-    if not isinstance(fitTable, pd.DataFrame):
-        raise TypeError("'fitTable' must be a pandas DataFrame")
+    # if not isinstance(fitTable, pd.DataFrame):
+    #     raise TypeError("'fitTable' must be a pandas DataFrame")
+
+    def __adjustFitTable__(sg, mdl, ft, ch, aft):
+        for coefName, coefValues in aft.items():
+            if coefName in ft.index:
+                for key in ['Initial Value', 'Lower Bound', 'Upper Bound']:
+                    if key in coefValues:
+                        actor = coefValues[key]
+
+                        if isinstance(actor, str) and hasattr(sg, actor):
+                            value = getattr(sg, actor).magnitude
+
+                        elif isinstance(actor, typing.Callable):
+                            value = actor(sg[:,ch])
+
+                        elif (isinstance(actor, numbers.Number)
+                            or (isinstance(actor, pq.Quantity
+                                            and actor.size == 1)
+                                )
+                            ):
+                            value = actor
+
+                        else:
+                            raise TypeError(f"Cannot set {key} for {coefName} to {actor}")
+
+                        ft.loc[coefName, key] = value
+
+                kf = coefValues.get("Keep Feasible", None)
+                if isinstance(kf, bool):
+                    ft.loc[coefName, "Keep Feasible"] = kf
+
+            else:
+                raise ValueError(f"Invalid ft coefficient name: {coefName} for the {mdl.name} model")
+
+        return ft
+
+    def __get_initial_and_bounds__(fT):
+            initial = list(fT["Initial Value"])
+            bounds = optimize.Bounds(lb=list(fT["Lower Bound"]),
+                                     ub=list(fT["Upper Bound"]),
+                                     keep_feasible=list(fT["Keep Feasible"])
+                                     )
+
+            return initial, bounds
 
     def __do_fit__(sg, mdl, fT, ch):
-        initial = list(fT["Initial Value"])
-        bounds = optimize.Bounds(lb=list(fT["Lower Bound"]),
-                                 ub=list(fT["Upper Bound"]),
-                                 keep_feasible=list(fT["Keep Feasible"]))
         result = list()
+        if len(adjustFitTable) == 0:
+            # defer this to below if adjustments are to be made
+            initial, bounds = __get_initial_and_bounds__(fT)
+
         if datatypes.is_vector(sg):
+            if len(adjustFitTable):
+                fT = __adjustFitTable__(sg, mdl, fT, 0, adjustFitTable)
+                initial, bounds = __get_initial_and_bounds__(fT)
+
+            # print(f"initial = {initial}\nbounds = {bounds}")
             fC, fR = crvf.fit_model(sg, mdl, initial, bounds=bounds)
             result.append((fC, fR))
+
         else:
             if isinstance(ch, int):
                 if ch < -sg.shape[1] or ch >= sg.shape[1]:
                     raise ValueError(f"Invalid channel ({ch}) for a signal with {sg.shape[1]} channels")
+
+                if len(adjustFitTable):
+                    fT = __adjustFitTable__(sg, mdl, fT, ch, adjustFitTable)
+                    initial, bounds = __get_initial_and_bounds__(fT)
+
                 fC, fR = crvf.fit_model(sg[:,ch], mdl, initial,
                                         bounds=bounds)
                 result.append((fC, fR))
 
             elif ch is None:
                 for ch in range(sg.shape[1]):
+                    if len(adjustFitTable):
+                        fT = __adjustFitTable__(sg, mdl, fT, ch, adjustFitTable)
+                        initial, bounds = __get_initial_and_bounds__(fT)
+
                     fC, fR = crvf.fit_model(sg[:,ch], mdl, initial,
                                             bounds=bounds)
                     result.append((fC, fR))
@@ -3233,10 +3321,7 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
         return __do_fit__(signal, model, fitTable, channel)
 
     elif isinstance(loc, DeferredSignalMeasure):
-        # print(f"{signal_fit}: loc = \n\t{loc}) and ")
-        # print(f"\tsignal = \n\t{signal}\n\t({type(signal)}) => \n")
         sg = loc(signal)
-        # print(f"\tsg = \n\t{sg}\n\t({type(sg)})\n")
         if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
             raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
 
@@ -3274,11 +3359,12 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
 @signal_fit.register(neo.Epoch)
 @signal_fit.register(DataZone)
 @signal_fit.register(Interval)
-def _signal_fit_(loc: typing.Union[neo.Epoch, DataZone, Interval],
+def _signal_fit_(loc: typing.Union[neo.Epoch, DataZone, Interval],  # noqa
                  model: typing.Callable,
                  fitTable: pd.DataFrame,
                  signal: typing.Union[neo.AnalogSignal, DataSignal],
                  /,
+                 adjustFitTable: dict = dict(),
                  channel: typing.Optional[int] = None,
                  relative: bool = True) -> typing.Optional[
                    typing.Union[
@@ -3311,7 +3397,7 @@ def _signal_fit_(loc: typing.Union[neo.Epoch, DataZone, Interval],
         if not isinstance(i, Interval):
             t1 = t0 + t1
 
-        ret = signal_fit([t0, t1], func, signal, channel, relative)
+        ret = signal_fit([t0, t1], func, fitTable, signal, adjustFitTable, channel, relative)
 
         result.append(ret)
 
@@ -3319,11 +3405,12 @@ def _signal_fit_(loc: typing.Union[neo.Epoch, DataZone, Interval],
 
 @signal_fit.register(DataCursor)
 @signal_fit.register(SignalCursor)
-def _signal_fit_(loc: typing.Union[DataCursor, SignalCursor],
+def _signal_fit_(loc: typing.Union[DataCursor, SignalCursor], # noqa
                  model: types.FunctionType,
                  fitTable: pd.DataFrame,
                  signal: typing.Union[neo.AnalogSignal, DataSignal],
                  /,
+                 adjustFitTable: dict = dict(),
                  channel: typing.Optional[int] = None,
                  relative: bool = True) -> typing.Optional[
                    typing.Union[
@@ -3348,7 +3435,7 @@ def _signal_fit_(loc: typing.Union[DataCursor, SignalCursor],
 
     t0, t1 = (coord - span/2, coord + span/2)
 
-    return signal_fit([t0,t1], func, signal, channel, relative)
+    return signal_fit([t0,t1], model, fitTable, signal, adjustFitTable, channel, relative)
 
 @singledispatch
 def signal_reduce(loc: object, func: typing.Callable,

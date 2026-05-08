@@ -37,7 +37,7 @@ from core.datazone import (DataZone, Interval)
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import TriggerProtocol
 
-from core.prog import (safewrapper, scipywarn, print_styled)
+# from core.prog import (safewrapper, scipywarn, print_styled)
 
 from core import neoutils
 
