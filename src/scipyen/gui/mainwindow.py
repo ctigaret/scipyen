@@ -278,6 +278,7 @@ from core.strutils import InflectEngine # noqa
 from core.scipyen_plugin_loader import reload # noqa
 from core.vigra_patches import vigra # noqa
 from core.workspacefunctions import * # noqa
+from core.deferredmeasures import DeferredSignalMeasure # noqa
 
 from plots import plots as plots # noqa
 

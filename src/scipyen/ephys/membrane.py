@@ -399,7 +399,8 @@ def measure_membrane_test(signal:typing.Union[neo.AnalogSignal, DataSignal],
 
     # check if locations are as many as needed, given the clamping mode
     # (see above)
-    # then create a LocationMeasure to apply to the signal:
+    # then create an ephys.DeferredSignalMeasure (actually, a core.deferredmeasures.DeferredSignalMeasure)
+    # apply to the signal:
     #
     # Use ephys.cursors_dfference if cursors are given,
     # else use ephys.intervals_difference
