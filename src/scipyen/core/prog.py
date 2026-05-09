@@ -1352,9 +1352,40 @@ def signature_as_str(
     return "".join(func)
 
 
-def print_styled(s: str, color: str = "yellow", bright: bool = True):
-    c = getattr(colorama.Fore, color.upper())
-    pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
+def print_styled(s: str, color: str = "yellow", bright: bool = True,
+                 back: typing.Optional[str] = None, **kwargs):
+    r"""Colorful printing using the ``colorama`` package.
+
+For a list of colors and styles, call
+
+::
+
+    import colorama
+    dir(colorama.Fore) # -> available ANSI colors
+    dir(colorama.Style) # -> available ANSI styles
+"""
+    if color.lower().startswith("light") and not color.lower().endswith("_ex"):
+        color = f"{color.lower}_ex"
+
+    c = getattr(
+                    colorama.Fore,
+                    color.upper(),
+                    colorama.Fore.YELLOW
+        )
+
+    style = kwargs.pop("style", "bright" if bright else "normal")
+
+    st = getattr(colorama.Style,
+                 style.upper(),
+                 colorama.Style.BRIGHT if bright else colorama.Style.NORMAL)
+
+    # pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
+    pre = f"{c}{st}" if bright else c
+
+    if isinstance(back, str) and len(back.strip()):
+        b = getattr(colorama.Back, back.upper(), colorama.Back.RESET)
+        pre = f"{pre}{b}"
+
     return f"{pre}{s}{colorama.Style.RESET_ALL}"
 
 def print_traceback(exc = None) -> str:

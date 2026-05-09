@@ -9,6 +9,7 @@ r"""
 """
 import sys
 import os
+import io
 import collections
 import traceback
 import datetime
@@ -37,6 +38,7 @@ from core.datazone import (DataZone, Interval)
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import TriggerProtocol
 
+from core.prog import (scipywarn, print_styled)
 # from core.prog import (safewrapper, scipywarn, print_styled)
 
 from core import neoutils
@@ -47,9 +49,10 @@ from gui.cursors import (DataCursor, SignalCursor)# , SignalCursorTypes)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
+
 @dataclass
 class DeferredSignalMeasure:
-    r"""Defer calculating a signal measure at a location using a suitable function or functor.
+    r"""Functor that defers calculating a signal measure at a location using a suitable function or functor.
 
 .. |nbsp| unicode:: 0xA0
    :trim:
@@ -63,7 +66,7 @@ Attributes:
 -----------
 
 :func:
-    The function or functor with specific signature requirements, used to calculate the signal measure.
+    Function with specific signature requirements, used to calculate the signal measure.
 
     The signature requirements are:
 
@@ -131,6 +134,19 @@ See ephys.signal_* family of functions for example of suitable functions
     * A ``typing.Sequence[typing.Union[SignalCursor, DataCursor, neo.Epoch, DataZone, Interval]]`` |nbsp|
     e.g., a ``tuple`` or ``list`` of any of the above, and homogeneous in the type of its elements.
 
+    * A DeferredSignalMeasure object or sequence of DeferredSignalMeasure objects, with
+        the precondition that each of them returns a value in the signal's domain
+        (hence can be used as *locator* objects).
+
+:innerfuncs: tuple of tuple(callable, args, kwargs), to be applied to each parameter
+    passed to this object when called as a function, BEFORE calling ``func`` on the
+    result(s)
+
+    The contents of the inner tuples are as described for :deferred_operations_chain:
+    However, since these functions are applied to the signals, instead of the result,
+    they are collected in an immutable sequence (hence specific to the instance of
+    the DeferredSignalMeasure object)
+
 :name:
     Name of this DeferredSignalMeasure object
 
@@ -148,31 +164,51 @@ See ephys.signal_* family of functions for example of suitable functions
     This attribute is ignored when several signal objects are passed as a sequence or arguments |nbsp|
     when calling DeferredSignalMeasure as a function.
 
+:posargs: a tuple of additional positional arguments, as needed by ``func``
 
 :kwargs:
     Named and keyword parameters passed to func *after* location and signal parameters
 
-:deferred_access_chain: a list of tuples that defers access to the elements or members of
-    the result value returned from calling this DeferredSignalMeasure instance as a function.
+:deferred_operations_chain: a list of chained operations to be applied to the
+    *result* of the deferred computations performed by ``func`` while calling
+    this DeferredSignalMeasure object as a function.
 
-    Each tuple contains an accessor object and a flag indicating if the accessor
-is an attribute or an index.
+    The operations are "chained" in the sense that the first operation in the
+    chain works on the result of ``func``'s execution, and each of the
+    subsequent operations is applied to the result of the previous operation.
 
-    When an attribute, the accessor MUST be a string, referring to the symbol of
-the attribuet *expected* to exist in the result.
+    Therefore, the *order*  and the *contents* of the operation definitions
+    are important.
 
-    When an index (2nd element if False) the accessor can by *any* hashable object
-that the expected result *can use* as index (i.e., an ``int`` for sequences, or
-any hashable object — ``str``, ``int``, etc) when result is an instance of a mapping
-types such as ``dict``.
+    An operation is defined by a 3-tuple of the form:
 
-    Say you create a DeferredSignalMeasure to get a slice of the signal, but you're only
-interested in the first sample of the result to be used in computations performed by
-othee DeferredSignalMeasure. Simply calling the DeferredSignalMeasure object as a function
-gives you a concrete result which you will then have to index *later* on.
+            (operator, parameter_list, keyword_value_dict)
 
-You can "incorporate" this indexing into the DeferredSignalMeasure so that it will be
-executed when the DeferredSignalMeasure obect is called
+    * ``operator`` is a callable to which the result of the previous computations
+        will be passed as first parameter
+
+        Typical operators are the functions defined in the standard Pytyhon module
+        ``operator`` (some of whom correspond to algebraic operators of addition,
+        multiplication, collection indexing, etc), the ``getattr`` builtin function,
+        and some ``numpy`` array functions.
+
+    * ``parameter_list`` is a list of *aditional* arguments to be passed to ``operator``.
+
+    * ``keyword_value_dict`` is a dict of *additional* named parameter - value pairs
+        that will be passed to ``operator``
+
+    Both ``parameter_list`` and ``keyword_value_dict`` may be empty.
+
+    By default ``deferred_operations_chain`` is an empty list.
+
+    Deferred operations can be added by calling ``self.defer(…)``.
+
+    All defined deferred operations can be removed at any time by calling either
+    ``self.reset_operations()`` or ``self.deferred_operations_chain.clear()``.
+
+    **If you know what you are doing**, individual deferred operations can be inserted
+    or removed *manually* from the self.deferred_operations_chain field using
+    standard Python ``list`` API.
 
 
 .. note::
@@ -415,50 +451,51 @@ Changelog:
     #   although these two will by supplied in self.__call__ if not present in kwargs
     #
     func: typing.Callable
-    locations: typing.Union[typing.Sequence, DataCursor, Interval, SignalCursor, DataZone, neo.Epoch, typing.Self]
+    locations: typing.Optional[
+                                typing.Union[
+                                                typing.Sequence,
+                                                DataCursor,
+                                                Interval,
+                                                SignalCursor,
+                                                DataZone,
+                                                neo.Epoch,
+                                                typing.Self
+                                            ]
+        ] = dataclasses.field(default = tuple)
     name: str = dataclasses.field(default = "measure")
     signalNameOrIndex: typing.Optional[int|str] = dataclasses.field(default = None)
     channel:typing.Optional[int]  = dataclasses.field(default = None)
     relative:bool = True
     posargs: tuple = dataclasses.field(default_factory = tuple)
     kwargs: dict = dataclasses.field(default_factory=dict)
-    deferred_access_chain: list = dataclasses.field(default_factory=list)
+    innerfuncs: tuple[tuple[typing.Callable, tuple, dict]] = dataclasses.field(default_factory = tuple)
+    deferred_operations_chain: list[tuple[typing.Callable, tuple, dict]] = dataclasses.field(default_factory=list)
 
-    # def __post_init__(self):
-    #     # self.deferred_result = MISSING
-    #     self.deferred_access_chain = list()
-
-    def defer_access(self, item: object, isattribute: bool = True) -> typing.Self:
-        r"""Adds deferred access to future results of a call to self(…).
+    def defer(self, op: typing.Callable, *args, **kwargs):
+        """Appends a deferred operation to the future result of a call to self(…).
 
 Returns:
 --------
-    The instance of this object, with updated 'deferred_access_chain' field.
+    The instance of this object, with updated 'deferred_operations_chain' field.
 
     Although this *may* seem unnecessary, it allows chaining these calls, e.g.:
 
 ::
 
-    lm.defer_access(item1, True).defer_access(item2, False)
+    lm.defer(item1, True).defer(item2, False)
 
 .. note::
-    To **reset** the deferred access chain, call self.reset_access_chain()
+    To **reset** the deferred access chain, call self.reset_operations()
 
 """
-        self.deferred_access_chain.append((item, isattribute))
-
+        self.deferred_operations_chain.append((op, args, kwargs))
         return self
 
-    def reset_access_chain(self):
-        self.deferred_access_chain.clear()
+    def reset_operations(self):
+        self.deferred_operations_chain.clear()
 
-    def _apply_deferred_access_(self, obj, item, isattribute):
-        if isattribute:
-            return getattr(obj, item)
-
-        else:
-            return obj.__getitem__(item)
-
+    def _apply_deferred_operator_(self, obj, op, opargs, opkwargs):
+        return op(obj, *opargs, **opkwargs)
 
     def __call__(self, *args, **kwargs) -> object:
         r"""Executes the location measure object.
@@ -468,8 +505,12 @@ Returns:
 
 Var-positional parameters (*args):
 ----------------------------------
-Passed to encapsulated function (`func` field); MUST contain a signal or |nbsp|
-signals and any additional positional parameters **EXCEPT** locators
+Passed to encapsulated function (`func` field); MUST contain a signal a |nbsp|
+sequence of signals, or several comma-separated signal objects, followed by |nbsp|
+any additional positional parameters **EXCEPT** locators.
+
+When ``args`` contains more than one signal object, the ``func`` will perform
+the same computations on each of them.
 
 Var-keyword parameters (**kwargs):
 ---------------------------------
@@ -563,26 +604,98 @@ Any aditional named or keyword parameters to be passed to `func`.
             # NOTE: 2026-05-04 10:41:03
             # augment and rearrange arguments to fit the signature of ``func`` i.e.
             # location(s) THEN signal(s)
+
+            if len(self.innerfuncs) and all((isinstance(x, tuple)
+                                             and len(x) == 3
+                                             and isinstance(x[0], typing.Callable)
+                                             and isinstance(x[1], tuple)
+                                             and isinstance(x[2], dict)) for x in self.innerfuncs):
+                ifrets = list()
+                for l, idef in enumerate(self.innerfuncs):
+                    ifunc, ifargs, ifkw = idef
+                    ifret = ifunc(arg, *ifargs, **ifkw)
+                    ifrets.append(ifret)
+
+                fargs = (self.locations,) + self.posargs + tuple(ifrets)
+
+            else:
+                fargs = (self.locations,) + self.posargs + (arg,) # NOTE: 62026-05-04 22:31:56 DO NOT UNPACK self.locations; some funcs expect seq of locs
             fargs = (self.locations,) + self.posargs + (arg,) # NOTE: 62026-05-04 22:31:56 DO NOT UNPACK self.locations; some funcs expect seq of locs
-            # if isinstance(self.locations, (list, tuple, collections.deque)):
-            #     fargs = tuple(self.locations) + (arg,)
-            #
-            # else:
-            #     fargs = (self.locations,) + (arg,)
 
-
-            # print(f"{self.__class__.__name__}.call: relative = {self.relative}")
-            # print(f"{self.__class__.__name__}.call: func = {self.func}")
-            # print(f"{self.__class__.__name__}.__call__ fargs =\n\t{fargs}\n\n\n")
-            # print(f"{self.__class__.__name__}.__call__ kwargs = {kwargs}")
             result.append(self.func(*fargs, **kwargs))
 
         if len(result) == 1:
             result = result[0]
 
-        if len(self.deferred_access_chain):
-            for k, daccess in enumerate(self.deferred_access_chain):
-                result = self._apply_deferred_access_(result, *daccess)
+        if len(self.deferred_operations_chain):
+            for k, defop in enumerate(self.deferred_operations_chain):
+                try:
+                    result = self._apply_deferred_operator_(result, *defop)
+                except:
+                    msg = print_styled(f"Deferred operator {k}: {defop} could not be applied",
+                                       color="lightmagenta", bright=True, back="white")
+                    scipywarn(f"{msg}")
+                    traceback.print_exc()
 
         return result
+
+@dataclass
+class DeferredComputation:
+    r"""Deferred computations with values using suitable function or functor.
+
+The computations are deferred until concrete data is passed as parameters to calling
+this object as a function.
+
+"""
+    func: typing.Callable
+    name: str = dataclasses.field(default = "measure")
+    posargs: tuple = dataclasses.field(default_factory = tuple)
+    kwargs: dict = dataclasses.field(default_factory=dict)
+    deferred_operations_chain: list = dataclasses.field(default_factory=list)
+
+    def defer(self, op: typing.Callable, *args, **kwargs):
+        self.deferred_operations_chain.append((op, args, kwargs))
+        return self
+
+    def reset_operations(self):
+        self.deferred_operations_chain.clear()
+
+    def _apply_deferred_operator_(self, obj, op, opargs, opkwargs):
+        return op(obj, *opargs, **opkwargs)
+
+    def __call__(self, *args, **kwargs) -> object:
+        if len(args) == 0:
+            raise ValueError("At least one operand must be specified")
+
+        kw = dict()
+        for key in self.kwargs:
+            if key in kwargs:
+                kw[key] = kwargs[key]
+        kwargs.update(self.kwargs)
+        kwargs.update(kw)
+
+        fargs = args + self.posargs
+
+        try:
+            result = self.func(*fargs, **kwargs)
+
+            if len(self.deferred_operations_chain):
+                for k, defop in enumerate(self.deferred_operations_chain):
+                    try:
+                        result = self._apply_deferred_operator_(result, *defop)
+                    except:
+                        msg = print_styled(f"Deferred operator {k}: {defop} could not be applied",
+                                        color="lightmagenta", bright=True, back="white")
+                        scipywarn(f"{msg}")
+                        traceback.print_exc()
+
+            return result
+
+        except Exception as e:
+            msg = print_styled(f"Function {self.func} could not be executed called with the supplied parameters\n\targs =\n{args}\n\tkwargs =\n{kwargs}",
+                                        color="lightmagenta", bright=True, back="white")
+            scipywarn(msg)
+            traceback.print_exc()
+
+
 
