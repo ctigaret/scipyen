@@ -51,6 +51,11 @@ from gui.cursors import (DataCursor, SignalCursor)# , SignalCursorTypes)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
+# class DeferredOperation(typing.NamedTuple):
+#     op: typing.Callable
+#     args: tuple
+#     kwargs: dict
+
 
 @dataclass
 class DeferredSignalMeasure:
@@ -219,7 +224,7 @@ See ephys.signal_* family of functions for example of suitable functions.
     ``self.do(…)`` (for "Deferred Operation").
 
     All defined deferred operations can be removed at any time by calling either
-    ``self.reset_operations()`` or ``self.deferred_operations_chain.clear()``.
+    ``self.reset_deferred_operations()`` or ``self.deferred_operations_chain.clear()``.
 
     **If you know what you are doing**, individual deferred operations can be inserted
     or removed *manually* from the self.deferred_operations_chain field using
@@ -488,8 +493,51 @@ Changelog:
     def __post_init__(self):
         self.placeholder = re.compile(r'<[0-9]*?>')
 
+    def _is_def_op_tuple_(self, x):
+        ret = isinstance(x, tuple)
+        if ret:
+            ret &= len(x) in (2,3)
+        if ret:
+            ret &= not any(self._is_def_op_tuple_(x_) for x_ in x)
+
+        return ret
+
     def defer(self, op: typing.Callable, *args, **kwargs) -> typing.Self:
         """Appends a deferred operation to the future result of a call to self(…).
+
+Parameters:
+-----------
+:op: a Callable, a **"deferred operation definition"** tuple (see below), or
+    a sequence of **deferred operation definitions**.
+
+    The latter two are useful when there are many deferred operations to be
+    defined, by passing them in the appropriate order to a single self.defer(…)
+    call instead of chaining several self.defer(…) calls.
+
+Var-positional parameters
+-------------------------
+:args: comma-separated parameters to be passed to the ``op``, when ``op`` is a Callable.
+
+    These *may* also be:
+
+    * special placeholder strings of the form "<𝒌>", where "𝒌" is an integer;
+        during the execution of self.__call__(…) these will be *replaced* with
+        the 𝒌ᵗʰ var-positional parameter passed to self.__call__(…)
+
+    * a **deferred operation definition**, which is a tuple
+
+        (sub_op:Callable, args: tuple, kwargs:dict)
+
+        This definition will be *evaluated* during the execution of self.__call__(…).
+
+        **NOTE** that the args in this definition can also contain placeholder strings
+        or deferred operation definition tuples, and so on, but apply **CAUTION**
+        to deep nesting these because the resulting deep recursions will be harder to debug!
+
+Var-keyword parameters:
+-----------------------
+:kwargs: <name>=<value> pairs, passed to the ``op``, when ``op`` is a Callable.
+
 
 Returns:
 --------
@@ -502,16 +550,81 @@ Returns:
     lm.defer(item1, True).defer(item2, False)
 
 .. note::
-    To **reset** the deferred access chain, call self.reset_operations()
+    To **reset** the deferred access chain, call self.reset_deferred_operations()
 
 """
-        self.deferred_operations_chain.append((op, args, kwargs))
+        if isinstance(op, typing.Callable):
+            self.deferred_operations_chain.append((op, args, kwargs))
+
+        elif isinstance(op, collections.abc.Sequence):
+            if self._is_def_op_tuple_(op):
+                _op_ = list()
+                if len(op) in (2,3):
+                    if isinstance(op[0], typing.Callable):
+                        _op_.append(op[0])
+                    else:
+                        raise TypeError(f"Invalid deferred operation definition {op}; first element MUST be a Callable")
+
+                    if isinstance(op[1], tuple):
+                        _op_.append(op[1])
+                    else:
+                        _op_.append((op[1], )) # make it a tuple!
+
+                    if len(op) == 3:
+                        if isinstance(op[2], dict):
+                            _op_.append(op[2])
+                        else:
+                            _op_.append(dict())
+
+                    else:
+                        _op_.append(dict())
+
+                else:
+                    raise TypeError(f"Invalid deferred operation definition; expecting between 2 and 3 elements, instead got {len(op_)}")
+
+                # self.deferred_operations_chain.append((_op_[0], _op_[1], _op_[2]))
+                # print(f"{self.__class__.__name__}.defer will defer: {(_op_[0], _op_[1], _op_[2])}")
+                self.defer(_op_[0], *_op_[1], **_op_[2])
+
+            else:
+                for op_ in op:
+                    if (isinstance(op_, tuple)):
+                        _op_ = list()
+                        if len(op_) in (2,3):
+                            if isinstance(op_[0], typing.Callable):
+                                _op_.append(op_[0])
+                            else:
+                                raise TypeError(f"Invalid deferred operation definition {op_}; first element MUST be a Callable")
+
+                            if isinstance(op_[1], tuple):
+                                _op_.append(op_[1])
+                            else:
+                                _op_.append((op_[1], )) # make it a tuple!
+
+                            if len(op_) == 3:
+                                if isinstance(op_[2], dict):
+                                    _op_.append(op_[2])
+                                else:
+                                    _op_.append(dict())
+                            else:
+                                _op_.append(dict())
+                        else:
+                            raise TypeError(f"Invalid deferred operation definition; expecting between 2 and 3 elements, instead got {len(op_)}")
+
+                        # self.deferred_operations_chain.append((_op_[0], _op_[1], _op_[2]))
+                        # print(f"{self.__class__.__name__}.defer will defer: {(_op_[0], _op_[1], _op_[2])}")
+                        self.defer(_op_[0], *_op_[1], **_op_[2])
+                    else:
+                        raise TypeError(f"Invalid deferred operation definition {op_}")
+        else:
+            raise TypeError(f"Invalid deferred operation definition: op = {op}, args = {args}, kwargs = {kwargs}")
+
         return self
 
     # NOTE: 2026-05-10 01:13:35 provide a shortcut alias
     do = defer
 
-    def reset_operations(self):
+    def reset_deferred_operations(self):
         self.deferred_operations_chain.clear()
 
     def _apply_deferred_operator_(self, obj, op, opargs, opkwargs):
@@ -736,7 +849,7 @@ this object as a function.
         self.deferred_operations_chain.append((op, args, kwargs))
         return self
 
-    def reset_operations(self):
+    def reset_deferred_operations(self):
         self.deferred_operations_chain.clear()
 
     def _apply_deferred_operator_(self, obj, op, opargs, opkwargs):
