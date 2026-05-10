@@ -7,33 +7,35 @@
 r"""
     Deferred function calls for signal measures
 """
-import sys
+# import sys
 import os
-import io
+# import io
 import collections
 import traceback
-import datetime
-import numbers
-import inspect
-import itertools
+# import datetime
+# import numbers
+# import inspect
+# import itertools
+import operator
+import re
 # import functools
-from functools import singledispatch
-import warnings
+# from functools import singledispatch
+# import warnings
 import typing
-import types
+# import types
 # import difflib
 # import re as _re
 # from enum import Enum, IntEnum
 # from abc import ABC
 import dataclasses
-from dataclasses import (dataclass, MISSING)
-import numpy as np
-import quantities as pq
+from dataclasses import dataclass
+# import numpy as np
+# import quantities as pq
 import neo
 # import h5py
-import pandas as pd
+# import pandas as pd
 
-from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+from core.datasignal import DataSignal
 from core.datazone import (DataZone, Interval)
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import TriggerProtocol
@@ -52,10 +54,12 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 @dataclass
 class DeferredSignalMeasure:
-    r"""Functor that defers calculating a signal measure at a location using a suitable function or functor.
+    r"""Functor that defers calculating a signal measure.
 
 .. |nbsp| unicode:: 0xA0
    :trim:
+
+Applies a suitable function or functor on analog signal-like objects at a given "location" in the signal.
 
 The ``DeferredSignalMeasure`` object is callable, taking as first argument a signal-like |nbsp|
     object, which will be passed at the *functor* or *function* encapsulated by |nbsp|
@@ -92,8 +96,6 @@ Attributes:
          channel: int = None, relative: bool)
 
 
-
-
 A "suitable" *function* (``func`` in the examples above) takes a primitive numeric |nbsp|
 function as argument and uses it to calculate a measure in a ``neo`` signal-like object, |nbsp|
 using ALL the supplied |nbsp| locators.
@@ -102,7 +104,7 @@ The arguments of ``func`` are:
 
 * one or two location objects,
 
-* a function (Callable) object which operates on ``signal`` **at** the given location ``loc`` or between locations ``loc0`` and ``loc1`` akes the location object and a signal object.
+* a function (Callable) object which operates on ``signal`` **at** the given location ``loc`` **or between** locations ``loc0`` and ``loc1``.
 
 A ``lambda`` function can also be provided here.
 
@@ -113,17 +115,19 @@ and the ``signal`` argument are specified in the DeferredSignalMeasure's ``posar
 The ``ephys`` module provides several such functors and functions, all named |nbsp|
 as 'signal_*'
 
-See ephys.signal_* family of functions for example of suitable functions
+See ephys.signal_* family of functions for example of suitable functions.
 
 :locations:
-    A location object or a sequence of location objects.
+    A location object or a sequence of location objects. These will be the first
+    positional parmeters passed to ``func`` when this DeferredSignalMeasure is called
+    as a function.
 
     A *location* is an object with one of the following types ('locator' types):
 
     * ``SignalCursor``
 
-    * ``DataCursor`` This is an abstraction of a SignalCursor, which stores only the cursor's coordinates, NOT its type. |nbsp|
-        It *may* represent a vertical or horizontal signal cursor; useful when no SignalViewer axes are available.
+    * ``DataCursor`` This is an abstraction of a vertical or horizontal SignalCursor, which stores only the cursor's coordinates, NOT its type. |nbsp|
+        Useful when no SignalViewer axes are available.
 
     * ``DataZone``
 
@@ -131,21 +135,12 @@ See ephys.signal_* family of functions for example of suitable functions
 
     * ``neo.Epoch``
 
-    * A ``typing.Sequence[typing.Union[SignalCursor, DataCursor, neo.Epoch, DataZone, Interval]]`` |nbsp|
-    e.g., a ``tuple`` or ``list`` of any of the above, and homogeneous in the type of its elements.
+    * A ``collections.abc.Sequence[typing.Union[SignalCursor, DataCursor, neo.Epoch, DataZone, Interval]]`` |nbsp|
+    e.g., a ``tuple`` or ``list`` of any of the above, and *homogeneous* in the type of its elements.
 
     * A DeferredSignalMeasure object or sequence of DeferredSignalMeasure objects, with
         the precondition that each of them returns a value in the signal's domain
-        (hence can be used as *locator* objects).
-
-:innerfuncs: tuple of tuple(callable, args, kwargs), to be applied to each parameter
-    passed to this object when called as a function, BEFORE calling ``func`` on the
-    result(s)
-
-    The contents of the inner tuples are as described for :deferred_operations_chain:
-    However, since these functions are applied to the signals, instead of the result,
-    they are collected in an immutable sequence (hence specific to the instance of
-    the DeferredSignalMeasure object)
+        (hence can be used as *locator* objects), or a signal (possibly, a region of it).
 
 :name:
     Name of this DeferredSignalMeasure object
@@ -164,7 +159,7 @@ See ephys.signal_* family of functions for example of suitable functions
     This attribute is ignored when several signal objects are passed as a sequence or arguments |nbsp|
     when calling DeferredSignalMeasure as a function.
 
-:posargs: a tuple of additional positional arguments, as needed by ``func``
+:posargs: a tuple of additional positional arguments, to be passed to ``func``
 
 :kwargs:
     Named and keyword parameters passed to func *after* location and signal parameters
@@ -189,10 +184,29 @@ See ephys.signal_* family of functions for example of suitable functions
 
         Typical operators are the functions defined in the standard Pytyhon module
         ``operator`` (some of whom correspond to algebraic operators of addition,
-        multiplication, collection indexing, etc), the ``getattr`` builtin function,
-        and some ``numpy`` array functions.
+        multiplication, collection indexing, method calling, etc), the ``getattr``
+        builtin function, and some ``numpy`` array functions.
+
+        Lambda functions can also be used here, although **I recommend against it**
+        because they cannot be serialized (i.e. pickled), meaning that DeferredSignalMeasure
+        objects containing lambda functions cannot be saved to disk for later use!
 
     * ``parameter_list`` is a list of *aditional* arguments to be passed to ``operator``.
+
+        A special case is when the parameters to the operator also needs to be
+        generated dynamically from one of the call arguments
+        This list may contain strings of the form "<>" or "<X>" where X is an integer >= 0.
+
+        These strings are placeholders intended to pass to the operator any of
+        the signals given to the DeferredSignalMeasure when called as a function.
+
+        The special placeholder "<>" always refers to the first parameter passed to
+        the DeferredSignalMeasure() call, and is equivalent to "<0>".
+
+        If there are more parameters passed to the call they can be referred with
+        "<1>", "<2>", etc. Any integer X larger than the number of parameters will
+        trigger an Exception.
+
 
     * ``keyword_value_dict`` is a dict of *additional* named parameter - value pairs
         that will be passed to ``operator``
@@ -201,7 +215,8 @@ See ephys.signal_* family of functions for example of suitable functions
 
     By default ``deferred_operations_chain`` is an empty list.
 
-    Deferred operations can be added by calling ``self.defer(…)``.
+    Deferred operations can be added by calling ``self.defer(…)`` or its *alias*
+    ``self.do(…)`` (for "Deferred Operation").
 
     All defined deferred operations can be removed at any time by calling either
     ``self.reset_operations()`` or ``self.deferred_operations_chain.clear()``.
@@ -209,7 +224,6 @@ See ephys.signal_* family of functions for example of suitable functions
     **If you know what you are doing**, individual deferred operations can be inserted
     or removed *manually* from the self.deferred_operations_chain field using
     standard Python ``list`` API.
-
 
 .. note::
     ¹ A signal `channel` is a numeric data vector, not to be confused with |nbsp|
@@ -468,10 +482,13 @@ Changelog:
     relative:bool = True
     posargs: tuple = dataclasses.field(default_factory = tuple)
     kwargs: dict = dataclasses.field(default_factory=dict)
-    innerfuncs: tuple[tuple[typing.Callable, tuple, dict]] = dataclasses.field(default_factory = tuple)
+    # innerfuncs: tuple[tuple[typing.Callable, tuple, dict]] = dataclasses.field(default_factory = tuple)
     deferred_operations_chain: list[tuple[typing.Callable, tuple, dict]] = dataclasses.field(default_factory=list)
 
-    def defer(self, op: typing.Callable, *args, **kwargs):
+    def __post_init__(self):
+        self.placeholder = re.compile(r'<[0-9]*?>')
+
+    def defer(self, op: typing.Callable, *args, **kwargs) -> typing.Self:
         """Appends a deferred operation to the future result of a call to self(…).
 
 Returns:
@@ -491,10 +508,16 @@ Returns:
         self.deferred_operations_chain.append((op, args, kwargs))
         return self
 
+    # NOTE: 2026-05-10 01:13:35 provide a shortcut alias
+    do = defer
+
     def reset_operations(self):
         self.deferred_operations_chain.clear()
 
     def _apply_deferred_operator_(self, obj, op, opargs, opkwargs):
+        if op in (operator.attrgetter, operator.itemgetter, operator.methodcaller):
+            return op(*opargs, **opkwargs)(obj)
+
         return op(obj, *opargs, **opkwargs)
 
     def __call__(self, *args, **kwargs) -> object:
@@ -523,31 +546,35 @@ Any aditional named or keyword parameters to be passed to `func`.
     Typical examples are ``channel`` and ``relative``.
 
 """
-        # print(f"{self.__class__.__name__}<{self.name}>.__call__({args})\n\n\n")
         if len(args) == 0:
             raise ValueError("At least one signal, a iterable of signals, or a neo.Segment must be specified")
 
+        # NOTE: 2026-05-10 01:14:51
+        # prepare the signals; if args contain collections of signals then use
+        # self.signalNameOrIndex to select the signal from these.
         if len(args) == 1:
             if (isinstance(args[0], (typing.Sequence, typing.Iterable))
                 and len(args[0]) > 0
-                and all(isinstance(s, (neo.AnalogSignal, DataSignal)) for s in args[0])
+                and all(
+                            isinstance(s,
+                                       (
+                                           neo.AnalogSignal, DataSignal,
+                                        )
+                                       ) for s in args[0]
+                        )
                 ):
 
-                # print(f"{self.__class__.__name__}<{self.name}>.__call__ {type(args[0])}, {self.signalNameOrIndex} =>")
                 if isinstance(self.signalNameOrIndex, int):
                     args = (args[0][self.signalNameOrIndex], )
-                    # print(f"\n\targs[0] = {args[0]}")
 
                 elif isinstance(self.signalNameOrIndex, str):
                     ndx = neoutils.normalized_index(args[0], self.signalNameOrIndex, silent=True)
-                    # print(f"\n\tndx = {ndx}")
                     if isinstance(ndx, int):
                         args = (args[0][ndx], )
                     else:
                         raise ValueError(f"No signal with name or index {self.signalNameOrIndex} was found in the argument")
 
                 else:
-                    # print(f"\n\targs[0] = {args[0]}")
                     args = (args[0], )
 
             elif isinstance(args[0], neo.Segment):
@@ -555,9 +582,7 @@ Any aditional named or keyword parameters to be passed to `func`.
                     args = (args[0].analogsignals[self.signalNameOrIndex], )
 
                 elif isinstance(self.signalNameOrIndex, str):
-                    # print(f"{self.__class__.__name__}<{self.name}>.__call__ {type(args[0])}, {self.signalNameOrIndex} =>")
                     ndx = neoutils.normalized_index(args[0].analogsignals, self.signalNameOrIndex, silent=True)
-                    # print(f"\n\tndx = {ndx}")
                     if isinstance(ndx, int):
                         args = (args[0].analogsignals[ndx], )
                     else:
@@ -574,7 +599,7 @@ Any aditional named or keyword parameters to be passed to `func`.
 
 
         # NOTE: 2026-05-04 10:42:29
-        # apply the measure to each signal, collect in a list;
+        # apply the measure to each signal, collect results in a list;
         # when just one signal is measured, return the first result
         result = list()
 
@@ -604,40 +629,68 @@ Any aditional named or keyword parameters to be passed to `func`.
             # NOTE: 2026-05-04 10:41:03
             # augment and rearrange arguments to fit the signature of ``func`` i.e.
             # location(s) THEN signal(s)
-
-            if len(self.innerfuncs) and all((isinstance(x, tuple)
-                                             and len(x) == 3
-                                             and isinstance(x[0], typing.Callable)
-                                             and isinstance(x[1], tuple)
-                                             and isinstance(x[2], dict)) for x in self.innerfuncs):
-                ifrets = list()
-                for l, idef in enumerate(self.innerfuncs):
-                    ifunc, ifargs, ifkw = idef
-                    ifret = ifunc(arg, *ifargs, **ifkw)
-                    ifrets.append(ifret)
-
-                fargs = (self.locations,) + self.posargs + tuple(ifrets)
-
-            else:
-                fargs = (self.locations,) + self.posargs + (arg,) # NOTE: 62026-05-04 22:31:56 DO NOT UNPACK self.locations; some funcs expect seq of locs
-            fargs = (self.locations,) + self.posargs + (arg,) # NOTE: 62026-05-04 22:31:56 DO NOT UNPACK self.locations; some funcs expect seq of locs
+            #
+            # NOTE: 62026-05-04 22:31:56 DO NOT UNPACK self.locations;
+            # some funcs (might) expect a sequence of locs
+            #
+            fargs = (self.locations,) + self.posargs + (arg,)
 
             result.append(self.func(*fargs, **kwargs))
 
-        if len(result) == 1:
-            result = result[0]
 
         if len(self.deferred_operations_chain):
             for k, defop in enumerate(self.deferred_operations_chain):
                 try:
-                    result = self._apply_deferred_operator_(result, *defop)
-                except:
+                    if len(defop[1]):
+                        # replace placeholders with the corresponding arg
+                        adf = self._resolve_placeholders_(args, defop[1])
+                        defop = (defop[0], adf, defop[2])
+
+                    for kr, res in enumerate(result):
+                        res = self._apply_deferred_operator_(res, *defop)
+                        result[kr] = res
+
+                except: # noqa
                     msg = print_styled(f"Deferred operator {k}: {defop} could not be applied",
                                        color="lightmagenta", bright=True, back="white")
                     scipywarn(f"{msg}")
                     traceback.print_exc()
 
+        if len(result) == 1:
+            result = result[0]
+
         return result
+
+    def _resolve_placeholders_(self, callargs, defopargs):
+        adf = list()
+        for a in defopargs:
+            if isinstance(a, str) and self.placeholder.match(a):
+                try:
+                    arg_ndx = int(ph.strip("<").strip(">"))
+                    if arg_ndx >= 0 and arg_ndx < len(callargs):
+                        adf.append(callargs[arg_ndx])
+                    else:
+                        raise ValueError(f"Placeholder {ph} refers to an invalid parameter index for {len(callargs)} parameters")
+
+                except: # noqa
+                    # case of special placeholder "<>"
+                    adf.append(callargs[0])
+
+            elif (isinstance(a, tuple)
+                  and len(a) == 3
+                  and isinstance(a[0], typing.Callable)
+                  ):
+                print(f"*** a = {a} ***")
+                aa = self._resolve_placeholders_(callargs, a)
+                print(f"\n\t =>\n*** aa[0] = {aa[0]} ***")
+                print(f"\n\t =>\n*** aa[1] = {aa[1]} ***")
+                print(f"\n\t =>\n*** aa[2] = {aa[2]} ***")
+                adf.append(a[0](*aa, **a[2])) # do execute this call!
+
+            else:
+                adf.append(a)
+
+        return tuple(adf)
 
 @dataclass
 class DeferredComputation:
