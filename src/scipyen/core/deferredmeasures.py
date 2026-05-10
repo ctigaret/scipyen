@@ -588,7 +588,8 @@ Returns:
 
             else:
                 for op_ in op:
-                    if (isinstance(op_, tuple)):
+                    if self._is_def_op_tuple_(op_):
+                    # if (isinstance(op_, tuple)):
                         _op_ = list()
                         if len(op_) in (2,3):
                             if isinstance(op_[0], typing.Callable):
