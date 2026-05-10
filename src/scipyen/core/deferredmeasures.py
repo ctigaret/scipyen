@@ -546,6 +546,12 @@ Any aditional named or keyword parameters to be passed to `func`.
     Typical examples are ``channel`` and ``relative``.
 
 """
+        # print(f"{self.__class__.__name__}[{self.name}].__call__: -> args = \n\t{args}\n\t({type(args)})")
+
+        # print(f"{self.__class__.__name__}[{self.name}].__call__: -> {len(args)} args = ")
+        # for ka, ia in enumerate(args):
+        #     print(f"\n\targ {ka}: {type(ia)} =\n\t\t{ia}\n")
+
         if len(args) == 0:
             raise ValueError("At least one signal, a iterable of signals, or a neo.Segment must be specified")
 
@@ -553,49 +559,59 @@ Any aditional named or keyword parameters to be passed to `func`.
         # prepare the signals; if args contain collections of signals then use
         # self.signalNameOrIndex to select the signal from these.
         if len(args) == 1:
-            if (isinstance(args[0], (typing.Sequence, typing.Iterable))
-                and len(args[0]) > 0
-                and all(
+            if isinstance(args[0], (neo.AnalogSignal, DataSignal)):
+                callargs = (args[0], )
+
+            elif isinstance(args[0], (typing.Sequence, typing.Iterable)):
+                if len(args[0]) == 0:
+                    raise ValueError("'args' is empty !")
+
+                if not all(
                             isinstance(s,
                                        (
                                            neo.AnalogSignal, DataSignal,
                                         )
                                        ) for s in args[0]
-                        )
-                ):
+                        ):
+                    raise TypeError(f"All elements in {type(args[0])} must be analog signal-like")
 
                 if isinstance(self.signalNameOrIndex, int):
-                    args = (args[0][self.signalNameOrIndex], )
+                    callargs = (args[0][self.signalNameOrIndex], )
 
                 elif isinstance(self.signalNameOrIndex, str):
                     ndx = neoutils.normalized_index(args[0], self.signalNameOrIndex, silent=True)
                     if isinstance(ndx, int):
-                        args = (args[0][ndx], )
+                        callargs = (args[0][ndx], )
                     else:
                         raise ValueError(f"No signal with name or index {self.signalNameOrIndex} was found in the argument")
 
                 else:
-                    args = (args[0], )
+                    callargs = (args[0], )
 
             elif isinstance(args[0], neo.Segment):
                 if isinstance(self.signalNameOrIndex, int):
-                    args = (args[0].analogsignals[self.signalNameOrIndex], )
+                    callargs = (args[0].analogsignals[self.signalNameOrIndex], )
 
                 elif isinstance(self.signalNameOrIndex, str):
                     ndx = neoutils.normalized_index(args[0].analogsignals, self.signalNameOrIndex, silent=True)
                     if isinstance(ndx, int):
-                        args = (args[0].analogsignals[ndx], )
+                        callargs = (args[0].analogsignals[ndx], )
                     else:
                         raise ValueError(f"No signal with name or index {self.signalNameOrIndex} was found in the argument")
                 else:
-                    args = tuple(args[0].analogsignals)
+                    callargs = tuple(args[0].analogsignals)
 
             elif not isinstance(args[0], (neo.AnalogSignal, DataSignal)):
                 raise TypeError(f"Unexpected type of the first argument: {type(args[0]).__name__}")
 
+            else:
+                callargs = args
+
         else:
             if not all(isinstance(a, (neo.AnalogSignal, DataSignal)) for a in args):
-                raise TypeError("Expecting all arguments to be signal-like objects")
+                raise TypeError("Expecting all arguments to be analog signal-like objects")
+
+            callargs = args
 
 
         # NOTE: 2026-05-04 10:42:29
@@ -625,7 +641,11 @@ Any aditional named or keyword parameters to be passed to `func`.
         # construction
         kwargs.update(kw)
 
-        for arg in args:
+        # print(f"{self.__class__.__name__}[{self.name}].__call__: -> callargs = ")
+        # for ca in callargs:
+        #     print(f"\n\t{type(ca)}: {ca}\n")
+
+        for arg in callargs:
             # NOTE: 2026-05-04 10:41:03
             # augment and rearrange arguments to fit the signature of ``func`` i.e.
             # location(s) THEN signal(s)
@@ -637,22 +657,24 @@ Any aditional named or keyword parameters to be passed to `func`.
 
             result.append(self.func(*fargs, **kwargs))
 
-
         if len(self.deferred_operations_chain):
             for k, defop in enumerate(self.deferred_operations_chain):
+                if len(defop[1]):
+                    # replace any placeholders with the corresponding arg
+                    adf = self._resolve_placeholders_(callargs, defop[1])
+                    dfop = (defop[0], adf, defop[2])
+                else:
+                    dfop = defop
+
                 try:
-                    if len(defop[1]):
-                        # replace placeholders with the corresponding arg
-                        adf = self._resolve_placeholders_(args, defop[1])
-                        defop = (defop[0], adf, defop[2])
 
                     for kr, res in enumerate(result):
-                        res = self._apply_deferred_operator_(res, *defop)
+                        res = self._apply_deferred_operator_(res, *dfop)
                         result[kr] = res
 
                 except: # noqa
-                    msg = print_styled(f"Deferred operator {k}: {defop} could not be applied",
-                                       color="lightmagenta", bright=True, back="white")
+                    msg = print_styled(f"Deferred operator {k}: {dfop} could not be applied",
+                                       color="lightred", bright=True, back="white")
                     scipywarn(f"{msg}")
                     traceback.print_exc()
 
@@ -680,12 +702,16 @@ Any aditional named or keyword parameters to be passed to `func`.
                   and len(a) == 3
                   and isinstance(a[0], typing.Callable)
                   ):
-                print(f"*** a = {a} ***")
+                # print(f"{self.__class__.__name__}[{self.name}]._resolve_placeholders_:")
+                # print(f"\n\t*** a[0]: {type(a[0])} =\n\t{a[0]}\n\t***")
+                # print(f"\n\t*** a[1]: {type(a[1])} =\n\t{a[1]}\n\t***")
+                # print(f"\n\t*** a[2]: {type(a[2])} =\n\t{a[2]}\n\t***\n")
                 aa = self._resolve_placeholders_(callargs, a)
-                print(f"\n\t =>\n*** aa[0] = {aa[0]} ***")
-                print(f"\n\t =>\n*** aa[1] = {aa[1]} ***")
-                print(f"\n\t =>\n*** aa[2] = {aa[2]} ***")
-                adf.append(a[0](*aa, **a[2])) # do execute this call!
+                # print(f"\n\t =>\n*** aa[0]: {type(aa[0])} =\n\t{aa[0]}\n\t***")
+                # print(f"\n\t =>\n*** aa[1]: {type(aa[1])} =\n\t{aa[1]}\n\t***")
+                # print(f"\n\t =>\n*** aa[2]: {type(aa[2])} =\n\t{aa[2]}\n\t***\n")
+                # adf.append(a[0](*aa, **a[2])) # do execute this call!
+                adf.append(a[0](aa[1], **a[2])) # do execute this call!
 
             else:
                 adf.append(a)

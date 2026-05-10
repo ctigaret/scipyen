@@ -1365,7 +1365,7 @@ For a list of colors and styles, call
     dir(colorama.Style) # -> available ANSI styles
 """
     if color.lower().startswith("light") and not color.lower().endswith("_ex"):
-        color = f"{color.lower}_ex"
+        color = f"{color.lower()}_ex"
 
     c = getattr(
                     colorama.Fore,
