@@ -674,14 +674,15 @@ Returns:
     def reset_deferred_potprocessing(self):
         self.postprocess.clear()
 
-    def _deferred_process_(self, obj, op, opargs, opkwargs):
-        print(f"{self.__class__.__name__}[{self.name}]._deferred_process_ got:")
-        print(f"\n\tobj: {type(obj)}")
-        print(f"\n\top: {type(op)}\n*****\n\n\n")
+    def _exec_deferred_(self, obj, op, opargs, opkwargs):
+        print(f"{self.__class__.__name__}[{self.name}]._exec_deferred_(obj: {obj} ({type(obj)}), op: {op} ({type(op)})), opargs: {opargs}")
         if op in (operator.attrgetter, operator.itemgetter, operator.methodcaller):
-            return op(*opargs, **opkwargs)(obj)
+            ret = op(*opargs, **opkwargs)(obj)
+        else:
+            ret = op(obj, *opargs, **opkwargs)
 
-        return op(obj, *opargs, **opkwargs)
+        print(f"\n\t[{self.name}] => ret = {ret}\n*****\n\n\n")
+        return ret
 
     def __call__(self, *args, **kwargs) -> object:
         r"""Executes the location measure object.
@@ -813,26 +814,28 @@ Any aditional named or keyword parameters to be passed to `func`.
         #     print(f"\n\t{type(ca)}: {ca}\n")
 
         preops = list()
-        for k, defop in enumerate(self.preprocess):
-            if len(defop[1]):
-                # replace any placeholders with the corresponding arg
-                adf = self._resolve_placeholders_(callargs, defop[1])
-                dfop = (defop[0], adf, defop[2])
+        for kpre, pre in enumerate(self.preprocess):
+            if len(pre[1]):
+                # replace any placeholders with the corresponding arg in callargs
+                adf = self._resolve_placeholders_(callargs, pre[1])
+                pre_ = (pre[0], adf, pre[2])
             else:
-                dfop = defop
+                pre_ = pre
 
-            preops.append(defop)
+            preops.append(pre_)
 
         postops = list()
-        for k, defop in enumerate(self.postprocess):
-            if len(defop[1]):
-                # replace any placeholders with the corresponding arg
-                adf = self._resolve_placeholders_(callargs, defop[1])
-                dfop = (defop[0], adf, defop[2])
+        for kpost, post in enumerate(self.postprocess):
+            print(f"\n###\n[{self.name}] {kpost}: post[1] = {post[1]}\n###\n")
+            if len(post[1]):
+                # replace any placeholders with the corresponding arg in callargs
+                adf = self._resolve_placeholders_(callargs, post[1])
+                print(f"\n###\n[{self.name}] {kpost}: adf = {adf}\n###\n")
+                post_ = (post[0], adf, post[2])
             else:
-                dfop = defop
+                post_ = post
 
-            postops.append(defop)
+            postops.append(post)
 
         for karg, arg in enumerate(callargs):
             # NOTE: 2026-05-04 10:41:03
@@ -844,13 +847,13 @@ Any aditional named or keyword parameters to be passed to `func`.
             #
 
 
-            for kop, preop in enumerate(preops):
+            for kpre, preop in enumerate(preops):
                 try:
-                    print(f"\n\t[{self.name}] preprocess {kop}: {preop}\n")
-                    arg = self._deferred_process_(arg, *preop)
+                    print(f"\n\t[{self.name}] argument {karg} preprocess {kpre}: {preop}\n")
+                    arg = self._exec_deferred_(arg, *preop)
 
                 except: # noqa
-                    msg = print_styled(f"\n{self.__class__.__name__}[{self.name}]: Deferred preprocessor {kop}: {preop}\n\tcould not be executed\n",
+                    msg = print_styled(f"\n{self.__class__.__name__}[{self.name}]: Deferred preprocessor {kpre}: {preop}\n\tcould not be executed\n",
                                         color="lightred", bright=True, back="white")
                     scipywarn(f"{msg}")
                     traceback.print_exc()
@@ -859,13 +862,13 @@ Any aditional named or keyword parameters to be passed to `func`.
 
             ret = self.func(*fargs, **kwargs)
 
-            for kop, postop in enumerate(postops):
+            for kpost, postop in enumerate(postops):
+                print(f"\n\t[{self.name}] argument {karg} postprocess {kpost}: {postop}\n")
                 try:
-                    print(f"\n\t[{self.name}] postprocess {kop}: {postop}\n")
-                    ret = self._deferred_process_(ret, *postop)
+                    ret = self._exec_deferred_(ret, *postop)
 
                 except: # noqa
-                    msg = print_styled(f"\n{self.__class__.__name__}[{self.name}]: Deferred postprocessor {kop}: {postop}\n\tcould not be executed\n",
+                    msg = print_styled(f"\n{self.__class__.__name__}[{self.name}]: Deferred postprocessor {kpost}: {postop}\n\tcould not be executed\n",
                                         color="lightred", bright=True, back="white")
                     scipywarn(f"{msg}")
                     traceback.print_exc()
@@ -884,7 +887,7 @@ Any aditional named or keyword parameters to be passed to `func`.
 #
 #                 try:
 #                     for kr, res in enumerate(result):
-#                         res = self._deferred_process_(res, *dfop)
+#                         res = self._exec_deferred_(res, *dfop)
 #                         result[kr] = res
 #
 #                 except: # noqa
@@ -909,17 +912,36 @@ Any aditional named or keyword parameters to be passed to `func`.
         #         return (defopargs[0], dfa, defopargs[2])
 
         for a in defopargs:
-            if isinstance(a, str) and self.placeholder.match(a):
-                try:
-                    arg_ndx = int(ph.strip("<").strip(">"))
+            print(f"\n\t{self.__class__.__name__}._resolve_placeholders_: defop arg: {a}")
+            if isinstance(a, str):
+                print(f"\n\t\t[{self.name}] placeholder match -> {self.placeholder.match(a)}")
+                if self.placeholder.match(a):
+                    a_ = a.strip("<").strip(">")
+                    if len(a_):
+                        arg_ndx = int(a_)
+                    else:
+                        arg_ndx = 0
+                    print(f"\n\t\t[{self.name}] arg_ndx = {arg_ndx}")
                     if arg_ndx >= 0 and arg_ndx < len(callargs):
                         adf.append(callargs[arg_ndx])
                     else:
-                        raise ValueError(f"Placeholder {ph} refers to an invalid parameter index for {len(callargs)} parameters")
-
-                except: # noqa
-                    # case of special placeholder "<>"
-                    adf.append(callargs[0])
+                        raise ValueError(f"Placeholder {a} refers to an invalid parameter index for {len(callargs)} parameters")
+                    # try:
+                    #     a_ = a.strip("<").strip(">")
+                    #     if len(a_):
+                    #         arg_ndx = int(a)
+                    #     else:
+                    #         arg_ndx = 0
+                    #     if arg_ndx >= 0 and arg_ndx < len(callargs):
+                    #         adf.append(callargs[arg_ndx])
+                    #     else:
+                    #         raise ValueError(f"Placeholder {a} refers to an invalid parameter index for {len(callargs)} parameters")
+                    #
+                    # except: # noqa
+                    #     # case of special placeholder "<>"
+                    #     adf.append(callargs[0])
+                else:
+                    adf.append(a)
 
             elif (isinstance(a, tuple)
                   and self._is_def_op_tuple_(a)
@@ -965,7 +987,7 @@ this object as a function.
     def reset_deferred_potprocessing(self):
         self.postprocess.clear()
 
-    def _deferred_process_(self, obj, op, opargs, opkwargs):
+    def _exec_deferred_(self, obj, op, opargs, opkwargs):
         return op(obj, *opargs, **opkwargs)
 
     def __call__(self, *args, **kwargs) -> object:
@@ -987,7 +1009,7 @@ this object as a function.
             if len(self.postprocess):
                 for k, defop in enumerate(self.postprocess):
                     try:
-                        result = self._deferred_process_(result, *defop)
+                        result = self._exec_deferred_(result, *defop)
                     except:
                         msg = print_styled(f"Deferred operator {k}: {defop} could not be applied",
                                         color="lightmagenta", bright=True, back="white")

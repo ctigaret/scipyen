@@ -3256,98 +3256,8 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
     # if not isinstance(fitTable, pd.DataFrame):
     #     raise TypeError("'fitTable' must be a pandas DataFrame")
 
-    def __adjustFitTable__(sg, mdl, ft, ch, aft):
-        for coefName, coefValues in aft.items():
-            if coefName in ft.index:
-                for key in ['Initial Value', 'Lower Bound', 'Upper Bound']:
-                    if key in coefValues:
-                        actor = coefValues[key]
-
-                        if isinstance(actor, str) and hasattr(sg, actor):
-                            value = getattr(sg, actor).magnitude
-
-                        elif isinstance(actor, typing.Callable):
-                            value = actor(sg[:,ch])
-
-                        elif (isinstance(actor, numbers.Number)
-                            or (isinstance(actor, pq.Quantity
-                                            and actor.size == 1)
-                                )
-                            ):
-                            value = actor
-
-                        else:
-                            raise TypeError(f"Cannot set {key} for {coefName} to {actor}")
-
-                        ft.loc[coefName, key] = value
-
-                kf = coefValues.get("Keep Feasible", None)
-                if isinstance(kf, bool):
-                    ft.loc[coefName, "Keep Feasible"] = kf
-
-            else:
-                raise ValueError(f"Invalid ft coefficient name: {coefName} for the {mdl.name} model")
-
-        return ft
-
-    def __get_initial_and_bounds__(fT):
-            initial = list(fT["Initial Value"])
-            bounds = optimize.Bounds(lb=list(fT["Lower Bound"]),
-                                     ub=list(fT["Upper Bound"]),
-                                     keep_feasible=list(fT["Keep Feasible"])
-                                     )
-
-            return initial, bounds
-
-    def __do_fit__(sg, mdl, fT, ch):
-        result = list()
-        if len(adjustFitTable) == 0:
-            # defer this to below if adjustments are to be made
-            initial, bounds = __get_initial_and_bounds__(fT)
-
-        if datatypes.is_vector(sg):
-            if len(adjustFitTable):
-                fT = __adjustFitTable__(sg, mdl, fT, 0, adjustFitTable)
-                initial, bounds = __get_initial_and_bounds__(fT)
-
-            # print(f"initial = {initial}\nbounds = {bounds}")
-            fC, fR = crvf.fit_model(sg, mdl, initial, bounds=bounds)
-            result.append((fC, fR))
-
-        else:
-            if isinstance(ch, int):
-                if ch < -sg.shape[1] or ch >= sg.shape[1]:
-                    raise ValueError(f"Invalid channel ({ch}) for a signal with {sg.shape[1]} channels")
-
-                if len(adjustFitTable):
-                    fT = __adjustFitTable__(sg, mdl, fT, ch, adjustFitTable)
-                    initial, bounds = __get_initial_and_bounds__(fT)
-
-                fC, fR = crvf.fit_model(sg[:,ch], mdl, initial,
-                                        bounds=bounds)
-                result.append((fC, fR))
-
-            elif ch is None:
-                for ch in range(sg.shape[1]):
-                    if len(adjustFitTable):
-                        fT = __adjustFitTable__(sg, mdl, fT, ch, adjustFitTable)
-                        initial, bounds = __get_initial_and_bounds__(fT)
-
-                    fC, fR = crvf.fit_model(sg[:,ch], mdl, initial,
-                                            bounds=bounds)
-                    result.append((fC, fR))
-
-            else:
-                raise TypeError(f"'channel' expected to be an int or None; instead, got {type(channel).__name__}")
-
-        if len(result) == 1:
-            return result[0]
-
-        elif len(result) > 1:
-            return result
-
     if loc is None:
-        return __do_fit__(signal, model, fitTable, channel)
+        return __do_fit__(signal, model, fitTable, adjustFitTable, channel)
 
     # elif isinstance(loc, DeferredSignalMeasure):
     elif isinstance(loc, typing.Callable):
@@ -3359,7 +3269,7 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
         if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
             raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
 
-        return __do_fit__(sg, model, fitTable, channel)
+        return __do_fit__(sg, model, fitTable, adjustFitTable, channel)
 
     # elif all(isinstance(loc_, (numbers.Number, pq.Quantity, DeferredSignalMeasure)) for loc_ in loc):
     elif all(isinstance(loc_, (numbers.Number, pq.Quantity, typing.Callable)) for loc_ in loc):
@@ -3373,13 +3283,13 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
             if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
                 raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
 
-            return __do_fit__(sg, model, fitTable, channel)
+            return __do_fit__(sg, model, fitTable, adjustFitTable, channel)
 
         elif len(loc) == 2:
             t0, t1 = loc
             sg = __slice_signal__(t0,t1, signal, channel, relative)
 
-            return __do_fit__(sg, model, fitTable, channel)
+            return __do_fit__(sg, model, fitTable, adjustFitTable, channel)
 
         else:
             raise ValueError(f"Expecting a pair of elements; got {len(loc)} elements instead.")
@@ -3389,7 +3299,7 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
         for loc_ in loc:
             t0, t1 = loc_
             sg = __slice_signal__(t0, t1, signal, channel, relative)
-            ret = __do_fit__(sg, model, fitTable, channel)
+            ret = __do_fit__(sg, model, fitTable, adjustFitTable, channel)
 
         return np.vstack(result)
 
@@ -3596,29 +3506,6 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
                     channel: typing.Optional[int] = None,
                     relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
 
-    # print(f"signal_reduce: loc = \n\t{loc}\n\t({type(loc)})")
-
-    # if isinstance(loc, typing.Sequence):
-    #     for k,l in enumerate(loc):
-    #         print(f"\n\tlocation {k} = {type(l)}")
-
-    def __do_reduce__(fn, sg, ch):
-        kw = dict()
-
-        if not inspect.isbuiltin(fn):
-            signature = inspect.signature(fn)
-            if "axis" in signature.parameters:
-                kw["axis"] = 0
-
-        ret = fn(sg, **kw)
-        if isinstance(ch, int):
-            ret = ret[ch].flatten()
-
-        # if not isinstance(ret, pq.Quantity):
-        #     ret = ret * sg.units
-
-        return ret
-
     if loc is None:
         return __do_reduce__(func, signal, channel)
         # return __do_reduce__(t0, t1, func, signal, channel, relative)
@@ -3630,17 +3517,13 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
 
         return __do_reduce__(func, sg, channel)
 
-    # elif all(isinstance(loc_, (numbers.Number, pq.Quantity, DeferredSignalMeasure)) for loc_ in loc):
     elif all(isinstance(loc_, (numbers.Number, pq.Quantity, typing.Callable)) for loc_ in loc):
         if len(loc) == 1:
             if isinstance(loc[0], DeferredSignalMeasure):
                 sg = loc[0](signal)
-                # if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
-                #     raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
-                #
-                # return __do_reduce__(func, sg, channel)
             else:
                 sg = loc[0]() # pass here a functools.partial!
+
             if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
                 raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
 
@@ -3648,14 +3531,13 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
 
         elif len(loc) == 2:
             t0, t1 = loc
-            sg = __slice_signal__(t0,t1, signal, channel, relative)
+            sg = __slice_signal__(t0, t1, signal, channel, relative)
 
             return __do_reduce__(func, sg, channel)
 
         else:
             raise ValueError(f"Expecting a pair of elements; got {len(loc)} elements instead.")
 
-    # elif all(isinstance(loc_, (tuple, list, collections.deque)) and all(isinstance(ll, (numbers.Number, pq.Quantity, DeferredSignalMeasure)) for ll in loc_) for loc_ in loc):
     elif all(isinstance(loc_, (tuple, list, collections.deque)) and all(isinstance(ll, (numbers.Number, pq.Quantity, typing.Callable)) for ll in loc_) for loc_ in loc):
         result = list()
         for loc_ in loc:
@@ -3698,13 +3580,12 @@ def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval], # noqa
 
     result = list()
 
-    for i in intervals:
+    for ki, i in enumerate(intervals):
         if isinstance(i, Interval):
             t0, t1 = i.t0.copy(), i.t1.copy()
         else:
             t0, t1 = i.times.copy(), i.durations.copy()
 
-        # x0, x1 = t0, t1
         # NOTE: Must convert to scalars, i.e., unsized arrays
         if t0.ndim > 0:
             t0 = t0[0]
@@ -3716,13 +3597,31 @@ def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval], # noqa
             t1 = t0 + t1
 
         ret = signal_reduce([t0, t1], func, signal, channel, relative)
+        print(f"_signal_reduce_<{i}: {type(i)}> -> interval {ki}: t0 = {t0}, t1 = {t1} => {ret} ({type(ret)})")
 
         result.append(ret)
 
-    if all(isinstance(ret, (neo.AnalogSignal, DataSignal)) for ret in result):
-        return neoutils.concatenate_signals(result)
-
-    return np.vstack(result)# * signal.units
+    return result
+    # if all(isinstance(ret, (neo.AnalogSignal, DataSignal)) for ret in result):
+    #     return neoutils.concatenate_signals(result)
+    #
+    # elif all(isinstance(ret, pq.Quantity) for ret in result):
+    #     if len(result) == 1:
+    #         return result[0]
+    #     return np.vstack(result) * result[0].units
+    #
+    # elif all(isinstance(ret, np.ndarray) for ret in result):
+    #     if len(result) == 1:
+    #         return result[0] * signal.units
+    #     return np.vstack(result) * signal.units
+    #
+    # elif all(isinstance(ret, (np.floating, float)) for ret in result):
+    #     if len(result) == 1:
+    #         return result[0] * signal.units
+    #     return np.vstack(result) * signal.units
+    #
+    # else:
+    #     return result
 
 @signal_reduce.register(DataCursor)
 @signal_reduce.register(SignalCursor)
@@ -3762,8 +3661,10 @@ def signal_argmax(loc, signal, /, channel = None, relative = True):
     # therefore, this HAS to be added to the number of samples UP TO the earliest
     # boundary of 'loc'
     loc_bounds = get_location_boundary(loc, True, True)
-    # print(f"signal_argmax -> loc_bounds = {loc_bounds}\n")
     starts = signal.time_index(loc_bounds)
+    print(f"signal_argmax -> loc_bounds = {loc_bounds}, starts -> {starts}\n")
+    ext = signal_reduce(loc, np.argmax, signal, channel, relative)
+    print(f"\t ext -> {ext}")
     return starts + signal_reduce(loc, np.argmax, signal, channel, relative)
 
 def signal_domain_max(loc, signal, /, channel = None, relative = True):
@@ -6878,3 +6779,114 @@ def __slice_signal__(t0, t1, sg, ch, rel):
 
     else:
         return sg.time_slice(t0,t1)
+
+def __do_reduce__(fn, sg, ch):
+    kw = dict()
+
+    if not inspect.isbuiltin(fn):
+        signature = inspect.signature(fn)
+        if "axis" in signature.parameters:
+            kw["axis"] = 0
+
+    ret = fn(sg, **kw)
+
+    if isinstance(ch, int):
+        ret = ret[ch].flatten()
+
+    # if not isinstance(ret, pq.Quantity):
+    #     ret = ret * sg.units
+
+    print(f"__do_reduce__ {fn} will return {ret} ({type(ret)})")
+
+    return ret
+
+def __adjustFitTable__(sg, mdl, ft, ch, aft):
+    for coefName, coefValues in aft.items():
+        if coefName in ft.index:
+            for key in ['Initial Value', 'Lower Bound', 'Upper Bound']:
+                if key in coefValues:
+                    actor = coefValues[key]
+
+                    if isinstance(actor, str) and hasattr(sg, actor):
+                        value = getattr(sg, actor).magnitude
+
+                    elif isinstance(actor, typing.Callable):
+                        value = actor(sg[:,ch])
+
+                    elif (isinstance(actor, numbers.Number)
+                        or (isinstance(actor, pq.Quantity
+                                        and actor.size == 1)
+                            )
+                        ):
+                        value = actor
+
+                    else:
+                        raise TypeError(f"Cannot set {key} for {coefName} to {actor}")
+
+                    ft.loc[coefName, key] = value
+
+            kf = coefValues.get("Keep Feasible", None)
+            if isinstance(kf, bool):
+                ft.loc[coefName, "Keep Feasible"] = kf
+
+        else:
+            raise ValueError(f"Invalid ft coefficient name: {coefName} for the {mdl.name} model")
+
+    return ft
+
+def __get_initial_and_bounds__(fT):
+        initial = list(fT["Initial Value"])
+        bounds = optimize.Bounds(lb=list(fT["Lower Bound"]),
+                                    ub=list(fT["Upper Bound"]),
+                                    keep_feasible=list(fT["Keep Feasible"])
+                                    )
+
+        return initial, bounds
+
+def __do_fit__(sg, mdl, fT, fTadj, ch):
+    result = list()
+    if len(fTadj) == 0:
+        # defer this to below if adjustments are to be made
+        initial, bounds = __get_initial_and_bounds__(fT)
+
+    if datatypes.is_vector(sg):
+        if len(fTadj):
+            fT = __adjustFitTable__(sg, mdl, fT, 0, fTadj)
+            initial, bounds = __get_initial_and_bounds__(fT)
+
+        # print(f"initial = {initial}\nbounds = {bounds}")
+        fC, fR = crvf.fit_model(sg, mdl, initial, bounds=bounds)
+        result.append((fC, fR))
+
+    else:
+        if isinstance(ch, int):
+            if ch < -sg.shape[1] or ch >= sg.shape[1]:
+                raise ValueError(f"Invalid channel ({ch}) for a signal with {sg.shape[1]} channels")
+
+            if len(fTadj):
+                fT = __adjustFitTable__(sg, mdl, fT, ch, fTadj)
+                initial, bounds = __get_initial_and_bounds__(fT)
+
+            fC, fR = crvf.fit_model(sg[:,ch], mdl, initial,
+                                    bounds=bounds)
+            result.append((fC, fR))
+
+        elif ch is None:
+            for ch in range(sg.shape[1]):
+                if len(fTadj):
+                    fT = __adjustFitTable__(sg, mdl, fT, ch, fTadj)
+                    initial, bounds = __get_initial_and_bounds__(fT)
+
+                fC, fR = crvf.fit_model(sg[:,ch], mdl, initial,
+                                        bounds=bounds)
+                result.append((fC, fR))
+
+        else:
+            raise TypeError(f"'channel' expected to be an int or None; instead, got {type(channel).__name__}")
+
+    if len(result) == 1:
+        return result[0]
+
+    elif len(result) > 1:
+        return result
+
