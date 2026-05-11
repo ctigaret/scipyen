@@ -51,7 +51,9 @@ from gui.cursors import (DataCursor, SignalCursor)# , SignalCursorTypes)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-# class DeferredOperation(typing.NamedTuple):
+# @dataclass
+# class DeferredOperation:
+#     r""""""
 #     op: typing.Callable
 #     args: tuple
 #     kwargs: dict
@@ -498,7 +500,9 @@ Changelog:
         if ret:
             ret &= len(x) in (2,3)
         if ret:
-            ret &= not any(self._is_def_op_tuple_(x_) for x_ in x)
+            ret &= isinstance(x[0], typing.Callable)
+        # if ret:
+        #     ret &= any(self._is_def_op_tuple_(x_) for x_ in x)
 
         return ret
 
@@ -573,6 +577,12 @@ Var-positional parameters
         **NOTE** that the args in this definition can also contain placeholder strings
         or deferred operation definition tuples, and so on, but apply **CAUTION**
         to deep nesting these because the resulting deep recursions will be harder to debug!
+
+    WARNING: This syntax variant is currently buggy, as it does not play well when
+placeholder strings are included in the "opargs"
+
+    I suggest using the less convenient way of chaining calls to self.defer when
+uain placeholder strings.
 
 Var-keyword parameters:
 -----------------------
@@ -802,7 +812,7 @@ Any aditional named or keyword parameters to be passed to `func`.
                         result[kr] = res
 
                 except: # noqa
-                    msg = print_styled(f"Deferred operator {k}: {dfop} could not be applied",
+                    msg = print_styled(f"{self.__class__.__name__}[{self.name}]: Deferred operator {k}: {dfop} could not be applied",
                                        color="lightred", bright=True, back="white")
                     scipywarn(f"{msg}")
                     traceback.print_exc()
@@ -814,6 +824,14 @@ Any aditional named or keyword parameters to be passed to `func`.
 
     def _resolve_placeholders_(self, callargs, defopargs):
         adf = list()
+        # if self._is_def_op_tuple_(defopargs):
+        #     print(f"{self.__class__.__name__}._resolve_placeholders_: defopargs = {defopargs}")
+        #     dfa =  self._resolve_placeholders_(callargs, defopargs[1])
+        #     if len(defopargs) == 2:
+        #         return (defopargs[0], dfa)
+        #     else:
+        #         return (defopargs[0], dfa, defopargs[2])
+
         for a in defopargs:
             if isinstance(a, str) and self.placeholder.match(a):
                 try:
@@ -828,8 +846,7 @@ Any aditional named or keyword parameters to be passed to `func`.
                     adf.append(callargs[0])
 
             elif (isinstance(a, tuple)
-                  and len(a) == 3
-                  and isinstance(a[0], typing.Callable)
+                  and self._is_def_op_tuple_(a)
                   ):
                 # print(f"{self.__class__.__name__}[{self.name}]._resolve_placeholders_:")
                 # print(f"\n\t*** a[0]: {type(a[0])} =\n\t{a[0]}\n\t***")

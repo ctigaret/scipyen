@@ -954,6 +954,67 @@ def state_levels(x: np.ndarray, **kwargs):
 
     return sLevels, counts, edges, ranges
 
+def remove_stim_artifacts(x: np.ndarray, wp: float, ws: float, gp: float, gs: float,
+                          fs: typing.Optional[float | pq.Quantity] = None):
+    r"""Removes stimulus artifacts usin a Butterworth filter"""
+    if isinstance(x, (neo.AnalogSignal, DataSignal)):
+        if not isinstance(fs, pq.Quantity):
+            fs = float(x.sampling_rate)
+
+    elif isinstance(x, np.ndarray):
+        if not isinstance(fs, float):
+            raise TypeError("'f' must be supplied for ordinary numy arrays")
+
+    bord, wn = scipy.signal.buttord(wp, ws, gp, gs, fs=fs)
+    btr = scipy.signal.butter(bord, wn, "low", fs = fs)
+    # btrsos = scipy.signal.tf2sos(*btr)
+    btrsos = scipy.signal.butter(bord, wn, "low", output="sos", fs = fs)
+
+    if isinstance(x, (neo.AnalogSignal, DataSignal)):
+        ret = sosfilter(x, btrsos)
+        klass = x.__class__
+        ret = klass(ret, units = x.units, t_start = x.t_start,
+                            sampling_rate = x.sampling_rate,
+                            name=x.name,
+                            description = x.description)
+        ann = x.array_annotations
+        for key in ann:
+            ret.array_annotations[key] = ann[key]
+    else:
+        ret = scipy.signal.sosfiltfilt(btrsos, x, axis=0)
+
+    return ret
+
+def remove_hum(x: np.ndarray, notch_freq: typing.Union[float, int, pq.Quantity] = 50 * pq.Hz,
+               quality: float | int = 30,
+               fs: typing.Optional[typing.Union[float, int, pq.Quantity]] = None,) -> np.ndarray:
+    r"""Removes 'hum' (power grid noise)"""
+    if isinstance(x, (neo.AnalogSignal, DataSignal)):
+        if not isinstance(fs, pq.Quantity):
+            fs = float(x.sampling_rate)
+
+    elif isinstance(x, np.ndarray):
+        if not isinstance(fs, float):
+            raise TypeError("'f' must be supplied for ordinary numpy arrays")
+
+    notch = scipy.signal.iirnotch(notch_freq, quality, fs=fs)
+    notchsos = scipy.signal.tf2sos(*notch)
+    if isinstance(x, (neo.AnalogSignal, DataSignal)):
+        ret = sosfilter(x, notchsos)
+        klass = x.__class__
+        ret = klass(ret, units = x.units, t_start = x.t_start,
+                            sampling_rate = x.sampling_rate,
+                            name=x.name,
+                            description = x.description)
+        ann = x.array_annotations
+        for key in ann:
+            ret.array_annotations[key] = ann[key]
+    else:
+        ret = scipy.signal.sosfiltfilt(notchsos, x, axis=0)
+
+    return ret
+
+
 
 def remove_dc(
     x,

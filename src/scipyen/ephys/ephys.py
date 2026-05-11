@@ -3107,6 +3107,22 @@ def _get_location_boundary_(loc: typing.Union[DataCursor, SignalCursor], # noqa
 
     return t0 if start else t1
 
+# @singledispatch
+# def signal_filter(loc: object,
+#                   func: typing.Callable,
+#                   fargs, fkwargs,
+#                   signal,
+#                   /,
+#                   channel = None, relative=True):
+#     raise NotImplementedError(f"Locations of type {type(loc)} are not supported")
+#
+# @signal_filter.register(DeferredSignalMeasure)
+# @signal_filter.register(types.NoneType)
+# @signal_filter.register(tuple)
+# @signal_filter.register(list)
+# @signal_filter.register(collections.deque)
+# def _signal_filter(loc, func, fargs, fkwargs)
+
 @singledispatch
 def signal_fit(loc:object,
                model: typing.Callable,
@@ -3401,6 +3417,9 @@ def _signal_fit_(loc: typing.Union[neo.Epoch, DataZone, Interval],  # noqa
 
         result.append(ret)
 
+    if all(isinstance(ret, (neo.AnalogSignal, DataSignal)) for ret in result):
+        return neoutils.concatenate_signals(result)
+
     return np.vstack(result)
 
 @signal_fit.register(DataCursor)
@@ -3561,18 +3580,12 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
 
         ret = fn(sg, **kw)
         if isinstance(ch, int):
-            return ret[ch].flatten()
+            ret = ret[ch].flatten()
+
+        # if not isinstance(ret, pq.Quantity):
+        #     ret = ret * sg.units
 
         return ret
-
-        # if t0 == t1:
-        #     ret = func(signal[signal.time_index(t0),:], **kw)
-        #
-        # else:
-        #     ret = func(signal.time_slice(t0,t1), **kw)
-        #
-        #
-        # return ret
 
     if loc is None:
         return __do_reduce__(func, signal, channel)
@@ -3610,7 +3623,12 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
             ret = __do_reduce__(func, sg, channel)
             result.append(ret)
 
-        return np.vstack(result)
+        # print(f"_signal_reduce_ loc = {loc} ->\n\t{result}")
+
+        if all(isinstance(ret, (neo.AnalogSignal, DataSignal)) for ret in result):
+            return neoutils.concatenate_signals(result)
+
+        return np.vstack(result) * signal.units
 
     else:
         raise ValueError("'loc' must be a Location Measure, a pair of scalars or Location Measures, or a sequence of such pairs")
@@ -3654,6 +3672,9 @@ def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval], # noqa
 
         result.append(ret)
 
+    if all(isinstance(ret, (neo.AnalogSignal, DataSignal)) for ret in result):
+        return neoutils.concatenate_signals(result)
+
     return np.vstack(result)# * signal.units
 
 @signal_reduce.register(DataCursor)
@@ -3684,6 +3705,9 @@ def _signal_reduce_(loc: typing.Union[DataCursor, SignalCursor], # noqa
 
 def signal_max(loc, signal, /, channel = None, relative = True):
     return signal_reduce(loc, np.max, signal, channel, relative) * signal.units
+    # if not isinstance(ret, pq.Quantity):
+    #     ret *= signal.units
+    # return ret
 
 def signal_argmax(loc, signal, /, channel = None, relative = True):
     # CAUTION: 2026-05-03 09:25:45
@@ -3701,6 +3725,9 @@ def signal_domain_max(loc, signal, /, channel = None, relative = True):
 
 def signal_min(loc, signal, /, channel = None, relative = True):
     return signal_reduce(loc, np.min, signal, channel, relative) * signal.units
+    # if not isinstance(ret, pq.Quantity):
+    #     ret *= signal.units
+    # return ret
 
 def signal_argmin(loc, signal, /, channel = None, relative = True):
     starts = signal.time_index(get_location_boundary(loc, True, True))
@@ -3712,6 +3739,9 @@ def signal_domain_min(loc, signal, /, channel = None, relative = True):
 
 def signal_maxmin(loc, signal, /, channel =  None, relative = True):
     return signal_reduce(loc, sigp.maxmin, signal, channel, relative) * signal.units
+    # if not isinstance(ret, pq.Quantity): # BUG 2026-05-11 01:02:33 FIXME
+    #     ret *= signal.units
+    # return ret
 
 def signal_argmaxmin(loc, signal, /, channel = None, relative = True):
     starts = signal.time_index(get_location_boundary(loc, True, True))
@@ -3723,6 +3753,9 @@ def signal_domain_maxmin(loc, signal, /, channel = None, relative = True):
 
 def signal_minmax(loc, signal, /, channel = None, relative = True):
     return signal_reduce(loc, sigp.minmax, signal, channel, relative) * signal.units
+    # if not isinstance(ret, pq.Quantity):
+    #     ret *= signal.units
+    # return ret
 
 def signal_argminmax(loc, signal, /, channel = None, relative = True):
     starts = signal.time_index(get_location_boundary(loc, True, True))
@@ -3733,7 +3766,12 @@ def signal_domain_minmax(loc, signal, /, channel = None, relative = True):
     return signal.times[ndx]
 
 def signal_average(loc, signal, /, channel = None, relative = True):
-    return signal_reduce(loc, np.nanmean, signal, channel, relative) * signal.units
+    ret = signal_reduce(loc, np.nanmean, signal, channel, relative)
+    if not isinstance(ret, pq.Quantity):
+        ret *= signal.units
+    return ret
+
+    # return signal_reduce(loc, np.nanmean, signal, channel, relative) * signal.units
 
 @singledispatch
 def signal_slice(loc, signal, /, channel = None,
