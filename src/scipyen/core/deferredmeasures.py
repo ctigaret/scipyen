@@ -145,9 +145,10 @@ See ephys.signal_* family of functions for example of suitable functions.
     * A ``collections.abc.Sequence[typing.Union[SignalCursor, DataCursor, neo.Epoch, DataZone, Interval]]`` |nbsp|
     e.g., a ``tuple`` or ``list`` of any of the above, and *homogeneous* in the type of its elements.
 
-    * A DeferredSignalMeasure object or sequence of DeferredSignalMeasure objects, with
-        the precondition that each of them returns a value in the signal's domain
-        (hence can be used as *locator* objects), or a signal (possibly, a region of it).
+    * A functor generating a *locator* object as above; this includes DeferredSignalMeasure objects or
+        sequence of DeferredSignalMeasure objects, with the precondition that each
+        of them returns a value in the signal's domain (hence can be used as *locator*
+        objects), or a signal (possibly, a region of it).
 
 :name:
     Name of this DeferredSignalMeasure object

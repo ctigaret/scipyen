@@ -162,7 +162,7 @@ import datetime
 import numbers
 import inspect
 import itertools
-# import functools
+import functools
 from functools import singledispatch
 import warnings
 import typing
@@ -3214,6 +3214,8 @@ Returns None in case of failure
     raise NotImplementedError(f"Locations of type {type(loc).__name__} are not supported")
 
 @signal_fit.register(DeferredSignalMeasure)
+@signal_fit.register(types.FunctionType)
+@signal_fit.register(functools.partial)
 @signal_fit.register(types.NoneType)
 @signal_fit.register(tuple)
 @signal_fit.register(list)
@@ -3224,6 +3226,17 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
                                       typing.Sequence[typing.Sequence[numbers.Number]],
                                       typing.Sequence[typing.Sequence[pq.Quantity]],
                                       typing.Sequence[typing.Sequence[DeferredSignalMeasure]],
+                                      typing.Sequence[typing.Sequence[types.FunctionType]],
+                                      typing.Sequence[typing.Sequence[functools.partial]],
+                                      typing.Sequence[
+                                                        typing.Union[
+                                                            numbers.Number,
+                                                            pq.Quantity,
+                                                            DeferredSignalMeasure,
+                                                            types.FunctionType,
+                                                            functools.partial,
+                                                            ]
+                                                     ],
                                       types.NoneType],
                  model: typing.Callable,
                  fitTable: pd.DataFrame,
@@ -3336,16 +3349,27 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
     if loc is None:
         return __do_fit__(signal, model, fitTable, channel)
 
-    elif isinstance(loc, DeferredSignalMeasure):
-        sg = loc(signal)
+    # elif isinstance(loc, DeferredSignalMeasure):
+    elif isinstance(loc, typing.Callable):
+        if isinstance(loc, DeferredSignalMeasure):
+            sg = loc(signal)
+
+        else:
+            sg = loc()
         if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
             raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
 
         return __do_fit__(sg, model, fitTable, channel)
 
-    elif all(isinstance(loc_, (numbers.Number, pq.Quantity, DeferredSignalMeasure)) for loc_ in loc):
-        if len(loc) == 1 and isinstance(loc[0], DeferredSignalMeasure):
-            sg = loc[0](signal)
+    # elif all(isinstance(loc_, (numbers.Number, pq.Quantity, DeferredSignalMeasure)) for loc_ in loc):
+    elif all(isinstance(loc_, (numbers.Number, pq.Quantity, typing.Callable)) for loc_ in loc):
+        if len(loc) == 1:
+            if isinstance(loc[0], DeferredSignalMeasure):
+                sg = loc[0](signal)
+
+            elif isinstance(loc[0], typing.Callable):
+                sg = loc[0]()
+
             if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
                 raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
 
@@ -3544,18 +3568,26 @@ Example:
 @signal_reduce.register(list)
 @signal_reduce.register(collections.deque)
 @signal_reduce.register(DeferredSignalMeasure)
+@signal_reduce.register(types.FunctionType)
+@signal_reduce.register(functools.partial)
 @signal_reduce.register(types.NoneType)
 def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
                                       typing.Sequence[pq.Quantity],
                                       DeferredSignalMeasure,
+                                      types.FunctionType,
+                                      functools.partial,
                                       typing.Sequence[typing.Sequence[numbers.Number]],
                                       typing.Sequence[typing.Sequence[pq.Quantity]],
                                       typing.Sequence[typing.Sequence[DeferredSignalMeasure]],
+                                      typing.Sequence[typing.Sequence[types.FunctionType]],
+                                      typing.Sequence[typing.Sequence[functools.partial]],
                                       typing.Sequence[
                                                         typing.Union[
                                                             numbers.Number,
                                                             pq.Quantity,
-                                                            DeferredSignalMeasure
+                                                            DeferredSignalMeasure,
+                                                            types.FunctionType,
+                                                            functools.partial,
                                                             ]
                                                      ],
                                       types.NoneType],
@@ -3598,9 +3630,17 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
 
         return __do_reduce__(func, sg, channel)
 
-    elif all(isinstance(loc_, (numbers.Number, pq.Quantity, DeferredSignalMeasure)) for loc_ in loc):
-        if len(loc) == 1 and isinstance(loc[0], DeferredSignalMeasure):
-            sg = loc[0](signal)
+    # elif all(isinstance(loc_, (numbers.Number, pq.Quantity, DeferredSignalMeasure)) for loc_ in loc):
+    elif all(isinstance(loc_, (numbers.Number, pq.Quantity, typing.Callable)) for loc_ in loc):
+        if len(loc) == 1:
+            if isinstance(loc[0], DeferredSignalMeasure):
+                sg = loc[0](signal)
+                # if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
+                #     raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
+                #
+                # return __do_reduce__(func, sg, channel)
+            else:
+                sg = loc[0]() # pass here a functools.partial!
             if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
                 raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
 
@@ -3615,11 +3655,18 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
         else:
             raise ValueError(f"Expecting a pair of elements; got {len(loc)} elements instead.")
 
-    elif all(isinstance(loc_, (tuple, list, collections.deque)) and all(isinstance(ll, (numbers.Number, pq.Quantity, DeferredSignalMeasure)) for ll in loc_) for loc_ in loc):
+    # elif all(isinstance(loc_, (tuple, list, collections.deque)) and all(isinstance(ll, (numbers.Number, pq.Quantity, DeferredSignalMeasure)) for ll in loc_) for loc_ in loc):
+    elif all(isinstance(loc_, (tuple, list, collections.deque)) and all(isinstance(ll, (numbers.Number, pq.Quantity, typing.Callable)) for ll in loc_) for loc_ in loc):
         result = list()
         for loc_ in loc:
-            t0, t1 = loc_
-            sg = __slice_signal__(t0, t1, signal, channel, relative)
+            if isinstance(loc_, DeferredSignalMeasure):
+                sg = loc_(signal)
+            elif isinstance(loc_, typing.Callable):
+                sg = loc_()
+            else:
+                t0, t1 = loc_
+                sg = __slice_signal__(t0, t1, signal, channel, relative)
+
             ret = __do_reduce__(func, sg, channel)
             result.append(ret)
 
@@ -3799,13 +3846,13 @@ def _signal_slice_(loc: typing.Union[list, tuple, collections.deque], signal, /,
     if isinstance(t0, DeferredSignalMeasure):
         t0_ = t0(signal, channel=channel, relative=relative)
         if isinstance(t0_, pq.Quantity) and not scq.unitsConvertible(t0_, signal.times.units):
-            raise ValueError(f"Location measure {t0} generated data with incimplatible physical dimensionality {t0_} ")
+            raise ValueError(f"Location measure {t0} generated data with incompatible physical dimensionality {t0_} ")
         t0 = t0_
 
     if isinstance(t1, DeferredSignalMeasure):
         t1_ = t1(signal, channel=channel, relative=relative)
         if isinstance(t1_, pq.Quantity) and not scq.unitsConvertible(t1_, signal.times.units):
-            raise ValueError(f"Location measure {t1} generated data with incimplatible physical dimensionality {t1_} ")
+            raise ValueError(f"Location measure {t1} generated data with incompatible physical dimensionality {t1_} ")
         t1 = t1_
 
     if all(isinstance(x, numbers.Number) for x in (t0,t1)):
@@ -6788,13 +6835,13 @@ def __slice_signal__(t0, t1, sg, ch, rel):
     if isinstance(t0, DeferredSignalMeasure):
         t0_ = t0(sg, channel=ch, relative=rel)
         if isinstance(t0_, pq.Quantity) and not scq.unitsConvertible(t0_, signal.times.units):
-            raise ValueError(f"Location measure {t0} generated data with incimplatible physical dimensionality {t0_} ")
+            raise ValueError(f"Location measure {t0} generated data with incompatible physical dimensionality {t0_} ")
         t0 = t0_
 
     if isinstance(t1, DeferredSignalMeasure):
         t1 = t1(sg, channel=ch, relative=rel)
         if isinstance(t1_, pq.Quantity) and not scq.unitsConvertible(t1_, signal.times.units):
-            raise ValueError(f"Location measure {t1} generated data with incimplatible physical dimensionality {t1_} ")
+            raise ValueError(f"Location measure {t1} generated data with incompatible physical dimensionality {t1_} ")
         t1 = t1_
 
     if not isinstance(t0, pq.Quantity):
