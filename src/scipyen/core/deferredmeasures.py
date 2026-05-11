@@ -63,6 +63,8 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 class DeferredSignalMeasure:
     r"""Functor that defers calculating a signal measure.
 
+Aliased to ``DSM`` in this module.
+
 .. |nbsp| unicode:: 0xA0
    :trim:
 
@@ -172,7 +174,11 @@ See ephys.signal_* family of functions for example of suitable functions.
 :kwargs:
     Named and keyword parameters passed to func *after* location and signal parameters
 
-:deferred_operations_chain: a list of chained operations to be applied to the
+:preprocess: a list of chained operations to be applied to the parameters
+    passed to callinf this DeferredSignalMeasure object as a function. Same structure
+    as ``postprocess`` (see next).
+
+:postprocess: a list of chained operations to be applied to the
     *result* of the deferred computations performed by ``func`` while calling
     this DeferredSignalMeasure object as a function.
 
@@ -221,16 +227,16 @@ See ephys.signal_* family of functions for example of suitable functions.
 
     Both ``parameter_list`` and ``keyword_value_dict`` may be empty.
 
-    By default ``deferred_operations_chain`` is an empty list.
+    By default ``postprocess`` is an empty list.
 
     Deferred operations can be added by calling ``self.defer(…)`` or its *alias*
     ``self.do(…)`` (for "Deferred Operation").
 
     All defined deferred operations can be removed at any time by calling either
-    ``self.reset_deferred_operations()`` or ``self.deferred_operations_chain.clear()``.
+    ``self.reset_deferred_potprocessing()`` or ``self.postprocess.clear()``.
 
     **If you know what you are doing**, individual deferred operations can be inserted
-    or removed *manually* from the self.deferred_operations_chain field using
+    or removed *manually* from the self.postprocess field using
     standard Python ``list`` API.
 
 .. note::
@@ -490,8 +496,10 @@ Changelog:
     relative:bool = True
     posargs: tuple = dataclasses.field(default_factory = tuple)
     kwargs: dict = dataclasses.field(default_factory=dict)
-    # innerfuncs: tuple[tuple[typing.Callable, tuple, dict]] = dataclasses.field(default_factory = tuple)
-    deferred_operations_chain: list[tuple[typing.Callable, tuple, dict]] = dataclasses.field(default_factory=list)
+
+    preprocess: list[tuple[typing.Callable, tuple, dict]] = dataclasses.field(default_factory=list)
+
+    postprocess: list[tuple[typing.Callable, tuple, dict]] = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
         self.placeholder = re.compile(r'<[0-9]*?>')
@@ -508,6 +516,12 @@ Changelog:
         return ret
 
     def defer(self, op: typing.Callable, *args, **kwargs) -> typing.Self:
+        return self._defer_process_(op, True, *args, **kwargs)
+
+    def use(self, op: typing.Callable, *args, **kwargs) -> typing.Self:
+        return self._defer_process_(op, False, *args, **kwargs)
+
+    def _defer_process_(self, op: typing.Callable, post:bool = True, *args, **kwargs) -> typing.Self:
         """Appends a deferred operation to the future result of a call to self(…).
 
 Parameters:
@@ -517,11 +531,11 @@ Parameters:
 
     When ``op`` is a single **deferred operation definition** tuple, i.e. no
     further positional parameters are passed, its contents will be appended to
-    the ``deferred_operations_chain`` field and ``**kwargs`` are ignored.
+    the ``postprocess`` field and ``**kwargs`` are ignored.
 
     If, in addition, **all** subsequent positional parameters are also
     **deferred operation definition** tuples, they will also be appended to the
-    ``deferred_operations_chain`` field.
+    ``postprocess`` field.
 
     Examples:
 
@@ -592,7 +606,7 @@ Var-keyword parameters:
 
 Returns:
 --------
-    The instance of this object, with updated 'deferred_operations_chain' field,
+    The instance of this object, with updated 'postprocess' field,
     allowing chained called such as (but see alternative syntax examples above):
 
 ::
@@ -600,12 +614,14 @@ Returns:
     lm.defer(item1, True).defer(item2, False)
 
 .. note::
-    1. To **reset** the deferred access chain, call self.reset_deferred_operations()
+    1. To **reset** the deferred access chain, call self.reset_deferred_potprocessing()
     2. This method is *aliased* to ``self.do``
 
 """
+        target = self.postprocess if post else self.preprocess
         if isinstance(op, typing.Callable):
-            self.deferred_operations_chain.append((op, args, kwargs))
+            target.append((op, args, kwargs))
+            # self.postprocess.append((op, args, kwargs))
 
         else:
             if isinstance(op, collections.abc.Sequence):
@@ -640,7 +656,8 @@ Returns:
                         else:
                             raise TypeError(f"Invalid deferred operation definition; expecting between 2 and 3 elements, instead got {len(op_)}")
 
-                        self.deferred_operations_chain.append((_op_[0], _op_[1], _op_[2]))
+                        target.append((_op_[0], _op_[1], _op_[2]))
+                        # self.postprocess.append((_op_[0], _op_[1], _op_[2]))
                 else:
                     raise TypeError(f"Invalid deferred operation definitions {op}")
             else:
@@ -651,10 +668,16 @@ Returns:
     # NOTE: 2026-05-10 01:13:35 provide a shortcut alias
     do = defer
 
-    def reset_deferred_operations(self):
-        self.deferred_operations_chain.clear()
+    def reset_deferred_preprocess(self):
+        self.preprocess.clear()
 
-    def _apply_deferred_operator_(self, obj, op, opargs, opkwargs):
+    def reset_deferred_potprocessing(self):
+        self.postprocess.clear()
+
+    def _deferred_process_(self, obj, op, opargs, opkwargs):
+        print(f"{self.__class__.__name__}[{self.name}]._deferred_process_ got:")
+        print(f"\n\tobj: {type(obj)}")
+        print(f"\n\top: {type(op)}\n*****\n\n\n")
         if op in (operator.attrgetter, operator.itemgetter, operator.methodcaller):
             return op(*opargs, **opkwargs)(obj)
 
@@ -686,6 +709,7 @@ Any aditional named or keyword parameters to be passed to `func`.
     Typical examples are ``channel`` and ``relative``.
 
 """
+        print(f"\n*****\n{self.__class__.__name__}[{self.name}].__call__:\n")
         # print(f"{self.__class__.__name__}[{self.name}].__call__: -> args = \n\t{args}\n\t({type(args)})")
 
         # print(f"{self.__class__.__name__}[{self.name}].__call__: -> {len(args)} args = ")
@@ -741,6 +765,9 @@ Any aditional named or keyword parameters to be passed to `func`.
                 else:
                     callargs = tuple(args[0].analogsignals)
 
+            elif isinstance(args[0], typing.Callable):
+                callargs = (args[0](), )
+
             elif not isinstance(args[0], (neo.AnalogSignal, DataSignal)):
                 raise TypeError(f"Unexpected type of the first argument: {type(args[0]).__name__}")
 
@@ -785,7 +812,29 @@ Any aditional named or keyword parameters to be passed to `func`.
         # for ca in callargs:
         #     print(f"\n\t{type(ca)}: {ca}\n")
 
-        for arg in callargs:
+        preops = list()
+        for k, defop in enumerate(self.preprocess):
+            if len(defop[1]):
+                # replace any placeholders with the corresponding arg
+                adf = self._resolve_placeholders_(callargs, defop[1])
+                dfop = (defop[0], adf, defop[2])
+            else:
+                dfop = defop
+
+            preops.append(defop)
+
+        postops = list()
+        for k, defop in enumerate(self.postprocess):
+            if len(defop[1]):
+                # replace any placeholders with the corresponding arg
+                adf = self._resolve_placeholders_(callargs, defop[1])
+                dfop = (defop[0], adf, defop[2])
+            else:
+                dfop = defop
+
+            postops.append(defop)
+
+        for karg, arg in enumerate(callargs):
             # NOTE: 2026-05-04 10:41:03
             # augment and rearrange arguments to fit the signature of ``func`` i.e.
             # location(s) THEN signal(s)
@@ -793,30 +842,56 @@ Any aditional named or keyword parameters to be passed to `func`.
             # NOTE: 62026-05-04 22:31:56 DO NOT UNPACK self.locations;
             # some funcs (might) expect a sequence of locs
             #
-            fargs = (self.locations,) + self.posargs + (arg,)
 
-            result.append(self.func(*fargs, **kwargs))
 
-        if len(self.deferred_operations_chain):
-            for k, defop in enumerate(self.deferred_operations_chain):
-                if len(defop[1]):
-                    # replace any placeholders with the corresponding arg
-                    adf = self._resolve_placeholders_(callargs, defop[1])
-                    dfop = (defop[0], adf, defop[2])
-                else:
-                    dfop = defop
-
+            for kop, preop in enumerate(preops):
                 try:
-
-                    for kr, res in enumerate(result):
-                        res = self._apply_deferred_operator_(res, *dfop)
-                        result[kr] = res
+                    print(f"\n\t[{self.name}] preprocess {kop}: {preop}\n")
+                    arg = self._deferred_process_(arg, *preop)
 
                 except: # noqa
-                    msg = print_styled(f"{self.__class__.__name__}[{self.name}]: Deferred operator {k}: {dfop} could not be applied",
-                                       color="lightred", bright=True, back="white")
+                    msg = print_styled(f"\n{self.__class__.__name__}[{self.name}]: Deferred preprocessor {kop}: {preop}\n\tcould not be executed\n",
+                                        color="lightred", bright=True, back="white")
                     scipywarn(f"{msg}")
                     traceback.print_exc()
+
+            fargs = (self.locations,) + self.posargs + (arg,)
+
+            ret = self.func(*fargs, **kwargs)
+
+            for kop, postop in enumerate(postops):
+                try:
+                    print(f"\n\t[{self.name}] postprocess {kop}: {postop}\n")
+                    ret = self._deferred_process_(ret, *postop)
+
+                except: # noqa
+                    msg = print_styled(f"\n{self.__class__.__name__}[{self.name}]: Deferred postprocessor {kop}: {postop}\n\tcould not be executed\n",
+                                        color="lightred", bright=True, back="white")
+                    scipywarn(f"{msg}")
+                    traceback.print_exc()
+
+            result.append(ret)
+            # result.append(self.func(*fargs, **kwargs))
+
+#         if len(self.postprocess):
+#             for k, defop in enumerate(self.postprocess):
+#                 if len(defop[1]):
+#                     # replace any placeholders with the corresponding arg
+#                     adf = self._resolve_placeholders_(callargs, defop[1])
+#                     dfop = (defop[0], adf, defop[2])
+#                 else:
+#                     dfop = defop
+#
+#                 try:
+#                     for kr, res in enumerate(result):
+#                         res = self._deferred_process_(res, *dfop)
+#                         result[kr] = res
+#
+#                 except: # noqa
+#                     msg = print_styled(f"{self.__class__.__name__}[{self.name}]: Deferred operator {k}: {dfop} could not be applied",
+#                                        color="lightred", bright=True, back="white")
+#                     scipywarn(f"{msg}")
+#                     traceback.print_exc()
 
         if len(result) == 1:
             result = result[0]
@@ -865,9 +940,13 @@ Any aditional named or keyword parameters to be passed to `func`.
 
         return tuple(adf)
 
+DSM = DeferredSignalMeasure
+
 @dataclass
 class DeferredComputation:
     r"""Deferred computations with values using suitable function or functor.
+
+Aliased to ``DComp`` in this module.
 
 The computations are deferred until concrete data is passed as parameters to calling
 this object as a function.
@@ -877,16 +956,16 @@ this object as a function.
     name: str = dataclasses.field(default = "measure")
     posargs: tuple = dataclasses.field(default_factory = tuple)
     kwargs: dict = dataclasses.field(default_factory=dict)
-    deferred_operations_chain: list = dataclasses.field(default_factory=list)
+    postprocess: list = dataclasses.field(default_factory=list)
 
     def defer(self, op: typing.Callable, *args, **kwargs):
-        self.deferred_operations_chain.append((op, args, kwargs))
+        self.postprocess.append((op, args, kwargs))
         return self
 
-    def reset_deferred_operations(self):
-        self.deferred_operations_chain.clear()
+    def reset_deferred_potprocessing(self):
+        self.postprocess.clear()
 
-    def _apply_deferred_operator_(self, obj, op, opargs, opkwargs):
+    def _deferred_process_(self, obj, op, opargs, opkwargs):
         return op(obj, *opargs, **opkwargs)
 
     def __call__(self, *args, **kwargs) -> object:
@@ -905,10 +984,10 @@ this object as a function.
         try:
             result = self.func(*fargs, **kwargs)
 
-            if len(self.deferred_operations_chain):
-                for k, defop in enumerate(self.deferred_operations_chain):
+            if len(self.postprocess):
+                for k, defop in enumerate(self.postprocess):
                     try:
-                        result = self._apply_deferred_operator_(result, *defop)
+                        result = self._deferred_process_(result, *defop)
                     except:
                         msg = print_styled(f"Deferred operator {k}: {defop} could not be applied",
                                         color="lightmagenta", bright=True, back="white")
@@ -923,5 +1002,5 @@ this object as a function.
             scipywarn(msg)
             traceback.print_exc()
 
-
+DComp = DeferredComputation
 

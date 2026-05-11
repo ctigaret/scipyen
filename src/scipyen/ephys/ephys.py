@@ -257,7 +257,7 @@ from core.scipyen_quantities import (unitsConvertible, checkTimeUnits,
                              checkRescale)
 import core.pyabfbridge as pab
 
-from core.deferredmeasures import (DeferredSignalMeasure, DeferredComputation)
+from core.deferredmeasures import (DeferredSignalMeasure, DeferredComputation, DSM, DComp)
 
 from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
 
