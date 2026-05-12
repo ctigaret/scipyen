@@ -115,7 +115,7 @@ except:
 # from IPython.display import set_matplotlib_formats
 from IPython.core.history import HistoryAccessor
 from jupyter_core.paths import jupyter_runtime_dir
-from qtconsole.svg import save_svg, svg_to_clipboard, svg_to_image
+from qtconsole.svg import save_svg, svg_to_clipboard, svg_to_image # noqa
 # from IPython.lib.deepreload import reload as dreload
 
 # from IPython.core.autocall import ZMQExitAutocall
@@ -124,7 +124,7 @@ from qtconsole.svg import save_svg, svg_to_clipboard, svg_to_image
 # NOTE: 2021-08-23 11:02:10
 # ATTENTION do not import config directly, as it will override IPython's own
 # 'config' object
-import traitlets
+import traitlets # noqa
 from traitlets.utils.bunch import Bunch
 
 # END Configurable objects with traitlets.config
@@ -136,21 +136,22 @@ from traitlets.utils.bunch import Bunch
 # NOTE: 2024-09-26 12:36:36
 # vigra is imported via my own vigra_patches module
 import numpy as np
-import numpy.ma as ma
+import numpy.ma as ma # noqa
 import pywt  # wavelets
-import scipy
-from scipy import io as sio
-from scipy import stats
-import sympy
-import shapely
+import scipy # noqa
+from scipy import io as sio # noqa
+from scipy import stats # noqa
+import sympy # noqa
+import shapely # noqa
 import neo
 if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList
 
 else:
     NeoObjectList = list # alias for backward compatibility :(
-import h5py
-import xarray as xa
+
+import h5py # noqa
+import xarray as xa # noqa
 import quantities as pq
 # END data types & numerics
 
@@ -158,14 +159,20 @@ import quantities as pq
 # NOTE: 2024-09-26 12:40:27
 # ptqtgraph is imported via gui.pyqtgraph_patch
 
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
-import statsmodels.stats as sms
-import statsmodels.regression as smr
-import patsy as pt
-import pandas as pd  # for DataFrame and Series
-import pingouin as pn  # nicer stats
-import mpmath as mpm
+import statsmodels.api as sm # noqa
+import statsmodels.formula.api as smf # noqa
+import statsmodels.stats as sms # noqa
+import statsmodels.regression as smr # noqa
+import patsy as pt # noqa
+
+# for DataFrame and Series
+import pandas as pd
+
+# nicer stats
+import pingouin as pn  # noqa
+
+import mpmath as mpm # noqa
+
 #import researchpy as rp  # for use with DataFrames & stats -- not here ?!?
 import joblib as jl  # to use functions as pipelines: lightweight pipelining in Python
 # import sklearn as sk  # machine learning, also nice plot_* functionality
@@ -206,7 +213,8 @@ plt.ion()
 
 # END statistics, plotting and visualization (other than pyqtgraph)
 
-import colorama # for console output styles
+# for console output styles
+import colorama  # noqa
 # END numerics & data visualization
 
 # END 3rd party modules
@@ -225,6 +233,7 @@ from core import utilities # noqa
 from core import svgutils # noqa
 from core import models # noqa
 from core import (bgbridge, taxonbridge) # noqa
+from core import deferredmeasures as dms # noqa
 
 from core.basescipyen import BaseScipyenData # noqa
 

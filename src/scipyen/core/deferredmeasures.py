@@ -29,11 +29,13 @@ import typing
 # from abc import ABC
 import dataclasses
 from dataclasses import dataclass
-# import numpy as np
-# import quantities as pq
+import numpy as np
+import quantities as pq
 import neo
 # import h5py
 # import pandas as pd
+
+from copy import deepcopy
 
 from core.datasignal import DataSignal
 from core.datazone import (DataZone, Interval)
@@ -51,13 +53,135 @@ from gui.cursors import (DataCursor, SignalCursor)# , SignalCursorTypes)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-# @dataclass
-# class DeferredOperation:
-#     r""""""
-#     op: typing.Callable
-#     args: tuple
-#     kwargs: dict
+class DeferredSignalMeasure: pass # forward declaration
+class DeferredMeasure: pass # forward declaration
 
+@dataclass
+class DeferredOperation:
+    r""""""
+    op: typing.Callable
+    args: tuple = dataclasses.field(default_factory = tuple)
+    kwargs: dict = dataclasses.field(default_factory = dict)
+
+    def __post_init__(self):
+        self.placeholder = re.compile(r'<[0-9]*?>')
+
+    def resolve(self, objs):
+        if isinstance(self.args, str):
+            new_args = (self.args, )
+
+        elif isinstance(self.args, typing.Sequence) and len(self.args):
+            new_args = list()
+            for ka, arg in enumerate(self.args):
+                # print(f"{self.__class__.__name__} to resolve arg {arg}\n\t({type(arg)})")
+                resolved = arg
+
+                if isinstance(arg, str):
+                    phMatch = self.placeholder.match(arg)
+                    if phMatch:
+                        argMatch = phMatch.string.strip("<").strip(">")
+                        try:
+                            argNdx = int(argMatch)
+                        except:
+                            scipywarn(f"Cannot convert {argMatch} to an int")
+                            traceback.print_exc()
+                            argNdx = 0
+
+                        if isinstance(objs, tuple):
+                            if argNdx >=-len(objs) and argNdx < len(objs):
+                                resolved = objs[argNdx]
+
+                            else:
+                                resolved = objs
+
+                    # print(f"\n\t\t => resolved is {resolved}\n")
+
+                elif isinstance(arg, self.__class__):
+                    resolved = arg.resolve(objs) # this already creates a copy!
+
+                    # print(f"\n\t\t => resolved is {resolved}\n")
+
+                elif isinstance(arg, DeferredSignalMeasure):
+                    print(f"{self.__class__.__name__} to resolve arg:\n\t{a_}\n\t({type(a_)})")
+                    resolved = deepcopy(arg)
+                    for k, preproc in enumerate(resolved.preprocess):
+                        resolved.preprocess[k] = preproc.resolve(objs)
+
+                    for k, postproc in enumerate(resolved.postprocess):
+                        resolved.postprocess[k] = postproc.resolve(objs)
+
+                    # print(f"\n\t\t => resolved is {resolved}\n")
+
+                elif isinstance(arg, tuple):
+                    resolved = list()
+
+                    for a_ in arg:
+                        print(f"{self.__class__.__name__} to resolve a_:\n\t{a_}\n\t({type(a_)})")
+                        res_a = a_
+                        if isinstance(a_, str):
+                            phMatch = self.placeholder.match(a_)
+                            if phMatch:
+                                argMatch = phMatch.string.strip("<").strip(">")
+                                try:
+                                    argNdx = int(argMatch)
+                                except:
+                                    scipywarn(f"Cannot convert {argMatch} to an int")
+                                    traceback.print_exc()
+                                    argNdx = 0
+
+                                if isinstance(objs, tuple):
+                                    if argNdx >=-len(objs) and argNdx < len(objs):
+                                        res_a = objs[argNdx]
+
+                                else:
+                                    res_a = objs
+
+                        elif isinstance(a_, self.__class__):
+                            res_a = a_.resolve(objs) # this already crceates a copy !
+
+                        elif isinstance(a_, DeferredSignalMeasure):
+                            res_a = deepcopy(a_)
+                            for k, preproc in enumerate(res_a.preprocess):
+                                res_a.preprocess[k] = preproc.resolve(objs)
+
+                            for k, postproc in enumerate(res_a.postprocess):
+                                res_a.postprocess[k] = postproc.resolve(objs)
+
+                        resolved.append(res_a)
+
+                    if len(resolved) == 1:
+                        resolved = resolved[0]
+                    else:
+                        resolved = tuple(resolved)
+
+                    # print(f"\n\t\t => resolved is {resolved}\n")
+
+                    # pass # FIXME
+
+                    # resolved.preprocess.clear()
+                    # for preop in resolved.preprocess:
+                    #     pre_ = resolved.resolve(*args)
+                    # resolved.use()
+
+                # if isinstance(resolved, self.__class__):
+                #     resargs =
+                #     new_resolved = ag
+
+                new_args.append(resolved)
+
+            # if len(new_args) == 1:
+            #     new_args = new_args[0]
+            # else:
+            #     new_args = tuple(new_args)
+            new_args = tuple(new_args)
+
+        else:
+            new_args = (self.args, )
+
+
+        ret = self.__class__(self.op, new_args, self.kwargs)
+        print(f"\n\t => return {ret}")
+        return ret
 
 @dataclass
 class DeferredSignalMeasure:
@@ -504,24 +628,16 @@ Changelog:
     def __post_init__(self):
         self.placeholder = re.compile(r'<[0-9]*?>')
 
-    def _is_def_op_tuple_(self, x):
-        ret = isinstance(x, tuple)
-        if ret:
-            ret &= len(x) in (2,3)
-        if ret:
-            ret &= isinstance(x[0], typing.Callable)
-        # if ret:
-        #     ret &= any(self._is_def_op_tuple_(x_) for x_ in x)
-
-        return ret
-
     def defer(self, op: typing.Callable, *args, **kwargs) -> typing.Self:
-        return self._defer_process_(op, True, *args, **kwargs)
+        r"""Appends a deferred process to self.preprocess"""
+        # print(f"{self.__class__.__name__}.defer({op}, {args}, {kwargs})")
+        return self._add_deferred_process_(op, True, *args, **kwargs)
 
     def use(self, op: typing.Callable, *args, **kwargs) -> typing.Self:
-        return self._defer_process_(op, False, *args, **kwargs)
+        r"""Appends a deferred process to self.postprocess"""
+        return self._add_deferred_process_(op, False, *args, **kwargs)
 
-    def _defer_process_(self, op: typing.Callable, post:bool = True, *args, **kwargs) -> typing.Self:
+    def _add_deferred_process_(self, op: typing.Callable, post:bool = True, *args, **kwargs) -> typing.Self:
         """Appends a deferred operation to the future result of a call to self(…).
 
 Parameters:
@@ -619,51 +735,47 @@ Returns:
 
 """
         target = self.postprocess if post else self.preprocess
+
         if isinstance(op, typing.Callable):
-            target.append((op, args, kwargs))
-            # self.postprocess.append((op, args, kwargs))
+            dop = DeferredOperation(op, args, kwargs)
+            target.append(dop)
+            return self
+
+        elif isinstance(op, DeferredOperation):
+            target.append(op)
+            return self
+
+        elif isinstance(op, (tuple, list, collections.deque)):
+            # print(f"\nop is {op}")
+            if len(op) in (2,3) and isinstance(op[0], typing.Callable):
+                dop = DeferredOperation(*op)
+                target.append(dop)
+                if len(args):
+                    for arg in args:
+                        if isinstance(arg, tuple) and len(arg) in (2,3) and isinstance(arg[0], typing.Callable):
+                            d_ = DeferredOperation(*arg)
+                            target.append(d_)
+            else:
+                for op_ in op:
+                    # print(f"\t\t to add {op_}")
+                    if isinstance(op_, tuple) and len(op_) in (2,3) and isinstance(op_[0], typing.Callable):
+                        d_ = DeferredOperation(*op_)
+                        target.append(d_)
+
+                    elif isinstance(op_, DeferredOperation):
+                        target.append(op_)
+
+                    else:
+                        raise TypeError(f"Invalid operator definitions {op_}")
+
+            return self
 
         else:
-            if isinstance(op, collections.abc.Sequence):
-                if self._is_def_op_tuple_(op):
-                    opdefs = (op, )
-                    if len(args):
-                        if all(self._is_def_op_tuple_(a_) for a_ in args):
-                            opdefs = (op, ) + args
-                        else:
-                            scipywarn("Ignoring extra var-positinoal parameters as not all of them are valid deferred operation definitions")
+            raise TypeError(f"Invalid operator definition {op} {args} {kwargs}")
 
-                    for op_ in opdefs:
-                        _op_ = list()
-                        if len(op_) in (2,3):
-                            if isinstance(op_[0], typing.Callable):
-                                _op_.append(op_[0])
-                            else:
-                                raise TypeError(f"Invalid deferred operation definition {op_}; first element MUST be a Callable")
+        # target.append(defop)
 
-                            if isinstance(op_[1], tuple):
-                                _op_.append(op_[1])
-                            else:
-                                _op_.append((op_[1], )) # make it a tuple!
-
-                            if len(op_) == 3:
-                                if isinstance(op_[2], dict):
-                                    _op_.append(op_[2])
-                                else:
-                                    _op_.append(dict())
-                            else:
-                                _op_.append(dict())
-                        else:
-                            raise TypeError(f"Invalid deferred operation definition; expecting between 2 and 3 elements, instead got {len(op_)}")
-
-                        target.append((_op_[0], _op_[1], _op_[2]))
-                        # self.postprocess.append((_op_[0], _op_[1], _op_[2]))
-                else:
-                    raise TypeError(f"Invalid deferred operation definitions {op}")
-            else:
-                raise TypeError(f"Invalid deferred operation definitions {op}")
-
-        return self
+        # return self
 
     # NOTE: 2026-05-10 01:13:35 provide a shortcut alias
     do = defer
@@ -674,14 +786,54 @@ Returns:
     def reset_deferred_potprocessing(self):
         self.postprocess.clear()
 
-    def _exec_deferred_(self, obj, op, opargs, opkwargs):
-        print(f"{self.__class__.__name__}[{self.name}]._exec_deferred_(obj: {obj} ({type(obj)}), op: {op} ({type(op)})), opargs: {opargs}")
-        if op in (operator.attrgetter, operator.itemgetter, operator.methodcaller):
-            ret = op(*opargs, **opkwargs)(obj)
-        else:
-            ret = op(obj, *opargs, **opkwargs)
+    # def _exec_deferred_process_(self, obj, op, opargs, opkwargs):
+    def _exec_deferred_process_(self, obj: object, defop: DeferredOperation):
+        # print(f"{self.__class__.__name__}[{self.name}]._exec_deferred_process_(obj: {obj} ({type(obj)}), defop: {defop})")
 
-        print(f"\n\t[{self.name}] => ret = {ret}\n*****\n\n\n")
+        if defop.op in (operator.attrgetter, operator.itemgetter, operator.methodcaller):
+            ret = defop.op(*defop.args, **defop.kwargs)(obj)
+
+
+        else:
+            # if isinstance(defop.op, self.__class__):
+            #     print(f"\n\tdefop.op is {defop.op.name} with args: {defop.op.args}")
+
+            res_args = list()
+            for arg in defop.args:
+                if isinstance(arg, tuple) and len(arg) in (2,3) and isinstance(arg[0], self.__class__):
+                    print(f"\n\n arg[0] {arg[0]}, {type(arg[0])}\n\n\t arg[1] {arg[1]}, {type(arg[1])}")
+                    if len(arg) == 2:
+                        if isinstance(arg[1], np.ndarray):
+                            arg = arg[0](arg[1])
+                        else:
+                            arg = arg[0](*arg[1])
+                    else:
+                        print(f"\n\n arg[2] {arg[2]}, {type(arg[2])}")
+                        if isinstance(arg[1], np.ndarray):
+                            arg = arg[0](arg[1], **arg[2])
+                        else:
+                            arg = arg[0](*arg[1], **arg[2])
+
+                        print(f"\n\t =>=> {arg}\n")
+
+                res_args.append(arg)
+
+            try:
+                ret = defop.op(obj, *res_args, **defop.kwargs)
+                # ret = defop.op(obj, *defop.args, **defop.kwargs)
+            except:
+                print(f"\n\n{self.__class__.__name__}[{self.name}]._exec_deferred_process_: OFFENDING CODE:\n\n")
+                print(f"\n\n\t{defop.op} with args:")
+                for ka, a in enumerate(defop.args):
+                    print(f"\n\targ {ka} -> {a}\n\t of type {type(a)}")
+
+                print(f"\n\n\t{defop.op} and kwargs:")
+                for i in defop.kwargs.items():
+                    print(f"\n\t{i[0]} = {i[1]}\n\tof type {type(i[1])}")
+
+                raise
+
+        # print(f"\n\t[{self.name}] => ret = {ret}\n*****\n\n\n")
         return ret
 
     def __call__(self, *args, **kwargs) -> object:
@@ -710,8 +862,8 @@ Any aditional named or keyword parameters to be passed to `func`.
     Typical examples are ``channel`` and ``relative``.
 
 """
-        print(f"\n*****\n{self.__class__.__name__}[{self.name}].__call__:\n")
-        # print(f"{self.__class__.__name__}[{self.name}].__call__: -> args = \n\t{args}\n\t({type(args)})")
+        # print(f"\n*****\n{self.__class__.__name__}[{self.name}].__call__:\n")
+        print(f"{self.__class__.__name__}[{self.name}].__call__: -> args = \n\t{args}\n\t({type(args)})\n\t({len(args)} args)")
 
         # print(f"{self.__class__.__name__}[{self.name}].__call__: -> {len(args)} args = ")
         # for ka, ia in enumerate(args):
@@ -809,34 +961,6 @@ Any aditional named or keyword parameters to be passed to `func`.
         # construction
         kwargs.update(kw)
 
-        # print(f"{self.__class__.__name__}[{self.name}].__call__: -> callargs = ")
-        # for ca in callargs:
-        #     print(f"\n\t{type(ca)}: {ca}\n")
-
-        preops = list()
-        for kpre, pre in enumerate(self.preprocess):
-            if len(pre[1]):
-                # replace any placeholders with the corresponding arg in callargs
-                adf = self._resolve_placeholders_(callargs, pre[1])
-                pre_ = (pre[0], adf, pre[2])
-            else:
-                pre_ = pre
-
-            preops.append(pre_)
-
-        postops = list()
-        for kpost, post in enumerate(self.postprocess):
-            print(f"\n###\n[{self.name}] {kpost}: post[1] = {post[1]}\n###\n")
-            if len(post[1]):
-                # replace any placeholders with the corresponding arg in callargs
-                adf = self._resolve_placeholders_(callargs, post[1])
-                print(f"\n###\n[{self.name}] {kpost}: adf = {adf}\n###\n")
-                post_ = (post[0], adf, post[2])
-            else:
-                post_ = post
-
-            postops.append(post)
-
         for karg, arg in enumerate(callargs):
             # NOTE: 2026-05-04 10:41:03
             # augment and rearrange arguments to fit the signature of ``func`` i.e.
@@ -847,120 +971,37 @@ Any aditional named or keyword parameters to be passed to `func`.
             #
 
 
-            for kpre, preop in enumerate(preops):
+            for kpre, preop in enumerate(self.preprocess):
+                # print(f"\n\t[{self.name}] argument {karg} preprocess {kpre}: {preop}\n")
+                pre = preop.resolve(args)
+                # print(f"\n\t[{self.name}] argument {karg} resolved preprocess {kpre}: {pre}\n")
                 try:
-                    print(f"\n\t[{self.name}] argument {karg} preprocess {kpre}: {preop}\n")
-                    arg = self._exec_deferred_(arg, *preop)
+                    arg = self._exec_deferred_process_(arg, pre)
 
                 except: # noqa
                     msg = print_styled(f"\n{self.__class__.__name__}[{self.name}]: Deferred preprocessor {kpre}: {preop}\n\tcould not be executed\n",
                                         color="lightred", bright=True, back="white")
                     scipywarn(f"{msg}")
-                    traceback.print_exc()
+                    # traceback.print_exc()
+                    raise
 
             fargs = (self.locations,) + self.posargs + (arg,)
 
             ret = self.func(*fargs, **kwargs)
 
-            for kpost, postop in enumerate(postops):
-                print(f"\n\t[{self.name}] argument {karg} postprocess {kpost}: {postop}\n")
-                try:
-                    ret = self._exec_deferred_(ret, *postop)
-
-                except: # noqa
-                    msg = print_styled(f"\n{self.__class__.__name__}[{self.name}]: Deferred postprocessor {kpost}: {postop}\n\tcould not be executed\n",
-                                        color="lightred", bright=True, back="white")
-                    scipywarn(f"{msg}")
-                    traceback.print_exc()
+            for kpost, postop in enumerate(self.postprocess):
+                # print(f"\n\t[{self.name}] argument {karg} postprocess {kpost}: {postop}\n")
+                post = postop.resolve(*args)
+                # print(f"\n\t[{self.name}] argument {karg} resolved postprocess {kpost}: {post}\n")
+                ret = self._exec_deferred_process_(ret, post)
+                # print(f"\n\t[{self.name}] => {ret}\n")
 
             result.append(ret)
-            # result.append(self.func(*fargs, **kwargs))
-
-#         if len(self.postprocess):
-#             for k, defop in enumerate(self.postprocess):
-#                 if len(defop[1]):
-#                     # replace any placeholders with the corresponding arg
-#                     adf = self._resolve_placeholders_(callargs, defop[1])
-#                     dfop = (defop[0], adf, defop[2])
-#                 else:
-#                     dfop = defop
-#
-#                 try:
-#                     for kr, res in enumerate(result):
-#                         res = self._exec_deferred_(res, *dfop)
-#                         result[kr] = res
-#
-#                 except: # noqa
-#                     msg = print_styled(f"{self.__class__.__name__}[{self.name}]: Deferred operator {k}: {dfop} could not be applied",
-#                                        color="lightred", bright=True, back="white")
-#                     scipywarn(f"{msg}")
-#                     traceback.print_exc()
 
         if len(result) == 1:
             result = result[0]
 
         return result
-
-    def _resolve_placeholders_(self, callargs, defopargs):
-        adf = list()
-        # if self._is_def_op_tuple_(defopargs):
-        #     print(f"{self.__class__.__name__}._resolve_placeholders_: defopargs = {defopargs}")
-        #     dfa =  self._resolve_placeholders_(callargs, defopargs[1])
-        #     if len(defopargs) == 2:
-        #         return (defopargs[0], dfa)
-        #     else:
-        #         return (defopargs[0], dfa, defopargs[2])
-
-        for a in defopargs:
-            print(f"\n\t{self.__class__.__name__}._resolve_placeholders_: defop arg: {a}")
-            if isinstance(a, str):
-                print(f"\n\t\t[{self.name}] placeholder match -> {self.placeholder.match(a)}")
-                if self.placeholder.match(a):
-                    a_ = a.strip("<").strip(">")
-                    if len(a_):
-                        arg_ndx = int(a_)
-                    else:
-                        arg_ndx = 0
-                    print(f"\n\t\t[{self.name}] arg_ndx = {arg_ndx}")
-                    if arg_ndx >= 0 and arg_ndx < len(callargs):
-                        adf.append(callargs[arg_ndx])
-                    else:
-                        raise ValueError(f"Placeholder {a} refers to an invalid parameter index for {len(callargs)} parameters")
-                    # try:
-                    #     a_ = a.strip("<").strip(">")
-                    #     if len(a_):
-                    #         arg_ndx = int(a)
-                    #     else:
-                    #         arg_ndx = 0
-                    #     if arg_ndx >= 0 and arg_ndx < len(callargs):
-                    #         adf.append(callargs[arg_ndx])
-                    #     else:
-                    #         raise ValueError(f"Placeholder {a} refers to an invalid parameter index for {len(callargs)} parameters")
-                    #
-                    # except: # noqa
-                    #     # case of special placeholder "<>"
-                    #     adf.append(callargs[0])
-                else:
-                    adf.append(a)
-
-            elif (isinstance(a, tuple)
-                  and self._is_def_op_tuple_(a)
-                  ):
-                # print(f"{self.__class__.__name__}[{self.name}]._resolve_placeholders_:")
-                # print(f"\n\t*** a[0]: {type(a[0])} =\n\t{a[0]}\n\t***")
-                # print(f"\n\t*** a[1]: {type(a[1])} =\n\t{a[1]}\n\t***")
-                # print(f"\n\t*** a[2]: {type(a[2])} =\n\t{a[2]}\n\t***\n")
-                aa = self._resolve_placeholders_(callargs, a)
-                # print(f"\n\t =>\n*** aa[0]: {type(aa[0])} =\n\t{aa[0]}\n\t***")
-                # print(f"\n\t =>\n*** aa[1]: {type(aa[1])} =\n\t{aa[1]}\n\t***")
-                # print(f"\n\t =>\n*** aa[2]: {type(aa[2])} =\n\t{aa[2]}\n\t***\n")
-                # adf.append(a[0](*aa, **a[2])) # do execute this call!
-                adf.append(a[0](aa[1], **a[2])) # do execute this call!
-
-            else:
-                adf.append(a)
-
-        return tuple(adf)
 
 DSM = DeferredSignalMeasure
 
@@ -987,7 +1028,7 @@ this object as a function.
     def reset_deferred_potprocessing(self):
         self.postprocess.clear()
 
-    def _exec_deferred_(self, obj, op, opargs, opkwargs):
+    def _exec_deferred_process_(self, obj, op, opargs, opkwargs):
         return op(obj, *opargs, **opkwargs)
 
     def __call__(self, *args, **kwargs) -> object:
@@ -1009,7 +1050,7 @@ this object as a function.
             if len(self.postprocess):
                 for k, defop in enumerate(self.postprocess):
                     try:
-                        result = self._exec_deferred_(result, *defop)
+                        result = self._exec_deferred_process_(result, *defop)
                     except:
                         msg = print_styled(f"Deferred operator {k}: {defop} could not be applied",
                                         color="lightmagenta", bright=True, back="white")

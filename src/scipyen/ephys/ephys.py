@@ -3597,7 +3597,7 @@ def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval], # noqa
             t1 = t0 + t1
 
         ret = signal_reduce([t0, t1], func, signal, channel, relative)
-        print(f"_signal_reduce_<{i}: {type(i)}> -> interval {ki}: t0 = {t0}, t1 = {t1} => {ret} ({type(ret)})")
+        # print(f"_signal_reduce_<{i}: {type(i)}> -> interval {ki}: t0 = {t0}, t1 = {t1} => {ret} ({type(ret)})")
 
         result.append(ret)
 
@@ -3662,9 +3662,9 @@ def signal_argmax(loc, signal, /, channel = None, relative = True):
     # boundary of 'loc'
     loc_bounds = get_location_boundary(loc, True, True)
     starts = signal.time_index(loc_bounds)
-    print(f"signal_argmax -> loc_bounds = {loc_bounds}, starts -> {starts}\n")
+    # print(f"signal_argmax -> loc_bounds = {loc_bounds}, starts -> {starts}\n")
     ext = signal_reduce(loc, np.argmax, signal, channel, relative)
-    print(f"\t ext -> {ext}")
+    # print(f"\t ext -> {ext}")
     return starts + signal_reduce(loc, np.argmax, signal, channel, relative)
 
 def signal_domain_max(loc, signal, /, channel = None, relative = True):
@@ -6796,7 +6796,7 @@ def __do_reduce__(fn, sg, ch):
     # if not isinstance(ret, pq.Quantity):
     #     ret = ret * sg.units
 
-    print(f"__do_reduce__ {fn} will return {ret} ({type(ret)})")
+    # print(f"__do_reduce__ {fn} will return {ret} ({type(ret)})")
 
     return ret
 
