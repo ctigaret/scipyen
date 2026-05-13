@@ -2358,10 +2358,11 @@ class SynapticPathway:
 
     # NOTE: 2026-05-13 14:52:36
     # using DeferredSignalMeasure objects (but others, too):
-    # map the name of the measure (as it would appear in a results table) to either:
+    # map the name of the measure (as it would appear in a results table) to
+    # a sequence of measures (DeferredSignalMeasure, functions, etc): each of these
+    # are to be executed in the order given in the sequence
     #
-    measurements: typing.Mapping[str, typing.Union[types.FunctionType, DSM, np.ufunc,
-                                                   typing.List[typing.Union[types.FunctionType, DSM, np.ufunc]]]] = dataclasses.field(default_factory = dict)
+    measurements: dict[str, list] = dataclasses.field(default_factory = dict)
     # source: RecordingSource = dataclasses.field(default_factory = lambda: RecordingSource())
 
     def __post_init__(self, electrode:typing.Union[ElectrodeMode, int, str] = ElectrodeMode.Null,
