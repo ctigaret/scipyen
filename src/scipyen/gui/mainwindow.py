@@ -234,6 +234,7 @@ from core import svgutils # noqa
 from core import models # noqa
 from core import (bgbridge, taxonbridge) # noqa
 from core import deferredmeasures as dms # noqa
+from core.deferredmeasures import *
 
 from core.basescipyen import BaseScipyenData # noqa
 

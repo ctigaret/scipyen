@@ -55,7 +55,7 @@ from gui.cursors import (DataCursor, SignalCursor)# , SignalCursorTypes)
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 class DeferredSignalMeasure: pass # forward declaration
-class DeferredMeasure: pass # forward declaration
+class DeferredComputation: pass # forward declaration
 
 @dataclass
 class DeferredOperation:
@@ -206,7 +206,7 @@ class DeferredOperation:
         return ret
 
     def __call__(self, obj):
-        # print(f"\n{self.__class__.__name__}__call__(obj, {self.args})\n\t<{len(self.args)} var-positional arguments>")
+        # print(f"\n{self.__class__.__name__}__call__(obj={obj}, {self.args})\n\t<{len(self.args)} var-positional arguments>")
         if self.op in (operator.attrgetter, operator.itemgetter, operator.methodcaller):
             return self.op(*self.args, **self.kwargs)(obj)
 
@@ -842,70 +842,12 @@ Returns:
     def reset_deferred_potprocessing(self):
         self.postprocess.clear()
 
-    # def _exec_deferred_process_(self, obj, op, opargs, opkwargs):
     def _exec_deferred_process_(self, obj: object, defop: DeferredOperation):
         # print(f"\n{self.__class__.__name__}[{self.name}] DEFERRED PROCESSING:")
         # print(f"\n\t[{self.name}]_exec_deferred_process_(obj: {obj} ({type(obj)}), defop: {defop})")
 
         return defop(obj)
 
-        # if defop.op in (operator.attrgetter, operator.itemgetter, operator.methodcaller):
-        #     ret = defop.op(*defop.args, **defop.kwargs)(obj)
-        #     print(f"\n\t[{self.name}] {defop.op} => {ret}")
-        #
-        # elif isinstance(defop.op, np.ufunc):
-        #     ret = defop.op(obj)
-        #     print(f"\n\t[{self.name}] {defop.op} => {ret}")
-        #
-        # else:
-        #     res_args = list()
-        #     # if len(defop.args):
-        #     for arg in defop.args:
-        #         if isinstance(arg, tuple) and len(arg) in (2,3) and isinstance(arg[0], self.__class__):
-        #             print(f"\n\n[{self.name}] arg[0], {type(arg[0])}: {arg[0]}\n\n\t arg[1], {type(arg[1])}: {arg[1]}, {type(arg[1])}")
-        #             if len(arg) == 2:
-        #                 if isinstance(arg[1], np.ndarray):
-        #                     arg = arg[0](arg[1])
-        #                 else:
-        #                     arg = arg[0](*arg[1])
-        #             else:
-        #                 print(f"\n\n[{self.name}] arg[2] {arg[2]}, {type(arg[2])}")
-        #                 # NOTE: 2026-05-12 23:09:06 possible BUG will creep out -> to investigate!
-        #                 if isinstance(arg[1], np.ndarray):
-        #                     arg = arg[0](arg[1], **arg[2])
-        #                 else:
-        #                     arg = arg[0](*arg[1], **arg[2])
-        #
-        #                 print(f"\n\t[{self.name}] =>=> {arg}\n")
-        #
-        #         res_args.append(arg)
-        #
-        #
-        #     print(f"\n\t[{self.name}] {defop.op} res_args =>=>=> {res_args}")
-        #     try:
-        #         print(f"\n\t[{self.name}] to call {defop.op} on:\n{obj}\nand res_args:\n")
-        #         for kra, ra in enumerate(res_args):
-        #             print(f"\n\tres_arg {kra}: {ra}")
-        #
-        #         ret = defop.op(obj, *res_args, **defop.kwargs)
-        #         print(f"\n\t[{self.name}] {defop.op} => {ret}")
-        #         # ret = defop.op(obj, *defop.args, **defop.kwargs)
-        #     except:
-        #         print(f"\n\n*******************************************************************************\n")
-        #         print(f"{self.__class__.__name__}[{self.name}]._exec_deferred_process_: OFFENDING CODE:\n")
-        #         print(f"*******************************************************************************\n")
-        #         print(f"\t[{self.name}]{defop.op} with args:")
-        #         for ka, a in enumerate(defop.args):
-        #             print(f"\n\t[{self.name}]arg {ka} -> {a}\n\t of type {type(a)}")
-        #
-        #         print(f"\n\n\t[{self.name}]{defop.op} and kwargs:")
-        #         for i in defop.kwargs.items():
-        #             print(f"\n\t[{self.name}]{i[0]} = {i[1]}\n\tof type {type(i[1])}")
-        #
-        #         raise
-        #
-        # # print(f"\n\t[{self.name}] => ret = {ret}\n*****\n\n\n")
-        # return ret
 
     def __call__(self, *args, **kwargs) -> object:
         r"""Executes the location measure object.
@@ -1082,7 +1024,6 @@ Any aditional named or keyword parameters to be passed to `func`.
 
         return result
 
-DSM = DeferredSignalMeasure
 
 @dataclass
 class DeferredComputation:
@@ -1144,5 +1085,15 @@ this object as a function.
             scipywarn(msg)
             traceback.print_exc()
 
-DComp = DeferredComputation
 
+def itself(x, *args, **kwargs):
+    r"""A noop to return the argument passed onto it.
+
+Useful for adding deferred ops to a DeferredSignalMeasure"""
+    return x
+
+DSM     = DeferredSignalMeasure
+DComp   = DeferredComputation
+DOp     = DeferredOperation
+
+__all__ = ("DeferredSignalMeasure", "DSM", "DeferredOperation", "DOp", "DeferredComputation", "DComp", "itself")

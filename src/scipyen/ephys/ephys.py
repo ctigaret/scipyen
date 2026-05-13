@@ -257,7 +257,7 @@ from core.scipyen_quantities import (unitsConvertible, checkTimeUnits,
                              checkRescale)
 import core.pyabfbridge as pab
 
-from core.deferredmeasures import (DeferredSignalMeasure, DeferredComputation, DSM, DComp)
+from core.deferredmeasures import * # noqa
 
 from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
 
@@ -2353,8 +2353,15 @@ class SynapticPathway:
     # CAUTION 2024-10-17 22:31:14 FIXME
     # these measurements MUST be mapped to the episode boundaries, so that one
     # can easily access the measurement values during a particular episode or
-    # across several apisodes of the schedule!
-    measurements: typing.Mapping[str, typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = dataclasses.field(default_factory = dict)
+    # across several episodes of the schedule!
+    # measurements: typing.Mapping[str, typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = dataclasses.field(default_factory = dict)
+
+    # NOTE: 2026-05-13 14:52:36
+    # using DeferredSignalMeasure objects (but others, too):
+    # map the name of the measure (as it would appear in a results table) to either:
+    #
+    measurements: typing.Mapping[str, typing.Union[types.FunctionType, DSM, np.ufunc,
+                                                   typing.List[typing.Union[types.FunctionType, DSM, np.ufunc]]]] = dataclasses.field(default_factory = dict)
     # source: RecordingSource = dataclasses.field(default_factory = lambda: RecordingSource())
 
     def __post_init__(self, electrode:typing.Union[ElectrodeMode, int, str] = ElectrodeMode.Null,
