@@ -19,7 +19,7 @@ import traceback
 import operator
 import re
 # import functools
-# from functools import singledispatch
+from functools import (partial, singledispatch, singledispatchmethod) # noqa
 # import warnings
 import typing
 # import types
@@ -29,7 +29,6 @@ import typing
 # from abc import ABC
 import dataclasses
 from dataclasses import dataclass
-import operator
 import numpy as np
 import quantities as pq
 import neo
@@ -1071,7 +1070,7 @@ this object as a function.
                 for k, defop in enumerate(self.postprocess):
                     try:
                         result = self._exec_deferred_process_(result, *defop)
-                    except:
+                    except: # noqa
                         msg = print_styled(f"Deferred operator {k}: {defop} could not be applied",
                                         color="lightmagenta", bright=True, back="white")
                         scipywarn(f"{msg}")
@@ -1084,6 +1083,8 @@ this object as a function.
                                         color="lightmagenta", bright=True, back="white")
             scipywarn(msg)
             traceback.print_exc()
+
+
 
 
 def itself(x, *args, **kwargs):
