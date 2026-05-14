@@ -18,7 +18,7 @@ import traceback
 # import itertools
 import operator
 import re
-# import functools
+import functools
 from functools import (partial, singledispatch, singledispatchmethod) # noqa
 # import warnings
 import typing
@@ -46,6 +46,7 @@ from core.prog import (scipywarn, print_styled)
 # from core.prog import (safewrapper, scipywarn, print_styled)
 
 from core import neoutils
+from core.utilities import eq
 
 # import core.pyabfbridge as pab
 
@@ -240,7 +241,7 @@ class DeferredOperation:
 
 @dataclass
 class DeferredSignalMeasure:
-    r"""Functor that defers calculating a signal measure.
+    r"""Defers calculating a signal measure.
 
 Aliased to ``DSM`` in this module.
 
@@ -680,8 +681,12 @@ Changelog:
 
     postprocess: list[tuple[typing.Callable, tuple, dict]] = dataclasses.field(default_factory=list)
 
+    use_cache: bool = False # needs more work!
+
     def __post_init__(self):
         self.placeholder = re.compile(r'<[0-9]*?>')
+        # self.cached_result = dataclasses.MISSING
+        self.cached_result = dict()
 
     def defer(self, op: typing.Callable, *args, **kwargs) -> typing.Self:
         r"""Appends a deferred process to self.preprocess"""
@@ -884,6 +889,31 @@ Any aditional named or keyword parameters to be passed to `func`.
         if len(args) == 0:
             raise ValueError("At least one signal, a iterable of signals, or a neo.Segment must be specified")
 
+        if self.use_cache:
+            cached_args = self.cached_result.get("args", tuple())
+            cached_kwargs = self.cached_result.get("kwargs", dict())
+
+            cached_OK = len(cached_args) == len(args)
+
+            if cached_OK:
+                cached_OK &= all(eq(a[0], a[1]) for a in zip(cached_args, args))
+
+            if cached_OK:
+                cached_OK = len(cached_kwargs) == len(kwargs)
+
+            if cached_OK:
+                cached_OK &= all(eq(k[0], k[1]) for k in zip(cached_kwargs.keys(), kwargs.keys()))
+
+            if cached_OK:
+                cached_OK &= all(eq(v[0], v[1]) for v in zip(cached_kwargs.values(), kwargs.values()))
+
+            if cached_OK:
+                cached_OK &= self.cached_result.get("result", dataclasses.MISSING) is not dataclasses.MISSING
+
+            if cached_OK:
+                print(f"{self.__class__.__name__}[{self.name}] returning cached result")
+                return self.cached_result["result"]
+
         # NOTE: 2026-05-10 01:14:51
         # prepare the signals; if args contain collections of signals then use
         # self.signalNameOrIndex to select the signal from these.
@@ -1007,6 +1037,9 @@ Any aditional named or keyword parameters to be passed to `func`.
 
             ret = self.func(*fargs, **kwargs)
 
+            #  NOTE: analogsignals are not hashable
+            # ret = __dsm_call__(self.func, *fargs, **kwargs)
+
             for kpost, postop in enumerate(self.postprocess):
                 # print(f"\n\t[{self.name}] for argument {karg}, resolving postrocess {kpost}:\n{postop}\n")
                 post = postop.resolve(*args)
@@ -1020,6 +1053,14 @@ Any aditional named or keyword parameters to be passed to `func`.
 
         if len(result) == 1:
             result = result[0]
+
+        if self.use_cache:
+            self.cached_result = {"args": args,
+                                "kwargs": kwargs,
+                                "result": result}
+        else:
+            if len(self.cached_result):
+                self.cached_result.clear()
 
         return result
 
@@ -1084,7 +1125,9 @@ this object as a function.
             scipywarn(msg)
             traceback.print_exc()
 
-
+@functools.cache
+def __dsm_call__(func, *args, **kwargs):
+    return func(*args, **kwargs)
 
 
 def itself(x, *args, **kwargs):

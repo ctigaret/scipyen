@@ -2985,7 +2985,8 @@ def _mid_point_(loc: typing.Union[DataCursor, SignalCursor], # noqa
 
 @singledispatch
 def get_location_boundary(loc: object, start: bool,
-                          outer: bool = True) -> typing.Union[
+                          outer: bool = True,
+                          ) -> typing.Union[
                             numbers.Number, pq.Quantity,
                             typing.Sequence[numbers.Number],
                             typing.Sequence[pq.Quantity]
@@ -3669,10 +3670,12 @@ def signal_argmax(loc, signal, /, channel = None, relative = True):
     # therefore, this HAS to be added to the number of samples UP TO the earliest
     # boundary of 'loc'
     loc_bounds = get_location_boundary(loc, True, True)
+    if relative:
+        loc_bounds += signal.t_start
     starts = signal.time_index(loc_bounds)
-    # print(f"signal_argmax -> loc_bounds = {loc_bounds}, starts -> {starts}\n")
+    print(f"signal_argmax -> loc_bounds = {loc_bounds}, starts -> {starts}\n")
     ext = signal_reduce(loc, np.argmax, signal, channel, relative)
-    # print(f"\t ext -> {ext}")
+    print(f"\t ext -> {ext}")
     return starts + signal_reduce(loc, np.argmax, signal, channel, relative)
 
 def signal_domain_max(loc, signal, /, channel = None, relative = True):
@@ -3686,7 +3689,10 @@ def signal_min(loc, signal, /, channel = None, relative = True):
     # return ret
 
 def signal_argmin(loc, signal, /, channel = None, relative = True):
-    starts = signal.time_index(get_location_boundary(loc, True, True))
+    loc_bounds = get_location_boundary(loc, True, True)
+    if relative:
+        loc_bounds += signal.t_start
+    starts = signal.time_index(loc_bounds)
     return starts + signal_reduce(loc, np.argmin, signal, channel, relative)
 
 def signal_domain_min(loc, signal, /, channel = None, relative = True):
@@ -3700,7 +3706,10 @@ def signal_maxmin(loc, signal, /, channel =  None, relative = True):
     # return ret
 
 def signal_argmaxmin(loc, signal, /, channel = None, relative = True):
-    starts = signal.time_index(get_location_boundary(loc, True, True))
+    loc_bounds = get_location_boundary(loc, True, True)
+    if relative:
+        loc_bounds += signal.t_start
+    starts = signal.time_index(loc_bounds)
     return starts + signal_reduce(loc, sigp.maxmin, signal, channel, relative)
 
 def signal_domain_maxmin(loc, signal, /, channel = None, relative = True):
@@ -3714,7 +3723,10 @@ def signal_minmax(loc, signal, /, channel = None, relative = True):
     # return ret
 
 def signal_argminmax(loc, signal, /, channel = None, relative = True):
-    starts = signal.time_index(get_location_boundary(loc, True, True))
+    loc_bounds = get_location_boundary(loc, True, True)
+    if relative:
+        loc_bounds += signal.t_start
+    starts = signal.time_index(loc_bounds)
     return starts + signal_reduce(loc, sigp.maxmin, signal, channel, relative)
 
 def signal_domain_minmax(loc, signal, /, channel = None, relative = True):
