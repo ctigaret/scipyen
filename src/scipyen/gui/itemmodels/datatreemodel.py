@@ -1680,7 +1680,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         tip = type(obj).__name__
         n = len(obj)
-        klass = "Zone" if isinstance(obj, DataZone) else Epoch
+        klass = "Zone" if isinstance(obj, DataZone) else "Epoch"
         desc = strutils.pluralize('subinterval', n)
         info = f"{klass} '{obj.name}' with {len(obj)} {desc}"
 

@@ -2560,14 +2560,17 @@ class DataListener(QtCore.QObject):
     @Slot(object)
     def slot_filesRemoved(self, removedItems):
         print(f"{self.__class__.__name__}.slot_filesRemoved {removedItems}")
+        pass
 
     @Slot(object)
     def slot_filesChanged(self, changedItems):
         print(f"{self.__class__.__name__}.slot_filesChanged {changedItems}")
+        pass
 
     @Slot(object)
     def slot_filesNew(self, newItems):
         print(f"{self.__class__.__name__}.slot_filesNew {newItems}")
+        pass
 
 class Analysis(BaseScipyenData):
     r"""TODO Finalize me !!!"""
@@ -3540,6 +3543,7 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
 
         elif len(loc) == 2:
             t0, t1 = loc
+            # print(f"\n__signal_reduce__ t0 = {t0}, t1 = {t1}\n")
             sg = __slice_signal__(t0, t1, signal, channel, relative)
 
             return __do_reduce__(func, sg, channel)
@@ -3556,6 +3560,7 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
                 sg = loc_()
             else:
                 t0, t1 = loc_
+                # print(f"\n__signal_reduce__ t0 = {t0}, t1 = {t1}\n")
                 sg = __slice_signal__(t0, t1, signal, channel, relative)
 
             ret = __do_reduce__(func, sg, channel)
@@ -3669,17 +3674,25 @@ def signal_argmax(loc, signal, /, channel = None, relative = True):
     # np.argmax will report the sample of the max WITHIN the boundaries of loc!
     # therefore, this HAS to be added to the number of samples UP TO the earliest
     # boundary of 'loc'
+    # print(f"\n***\nsignal_argmax: signal length: {signal.shape[0]}, t_start: {signal.t_start}, t_stop: {signal.t_stop}")
+    # if relative and signal.t_start != 0:
+    #     signal = signal.copy()
+    #     signal.t_start = 0 * signal.times.units
     loc_bounds = get_location_boundary(loc, True, True)
+    # print(f"\n\tloc_bounds = {loc_bounds}\n")
     if relative:
-        loc_bounds += signal.t_start
+        loc_bounds = adjust_time_relative_to_signal(signal, loc_bounds)
     starts = signal.time_index(loc_bounds)
-    print(f"signal_argmax -> loc_bounds = {loc_bounds}, starts -> {starts}\n")
+    # print(f"\n\tasjusted loc_bounds = {loc_bounds}, starts -> {starts}\n")
     ext = signal_reduce(loc, np.argmax, signal, channel, relative)
-    print(f"\t ext -> {ext}")
-    return starts + signal_reduce(loc, np.argmax, signal, channel, relative)
+    # print(f"\t ext -> {ext}")
+    return starts + ext
+    # return starts + signal_reduce(loc, np.argmax, signal, channel, relative)
 
 def signal_domain_max(loc, signal, /, channel = None, relative = True):
+    # print(f"\n***\nsignal_domain_max: signal length: {signal.shape[0]}, t_start: {signal.t_start}, t_stop: {signal.t_stop}")
     ndx = signal_argmax(loc, signal, channel, relative)
+    # print(f"\n\tsignal_domain_max -> ndx = {ndx}\n***\n")
     return signal.times[ndx]
 
 def signal_min(loc, signal, /, channel = None, relative = True):
@@ -3689,14 +3702,24 @@ def signal_min(loc, signal, /, channel = None, relative = True):
     # return ret
 
 def signal_argmin(loc, signal, /, channel = None, relative = True):
+    # print(f"\nsignal_argmin: signal length: {signal.shape[0]}, t_start: {signal.t_start}, t_stop: {signal.t_stop}")
+    # if relative and signal.t_start != 0:
+    #     signal = signal.copy()
+    #     signal.t_start = 0 * signal.times.units
     loc_bounds = get_location_boundary(loc, True, True)
+    # print(f"\n\tloc_bounds = {loc_bounds}\n")
     if relative:
-        loc_bounds += signal.t_start
-    starts = signal.time_index(loc_bounds)
-    return starts + signal_reduce(loc, np.argmin, signal, channel, relative)
+        loc_bounds = adjust_time_relative_to_signal(signal, loc_bounds)
+    starts = signal.time_index(loc_bounds)# - signal.time_index(signal.t_start)
+    # print(f"\n\tadjusted loc_bounds = {loc_bounds}, starts -> {starts}\n")
+    ext = signal_reduce(loc, np.argmin, signal, channel, relative)
+    # print(f"\n\text -> {ext}") # this is the time index in the signal AFTER having been sliced by loc!
+    return starts + ext
 
 def signal_domain_min(loc, signal, /, channel = None, relative = True):
+    # print(f"\nsignal_domain_min: signal length: {signal.shape[0]}, t_start: {signal.t_start}, t_stop: {signal.t_stop}")
     ndx = signal_argmin(loc, signal, channel, relative)
+    # print(f"\n\tsignal_domain_min -> ndx = {ndx}")
     return signal.times[ndx]
 
 def signal_maxmin(loc, signal, /, channel =  None, relative = True):
@@ -3782,8 +3805,14 @@ def _signal_slice_(loc: typing.Union[list, tuple, collections.deque], signal, /,
     elif not all(isinstance(x, pq.Quantity) and x.size==1 for x in (t0,t1)):
         raise ValueError("Expecting a pair of floats or scalar Quantity objects")
 
+    # print(f"\n***\n_signal_slice_ t0 = {t0}, t1 = {t1}")
+
     if relative:
-        t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
+        # t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
+        t0 = adjust_time_relative_to_signal(signal, t0)
+        t1 = adjust_time_relative_to_signal(signal, t1)
+
+    # print(f"\n\t_signal_slice_ adjusted t0 = {t0}, t1 = {t1}\n***\n")
 
     # ensure all are scalars (i.e. arrays with ndim = 0) an sorted in ascending order
     t0, t1 = sorted(tuple(map(lambda x: x.flatten()[0], (t0, t1))))
@@ -3809,13 +3838,13 @@ def _signal_slice_(loc: typing.Union[neo.Epoch, DataZone, Interval,
     t0 = get_location_boundary(loc, True, outer)
     t1 = get_location_boundary(loc, False, outer)
 
-    if relative:
-        if all(isinstance(t, pq.Quantity) for t in (t0,t1)):
-            t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
-
-        elif all(isinstance(t, typing.Sequence) for t in (t0, t1)):
-            t0,t1 = zip(*list(map(lambda xx: adjust_times_relative_to_signal(signal, *xx),
-                                  zip(t0, t1))))
+    # if relative:
+    #     if all(isinstance(t, pq.Quantity) for t in (t0,t1)):
+    #         t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
+    #
+    #     elif all(isinstance(t, typing.Sequence) for t in (t0, t1)):
+    #         t0,t1 = zip(*list(map(lambda xx: adjust_time_relative_to_signal(signal, *xx),
+    #                               zip(t0, t1))))
 
     if isinstance(t0, typing.Sequence):
         if isinstance(channel, int):
@@ -3853,7 +3882,9 @@ See signal_chord_slope2() for a verison taking two locations.
 
     if all(isinstance(t, pq.Quantity) for t in (t0,t1)):
         if relative:
-            t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
+            # t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
+            t0 = adjust_time_relative_to_signal(signal, t0)
+            t1 = adjust_time_relative_to_signal(signal, t1)
 
         if t1 == t0:
             raise ValueError(f"The signal slice between t0 = {t0} and t1 = {t1} has zero length")
@@ -3871,7 +3902,7 @@ See signal_chord_slope2() for a verison taking two locations.
 
     elif all(isinstance(t, typing.Sequence) for t in (t0, t1)):
         if relative:
-            t0,t1 = zip(*list(map(lambda xx: adjust_times_relative_to_signal(signal, *xx),
+            t0, t1 = zip(*list(map(lambda xx: adjust_time_relative_to_signal(signal, *xx),
                                   zip(t0, t1))))
 
         eqtimes = list(filter(lambda x: x[1][0] == x[1][1],
@@ -3926,7 +3957,7 @@ Best used with two DataCursor or two SignaCursor objects.
         t1 = t1 * signal.times.units
 
     if relative:
-        t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
+        t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
 
    # print(f"signal_chord_slope2: t0 = {t0}, t1 = {t1}")
 
@@ -4441,7 +4472,7 @@ def cursor_reduce(func:types.FunctionType,
     t0, t1 = min(t0,t1), max(t0,t1)
 
     if relative:
-        t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
+        t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
 
     else:
         if t0 < signal.t_start or t0 > signal.t_stop:
@@ -4463,7 +4494,8 @@ def cursor_reduce(func:types.FunctionType,
 
     return ret
 
-def adjust_times_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSignal], *args) -> typing.Union[pq.Quantity, typing.List[pq.Quantity]]:
+# def adjust_time_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSignal], t) -> typing.Union[pq.Quantity, typing.List[pq.Quantity]]:
+def adjust_time_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSignal], *args) -> typing.Union[pq.Quantity, typing.List[pq.Quantity]]:
     r"""Adjust the domain values supplied in `args` relative to signal's domain limit.
     `args` must contain scalar Quantities with units equal (or convertible to) signal's domain units.
 
@@ -4475,25 +4507,52 @@ def adjust_times_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSi
         return
 
     if not all(isinstance(v, pq.Quantity) and v.size == 1 and unitsConvertible(v, signal.times.units) for v in args):
-        raise TypeError(f"All domain values expected to be scalar Quantities in {signal.times.units}")
+        raise TypeError(f"Expecting scalar Quantities in {signal.times.units}")
+
+    # if not (isinstance(t, pq.Quantity) and t.size == 1 and unitsConvertible(t, signal.times.units)):
+    #     raise TypeError(f"'t' expected to be scalar Quantities in {signal.times.units}")
 
     args = sorted([checkRescale(t, signal.times.units) for t in args])
 
-    t0 = args[0]
+    # print(f"\n***\nadjust_time_relative_to_signal from {args}")
 
-    deltas = [t-t0 for t in args[1:]]
+    # t0 = args[0]
 
-    if t0 < signal.t_start:
-        t0 += signal.t_start
+    # deltas = [t-t0 for t in args[1:]]
+    # print(f"\n\tadjust_time_relative_to_signal deltas = {deltas}")
 
-    elif t0 > signal.t_stop:
-        while t0 > signal.t_stop:
-            t0 -= signal.t_stop
+    # if t0 < signal.t_start:
+    #     t0 += signal.t_start
+    #
+    # elif t0 > signal.t_stop:
+    #     t0 -= signal.t_start
+    #     # while t0 > signal.t_stop:
+    #     #     t0 -= signal.t_stop
+    #
+    # if len(deltas):
+    #     ret = [t0] + list(map(lambda x: t0 + x if (t0 + x) < signal.t_stop else signal.t_stop, deltas))
+    # else:
+    #     ret = t0
 
-    if len(deltas):
-        return [t0] + list(map(lambda x: t0 + x if t0 + x < signal.t_stop else signal.t_stop, deltas))
+    ret = list()
+    for t in args:
+        if t < signal.t_start:
+            t += signal.t_start
 
-    return t0
+        elif t > signal.t_stop:
+            t -= signal.t_start
+
+        ret.append(t)
+
+    if len(ret) == 1:
+        return ret[0]
+    else:
+        return ret
+
+    #
+    # print(f"\n\tadjust_time_relative_to_signal -> {ret}\n***\n")
+    #
+    # return ret
 
 @safewrapper
 def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal],
@@ -4817,7 +4876,7 @@ def cursor_index(signal:typing.Union[neo.AnalogSignal, DataSignal],
         raise TypeError("Cursor expected to be a float, python Quantity, DataCursor or SignalCursor; got %s instead" % type(cursor).__name__)
 
     if relative:
-        t = adjust_times_relative_to_signal(signal, t)
+        t = adjust_time_relative_to_signal(signal, t)
 
     data_index = signal.time_index(t)
 
@@ -5196,7 +5255,7 @@ def cursor_chord_slope(signal:typing.Union[neo.AnalogSignal, DataSignal],
         raise ValueError("Cursor xwindow is 0")
 
     if relative:
-        t0, t1 = adjust_times_relative_to_signal(signal, t0, t1)
+        t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
 
     else:
         if t0 < signal.t_start or t0 > signal.t_stop:
@@ -5209,8 +5268,8 @@ def cursor_chord_slope(signal:typing.Union[neo.AnalogSignal, DataSignal],
 
     v0, v1 = list(map(lambda x: neoutils.get_sample_at_domain_value(signal, x), (t0, t1)))
 
-    print(f"cursor_chord_slope t0 = {t0}, t1 = {t1}, v0 = {v0}, v1 = {v1}")
-    print(f"t1-t0 = {t1-t0}, v1-v0 = {v1-v0}")
+    # print(f"cursor_chord_slope t0 = {t0}, t1 = {t1}, v0 = {v0}, v1 = {v1}")
+    # print(f"t1-t0 = {t1-t0}, v1-v0 = {v1-v0}")
 
     ret = ((v1-v0) / (t1-t0)).simplified
 
@@ -6753,6 +6812,7 @@ def getProtocol(x:typing.Union[neo.Block, pab.pyabf.ABF]) -> ElectrophysiologyPr
 
 def __slice_signal__(t0, t1, sg, ch, rel):
     r"""Helper function for signal_fit & signal_reduce."""
+    # print(f"\n***\n__slice_signal__({t0}, {t1}, rel = {rel})\n\tt_start: {sg.t_start}, t_stop: {sg.t_stop}")
     if isinstance(t0, DeferredSignalMeasure):
         t0_ = t0(sg, channel=ch, relative=rel)
         if isinstance(t0_, pq.Quantity) and not scq.unitsConvertible(t0_, signal.times.units):
@@ -6777,22 +6837,36 @@ def __slice_signal__(t0, t1, sg, ch, rel):
     else:
         t1 = checkRescale(t1, sg.times.units)
 
-    t0, t1 = min(t0,t1), max(t0,t1)
+    t0, t1 = sorted((t0,t1))
 
     if rel:
-        t0, t1 = adjust_times_relative_to_signal(sg, t0, t1)
+        # t0, t1 = tuple(map(lambda t_: sg.t_start + t_, (t0, t1)))
+        t0, t1 = adjust_time_relative_to_signal(sg, t0, t1)
+        # t0, t1 = tuple(map(lambda t: adjust_time_relative_to_signal(sg, t),  (t0, t1)))
 
-    elif t0 < sg.t_start or t0 > sg.t_stop:
-        scipywarn(f"t0 {t0} falls outside signal's domain with start {sg.t_start} and stop {sg.t_stop}")
+    # print(f"\n\t__slice_signal__ adjusted t0 = {t0}, t1 = {t1}")
+
+    if t0 < sg.t_start:
+        scipywarn(f"__slice_signal__: t0 {t0} is earlier than signal's domain start {sg.t_start}")
+        return np.nan
+    if t0 > sg.t_stop:
+        scipywarn(f"__slice_signal__: t0 {t0} is later than signal's domain stop {sg.t_stop}")
         return np.nan
 
-    elif t1 < sg.t_start or t1 > sg.t_stop:
-        scipywarn(f"t1 {t1} falls outside signal's domain with start {sg.t_start} and stop {sg.t_stop}")
+    if t1 < sg.t_start or t1 > sg.t_stop:
+        scipywarn(f"__slice_signal__: t1 {t1} is earlier than signal's domain start {sg.t_start}")
         return np.nan
+
+    if t1 > sg.t_stop:
+        scipywarn(f"__slice_signal__: t1 {t1} is later than signal's domain stop {sg.t_stop}")
+
+    # t0, t1 = sorted((t0,t1))
 
     # NOTE: 2026-05-04 22:12:55
     # make sure t0, t1 are "scalar-like" arrays
-    t0, t1 = tuple(map(lambda x: x.flatten()[0], (t0, t1)))
+    t0, t1 = tuple(map(lambda x: x.flatten()[0], sorted((t0, t1))))
+
+    # print(f"\n\t__slice_signal__ -> t0 = {t0}, t1 = {t1}:\n\tfor a signal with t_start = {sg.t_start}, t_stop = {sg.t_stop}\n***\n")
 
     if t0 == t1:
         return sg[sg.time_index(t0),:]

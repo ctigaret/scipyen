@@ -3462,13 +3462,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # with the Gcf, then remove them on closing, regardless of the autoRemoveViewers
         # settings
         fig = evt.canvas.figure
-        plt.close(fig) # this removes fig from Gcf.figs
         self.deRegisterWindow(fig) # this just removes the reference to figure in self.viewers and self.currentViewers
 
         fig_var_name = self.workspaceModel.getDisplayableVarnamesForVar(self.workspace, fig)
         if len(fig_var_name):
             for name in fig_var_name:
                 self.workspaceModel.unbindFromNamespace(name)
+
+        plt.close(fig) # this removes fig from Gcf.figs
 
     @safewrapper
     def newViewer(self, winClass, *args, **kwargs):
@@ -3795,6 +3796,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         """
         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             return
+
+        if isinstance(win, mpl.figure.Figure):
+            plt.close(win.number)
 
         viewer_type = type(win)
 
@@ -4705,12 +4709,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 obj = self.workspaceModel.unbindFromNamespace(n_o[0])
                 if isinstance(obj, QtCore.QObject):
                     del obj
-            # named_objects = [(name, obj)
-            #            for (name, obj) in self.workspace.items() if obj is value]
-            #
-            # if len(named_objects):
-            #     for n_o in named_objects:
-            #         obj = self.workspaceModel.unbindFromNamespace(n_o[0])
 
         self.workspaceModel.currentItem = None
 
@@ -6011,28 +6009,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     plt.close(obj)
                 self.deRegisterWindow(obj)
 
-            # for n in varNames:
-            #     obj = self.workspace[n]
-            #     if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
-            #         if isinstance(obj, mpl.figure.Figure):
-            #             # also removes obj.number from plt.get_fignums()
-            #             if self.autoRemoveViewers and hasattr(obj, "manager") or hasattr(obj, "number"):
-            #                 plt.close(obj)
-            #
-            #         else:
-            #             obj.close()
-            #
-            #         # does not remove its symbol for workspace - this has already been removed by delete action
-            #         self.deRegisterWindow(obj)
-
-                # self.removeWorkspaceSymbol(n)
-
             self.workspaceModel.unbindFromNamespace(varNames)
 
             self.currentVarItem = None
             self.currentVarItemName = None
 
-            # self.workspaceModel.update() # is this still required?
         else:
             varName = self.workspaceModel.getVarName(indexList[0])
 
