@@ -880,7 +880,7 @@ Any aditional named or keyword parameters to be passed to `func`.
 
 """
         # print(f"\n*****\n{self.__class__.__name__}[{self.name}].__call__:\n")
-        # print(f"\n*****\n{self.__class__.__name__}[{self.name}].__call__: -> args = \n\t{args}\n\t({type(args)})\n\t({len(args)} args)")
+        print(f"\n*****\n{self.__class__.__name__}[{self.name}].__call__: -> args = \n\t{args}\n\t({type(args)})\n\t({len(args)} args)")
 
         # print(f"{self.__class__.__name__}[{self.name}].__call__: -> {len(args)} args = ")
         # for ka, ia in enumerate(args):
@@ -1031,7 +1031,10 @@ Any aditional named or keyword parameters to be passed to `func`.
                 #     raise
 
 
-            fargs = (self.locations,) + self.posargs + (arg,)
+            if self.locations is not None:
+                fargs = (self.locations,) + self.posargs + (arg,)
+            else:
+                fargs = self.posargs + (arg, )
 
             # print(f"\n\t[{self.name}] calls {self.func}\n\n")
 
