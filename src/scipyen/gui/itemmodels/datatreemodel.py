@@ -21,6 +21,7 @@ import decimal
 import pkgutil
 import typing
 import enum
+import functools
 from functools import singledispatchmethod
 from collections import deque, UserDict, OrderedDict
 from dataclasses import MISSING
@@ -150,6 +151,10 @@ NOTMEMOIZED = (
     np.ndarray,
     types.ModuleType,
     pkgutil.ModuleInfo,
+    typing.Callable,
+    types.FunctionType,
+    np.ufunc,
+    functools.partial
 )
 
 # PODS = (
@@ -492,9 +497,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         if parentItem:
             parentItem.insertRow(row, rowItems)
-            if not issubclass(
-                type(obj), NOTMEMOIZED + PODS
-            ) and objId not in self._visited_:
+            if (not isinstance(obj, NOTMEMOIZED)
+                and not issubclass(
+                    type(obj), NOTMEMOIZED + PODS
+                )
+                and objId not in self._visited_):
                 itemPath = f"{self._rootTitle_}{self.getPathForLeaf(objItem)}"
                 self._memoize_(obj, itemPath, objDict)
                 # self._memoize_(obj, itemPath, objDict["objType"], objId)
@@ -610,7 +617,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
                                              pkgutil.ModuleInfo))
                          and obj is not None)
 
-    # def _memoize_(self, obj, path, realtype, objId):
     def _memoize_(self, obj, path, objDict):
         objId = objDict["objId"]
         realtype = objDict["objType"]

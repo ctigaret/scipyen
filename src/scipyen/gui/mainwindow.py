@@ -3467,9 +3467,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         fig_var_name = self.workspaceModel.getDisplayableVarnamesForVar(self.workspace, fig)
         if len(fig_var_name):
             for name in fig_var_name:
-                self.workspaceModel.unbindFromNamespace(name)
+                obj = self.workspaceModel.unbindFromNamespace(name)
+                if isinstance(obj.canvas, QtWidgets.QWidget):
+                    del obj.canvas
 
         plt.close(fig) # this removes fig from Gcf.figs
+        del fig
 
     @safewrapper
     def newViewer(self, winClass, *args, **kwargs):
@@ -3798,7 +3801,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             return
 
         if isinstance(win, mpl.figure.Figure):
-            plt.close(win.number)
+            plt.close(win)
 
         viewer_type = type(win)
 
@@ -9674,7 +9677,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     self.workspaceModel.preExecute()
                     self.console.centralWidget().clear_last_input()
                     self.console.centralWidget()._flush_pending_stream()
-                    self.console.execute(cmd, hidden=True, interactive=True)
+                    # self.console.execute(cmd, hidden=True, interactive=True)
+                    self.console.execute(cmd, hidden=True, interactive=False)
                     self.workspaceModel.postRunCell(Bunch(success=True))
 
                 except:
