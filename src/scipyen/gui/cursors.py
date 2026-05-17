@@ -9,6 +9,7 @@ r"""Pyqtgraph-based cursors for signal viewers
 import collections, enum, numbers, typing, os
 import dataclasses
 from dataclasses import (dataclass, MISSING)
+from traitlets import Bunch
 
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
@@ -46,6 +47,17 @@ import neo
 
 from core.prog import (safewrapper, with_doc)
 from core.scipyen_quantities import checkTimeUnits
+
+DefaultCursorLineStyle = QtCore.Qt.DashLine
+DefaultSelectedCursorLineStyle = QtCore.Qt.SolidLine
+
+DefaultCursorColors = Bunch({"crosshair":"#C173B088", "horizontal":"#B1D28F88", "vertical":"#ff007f88"})
+DefaultLinkedCursorColors = Bunch({"crosshair":QtGui.QColor(DefaultCursorColors["crosshair"]).darker().name(QtGui.QColor.HexArgb),
+                                    "horizontal":QtGui.QColor(DefaultCursorColors["horizontal"]).darker().name(QtGui.QColor.HexArgb),
+                                    "vertical":QtGui.QColor(DefaultCursorColors["vertical"]).darker().name(QtGui.QColor.HexArgb)})
+
+DefaultCursorHoverColor = "red"
+
 
 @dataclass
 class DataCursor:
@@ -367,29 +379,35 @@ class SignalCursor(QtCore.QObject):
             self._pen_ = pen
 
         else:
-            self._pen_ = None
+            self._pen_ = kwargs.pop("pen", None)
+            if not isinstance(self._pen_, QtGui.QPen):
+                self._pen_ = QtGui.QPen(DefaultCursorLineStyle)
+                # self._pen_.setColor()
 
         if isinstance(hoverPen, QtGui.QPen):
             self._hoverPen_ = hoverPen
 
         else:
-            self._hoverPen_ = None
+            self._hoverPen_ = kwargs.pop("hoverPen", None)
+            if not isinstance(self._hoverPen_, QtGui.QPen):
+                self._hoverPen_ = QtGui.QPen(DefaultCursorLineStyle)
 
         if isinstance(linkedPen, QtGui.QPen):
             self._linkedPen_ = linkedPen
 
         else:
-            self._linkedPen_ = None
+            self._linkedPen_ = kwargs.pop("linkedPen", None)
+            if not isinstance(self._linkedPen_, QtGui.QPen):
+                self._linkedPen_ = QtGui.QPen(DefaultCursorLineStyle)
 
-        # if isinstance(selectedPen, QtGui.QPen):
-        #     self._selectedPen_ = selectedPen
-        # else:
-        #     self._selectedPen_ = None
+        self._penStyle_ = penStyle if isinstance(penStyle, QtCore.Qt.PenStyle) else DefaultCursorLineStyle
+        self._selectedPenStyle_ = selectedPenStyle if isinstance(selectedPenStyle, QtCore.Qt.PenStyle) else DefaultSelectedCursorLineStyle
 
-        self._penStyle_ = penStyle if isinstance(penStyle, QtCore.Qt.PenStyle) else QtCore.Qt.SolidLine
-        self._selectedPenStyle_ = selectedPenStyle if isinstance(selectedPenStyle, QtCore.Qt.PenStyle) else QtCore.Qt.DashLine
-        self._pen_.setStyle(self._penStyle_)
-        self._hoverPen_.setStyle(self._penStyle_)
+        if isinstance(self._pen_, QtGui.QPen):
+            self._pen_.setStyle(self._penStyle_)
+
+        if isinstance(self._hoverPen_, QtGui.QPen):
+            self._hoverPen_.setStyle(self._penStyle_)
 
         # NOTE: 2023-01-14 14:01:17
         # valid ranges where the cursor lines can go
@@ -397,18 +415,6 @@ class SignalCursor(QtCore.QObject):
         # will be configured by self.setBounds called from self._setup_
         self._x_range_ = None
         self._y_range_ = None
-
-#         self._x_range_ = xBounds
-#         self._y_range_ = yBounds
-#
-        if self._pen_ is None:
-            self._pen_ = kwargs.pop("pen", None)
-
-        if self._linkedPen_ is None:
-            self._linkedPen_ = kwargs.pop("linkedPen", None)
-
-        if self._hoverPen_ is None:
-            self._hoverPen_ = kwargs.pop("hoverPen", None)
 
         # dict that maps PlotItem objects to SignalProxy objects -- only used for
         # dynamic cursors
@@ -1175,7 +1181,6 @@ class SignalCursor(QtCore.QObject):
                     self._cursor_type_ = SignalCursorTypes.horizontal
 
         else:
-
             if isinstance(x, numbers.Number):
                 _x = x
                 # self._x_ = x

@@ -3951,9 +3951,9 @@ See also ``dacEpochsToNeoEpoch`` and ``getEpochsTable`` with ``asNeoEpoch = True
                          epochFirstDuration = epoch.firstDuration,
                          epochDeltaDuration = epoch.deltaDuration,
                          epochPulseCount = self.getEpochPulseCount(epoch, dac, sweep),
-                         epochPulsePeriod = self.getEpochPulsePeriod(epoch, dac, sweep),
+                         epochPulsePeriod = self.getEpochPulsePeriod(epoch, dac, samples=False),#, sweep),
                          epochPulseTimes = self.getEpochPulseTimes(epoch, dac, sweep),
-                         epochPulseWidth = self.getEpochPulseWidth(epoch, dac, sweep),
+                         epochPulseWidth = self.getEpochPulseWidth(epoch, dac, samples=False),#, sweep),
                          digital = self.getEpochDigitalPattern(epoch.epochNumber,
                                                                self.getIsAlternateDigital(sweep, dac)))
 

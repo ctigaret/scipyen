@@ -4335,44 +4335,13 @@ def _(obj, **kwargs):
     # ### BEGIN allow overwriting these here,
     # and store the orignals in the new annotations of the new object;
     sourceMetaData = dict()
+    name = obj.name
+    file_datetime = obj.file_datetime
+    rec_datetime = obj.rec_datetime
+    file_origin = obj.file_origin
+    description = obj.description
 
-    name = kwargs.pop("name", obj.name)
-
-    if name != obj.name:
-        sourceMetaData["name"] = obj.name
-
-    description = kwargs.pop("description", obj.description)
-
-    if description != obj.description:
-        sourceMetaData["description"] = obj.description
-
-    file_origin = kwargs.pop("file_origin", obj.file_origin)
-
-    if file_origin != obj.file_origin:
-        sourceMetaData["file_origin"] = obj.file_origin
-
-    file_datetime = kwargs.pop("file_datetime", obj.file_datetime)
-
-    if file_datetime != obj.file_datetime:
-        sourceMetaData["file_datetime"] = obj.file_datetime
-
-    rec_datetime = kwargs.pop("rec_datetime", obj.rec_datetime)
-
-    if rec_datetime != obj.rec_datetime:
-        sourceMetaData["rec_datetime"] = obj.rec_datetime
-
-    annotations = kwargs.pop("annotations", obj.annotations)
-
-    if annotations is None:
-        annotations = dict()
-
-    if annotations != obj.annotations:
-        sourceMetaData["annotations"] = obj.annotations
-
-        if sourceMetaData["annotations"] is None:
-            sourceMetaData["annotations"] = dict()
-    # ### END
-
+    annotations = obj.annotations
 
     # NOTE: 2023-04-13 09:45:19
     # some kwargs are not suitable for a Block, but they may be suitable for
@@ -4451,7 +4420,6 @@ def _(obj, **kwargs):
     ret.file_datetime = file_datetime
     ret.rec_datetime = rec_datetime
     ret.annotations.update(annotations)
-    ret.annotate(sourceMetaData=sourceMetaData)
 
     # NOTE: 2021-11-23 12:06:31
     # Because the number of segments and the sizes of their signal containers
@@ -4984,8 +4952,6 @@ def concatenate_blocks(*args, **kwargs):
             except:
                 traceback.print_exc()
                 return
-        # # # # else:
-        # # # #     blocks = [b for b in args]
 
         # NOTE: 2021-11-24 09:55:15
         # this branch deals with a sequence of Blocks:
@@ -9659,7 +9625,7 @@ def plot_neo(obj: neo.core.basesignal.BaseSignal,
             args = ["o"]
 
     if obj.shape[1] == 1:
-        pfun(times, obj, label=labels[0], **kwargs)
+        pfun(times, obj, label=labels[0], *args, **kwargs)
 
     else:
         for k in range(obj.shape[1]):

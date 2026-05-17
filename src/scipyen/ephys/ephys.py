@@ -3592,6 +3592,8 @@ def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval], # noqa
     else:
         intervals = [loc]
 
+    # print(f"\n»»»\n_signal_reduce_[{type(loc)}]\n\tintervals = \n")
+
     result = list()
 
     for ki, i in enumerate(intervals):
@@ -3599,7 +3601,7 @@ def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval], # noqa
             t0, t1 = i.t0.copy(), i.t1.copy()
         else:
             t0, t1 = i.times.copy(), i.durations.copy()
-
+        # print(f"\n\tt0 = {t0}, t1 = {t1}\n")
         # NOTE: Must convert to scalars, i.e., unsized arrays
         if t0.ndim > 0:
             t0 = t0[0]
@@ -3610,10 +3612,13 @@ def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval], # noqa
         if not isinstance(i, Interval):
             t1 = t0 + t1
 
+        # print(f"\n\t»»» t0 = {t0}, t1 = {t1} «««\n")
         ret = signal_reduce([t0, t1], func, signal, channel, relative)
         # print(f"_signal_reduce_<{i}: {type(i)}> -> interval {ki}: t0 = {t0}, t1 = {t1} => {ret} ({type(ret)})")
 
         result.append(ret)
+
+        # print(f"\n«««\n")
 
     return result
     # if all(isinstance(ret, (neo.AnalogSignal, DataSignal)) for ret in result):
@@ -6853,7 +6858,7 @@ def __slice_signal__(t0, t1, sg, ch, rel):
         scipywarn(f"__slice_signal__: t0 {t0} is later than signal's domain stop {sg.t_stop}")
         return np.nan
 
-    if t1 < sg.t_start or t1 > sg.t_stop:
+    if t1 < sg.t_start:
         scipywarn(f"__slice_signal__: t1 {t1} is earlier than signal's domain start {sg.t_start}")
         return np.nan
 

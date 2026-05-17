@@ -1661,7 +1661,8 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
     When axis is not None, the cursors are added to the PlotItem or GraphicsScene
     specified by the 'axis' parameter.
     """
-
+    # BUG 2026-05-17 17:31:25 FIXME
+    # when axis is a plotitem but no signal viewer is supplied
     from gui.signalviewer import SignalViewer
     from gui.cursors import SignalCursor, SignalCursorTypes, DataCursor
 
@@ -1674,14 +1675,23 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
     if keep_units:
         ret = [(t + d/2. if d else t,
                 d if d else 0*t.units,
-                l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times, epoch.durations, epoch.labels, range(len(epoch)))]
+                l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times.flatten(), epoch.durations.flatten(), epoch.labels.flatten(), range(epoch.size))]
+                # l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times.flatten(), epoch.durations.flatten(), epoch.labels.flatten, range(len(epoch.flatten())))]
+                # l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times, epoch.durations, epoch.labels, range(len(epoch)))]
 
     else:
         ret = [(t + d/2. if d else t,
                 d if d else 0,
-                l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels, range(len(epoch)))]
+                l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times.flatten().magnitude, epoch.durations.flatten().magnitude, epoch.labels.flatten(), range(epoch.size))]
+                # l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times.flatten().magnitude, epoch.durations.flatten().magnitude, epoch.labels.flatten(), range(len(epoch.flatten())))]
+                # l if l else f"{epoch_name}_{k}") for (t, d, l, k) in itertools.zip_longest(epoch.times.magnitude, epoch.durations.magnitude, epoch.labels, range(len(epoch)))]
 
     signal_viewer = kwargs.pop("signal_viewer", None)
+
+    if axis is None:
+        # scipywarn("No axis was specified")
+        ret = list(map(lambda x: DataCursor(*x), ret))
+        return ret
 
     if isinstance(axis, (int, str)):
         if not isinstance(signal_viewer, SignalViewer):
@@ -1694,8 +1704,7 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
             if isinstance(axis, (int, str)):
                 axis = signal_viewer.axis(axis)
 
-    if axis is None and isinstance(signal_viewer, SignalViewer):
-        axis = signal_viewer.currentAxis()
+        axis = signal_viewer.currentAxis
 
     if isinstance(axis, (pg.PlotItem, pg.GraphicsScene)):
         # NOTE: 2020-03-10 18:23:03
@@ -1703,64 +1712,69 @@ def epoch2cursors(epoch: typing.Union[neo.Epoch, DataZone],
         # parameters x, y, xwindow, ywindow, xBounds and yBounds
         # NOTE: below, parent MUST be set to axis, else there will be duplicate
         # cursor lines when registering with signal viewer instance
+
+        # BUG: 2026-05-17 17:33:00 see BUG 2026-05-17 17:31:25 FIXME
         cursors = [SignalCursor(axis, x=t, xwindow=d,
                                 cursor_type=SignalCursorTypes.vertical,
                                 cursorID=l, parent=axis, relative=True) for (t,d,l) in ret]
 
-        if isinstance(signal_viewer, SignalViewer):
-            if isinstance(axis, pg.PlotItem):
-                if axis not in signal_viewer.axes:
-                    return cursors
+        if not isinstance(signal_viewer, SignalViewer):
+            raise TypeError(f"'signal_viewer'must be supplied")
 
-            elif isinstance(axis, pg.GraphicsScene):
-                if axis is not signal_viewer.signalsLayout.scene():
-                    return cursors
+        # if isinstance(signal_viewer, SignalViewer):
+        if isinstance(axis, pg.PlotItem):
+            if axis not in signal_viewer.axes:
+                return cursors
 
-                pIs = [i for i in axis.items() if isinstance(i, pg.PlotItem)]
+        elif isinstance(axis, pg.GraphicsScene):
+            if axis is not signal_viewer.signalsLayout.scene():
+                return cursors
 
-                if len(pIs):
-                    min_x_axis = np.min([p.viewRange()[0][0] for p in pIs])
-                    max_x_axis = np.max([p.viewRange()[0][1] for p in pIs])
+            pIs = [i for i in axis.items() if isinstance(i, pg.PlotItem)]
 
-                    min_point = pIs[0].vb.mapViewToScene(QtCore.QPointF(min_x_axis, 0))
-                    max_point = pIs[0].vb.mapViewToScene(QtCore.QPointF(max_x_axis, 0))
+            if len(pIs):
+                min_x_axis = np.min([p.viewRange()[0][0] for p in pIs])
+                max_x_axis = np.max([p.viewRange()[0][1] for p in pIs])
 
-                    xbounds = [min_point.x(), max_point.x()]
+                min_point = pIs[0].vb.mapViewToScene(QtCore.QPointF(min_x_axis, 0))
+                max_point = pIs[0].vb.mapViewToScene(QtCore.QPointF(max_x_axis, 0))
 
-                    for c in cursors: # BUG 2023-06-19 12:20:36 FIXME
-                        c.setBounds(xBounds = xbounds)
-                        # newX =
+                xbounds = [min_point.x(), max_point.x()]
 
-
-                    pi_precisions = [signal_viewer.getAxis_xDataPrecision(ax) for ax in signal_viewer.plotItems]
-                    precision = min(pi_precisions)
-                else:
-                    scene_rect = axis.sceneRect()
-                    xbounds = (scene_rect.x(), scene_rect.x() + scene_rect.width())
-                    precision=None
+                for c in cursors: # BUG 2023-06-19 12:20:36 FIXME
+                    c.setBounds(xBounds = xbounds)
 
 
-            cursorDict = signal_viewer.getSignalCursors(SignalCursorTypes.vertical)
-            cursorPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
-            cursorPen.setCosmetic(True)
-            hoverPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorHoverColor), 1, QtCore.Qt.SolidLine)
-            hoverPen.setCosmetic(True)
-            linkedPen = QtGui.QPen(QtGui.QColor(signal_viewer.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
-            linkedPen.setCosmetic(True)
-            if isinstance(axis, pg.PlotItem):
-                cursorPrecision = signal_viewer.getAxis_xDataPrecision(axis)
-            elif isinstance(axis, pg.GraphicsScene):
                 pi_precisions = [signal_viewer.getAxis_xDataPrecision(ax) for ax in signal_viewer.plotItems]
-                cursorPrecision = min(pi_precisions)
-
+                precision = min(pi_precisions)
             else:
-                cursorPrecision = None
+                scene_rect = axis.sceneRect()
+                xbounds = (scene_rect.x(), scene_rect.x() + scene_rect.width())
+                precision=None
 
-            for c in cursors:
-                signal_viewer.registerCursor(c, pen=cursorPen, hoverPen=hoverPen,
-                                             linkedPen=linkedPen,
-                                             precision=cursorPrecision,
-                                             showValue = signal_viewer.cursorsShowValue)
+
+        cursorDict = signal_viewer.getSignalCursors(SignalCursorTypes.vertical)
+        cursorPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+        cursorPen.setCosmetic(True)
+        hoverPen = QtGui.QPen(QtGui.QColor(signal_viewer.cursorHoverColor), 1, QtCore.Qt.SolidLine)
+        hoverPen.setCosmetic(True)
+        linkedPen = QtGui.QPen(QtGui.QColor(signal_viewer.linkedCursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
+        linkedPen.setCosmetic(True)
+        if isinstance(axis, pg.PlotItem):
+            cursorPrecision = signal_viewer.getAxis_xDataPrecision(axis)
+
+        elif isinstance(axis, pg.GraphicsScene):
+            pi_precisions = [signal_viewer.getAxis_xDataPrecision(ax) for ax in signal_viewer.plotItems]
+            cursorPrecision = min(pi_precisions)
+
+        else:
+            cursorPrecision = None
+
+        for c in cursors:
+            signal_viewer.registerCursor(c, pen=cursorPen, hoverPen=hoverPen,
+                                            linkedPen=linkedPen,
+                                            precision=cursorPrecision,
+                                            showValue = signal_viewer.cursorsShowValue)
 
         return cursors
 

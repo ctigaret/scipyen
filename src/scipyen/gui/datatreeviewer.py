@@ -501,12 +501,19 @@ A lot of things copied from there, EXCEPT that it now uses
     @Slot(QtCore.QModelIndex)
     def _slot_indexExpanded(self, index: QtCore.QModelIndex):
         # print(f"{self.__class__.__name__}._slot_indexExpanded(index={index})")
-        self.treeView.resizeColumnToContents(index.column())
+        column = index.column()
+        self.treeView.resizeColumnToContents(column)
+        if column < (self.treeView.model().columnCount()-1):
+            self.treeView.resizeColumnToContents(column+1)
 
     @Slot(QtCore.QModelIndex)
     def _slot_indexCollapsed(self, index: QtCore.QModelIndex):
+        column = index.column()
         # print(f"{self.__class__.__name__}._slot_indexCollapsed(index={index})")
-        self.treeView.resizeColumnToContents(index.column())
+        self.treeView.resizeColumnToContents(column)
+        if column < (self.treeView.model().columnCount()-1):
+            self.treeView.resizeColumnToContents(column+1)
+        # self.treeView.resizeColumnToContents(index.column())
 
     @Slot()
     @safewrapper

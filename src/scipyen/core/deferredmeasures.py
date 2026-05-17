@@ -50,7 +50,7 @@ from core.utilities import eq
 
 # import core.pyabfbridge as pab
 
-from gui.cursors import (DataCursor, SignalCursor)# , SignalCursorTypes)
+from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -687,12 +687,17 @@ Changelog:
                                                 typing.Self
                                             ]
         ] = dataclasses.field(default = None)
+
     name: str = dataclasses.field(default = "measure")
+
     signalNameOrIndex: typing.Optional[int|str] = dataclasses.field(default = None)
+
     channel:typing.Optional[int]  = dataclasses.field(default = None)
+
     relative:bool = True
 
     posargs: tuple = dataclasses.field(default_factory = tuple)
+
     kwargs: dict = dataclasses.field(default_factory=dict)
 
     preprocess: list[tuple[typing.Callable, tuple, dict]] = dataclasses.field(default_factory=list)
@@ -707,6 +712,7 @@ Changelog:
         # self.cached_result = dataclasses.MISSING
         self.cached_result = dict()
         self.debug: bool = False
+        self.signal_cursors = list()
 
     def defer(self, op: typing.Callable, *args, **kwargs) -> typing.Self:
         r"""Appends a deferred process to self.postprocess"""
@@ -1100,6 +1106,14 @@ Any aditional named or keyword parameters to be passed to `func`.
             # arg after the location, pased to func
             fargs = (locations,) + self.posargs + (arg,)
 
+            if self.debug:
+                print(f"\n\t>>>>\n\t{self.__class__.__name__}[{self.name}] will call:\n\tfunc = {self.func} with\n\tfargs = \n")
+                for kfa, fa in enumerate(fargs):
+                    print(f"\n\t{kfa}: {fa}\n")
+                print(f"\n\t and kwargs = \n")
+                for kw, kval in kwargs.items():
+                    print(f"\n\t{kw} = {kval}\n")
+
             ret = self.func(*fargs, **kwargs)
 
             #  NOTE: analogsignals are not hashable
@@ -1133,6 +1147,27 @@ Any aditional named or keyword parameters to be passed to `func`.
         ret = deepcopy(self)
         ret.locations = loc
         return ret
+
+    def toSignalCursors(self, viewer = None):
+        from gui import signalviewer as sv
+
+        if not isinstance(viewer, sv.SignalViewer):
+            return
+
+        if self.locations is None:
+            return
+
+        if isinstance(self.locations, DataCursor):
+            c = self.locations
+
+        # elif isinstance(self.locations, (neo.Epoch, DataZone)):
+        #     c =
+
+
+
+
+
+
 
 
 @dataclass

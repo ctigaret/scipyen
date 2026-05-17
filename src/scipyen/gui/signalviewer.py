@@ -257,6 +257,7 @@ from gui.scipyenviewer import (ScipyenFrameViewer,Bunch)
 # from gui.dataviewer import (InteractiveTreeWidget, DataViewer,)
 from gui.datatreeviewer import DataTreeViewer
 from gui.widgets.datatreeview import DataTreeView
+from gui import cursors as guicursors
 from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes, cursors2epoch)
 from gui.widgets.colorwidgets import ColorSelectionWidget, quickColorDialog
 from gui.pictgui import (GuiWorker, WorkerThread)
@@ -469,8 +470,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     defaultCursorWindowSizeY = 0.001
 
     defaultCursorLabelPrecision = SignalCursor.default_precision
-
     defaultCursorsShowValue = False
+
     defaultXAxesLinked = False
     defaultXGrid = False
     defaultYGrid = False
@@ -501,15 +502,17 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     default_antialias = True
 
-    defaultCursorLineStyle = QtCore.Qt.DashLine
-    defaultSelectedCursorLineStyle = QtCore.Qt.SolidLine
-
-    defaultCursorColors = Bunch({"crosshair":"#C173B088", "horizontal":"#B1D28F88", "vertical":"#ff007f88"})
-    defaultLinkedCursorColors = Bunch({"crosshair":QtGui.QColor(defaultCursorColors["crosshair"]).darker().name(QtGui.QColor.HexArgb),
-                                       "horizontal":QtGui.QColor(defaultCursorColors["horizontal"]).darker().name(QtGui.QColor.HexArgb),
-                                       "vertical":QtGui.QColor(defaultCursorColors["vertical"]).darker().name(QtGui.QColor.HexArgb)})
-
-    defaultCursorHoverColor = "red"
+    defaultCursorLineStyle = guicursors.DefaultCursorLineStyle
+    defaultSelectedCursorLineStyle = guicursors.DefaultSelectedCursorLineStyle
+    defaultCursorColors = guicursors.DefaultCursorColors
+    defaultLinkedCursorColors = guicursors.DefaultLinkedCursorColors
+    defaultCursorHoverColor = guicursors.DefaultCursorHoverColor
+    # defaultCursorColors = Bunch({"crosshair":"#C173B088", "horizontal":"#B1D28F88", "vertical":"#ff007f88"})
+    # defaultLinkedCursorColors = Bunch({"crosshair":QtGui.QColor(defaultCursorColors["crosshair"]).darker().name(QtGui.QColor.HexArgb),
+    #                                    "horizontal":QtGui.QColor(defaultCursorColors["horizontal"]).darker().name(QtGui.QColor.HexArgb),
+    #                                    "vertical":QtGui.QColor(defaultCursorColors["vertical"]).darker().name(QtGui.QColor.HexArgb)})
+    #
+    # defaultCursorHoverColor = "red"
 
     defaultLeftAxisLabelSpace = 40
 
@@ -3225,7 +3228,7 @@ Var-keyword arguments ("name=value" pairs):
                                 editFirst: bool=False,
                                 **kwargs) -> None:
 
-        assert(isinstance(c, DataCursor)), f"Expecting a DataCursor; isntead, got a {type(c).__name__}"
+        assert(isinstance(c, DataCursor)), f"Expecting a DataCursor; instead, got a {type(c).__name__}"
 
         if label is None:
             if isinstance(c.name, str) and len(c.name.strip()) > 0:
@@ -3265,7 +3268,7 @@ Var-keyword arguments ("name=value" pairs):
                 When None, the cursor will be placed in the middle of the X range
                 of the selected axis.
 
-        x can also be a DataCursor -> vertical or horizintal cursor
+        x can also be a DataCursor -> vertical or horizontal cursor
 
         y: None, float (cursor's vertical coordinate in axis unitss), or a DataCursor.
                 When None, the cursor will be placed in the middle of the Y range
@@ -4104,8 +4107,8 @@ Var-keyword parameters ("name=value" pairs):
                 xwindow = self.defaultCursorWindowSizeX
 
         elif isinstance(xwindow, pq.Quantity):
-            xwindow = float(xwindow.magnitude.flatten()[0])
             xUnits = xwindow.units
+            xwindow = float(xwindow.magnitude.flatten()[0])
 
         elif not isinstance(xwindow, numbers.Number):
             raise TypeError("Unexpected type for xwindow: %s" % type(xwindow).__name__)
@@ -4126,8 +4129,8 @@ Var-keyword parameters ("name=value" pairs):
                 ywindow = self.defaultCursorWindowSizeY
 
         elif isinstance(ywindow, pq.Quantity):
-            ywindow = float(ywindow.magnitude.flatten()[0])
             yUnits = ywindow.units
+            ywindow = float(ywindow.magnitude.flatten()[0])
 
         elif not isinstance(ywindow, numbers.Number):
             raise TypeError("Unexpected type for ywindow: %s" % type(ywindow).__name__)
@@ -4207,6 +4210,8 @@ Var-keyword parameters ("name=value" pairs):
             if axis not in self.signalsLayout.items:
                 return
 
+            print(f"{self.__class__.__name__}._addCursor_ single-axis received x = {x}")
+
             # NOTE: 2025-07-14 22:29:19
             # use embedded user data in the QGraphicsItem (Qt API), see also:
             # NOTE: 2025-07-14 21:49:57 and NOTE: 2025-07-14 21:52:45
@@ -4228,8 +4233,11 @@ Var-keyword parameters ("name=value" pairs):
 
                 x = float(x.magnitude.flatten()[0])
 
+            # elif isinstance(x, numbers.Number):
+
             elif not isinstance(x, (numbers.Number, DataCursor)):
                 raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
+
             else:
                 xUnits = ax_xUnits
 
@@ -4369,7 +4377,8 @@ Var-keyword parameters ("name=value" pairs):
                 if len(self.plotItems):
                     pi_precisions = [self.getAxis_xDataPrecision(ax) for ax in self.plotItems]
                     precision = min(pi_precisions)
-        # print(f"{self.__class__.__name__}._addCursor_ x = {x}, xwindow = {xwindow}, y = {y}, ywindow = {ywindow}")
+
+        print(f"{self.__class__.__name__}._addCursor_ x = {x}, xwindow = {xwindow}, y = {y}, ywindow = {ywindow}")
         # print(f"{self.__class__.__name__}._addCursor_ kwargs = {kwargs}")
 
         cursor = SignalCursor(axis,
@@ -8395,7 +8404,8 @@ Var-keyword parameters ("name=value" pairs):
     def getCursors(self, cursorType:typing.Optional[typing.Union[str, SignalCursorTypes]]):
         return self.getSignalCursors(cursorType)
 
-    def registerCursor(self, cursor, cursorDict:typing.Optional[dict]=None, **kwargs):
+    def registerCursor(self, cursor, cursorDict:typing.Optional[dict]=None,
+                       **kwargs):
         r"""Register externally-created cursors.
         """
         # TODO: 2023-06-12 23:11:50
