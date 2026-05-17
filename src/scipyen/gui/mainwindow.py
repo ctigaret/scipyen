@@ -7988,8 +7988,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 scipywarn(f"The path {print_styled(path, 'yellow')} does not exist. is it a mount point or a remote place?")
                 return
 
-            # print(f"{self.__class__.__name__}.slot_fileSystemItemActivated: path = {path}")
             url = QtCore.QUrl(path.as_uri())
+            # print(f"{self.__class__.__name__}.slot_fileSystemItemActivated: path = {path} -> {path.as_uri()} -> {url}")
             self.navigator.setLocationUrl(url)
             self.navigator.urlChanged.emit(url)
 
@@ -8003,6 +8003,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # print(f"{self.__class__.__name__}.slot_chDirUrl({val})")
         path = desktoputils.urlToPath(val)
         s = path.as_posix()
+        # print(f"\n\t-> path = {path} -> {s}")
         self.slot_chDirString(s)
 
     @Slot(str)
@@ -8054,7 +8055,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @safewrapper
     def slot_changeDirectory(self, targetDir:str=None):
         r"""Convergence for all directory navigation in ScipyenWindow"""
-        # print(f"MainWindow.slot_changeDirectory(targetDir = {targetDir})")
+        # print(f"{self.__class__.__name__}.slot_changeDirectory(targetDir = {targetDir})")
         if targetDir is None:
             if isinstance(self.sender(), QAction):
                 targetDir = str(self.sender().text()).replace('&', '')
@@ -8066,10 +8067,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     elif os.path.isdir(fName):
                         targetDir = fName
 
-        if isinstance(targetDir, str) and "&" in targetDir:
+        if isinstance(targetDir, str): # and "&" in targetDir:
             # NOTE: 2017-03-04 16:08:17 because for whatever reason Qt also
             # returns the shortcut indicator character '&'
-            targetDir = targetDir.replace('&', '')
+            # targetDir = targetDir.replace('&', '')
             if os.path.exists(targetDir):
                 if os.path.isfile(targetDir):
                     targetDir = os.path.dirname(targetDir)

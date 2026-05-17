@@ -1192,26 +1192,40 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         if len(adjustedText) == 0:
             adjustedText = self._url_.scheme()
 
-        adjustedText.replace("\n", " ")
-        super().setText(text)
+        adjustedText = adjustedText.replace("\n", " ")
+
+        # parts = adjustedText.split("&&")
+        #
+        # new_parts = list(map(lambda p: p.replace("&", "&&"), parts))
+        #
+        # adjustedText = "&&".join(new_parts)
+
+        # print(f"{self.__class__.__name__}.setText: text {text} -> adjustedText {adjustedText}")
+
+        super().setText(adjustedText)
 
         self.updateMinimumWidth()
 
         self._pendingTextChange_ = False
 
     def plainText(self):
-        source = self.text()
-        sourceLength = len(source)
-
-        dest = list()
-
-        for c in source:
-            if c == '&':
-                continue
-
-            dest.append(c)
-
-        return "".join(dest)
+        return self.text()
+        # source = self.text()
+        # # sourceLength = len(source)
+        #
+        # parts = source.split("&&")
+        # new_parts = list(map(lambda p: p.replace("&", "&&"), parts))
+        # return "&&".join(new_parts)
+        # # dest = list()
+        # #
+        # # for c in source:
+        # #     if c == '&':
+        # #         dest.append('&&')
+        # #         # continue
+        # #     else:
+        # #         dest.append(c)
+        # #
+        # # return "".join(dest)
 
     def arrowWidth(self):
         width = 0
@@ -2110,9 +2124,14 @@ class CoreUrlNavigator(QtCore.QObject):
         else:
             url = QtCore.QUrl(newUrl.adjusted(QtCore.QUrl.NormalizePathSegments))
 
+        # print(f"\n\t-> url = {url}")
+
         firstUrlChild = firstChildUrl(self.locationUrl(), url)
 
+        # print(f"\n\t-> firstUrlChild = {firstUrlChild}")
+
         scheme = url.scheme()
+        # print(f"\n\t-> scheme = {scheme}")
         # NOTE: 2023-05-04 15:15:30
         # Scipyen's file manager does NOT use special protocols (which include
         # compressed archives)
@@ -2132,7 +2151,7 @@ class CoreUrlNavigator(QtCore.QObject):
                     while parentUrl != prevUrl:
                         if self.isCompressedPath(parentUrl, archiveMimeTypes):
                             insideCompressedPath = True
-                            break;
+                            break
                         prevUrl = parentUrl
                         parentUrl = upUrl(parentUrl)
                 if not insideCompressedPath:
@@ -2298,7 +2317,7 @@ class _UrlNavigator_(QtCore.QObject):
 
         # ### BEGIN UI Components of self._nav_:UrlNavigator
 
-        self._nav_:UrlNavigator = qq
+        self._nav_: UrlNavigator = qq
         self._nav_.setAutoFillBackground(False)
 
         self._layout_:QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout(self._nav_)
@@ -2306,7 +2325,7 @@ class _UrlNavigator_(QtCore.QObject):
         self._layout_.setContentsMargins(0,0,0,0)
 
         # print(f"\tconstructing self._coreUrlNavigator_ on {url}")
-        self._coreUrlNavigator_:CoreUrlNavigator = CoreUrlNavigator(url, self._nav_) # m_coreUrlNavigator
+        self._coreUrlNavigator_: CoreUrlNavigator = CoreUrlNavigator(url, self._nav_) # m_coreUrlNavigator
         self._coreUrlNavigator_.currentLocationUrlChanged.connect(self._nav_.slot_coreUrlNavigatorUrlChanged)
         self._coreUrlNavigator_.currentUrlAboutToChange[QtCore.QUrl].connect(self._nav_.slot_coreUrlNavigatorUrlAboutToBeChanged)
         self._coreUrlNavigator_.historySizeChanged.connect(self._nav_._slot_historyChanged)
@@ -2317,7 +2336,7 @@ class _UrlNavigator_(QtCore.QObject):
         # NOTE: 2025-03-02 09:28:53
         # ### BEGIN stand-in for places selector
         #
-        self._placesButton_:PlacesButton = PlacesButton(self._nav_)
+        self._placesButton_: PlacesButton = PlacesButton(self._nav_)
         self._placesButton_.setForegroundRole(QtGui.QPalette.WindowText)
         self._placesButton_.installEventFilter(self._nav_)
         #
@@ -2334,7 +2353,7 @@ class _UrlNavigator_(QtCore.QObject):
         # ### END   _schemes_: UrlNavigatorSchemeCombo
 
         # ### BEGIN _navButtons_
-        self._navButtons_:list = list() # list of "breadcrumb buttons" - instances of UrlNavigatorButton
+        self._navButtons_: list = list() # list of "breadcrumb buttons" - instances of UrlNavigatorButton
         # ### END   _navButtons_
 
 
