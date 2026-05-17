@@ -4210,7 +4210,7 @@ Var-keyword parameters ("name=value" pairs):
             if axis not in self.signalsLayout.items:
                 return
 
-            print(f"{self.__class__.__name__}._addCursor_ single-axis received x = {x}")
+            # print(f"{self.__class__.__name__}._addCursor_ single-axis received x = {x}")
 
             # NOTE: 2025-07-14 22:29:19
             # use embedded user data in the QGraphicsItem (Qt API), see also:
@@ -4378,7 +4378,7 @@ Var-keyword parameters ("name=value" pairs):
                     pi_precisions = [self.getAxis_xDataPrecision(ax) for ax in self.plotItems]
                     precision = min(pi_precisions)
 
-        print(f"{self.__class__.__name__}._addCursor_ x = {x}, xwindow = {xwindow}, y = {y}, ywindow = {ywindow}")
+        # print(f"{self.__class__.__name__}._addCursor_ x = {x}, xwindow = {xwindow}, y = {y}, ywindow = {ywindow}")
         # print(f"{self.__class__.__name__}._addCursor_ kwargs = {kwargs}")
 
         cursor = SignalCursor(axis,
