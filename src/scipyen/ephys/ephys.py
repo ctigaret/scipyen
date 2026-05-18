@@ -4476,6 +4476,8 @@ def cursor_reduce(func:types.FunctionType,
 
     t0, t1 = min(t0,t1), max(t0,t1)
 
+    # print(f"cursor_reduce: t0 = {t0}, t1 = {t1}")
+
     if relative:
         t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
 
@@ -4488,6 +4490,7 @@ def cursor_reduce(func:types.FunctionType,
             scipywarn(f"t1 {t1} falls outside signal's domain with start {signal.t_start} and stop {signal.t_stop}")
             return np.nan
 
+    # print(f"\n\t-> t0 = {t0}, t1 = {t1}")
     if t0 == t1:
         ret = signal[signal.time_index(t0),:]
 
@@ -5189,12 +5192,15 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
 
     if isinstance(cursor0, tuple):
         t0 = float(cursor0[0])
+
     elif isinstance(cursor0, Interval):
         t0 = cursor0.t0[0].copy()
+
     else:
         if isinstance(cursor0, DataCursor):
             coord = cursor0.coord.copy() if isinstance(cursor0.coord, np.ndarray) else float(cursor0.coord)
             span = cursor0.span.copy() if isinstance(cursor0.span, np.ndarray) else float(cursor0.span)
+
         elif isinstance(cursor0, SignalCursor):
             coord = float(cursor0.x)
             span = float(cursor0.xwindow)
@@ -5202,12 +5208,14 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
                 coord *= cursor0.xUnits
                 span *= cursor0.xUnits
 
-        t0 = coord-span/2
+        t0 = coord#-span/2
 
     if isinstance(cursor1, tuple):
         t1 = float(cursor1[0])
+
     elif isinstance(cursor1, Interval):
         t1 = cursor1.t0[0].copy()
+
     else:
         if isinstance(cursor1, DataCursor):
             coord = cursor1.coord.copy() if isinstance(cursor1.coord, np.ndarray) else float(cursor1.coord)
@@ -5220,7 +5228,7 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
                 coord *= cursor1.xUnits
                 span *= cursor1.xUnits
 
-        t1 = coord-span/2
+        t1 = coord#-span/2
 
     y0 = cursor_average(signal, cursor0, channel=channel)
 
