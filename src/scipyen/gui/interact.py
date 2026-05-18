@@ -41,7 +41,8 @@ from .itemslistdialog import ItemsListDialog
 from gui.widgets import small_widgets as smw
 
 
-def selectWSData(*args, title="", single=True, asDict=False, **kwargs):
+def selectWSData(*args, title="", single=True, asDict=False,
+                 **kwargs) -> tuple | dict:
     r"""Selection of workspace variables from a list
     """
     from core.workspacefunctions import (lsvars, getvarsbytype, user_workspace)
@@ -52,10 +53,10 @@ def selectWSData(*args, title="", single=True, asDict=False, **kwargs):
 
     user_ns_visible = dict([(k,v) for k,v in ws.items() if not k.startswith("_") and k not in ws["mainWindow"].workspaceModel.user_ns_hidden])
 
-    name_vars = lsvars(*args, glob=True, ws=user_ns_visible, **kwargs)
+    name_vars = lsvars(*args, glob=glob, ws=user_ns_visible, **kwargs)
 
     if len(name_vars) == 0:
-        return list()
+        return tuple()
 
     name_list = sorted([name for name in name_vars])
 
@@ -71,14 +72,13 @@ def selectWSData(*args, title="", single=True, asDict=False, **kwargs):
 
     ans = dialog.exec()
 
-
     if ans == QtWidgets.QDialog.Accepted:
         if asDict:
             return dict((i, ws[i]) for i in dialog.selectedItemsText)
 
         return tuple(ws[i] for i in dialog.selectedItemsText)
 
-    return dict() if asDict else list()
+    return dict() if asDict else tuple()
 
 
 def getInputs(**kwargs):

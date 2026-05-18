@@ -14,7 +14,7 @@ from __future__ import print_function
 
 import re as _re # re is also imported directly from pict
 
-import inspect, keyword, warnings, typing, os, sys, traceback
+import inspect, keyword, warnings, typing, os, sys, traceback # noqa
 
 from functools import singledispatch
 
@@ -23,7 +23,7 @@ from operator import attrgetter, itemgetter, methodcaller
 from collections import OrderedDict, deque
 import dataclasses
 
-import qtpy
+import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False

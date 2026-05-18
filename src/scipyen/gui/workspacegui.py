@@ -1365,7 +1365,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             scipyenWindow = self.appWindow
         else:
             parent = self.parent()
-            if getattr(parent, "isTopLevel", None) == True:
+            if getattr(parent, "isTopLevel", None) is True:
                 scipyenWindow = parent.appWindow
             else:
                 return
