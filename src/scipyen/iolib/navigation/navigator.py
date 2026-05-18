@@ -1281,8 +1281,9 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         menu.triggered.connect(self.slot_menuActionTriggered) # keybard activation of menu entry
         menu.sig_urlDropped.connect(self.slot_urlsDropped) # TODO: drag'ndrop not yet implemented
 
-        if isinstance(menu.parent(), self.__class__):
-            menu.sig_closed.connect(self.slot_navMenuClosed)
+        menu.sig_closed.connect(self.slot_navMenuClosed)
+        # if isinstance(menu.parent(), self.__class__):
+        #     menu.sig_closed.connect(self.slot_navMenuClosed)
 
         menu.setLayoutDirection(QtCore.Qt.LeftToRight)
 
@@ -1294,7 +1295,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         maxIndex = startIndex + maxItems  # (max 30 items shown in the menu)
         # maxIndex = startIndex + 30  # (max 30 items shown in the menu)
 
-        subDirs = sorted(self._subDirs_)
+        # subDirs = sorted(self._subDirs_)
 
         nSubDirs = len(self._subDirs_)
 
@@ -1302,7 +1303,8 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
 
         subDirsNames = list(map(lambda x: x.name, self._subDirs_[startIndex : lastIndex]))
 
-        subDirsActions = list(map(lambda x: QAction(csqueeze(x.replace('&', '&&'), 60), self), subDirsNames))
+        # subDirsActions = list(map(lambda x: QAction(csqueeze(x.replace('&', '&&'), 60), self), subDirsNames))
+        subDirsActions = list(map(lambda x: QAction(csqueeze(x, 60), self), subDirsNames))
 
         if self._subDir_ in subDirsNames:
             currentIndex = subDirsNames.index(self._subDir_)
@@ -1315,6 +1317,8 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             # action carries <int> data which is the index of the subdirectory
             # pointed to by this action, in self._subDirs_ !!!
             subDirsActions[k].setData(i)
+            subDirsActions[k].setText(subDirsNames[k].replace('&', '&&'))
+
             menu.addAction(subDirsActions[k])
 
         if nSubDirs > maxIndex: # NOTE: 2025-01-21 09:03:03 generates the overspill menu
@@ -1652,6 +1656,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         path = self._subDirs_[result]
         url = QtCore.QUrl(path.as_uri())
         self.navigatorButtonActivated.emit(url, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier)
+        self._subDirsMenu_.close()
         self.update()
 
     @Slot(QAction, QtCore.Qt.MouseButton)
@@ -1669,9 +1674,10 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         result = action.data()
         buttonPath = self.path()
         path = pictio.concatPaths(buttonPath, self._subDirs_[result])   # the path to the subdirectory pointed to by the action
-        print()
+        # print()
         url = QtCore.QUrl(path.absolute().as_uri())
         self.navigatorButtonActivated.emit(url, button, QtCore.Qt.NoModifier)
+        self._subDirsMenu_.close()
         self.update()
 
     @Slot()

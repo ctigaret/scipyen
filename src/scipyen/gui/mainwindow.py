@@ -1561,6 +1561,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._workspaceViewerFont = QtGui.QFont(self._defaultUIFont)
         self._commandHistoryFont = QtGui.QFont(self._defaultUIFont)
 
+        self._fileSystemTimeDisplayFormat_: str = "Standard"
+
 
         # BEGIN configurables; for each of these we define a read-write property
         # decorated with markConfigurable
@@ -2872,6 +2874,43 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         signalBlocker = QtCore.QSignalBlocker(self.toggleFilesFilterToolBtn)
 
         self.toggleFilesFilterToolBtn.setChecked(self._showFilesFilter)
+
+    @property
+    def fileSystemTimeFormat(self) -> str:
+        return self._fileSystemTimeDisplayFormat_
+
+    @markConfigurable("FileSystemTimeDisplay", "Qt")
+    @fileSystemTimeFormat.setter
+    def fileSystemTimeFormat(self, val: str) -> None:
+        if isinstance(val, str) and val in ("LongFormat", "ShortFormat", "NarrowFormat"):
+            self._fileSystemTimeDisplayFormat_ = val
+            self.fileSystemModel.timeFormat = getattr(QtCore.QLocale.FormatType, self._fileSystemTimeDisplayFormat_)
+        else:
+            self._fileSystemTimeDisplayFormat_ = "Standard"
+            self.fileSystemModel.timeFormat = None
+
+        self.fileSystemTreeView.update()
+
+    @Slot()
+    def _slot_setFilesystemTimeDisplayFormat(self):
+        formats = ("LongFormat", "NarrowFormat", "ShortFormat", "Standard")
+        dlg = qd.QuickDialog(self, "File Time Display Format", True, False)
+        cb = qd.QuickDialogComboBox(dlg, "Format:")
+        dlg.addWidget(cb)
+        cb.setItems(formats)
+
+        currentFormat = self._fileSystemTimeDisplayFormat_ if self._fileSystemTimeDisplayFormat_ in formats else "Standard"
+        selected = formats.index(currentFormat)
+        cb.setCurrentIndex(selected)
+        dlg.adjustSize()
+        if dlg.exec() > 0:
+            newVal = formats[cb.value()]
+
+        else:
+            newVal = currentFormat
+
+        self.fileSystemTimeFormat = newVal
+
 
     @property
     def uiFontFamily(self) -> str:
@@ -6318,6 +6357,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.actionWorkplaceFont.triggered.connect(self._slot_chooseWorkplaceFont)
         self.actionCommandHistoryFont.triggered.connect(self._slot_chooseHistoryFont)
 
+        self.actionTimeDisplayFormat.triggered.connect(self._slot_setFilesystemTimeDisplayFormat)
+
         # ### BEGIN scripts menu
         # NOTE: 2024-09-21 14:55:07
         # menuScripts is now def'ed in the ui file
@@ -6440,6 +6481,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.recentDirectoriesMenu.mouseButtonClicked.connect(self.slot_recentDirActivated)
         # self.recentDirectoriesMenu.setLayoutDirection(QtCore.Qt.LeftToRight)
         self.recentDirectoriesMenu.setIcon(QtGui.QIcon.fromTheme("folder-open-recent"))
+        # self.recentDirectoriesMenu.sig_closed.connect(self._slot_recenDirsMenuClosed)
 
         self.menuFile.insertMenu(self.actionReload_Plugins, self.recentDirectoriesMenu)
         self.menuFile.insertSeparator(self.actionReload_Plugins)
@@ -7389,7 +7431,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         dirsNames = list(self._recentDirectories)[startIndex : lastIndex]
 
 
-        dirsActions = list(map(lambda x: QAction(guiutils.csqueeze(x.replace('&', '&&'), 60), self), dirsNames))
+        # dirsActions = list(map(lambda x: QAction(guiutils.csqueeze(x.replace('&', '&&'), 60), self), dirsNames))
+        dirsActions = list(map(lambda x: QAction(guiutils.csqueeze(x, 60), self), dirsNames))
 
         for action in dirsActions:
             action.triggered.connect(self._slot_recentDirActionTriggered)
@@ -7402,7 +7445,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         for k,i in enumerate(range(startIndex, lastIndex)):
             dirsActions[k].setData(i)
-            dirsActions[k].setText(dirsNames[k])
+            dirsActions[k].setText(dirsNames[k].replace('&', '&&'))
             dirPath = pathlib.Path(dirsNames[k])
             try:
                 dirsActions[k].setEnabled(dirPath.exists())
@@ -7418,6 +7461,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             nextDirsMenu.mouseButtonClicked.connect(self.slot_recentDirActivated)
             self._initRecentDirsMenu_(nextDirsMenu, maxIndex)
             menu.addMenu(nextDirsMenu)
+
+    # @Slot()
+    # def _slot_recenDirsMenuClosed(self):
+    #     self.setDisplayHintEnabled(DisplayHint.PopupActiveHint, False)
 
     def _clearRecentDirectories_(self):
         self._recentDirectories.clear()
@@ -8178,6 +8225,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             return
         path = pathlib.Path(self._recentDirectories[index]).absolute() #.resolve()   # the path to the subdirectory pointed to by the action
         self._recentDirectoryActioned(path)
+        self.recentDirectoriesMenu.close()
 
 
     @safewrapper

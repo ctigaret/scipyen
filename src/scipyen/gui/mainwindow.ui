@@ -162,16 +162,11 @@
       <addaction name="actionOpeningARecentFileNavigatesToItsDirectory"/>
       <addaction name="actionSynchronize_working_directory_when_opening_a_dropped_file"/>
      </widget>
-     <widget class="QMenu" name="menuType_Here">
-      <property name="title">
-       <string>Type Here</string>
-      </property>
-     </widget>
      <addaction name="actionUse_Native_Menu_Bar"/>
      <addaction name="actionUse_New_Navigator_Look"/>
+     <addaction name="actionTimeDisplayFormat"/>
      <addaction name="actionHide_Filtered_out_File_Names"/>
      <addaction name="menuSynchronize_working_directory"/>
-     <addaction name="menuType_Here"/>
     </widget>
     <widget class="QMenu" name="menuAppearance">
      <property name="title">
@@ -1955,6 +1950,37 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>When opening a dropped file</string>
+   </property>
+  </action>
+  <action name="actionStandard">
+   <property name="checkable">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Standard</string>
+   </property>
+  </action>
+  <action name="actionNarrow">
+   <property name="text">
+    <string>Narrow</string>
+   </property>
+  </action>
+  <action name="actionShort">
+   <property name="text">
+    <string>Short</string>
+   </property>
+  </action>
+  <action name="actionLong">
+   <property name="text">
+    <string>Long</string>
+   </property>
+  </action>
+  <action name="actionTimeDisplayFormat">
+   <property name="icon">
+    <iconset theme="accept_time_event"/>
+   </property>
+   <property name="text">
+    <string>Time Display Format</string>
    </property>
   </action>
  </widget>

@@ -562,7 +562,65 @@ def svg2pixmap(s:str, scale:float=1.0) -> QtGui.QPixmap:
     painter.end()
     return pix
 
+def formatRelativeDate(date: QtCore.QDate, fmt: QtCore.QLocale.FormatType) -> str:
+    if not date.isValid():
+        return ("Invalid date")
 
+    daysTo = QtCore.QDate.currentDate().daysTo(date)
+
+    if daysTo > 2 or daysTo < -2:
+        return QtCore.QLocale.system().toString(date, fmt)
+
+    if daysTo == 2:
+        return "In two days"
+    elif daysTo == 1:
+        return "Tomorrow"
+    elif daysTo == 0:
+        return "Today"
+    elif daysTo == -1:
+        return "Yesterday"
+    elif daysTo == -2:
+        return "Two days ago"
+
+def formatRelativeDateTime(dateTime: QtCore.QDateTime, fmt: QtCore.QLocale.FormatType) -> str:
+    now = QtCore.QDateTime.currentDateTime()
+
+    secsToNow = dateTime.secsTo(now)
+    secsInAnHour = 60 * 60
+    if secsToNow >= 0 and secsToNow < secsInAnHour:
+        minutesToNow = secsToNow / 60
+
+        if minutesToNow <= 1:
+            return "Just now"
+
+        elif fmt == QtCore.QLocale.NarrowFormat:
+            return f"{minutesToNow} {strutils.pluralize('min', minutesToNow)} ago"
+
+        return f"{minutesToNow} {strutils.pluralize('minute', minutesToNow)} ago"
+
+    if secsToNow <= 0 and -secsToNow < secsInAnHour:
+        minutesFromNow = -secsToNow / 60
+        if minutesFromNow < 1:
+            return "Now"
+
+        elif fmt == QtCore.QLocale.NarrowFormat:
+            return f"{minutesToNow} {strutils.pluralize('min', minutesToNow)} ago"
+
+        return f"{minutesToNow} {strutils.pluralize('minute', minutesToNow)} ago"
+
+    timeFormatType = QtCore.QLocale.FormatType.ShortFormat if fmt == QtCore.QLocale.FormatType.LongFormat else fmt
+    # timeFormatType = fmt
+
+    daysToNow = dateTime.daysTo(now)
+
+    if daysToNow < 2 and daysToNow > -2:
+        dateString = formatRelativeDate(dateTime.date(), fmt)
+    else:
+        dateString = QtCore.QLocale.system().toString(dateTime.date(), fmt)
+
+    formattedDate = f"{dateString} at {QtCore.QLocale.system().toString(dateTime.time(), timeFormatType)}"
+
+    return formattedDate.replace(formattedDate[0], formattedDate[0].upper())
 
 
 # def testme():

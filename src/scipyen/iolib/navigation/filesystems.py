@@ -36,7 +36,7 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-
+from gui.itemmodels.filesystemmodel import FileSystemModel
 # from . import networkmounts
 # from iolib.navigation.networkmounts import (NetworkMounts, NetworkMountsType)
 
@@ -110,35 +110,35 @@ fsMap = [
         FsInfo(FsType.Fuse, "fuseblk"),
     ]
 
-class FileSystemModel(QtGui.QFileSystemModel):
-    CutItemRole = QtCore.Qt.UserRole=1
-    def __init__(self, parent:typing.Optional[QtCore.QObject] = None):
-        super().__init__(parent=parent)
-        self._cutIndexes_:typing.Sequence[QtCore.QModelIndex] = list()
-
-    def data(self, index:QtCore.QModelIndex, role:QtCore.Qt.ItemDataRole=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
-        # NOTE: 2026-01-25 21:20:01
-        # not sure this does anything meaningful...
-        # simply because the stock QTreeView does not seem to ever query the ForegroundRole
-        # and because this model does define a custom setData(…) to set a ForegroundRole for the items.
-        #
-        # besides, I don;t think this approach works; rather, I use a custom QStyledItemDelegate defined in gui.delegates
-        if index in self._cutIndexes_:
-            if role == QtCore.Qt.ForegroundRole:
-                return QtWidgets.QApplication.palette().brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
-
-        return super().data(index, role)
-
-    @property
-    def cutIndexes(self) -> list:
-        return self._cutIndexes_
-
-    @cutIndexes.setter
-    def cutIndexes(self, value:typing.Sequence[QtCore.QModelIndex]):
-        if len(value) and not all(isinstance(v, QtCore.QModelIndex) for v in value):
-            return
-
-        self._cutIndexes_ = value
+# class FileSystemModel(QtGui.QFileSystemModel):
+#     CutItemRole = QtCore.Qt.UserRole=1
+#     def __init__(self, parent:typing.Optional[QtCore.QObject] = None):
+#         super().__init__(parent=parent)
+#         self._cutIndexes_:typing.Sequence[QtCore.QModelIndex] = list()
+#
+#     def data(self, index:QtCore.QModelIndex, role:QtCore.Qt.ItemDataRole=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
+#         # NOTE: 2026-01-25 21:20:01
+#         # not sure this does anything meaningful...
+#         # simply because the stock QTreeView does not seem to ever query the ForegroundRole
+#         # and because this model does define a custom setData(…) to set a ForegroundRole for the items.
+#         #
+#         # besides, I don;t think this approach works; rather, I use a custom QStyledItemDelegate defined in gui.delegates
+#         if index in self._cutIndexes_:
+#             if role == QtCore.Qt.ForegroundRole:
+#                 return QtWidgets.QApplication.palette().brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
+#
+#         return super().data(index, role)
+#
+#     @property
+#     def cutIndexes(self) -> list:
+#         return self._cutIndexes_
+#
+#     @cutIndexes.setter
+#     def cutIndexes(self, value:typing.Sequence[QtCore.QModelIndex]):
+#         if len(value) and not all(isinstance(v, QtCore.QModelIndex) for v in value):
+#             return
+#
+#         self._cutIndexes_ = value
 
 class FileOperationJob(QtCore.QObject):
     sig_finished = Signal(name="sig_finished") # noqa
