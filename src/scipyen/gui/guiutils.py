@@ -613,6 +613,8 @@ def formatRelativeDateTime(dateTime: QtCore.QDateTime, fmt: QtCore.QLocale.Forma
         elif fmt == QtCore.QLocale.NarrowFormat:
             return f"{pfx} {strutils.pluralize('min', minutesToNow)} ago"
 
+        # elif fmt == QtCore.QLocale.ShortFormat:
+
         return f"{pfx} {strutils.pluralize('minute', minutesToNow)} ago"
 
     timeFormatType = QtCore.QLocale.FormatType.ShortFormat if fmt == QtCore.QLocale.FormatType.LongFormat else fmt

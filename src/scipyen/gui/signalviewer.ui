@@ -426,6 +426,7 @@
    <addaction name="actionCrosshair_Cursor"/>
    <addaction name="actionHorizontal_Cursor"/>
    <addaction name="actionRemove_Cursor"/>
+   <addaction name="actionRemove_All_Cursors"/>
   </widget>
   <widget class="QToolBar" name="triggersToolBar">
    <property name="windowTitle">
@@ -448,6 +449,7 @@
    </attribute>
    <addaction name="actionDetect_Triggers"/>
    <addaction name="actionRemoveTriggers"/>
+   <addaction name="actionRemoveAllEvents"/>
   </widget>
   <widget class="QToolBar" name="epochsToolBar">
    <property name="windowTitle">
@@ -1024,6 +1026,17 @@
    </property>
    <property name="menuRole">
     <enum>QAction::MenuRole::NoRole</enum>
+   </property>
+  </action>
+  <action name="actionRemove_All_Cursors">
+   <property name="icon">
+    <iconset theme="delete"/>
+   </property>
+   <property name="text">
+    <string>Remove Cursor...</string>
+   </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remove &lt;span style=&quot; text-decoration: underline;&quot;&gt;all&lt;/span&gt; cursors.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
  </widget>

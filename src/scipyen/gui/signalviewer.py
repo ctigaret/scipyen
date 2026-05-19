@@ -1019,6 +1019,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionCrosshair_Cursor.triggered.connect(self.slot_TBAddCrosshairCursor)
         self.actionHorizontal_Cursor.triggered.connect(self.slot_TBAddHorizontalCursor)
         self.actionRemove_Cursor.triggered.connect(self.slot_TBRemoveCursor)
+        self.actionRemove_All_Cursors.triggered.connect(self.slot_TBRemoveAllCursors)
 
         # NOTE: 2024-09-18 10:43:04
         # useful for LTP analysis, etc
@@ -1219,8 +1220,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionDetect_Triggers.setEnabled(False)
         self.actionRemoveTriggers.triggered.connect(self.slot_removeTriggers)
         self.actionRemoveTriggers.setEnabled(False)
-        # self.actionRemoveAllEvents.triggered.connect(self.slot_removeAllEvents)
-        # self.actionRemoveAllEvents.setEnabled(False)
+        self.actionRemoveAllEvents.triggered.connect(self.slot_removeAllEvents)
+        self.actionRemoveAllEvents.setEnabled(False)
 
         self.actionRefresh.triggered.connect(self.slot_refreshDataDisplay)
 
@@ -3683,6 +3684,34 @@ Var-keyword parameters ("name=value" pairs):
             tdlg.show()
 
     @Slot()
+    def slot_removeAllEvents(self):
+        if not isinstance(self.yData, neo.Block) or len(self.yData.segments) == 0:
+            return
+        fn = lambda s: neoutils.remove_events(s) # remove all neo.Events
+        dlg = qd.QuickDialog(self, "Remove Events & Triggers")
+        # evtCombo = qd.QuickDialogComboBox(dlg, "Select Event Type")
+        # comboItems = ["All Trigger Events"]
+        # comboItems.extend(trigTypeNames)
+        # comboItems.append("Select TriggerEvent Type(s)...")
+        # comboItems.append("All Events")
+        # evtCombo.setItems(comboItems)
+        allSegments = qd.CheckBox(dlg, "In All Segments")
+        allSegments.setChecked=False
+        dlg.adjustSize()
+
+        if dlg.exec():
+            if allSegments.isChecked():
+                segments = self.yData.segments
+            else:
+                segments = [self.yData.segments[self.currentFrame]]
+
+            for s in segments:
+                fn(s)
+
+            self.displayFrame()
+
+
+    @Slot()
     def slot_removeTriggers(self):
         if not isinstance(self.yData, neo.Block) or len(self.yData.segments) == 0:
             return
@@ -3730,7 +3759,6 @@ Var-keyword parameters ("name=value" pairs):
             for s in segments:
                 fn(s)
 
-            # self.refresh()
             self.displayFrame()
 
     @Slot(str)
@@ -4854,6 +4882,10 @@ Var-keyword parameters ("name=value" pairs):
 
         else:
             self.removeActiveCursor()
+
+    @Slot()
+    def slot_TBRemoveAllCursors(self):
+        self.slot_removeCursors()
 
     @Slot()
     @safewrapper

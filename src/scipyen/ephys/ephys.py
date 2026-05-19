@@ -3852,13 +3852,13 @@ def _signal_slice_(loc: typing.Union[neo.Epoch, DataZone, Interval,
     t0 = get_location_boundary(loc, True, outer)
     t1 = get_location_boundary(loc, False, outer)
 
-    # if relative:
-    #     if all(isinstance(t, pq.Quantity) for t in (t0,t1)):
-    #         t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
-    #
-    #     elif all(isinstance(t, typing.Sequence) for t in (t0, t1)):
-    #         t0,t1 = zip(*list(map(lambda xx: adjust_time_relative_to_signal(signal, *xx),
-    #                               zip(t0, t1))))
+    if relative:
+        if all(isinstance(t, pq.Quantity) for t in (t0,t1)):
+            t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
+
+        elif all(isinstance(t, typing.Sequence) for t in (t0, t1)):
+            t0,t1 = zip(*list(map(lambda xx: adjust_time_relative_to_signal(signal, *xx),
+                                  zip(t0, t1))))
 
     if isinstance(t0, typing.Sequence):
         if isinstance(channel, int):
