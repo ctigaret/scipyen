@@ -541,7 +541,7 @@
     <string>Remove Cursor...</string>
    </property>
    <property name="toolTip">
-    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Removes the currently selected cursor.&lt;/p&gt;&lt;p&gt;Use the &lt;span style=&quot; text-decoration: underline;&quot;&gt;Cursors menu&lt;/span&gt; to remove &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;all&lt;/span&gt; cursors.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Removes the currently &lt;span style=&quot; text-decoration: underline;&quot;&gt;selected&lt;/span&gt; cursor.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="actionSVG">
