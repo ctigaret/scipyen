@@ -409,7 +409,7 @@ def main():
         # mainWindow.show()
         
         end = time.perf_counter()
-        print(f"Scipyen initialization took {end - start} s")
+        print(f"Scipyen initialized in {end - start} s")
         # 4. start the main GUI app (pyqt5) event loop
         app.exec()
     except Exception as e:

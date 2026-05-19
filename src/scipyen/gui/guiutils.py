@@ -589,24 +589,31 @@ def formatRelativeDateTime(dateTime: QtCore.QDateTime, fmt: QtCore.QLocale.Forma
     secsInAnHour = 60 * 60
     if secsToNow >= 0 and secsToNow < secsInAnHour:
         minutesToNow = secsToNow / 60
+        rMinutesToNow = int(np.round(minutesToNow))
+        intMinutesToNow = secsToNow // 60
+
+        pfx = f"Nearly {rMinutesToNow}" if intMinutesToNow < rMinutesToNow else f"Over {intMinutesToNow}"
 
         if minutesToNow <= 1:
             return "Just now"
 
         elif fmt == QtCore.QLocale.NarrowFormat:
-            return f"{minutesToNow} {strutils.pluralize('min', minutesToNow)} ago"
+            return f"{pfx} {strutils.pluralize('min', minutesToNow)} ago"
 
-        return f"{minutesToNow} {strutils.pluralize('minute', minutesToNow)} ago"
+        return f"{pfx} {strutils.pluralize('minute', minutesToNow)} ago"
 
     if secsToNow <= 0 and -secsToNow < secsInAnHour:
         minutesFromNow = -secsToNow / 60
+        rMinutesToNow = int(np.round(minutesToNow))
+        intMinutesToNow = secsToNow // 60
+        pfx = f"Nearly {rMinutesToNow}" if intMinutesToNow < rMinutesToNow else f"Over {intMinutesToNow}"
         if minutesFromNow < 1:
             return "Now"
 
         elif fmt == QtCore.QLocale.NarrowFormat:
-            return f"{minutesToNow} {strutils.pluralize('min', minutesToNow)} ago"
+            return f"{pfx} {strutils.pluralize('min', minutesToNow)} ago"
 
-        return f"{minutesToNow} {strutils.pluralize('minute', minutesToNow)} ago"
+        return f"{pfx} {strutils.pluralize('minute', minutesToNow)} ago"
 
     timeFormatType = QtCore.QLocale.FormatType.ShortFormat if fmt == QtCore.QLocale.FormatType.LongFormat else fmt
     # timeFormatType = fmt
@@ -621,17 +628,3 @@ def formatRelativeDateTime(dateTime: QtCore.QDateTime, fmt: QtCore.QLocale.Forma
     formattedDate = f"{dateString} at {QtCore.QLocale.system().toString(dateTime.time(), timeFormatType)}"
 
     return formattedDate.replace(formattedDate[0], formattedDate[0].upper())
-
-
-# def testme():
-#     import pywt
-#     old_stdout = sys.stdout
-#     sys.stdout = buffer = io.StringIO()
-#
-#     help(pywt.wavelist)
-#
-#     sys.stdout = old_stdout
-#
-#     txt = buffer.getvalue()
-#
-#     return txt

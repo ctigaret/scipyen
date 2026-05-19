@@ -248,6 +248,7 @@ from ephys import ephys as ephys
 #### BEGIN gui modules
 #from . import imageviewer as iv
 from core.pyqtgraph_patch import pyqtgraph as pg
+from core import qtutils as qtutils
 from gui import guiutils as guiutils
 from gui import pictgui as pgui
 from gui import quickdialog as qd
@@ -2746,6 +2747,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         self.refresh()
 
+    def addPage(self, obj):
+        r"""Adds a new data page, or frame, to the displayed data."""
+        self.addDataFrame(obj)
+
     @singledispatchmethod
     def addDataFrame(self, obj):
         r"""Adds a new data frame to the displayed data.
@@ -3046,7 +3051,14 @@ anything else       anything else       ❌
 
             self._plot_names_.clear()
             for plotItem in self.axes:
-                del plotItem
+                # print(f"{self.__class__.__name__}.closEvent calling del {plotItem.vb.name}")
+                try:
+                    plotItem.vb.sigStateChanged.disconnect()
+                    plotItem.vb.close()
+                    plotItem.close()
+                    del plotItem
+                except:
+                    continue
 
             # self.signalsLayout.clear()
 
@@ -8416,7 +8428,9 @@ Var-keyword parameters ("name=value" pairs):
         crsId = cursor.ID
         if crsId in cursorDict:
             warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: A {cursor.cursorType.name} cursor named {crsId} already exists")
-            return
+            newId = strutils.counter_suffix(crsId, list(cursorDict.keys()), returns_counter=False)
+            cursor.ID = newId
+            # return
 
         if cursor in cursorDict.values():
             ndx = list(cursorDict.values()).index(cursor)
@@ -8449,12 +8463,19 @@ Var-keyword parameters ("name=value" pairs):
             if isinstance(precision, int) and precision > 0:
                 cursor.precision = precision
 
-        cursorDict[crsId] = cursor
-        cursorDict[crsId].sig_cursorSelected[str].connect(self.slot_selectCursor)
-        cursorDict[crsId].sig_reportPosition[str].connect(self.slot_reportCursorPosition)
-        cursorDict[crsId].sig_doubleClicked[str].connect(self.slot_editCursor)
-        cursorDict[crsId].sig_lineContextMenuRequested[str].connect(self.slot_cursorMenu)
-        cursorDict[crsId].sig_editMe[str].connect(self.slot_editCursor)
+        cursorDict[cursor.ID] = cursor
+        cursorDict[cursor.ID].sig_cursorSelected[str].connect(self.slot_selectCursor)
+        cursorDict[cursor.ID].sig_reportPosition[str].connect(self.slot_reportCursorPosition)
+        cursorDict[cursor.ID].sig_doubleClicked[str].connect(self.slot_editCursor)
+        cursorDict[cursor.ID].sig_lineContextMenuRequested[str].connect(self.slot_cursorMenu)
+        cursorDict[cursor.ID].sig_editMe[str].connect(self.slot_editCursor)
+
+        # cursorDict[crsId] = cursor
+        # cursorDict[crsId].sig_cursorSelected[str].connect(self.slot_selectCursor)
+        # cursorDict[crsId].sig_reportPosition[str].connect(self.slot_reportCursorPosition)
+        # cursorDict[crsId].sig_doubleClicked[str].connect(self.slot_editCursor)
+        # cursorDict[crsId].sig_lineContextMenuRequested[str].connect(self.slot_cursorMenu)
+        # cursorDict[crsId].sig_editMe[str].connect(self.slot_editCursor)
 
 
 
@@ -10543,9 +10564,10 @@ Var-keyword parameters ("name=value" pairs):
 
         return plotItem
 
-    def _remove_axes_(self, plotItem:pg.PlotItem):
+    def _remove_axis_(self, plotItem:pg.PlotItem):
         cursors = self.cursorsInAxis(plotItem)
         k = self.axes.index(plotItem)
+        # del self.signalsLayout[k]  # remove plotItem from self.axes
         if len(cursors):
             for cursor in cursors:
                 cursor.detach() # option (b)
@@ -10558,10 +10580,28 @@ Var-keyword parameters ("name=value" pairs):
         if plotItem in self._signal_axes_:
             self._signal_axes_.remove(plotItem)
 
-        plotItem.close()
+        entry = plotItem.getViewBox().name
+        self._unregister_plot_item_name_(plotItem, entry)
+
         self.signalsLayout.removeItem(plotItem)
+
         if self.currentAxis == plotItem:
             self.currentAxis = self.axes[0] if len(self.axes) else None
+
+        # if qtutils.isQObjectAlive(plotItem.vb):
+        #     vb = plotItem.vb
+        #     vb.deleteLater()
+        #     vb = None
+        #     del vb
+
+        # plotItem.close()
+        # print(f"{self.__class__.__name__}._remove_axis_ {entry}")
+        if qtutils.isQObjectAlive(plotItem):
+            plotItem.vb.close()
+            plotItem.deleteLater()
+            plotItem = None
+            del plotItem
+
 
     def _showXGrid(self, value:bool):
         for ax in self.axes:
@@ -10733,7 +10773,7 @@ Var-keyword parameters ("name=value" pairs):
 
             # remove the rest of them
             for plotItem in self.signalAxes[_n_signal_axes_:]:
-                self._remove_axes_(plotItem)
+                self._remove_axis_(plotItem)
 
             self._signal_axes_ = self._signal_axes_[:_n_signal_axes_]
 
@@ -11204,7 +11244,7 @@ Var-keyword parameters ("name=value" pairs):
         self.docTitle = None # to completely remove the data name from window title
 
         for p in self.plotItems:
-            self._remove_axes_(p)
+            self._remove_axis_(p)
 
         # remove all PlotItems references
         self._signal_axes_.clear()

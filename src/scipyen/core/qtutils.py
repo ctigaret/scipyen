@@ -87,7 +87,8 @@ class QtRef(weakref.ref):
         return "<qtweakref at %08X; dead>" % id(self)
     
 def isQObjectDeleted(obj:QtCore.QObject):
-    import sip
+    if not __has_sip__:
+        return False # fallback
     
     if not isinstance(obj, QtCore.QObject):
         return True
@@ -103,7 +104,6 @@ def isQObjectAlive(obj:QtCore.QObject):
         return False
     
     try:
-        # obj.name()
         obj.parent()
     except RuntimeError:
         return False

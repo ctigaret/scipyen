@@ -1198,45 +1198,36 @@ class SignalCursor(QtCore.QObject):
 
             if isinstance(y, numbers.Number):
                 _y = y
-                # self._y_ = y
 
             elif isinstance(y, pq.Quantity):
                 _y = float(y.magnitude.flatten()[0])
-                # self._y_ = y.magnitude.flatten()[0]
 
             elif y is None:
                 _y = float((self._y_range_[0] + np.diff(self._y_range_)/2).flatten()[0])
-                # self._y_ = self._y_range_[0] + np.diff(self._y_range_)/2
 
             else:
                 raise TypeError("y expected to be a number, python Quantity or None; got %s instead" % type(y).__name__)
 
             if isinstance(xwindow, numbers.Number):
                 _hWin = xwindow
-                # self._hWin_ = xwindow
 
             elif isinstance(xwindow, pq.Quantity):
                 _hWin = float(xwindow.magnitude.flatten()[0])
-                # self._hWin_ = xwindow.magnitude.flatten()[0]
 
             elif xwindow is None:
                 _hWin = 0.0
-                # self._hWin_ = 0.0
 
             else:
                 raise TypeError("xwindow expected to be a number, python Quantity or None; got %s instead" % type(xwindow).__name__)
 
             if isinstance(ywindow, numbers.Number):
                 _vWin = ywindow
-                # self._vWin_ = ywindow
 
             elif isinstance(ywindow, pq.Quantity):
                 _vWin = float(ywindow.magnitude.flatten()[0])
-                # self._vWin_ = ywindow.magnitude.flatten()[0]
 
             elif ywindow is None:
                 _vWin = 0.0
-                # self._vWin_ = 0.0
 
             else:
                 raise TypeError("ywindow expected to be a number, python Quantity or None; got %s instead" % type(ywindow).__name__)
@@ -1303,7 +1294,7 @@ class SignalCursor(QtCore.QObject):
         if "name" not in kwargs.keys():
             kwargs["name"] = self._cursor_type_
 
-        # print(f"{self.__class__.__name__}._setup_ _x_ = {self._x_} _y_ = {self._y_}")
+        # print(f"{self.__class__.__name__}._setup_ self._vDataCursor_ = {self._vDataCursor_} self._hDataCursor_ = {self._hDataCursor_}")
 
         self._setup_lines_(*show_lines, **kwargs)
 

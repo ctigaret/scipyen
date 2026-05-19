@@ -63,12 +63,14 @@ def selectWSData(*args, title="", single=True, asDict=False,
     selectionMode = QtWidgets.QAbstractItemView.SingleSelection if single else QtWidgets.QAbstractItemView.ExtendedSelection
 
     if len(title.strip()):
-        dtitle = f"Select {title}"
+        dtitle = f"{title}"
     else:
-        dtitle = "Select variable in workspace"
+        dtitle = "Select Workspace Variable(s)"
 
     dialog = ItemsListDialog(title=dtitle, itemsList = name_list,
                             selectmode = selectionMode)
+
+    # dialog.adjustSize()
 
     ans = dialog.exec()
 

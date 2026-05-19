@@ -3833,8 +3833,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         win: a QMainWindow or matplotlib.figure.Figure instance
 
-        ATTENTION: This function neither removes the viewer object from the
-        workspace, nor unbinds it from its symbol in the workspace!!!
         """
         if not isinstance(win, (QtWidgets.QMainWindow, mpl.figure.Figure)):
             return
@@ -3856,6 +3854,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 self.currentViewers[viewer_type] = self.viewers[viewer_type][-1]
 
         self.removeFromWorkspace(win)
+
+        # NOTE: 2026-05-19 18:10:09 see # NOTE: 2026-05-19 18:09:59
+        # this fuction would still have held a ref to `win` after having been
+        # `del`-ed in self.removeFromWorkspace -
+        if qtutils.isQObjectAlive(win):
+            win.deleteLater()
+            win = None
+            del win
 
     def raiseWindow(self, obj: typing.Union[QtWidgets.QMainWindow, mpl.figure.Figure]):
         r"""Sets obj to be the current window and raises it.
@@ -4682,21 +4688,24 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if mustUpdateSessionID:
             self.currentSessionID = self.historyAccessor.get_last_session_id()
 
-    def removeWorkspaceSymbol(self, name: str):
+    def removeWorkspaceSymbol(self, name: str) -> object:
         r"""Remove a binding from the workspace.
 
         Given 'name' a symbol bound to a variable in the workspace, this method
         removes that binding (and its representation in the "User Variables"
         tab of Scipyen's main window).
 
-        Equivalent of removing that binding by calling `del` at the console.
-
         """
         # NOTE: 2023-05-28 00:13:40
         # With the current workspaceModel implementation since 2023-05-28 this
         # function appears redundant. However, it is not, as it allows code outside
         # the main Scipyen window to remove user data from the workspace.
-        self.workspaceModel.unbindFromNamespace(name) # single-shot
+
+        # ATTENTION: however, the object is STILL ALIVE! for Qt objects, this means
+        # their memory is STILL allocated!
+        # hence the object is returned to tbe caller in order to be able to handle it
+        # in custom (safer?) ways.
+        return self.workspaceModel.unbindFromNamespace(name) # single-shot
 
     def removeFromWorkspace(self, value: typing.Any, by_name: bool = True):#, update: bool = True):
         r"""Removes an object from the workspace via Context menu Delete action.
@@ -4749,8 +4758,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             named_objects = list(filter(lambda i: i[1] is value, self.workspace.items()))
             for n_o in named_objects:
                 obj = self.workspaceModel.unbindFromNamespace(n_o[0])
-                if isinstance(obj, QtCore.QObject):
-                    del obj
+
+                # NOTE: 2026-05-19 18:09:59
+                # if isinstance(obj, QtCore.QObject):
+                #     del obj
 
         self.workspaceModel.currentItem = None
 
