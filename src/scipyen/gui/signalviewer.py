@@ -11459,6 +11459,7 @@ Var-keyword parameters ("name=value" pairs):
     @property
     def dataCursors(self):
         r"""Alias to cursors and signalCursors properties"""
+        return self.cursors
 
     @property
     def selectedAxis(self):

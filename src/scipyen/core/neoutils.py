@@ -2844,120 +2844,6 @@ def epoch_has_interval(
 
     return interval_name in epoch.labels
 
-
-# @safewrapper
-# def get_epoch_interval(
-#     epoch: typing.Union[neo.Epoch, DataZone],
-#     index: typing.Union[str, bytes, np.str_, int],
-#     duration: bool = False,
-# ) -> tuple:
-#     r"""Returns the time stamps for an epoch interval.
-#
-#     These are the (time, duration, <label>) or (time, time+duration, <label>),
-#     depending on the 'duration' flag. The term in angle brackets is optional and
-#     is returned only when the epoch's intervals are labeled
-#
-#     Parameters:
-#     ----------
-#     epoch: neo.Epoch
-#
-#     index: str, bytes, numpy.str_, or int
-#         When a str, or bytes, this specifies the interval by its label
-#         (NOTE: this only works when the epoch's `labels` attribute, an numpy
-#         array, is not empty)
-#         When bytes, it must an utf-8 - encoded bytes string (i.e., identical to
-#             the result of calling bytes("xx", "utf-8") where "xx" is a str.
-#
-#         This must not be empty, and must be present in the epoch's "labels" array.
-#         This implies epoch.labels.size == epoch.times.size == epoch.size
-#
-#         When an int, this is the index of the interval in the epoch.
-#
-#         NOTE: The kᵗʰ interval of an epoch is defined by two quantities:
-#         epoch[k] or epoch.times[k]  ⇾ start of the kᵗʰ interval
-#         epoch.durations[k]          ⇾ duration of the kᵗʰ interval
-#
-#     duration: bool Optional (default is False)
-#         When True, returns the (time, duration) tuple for the specified interval
-#         (see above)
-#
-#         When False (default), returns the (time, time + duration) tuple corresponding
-#         to the specified interval (i.e., start & stop).
-#
-#     Returns:
-#     --------
-#
-#     A tuple:
-#
-#     (time, duration, <label>) when duration is True
-#
-#     or:
-#
-#     (time, time + duration, <label>), when duration is False (the default)  -
-#         this tuple is useful for time slicing of neo-style data arrays;
-#
-#     NOTE: <label> is optional, and is included ONLY when the epoch.labels is
-#     non-empty.
-#
-#     """
-#     if not isinstance(epoch, (neo.Epoch, DataZone)):
-#         raise TypeError(
-#             f"'epoch' expected to be a neo.Epoch; got {type(epoch).__name__} instead"
-#         )
-#
-#     if isinstance(index, (str, np.str_, bytes)):
-#         if isinstance(index, bytes):
-#             index = index.decode()
-#
-#         if index not in epoch.labels:
-#             raise ValueError(f"Interval label {index} not found")
-#
-#         ndx = np.flatnonzero(epoch.labels == index)
-#
-#     elif isinstance(index, int):
-#         if index not in range(-len(epoch), len(epoch)):
-#             raise ValueError(
-#                 f"Invalid index {index} for an epoch with {len(epoch)} intervals"
-#             )
-#         ndx = index
-#
-#     else:
-#         raise TypeError(
-#             f"Index expected to be a bytes, str, or int; got {type(index).__name__} instead"
-#         )
-#
-#     if duration:
-#         intvl = (
-#             (
-#                 epoch.times[ndx].flatten()[0],
-#                 epoch.durations[ndx].flatten()[0],
-#                 epoch.labels[ndx].flatten()[0],
-#             )
-#             if ndx in range(epoch.labels.size)
-#             else (
-#                 epoch.times[ndx].flatten()[0],
-#                 epoch.durations[ndx].flatten()[0],
-#                 epoch.labels[ndx],
-#             )
-#         )
-#     else:
-#         intvl = (
-#             (
-#                 epoch.times[ndx].flatten()[0],
-#                 epoch.times[ndx].flatten()[0] + epoch.durations[ndx].flatten()[0],
-#                 epoch.labels[ndx].flatten()[0],
-#             )
-#             if ndx in range(epoch.labels.size)
-#             else (
-#                 epoch.times[ndx].flatten()[0],
-#                 epoch.times[ndx],
-#                 flatten()[0] + epoch.durations[ndx].flatten()[0],
-#             )
-#         )
-#
-#     return Interval(*intvl, extent=duration)
-
-
 def get_sample_at_time(data, t, channel=None):
     r"""Returns the signal sample value at (or around) time t.
 
@@ -3000,6 +2886,8 @@ def get_sample_at_time(data, t, channel=None):
             t *= u
 
     ndx = get_domain_index(data, t)
+
+    print(f"neoutils.get_sample_at_time t: {t} -> ndx = {ndx}")
 
     if isinstance(ndx, int):
         return data[ndx, :]

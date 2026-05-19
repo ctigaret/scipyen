@@ -3522,19 +3522,23 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
         return __do_reduce__(func, signal, channel)
         # return __do_reduce__(t0, t1, func, signal, channel, relative)
 
-    elif isinstance(loc, DeferredSignalMeasure):
+    elif isinstance(loc, DeferredSignalMeasure): # noqa
         sg = loc(signal)
         if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
             raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
 
         return __do_reduce__(func, sg, channel)
 
-    elif all(isinstance(loc_, (numbers.Number, pq.Quantity, typing.Callable)) for loc_ in loc):
+    elif isinstance(loc, typing.Sequence) and all(isinstance(loc_, (numbers.Number, pq.Quantity, typing.Callable)) for loc_ in loc):
         if len(loc) == 1:
-            if isinstance(loc[0], DeferredSignalMeasure):
+            if isinstance(loc[0], (DeferredSignalMeasure, np.ufunc)): # noqa
                 sg = loc[0](signal)
-            else:
+
+            elif isinstance(loc, (types.FunctionType, functools.partial, typing.Callable)):
                 sg = loc[0]() # pass here a functools.partial!
+
+            else:
+                raise TypeError(f"When 'loc' is a sequence with one element, this element should be a Callable: function, partial, np.ufunc or DeferredMeasure; instead, got a {type(loc[0]).__name__}")
 
             if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
                 raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
@@ -3650,8 +3654,13 @@ def _signal_reduce_(loc: typing.Union[DataCursor, SignalCursor], # noqa
                     channel: typing.Optional[int] = None,
                     relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
     if isinstance(loc, SignalCursor):
-        coord = float(loc.x)
+        assert loc.cursorType != SignalCursorTypes.horizontal, "Only vertical and crossshair cursors are supported"
+        δx = loc.x - loc.xBounds()[0]
+        coord = float(signal.t_start) + float(δx)
+        # coord = float(loc.x)
+
         span = float(loc.xwindow)
+
         if isinstance(loc.xUnits, pq.Quantity):
             coord *= loc.xUnits
             span *= loc.xUnits
@@ -3941,12 +3950,12 @@ def signal_chord_slope2(loc0, loc1, signal, /, channel = None, relative = True):
 .. |nbsp| unicode:: 0xA0
    :trim:
 
-To calculate the chord slope between the boundaries of a location use the |nbsp|
+To calculate the chord slope between the boundaries of a single location use the |nbsp|
 signal_chord_slope() function.
 
 .. attention::
 
-    The location mid-points are calculates over the entire location (thus, including all sub-intervals defined in the location).
+    The location mid-points are calculated over the entire locations (thus, including all sub-intervals defined in the location).
 
     If this is not what is intended, then make sure each location defines a single sub-interval.
 
@@ -3954,6 +3963,33 @@ Best used with two DataCursor or two SignaCursor objects.
 
 """
     t0, t1 = tuple(map(lambda loc: mid_point(loc, True), (loc0, loc1)))
+
+    # NOTE: 2026-05-19 10:05:48
+    #
+    # SignalCursor objects have x "boundaries" allowing us to adjust their x
+    # coordinate according to the current signal domain boundaries, when the
+    # cursors were defined on another signal domain boundaries (and thus would fall
+    # outside the domain of the current signal);
+    #
+    # Thisk is helpful when signal cursors defined in a signal viewer showing
+    # a segment in a block, are used to measure things in signals in another
+    # segment (i.e., with t_start DISTINCT from the current signal.t_start)
+    #
+    # ATTENTION: there are two CAVEATS:
+    #
+    # 1. The signal where the cursors were defined and the current signal should
+    # have domains of identical size
+    #
+    # 2. The SignalCursor x boundaries must be identical to the domain boundaries
+    # of the signal where the cursor was defined
+    #
+    if isinstance(loc0, SignalCursor):
+        δx = loc0.x - loc0.xBounds()[0]
+        t0 = float(signal.t_start) + float(δx)
+
+    if isinstance(loc1, SignalCursor):
+        δx = loc1.x - loc1.xBounds()[0]
+        t1 = float(signal.t_start) + float(δx)
 
     if isinstance(t0, float):
         t0 = t0 * signal.times.units
@@ -3967,11 +4003,16 @@ Best used with two DataCursor or two SignaCursor objects.
    # print(f"signal_chord_slope2: t0 = {t0}, t1 = {t1}")
 
     if isinstance(channel, int):
-        y0, y1 = tuple(map(lambda x: neoutils.get_sample_at_domain_value(signal[:channel], x), (t0, t1)))
+        y0, y1 = tuple(map(lambda x: signal[signal.time_index(x), channel], (t0, t1)))
+        # y0, y1 = tuple(map(lambda x: neoutils.get_sample_at_domain_value(signal[:channel], x), (t0, t1)))
     else:
-        y0, y1 = tuple(map(lambda x: neoutils.get_sample_at_domain_value(signal, x), (t0, t1)))
+        y0, y1 = tuple(map(lambda x: signal[signal.time_index(x)], (t0, t1)))
+        # y0, y1 = tuple(map(lambda x: neoutils.get_sample_at_domain_value(signal, x), (t0, t1)))
 
-    return ((y1-y0)/(t1-t0)).simplified
+    # print(f"{signal_chord_slope2} -> y0 = {y0}, y1 = {y1}")
+
+    return (y1-y0)/(t1-t0)
+    # return ((y1-y0)/(t1-t0)).simplified
 
 @safewrapper
 def epoch_reduce(func:types.FunctionType,
@@ -4522,33 +4563,35 @@ def adjust_time_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSig
 
     args = sorted([checkRescale(t, signal.times.units) for t in args])
 
-    # print(f"\n***\nadjust_time_relative_to_signal from {args}")
-
-    # t0 = args[0]
-
-    # deltas = [t-t0 for t in args[1:]]
-    # print(f"\n\tadjust_time_relative_to_signal deltas = {deltas}")
-
-    # if t0 < signal.t_start:
-    #     t0 += signal.t_start
-    #
-    # elif t0 > signal.t_stop:
-    #     t0 -= signal.t_start
-    #     # while t0 > signal.t_stop:
-    #     #     t0 -= signal.t_stop
-    #
-    # if len(deltas):
-    #     ret = [t0] + list(map(lambda x: t0 + x if (t0 + x) < signal.t_stop else signal.t_stop, deltas))
-    # else:
-    #     ret = t0
+    # print(f"\n»»»\nadjust_time_relative_to_signal from {args}\n«««\n")
 
     ret = list()
+
     for t in args:
+        # if t > signal.t_stop:
+        #     print(f"t {t} is in the future")
+        #     while t > signal.t_stop:
+        #         t -= signal.t_start
+        #
+        #     if t < signal.t_start:
+        #         t += signal.t_start
+        #
+        # elif t < signal.t_start:
+        #     print(f"t {t} is in the past")
+        #     while t < signal.t_start:
+        #         t += signal.t_start
+        #
+        #     if t > signal.t_stop:
+        #         t -= signal.t_stop
+
+        # not working when t is in the future...
         if t < signal.t_start:
             t += signal.t_start
 
         elif t > signal.t_stop:
-            t -= signal.t_start
+            while t > signal.t_stop:
+                t -= signal.t_start
+                # t -= signal.t_stop
 
         ret.append(t)
 
@@ -5199,16 +5242,19 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     else:
         if isinstance(cursor0, DataCursor):
             coord = cursor0.coord.copy() if isinstance(cursor0.coord, np.ndarray) else float(cursor0.coord)
-            span = cursor0.span.copy() if isinstance(cursor0.span, np.ndarray) else float(cursor0.span)
+            # span = cursor0.span.copy() if isinstance(cursor0.span, np.ndarray) else float(cursor0.span)
 
         elif isinstance(cursor0, SignalCursor):
             coord = float(cursor0.x)
-            span = float(cursor0.xwindow)
+            # span = float(cursor0.xwindow)
             if isinstance(cursor0.xUnits, pq.Quantity):
                 coord *= cursor0.xUnits
-                span *= cursor0.xUnits
+                # span *= cursor0.xUnits
 
-        t0 = coord#-span/2
+        t0 = coord
+
+    if isinstance(t0, float):
+        t0 = t0 * signal.times.units
 
     if isinstance(cursor1, tuple):
         t1 = float(cursor1[0])
@@ -5219,22 +5265,27 @@ def cursors_chord_slope(signal: typing.Union[neo.AnalogSignal, DataSignal],
     else:
         if isinstance(cursor1, DataCursor):
             coord = cursor1.coord.copy() if isinstance(cursor1.coord, np.ndarray) else float(cursor1.coord)
-            span = cursor1.span.copy() if isinstance(cursor1.span, np.ndarray) else float(cursor1.span)
+            # span = cursor1.span.copy() if isinstance(cursor1.span, np.ndarray) else float(cursor1.span)
 
         elif isinstance(cursor1, SignalCursor):
             coord = float(cursor1.x)
-            span = float(cursor1.xwindow)
+            # span = float(cursor1.xwindow)
             if isinstance(cursor1.xUnits, pq.Quantity):
                 coord *= cursor1.xUnits
-                span *= cursor1.xUnits
+                # span *= cursor1.xUnits
 
-        t1 = coord#-span/2
+        t1 = coord
 
-    y0 = cursor_average(signal, cursor0, channel=channel)
+    if isinstance(t1, float):
+        t1 = t1 * signal.times.units
 
-    y1 = cursor_average(signal, cursor1, channel=channel)
+    # y0 = cursor_average(signal, cursor0, channel=channel)
+    # y1 = cursor_average(signal, cursor1, channel=channel)
 
-    return (y1-y0)/(t1-t0).simplified
+    y0 = signal_average(cursor0, signal, channel=channel)
+    y1 = signal_average(cursor1, signal, channel=channel)
+
+    return (y1-y0)/(t1-t0) # ).simplified
 
 
 def cursor_chord_slope(signal:typing.Union[neo.AnalogSignal, DataSignal],
@@ -6852,12 +6903,14 @@ def __slice_signal__(t0, t1, sg, ch, rel):
 
     t0, t1 = sorted((t0,t1))
 
+    # print(f"\n\t__slice_signal__ t0 = {t0}, t1 = {t1}")
+
     if rel:
         # t0, t1 = tuple(map(lambda t_: sg.t_start + t_, (t0, t1)))
         t0, t1 = adjust_time_relative_to_signal(sg, t0, t1)
         # t0, t1 = tuple(map(lambda t: adjust_time_relative_to_signal(sg, t),  (t0, t1)))
 
-    # print(f"\n\t__slice_signal__ adjusted t0 = {t0}, t1 = {t1}")
+    # print(f"\n\t__slice_signal__ adjusted t0 = {t0}, t1 = {t1}\n***\n\n")
 
     if t0 < sg.t_start:
         scipywarn(f"__slice_signal__: t0 {t0} is earlier than signal's domain start {sg.t_start}")
@@ -6899,9 +6952,6 @@ def __do_reduce__(fn, sg, ch):
 
     if isinstance(ch, int):
         ret = ret[ch].flatten()
-
-    # if not isinstance(ret, pq.Quantity):
-    #     ret = ret * sg.units
 
     # print(f"__do_reduce__ {fn} will return {ret} ({type(ret)})")
 
