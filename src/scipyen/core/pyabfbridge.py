@@ -1171,6 +1171,12 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._inputs_ = [ABFInputConfiguration(obj, self, k) for k in range(self._nADCChannels_)]
             self._outputs_ = [ABFOutputConfiguration(obj, self, k) for k in range(self._nDACChannels_)]
 
+            # BUG: 2026-05-20 19:30:02 FIXME/TODO
+            self._sweep_start_times_ = dict(map(lambda k: (k,0), range(self._nSweeps_)))
+            # if self._nSweeps_ > 1:
+            #
+            # else:
+
         elif isinstance(obj, neo.Block):
             assert sourcedFromABF(obj), "Object does not appear to be sourced from an ABF file"
             info_dict = getAcquisitionInfo(obj)
@@ -1251,6 +1257,8 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._inputs_ = [ABFInputConfiguration(obj, k) for k in range(self._nADCChannels_)]
             self._outputs_ = [ABFOutputConfiguration(obj, k) for k in range(self._nDACChannels_)]
 
+            self._sweep_start_times_ = info_dict['t_starts']
+
         else:
             if len(kwargs) == 0:
                 raise TypeError(f"A source pyabf.ABF or neo.Block object was not specified; instead, got {type(obj).__name__}; in addition, no other parameters were given, therefore cannot initialize a {self.__class__.__name__} object")
@@ -1302,6 +1310,9 @@ class ABFProtocol(ElectrophysiologyProtocol):
             self._inputs_ = [i for i in kwargs.get("inputs", list()) if isinstance(i, ABFInputConfiguration)]
             self._outputs_ = [i for i in kwargs.get("outputs", list()) if isinstance(i, ABFOutputConfiguration)]
 
+            # BUG: 2026-05-20 19:30:02 FIXME/TODO
+            self._sweep_start_times_ = dict(map(lambda k: (k,0), range(self._nSweeps_)))
+
         # NOTE: 2024-07-19 13:43:00
         # All attributes below are calculated from what h been set up so far
         #
@@ -1309,8 +1320,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
         # since Clampex only runs on Windows, we simply split the string up:
         if isinstance(self._protocolFile_, str) and len(self._protocolFile_.strip()):
             self._name_ = pathlib.Path(self._protocolFile_.split("\\")[-1]).stem  # strip off the extension
+
         self._sweepDuration_ = (self._nDataPointsPerSweep_ / self._samplingRate_).rescale(pq.s)
+
         self._totalDuration_ = self._nSweeps_ * (self._sweepDuration_ if self._sweepInterval_ == 0*pq.s else self._sweepInterval_)
+
         if self._nSweeps_ > 1:
             self._totalDuration_ += self._sweepDuration_
 
@@ -2146,6 +2160,11 @@ class ABFProtocol(ElectrophysiologyProtocol):
             return self.ClampMode.NoClamp
 
     def getSweepTime(self, sweep:int = 0) -> pq.Quantity:
+        if isinstance(self._sweep_start_times_, dict) and sweep in self._sweep_start_times_:
+            return self._sweep_start_times_[sweep]
+
+        # NOTE: 2026-05-20 20:39:03
+        # not sure about the next lines ...
         if self.sweepInterval == 0*pq.s:
             return sweep * self.sweepDuration
         return sweep * self.sweepInterval
@@ -2589,11 +2608,15 @@ Parameters:
             if holding:
                 ret += self.holdingTime
 
+            ret += self.sweepTimes[sweep]
+
         if fromRunStart:
             if samples:
                 # only useful is representing data as a continuous signal !!!
                 sweepInterval = self.sweepSampleCount
+                # ret += sweepInterval * sweep
             else:
+                # ret += self.sweepTimes[sweep]
                 if skipInterSweepInterval:
                     sweepInterval = self.sweepDuration
                 else:

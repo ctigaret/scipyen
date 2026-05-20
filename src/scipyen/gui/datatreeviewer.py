@@ -330,6 +330,20 @@ A lot of things copied from there, EXCEPT that it now uses
 
         showValuesOnlyAction.toggled.connect(self.slot_showValuesOnly)
 
+        showPrivateMembers = self.toolBar.addAction(
+            QtGui.QIcon.fromTheme("view-private"), "Show private members")
+        showPrivateMembers.setCheckable(True)
+        showPrivateMembers.setChecked(False)
+
+        showPrivateMembers.toggled.connect(self.slot_showPrivateMembers)
+
+        showIntrospect = self.toolBar.addAction(
+            QtGui.QIcon.fromTheme("view-list-details"), "Introspect")
+        showIntrospect.setCheckable(True)
+        showIntrospect.setChecked(False)
+
+        showIntrospect.toggled.connect(self.slot_showIntrospect)
+
         self.goFirst = self.toolBar.addAction(QtGui.QIcon.fromTheme("go-first-symbolic"), "First view")
         self.goFirst.triggered.connect(self.slot_goFirst)
         self.goFirst.setEnabled(False)
@@ -532,6 +546,16 @@ A lot of things copied from there, EXCEPT that it now uses
     @safewrapper
     def slot_showValuesOnly(self, value: bool):
         self.model.showValuesOnly = value is True
+        self.slot_refreshDataDisplay()
+
+    @Slot(bool)
+    def slot_showPrivateMembers(self, value: bool):
+        self.model.showPrivateMembers = value is True
+        self.slot_refreshDataDisplay()
+
+    @Slot(bool)
+    def slot_showIntrospect(self, value: bool):
+        self.model.showIntrospection = value is True
         self.slot_refreshDataDisplay()
 
     @Slot(bool)
@@ -818,7 +842,8 @@ A lot of things copied from there, EXCEPT that it now uses
                 self._cache_index_ = len(self._obj_cache_) - 1
             obj, name = self._obj_cache_[self._cache_index_]
             self.update_title(doc_title = name, win_title=self._winTitle_)
-            what = {"data": obj, "predicate": self.predicate, "root_title": name,
+            what = {"data": obj, "predicate": self.predicate,
+                    "root_title": name,
                     "showPrivate": self._showPrivateMembers_,
                     "dataTypeStr": type(obj).__name__,
                     "readOnly": self.readOnly}

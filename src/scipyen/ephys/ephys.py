@@ -3866,7 +3866,7 @@ def _signal_slice_(loc: typing.Union[neo.Epoch, DataZone, Interval,
     t0 = get_location_boundary(loc, True, outer) #+ signal.t_start
     t1 = get_location_boundary(loc, False, outer)# + signal.t_start
 
-    print(f"_signal_slice_[{type(loc)}]: t0 = {t0}, t1 = {t1}")
+    # print(f"_signal_slice_[{type(loc)}]: t0 = {t0}, t1 = {t1}")
 
     return signal_slice((t0, t1), signal, channel, outer, relative)
 

@@ -304,7 +304,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
         item0 = QtGui.QStandardItem(objName)
         item0.setData(objName, QtCore.Qt.DisplayRole)
         item0.setData(objDict["objType"], ObjectTypeRole) # noqa
-        # item0.setData(type(objKey).__name__, QtCore.Qt.ToolTipRole)
         item0.setData(objDict["objType"].__name__, QtCore.Qt.ToolTipRole)
 
         # NOTE: 2026-02-09 21:47:10
@@ -416,6 +415,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # dataTypeStr: typing.Optional[str] = None,
         hideRoot: bool = False,
         readOnly: bool = False,
+        # introspect: bool = False
     ):
         # print(f"{self.__class__.__name__}.setModelData(obj: {type(obj).__name__})")
         self._visited_.clear()
@@ -423,6 +423,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         self._showPrivate_ = showPrivate is True
         self._hideRoot_ = hideRoot is True
         self._readOnly_ = readOnly is True
+        # self._introspect_ = introspect is True
 
         self._rootTitle_ = rootTitle if (
             isinstance(rootTitle, str)
@@ -433,7 +434,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         self.setHorizontalHeaderLabels(["Object", "Type", "Information or Value"])
 
-        pData, objDict = self._parseObject_(obj, dict(), self._showPrivate_)
+        pData, objDict = self._parseObject_(obj, dict(),
+                                            self._showPrivate_)
 
         self._privateData_ = pData
 
@@ -602,6 +604,22 @@ class DataTreeModel(QtGui.QStandardItemModel):
         self._showMethods_ = val is True
 
     @property
+    def showPrivateMembers(self) ->bool:
+        return self._showPrivate_
+
+    @showPrivateMembers.setter
+    def showPrivateMembers(self, val:bool):
+        self._showPrivate_ = val is True
+
+    @property
+    def showIntrospection(self) -> bool:
+        return self._introspect_
+
+    @showIntrospection.setter
+    def showIntrospection(self, val: bool):
+        self._introspect_ = val is True
+
+    @property
     def showValuesOnly(self) -> bool:
         return self._showValueAttributesOnly_
 
@@ -768,6 +786,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             readOnlyChildren = True
 
         elif self._introspect_ and self.introspectable(obj) :
+            # print(f"{self.__class__.__name__}._parseObject_ introspecting")
             pData = datatypes.inspect_members(obj, self._predicate_)
             indirect = True
             if not includePrivateMembers:
@@ -780,7 +799,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                     )
                 )
 
-            indirect = True
+            # indirect = True
             objDataAsChild = False
 
             n = len(pData)
@@ -800,7 +819,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             memberAccess = tuple()
             accessType = None
             # choices = dict()
-            scipywarn(f"TODO: Support for objects of type {type(obj).__name__} awaits implementation. FIXME")
+            # scipywarn(f"TODO: Support for objects of type {type(obj).__name__} awaits implementation. FIXME")
             # raise NotImplementedError(
             # f"Objects of type {type(obj).__name__} are not supported"
             # )
@@ -1685,10 +1704,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 }
 
         tip = type(obj).__name__
-        n = len(obj)
+        n = obj.size
         klass = "Zone" if isinstance(obj, DataZone) else "Epoch"
         desc = strutils.pluralize('subinterval', n)
-        info = f"{klass} '{obj.name}' with {len(obj)} {desc}"
+        info = f"{klass} '{obj.name}' with {n} {desc}"
 
         return pData, {
             "indirect": True,
