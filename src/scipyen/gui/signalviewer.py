@@ -3054,10 +3054,20 @@ anything else       anything else       ❌
             for plotItem in self.axes:
                 # print(f"{self.__class__.__name__}.closEvent calling del {plotItem.vb.name}")
                 try:
-                    plotItem.vb.sigStateChanged.disconnect()
+                    try:
+                        plotItem.vb.sigStateChanged.disconnect()
+                    except:
+                        pass
+
+                    try:
+                        plotItem.vb.sigResized.disconnect()
+                    except:
+                        pass
+
                     plotItem.vb.close()
                     plotItem.close()
                     del plotItem
+
                 except:
                     continue
 
@@ -4137,7 +4147,7 @@ Var-keyword parameters ("name=value" pairs):
                     xUnits = xwindow.units
                     xwindow = float(xwindow.magnitude.flatten()[0])
                 else:
-                    xwindow = float(x.span[0]) if isinstance(x.span, np.ndarray) else float(x.span)
+                    xwindow = float(x.span.flatten()[0]) if isinstance(x.span, np.ndarray) else float(x.span)
 
             elif isinstance(x, Interval):
                 xwindow = x.durations[0]
@@ -4395,12 +4405,14 @@ Var-keyword parameters ("name=value" pairs):
                 if len(labels):
                     label = "_".join(labels)
 
-            if label is None:
+            if label is None or (isinstance(label, str) and len(label.strip()) == 0):
                 # crsId = "%s%s" % (crsPrefix, str(nCursors))
                 crsId = f"{crsPrefix}{nCursors}"
 
             else:
-                crsId = label
+                currentCursorLabels = list(cursorDict.keys() )
+                crsId = counter_suffix(label, currentCursorLabels, returns_counter=False)
+                # crsId = label
 
         else:
             currentCursorLabels = list(cursorDict.keys() )
@@ -8461,6 +8473,7 @@ Var-keyword parameters ("name=value" pairs):
         if crsId in cursorDict:
             warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: A {cursor.cursorType.name} cursor named {crsId} already exists")
             newId = strutils.counter_suffix(crsId, list(cursorDict.keys()), returns_counter=False)
+            print(f"{self.__class__.__name__}.registerCursor -> newId: {newId}")
             cursor.ID = newId
             # return
 

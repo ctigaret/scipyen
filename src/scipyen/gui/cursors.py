@@ -454,7 +454,7 @@ class SignalCursor(QtCore.QObject):
             self._hDataCursor_.coord = pos.x()
 
         else:
-            x, y = tuple(map(lambda vdc: float(vdc.coord[0]) if isinstance(vdc.coord, np.ndarray) else float(vdc.coord), (self._vDataCursor_, self._hDataCursor_)))
+            x, y = tuple(map(lambda vdc: float(vdc.coord.flatten()[0]) if isinstance(vdc.coord, np.ndarray) else float(vdc.coord), (self._vDataCursor_, self._hDataCursor_)))
 
             pos = QtCore.QPointF(x,y)
 

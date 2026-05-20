@@ -2887,7 +2887,7 @@ def get_sample_at_time(data, t, channel=None):
 
     ndx = get_domain_index(data, t)
 
-    print(f"neoutils.get_sample_at_time t: {t} -> ndx = {ndx}")
+    # print(f"neoutils.get_sample_at_time t: {t} -> ndx = {ndx}")
 
     if isinstance(ndx, int):
         return data[ndx, :]

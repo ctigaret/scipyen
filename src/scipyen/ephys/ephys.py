@@ -801,52 +801,66 @@ class RecordingSource():
     auxin: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]     = dataclasses.field(default_factory=list)
     auxout: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]   = dataclasses.field(default_factory=list)
     electrodeMode: ElectrodeMode = dataclasses.field(default=ElectrodeMode.Null)
-    pathways: dataclasses.InitVar[typing.Sequence[SynapticPathway]] = tuple()
+    # pathways: dataclasses.InitVar[typing.Sequence[SynapticPathway]] = tuple()
 
-    def __post_init__(self, pathways):
-        if isinstance(pathways, (tuple, list)) and len(pathways) and all(isinstance(p, SynapticPathway) and p.adc == self.adc and p.dac == self.dac for p in pathways):
-            pp = list()
-            for p in pathways:
-                if isinstance(self.syn, SynapticStimulus):
-                    if p.stimulus == self.syn:
-                        pp.append(p)
-
-                elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
-                    if p.stimulus in self.syn:
-                        pp.append(p)
-
-            self.pathways = tuple(pp)
-
-        elif isinstance(pathways, SynapticPathway):
-            if isinstance(self.syn, SynapticStimulus):
-                if pathways.stimulus == self.syn:
-                    self.pathways = (pathway, )
-
-            elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
-                if pathways.stimulus in self.syn:
-                    self.pathways = (pathways, )
-
-        else:
-            if isinstance(self.syn, SynapticStimulus):
-                self.pathways = (SynapticPathway(stimulus = self.syn,
-                                        name = self.syn.name, adc = self.adc,
+    def __post_init__(self):
+        pathways = list()
+        for syn in self.syn:
+            if isinstance(syn, SynapticStimulus):
+                pathways.append(SynapticPathway(stimulus = syn,
+                                        name = syn.name, adc = self.adc,
                                         dac = self.dac,
-                                        electrode = self.electrodeMode), )
-            elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
-                if len(self.syn) == 1:
-                    self.pathways = tuple(SynapticPathway(stimulus = self.syn[0],
-                                        name = self.syn[0].name,
-                                        adc = self.adc, dac = self.dac,
                                         electrode = self.electrodeMode))
-                elif len(self.syn) > 1:
-                    self.pathways = tuple(SynapticPathway(stimulus = s,
-                                                name = s.name,
-                                                adc = self.adc, dac = self.dac,
-                                                electrode = self.electrodeMode) for s in self.syn)
 
-            else:
-                self.pathways = tuple()
+        self.pathways = tuple(pathways)
 
+#     def __post_init__(self, pathways):
+#         if isinstance(pathways, (tuple, list)) and len(pathways) and all(isinstance(p, SynapticPathway) and p.adc == self.adc and p.dac == self.dac for p in pathways):
+#             pp = list()
+#             for p in pathways:
+#                 if isinstance(self.syn, SynapticStimulus):
+#                     if p.stimulus == self.syn:
+#                         pp.append(p)
+#
+#                 elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+#                     if p.stimulus in self.syn:
+#                         pp.append(p)
+#
+#             self.pathways = tuple(pp)
+#
+#         elif isinstance(pathways, SynapticPathway):
+#             if isinstance(self.syn, SynapticStimulus):
+#                 if pathways.stimulus == self.syn:
+#                     self.pathways = (pathway, )
+#
+#             elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+#                 if pathways.stimulus in self.syn:
+#                     self.pathways = (pathways, )
+#
+#         else:
+#             if isinstance(self.syn, SynapticStimulus):
+#                 self.pathways = (SynapticPathway(stimulus = self.syn,
+#                                         name = self.syn.name, adc = self.adc,
+#                                         dac = self.dac,
+#                                         electrode = self.electrodeMode), )
+#             elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+#                 if len(self.syn) == 1:
+#                     self.pathways = tuple(SynapticPathway(stimulus = self.syn[0],
+#                                         name = self.syn[0].name,
+#                                         adc = self.adc, dac = self.dac,
+#                                         electrode = self.electrodeMode))
+#                 elif len(self.syn) > 1:
+#                     self.pathways = tuple(SynapticPathway(stimulus = s,
+#                                                 name = s.name,
+#                                                 adc = self.adc, dac = self.dac,
+#                                                 electrode = self.electrodeMode) for s in self.syn)
+#
+#             else:
+#                 self.pathways = tuple()
+
+    # @property
+    # def pathways(self) -> tuple:
+    #     return self.syn
 
     # __slots__ = ()
     # __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseSource__.__annotations__.items()])
@@ -3849,27 +3863,31 @@ def _signal_slice_(loc: typing.Union[neo.Epoch, DataZone, Interval,
                    outer: bool = True,
                    relative: bool = True) -> typing.Union[neo.AnalogSignal,
                                                         DataSignal]:
-    t0 = get_location_boundary(loc, True, outer)
-    t1 = get_location_boundary(loc, False, outer)
+    t0 = get_location_boundary(loc, True, outer) #+ signal.t_start
+    t1 = get_location_boundary(loc, False, outer)# + signal.t_start
 
-    if relative:
-        if all(isinstance(t, pq.Quantity) for t in (t0,t1)):
-            t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
+    print(f"_signal_slice_[{type(loc)}]: t0 = {t0}, t1 = {t1}")
 
-        elif all(isinstance(t, typing.Sequence) for t in (t0, t1)):
-            t0,t1 = zip(*list(map(lambda xx: adjust_time_relative_to_signal(signal, *xx),
-                                  zip(t0, t1))))
+    return signal_slice((t0, t1), signal, channel, outer, relative)
 
-    if isinstance(t0, typing.Sequence):
-        if isinstance(channel, int):
-            return list(map(lambda xx: signal.time_slice(*xx)[:,channel], zip(t0, t1)))
-        else:
-            return list(map(lambda xx: signal.time_slice(*xx), zip(t0, t1)))
-    else:
-        ret = signal.time_slice(t0, t1)
-        if isinstance(channel, int):
-            ret = ret[:,channel]
-        return ret
+    # if relative:
+    #     if all(isinstance(t, pq.Quantity) for t in (t0,t1)):
+    #         t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
+    #
+    #     elif all(isinstance(t, typing.Sequence) for t in (t0, t1)):
+    #         t0,t1 = zip(*list(map(lambda xx: adjust_time_relative_to_signal(signal, *xx),
+    #                               zip(t0, t1))))
+    #
+    # if isinstance(t0, typing.Sequence):
+    #     if isinstance(channel, int):
+    #         return list(map(lambda xx: signal.time_slice(*xx)[:,channel], zip(t0, t1)))
+    #     else:
+    #         return list(map(lambda xx: signal.time_slice(*xx), zip(t0, t1)))
+    # else:
+    #     ret = signal.time_slice(t0, t1)
+    #     if isinstance(channel, int):
+    #         ret = ret[:,channel]
+    #     return ret
 
 def signal_chord_slope(loc, signal, /, channel = None, outer: bool = True, relative = True):
     r"""Calculates the signal chord slope between two time points t0 and t1.

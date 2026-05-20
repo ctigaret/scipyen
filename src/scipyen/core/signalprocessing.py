@@ -1577,23 +1577,48 @@ def detrend(x: typing.Union[neo.AnalogSignal, DataSignal], **kwargs):
     return ret
 
 
-def sosfilter(sig: typing.Union[pq.Quantity, np.ndarray], kernel: np.ndarray):
+def sosfilter(sig: typing.Union[pq.Quantity, np.ndarray], kernel: np.ndarray,
+              name: typing.Optional[str] = None):
+    r"""Filters the signal using a cascading Second Order Sections (SOS) filter.
+
+Uses scipy.signal.sosfilter with ``axis`` set to 0 (zero) and no initil conditions.
+
+See scipy documentation for details.
+
+Parameters:
+-----------
+
+:sig:  signal-like
+
+:kernel: Array of second-order filter coefficients
+
+:name: optional, a memorable name for the implemented filter, for information only
+    (e.g. "de-hum", etc).
+"""
     if isinstance(sig, (neo.AnalogSignal, DataSignal)):
         ret = scipy.signal.sosfiltfilt(kernel, sig.magnitude, axis=0)
 
         klass = sig.__class__
-        name = sig.name
+        sig_name = sig.name
+
         if isinstance(name, str) and len(name.strip()):
-            name = f"{name}_filtered"
+            sfx = name
         else:
-            name = "filtered"
+            sfx = "filtered"
+
+        if isinstance(sig_name, str) and len(sig_name.strip()):
+            sig_name = f"{sig_name}_{sfx}"
+        else:
+            sig_name = sfx
+
         ret = klass(
             ret,
             units=sig.units,
             t_start=sig.t_start,
             sampling_rate=sig.sampling_rate,
-            name=name,
+            name=sig_name,
             description=f"{sig.description} filtered",
+            filtered = {"name": sfx if sfx != "filtered" else "unknown", "sos": kernel}
         )
 
     else:
