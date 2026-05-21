@@ -378,17 +378,26 @@ A lot of things copied from there, EXCEPT that it now uses
         cm = QtWidgets.QMenu("Data operations", self)
         cm.setToolTipsVisible(True)
 
-        copyItemData = cm.addAction("Copy value(s) to workspace")
-        copyItemData.setToolTip("Copy value(s) to workspace (SHIFT to assign full path as name)")
-        copyItemData.setStatusTip("Copy value(s) to workspace (SHIFT to assign full path as name)")
-        copyItemData.setWhatsThis("Copy value(s) to workspace (SHIFT to assign full path as name)")
+        copyItemData = cm.addAction("Send to workspace")
+        _tip = "Create a reference in the workspace (press and hold SHIFT to assign full path as name)"
+        copyItemData.setToolTip(_tip)
+        copyItemData.setStatusTip(_tip)
+        copyItemData.setWhatsThis("Binds the selected object to a new symbol in the workspace")
         copyItemData.triggered.connect(self.slot_exportToWorkspace)
 
         copyItemPath = cm.addAction("Copy path(s)")
+        _tip = "Copy the access path to this object as a string, to system's clipboard."
         copyItemPath.triggered.connect(self.slot_copyPaths)
+        copyItemPath.setToolTip(_tip)
+        copyItemPath.setStatusTip(_tip)
+        copyItemPath.setWhatsThis(_tip + " When more than one object is selected, the paths will be comma-separated. Press and hold CTRL to have each path on a separate line of text.")
 
         sendToConsole = cm.addAction("Send path(s) to console")
+        _tip = "Write the access path to this object as a Python statement, ready to execute (press ENTER)."
         sendToConsole.triggered.connect(self.slot_exportToConsole)
+        sendToConsole.setToolTip(_tip)
+        sendToConsole.setStatusTip(_tip)
+        sendToConsole.setWhatsThis(_tip + " When more than one object is selected, the paths will be comma-separated. Press and hold CTRL to have each path on a separate line of text.")
 
         # NOTE: 2025-05-28 13:28:36
         # to keep it simple, restrict the option viewing the selected item, to

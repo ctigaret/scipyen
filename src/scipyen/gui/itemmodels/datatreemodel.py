@@ -25,6 +25,7 @@ import functools
 from functools import singledispatchmethod
 from collections import deque, UserDict, OrderedDict
 from dataclasses import MISSING
+import weakref
 import math # noqa
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
@@ -2201,12 +2202,20 @@ class DataTreeModel(QtGui.QStandardItemModel):
                     path.append(f"{parentAccess[0]}{itemBinding}")
 
                 elif len(parentAccess) == 2:
-                    if bindingType is str:
-                        itemBinding = f"'{itemBinding}'"
+                    # print(f"{self.__class__.__name__}_getPathForItemOrIndex_: bindingType = {bindingType} for itemBinding {itemBinding}")
+                    if bindingType is weakref.ReferenceType:
+                        path.append(f"{parentAccess[0]}{itemBinding}{parentAccess[1]}")
                     else:
-                        itemBinding = bindingType(itemBinding) # hedging my bets...
+                        if bindingType is str:
+                            iB = f"'{itemBinding}'"
+                        else:
+                            try:
+                                iB = bindingType(itemBinding) # hedging my bets...
+                            except:
+                                iB = itemBinding
 
-                    path.append(f"{parentAccess[0]}{itemBinding}{parentAccess[1]}")
+
+                        path.append(f"{parentAccess[0]}{iB}{parentAccess[1]}")
 
             path += self._getPathForItemOrIndex_(parentItem)
 

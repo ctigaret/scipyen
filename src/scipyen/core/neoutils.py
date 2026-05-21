@@ -400,7 +400,10 @@ def get_codomain_name(obj):
 @get_codomain_name.register(DataZone)
 @get_codomain_name.register(DataMark)
 @get_codomain_name.register(TriggerEvent)
-def _(obj):
+def _get_codomain_name_(obj: typing.Union[neo.AnalogSignal, neo.IrregularlySampledSignal,
+                                          neo.Epoch, neo.Event, neo.SpikeTrain,
+                                          DataSignal, IrregularlySampledDataSignal,
+                                          DataZone, DataMark, TriggerEvent]):
     codomain_name = None
     if hasattr(obj, "annotations"):
         codomain_name = obj.annotations.get("codomain_name", None)
@@ -417,20 +420,24 @@ def get_domain_name(obj):
 @get_domain_name.register(neo.Epoch)
 @get_domain_name.register(neo.Event)
 @get_domain_name.register(neo.SpikeTrain)
-def _(obj):
+def _get_domain_name_(obj: typing.Union[
+    neo.AnalogSignal, neo.IrregularlySampledSignal,
+    neo.Epoch, neo.Event,
+    neo.SpikeTrain,
+    ]):
     return unitFamilyName(obj.times)
 
 
 @get_domain_name.register(DataSignal)
 @get_domain_name.register(IrregularlySampledDataSignal)
-def _(obj):
+def _get_domain_name_(obj: DataSignal | IrregularlySampledDataSignal):
     return obj.domain_name
 
 
 @get_domain_name.register(DataZone)
 @get_domain_name.register(DataMark)
 @get_domain_name.register(TriggerEvent)
-def _(obj):
+def _get_domain_name_(obj: typing.Union[DataZone, DataMark, TriggerEvent]):
     return unitFamilyName(obj.times)
 
 
@@ -442,7 +449,7 @@ def set_relative_time_start(data, t=0):
 
 @set_relative_time_start.register(neo.Epoch)
 @set_relative_time_start.register(DataZone)
-def _(data, t=0):
+def _set_relative_time_start_(data: neo.Epoch | DataZone, t=0):
     if isinstance(t, pq.Quantity):
         t.rescale(data.times.units)  # will raise if units are wrong wrt signal's domain
 
@@ -466,7 +473,7 @@ def _(data, t=0):
     return ret
 
 @set_relative_time_start.register(Interval)
-def _(data, t=0):
+def _set_relative_time_start_(data: Interval, t=0):
     if isinstance(t, pq.Quantity):
         t.rescale(data.times.units)  # will raise if units are wrong wrt signal's domain
 
@@ -495,7 +502,7 @@ def _(data, t=0):
 @set_relative_time_start.register(neo.Event)
 @set_relative_time_start.register(DataMark)
 @set_relative_time_start.register(TriggerEvent)
-def _(data, t=0):
+def _set_relative_time_start_(data: typing.Union[neo.Event, DataMark, TriggerEvent], t=0):
     if isinstance(t, pq.Quantity):
         t.rescale(data.times.units)  # will raise if units are wrong wrt signal's domain
 
@@ -527,7 +534,7 @@ def _(data, t=0):
 
 
 @set_relative_time_start.register(neo.SpikeTrain)
-def _(data, t=0):
+def _set_relative_time_start_(data: neo.SpikeTrain, t=0):
     if isinstance(t, pq.Quantity):
         t.rescale(data.times.units)  # will raise if units wrong wrt signal's domain
 
@@ -556,7 +563,7 @@ def _(data, t=0):
 
 @set_relative_time_start.register(neo.AnalogSignal)
 @set_relative_time_start.register(DataSignal)
-def _(data, t=0):
+def _set_relative_time_start_(data: neo.AnalogSignal | DataSignal, t=0):
     if isinstance(t, pq.Quantity):
         t.rescale(data.times.units)  # will raise if units are wrong wrt signal's domain
 
@@ -575,7 +582,7 @@ def _(data, t=0):
 
 @set_relative_time_start.register(neo.IrregularlySampledSignal)
 @set_relative_time_start.register(IrregularlySampledDataSignal)
-def _(data, t=0):
+def _set_relative_time_start_(data: neo.IrregularlySampledSignal | IrregularlySampledDataSignal, t=0):
     if isinstance(t, pq.Quantity):
         t.rescale(data.times.units)  # will raise if units are wrong wrt signal's domain
 
@@ -588,7 +595,7 @@ def _(data, t=0):
 
 
 @set_relative_time_start.register(neo.Segment)
-def _(data, t=0):
+def _set_relative_time_start_(data: neo.Segment, t=0):
     from neo.core.spiketrainlist import SpikeTrainList
 
     ret = make_neo_object(data)
@@ -619,7 +626,7 @@ def _(data, t=0):
 
 
 @set_relative_time_start.register(neo.Block)
-def _(data, t=0):
+def _set_relative_time_start_(data: neo.Block, t=0):
     r"""Set the components in each segment to the same t_start.
     WARNING: Modifies data in-place only for signals, because the `times`
     attribute is read-only for neo data objects, except analog signals and
@@ -644,7 +651,7 @@ def _(data, t=0):
 
 @set_relative_time_start.register(tuple)
 @set_relative_time_start.register(list)
-def _(data, t=0):
+def _set_relative_time_start_(data: tuple | list, t=0):
     return [set_relative_time_start(d, t) for d in data]
 
 
@@ -728,7 +735,7 @@ def make_neo_object(obj, /, **kwargs):
 
 
 @make_neo_object.register(neo.core.container.Container)
-def _(obj, /, **kwargs):
+def _make_neo_object_(obj, /, **kwargs):
     r"""Generic (copy) constructor for neo's Container-like objects.
 
     Generates an empty container of the same type as 'obj'; data children need
@@ -801,14 +808,14 @@ def _(obj, /, **kwargs):
 
 
 @make_neo_object.register(neo.core.spiketrainlist.SpikeTrainList)
-def _(obj, /, **kwargs):
+def _make_neo_object_(obj, /, **kwargs):
     items = [make_neo_obj(st) for st in obj]
     segment = obj.segment
     return neo.core.spiketrainlist.SpikeTrainList(items=items, segment=segment)
 
 
 @make_neo_object.register(neo.core.dataobject.DataObject)
-def _(obj, /, **kwargs):
+def _make_neo_object_(obj, /, **kwargs):
     r"""Generic (copy) constructor for objects of types inheriting neo.DataObject.
     Initialization based on half-educated guess, for code refactoring.
 
@@ -2414,7 +2421,7 @@ def normalized_index(
     raise NotImplementedError(f"Function is not implemented for objects of type {type(src)}")
 
 @normalized_index.register(neo.core.container.Container) # neo.Block, neo.Segment, neo.Group
-def _(src: neo.core.container.Container,
+def _normalized_index_(src: neo.core.container.Container,
     index: typing.Union[int, str, range, slice, typing.Sequence], /,
     silent: bool = False,
     ingroups: bool = False,
@@ -2542,7 +2549,7 @@ def _(src: neo.core.container.Container,
 @normalized_index.register(list) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
 @normalized_index.register(tuple) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
 @normalized_index.register(deque) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
-def _(src: typing.Union[NeoObjectList, list, tuple, deque],
+def _normalized_index_(src: typing.Union[NeoObjectList, list, tuple, deque],
     index: typing.Union[int, str, range, slice, typing.Sequence], /,
     silent: bool = False,
     ingroups: bool = False, # not used
@@ -4217,7 +4224,7 @@ def copy_with_data_subset(obj, **kwargs):
 
 
 @copy_with_data_subset.register(neo.Block)
-def _(obj, **kwargs):
+def _copy_with_data_subset_(obj:neo.Block, **kwargs):
     r"""Deep copy for a subset of data & containers in Block."""
     # NOTE: 2023-05-20 09:48:31
     # ### BEGIN allow overwriting these here,
@@ -4388,7 +4395,7 @@ def _(obj, **kwargs):
 
 
 @copy_with_data_subset.register(neo.Segment)
-def _(obj, **kwargs):
+def _copy_with_data_subset_(obj: neo.Segment, **kwargs):
     from neo.core.spiketrainlist import SpikeTrainList
     import difflib
 
@@ -4445,13 +4452,21 @@ def _(obj, **kwargs):
         container = list(getattr(obj, container_name))
         try:
             keep_ndx = normalized_index(container, indices)
+
+            # print(f"copy_with_data_subset[{type(obj)}]: indices = {indices} -> keep_ndx = {keep_ndx}")
         except:
             print(
                 f"*****\nInvalid {container_name} indices ({indices}) for {obj.__class__.__name__} object {getattr(obj, 'name', None)} with {len(container)} {pluralize('element', len(container))} \n*****\n"
             )
             raise
 
-        keep_data = list(make_neo_object(container[k]) for k in keep_ndx)  # copy c'tor
+        if isinstance(keep_ndx, (typing.Sequence, range)):
+            keep_data = list(make_neo_object(container[k]) for k in keep_ndx)  # copy c'tor
+        elif isinstance(keep_ndx, slice):
+            keep_data = list(make_neo_object(container[k]) for k in keep_ndx.indices(len(container)))  # copy c'tor
+
+        elif isinstance(keep_ndx, int):
+            keep_data = [make_neo_object(container[keep_ndx])]
 
         for d in keep_data:
             d.segment = ret
@@ -6327,15 +6342,16 @@ def remove_events(segment, event:typing.Optional[typing.Union[neo.Event, str, in
 
 
 @singledispatch
-def is_same_as(
-    a, b, rtol=1e-4, atol=1e-4, equal_nan=True, use_math=False, comparator=operator.eq
+def is_same_as(a, b,
+               rtol=1e-4, atol=1e-4, equal_nan=True, use_math=False,
+               comparator=operator.eq
 ):
     raise NotImplementedError(f"{type(a).__name__} objects are not supported")
 
 
 @is_same_as.register(neo.core.dataobject.DataObject)
-def _(
-    a, b, rtol=1e-4, atol=1e-4, equal_nan=True, use_math=False, comparator=operator.eq
+def _is_same_as_(a: neo.core.dataobject.DataObject, b: neo.core.dataobject.DataObject,
+    rtol=1e-4, atol=1e-4, equal_nan=True, use_math=False, comparator=operator.eq
 ):
     if comparator not in (operator.eq, isclose):
         raise TypeError(
@@ -6386,8 +6402,8 @@ def _(
 
 
 @is_same_as.register(neo.core.container.Container)
-def _(
-    a, b, rtol=1e-4, atol=1e-4, equal_nan=True, use_math=False, comparator=operator.eq
+def _is_same_as_(a: neo.core.container.Container, b: neo.core.container.Container,
+    rtol=1e-4, atol=1e-4, equal_nan=True, use_math=False, comparator=operator.eq
 ):
     sim_func = partial(
         utilities.is_same_as,
@@ -6446,8 +6462,8 @@ def _(
 
 
 @is_same_as.register(neo.ChannelView)
-def _(
-    a, b, rtol=1e-4, atol=1e-4, equal_nan=True, use_math=False, comparator=operator.eq
+def _is_same_as_(a: neo.ChannelView, b: neo.ChannelView,
+    rtol=1e-4, atol=1e-4, equal_nan=True, use_math=False, comparator=operator.eq
 ):
     sim_func = partial(
         utilities.is_same_as,

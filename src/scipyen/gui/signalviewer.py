@@ -3076,7 +3076,7 @@ anything else       anything else       ❌
         super().closeEvent(evt) # NOTE: 2026-04-12 00:18:02 This is crucial!
         evt.accept()
 
-    def addCursors(self, /, *args, **kwargs):
+    def addCursors(self, /, *args, **kwargs) -> tuple:
         r"""Manually adds a set of cursors to the selected axes in the SignalViewer window.
 
 .. |nbsp| unicode:: 0xA0
@@ -3139,6 +3139,8 @@ Var-keyword arguments ("name=value" pairs):
         axis    = kwargs.pop("axis",    None)
 
         showEditor = kwargs.pop("editFirst", False)
+
+        ret = list()
 
         if len(self.plotItems) == 0:
             axis = self.signalsLayout.scene()
@@ -3208,36 +3210,35 @@ Var-keyword arguments ("name=value" pairs):
         elif not isinstance(cursorType, SignalCursorTypes):
             raise TypeError(f"Expecting cursorType a str or a gui.cursors.SignalCursorTypes object; instead, got {type(cursorType).__name__}")
 
-
         if len(args) == 0: # no coordinates given
             x = y = None
 
         elif len(args) == 1: # a single object passed - figure it out
             if isinstance(args[0], np.ndarray):
-                self._use_coords_sequence_(args[0], xwindow, ywindow, labels, axis, cursorType)
-                return
+                return self._use_coords_sequence_(args[0], xwindow, ywindow, labels, axis, cursorType)
 
             elif isinstance(args[0], (tuple, list)):
                 x, y = self._addCursors_parse_coords_(args[0], cursorType)
 
             elif isinstance(args[0], DataCursor):
-                self.addCursor(cursorType, args[0])
+                return (self.addCursor(cursorType, args[0]), )
 
         elif isinstance(args, (tuple, list)):
             if all(isinstance(a, numbers.Number) for a in args):
-                self._use_coords_sequence_(args, xwindow, ywindow, labels, axis, cursorType)
-                return
+                return self._use_coords_sequence_(args, xwindow, ywindow, labels, axis, cursorType)
 
             elif all(isinstance(a, DataCursor) for a in args):
                 if len(args) > 2:
                     raise SyntaxError(f"Too many DataCursor objects passed: expecting at most two, got {len(args)}")
 
-        self.addCursor(cursorType=cursorType, x=x, y=y,
+        ret = (self.addCursor(cursorType=cursorType, x=x, y=y,
                        xwindow=xwindow, ywindow=ywindow,
                        label=labels,
                        show_value = self.setCursorsShowValue.isChecked(),
                        axis = axis,
-                       editFirst = showEditor)
+                       editFirst = showEditor), )
+
+        return ret
 
     def addVerticalSignalCursorFromDataCursor(self, c: DataCursor,
                                 label: typing.Optional[
@@ -3249,7 +3250,7 @@ Var-keyword arguments ("name=value" pairs):
                                 follows_mouse: bool = False,
                                 axis: typing.Optional[int] = None,
                                 editFirst: bool=False,
-                                **kwargs) -> None:
+                                **kwargs) -> str:
 
         assert(isinstance(c, DataCursor)), f"Expecting a DataCursor; instead, got a {type(c).__name__}"
 
@@ -3261,7 +3262,7 @@ Var-keyword arguments ("name=value" pairs):
             if isinstance(c.name, str) and len(c.name.strip()) > 0:
                 name = c.name
 
-        self.addCursor(cursorType = SignalCursorTypes.vertical,
+        return self.addCursor(cursorType = SignalCursorTypes.vertical,
                        x = c.coord, xwindow = c.span,
                        name = name, relative=True)
 
@@ -3277,89 +3278,94 @@ Var-keyword arguments ("name=value" pairs):
                   follows_mouse: bool = False,
                   axis: typing.Optional[int] = None,
                   editFirst: bool=False,
-                  **kwargs) -> None:
+                  **kwargs) -> str:
         r""" Add a cursor to the selected axes in the signal viewer window.
 
-        When no data has been plotted, the cursor is created in the scene.
+When no data has been plotted, the cursor is created in the scene.
 
-        Parameters:
-        ------------
-        cursorType: str, one of "c", "v" or "h" respectively, for
-                    crosshair, vertical or horizontal cursors; default is "c"
+Parameters:
+------------
+cursorType: str, one of "c", "v" or "h" respectively, for
+            crosshair, vertical or horizontal cursors; default is "c"
 
-        x: None, float (cursor's horizontal coordinate in axis units) or a DataCursor.
-                When None, the cursor will be placed in the middle of the X range
-                of the selected axis.
+x: None, float (cursor's horizontal coordinate in axis units) or a DataCursor.
+        When None, the cursor will be placed in the middle of the X range
+        of the selected axis.
 
-        x can also be a DataCursor -> vertical or horizontal cursor
+x can also be a DataCursor -> vertical or horizontal cursor
 
-        y: None, float (cursor's vertical coordinate in axis unitss), or a DataCursor.
-                When None, the cursor will be placed in the middle of the Y range
-                of the selected axis
+y: None, float (cursor's vertical coordinate in axis unitss), or a DataCursor.
+        When None, the cursor will be placed in the middle of the Y range
+        of the selected axis
 
-        xwindow: None or float with the horizontal size of the cursor window;
-                    this is ignored for horizontal cursors
+xwindow: None or float with the horizontal size of the cursor window;
+            this is ignored for horizontal cursors
 
-        ywindow: as xwindow; ignored for vertical cursors
+ywindow: as xwindow; ignored for vertical cursors
 
-        xBounds, yBounds: limits for the cursor's position, respectively in the
-            X and Y ranges of the selected axis.
+xBounds, yBounds: limits for the cursor's position, respectively in the
+    X and Y ranges of the selected axis.
 
-        label: None, or a str; is None, the cursor will be assigned an ID
-                    composed of "c", "v", or "h", followed by the current cursor
-                    number of the same type.
+label: None, or a str; is None, the cursor will be assigned an ID
+            composed of "c", "v", or "h", followed by the current cursor
+            number of the same type.
 
-        name: same as label (for backward compatibility in old API)
+name: same as label (for backward compatibility in old API)
 
-        follows_mouse: bool default False. When True, the cursor will follow
-            the mouse position in the axis
+follows_mouse: bool default False. When True, the cursor will follow
+    the mouse position in the axis
 
-        axis: None (default), int, the str "all" or "a" (case-insensitive), or
-            a pyqtgraph.PlotItem object.
+axis: None (default), int, the str "all" or "a" (case-insensitive), or
+    a pyqtgraph.PlotItem object.
 
-            Indicates the axis (or PlotItem) where the cursor will be created.
+    Indicates the axis (or PlotItem) where the cursor will be created.
 
-            When there are no axes yet the cursor will be created by default in
-            the scene, and wil behave like a multi-axis cursor.
-            WARNING the coordinates won't make much sense unless in this case,
-            unless they are given in the scene coordinates.
+    When there are no axes yet the cursor will be created by default in
+    the scene, and wil behave like a multi-axis cursor.
+    WARNING the coordinates won't make much sense unless in this case,
+    unless they are given in the scene coordinates.
 
-            None (the default) indicates that the cursor will be created in
-            the selected axis (which by default is the top axis at index 0).
+    None (the default) indicates that the cursor will be created in
+    the selected axis (which by default is the top axis at index 0).
 
-            Axis "a" or "all" indicates a cursor that spans all axes
-            (multi-axis cursor).
+    Axis "a" or "all" indicates a cursor that spans all axes
+    (multi-axis cursor).
 
-            When "axis" is a pyqtgraph.PlotItem, it must be one of the axes
-            that belong to this instance of SignalViewer.
+    When "axis" is a pyqtgraph.PlotItem, it must be one of the axes
+    that belong to this instance of SignalViewer.
 
-        editFirst:bool, default False; When True, the user will be prompted with
-            the CursorEditor dialog to edit the cursor's parameter (e.g., name,
-            coordinates)
+editFirst:bool, default False; When True, the user will be prompted with
+    the CursorEditor dialog to edit the cursor's parameter (e.g., name,
+    coordinates)
 
-        Var-keyword parameters (**kwargs):
-        ----------------------------------
+Var-keyword parameters (**kwargs):
+----------------------------------
 
-        show_value: bool. When True, the cursor's coordinate(s) will be shown
-            next to its label; by default, this is set in SignalViewer's "Cursors"
-            menu
+show_value: bool. When True, the cursor's coordinate(s) will be shown
+    next to its label; by default, this is set in SignalViewer's "Cursors"
+    menu
 
-        precison: int; the precision of the displayed coordinate (i.e. number of
-            digits after the decimal point); by default, this is set in SignalViewer's "Cursors"
-            menu
+precison: int; the precision of the displayed coordinate (i.e. number of
+    digits after the decimal point); by default, this is set in SignalViewer's "Cursors"
+    menu
 
-        relative: bool, default is True.
-            When True, the cursor's horizontal coordinate will be adjusted
-            relative to the minimum of the axis X range (ths is necessary for a
-            given cursor to 'stay' in axis across, e.g., successive segments of
-            a neo.Block).
+relative: bool, default is True.
+    When True, the cursor's horizontal coordinate will be adjusted
+    relative to the minimum of the axis X range (ths is necessary for a
+    given cursor to 'stay' in axis across, e.g., successive segments of
+    a neo.Block).
 
-            When False, whenever the axis X domain changes, the cursor may become
-            invisible, or plotted at one of the axis X domain end (dependng on its
-            xBounds).
+    When False, whenever the axis X domain changes, the cursor may become
+    invisible, or plotted at one of the axis X domain end (dependng on its
+    xBounds).
 
-        label_position: float, default is 0.5; the initial position of the cursor's
-            label, as a fraction of the cursor's line extent
+label_position: float, default is 0.5; the initial position of the cursor's
+    label, as a fraction of the cursor's line extent
+
+Returns:
+--------
+The ID of the newly created SignalCursor
+
 
         """
         # NOTE: 2020-02-26 14:23:40
@@ -3380,6 +3386,8 @@ Var-keyword arguments ("name=value" pairs):
                                 **kwargs)
 
         self.slot_selectCursor(crsID)
+
+        return crsID
 
     @safewrapper
     def keyPressEvent(self, keyevt):
@@ -10955,7 +10963,7 @@ Var-keyword parameters ("name=value" pairs):
         else:
             self._update_coordinates_viewer_()
 
-    def _addCursors_parse_coords_(self, coords, cursorType):
+    def _addCursors_parse_coords_(self, coords, cursorType) -> tuple:
         # print(f"{self.__class__.__name__}._addCursors_parse_coords_ coords {coords}")
         if isinstance(coords, (tuple, list)) and all([isinstance(v, numbers.Number) for v in coords]):
             if len(coords) == 1:
@@ -10976,7 +10984,6 @@ Var-keyword parameters ("name=value" pairs):
 
             else:
                 raise ValueError(f"Invalid coordinates specified - expecting at most two; instead, got  {coords}")
-
 
         elif isinstance(coords, (pq.Quantity, np.ndarray)):
             if coords.size == 1:
@@ -11028,10 +11035,12 @@ Var-keyword parameters ("name=value" pairs):
 
         return x,y
 
-    def _use_coords_sequence_(self, seq, xw, yw, lbls, ax, cursorType):
+    def _use_coords_sequence_(self, seq, xw, yw, lbls, ax, cursorType) -> tuple:
         r"""Adds cursors based on a sequence of cursor coordinates
         """
         # print(f"_use_coords_sequence_ seq = {seq}, xw = {xw}, yw = {yw}, lbls = {lbls}, ax = {ax}")
+        ret = list()
+
         for (k, coords) in enumerate(seq):
             x, y = self._addCursors_parse_coords_(coords, cursorType)
 
@@ -11070,17 +11079,21 @@ Var-keyword parameters ("name=value" pairs):
                 lbl = f"{cursorType.name[0]}{len(n_existing_cursors)}"
 
             if isinstance(ax, (int, pg.PlotItem, str)):
-                self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
+                cID = self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
                             label=lbl, show_value = self.setCursorsShowValue.isChecked(),
                             axis=ax)
+                ret.append(cID)
 
             elif isinstance(ax, (tuple, list)) and all(isinstance(a, (int, pg.PlotItem)) for a in ax):
                 if len(ax) != len(seq):
                     raise ValueError(f"number of axes ({len(ax)}) should be the same as the number of cursors ({len(seq)})")
 
-                self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
+                cID = self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
                             label=lbl, show_value = self.setCursorsShowValue.isChecked(),
                             axis=ax[k])
+                ret.append(cID)
+
+        return tuple(ret)
 
     @safewrapper
     def _reportMouseCoordinatesInAxis_(self, pos, plotitem):

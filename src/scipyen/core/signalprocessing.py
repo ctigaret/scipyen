@@ -3441,8 +3441,9 @@ def detect_boxcar(
     return times_hi_lo, times_lo_hi, amplitude, cbook, code, upward
 
 def suggest_rise_fraction_indexes(sig: np.ndarray,
-                      refval: np.ndarray | pq.Quantity, targetval: np.ndarray | pq.Quantity,
-                      minpc: float, maxpc: float) -> tuple | None:
+                      refval: np.ndarray | pq.Quantity,
+                      targetval: np.ndarray | pq.Quantity,
+                      minpc: float, maxpc: float, asArray:bool = False) -> tuple | None:
 
     if not isinstance(refval, np.ndarray) or refval.size!=1:
         raise ValueError(f"revfal expected a scalar; instead, got {refval}")
@@ -3484,6 +3485,9 @@ def suggest_rise_fraction_indexes(sig: np.ndarray,
 
         startNdx = above[-1]
 
+        if asArray:
+            return np.ndarray([startNdx, endNdx])
+
         return startNdx, endNdx
 
     else:
@@ -3504,4 +3508,26 @@ def suggest_rise_fraction_indexes(sig: np.ndarray,
 
         startNdx = below[-1]
 
+        if asArray:
+            return np.ndarray([startNdx, endNdx])
+
         return startNdx, endNdx
+
+def rising_phase_fraction_times(sig: typing.Union[neo.AnalogSignal, DataSignal],
+                      refval: np.ndarray | pq.Quantity,
+                      targetval: np.ndarray | pq.Quantity,
+                      minpc: float, maxpc: float, asArray:bool = False) -> tuple | None:
+    if not isinstance(sig, (neo.AnalogSignal, DataSignal)):
+        raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal object; instead, ot a {type(sig).__name__}")
+
+    ndx = suggest_rise_fraction_indexes(sig, refval, targetval, minpc, maxpc, False)
+
+    if ndx is None:
+        return
+
+    ret = tuple(map(lambda x: sig.times[x], ndx))
+
+    if asArray:
+        return np.array(ret)
+
+    return ret
