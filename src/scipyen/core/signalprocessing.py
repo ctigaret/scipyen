@@ -3439,3 +3439,69 @@ def detect_boxcar(
 
     # emulates parse_step_waveform_signal
     return times_hi_lo, times_lo_hi, amplitude, cbook, code, upward
+
+def suggest_rise_fraction_indexes(sig: np.ndarray,
+                      refval: np.ndarray | pq.Quantity, targetval: np.ndarray | pq.Quantity,
+                      minpc: float, maxpc: float) -> tuple | None:
+
+    if not isinstance(refval, np.ndarray) or refval.size!=1:
+        raise ValueError(f"revfal expected a scalar; instead, got {refval}")
+
+    if not isinstance(targetval, np.ndarray) or targetval.size!=1:
+        raise ValueError(f"targetval expected a scalar; instead, got {targetval}")
+
+    if not all (isinstance(v, float) for v in (minpc, maxpc)):
+        raise TypeError(f"Both minpc and maxpc must be floats; instead, got minpc: {type(minpc).__name__} and maxpc: {type(maxpc).__name__}")
+
+    if not (minpc >=0 and minpc <=1 and maxpc >= 0 and maxpc <=1 and minpc != maxpc):
+        raise ValueError(f"Both minpc and maxpc must be in the interval [0,1] and distinct; instead, got minpc: {minpc} and maxpc: {maxpc}")
+
+    target = targetval.magnitude if (isinstance(targetval, pq.Quantity) and not isinstance(sig, pq.Quantity)) else targetval
+
+    ref = refval.magnitude if (isinstance(refval, pq.Quantity) and not isinstance(sig, pq.Quantity)) else refval
+
+    if np.isclose(float(target), float(ref)):
+        scipywarn(f"Traget ({targetval}) and reference ({revfal}) are too close")
+        return
+
+
+    inward = target < ref
+
+    δval = target-ref
+
+    if inward:
+        bottom = refval + δval * maxpc
+        top = refval + δval * minpc
+        below = np.where(sig < bottom)[0]
+        if below.size == 0:
+            return
+
+        endNdx = below[0]
+
+        above = np.where(sig > top)[0]
+        if above.size == 0:
+            return
+
+        startNdx = above[-1]
+
+        return startNdx, endNdx
+
+    else:
+        bottom = refval + δval * minpc
+        top = refval + δval * maxpc
+
+        above = np.where(sig > top)[0]
+
+        if above.size == 0:
+            return
+
+        endNdx = above[0]
+
+        below = np.where(sig < bottom)[0]
+
+        if below.size == 0:
+            return
+
+        startNdx = below[-1]
+
+        return startNdx, endNdx
