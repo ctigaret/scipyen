@@ -69,9 +69,10 @@ class DataCursor:
 Performs a similar function as Interval with extent=True (i.e. the coordinate is at |nbsp|
 the center of the span, and the span extends symmetrically around the coordinate) |nbsp|
 EXCEPT that the coordinates may not necessarily associate a physical quantity.
+
 """
-    coord:typing.Union[float, pq.Quantity]
-    span:typing.Union[float, pq.Quantity]
+    coord: typing.Union[float, pq.Quantity]
+    span: typing.Union[float, pq.Quantity]
     name:str = ""
 
 class SignalCursorTypes(enum.Enum):

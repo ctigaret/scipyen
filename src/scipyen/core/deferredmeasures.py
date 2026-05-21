@@ -60,10 +60,10 @@ class DeferredComputation: pass # forward declaration
 @dataclass
 class DeferredOperation:
     r""""""
-    op: typing.Callable
+    op: typing.Union[typing.Callable, typing.Sequence[typing.Callable]]
     args: tuple = dataclasses.field(default_factory = tuple)
     kwargs: dict = dataclasses.field(default_factory = dict)
-
+    name: str = dataclasses.field(default = "operation")
 
     def __post_init__(self) -> None:
         self.placeholder = re.compile(r'<[0-9]*?>')
@@ -208,14 +208,17 @@ class DeferredOperation:
         # print(f"\n\t => return {ret}")
         return ret
 
-    def __call__(self, obj) -> object:
-        if self.debug:
-            print(f"\n{self.__class__.__name__}__call__(obj={obj}, {self.args}, {self.kwargs})\n\t<with {len(self.args)} var-positional arguments and {len(self.kwargs)} keyword parameters>")
-        if self.op in (operator.attrgetter, operator.itemgetter, operator.methodcaller):
-            return self.op(*self.args, **self.kwargs)(obj)
+    def _call_op_(self, op, obj) -> object:
+        r"""needed to allow exec'ing more than one call for the same object"""
+        if op in (operator.attrgetter, operator.itemgetter, operator.methodcaller):
+            if isinstance(self.args, str):
+                args = (self.args, )
+            else:
+                args = self.args
+            return op(*args, **self.kwargs)(obj)
 
-        elif isinstance(self.op, np.ufunc):
-            return self.op(obj)
+        elif isinstance(op, np.ufunc):
+            return op(obj)
 
         else:
             res_args = list()
@@ -249,7 +252,59 @@ class DeferredOperation:
             if self.debug:
                 print(f"\n=>res_args = {res_args}")
 
-            return self.op(obj, *res_args, **self.kwargs)
+            return op(obj, *res_args, **self.kwargs)
+
+    def __call__(self, obj) -> object:
+        if self.debug:
+            print(f"\n{self.__class__.__name__}__call__(obj={obj}, {self.args}, {self.kwargs})\n\t<with {len(self.args)} var-positional arguments and {len(self.kwargs)} keyword parameters>")
+
+        if isinstance(self.op, typing.Sequence) and all(isinstance(op, (types.FunctionType, functools.partial, np.ufunc, typing.Callable)) for op in self.op):
+            return tuple(map(lambda op: self._call_op_(op, obj), self.op))
+
+        return self._call_op_(self.op, obj)
+        # if self.op in (operator.attrgetter, operator.itemgetter, operator.methodcaller):
+        #     if isinstance(self.args, str):
+        #         args = (self.args, )
+        #     else:
+        #         args = self.args
+        #     return self.op(*args, **self.kwargs)(obj)
+        #
+        # elif isinstance(self.op, np.ufunc):
+        #     return self.op(obj)
+        #
+        # else:
+        #     res_args = list()
+        #     for arg in self.args:
+        #         if isinstance(arg, tuple):
+        #             if len(arg) == 0:
+        #                 continue
+        #
+        #             elif len(arg) in (2,3) and isinstance(arg[0], DeferredSignalMeasure):
+        #                 if self.debug:
+        #                     print(f"\n\n[{arg[0].name}] arg[0], {type(arg[0])}: {arg[0]}\n\n\t arg[1], {type(arg[1])}: {arg[1]}, {type(arg[1])}")
+        #                 if len(arg) == 2:
+        #                     if isinstance(arg[1], np.ndarray):
+        #                         arg = arg[0](arg[1])
+        #                     else:
+        #                         arg = arg[0](*arg[1])
+        #                 else:
+        #                     if self.debug:
+        #                         print(f"\n\n[{arg[0].name}] arg[2] {arg[2]}, {type(arg[2])}")
+        #                     # NOTE: 2026-05-12 23:09:06 possible BUG will creep out -> to investigate!
+        #                     if isinstance(arg[1], np.ndarray):
+        #                         arg = arg[0](arg[1], **arg[2])
+        #                     else:
+        #                         arg = arg[0](*arg[1], **arg[2])
+        #
+        #                 if self.debug:
+        #                     print(f"\n\t[{arg[0].name}] =>=> {arg}\n")
+        #
+        #         res_args.append(arg)
+        #
+        #     if self.debug:
+        #         print(f"\n=>res_args = {res_args}")
+        #
+        #     return self.op(obj, *res_args, **self.kwargs)
 
 
 @dataclass
@@ -881,7 +936,6 @@ Returns:
 
         return defop(obj)
 
-
     def __call__(self, *args, **kwargs) -> object:
         r"""Executes the location measure object.
 
@@ -1104,6 +1158,7 @@ Any aditional named or keyword parameters to be passed to `func`.
             # posargs come first so that we can insert a functool.partial before
             # passing the arg; the result of that functool then becomes the first
             # arg after the location, pased to func
+
             fargs = (locations,) + self.posargs + (arg,)
 
             if self.debug:
@@ -1181,7 +1236,7 @@ this object as a function.
 
 """
     func: typing.Callable
-    name: str = dataclasses.field(default = "measure")
+    name: str = dataclasses.field(default = "computation")
 
     posargs: tuple = dataclasses.field(default_factory = tuple)
     kwargs: dict = dataclasses.field(default_factory=dict)
@@ -1399,9 +1454,6 @@ Returns:
 class DeferredCallChain:
     r"""Deferred call chain funcs[𝒌](funcs[𝒌-1](...(funcs[0](arg)))).
 
-
-
-
 All functions (Callables) in funcs must accept a single parameter,
 which is the result of calling the preceding function, or, in the
 case of the first func in the chain, the unique parameter passed on
@@ -1420,6 +1472,8 @@ calls that expect more than one parameter to a call expecting a single one.
                 np.ufunc
             ]
         ]
+
+    name: str = dataclasses.field(default = "callchain")
 
     def __call__(self, obj: object): #*args, **kwargs):
         r"""
