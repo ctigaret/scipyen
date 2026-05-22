@@ -448,22 +448,22 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     # TODO: 2019-11-01 22:43:50
     # implement viewing for all these
-    viewer_for_types = {neo.Block: 99,
-                        neo.Segment: 99,
-                        neo.AnalogSignal: 99,
-                        DataSignal: 99,
-                        neo.IrregularlySampledSignal: 99,
-                        IrregularlySampledDataSignal: 99,
-                        neo.SpikeTrain: 99,
-                        neo.Event: 99,
-                        neo.Epoch: 99,
-                        neo.core.spiketrainlist.SpikeTrainList:99,
+    viewer_for_types = {neo.Block: 100,
+                        neo.Segment: 100,
+                        neo.AnalogSignal: 100,
+                        DataSignal: 100,
+                        neo.IrregularlySampledSignal: 100,
+                        IrregularlySampledDataSignal: 100,
+                        neo.SpikeTrain: 100,
+                        neo.Event: 100,
+                        neo.Epoch: 100,
+                        neo.core.spiketrainlist.SpikeTrainList:100,
                         # neo.core.baseneo.BaseNeo: 99,
                         TriggerEvent: 99,
                         TriggerProtocol: 99,
                         vigra.filters.Kernel1D: 99,
                         pq.Quantity: 99,
-                        np.ndarray: 99,
+                        np.ndarray: 90,
                         tuple: 99,
                         list: 99}
 
@@ -3507,10 +3507,11 @@ Var-keyword parameters ("name=value" pairs):
                     cursor_pos_text = list()
 
                     if cursor.cursorTypeName in ("crosshair", "vertical"):
-                        cursor_pos_text.append("X: %f (window: %f)" % (x, cursor.xwindow))
+                        cursor_pos_text.append(f"X: {x} (window: {cursor.xwindow})")# % (x, cursor.xwindow))
 
                     if cursor.cursorTypeName in ("crosshair", "horizontal"):
-                        cursor_pos_text.append("Y: %f (window: %f)" % (y, cursor.ywindow))
+                        cursor_pos_text.append(f"Y: {y} (window: {cursor.ywindow})")# % (y, cursor.ywindow))
+                        # cursor_pos_text.append("Y: %f (window: %f)" % (y, cursor.ywindow))
 
                     text.append("\n".join(cursor_pos_text))
 
@@ -3554,10 +3555,12 @@ Var-keyword parameters ("name=value" pairs):
                         y = cursor.getY(plotitem)
 
                         if cursor.cursorTypeName in ("crosshair", "vertical"):
-                            plot_item_cursor_pos_text.append("X: %f (window: %f)" % (x, cursor.xwindow))
+                            plot_item_cursor_pos_text.append(f"X: {x} (window: {cursor.xwindow})")# % (x, cursor.xwindow))
+                            # plot_item_cursor_pos_text.append("X: %f (window: %f)" % (x, cursor.xwindow))
 
                         if cursor.cursorTypeName in ("crosshair", "horizontal"):
-                            plot_item_cursor_pos_text.append("Y: %f (window: %f)" % (y, cursor.ywindow))
+                            plot_item_cursor_pos_text.append(f"Y: {x} (window: {cursor.ywindow})")# % (y, cursor.ywindow))
+                            # plot_item_cursor_pos_text.append("Y: %f (window: %f)" % (y, cursor.ywindow))
 
                         plot_item_text.append("\n".join(plot_item_cursor_pos_text))
 
@@ -4096,8 +4099,8 @@ Var-keyword parameters ("name=value" pairs):
             self.configurable_traits[traitname] = name
 
     def _addCursor_(self, cursor_type: typing.Union[str, SignalCursorTypes],
-                    x: typing.Optional[typing.Union[numbers.Number, pq.Quantity, DataCursor]] = None,
-                    y: typing.Optional[typing.Union[numbers.Number, pq.Quantity, DataCursor]] = None,
+                    x: typing.Optional[typing.Union[numbers.Number, pq.Quantity, DataCursor, Interval, neo.Epoch, DataZone]] = None,
+                    y: typing.Optional[typing.Union[numbers.Number, pq.Quantity, DataCursor, Interval, neo.Epoch, DataZone]] = None,
                     xwindow: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
                     ywindow: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
                     xBounds: typing.Optional[tuple] = None,
@@ -4148,64 +4151,145 @@ Var-keyword parameters ("name=value" pairs):
 
         #### END Figure out cursors destination: axis or scene
 
-        #### BEGIN sort out cursor windows (and units, 1st pass) -- TODO 2025-07-14 22:40:39 streamline this
-        if xwindow is None:
-            if isinstance(x, DataCursor):
-                if isinstance(xwindow, pq.Quantity):
-                    xUnits = xwindow.units
-                    xwindow = float(xwindow.magnitude.flatten()[0])
-                else:
-                    xwindow = float(x.span.flatten()[0]) if isinstance(x.span, np.ndarray) else float(x.span)
+        if isinstance(axis, pg.PlotItem): # single-axis cursor - a.k.a cursor in axis
+            if axis not in self.signalsLayout.items:
+                return
 
-            elif isinstance(x, Interval):
-                xwindow = x.durations[0]
-                xUnits = xwindow.units
-                xwindow = float(xwindow.magnitude.flatten()[0])
+            # NOTE: 2025-07-14 22:29:19
+            # use embedded user data in the QGraphicsItem (Qt API), see also:
+            # NOTE: 2025-07-14 21:49:57 and NOTE: 2025-07-14 21:52:45
+            ax_xUnits = axis.data(0)
+            ax_yUnits = axis.data(1)
+
+            # data_range = guiutils.getPlotItemDataBoundaries(axis)
+            # view_range = axis.viewRange()
+
+        else:
+            ax_xUnits = None
+            ax_yUnits = None
+
+        # ### BEGIN sort out cursor windows (and units, 1st pass) -- TODO 2025-07-14 22:40:39 streamline this
+        #
+
+        # ### BEGIN x window
+        #
+        if xwindow is None:
+            xwindow = x.span if isinstance(x, DataCursor) else x.durations[0] if isinstance(x, (Interval, neo.Epoch, DataZone)) else self.defaultCursorWindowSizeX
+
+            if isinstance(xwindow, pq.Quantity):
+                if isinstance(ax_xUnits, pq.Quantity):
+                    xwindow = xwindow.rescale(ax_xUnits)
+                    xUnits = xwindow.units
+                else:
+                    xwindow = float(xwindow.magnitude.flatten()[0])
+                    xUnits = ax_xUnits
+
             else:
-                xwindow = self.defaultCursorWindowSizeX
+                if not isinstance(ax_xUnits, pq.Quantity):
+                    xwindow = float(xwindow.flatten()[0]) if isinstance(xwindow, np.ndarray) else float(xwindow)
+                    xUnits = pq.dimensionless
+                else:
+                    xwindow = xwindow * ax_xUnits
+                    xUnits = xwindow.units
+
+            # if isinstance(x, DataCursor):
+            #     xwindow = x.span
+            #
+            # elif isinstance(x, Interval):
+            #     xwindow = x.durations[0]
+            #     xUnits = xwindow.units
+            #     xwindow = float(xwindow.magnitude.flatten()[0])
+            # else:
+            #     xwindow = self.defaultCursorWindowSizeX
 
         elif isinstance(xwindow, pq.Quantity):
             xUnits = xwindow.units
-            xwindow = float(xwindow.magnitude.flatten()[0])
+            if not isinstance(ax_xUnits, pq.Quantity):
+                xwindow = float(xwindow.magnitude.flatten()[0])
+            else:
+                xwindow = xwindow.rescale(ax_xUnits)
 
         elif not isinstance(xwindow, numbers.Number):
             raise TypeError("Unexpected type for xwindow: %s" % type(xwindow).__name__)
 
-        if ywindow is None:
-            if isinstance(y, DataCursor):
-                if isinstance(ywindow, pq.Quantity):
-                    yUnits = ywindow.units
-                    ywindow = float(ywindow.magnitude.flatten()[0])
-                else:
-                    ywindow = float(y.span[0]) if isinstance(y.span, np.ndarray) else float(y.span)
-
-            elif isinstance(y, Interval):
-                ywindow = y.durations[0]
-                yUnits = ywindow.units
-                ywindow = float(ywindow.magnitude.flatten()[0])
+        else:
+            if isinstance(ax_xUnits, pq.Quantity):
+                xwindow  = xwindow * ax_xUnits
+                xUnits = xwindow.units
             else:
-                ywindow = self.defaultCursorWindowSizeY
+                xUnits = pq.dimensionless
+        #
+        # ### END   x window
+
+        # ### BEGIN y window
+        #
+
+        if ywindow is None:
+            ywindow = y.span if isinstance(y, DataCursor) else y.durations[0] if isinstance(y, (Interval, neo.Epoch, DataZone)) else self.defaultCursorWindowSizeY
+
+            if isinstance(ywindow, pq.Quantity):
+                if isinstance(ax_yUnits, pq.Quantity):
+                    ywindow = ywindow.rescale(ax_yUnits)
+                    yUnits = xwindow.units
+                else:
+                    ywindow = float(ywindow.magnitude.flatten()[0])
+                    yUnits = ax_yUnits
+
+            else:
+                if not isinstance(ax_yUnits, pq.Quantity):
+                    ywindow = float(ywindow.flatten()[0]) if isinstance(ywindow, np.ndarray) else float(ywindow)
+                    yUnits = ax_yUnits
+                else:
+                    ywindow = ywindow * ax_yUnits
+                    yUnits = ywindow.units
+
+            # if isinstance(y, DataCursor):
+            #     if isinstance(ywindow, pq.Quantity):
+            #         yUnits = ywindow.units
+            #         ywindow = float(ywindow.magnitude.flatten()[0])
+            #     else:
+            #         ywindow = float(y.span[0]) if isinstance(y.span, np.ndarray) else float(y.span)
+            #
+            # elif isinstance(y, Interval):
+            #     ywindow = y.durations[0]
+            #     yUnits = ywindow.units
+            #     ywindow = float(ywindow.magnitude.flatten()[0])
+            # else:
+            #     ywindow = self.defaultCursorWindowSizeY
 
         elif isinstance(ywindow, pq.Quantity):
             yUnits = ywindow.units
-            ywindow = float(ywindow.magnitude.flatten()[0])
+            if not isinstance(ax_yUnits, pq.Quantity):
+                ywindow = float(ywindow.magnitude.flatten()[0])
+            else:
+                ywindow = ywindow.rescale(ax_yUnits)
 
         elif not isinstance(ywindow, numbers.Number):
             raise TypeError("Unexpected type for ywindow: %s" % type(ywindow).__name__)
 
-        #### END sort out cursor windows (and units, 1st pass) -- TODO 2025-07-14 22:40:39 streamline this
+        else:
+            if isinstance(ax_yUnits, pq.Quantity):
+                ywindow = ywindow * ax_yUnits
+                yUnits = ywindow.units
+            else:
+                yUnits = ax_yUnits
 
-        #### BEGIN figure out cursor type ⇒
+        #
+        # ### END   y window
+        #
+        # ### END sort out cursor windows (and units, 1st pass) -- TODO 2025-07-14 22:40:39 streamline this
+
+        # ### BEGIN figure out cursor type ⇒
         # • identify` cursor_dict
         # • adjust cursor windows as needed (set 0 for unused cursor lines)
         #
-        if any(isinstance(v, (DataCursor, Interval)) for v in (x,y)):
-            cursor_type = SignalCursorTypes.getType((isinstance(y, (DataCursor, Interval)), isinstance(x, (DataCursor,Interval))))
+        if any(isinstance(v, (DataCursor, Interval, neo.Epoch, DataZone)) for v in (x,y)):
+            cursor_type = SignalCursorTypes.getType((isinstance(y, (DataCursor, Interval, neo.Epoch, DataZone)), isinstance(x, (DataCursor,Interval, neo.Epoch, DataZone))))
             if label is None or (isinstance(label, str) and len(label.strip()) == 0):
-                if isinstance(x, (DataCursor, Interval)):
+                if isinstance(x, (DataCursor, Interval, neo.Epoch, DataZone)):
                     label = getattr(x, "name", None)
 
-                if isinstance(y, (DataCursor, Interval)):
+                if isinstance(y, (DataCursor, Interval, neo.Epoch, DataZone)):
                     y_label = getattr(y, "name", None)
                 else:
                     y_label = ""
@@ -4226,9 +4310,10 @@ Var-keyword parameters ("name=value" pairs):
             cursorDict = self._verticalSignalCursors_
             crsPrefix = "dv" if follows_mouse else "v"
 
-            ywindow = 0.0 * yUnits if isinstance(yUnits, pq.Quantity) else 0.0
+            # NOTE: 2026-05-22 11:35:05
+            # dealt with this earlier
+            # ywindow = 0.0 * yUnits if isinstance(yUnits, pq.Quantity) else 0.0
 
-            # pen = QtGui.QPen(QtGui.QColor(self.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
             pen = QtGui.QPen(QtGui.QColor(self.cursorColors["vertical"]), 1., self._cursorLineStyle_)
             linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["vertical"]), 1., self._cursorLineStyle_)
             hoverPen = QtGui.QPen(QtGui.QColor(self._cursorHoverColor_), 1., self._cursorLineStyle_)
@@ -4240,10 +4325,15 @@ Var-keyword parameters ("name=value" pairs):
         elif cursor_type in ("horizontal", "h", SignalCursorTypes.horizontal):
             cursorDict = self._horizontalSignalCursors_
             crsPrefix = "dh" if follows_mouse else "h"
-            xwindow = 0.0 * xUnits if isinstance(xUnits, pq.Quantity) else 0.0
+
+            # NOTE: 2026-05-22 11:35:05
+            # dealt with this earlier
+            # xwindow = 0.0 * xUnits if isinstance(xUnits, pq.Quantity) else 0.0
+
             pen = QtGui.QPen(QtGui.QColor(self.cursorColors["horizontal"]), 1, self._cursorLineStyle_)
             linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["horizontal"]), 1, self._cursorLineStyle_)
             hoverPen = QtGui.QPen(QtGui.QColor(self._cursorHoverColor_), 1, self._cursorLineStyle_)
+
             pen.setCosmetic(True)
             linkedPen.setCosmetic(True)
             hoverPen.setCosmetic(True)
@@ -4260,10 +4350,12 @@ Var-keyword parameters ("name=value" pairs):
 
         else:
             raise ValueError("unsupported cursor type %s" % cursor_type)
-        #### END figure out cursor type; adjust cursor windows as needed (set 0 for unused cursor lines)
+        # ### END figure out cursor type; adjust cursor windows as needed (set 0 for unused cursor lines)
 
 
-        #### BEGIN check cursors coordinates (and units) - see also TODO 2025-07-14 22:40:39 streamline this
+        # ### BEGIN check cursors coordinates (and units) - see also TODO 2025-07-14 22:40:39 streamline this
+        #
+
         if isinstance(axis, pg.PlotItem): # single-axis cursor - a.k.a cursor in axis
             if axis not in self.signalsLayout.items:
                 return
@@ -4282,6 +4374,8 @@ Var-keyword parameters ("name=value" pairs):
             if x is None:
                 x = view_range[0][0] + (view_range[0][1] - view_range[0][0])/2
                 xUnits = ax_xUnits
+                if isinstance(ax_xUnits, pq.Quantity):
+                    x *= ax_xUnits
 
             elif isinstance(x, pq.Quantity):
                 if x.units != ax_xUnits:
@@ -4289,7 +4383,7 @@ Var-keyword parameters ("name=value" pairs):
                     x.rescale(ax_xUnits)
                     xUnits = x.units
 
-                x = float(x.magnitude.flatten()[0])
+                # x = float(x.magnitude.flatten()[0])
 
             # elif isinstance(x, numbers.Number):
 
@@ -4301,11 +4395,15 @@ Var-keyword parameters ("name=value" pairs):
 
             if xBounds is None:
                 xBounds = data_range[0]
+                if isinstance(ax_xUnits, pq.Quantity):
+                    xBounds = tuple(map(lambda v: v * ax_xUnits, xBounds))
                 # xBounds = view_range[0]
 
             if y is None:
                 y = view_range[1][0] + (view_range[1][1] - view_range[1][0])/2
                 yUnits = ax_yUnits
+                if isinstance(ax_yUnits, pq.Quantity):
+                    y *= ax_yUnits
 
             elif isinstance(y, pq.Quantity):
                 if yUnits != ax_yUnits:
@@ -4313,7 +4411,7 @@ Var-keyword parameters ("name=value" pairs):
                     y = y.rescale(ax_yUnits)
                     yUnits = y.units
 
-                y = float(y.magnitude.flatten()[0])
+                # y = float(y.magnitude.flatten()[0])
 
             elif not isinstance(y, (numbers.Number, DataCursor)):
                 raise TypeError("Unexpected type for y coordinate: %s" % type(y).__name__ )
@@ -4323,6 +4421,8 @@ Var-keyword parameters ("name=value" pairs):
 
             if yBounds is None:
                 yBounds = data_range[1]
+                if isinstance(ax_yUnits, pq.Quantity):
+                    yBounds = tuple(map(lambda v: v* ax_yUnits, yBounds))
                 # yBounds = view_range[1]
 
             # print(f"{self.__class__.__name__}._addCursor_ single-axis x = {x}")
@@ -4371,7 +4471,7 @@ Var-keyword parameters ("name=value" pairs):
             elif isinstance(x, pq.Quantity):
                 x = float(x.magnitude.flatten()[0])
 
-            elif not isinstance(x, (numbers.Number, DataCursor)):
+            elif not isinstance(x, (numbers.Number, DataCursor, Interval, neo.Epoch, DataZone)):
                 raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
 
             if y is None:
@@ -4386,6 +4486,12 @@ Var-keyword parameters ("name=value" pairs):
 
             elif not isinstance(y, (numbers.Number, DataCursor)):
                 raise TypeError("Unexpected type for y coordinate: %s" % type(y).__name__)
+
+            if isinstance(xwindow, pq.Quantity):
+                xwindow = xwindow.magnitude
+
+            if isinstance(ywindow, pq.Quantity):
+                ywindow = ywindow.magnitude
 
             # print(f"{self.__class__.__name__}._addCursor_ multi-axis x = {x}")
 
@@ -8737,20 +8843,35 @@ Var-keyword parameters ("name=value" pairs):
             # what is axes have different item data boundaries?
             [[dataxmin, dataxmax], [dataymin, dataymax]] = guiutils.getPlotItemDataBoundaries(ax)
 
+            ax_xUnits = ax.data(0)
+            ax_yUnits = ax.data(1)
+
+            if isinstance(ax_xUnits, pq.Quantity):
+                dataxmin, dataxmax = tuple(map(lambda v: v * ax_xUnits, (dataxmin, dataxmax)))
+
+            if isinstance(ax_yUnits, pq.Quantity):
+                dataymin, dataymax = tuple(map(lambda v: v * ax_yUnits, (dataymin, dataymax)))
+
             for c in self.cursorsInAxis(k):
                 if not c.staysInAxes:
                     continue
 
                 if not c.isHorizontal:
-                    relX = c.x - c.xBounds()[0]
+                    newX = ephys.adapt_coordinate_to_lower_boundary(c.x, c.xBounds()[0], dataxmin)
                     c.setBounds()
-                    c.x = dataxmin + relX
+                    c.x = newX
+                    # relX = c.x - c.xBounds()[0]
+                    # c.setBounds()
+                    # c.x = dataxmin + relX
 
                 if not c.isVertical:
-                    # print(f"{self.__class__.__name__}.displayFrame for cursor in axis {k}: cursor type {c.cursorType}, coordinates: {c.y}; bounds: {c.yBounds()}")
-                    relY = c.y - c.yBounds()[0]
+                #     # print(f"{self.__class__.__name__}.displayFrame for cursor in axis {k}: cursor type {c.cursorType}, coordinates: {c.y}; bounds: {c.yBounds()}")
+                #     newY = ephys.adapt_coordinate_to_lower_boundary(c.y, c.yBounds()[0], dataymin)
                     c.setBounds()
-                    c.y = dataymin+relY
+                #     c.y = newY
+                #     # relY = c.y - c.yBounds()[0]
+                #     # c.setBounds()
+                #     # c.y = dataymin+relY
 
         # NOTE: 2022-11-22 11:49:47
         # Finally, check for target overlays
@@ -8772,6 +8893,7 @@ Var-keyword parameters ("name=value" pairs):
         # NOTE: 2024-10-23 11:36:50 FIXME
         # hold off this for now
         # self._adjust_left_label_space_()
+
         # NOTE: 2026-04-02 09:19:39
         # connected to _slot_post_frameDisplay
         self.sig_frameDisplayReady.emit()
@@ -8782,21 +8904,6 @@ Var-keyword parameters ("name=value" pairs):
         # NOTE: 2026-04-07 22:42:49
         # possibly redundant with guiutils.getPlotItemDataBoundaries
         yield from guiutils.plotItemXDataBounds(axis)
-        # if isinstance(axis, int):
-        #     axis = self.axes[axis]
-        #
-        # x0 = np.array(list(map(lambda pdi: pdi.xData[0],
-        #                        filter(lambda i: (isinstance(i, pg.PlotDataItem)
-        #                                          and isinstance(i.xData, np.ndarray)
-        #                                          and i.xData.size > 0),
-        #                               axis.listDataItems()))))
-        # x1 = np.array(list(map(lambda pdi: pdi.xData[-1],
-        #                        filter(lambda i: (isinstance(i, pg.PlotDataItem)
-        #                                          and isinstance(i.xData, np.ndarray)
-        #                                          and i.xData.size > 0),
-        #                               axis.listDataItems()))))
-        # if len(x0) and len(x1):
-        #     yield np.nanmin(x0), np.nanmax(x1)
 
     @Slot()
     def _slot_post_frameDisplay(self):
@@ -8836,7 +8943,7 @@ Var-keyword parameters ("name=value" pairs):
         if len(tuple(filter(lambda ax: ax.isVisible(), self.axes))) == 0:
             return
 
-        getLinkedView = lambda l: pg.ViewBox.NamedViews.get(l, l)
+        # getLinkedView = lambda l: pg.ViewBox.NamedViews.get(l, l)
 
         visibleAxes = tuple(filter(lambda ax: ax.isVisible(), self.axes))
         visibleSignalAxes = tuple(filter(lambda ax: ax.isVisible(), self.signalAxes))
@@ -8910,9 +9017,6 @@ Var-keyword parameters ("name=value" pairs):
     def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
 
-        # if len(visibleAxes) == 0:
-        #     return
-
         for k, ax in enumerate(self.axes):
             if k > 0:
                 ndx = k-1
@@ -8933,7 +9037,6 @@ Var-keyword parameters ("name=value" pairs):
                 prev_ax.getAxis("bottom").showLabel(not sameLabel)
                 prev_ax.getAxis("bottom").setStyle(showValues=False)
 
-                # ax.getAxis("left").setWidth(60)
                 ax.getAxis("left").setWidth(self.leftLabelSpace)
 
                 # if ax in axes_with_X_overlap: # also hide axis values if same boundaries
@@ -8950,7 +9053,7 @@ Var-keyword parameters ("name=value" pairs):
         r"""Common landing zone for SpikeTrainList or collection of SpikeTrain.
         Actual plotting delegated to _plot_discrete_entities_.
         """
-        standaloneTrains = self._yData_ is trains
+        # standaloneTrains = self._yData_ is trains
         # plot all spike trains stacked in a single axis
         if self._plot_spiketrains_:
             if isinstance(trains, neo.SpikeTrain):
@@ -9060,13 +9163,13 @@ Var-keyword parameters ("name=value" pairs):
             isAxisSpecific = isinstance(epochAxis, str) and len(epochAxis.strip())
             if isAxisSpecific:
                 if plotItem.vb.name == epochAxis:
-                    labelAxis = plotItem
+                    labelsAxis = plotItem
                 else:
                     continue
 
             elif isinstance(epochAxis, int):
                 if epochAxis == k:
-                    labelAxis = plotItem
+                    labelsAxis = plotItem
                 else:
                     continue
 
@@ -9080,7 +9183,7 @@ Var-keyword parameters ("name=value" pairs):
                     labelText = str(labels[kl])
                     labelTextHeight = guiutils.get_text_height(labelText)
                     lriBoundingRect = lri.boundingRect()
-                    yPos = (lriBoundingRect.height() - 2 * labelTextHeight) / lriBoundingRect.height()
+                    # yPos = (lriBoundingRect.height() - 2 * labelTextHeight) / lriBoundingRect.height()
 
                     lri.lines[0].label = pg.InfLineLabel(lri.lines[0], text=str(labels[kl]),
                                                          position = 0.8,
@@ -9101,10 +9204,12 @@ Var-keyword parameters ("name=value" pairs):
         if len(args) == 0:
             return
 
-        epoch_pen = kwargs.pop("epoch_pen", self.epoch_plot_options["epoch_pen"])
         epoch_brush = kwargs.pop("epoch_brush", self.epoch_plot_options["epoch_brush"])
-        epoch_hoverPen = kwargs.pop("epoch_hoverPen", self.epoch_plot_options["epoch_hoverPen"])
-        epoch_hoverBrush = kwargs.pop("epoch_hoverBrush", self.epoch_plot_options["epoch_hoverBrush"])
+
+        # NOTE: do not remove yet
+        # epoch_pen = kwargs.pop("epoch_pen", self.epoch_plot_options["epoch_pen"])
+        # epoch_hoverPen = kwargs.pop("epoch_hoverPen", self.epoch_plot_options["epoch_hoverPen"])
+        # epoch_hoverBrush = kwargs.pop("epoch_hoverBrush", self.epoch_plot_options["epoch_hoverBrush"])
 
         # plot LRIs in a different colour for each epoch;
         # all LRIs that belong to the same epoch have the same colour.
@@ -10607,6 +10712,13 @@ Var-keyword parameters ("name=value" pairs):
                 lbl = lbl[3 : lbl.find("</B>")]
                 plotItem.setLabel("left", lbl)
 
+
+#         if xUnits is None:
+#             xUnits = pq.dimensionless
+#
+#         if yUnits is None:
+#             yUnits = pq.dimensionless
+
         # NOTE: 2025-07-14 21:49:57
         # as plotItem inherits from QGraphicsItem, we can use the user's data
         # available from Qt API to store X units under key 0, and yUnits under key 1
@@ -11499,7 +11611,7 @@ Var-keyword parameters ("name=value" pairs):
     def getPlotItemXOffsets(self, o: pg.PlotItem) -> dict | None:
         if not isinstance(o, pg.PlotItem):
             return
-        getLinkedView = lambda l: pg.ViewBox.NamedViews.get(l, l)
+        getLinkedView = lambda l: pg.ViewBox.NamedViews.get(l, l) # noqa
 
         bounds = guiutils.getPlotItemDataBoundaries(o)
         state = o.vb.getState()

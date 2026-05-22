@@ -46,7 +46,7 @@ import quantities as pq
 import neo
 
 from core.prog import (safewrapper, with_doc)
-from core.scipyen_quantities import checkTimeUnits
+from core.scipyen_quantities import (checkTimeUnits, unitSymbol)
 
 DefaultCursorLineStyle = QtCore.Qt.DashLine
 DefaultSelectedCursorLineStyle = QtCore.Qt.SolidLine
@@ -175,6 +175,25 @@ class CursorLine(pg.InfiniteLine):
 
         super().setHoverPen(*args, **kwargs)
         self.update()
+
+    # def mouseDragEvent(self, ev):
+    #     if self.movable and ev.button() == QtCore.Qt.MouseButton.LeftButton:
+    #         if ev.isStart():
+    #             self.moving = True
+    #             self.cursorOffset = self.pos() - self.mapToParent(ev.buttonDownPos())
+    #             self.startPosition = self.pos()
+    #         ev.accept()
+    #
+    #         if not self.moving:
+    #             return
+    #
+    #         newPos = self.cursorOffset + self.mapToParent(ev.pos())
+    #         print(f"{self.__class__.__name__}.mouseDragEvent: -> newPos = {newPos}")
+    #         self.setPos(self.cursorOffset + self.mapToParent(ev.pos()))
+    #         self.sigDragged.emit(self)
+    #         if ev.isFinish():
+    #             self.moving = False
+    #             self.sigPositionChangeFinished.emit(self)
 
     def setMouseHover(self, hover):
         # print(f"{self.__class__.__name__}.setMouseHover({hover})")
@@ -436,13 +455,14 @@ class SignalCursor(QtCore.QObject):
         self._show_value_ = show_value
         self._value_precision_ = precision if isinstance(precision, int) and precision > 0 else self.default_precision
 
+        self._x_units = x_units
+        self._y_units = y_units
+
         self._setup_(plot_item, x=x, y=y, xwindow=xwindow, ywindow=ywindow,
                          cursor_type=cursor_type, cursorID=cursorID,
                          follower=follower, xBounds = xBounds, yBounds=yBounds,
                          **kwargs)
 
-        self._x_units = x_units
-        self._y_units = y_units
 
     def _setup_lines_(self, h, v, **kwargs):
         name = kwargs.get("name", self._cursor_type_)
@@ -467,7 +487,10 @@ class SignalCursor(QtCore.QObject):
             # set up the horizontal InfiniteLine
             if not isinstance(self._hl_, pg.InfiniteLine):
                 if self._cursor_type_ == SignalCursorTypes.horizontal:
-                    label = "%s {value:.%d}" % (self._cursorId_, self._value_precision_) if self._show_value_ else self._cursorId_
+                    if isinstance(self._y_units, pq.Quantity):
+                        label = "%s\n{value:.%d} %s" % (self._cursorId_, self._value_precision_, unitSymbol(self._y_units)) if self._show_value_ else self._cursorId_
+                    else:
+                        label = "%s\n{value:.%d}" % (self._cursorId_, self._value_precision_) if self._show_value_ else self._cursorId_
                 else:
                     label = None
 
@@ -522,7 +545,10 @@ class SignalCursor(QtCore.QObject):
             # set up the vertical InfiniteLine
             if not isinstance(self._vl_, pg.InfiniteLine):
                 # label = f"{self._cursorId_}: value: {self._v}"
-                label = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_) if self._show_value_ else self._cursorId_
+                if isinstance(self._x_units, pq.Quantity):
+                    label = "%s:\n{value:.%d} %s" % (self._cursorId_, self._value_precision_, unitSymbol(self._x_units)) if self._show_value_ else self._cursorId_
+                else:
+                    label = "%s:\n{value:.%d}" % (self._cursorId_, self._value_precision_) if self._show_value_ else self._cursorId_
                 #print(self._value_precision_)
                 self._vl_ = CursorLine(pos=pos,
                                         angle=90,
@@ -753,7 +779,12 @@ class SignalCursor(QtCore.QObject):
             if isinstance(l, pg.InfiniteLine):
                 if isinstance(getattr(l, "label", None), pg.InfLineLabel):
                     if self._show_value_:
-                        format_str = "%s: {value:.%d}" % (self._cursorId_, self._value_precision_)
+                        if l is self._hl_ and isinstance(self.yUnits, pq.Quantity):
+                            format_str = "%s:\n{value:.%d} %s" % (self._cursorId_, self._value_precision_, unitSymbol(self.yUnits))
+                        elif l is self._vl_ and isinstance(self.xUnits, pq.Quantity):
+                            format_str = "%s:\n{value:.%d} %s" % (self._cursorId_, self._value_precision_, unitSymbol(self.xUnits))
+                        else:
+                            format_str = "%s:\n{value:.%d}" % (self._cursorId_, self._value_precision_)
                         l.label.setFormat(format_str)
                     else:
                         l.label.setFormat(self._cursorId_)
@@ -928,25 +959,33 @@ class SignalCursor(QtCore.QObject):
 
         hostBounds = self._get_host_boundaries_(host) # [[xmin, xmax], [ymin, ymax]]
 
+        if xBounds is None:
+            xBounds = hostBounds[0]
+
+        if yBounds is None:
+            yBounds = hostBounds[1]
+
+        # print(f"{self.__class__.__name__}.setBounds -> xBounds = {xBounds}, yBounds = {yBounds}")
+
         # set bounds for vertical line:
         if isinstance(xBounds, (tuple, list)) and len(xBounds) == 2:
             if all([isinstance(v, numbers.Number) for v in xBounds]):
                 self._x_range_ = xBounds
 
-            elif all([isinstance(v, pq.Quantity) and len(v) == 1 for v in xBounds]):
-                self._x_range_  = [v.flatten().magnitude for v in xBounds]
+            elif all([isinstance(v, pq.Quantity) and v.size == 1 for v in xBounds]):
+                self._x_range_  = [v.flatten().magnitude[0] for v in xBounds]
 
-        elif isinstance(xBounds, np.ndarray) and xBounds.ndim> 0 and len(xBounds) == 2:
+        elif isinstance(xBounds, np.ndarray) and xBounds.ndim > 0 and xBounds.size == 2:
             if isinstance(xBounds, pq.Quantity):
-                xBounds = xBounds.flatten().magnitude
+                xBounds = xBounds.flatten().magnitude[0]
 
             self._x_range_ = [v for v in xBounds]
 
-        elif xBounds is not None:
-            raise TypeError("xBounds expected to be a sequence of two (possibly Quantity) scalars, or a numpy or Quantity array with two elements")
-
         else:
-            self._x_range_ = hostBounds[0]
+            raise TypeError("xBounds expected to be a sequence of two (possibly Quantity) scalars, or a numpy or Quantity array with two elements")
+        #
+        # else:
+        #     self._x_range_ = hostBounds[0]
 
         if self._vl_ is not None:
             self._vl_.setBounds(self._x_range_)
@@ -956,12 +995,12 @@ class SignalCursor(QtCore.QObject):
             if all([isinstance(v, numbers.Number) for v in yBounds]):
                 self._y_range_ = yBounds
 
-            elif all([isinstance(v, pq.Quantity) and len(v) == 1 for v in xBounds]):
-                self._y_range_  = [v.flatten().magnitude for v in xBounds]
+            elif all([isinstance(v, pq.Quantity) and v.size == 1 for v in yBounds]):
+                self._y_range_  = [v.flatten().magnitude[0] for v in yBounds]
 
-        elif isinstance(yBounds, np.ndarray) and yBounds.ndim> 0 and len(yBounds) == 2:
+        elif isinstance(yBounds, np.ndarray) and yBounds.ndim> 0 and yBounds.size == 2:
             if isinstance(yBounds, pq.Quantity):
-                yBounds = yBounds.flatten().magnitude
+                yBounds = yBounds.flatten().magnitude[0]
 
             self._y_range_ = [v for v in yBounds]
 
@@ -974,12 +1013,18 @@ class SignalCursor(QtCore.QObject):
         if self._hl_ is not None:
             self._hl_.setBounds(self._y_range_)
 
+        # print(f"\n\tself._x_range_ = {self._x_range_}\n\tself._y_range_ = {self._y_range_}")
+
     def yBounds(self):
         if self._hl_ is not None:
+            if isinstance(self._y_units, pq.Quantity):
+                return tuple(map(lambda v: v * self._y_units, self._hl_.maxRange))
             return self._hl_.maxRange
 
     def xBounds(self):
         if self._vl_ is not None:
+            if isinstance(self._x_units, pq.Quantity):
+                return tuple(map(lambda v: v*self._x_units, self._vl_.maxRange))
             return self._vl_.maxRange
 
     def linkTo(self, *other):
@@ -1154,6 +1199,9 @@ class SignalCursor(QtCore.QObject):
         r"""See docstring for __init__
         """
         #print("SignalCursor._setup_ cursor_type %s" % cursor_type)
+
+        # print(f"{self.__class__.__name__}._setup_ x = {x}, y = {y}")
+        # print(f"{self.__class__.__name__}._setup_ xBounds = {xBounds}, yBounds = {yBounds}")
 
         show_lines = (False, False)
 
@@ -1582,7 +1630,7 @@ class SignalCursor(QtCore.QObject):
         that is spanned by the cursor, call self.getX(plotitem)
         """
         if self._hl_ is None and self._vl_ is None and isinstance(self._vDataCursor_, DataCursor):
-            return self._vDataCursor_.coord
+            ret = self._vDataCursor_.coord
 
         if self._vl_ is not None:
             line = self._vl_
@@ -1593,7 +1641,12 @@ class SignalCursor(QtCore.QObject):
         # BUG 2024-02-09 14:01:42 FIXME
         if isinstance(self._host_graphics_item_, pg.PlotItem):
             self._current_plot_item_ = self._host_graphics_item_
-            return line.getXPos()
+            ret = line.getXPos()
+
+            if isinstance(self._x_units, pq.Quantity) and not isinstance(ret, pq.Quantity):
+                return ret * self._x_units
+
+            return ret
 
         else:
             pos = line.getPos() # NOTE: a pair of values, not a QtCore.QPoint/F
@@ -1605,25 +1658,37 @@ class SignalCursor(QtCore.QObject):
                 for plot in plots:
                     vrange = plot.vb.viewRange()[0]
                     plot_x = plot.vb.mapSceneToView(QtCore.QPointF(pos[0], pos[1])).x()
-                    if plot_x >= vrange[0] and plot_x <= vrange[1]:
+                    if plot_x is not None and plot_x >= vrange[0] and plot_x <= vrange[1]:
                         self._current_plot_item_ = plot
+                        if isinstance(self._x_units, pq.Quantity) and not isinstance(plot_x, pq.Quantity):
+                            return plot_x * self._x_units
                         return plot_x
 
             else:
-                return line.getXPos() # up to the caller to do what it wants with this
+                ret = line.getXPos()
+                if ret is not None:
+                    if isinstance(self._x_units, pq.Quantity) and not isinstance(ret, pq.Quantity):
+                        return ret * self._x_units
+                    return ret # up to the caller to do what it wants with this
 
     @x.setter
-    def x(self, val:numbers.Number):
+    def x(self, val: numbers.Number | np.ndarray):
         r"""Expects a value in a plotitem valid range
         """
         if isinstance(val, pq.Quantity):
-            val = val.magnitude.flatten()[0]
+            v = float(val.magnitude.flatten()[0])
+
+        elif isinstance(val, np.ndarray):
+            v = float(val.flatten()[0])
 
         elif not isinstance(val, numbers.Number):
             raise TypeError("expected a numeric scalar value or a scalar python Quantity; got %s instead" % type(val).__name__)
 
+        else:
+            v = val
+
         if self._vl_ is not None:
-            self._update_vline_position_(val)
+            self._update_vline_position_(v)
 
     def getX(self, plotitem = None) -> numbers.Number | None:
         if isinstance(self._host_graphics_item_, pg.PlotItem):
@@ -1665,10 +1730,16 @@ class SignalCursor(QtCore.QObject):
 
         else:
             if isinstance(val, pq.Quantity):
-                val = val.magnitude.flatten()[0]
+                v = float(val.magnitude.flatten()[0])
+
+            elif isinstance(val, np.ndarray):
+                v = float(val.flatten()[0])
 
             elif not isinstance(val, numbers.Number):
                 raise TypeError("expected a numeric scalar value or a scalar python Quantity; got %s instead" % type(val).__name__)
+
+            else:
+                v = val
 
             if not isinstance(plotItem, pg.PlotItem):
                 raise TypeError("For multi-axis cursor please also specify a PlotItem")
@@ -1676,7 +1747,7 @@ class SignalCursor(QtCore.QObject):
             if plotItem not in [p for p in self.scenePlotItems]:
                 raise ValueError("Plot item %s not found in this cursor's scene" % plotItem)
 
-            self._update_vline_position_(val, plotItem)
+            self._update_vline_position_(v, plotItem)
 
     @property
     def y(self) -> numbers.Number | None:
@@ -1700,7 +1771,11 @@ class SignalCursor(QtCore.QObject):
 
         if isinstance(self._host_graphics_item_, pg.PlotItem):
             self._current_plot_item_ = self._host_graphics_item_
-            return line.getYPos()
+            ret = line.getYPos()
+            if isinstance(self._y_units, pq.Quantity) and not isinstance(ret, pq.Quantity):
+                return ret * self._y_units
+
+            return ret
 
         else:
             pos = line.getPos() # NOTE: a pair of values, not a QtCore.QPoint/F
@@ -1712,23 +1787,34 @@ class SignalCursor(QtCore.QObject):
                 for plot in plots:
                     vrange = plot.vb.viewRange()[1]
                     plot_y = plot.vb.mapSceneToView(QtCore.QPointF(pos[0], pos[1])).y()
-                    if plot_y >= vrange[0] and plot_y <= vrange[1]:
+                    if plot_y is not None and plot_y >= vrange[0] and plot_y <= vrange[1]:
                         self._current_plot_item_ = plot
+                        if isinstance(self._y_units, pq.Quantity) and not isinstance(plot_y, pq.Quantity):
+                            return plot_y * self._y_units
                         return plot_y
 
             else:
-                return line.getYPos() # up to the caller to do what it wants with this
+                ret = line.getYPos() # up to the caller to do what it wants with this
+                if ret is not None:
+                    if isinstance(self._y_units, pq.Quantity) and not isinstance(ret, pq.Quantity):
+                        return ret * self._y_units
+                    return ret
 
     @y.setter
-    def y(self, val:numbers.Number):
+    def y(self, val: numbers.Number | np.ndarray):
         if isinstance(val, pq.Quantity):
-            val = val.magnitude.flatten()[0]
+            v = float(val.magnitude.flatten()[0])
+
+        elif isinstance(val, np.ndarray):
+            v = float(val.flatten()[0])
 
         elif not isinstance(val, numbers.Number):
             raise TypeError("expected a numeric scalar value or a scalar python Quantity; got %s instead" % type(val).__name__)
 
+        v = val
+
         if self._hl_ is not None:
-            self._update_hline_position_(val)
+            self._update_hline_position_(v)
 
     def getY(self, plotitem=None) -> numbers.Number | None:
         if isinstance(self._host_graphics_item_, pg.PlotItem):
@@ -1761,10 +1847,16 @@ class SignalCursor(QtCore.QObject):
 
         else:
             if isinstance(val, pq.Quantity):
-                val = val.magnitude.flatten()[0]
+                v = float(val.magnitude.flatten()[0])
+
+            elif isinstance(val, np.ndarray):
+                v = float(val.flatten()[0])
 
             elif not isinstance(val, numbers.Number):
                 raise TypeError("expected a numeric scalar value or a scalar python Quantity; got %s instead" % type(val).__name__)
+
+            else:
+                v = val
 
             if not isinstance(plotItem, pg.PlotItem):
                 raise TypeError("For multi-axis cursor please also specify a PlotItem")
@@ -1772,7 +1864,7 @@ class SignalCursor(QtCore.QObject):
             if plotItem not in [p for p in self.scenePlotItems]:
                 raise ValueError("Plot item %s not found in this cursor's scene" % plotItem)
 
-            self._update_hline_position_(val, plotItem)
+            self._update_hline_position_(v, plotItem)
 
     @property
     def xwindow(self):

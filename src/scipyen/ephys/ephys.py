@@ -814,142 +814,6 @@ class RecordingSource():
 
         self.pathways = tuple(pathways)
 
-#     def __post_init__(self, pathways):
-#         if isinstance(pathways, (tuple, list)) and len(pathways) and all(isinstance(p, SynapticPathway) and p.adc == self.adc and p.dac == self.dac for p in pathways):
-#             pp = list()
-#             for p in pathways:
-#                 if isinstance(self.syn, SynapticStimulus):
-#                     if p.stimulus == self.syn:
-#                         pp.append(p)
-#
-#                 elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
-#                     if p.stimulus in self.syn:
-#                         pp.append(p)
-#
-#             self.pathways = tuple(pp)
-#
-#         elif isinstance(pathways, SynapticPathway):
-#             if isinstance(self.syn, SynapticStimulus):
-#                 if pathways.stimulus == self.syn:
-#                     self.pathways = (pathway, )
-#
-#             elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
-#                 if pathways.stimulus in self.syn:
-#                     self.pathways = (pathways, )
-#
-#         else:
-#             if isinstance(self.syn, SynapticStimulus):
-#                 self.pathways = (SynapticPathway(stimulus = self.syn,
-#                                         name = self.syn.name, adc = self.adc,
-#                                         dac = self.dac,
-#                                         electrode = self.electrodeMode), )
-#             elif isinstance(self.syn, (tuple, list)) and all(isinstance(s, SynapticStimulus) for s in self.syn):
-#                 if len(self.syn) == 1:
-#                     self.pathways = tuple(SynapticPathway(stimulus = self.syn[0],
-#                                         name = self.syn[0].name,
-#                                         adc = self.adc, dac = self.dac,
-#                                         electrode = self.electrodeMode))
-#                 elif len(self.syn) > 1:
-#                     self.pathways = tuple(SynapticPathway(stimulus = s,
-#                                                 name = s.name,
-#                                                 adc = self.adc, dac = self.dac,
-#                                                 electrode = self.electrodeMode) for s in self.syn)
-#
-#             else:
-#                 self.pathways = tuple()
-
-    # @property
-    # def pathways(self) -> tuple:
-    #     return self.syn
-
-    # __slots__ = ()
-    # __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseSource__.__annotations__.items()])
-
-    # __doc__ = "\n".join(["Semantic association between input and output signals in single-electrode recordings.\n",
-    #                "Signature:\n",
-    #                f"\tRecordingSource({__sig__})\n",
-    #                "where:",
-    #                "• name (str): The name of the source; default is 'cell'\n",
-    #                "• adc (int): The PHYSICAL¹ index (int) or name (str) of the ADC channel for the",
-    #                "    input signal containing the recorded electric behaviour of the source",
-    #                "    (a.k.a the primary 'input' channel i.e., cell or field → amplifier → DAQ device).\n",
-    #                "• dac (int, None): The PHYSICAL index (int) or name (str) of the DAC channel",
-    #                "    sending analog commands to the source in voltage- or current-clamp, (a.k.a the primary 'output', i.e.,",
-    #                "    DAQ device → amplifier → cell) other than synaptic stimuli (see below).",
-    #                "    Optional; default is None².\n",
-    #                "    WARNING: This must be the DAC channel actually used for clamping.\n",
-    #                "    and not necessarily the 'active' DAC channel of the protocol\n",
-    #                "• syn (SynapticStimulus, sequence of SynapticStimulus, or None):",
-    #                "    Specify the origin of trigger (TTL-like) signals for synaptic stimulation",
-    #                "    (one SynapticStimulus per synaptic pathway).",
-    #                "    The 'syn.dig' and 'syn.dac' fields must contain indices different",
-    #                "    from those specified in 'dac', or 'auxout' fields of this object. ",
-    #                "    Optional; default is SynapticStimulus('stim', None, None).\n",
-    #                "• auxin (AuxiliaryInput or sequence of AuxiliaryInput objects, or None)",
-    #                "    NOTE: When present, these must specify ADCs distinct from the 'adc' above",
-    #                "    Optional; default is None.\n",
-    #                "• auxout (AuxiliaryOutput, sequence of AuxiliaryOutput, or None): ",
-    #                "    Auxiliary outputs for purposes OTHER THAN clamping command waveforms or ",
-    #                "    synaptic stimulation (e.g., imaging frame triggers, etc)",
-    #                "    NOTE: These must be distinct from the channels specified by the 'dac' ",
-    #                "    or 'syn' fields above.",
-    #                "    Optional; default is None.\n",
-    #                "",
-    #                "Channel indices are expected to be >= 0 and correspond to the",
-    #                "    PHYSICAL¹ (NOT logical!) channel indices in the acquisition protocol. ",
-    #                "",
-    #                "Channel names are as assigned in the acquisition protocol (if available).",
-    #                "",
-    #                "NOTES:",
-    #                "",
-    #                "¹ Analog channels (analog input — ADCs — or output — DACs) have both physical ",
-    #                "    and logical indices. Physical indices are integers from 0 to one less than the ",
-    #                "    maximum number of physical channels of the same category (i.e. input or output)",
-    #                "    provided by the digital acquisition (DAQ) device.",
-    #                "    Logical indices are integers from 0 to one less than maximum number of channels",
-    #                "    of the same category, ACTUALLY used in the recording protocol.",
-    #                "",
-    #                "    Assuming a DAQ device provides eight ADCs (physical indices 0-7)",
-    #                "    with only four of these used to record data (say, 0, 1, 5, 6) - their",
-    #                "    logical indices would be 0-3, corresponding to physical indices as follows:",
-    #                "    0: 0, 1: 1, 2: 5, 3: 6",
-    #                "",
-    #                "    The logical index is also the index of the recorded signal stored in the file.",
-    #                "    E.g. in an ABF file, the signal at index 0 may have been recorded from the physical",
-    #                "    ADC 1 (taking data from, say, the second amplifier channel).",
-    #                "    In such case, the ADC in question has physical index 1, and logical index 0.",
-    #                "",
-    #                "    A more complex case is when a large set of inputs is specified in the recording",
-    #                "    protocol, such that the signal recorded from the cell via the physical ADC ends up ",
-    #                "    with a higher index in the file. Here, specifying a logical index of 0 will not",
-    #                "    indicate the actual ADC channel used to record from the cell.",
-    #                "",
-    #                "    Because of this, it is not possible to infer which ADC channel has been",
-    #                "    actually used to record from a source (cell or field) based only on the",
-    #                "    signals contained in the recorded file."
-    #                "",
-    #                "    The RecordingSource object helps avoid such ambiguities.",
-    #                "",
-    #                "",
-    #                "²   The DAC channels are used for sending analog `command` signals to the recorded source",
-    #                "    in order to `clamp` the membrane potential or membrane current. However, not all experiments",
-    #                "    require this — a good example are field recordings, where there is nothing to `clamp`."
-    #                "",
-    #                "ADDITIONAL NOTES: ",
-    #                "",
-    #                "1. This object type is oblivious to the recording mode or electrode mode.",
-    #                "",
-    #                "2. The order of parameters matters, unless they are given as name↦value pairs.",
-    #                "",
-    #                "3. A RecordingSource object is immutable. However one can create a modified copy by calling",
-    #                "    its '_replace' method specifying different values to selected fields, e.g.:",
-    #                "",
-    #                "\t source1 = RecordingSource('cell1', 0, 1, SynapticStimulus('path0', 0))",
-    #                "",
-    #                "\t source2 = source1._replace(name='cell2', adc=2, dac=1, syn=SynapticStimulus('path0', 0))"
-    #                "",
-    #                ])
-
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
         from iolib import h5io
@@ -987,10 +851,10 @@ class RecordingSource():
                             track_order=track_order,
                             entity_cache=entity_cache)
 
-        h5io.toHDF5(self.pathways, entity, name="pathways", oname="pathways",
-                            compression=compression, chunks=chunks,
-                            track_order=track_order,
-                            entity_cache=entity_cache)
+        # h5io.toHDF5(self.pathways, entity, name="pathways", oname="pathways",
+        #                     compression=compression, chunks=chunks,
+        #                     track_order=track_order,
+        #                     entity_cache=entity_cache)
 
         h5io.storeEntityInCache(entity_cache, self, entity)
         return entity
@@ -1013,7 +877,7 @@ class RecordingSource():
         syn = h5io.fromHDF5(entity["syn"], cache=cache)
         auxin = h5io.fromHDF5(entity["auxin"], cache=cache)
         auxout = h5io.fromHDF5(entity["auxout"], cache=cache)
-        pathways = h5io.fromHDF5(entity["pathways"], cache=cache)
+        # pathways = h5io.fromHDF5(entity["pathways"], cache=cache)
 
         return cls(name=name, adc=adc, dac=dac, syn=syn,
                    auxin=auxin, auxout=auxout, electrodeMode = electrodeMode)
@@ -4561,7 +4425,14 @@ def cursor_reduce(func:types.FunctionType,
 
     return ret
 
-# def adjust_time_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSignal], t) -> typing.Union[pq.Quantity, typing.List[pq.Quantity]]:
+def adapt_coordinate_to_lower_boundary(val: typing.Union[numbers.Number, np.ndarray, pq.Quantity],
+                        old: typing.Union[numbers.Number, np.ndarray, pq.Quantity],
+                        new: typing.Union[numbers.Number, np.ndarray, pq.Quantity]):
+    if new == old:
+        return val
+    return val - old + new
+
+
 def adjust_time_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSignal], *args) -> typing.Union[pq.Quantity, typing.List[pq.Quantity]]:
     r"""Adjust the domain values supplied in `args` relative to signal's domain limit.
     `args` must contain scalar Quantities with units equal (or convertible to) signal's domain units.
@@ -4586,22 +4457,6 @@ def adjust_time_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSig
     ret = list()
 
     for t in args:
-        # if t > signal.t_stop:
-        #     print(f"t {t} is in the future")
-        #     while t > signal.t_stop:
-        #         t -= signal.t_start
-        #
-        #     if t < signal.t_start:
-        #         t += signal.t_start
-        #
-        # elif t < signal.t_start:
-        #     print(f"t {t} is in the past")
-        #     while t < signal.t_start:
-        #         t += signal.t_start
-        #
-        #     if t > signal.t_stop:
-        #         t -= signal.t_stop
-
         # not working when t is in the future...
         if t < signal.t_start:
             t += signal.t_start
@@ -4609,7 +4464,6 @@ def adjust_time_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSig
         elif t > signal.t_stop:
             while t > signal.t_stop:
                 t -= signal.t_start
-                # t -= signal.t_stop
 
         ret.append(t)
 
@@ -4617,11 +4471,6 @@ def adjust_time_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSig
         return ret[0]
     else:
         return ret
-
-    #
-    # print(f"\n\tadjust_time_relative_to_signal -> {ret}\n***\n")
-    #
-    # return ret
 
 @safewrapper
 def cursor_max(signal: typing.Union[neo.AnalogSignal, DataSignal],
