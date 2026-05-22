@@ -215,6 +215,7 @@ class DeferredOperation:
                 args = (self.args, )
             else:
                 args = self.args
+
             return op(*args, **self.kwargs)(obj)
 
         elif isinstance(op, np.ufunc):
@@ -262,49 +263,6 @@ class DeferredOperation:
             return tuple(map(lambda op: self._call_op_(op, obj), self.op))
 
         return self._call_op_(self.op, obj)
-        # if self.op in (operator.attrgetter, operator.itemgetter, operator.methodcaller):
-        #     if isinstance(self.args, str):
-        #         args = (self.args, )
-        #     else:
-        #         args = self.args
-        #     return self.op(*args, **self.kwargs)(obj)
-        #
-        # elif isinstance(self.op, np.ufunc):
-        #     return self.op(obj)
-        #
-        # else:
-        #     res_args = list()
-        #     for arg in self.args:
-        #         if isinstance(arg, tuple):
-        #             if len(arg) == 0:
-        #                 continue
-        #
-        #             elif len(arg) in (2,3) and isinstance(arg[0], DeferredSignalMeasure):
-        #                 if self.debug:
-        #                     print(f"\n\n[{arg[0].name}] arg[0], {type(arg[0])}: {arg[0]}\n\n\t arg[1], {type(arg[1])}: {arg[1]}, {type(arg[1])}")
-        #                 if len(arg) == 2:
-        #                     if isinstance(arg[1], np.ndarray):
-        #                         arg = arg[0](arg[1])
-        #                     else:
-        #                         arg = arg[0](*arg[1])
-        #                 else:
-        #                     if self.debug:
-        #                         print(f"\n\n[{arg[0].name}] arg[2] {arg[2]}, {type(arg[2])}")
-        #                     # NOTE: 2026-05-12 23:09:06 possible BUG will creep out -> to investigate!
-        #                     if isinstance(arg[1], np.ndarray):
-        #                         arg = arg[0](arg[1], **arg[2])
-        #                     else:
-        #                         arg = arg[0](*arg[1], **arg[2])
-        #
-        #                 if self.debug:
-        #                     print(f"\n\t[{arg[0].name}] =>=> {arg}\n")
-        #
-        #         res_args.append(arg)
-        #
-        #     if self.debug:
-        #         print(f"\n=>res_args = {res_args}")
-        #
-        #     return self.op(obj, *res_args, **self.kwargs)
 
 
 @dataclass
@@ -1159,7 +1117,14 @@ Any aditional named or keyword parameters to be passed to `func`.
             # passing the arg; the result of that functool then becomes the first
             # arg after the location, pased to func
 
-            fargs = (locations,) + self.posargs + (arg,)
+            if isinstance(self.func, (DeferredOperation, DeferredComputation)):
+                # these don't take location parameter!
+                fargs = self.posargs + (arg, )
+            else:
+                if isinstance(locations, tuple):
+                    fargs = locations + self.posargs + (arg, )
+                else:
+                    fargs = (locations,) + self.posargs + (arg,)
 
             if self.debug:
                 print(f"\n\t>>>>\n\t{self.__class__.__name__}[{self.name}] will call:\n\tfunc = {self.func} with\n\tfargs = \n")
@@ -1168,6 +1133,11 @@ Any aditional named or keyword parameters to be passed to `func`.
                 print(f"\n\t and kwargs = \n")
                 for kw, kval in kwargs.items():
                     print(f"\n\t{kw} = {kval}\n")
+
+                print(f"\n\t »»» The call is:")
+                sfargs = ", ".join(list(map(lambda a: f"{a}", fargs)))
+                skwargs = ", ".join(list(map(lambda i: f"i[0] = i[1]", kwargs.items())))
+                print(f"\n\t{self.func.__name__}({sfargs}, {skwargs})")
 
             ret = self.func(*fargs, **kwargs)
 
@@ -1426,26 +1396,38 @@ Returns:
         kwargs.update(self.kwargs)
         kwargs.update(kw)
 
+        if len(args) == 1:
+            callargs = (args[0], )
+        else:
+            callargs = args
 
-        for kpre, preop in enumerate(self.preprocess):
-            if self.debug:
-                print(f"\n\t[{self.name}] for argument {karg}, resolving preprocess {kpre}: {preop}\n")
-            pre = preop.resolve(args)
-            if self.debug:
-                print(f"\n\t[{self.name}] => preprocess {kpre} resolved to:\n{pre}\n")
-            arg = self._exec_deferred_process_(arg, pre)
+        result = list()
 
-        fargs = args + self.posargs
+        for karg, arg in enumerate(callargs):
+            for kpre, preop in enumerate(self.preprocess):
+                if self.debug:
+                    print(f"\n\t[{self.name}] for argument {karg}, resolving preprocess {kpre}: {preop}\n")
+                pre = preop.resolve(args)
+                if self.debug:
+                    print(f"\n\t[{self.name}] => preprocess {kpre} resolved to:\n{pre}\n")
+                arg = self._exec_deferred_process_(arg, pre)
 
-        result = self.func(*fargs, **kwargs)
+            fargs = (arg, ) + self.posargs
 
-        for kpost, postop in enumerate(self.postprocess):
-            if self.debug:
-                print(f"\n\t[{self.name}] for argument {karg}, resolving postrocess {kpost}:\n{postop}\n")
-            post = postop.resolve(*args)
-            if self.debug:
-                print(f"\n\t[{self.name}] => postprocess {kpost} resolved to:\n{post}\n")
-            result = self._exec_deferred_process_(result, post)
+            ret = self.func(*fargs, **kwargs)
+
+            for kpost, postop in enumerate(self.postprocess):
+                if self.debug:
+                    print(f"\n\t[{self.name}] for argument {karg}, resolving postrocess {kpost}:\n{postop}\n")
+                post = postop.resolve(*args)
+                if self.debug:
+                    print(f"\n\t[{self.name}] => postprocess {kpost} resolved to:\n{post}\n")
+                ret = self._exec_deferred_process_(ret, post)
+
+            result.append(ret)
+
+        if len(result) == 1:
+            result = result[0]
 
         return result
 
@@ -1515,5 +1497,6 @@ Useful for adding deferred ops to a DeferredSignalMeasure"""
 DSM     = DeferredSignalMeasure
 DComp   = DeferredComputation
 DOp     = DeferredOperation
+DCC     = DeferredCallChain
 
-__all__ = ("DeferredSignalMeasure", "DSM", "DeferredOperation", "DOp", "DeferredComputation", "DComp", "itself")
+__all__ = ("DeferredSignalMeasure", "DSM", "DeferredOperation", "DOp", "DeferredComputation", "DComp", "DeferredCallChain", "DCC" ,"itself")

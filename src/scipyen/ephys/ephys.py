@@ -2864,6 +2864,14 @@ def _mid_point_(loc: typing.Union[DataCursor, SignalCursor], # noqa
 
     return ret
 
+@mid_point.register(pq.Quantity)
+def _mid_point_(loc: pq.Quantity, _:bool = True):
+    if loc.size == 1:
+        return loc
+
+    return (loc[-1] - loc[0])/2
+
+
 @singledispatch
 def get_location_boundary(loc: object, start: bool,
                           outer: bool = True,
@@ -3367,13 +3375,14 @@ Example:
 @signal_reduce.register(tuple)
 @signal_reduce.register(list)
 @signal_reduce.register(collections.deque)
-@signal_reduce.register(DeferredSignalMeasure)
+@signal_reduce.register(DeferredSignalMeasure) # noqa
 @signal_reduce.register(types.FunctionType)
 @signal_reduce.register(functools.partial)
 @signal_reduce.register(types.NoneType)
 def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
                                       typing.Sequence[pq.Quantity],
-                                      DeferredSignalMeasure,
+                                      DeferredSignalMeasure, # noqa
+                                      typing.Callable,
                                       types.FunctionType,
                                       functools.partial,
                                       typing.Sequence[typing.Sequence[numbers.Number]],
@@ -3844,7 +3853,13 @@ signal_chord_slope() function.
 Best used with two DataCursor or two SignaCursor objects.
 
 """
-    t0, t1 = tuple(map(lambda loc: mid_point(loc, True), (loc0, loc1)))
+    # print(f"signal_chord_slope2({loc0}, {loc1}, {signal})")
+
+    if isinstance(loc0, typing.Callable):
+        loc0 = loc0(signal)
+
+    if isinstance(loc1, typing.Callable):
+        loc1 = loc1(signal)
 
     # NOTE: 2026-05-19 10:05:48
     #
@@ -3869,9 +3884,18 @@ Best used with two DataCursor or two SignaCursor objects.
         δx = loc0.x - loc0.xBounds()[0]
         t0 = float(signal.t_start) + float(δx)
 
+    else:
+        t0 = mid_point(loc0, True)
+
     if isinstance(loc1, SignalCursor):
         δx = loc1.x - loc1.xBounds()[0]
         t1 = float(signal.t_start) + float(δx)
+
+    else:
+        t1 = mid_point(loc1, True)
+
+    # t0, t1 = tuple(map(lambda loc: mid_point(loc, True), (loc0, loc1)))
+
 
     if isinstance(t0, float):
         t0 = t0 * signal.times.units
