@@ -471,8 +471,10 @@ class SignalCursor(QtCore.QObject):
 
         if self._follows_mouse_:
             pos = QtCore.QPointF()
-            self._vDataCursor_.coord = pos.x()
-            self._hDataCursor_.coord = pos.x()
+            x_ = pos.x()
+            y_ = pos.y()
+            self._vDataCursor_.coord = x_ * self._x_units if isinstance(self._x_units, pq.Quantity) else x_
+            self._hDataCursor_.coord = y_ * self._y_units if isinstance(self._y_units, pq.Quantity) else y_
 
         else:
             x, y = tuple(map(lambda vdc: float(vdc.coord.flatten()[0]) if isinstance(vdc.coord, np.ndarray) else float(vdc.coord), (self._vDataCursor_, self._hDataCursor_)))
@@ -688,9 +690,11 @@ class SignalCursor(QtCore.QObject):
         r"""Called by programmatically setting the "y" coordinate
         """
         if isinstance(self._host_graphics_item_, pg.PlotItem):
-            self._hl_.setPos(val)
-            self._hDataCursor_.coord = self._hl_.getYPos()
-            # self._y_ = self._hl_.getYPos()
+            if self._hl_ is not None:
+                self._hl_.setPos(val)
+                self._hDataCursor_.coord = self._hl_.getYPos()
+                if isinstance(self._y_units, pq.Quantity) and not isinstance(self._hDataCursor_.coord, pq.Quantity):
+                    self._hDataCursor_.coord *= self._y_units
 
         else:
             if plotitem is None:
@@ -704,16 +708,18 @@ class SignalCursor(QtCore.QObject):
             if self._hl_ is not None:
                 self._hl_.setYPos(new_Y)
                 self._hDataCursor_.coord = self._hl_.getYPos()
-                # self._y_ = self._hl_.getYPos()
+                if isinstance(self._y_units, pq.Quantity) and not isinstance(self._hDataCursor_.coord, pq.Quantity):
+                    self._hDataCursor_.coord *= self._y_units
 
     def _update_vline_position_(self, val, plotitem=None):
         r"""Called by programmatically setting "x" coordinate
         """
         if isinstance(self._host_graphics_item_, pg.PlotItem):
-            self._vl_.setPos(val)
-            self._vDataCursor_.coord = self._vl_.getXPos()
-            # self._x_ = self._vl_.getXPos()
-            # print(f"{self.ID} _update_vline_position_ val = {val}, self._x_ = {self._x_}")
+            if self._vl_ is not None:
+                self._vl_.setPos(val)
+                self._vDataCursor_.coord = self._vl_.getXPos()
+                if isinstance(self._x_units, pq.Quantity) and not isinstance(self._vDataCursor_.coord, pq.Quantity):
+                    self._vDataCursor_.coord *= self._x_units
 
         else:
             if plotitem is None:
@@ -724,23 +730,23 @@ class SignalCursor(QtCore.QObject):
 
             new_X = plotItem.vb.mapViewToScene(QtCore.QPointF(val, 0.0)).x()
 
-            # print(f"{self.ID} _update_vline_position_ val = {val}, new_X = {newX}")
             if self._vl_ is not None:
                 self._vl_.setXPos(new_X)
                 self._vDataCursor_.coord = self._vl_.getXPos()
-                # self._x_ = self._vl_.getXPos()
+                if isinstance(self._x_units, pq.Quantity) and not isinstance(self._vDataCursor_.coord, pq.Quantity):
+                    self._vDataCursor_.coord *= self._x_units
 
     def _add_lines_to_host_(self):
         if self._cursor_type_ == SignalCursorTypes.crosshair:
-            pos = QtCore.QPointF(self._vDataCursor_.coord, self._hDataCursor_.coord)
+            pos = QtCore.QPointF(float(self._vDataCursor_.coord), self._hDataCursor_.coord)
             # pos = QtCore.QPointF(self._x_, self._y_)
 
         elif self._cursor_type_ == SignalCursorTypes.horizontal:
-            pos = QtCore.QPointF(0.0, self._hDataCursor_.coord)
+            pos = QtCore.QPointF(0.0, float(self._hDataCursor_.coord))
             # pos = QtCore.QPointF(0.0, self._y_)
 
         else:
-            pos = QtCore.QPointF(self._vDataCursor_.coord, 0.0)
+            pos = QtCore.QPointF(float(self._vDataCursor_.coord), 0.0)
             # pos = QtCore.QPointF(self._x_, 0.0)
 
         # print(f"{self.__class__.__name__}._add_lines_to_host_ pos = {pos}")
@@ -880,12 +886,16 @@ class SignalCursor(QtCore.QObject):
         self.sig_cursorSelected.emit(self._cursorId_)
 
         if self._hl_ is not None:
-            self._hDataCursor_.coord = self._hl_.getYPos()
-            # self._y_ = self._hl_.getYPos()
+            y = self._hl_.getYPos()
+            if isinstance(self._y_units, pq.Quantity) and not isinstance(y, pq.Quantity):
+                y *= self._y_units
+            self._hDataCursor_.coord = y
 
         if self._vl_ is not None:
-            self._vDataCursor_.coord = self._vl_.getXPos()
-            # self._x_ = self._vl_.getXPos()
+            x = self._vl_.getXPos()
+            if isinstance(self._x_units, pq.Quantity) and not isinstance(x, pq.Quantity):
+                x *= self._x_units
+            self._vDataCursor_.coord = x
 
         if self._cursor_type_ != SignalCursorTypes.crosshair:
             self.sig_reportPosition.emit(self.ID)
@@ -1230,59 +1240,90 @@ class SignalCursor(QtCore.QObject):
                     self._cursor_type_ = SignalCursorTypes.horizontal
 
         else:
-            if isinstance(x, numbers.Number):
-                _x = x
-                # self._x_ = x
+            if x is None:
+                x = (self._x_range_[0] + np.diff(self._x_range_)/2).flatten()[0]
+            if xwindow is None:
+                xwindow = 0.0
 
-            elif isinstance(x, pq.Quantity):
-                _x = float(x.magnitude.flatten()[0])
-                # self._x_ = x.magnitude.flatten()[0]
+            if y is None:
+                y = (self._y_range_[0] + np.diff(self._y_range_)/2).flatten()[0]
 
-            elif x is None:
-                _x = float((self._x_range_[0] + np.diff(self._x_range_)/2).flatten()[0])
-                # self._x_ = self._x_range_[0] + np.diff(self._x_range_)/2
+            if ywindow is None:
+                ywindow = 0.0
 
-            else:
-                raise TypeError("x expected to be a number, python Quantity or None; got %s instead" % type(x).__name__)
+            # WARNING: 2026-05-22 14:14:10 potential BUG/FIXME
+            # TODO ensure quantities are sound here TODO
+            self._vDataCursor_ = DataCursor(x, xwindow)
 
-            if isinstance(y, numbers.Number):
-                _y = y
+            if isinstance(self._x_units, pq.Quantity):
+                if not isinstance(self._vDataCursor_.coord, pq.Quantity):
+                    self._vDataCursor_.coord *= self._x_units
 
-            elif isinstance(y, pq.Quantity):
-                _y = float(y.magnitude.flatten()[0])
+                if not isinstance(self._vDataCursor_.span, pq.Quantity):
+                    self._vDataCursor_.span *= self._x_units
 
-            elif y is None:
-                _y = float((self._y_range_[0] + np.diff(self._y_range_)/2).flatten()[0])
+            self._hDataCursor_ = DataCursor(y, ywindow)
 
-            else:
-                raise TypeError("y expected to be a number, python Quantity or None; got %s instead" % type(y).__name__)
+            if isinstance(self._y_units, pq.Quantity):
+                if not isinstance(self._hDataCursor_.coord, pq.Quantity):
+                    self._hDataCursor_.coord *= self._y_units
 
-            if isinstance(xwindow, numbers.Number):
-                _hWin = xwindow
+                if not isinstance(self._hDataCursor_.span, pq.Quantity):
+                    self._hDataCursor_.span *= self._h_units
 
-            elif isinstance(xwindow, pq.Quantity):
-                _hWin = float(xwindow.magnitude.flatten()[0])
+            # if isinstance(x, numbers.Number):
+            #     _x = x
+            #     # self._x_ = x
+            #
+            # elif isinstance(x, pq.Quantity):
+            #     _x = float(x.magnitude.flatten()[0])
+            #     # self._x_ = x.magnitude.flatten()[0]
+            #
+            # elif x is None:
+            #     _x = float((self._x_range_[0] + np.diff(self._x_range_)/2).flatten()[0])
+            #     # self._x_ = self._x_range_[0] + np.diff(self._x_range_)/2
+            #
+            # else:
+            #     raise TypeError("x expected to be a number, python Quantity or None; got %s instead" % type(x).__name__)
+            #
+            # if isinstance(y, numbers.Number):
+            #     _y = y
+            #
+            # elif isinstance(y, pq.Quantity):
+            #     _y = float(y.magnitude.flatten()[0])
+            #
+            # elif y is None:
+            #     _y = float((self._y_range_[0] + np.diff(self._y_range_)/2).flatten()[0])
+            #
+            # else:
+            #     raise TypeError("y expected to be a number, python Quantity or None; got %s instead" % type(y).__name__)
+            #
+            # if isinstance(xwindow, numbers.Number):
+            #     _hWin = xwindow
+            #
+            # elif isinstance(xwindow, pq.Quantity):
+            #     _hWin = float(xwindow.magnitude.flatten()[0])
+            #
+            # elif xwindow is None:
+            #     _hWin = 0.0
+            #
+            # else:
+            #     raise TypeError("xwindow expected to be a number, python Quantity or None; got %s instead" % type(xwindow).__name__)
+            #
+            # if isinstance(ywindow, numbers.Number):
+            #     _vWin = ywindow
+            #
+            # elif isinstance(ywindow, pq.Quantity):
+            #     _vWin = float(ywindow.magnitude.flatten()[0])
+            #
+            # elif ywindow is None:
+            #     _vWin = 0.0
+            #
+            # else:
+            #     raise TypeError("ywindow expected to be a number, python Quantity or None; got %s instead" % type(ywindow).__name__)
 
-            elif xwindow is None:
-                _hWin = 0.0
-
-            else:
-                raise TypeError("xwindow expected to be a number, python Quantity or None; got %s instead" % type(xwindow).__name__)
-
-            if isinstance(ywindow, numbers.Number):
-                _vWin = ywindow
-
-            elif isinstance(ywindow, pq.Quantity):
-                _vWin = float(ywindow.magnitude.flatten()[0])
-
-            elif ywindow is None:
-                _vWin = 0.0
-
-            else:
-                raise TypeError("ywindow expected to be a number, python Quantity or None; got %s instead" % type(ywindow).__name__)
-
-            self._vDataCursor_ = DataCursor(_x, _hWin)
-            self._hDataCursor_ = DataCursor(_y, _vWin)
+            # self._vDataCursor_ = DataCursor(_x, _hWin)
+            # self._hDataCursor_ = DataCursor(_y, _vWin)
 
         if not isinstance(self._cursor_type_, SignalCursorTypes): # might have been set above
             if isinstance(cursor_type, str):
@@ -1478,18 +1519,19 @@ class SignalCursor(QtCore.QObject):
                 if len(di):
                     d = di[0]
 
-                    #if self.cursorType == SignalCursorTypes.crosshair:
-                        #print("mp", mp)
-
                     if mp.x() >= d.xData[0] and mp.x() <= d.xData[-1]:
                         if self._hl_ is not None:
                             self._hl_.setPos(mp.y())
                             self._hDataCursor_.coord = mp.y()
+                            if isinstance(self._y_units, pq.Quantity) and not isinstance(self._hDataCursor_.coord, pq.Quantity):
+                                self._hDataCursor_.coord *= self._y_units
                             # self._y_ = mp.y()
 
                         if self._vl_ is not None:
                             self._vl_.setPos(mp.x())
                             self._vDataCursor_.coord = mp.x()
+                            if isinstance(self._x_units, pq.Quantity) and not isinstance(self._vDataCursor_.coord, pq.Quantity):
+                                self._vDataCursor_.coord *= self._x_units
                             # self._x_ = mp.x()
 
                 # NOTE: only report position when mouse is in the sceneBoundingRect
@@ -2044,9 +2086,6 @@ class SignalCursor(QtCore.QObject):
 
                     self._signal_proxy_ = pg.SignalProxy(sig, rateLimit=60, slot=self._slot_mouse_moved_)
 
-                    # l.sigDragged.disconnect(self.slot_positionChanged)
-                    # l.sigPositionChanged.disconnect(self.slot_positionChanged)
-                    # l.sigPositionChangeFinished.disconnect(self.slot_positionChanged)
                 else:
                     l.sigDragged.connect(self.slot_positionChanged)
                     l.sigPositionChanged.connect(self.slot_positionChanged)

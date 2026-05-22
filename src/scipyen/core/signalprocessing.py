@@ -1606,10 +1606,10 @@ Parameters:
         else:
             sfx = "filtered"
 
-        if isinstance(sig_name, str) and len(sig_name.strip()):
-            sig_name = f"{sig_name}_{sfx}"
-        else:
-            sig_name = sfx
+        # if isinstance(sig_name, str) and len(sig_name.strip()):
+        #     sig_name = f"{sig_name}_{sfx}"
+        # else:
+        #     sig_name = sfx
 
         ret = klass(
             ret,
