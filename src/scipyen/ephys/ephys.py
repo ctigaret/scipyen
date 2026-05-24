@@ -289,8 +289,12 @@ class ClampMode(TypeEnum):
     VoltageClamp=2      # |these two should be
     CurrentClamp=4      # |     self-explanatory
 
+NoClamp = ClampMode.NoClamp
+VotageClamp = ClampMode.VoltageClamp
+CurrentClamp = ClampMode.CurrentClamp
+
 class ElectrodeMode(TypeEnum):
-    Null = 0
+    Null=0
     Field=1             # typically, associated with ClampMode.NoClamp; other ClampModes don't make sense
     WholeCellPatch=2    # can associate any ClampMode
     ExcisedPatch=4      # can associate any ClampMode although ClampMode.VoltageClamp makes more sense
@@ -298,6 +302,15 @@ class ElectrodeMode(TypeEnum):
     Tetrode=16          # 16-64 are for
     LinearArray=32      # local field potentials etc
     MultiElectrodeArray=64 # MEAs on a culture/slice?
+
+NullElectrode = ElectrodeMode.Null
+Field = ElectrodeMode.Field
+WholeCellPatch = ElectrodeMode.WholeCellPatch
+ExcisedPatch = ElectrodeMode.ExcisedPatch
+Sharp = ElectrodeMode.Sharp
+Tetrode = ElectrodeMode.Tetrode
+LinearArray = ElectrodeMode.LinearArray
+MultiElectrodeArray = ElectrodeMode.MultiElectrodeArray
 
 class RecordingEpisodeType(TypeEnum):
     r"""Once can define valid type combinations as follows:
