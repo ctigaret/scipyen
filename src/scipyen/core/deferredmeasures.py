@@ -1464,11 +1464,13 @@ calls that expect more than one parameter to a call expecting a single one.
 
 When no funcs are defined, returns obj
 """
-        result = obj
-        for func in self.funcs:
-            result = func(result)
+        if isinstance(self.funcs, typing.Sequence):
+            result = obj
+            for func in self.funcs:
+                result = func(result)
+            return result
 
-        return result
+        return self.funcs(obj)
 
 
 
