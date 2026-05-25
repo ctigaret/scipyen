@@ -3383,12 +3383,14 @@ Example:
     # then use the new ``sub_epoch`` object
 
 """
+    print(f"signal_reduce: loc = {loc}")
     raise NotImplementedError(f"Locations of type {type(loc).__name__} are not supported")
 
 @signal_reduce.register(tuple)
 @signal_reduce.register(list)
 @signal_reduce.register(collections.deque)
 @signal_reduce.register(DeferredSignalMeasure) # noqa
+@signal_reduce.register(DeferredComputation) # noqa
 @signal_reduce.register(types.FunctionType)
 @signal_reduce.register(functools.partial)
 @signal_reduce.register(types.NoneType)
@@ -3422,7 +3424,7 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
         return __do_reduce__(func, signal, channel)
         # return __do_reduce__(t0, t1, func, signal, channel, relative)
 
-    elif isinstance(loc, DeferredSignalMeasure): # noqa
+    elif isinstance(loc, (DeferredSignalMeasure, DeferredComputation)): # noqa
         sg = loc(signal)
         if not isinstance(sg, typing.Union[neo.AnalogSignal, DataSignal]):
             raise ValueError(f"The supplied location measure ({loc}) did not return a signal")
@@ -3692,14 +3694,64 @@ def signal_slice(loc, signal, /, channel = None,
                                                         DataSignal]:
     raise NotImplementedError(f"Locations of type {type(loc).__name__} are not supported")
 
+@signal_slice.register(types.NoneType)
+def _signal_slice_(loc: types.NoneType, signal, /, channel = None,
+                 outer: bool = True,
+                 relative: bool = True) -> typing.Union[neo.AnalogSignal,
+                                                        DataSignal]:
+    return signal
+
+@signal_slice.register(DeferredSignalMeasure) # noqa
+@signal_slice.register(types.FunctionType)
+@signal_slice.register(functools.partial)
+def _signal_slice_(loc: typing.Union[DeferredSignalMeasure, # noqa
+                                    typing.Callable,
+                                    types.FunctionType,
+                                    functools.partial,
+                                   ],
+                 signal, /,
+                 channel = None,
+                 outer: bool = True,
+                 relative: bool = True) -> typing.Union[neo.AnalogSignal,
+                                                        DataSignal]:
+
+    loc = loc(signal)
+    return slice_signal(loc, signal)
+
+
 @signal_slice.register(tuple)
 @signal_slice.register(list)
 @signal_slice.register(collections.deque)
-def _signal_slice_(loc: typing.Union[list, tuple, collections.deque], signal, /,
+# def _signal_slice_(loc: typing.Union[list, tuple, collections.deque], signal, /,
+def _signal_slice_(loc: typing.Union[typing.Sequence[numbers.Number],
+                                      typing.Sequence[pq.Quantity],
+                                      DeferredSignalMeasure, # noqa
+                                      typing.Callable,
+                                      types.FunctionType,
+                                      functools.partial,
+                                      typing.Sequence[pq.Quantity],
+                                      typing.Sequence[DeferredSignalMeasure],
+                                      typing.Sequence[types.FunctionType],
+                                      typing.Sequence[functools.partial],
+                                      typing.Sequence[
+                                                        typing.Union[
+                                                            numbers.Number,
+                                                            pq.Quantity,
+                                                            DeferredSignalMeasure,
+                                                            types.FunctionType,
+                                                            functools.partial,
+                                                            ]
+                                                     ],
+                                      types.NoneType],
+                   signal, /,
                    channel = None,
                    outer: bool = True,
                    relative: bool = True) -> typing.Union[neo.AnalogSignal,
                                                         DataSignal]:
+
+    # if isinstance(loc, typing.Callable):
+    #     loc = loc(signal)
+    #     return slice_signal(loc, signal, channel, outer, relative)
 
     if len(loc) != 2:
         raise ValueError("Expecting a sequence of two elements")
@@ -4472,6 +4524,9 @@ def cursor_reduce(func:types.FunctionType,
 def adapt_coordinate_to_lower_boundary(val: typing.Union[numbers.Number, np.ndarray, pq.Quantity],
                         old: typing.Union[numbers.Number, np.ndarray, pq.Quantity],
                         new: typing.Union[numbers.Number, np.ndarray, pq.Quantity]):
+
+    # print(f"adapt_coordinate_to_lower_boundary(val = {val}, new = {new}, old = {old}")
+
     if new == old:
         return val
     return val - old + new
@@ -6864,8 +6919,9 @@ def __do_reduce__(fn, sg, ch):
     if isinstance(ch, int):
         ret = ret[ch].flatten()
 
-    else:
-        if
+    # else:
+    #     if isinstance(ret, np.ndarray) and ret.size > 1:
+
 
     # print(f"__do_reduce__ {fn} will return {ret} ({type(ret)})")
 

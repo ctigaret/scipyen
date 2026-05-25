@@ -999,7 +999,7 @@ Any aditional named or keyword parameters to be passed to `func`.
                 if not all(
                             isinstance(s,
                                        (
-                                           neo.AnalogSignal, DataSignal,
+                                           neo.AnalogSignal, DataSignal # , pq.Quantity
                                         )
                                        ) for s in args[0]
                         ):
