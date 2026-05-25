@@ -290,7 +290,7 @@ class ClampMode(TypeEnum):
     CurrentClamp=4      # |     self-explanatory
 
 NoClamp = ClampMode.NoClamp
-VotageClamp = ClampMode.VoltageClamp
+VoltageClamp = ClampMode.VoltageClamp
 CurrentClamp = ClampMode.CurrentClamp
 
 class ElectrodeMode(TypeEnum):
@@ -3472,10 +3472,17 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
 
         # print(f"_signal_reduce_ loc = {loc} ->\n\t{result}")
 
-        if all(isinstance(ret, (neo.AnalogSignal, DataSignal)) for ret in result):
-            return neoutils.concatenate_signals(result)
+        if len(result) == 1:
+            result = result[0]
+            if not isinstance(result, pq.Quantity):
+                result *= signal.units
+            return result
 
-        return np.vstack(result) * signal.units
+        else:
+            if all(isinstance(ret, (neo.AnalogSignal, DataSignal)) for ret in result):
+                return neoutils.concatenate_signals(result)
+
+            return np.vstack(result) * signal.units
 
     else:
         raise ValueError("'loc' must be a Location Measure, a pair of scalars or Location Measures, or a sequence of such pairs")
@@ -3578,7 +3585,7 @@ def _signal_reduce_(loc: typing.Union[DataCursor, SignalCursor], # noqa
     return signal_reduce([t0,t1], func, signal, channel, relative)
 
 def signal_max(loc, signal, /, channel = None, relative = True):
-    return signal_reduce(loc, np.max, signal, channel, relative) * signal.units
+    return signal_reduce(loc, np.max, signal, channel, relative) # * signal.units
     # if not isinstance(ret, pq.Quantity):
     #     ret *= signal.units
     # return ret
@@ -3610,7 +3617,7 @@ def signal_domain_max(loc, signal, /, channel = None, relative = True):
     return signal.times[ndx]
 
 def signal_min(loc, signal, /, channel = None, relative = True):
-    return signal_reduce(loc, np.min, signal, channel, relative) * signal.units
+    return signal_reduce(loc, np.min, signal, channel, relative) # * signal.units
     # if not isinstance(ret, pq.Quantity):
     #     ret *= signal.units
     # return ret
@@ -6856,6 +6863,9 @@ def __do_reduce__(fn, sg, ch):
 
     if isinstance(ch, int):
         ret = ret[ch].flatten()
+
+    else:
+        if
 
     # print(f"__do_reduce__ {fn} will return {ret} ({type(ret)})")
 
