@@ -3922,16 +3922,20 @@ signal_chord_slope() function.
 
     If this is not what is intended, then make sure each location defines a single sub-interval.
 
-Best used with two DataCursor or two SignaCursor objects.
+Best used with two DataCursor or two SignalCursor objects.
 
 """
     # print(f"signal_chord_slope2({loc0}, {loc1}, {signal})")
 
     if isinstance(loc0, typing.Callable):
+        # print(f"\nsignal_chord_slope2: loc0 = {loc0}")
         loc0 = loc0(signal)
+        # print(f"\n\t => loc0 = {loc0}")
 
     if isinstance(loc1, typing.Callable):
+        # print(f"\nsignal_chord_slope2: loc1 = {loc1}")
         loc1 = loc1(signal)
+        # print(f"\n\t => loc1 = {loc1}")
 
     # NOTE: 2026-05-19 10:05:48
     #
@@ -3978,7 +3982,7 @@ Best used with two DataCursor or two SignaCursor objects.
     if relative:
         t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
 
-   # print(f"signal_chord_slope2: t0 = {t0}, t1 = {t1}")
+    # print(f"signal_chord_slope2: t0 = {t0}, t1 = {t1}")
 
     if isinstance(channel, int):
         y0, y1 = tuple(map(lambda x: signal[signal.time_index(x), channel], (t0, t1)))
@@ -4524,13 +4528,243 @@ def cursor_reduce(func:types.FunctionType,
 def adapt_coordinate_to_lower_boundary(val: typing.Union[numbers.Number, np.ndarray, pq.Quantity],
                         old: typing.Union[numbers.Number, np.ndarray, pq.Quantity],
                         new: typing.Union[numbers.Number, np.ndarray, pq.Quantity]):
+    r"""
 
+Parameters:
+===========
+
+:val:
+    coordinate to be adapted
+
+:old:
+    old domain boundary, used at the time the original coordinate was created
+
+:new:
+    new domain boundary
+
+Returns:
+========
+
+Coordinate adapted to the new domain boundary
+
+"""
     # print(f"adapt_coordinate_to_lower_boundary(val = {val}, new = {new}, old = {old}")
 
     if new == old:
-        return val
-    return val - old + new
+        ret = val
+    else:
+        ret = val - old + new
+    # print(f"\n\t => ret = {ret}")
 
+    return ret
+
+@singledispatch
+def adapt_location_to_lower_domain_bounds(obj, old: typing.Union[
+                                        numbers.Number,
+                                        np.ndarray,
+                                        pq.Quantity
+                                        ],
+        new: typing.Union[numbers.Number,
+                          np.ndarray,
+                          pq.Quantity
+                          ]
+        ) -> object:
+    raise NotImplementedError(f"adapt_location_to_lower_domain_bounds does not support {type(obj).__name__} location type ")
+
+# @adapt_location_to_lower_domain_bounds.register(neo.Epoch)
+# @adapt_location_to_lower_domain_bounds.register(DataZone)
+# def _adapt_location_to_lower_domain_bounds_(obj: typing.Union[neo.Epoch, DataZone],
+#                                             old, new):
+
+@adapt_location_to_lower_domain_bounds.register(neo.Epoch)
+@adapt_location_to_lower_domain_bounds.register(DataZone)
+def _adapt_location_to_lower_domain_bounds_(obj: typing.Union[neo.Epoch, DataZone],
+                                            old, new):
+
+    print(f"\nadapt_location_to_lower_domain_bounds[{type(obj).__name__}]: old = {old}, new = {new}\n")
+
+    new_times = list(
+        map(
+            lambda t: adapt_coordinate_to_lower_boundary(
+                t, old.flatten()[0], new.flatten()[0]
+                ),
+            obj.times
+            # list(obj.times)
+            )
+        )
+
+    # why not this ?!?
+    # ret = obj.duplicate_with_new_data()
+
+    ret = type(obj)(times = new_times, durations = obj.durations,
+                     units = obj.units, labels = obj.labels,
+                     name = obj.name, description = obj.description,
+                     array_annotations = obj.array_annotations)
+    if isinstance(obj, DataZone):
+        ret.relative = obj.relative
+
+    ret.annotations.update(obj.annotations)
+
+    if isinstance(obj, DataZone):
+        ret.domain_name = obj.domain_name
+
+    return ret
+
+@adapt_location_to_lower_domain_bounds.register(neo.Event)
+@adapt_location_to_lower_domain_bounds.register(DataMark)
+@adapt_location_to_lower_domain_bounds.register(TriggerEvent)
+def _adapt_location_to_lower_domain_bounds_(obj: typing.Union[neo.Event,
+                                                              DataMark,
+                                                              TriggerEvent],
+                                            old, new):
+    new_times = list(
+        map(
+            lambda t: adapt_coordinate_to_lower_boundary(
+                t, old, new
+                ),
+            obj.times
+            )
+        )
+
+    ret = type(obj)(times = new_times,
+                    units = obj.units, labels = obj.labels,
+                    name = obj.name, description = obj.description,
+                    array_annotations = obj.array_annotations)
+
+    ret.annotations.update(obj.annotations)
+
+    if isinstance(obj, DataMark):
+        ret.mark_type = obj.mark_type
+        ret.domain_name = obj.domain_name
+
+    elif isinstance(obj, TriggerEvent):
+        ret.event_type = obj.event_type
+
+    return ret
+
+@adapt_location_to_lower_domain_bounds.register(DataCursor)
+def _adapt_location_to_lower_domain_bounds_(obj: DataCursor,
+                                            old, new):
+    new_coord = adapt_coordinate_to_lower_boundary(obj, old, new)
+
+    return DataCursor(new_coord, snap = obj.span, name = obj.name)
+
+@adapt_location_to_lower_domain_bounds.register(SignalCursor)
+def _adapt_location_to_lower_domain_bounds_(obj: SignalCursor,
+                                            old, new, axis: int = None):
+
+    if obj.cursorType == SignalCursorTypes.vertical:
+        currentBounds = obj.xBounds()
+        currentCoord = obj.x
+
+    elif obj.cursorType == SignalCursorTypes.horizontal:
+        currentBounds = obj.yBounds()
+        currentCoord = obj.y
+
+    else:
+        if axis == 0:
+            currentBounds = obj.xBounds()
+            currentCoord = obj.x
+
+        elif axis == 1:
+            currentBounds = obj.yBounds()
+            currentCoord = obj.y
+
+        else:
+            raise ValueError(f"For crosshair cursors an axis of 0 or 1 must be specified")
+
+    new_coord = adapt_coordinate_to_lower_boundary(currentCoord, old, new)
+    boundRange = currentBounds[1] - currentBounds[0]
+    newBoundsLo = adapt_coordinate_to_lower_boundary(currentBounds[0])
+    newBoundsForAxis = (newBoundsLo, newBoundsLo + boundRange)
+
+    if obj.cursorType == SignalCursorTypes.vertical:
+        obj.x = new_coord
+        obj.setBounds(None, newBoundsForAxis, obj.yBounds())
+
+        if (
+            ((obj.x + obj.xwindow/2) >= newBoundsForAxis[-1])
+            or ((obj.x - obj.xwindow/2) < newBoundsForAxis[0])
+            ):
+            new_xwindow = 0
+
+            if isinstance(obj.xwindow, pq.Quantity):
+                new_xwindow *= obj.xwindow.units
+
+            obj.xwindow = new_xwindow
+
+    elif obj.cursorType == SignalCursorTypes.horizontal:
+        obj.y = new_coord
+        obj.setBounds(None, obj.xBounds(), newBoundsForAxis)
+
+        if (
+            ((obj.y + obj.ywindow/2) >= newBoundsForAxis[-1])
+            or ((obj.y - obj.ywindow/2) < newBoundsForAxis[0])
+            ):
+            new_ywindow = 0
+
+            if isinstance(obj.ywindow, pq.Quantity):
+                new_ywindow *= obj.ywindow.units
+
+            obj.ywindow = new_ywindow
+
+    else:
+        if axis == 0:
+            obj.x = new_coord
+            obj.setBounds(None, newBoundsForAxis, obj.yBounds())
+
+            if (
+                ((obj.x + obj.xwindow/2) >= newBoundsForAxis[-1])
+                or ((obj.x - obj.xwindow/2) < newBoundsForAxis[0])
+                ):
+                new_xwindow = 0
+
+                if isinstance(obj.xwindow, pq.Quantity):
+                    new_xwindow *= obj.xwindow.units
+
+                obj.xwindow = new_xwindow
+
+        elif axis == 1:
+            obj.y = new_coord
+            obj.setBounds(None, obj.xBounds(), newBoundsForAxis)
+
+            if (
+                ((obj.y + obj.ywindow/2) >= newBoundsForAxis[-1])
+                or ((obj.y - obj.ywindow/2) < newBoundsForAxis[0])
+                ):
+                new_ywindow = 0
+
+                if isinstance(obj.ywindow, pq.Quantity):
+                    new_ywindow *= obj.ywindow.units
+
+                obj.ywindow = new_ywindow
+
+    return obj
+
+@adapt_location_to_lower_domain_bounds.register(Interval)
+def _adapt_location_to_lower_domain_bounds_(obj: Interval,
+                                            old, new):
+
+    new_times = list(
+        map(
+            lambda t: adapt_coordinate_to_lower_boundary(
+                t, old, new
+                ),
+            obj.times
+            )
+        )
+
+    ret = Interval(times = new_times, units = obj.units, labels = obj.labels,
+                    durations = obj.durations, extent = obj.extent,
+                    name = obj.name, description = obj.description,
+                    segment = obj.segment, array_annotations = obj.array_annotations
+                    )
+
+    ret.annotations.update(obj.annotations)
+
+    ret.domain_name = obj.domain_name
+
+    return ret
 
 def adjust_time_relative_to_signal(signal:typing.Union[neo.AnalogSignal, DataSignal], *args) -> typing.Union[pq.Quantity, typing.List[pq.Quantity]]:
     r"""Adjust the domain values supplied in `args` relative to signal's domain limit.
@@ -6871,9 +7105,9 @@ def __slice_signal__(t0, t1, sg, ch, rel):
 
     # print(f"\n\t__slice_signal__ t0 = {t0}, t1 = {t1}")
 
-    if rel:
+    # if rel:
+    #     t0, t1 = adjust_time_relative_to_signal(sg, t0, t1)
         # t0, t1 = tuple(map(lambda t_: sg.t_start + t_, (t0, t1)))
-        t0, t1 = adjust_time_relative_to_signal(sg, t0, t1)
         # t0, t1 = tuple(map(lambda t: adjust_time_relative_to_signal(sg, t),  (t0, t1)))
 
     # print(f"\n\t__slice_signal__ adjusted t0 = {t0}, t1 = {t1}\n***\n\n")

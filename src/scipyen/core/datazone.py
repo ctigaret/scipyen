@@ -233,7 +233,7 @@ class DataZone(neo.Epoch):
         obj.segment = segment
         return obj
 
-    def __init__(self, place=None, times=None, extents=None, durations=None,
+    def __init__(self, places=None, times=None, extents=None, durations=None,
                  labels=None, units=None, name=None, description=None,
                  file_origin=None, relative=None, array_annotations=None, **annotations):
         DataObject.__init__(self, name=name, file_origin=file_origin,
@@ -822,20 +822,6 @@ coordinates are NOT restricted to time units.
 
     def _repr_pretty_(self, pp, cycle):
         super()._repr_pretty_(pp, cycle)
-    #
-    # def __str__(self) -> str:
-    #     times = list(self.times)
-    #     durations = list(self.durations)
-    #     # print(f"{self.__class__.__name__}.__repr__: labels = {self.labels}")
-    #     if isinstance(self.labels, np.ndarray) and self.labels.ndim>0 and self.labels.size>0:
-    #         labels = list(self.labels)
-    #     else:
-    #         labels = [""]
-    #     objs = ['%s @%s for %s' % (label, str(time), str(dur)) for label, time, dur in
-    #             zip(labels, times, durations)]
-    #     if isinstance(self.name, str) and len(self.name.strip()):
-    #         objs.append(self.name)
-    #     return f"<{self.__class__.__name__}:{', '.join(objs)}>"
 
     def _repr_pretty_(self, pp, cycle):
         super()._repr_pretty_(pp, cycle)
@@ -890,6 +876,7 @@ coordinates are NOT restricted to time units.
 
         t0 = self.t0[i] # super().__getitem__(i) # this is a scalar quantity i.e. with size=1 and ndim=0
         t1 = self.t1[i]
+
         if self._labels is not None and self._labels.size > 0:
             labels = self.labels[i]
         else:
@@ -901,48 +888,8 @@ coordinates are NOT restricted to time units.
 
         obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
         obj._copy_data_complement(self)
+
         return obj
-        # if isinstance(i, int):
-        #     t0 = self.t0[i] # super().__getitem__(i) # this is a scalar quantity i.e. with size=1 and ndim=0
-        #     t1 = self.t1[i]
-        #     if self._labels is not None and self._labels.size > 0:
-        #         labels = self.labels[i]
-        #     else:
-        #         labels = self.labels
-        #
-        #     obj = self.__class__(times=t0, durations=t1, units=self.units,
-        #                          labels=labels,
-        #                          extent=self._extent)
-        #
-        #     obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
-        #     obj._copy_data_complement(self)
-        #     return obj
-        #
-        # obj = super().__getitem__(i) # when i is int this is a scalar quantity i.e. with size=1 and ndim=0 hence the above
-        #
-        # if self._labels is not None and self._labels.size > 0:
-        #     obj._labels = self.labels[i]
-        # else:
-        #     obj._labels = self.labels
-        #
-        #
-        # obj._t0 = self.t0[i]
-        # obj._t1 = self.t1[i]
-        #
-        # if self._labels is not None and self._labels.size > 0:
-        #     obj._labels = self.labels[i]
-        # else:
-        #     obj._labels = self.labels
-        #
-        # try:
-        #     # Array annotations need to be sliced accordingly
-        #     obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
-        #     obj._copy_data_complement(self)
-        # except AttributeError:  # If Quantity was returned, not Epoch
-        #     obj.times = obj
-        #     obj.durations = obj._durations
-        #     obj.labels = obj._labels
-        # return obj
 
     def __getslice__(self, i, j):
         '''
@@ -1154,7 +1101,7 @@ coordinates are NOT restricted to time units.
 
     @property
     def t1(self):
-        r"""The second (end) point of the intrervals.
+        r"""The second (end) point of the intervals.
     Read-only
     To create an object with new times use self.duplicate_with_new_data(…)
     """

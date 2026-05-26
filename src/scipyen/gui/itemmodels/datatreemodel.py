@@ -1428,7 +1428,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         tip = type(obj).__name__
 
         if hasattr(obj, "__name__"):
-            mname = f" {obj._name__}"
+            mname = f" {obj.__name__}"
         else:
             mname = ""
 

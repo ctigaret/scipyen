@@ -26,7 +26,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 from core.typeenum import TypeEnum
 from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
 from core.prog import scipywarn
-from core.scipyen_quantities import (checkTimeUnits, unitsConvertible)
+from core.scipyen_quantities import (checkTimeUnits, unitsConvertible, unitFamilyName)
 #from core.utilities import unique
 
 def _new_DataMark(cls, places = None, labels=None, units=None, name=None,
@@ -556,6 +556,7 @@ class DataMark(neo.Event):
                             array_annotations=array_annotations, **annotations)
 
         # print(f"{self.__class__.__name__}[DataMark].__init__(labels = {labels}: {type(labels).__name__})")
+        self.__domain_name__ = unitFamilyName(self.places)
 
         if not isinstance(annotations, dict):
             annotations = dict()
@@ -657,6 +658,7 @@ class DataMark(neo.Event):
         # This ensures the attribute exists
         if not hasattr(self, 'array_annotations'):
             self.array_annotations = ArrayDict(self._get_arr_ann_length())
+        self.__domain_name__ = unitFamilyName(self.units)
 
     def __repr__(self):
         result = str(self)
@@ -709,6 +711,20 @@ class DataMark(neo.Event):
                                self.units, self.name, self.description,
                                self.file_origin, self.__mark_type__,
                                self.segment, self.array_annotations, annots)
+
+    @property
+    def domain_name(self):
+        r"""A brief description of the domain name
+        """
+        if self.__domain_name__ is None:
+            self.__domain_name__ = unitFamilyName(self.domain)
+
+        return self.__domain_name__
+
+    @domain_name.setter
+    def domain_name(self, value):
+        if isinstance(value, str) and len(value.strip()):
+            self.__domain_name__ = value
 
     @property
     def labels(self):

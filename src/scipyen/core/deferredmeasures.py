@@ -70,7 +70,9 @@ class DeferredOperation:
         self.debug: bool = False
 
     def resolve(self, objs) -> typing.Self:
-        # print(f"\n{self.__class__.__name__}.resolve:\n")
+        if self.debug:
+            print(f"\n{self.__class__.__name__}.resolve:\n")
+
         if isinstance(self.args, str):
             phMatch = self.placeholder.match(self.args)
             if phMatch:
@@ -97,7 +99,8 @@ class DeferredOperation:
         elif isinstance(self.args, self.__class__):
             new_args = (self.args.resolve(objs), ) # this already creates a copy!
 
-            # print(f"\n\t\t => resolved to {new_args}\n\t{type(new_args)}")
+            if self.debug:
+                print(f"\n\t\t => resolved to {new_args}\n\t{type(new_args)}")
 
         elif isinstance(self.args, DeferredSignalMeasure):
             resolved = deepcopy(self.args)
@@ -112,7 +115,8 @@ class DeferredOperation:
         elif isinstance(self.args, typing.Sequence) and len(self.args):
             new_args = list()
             for ka, arg in enumerate(self.args):
-                # print(f"{self.__class__.__name__} to resolve arg {arg}\n\t({type(arg)})")
+                if self.debug:
+                    print(f"{self.__class__.__name__} to resolve arg {arg}\n\t({type(arg)})")
                 resolved = arg
 
                 if isinstance(arg, str):
@@ -133,15 +137,19 @@ class DeferredOperation:
                             else:
                                 resolved = objs
 
-                    # print(f"\n\t\t => resolved to {resolved}\n\t{type(resolved)}")
+                    if self.debug:
+                        print(f"\n\t\t => resolved to {resolved}\n\t{type(resolved)}")
 
                 elif isinstance(arg, self.__class__):
                     resolved = arg.resolve(objs) # this already creates a copy!
 
-                    # print(f"\n\t\t => resolved to {resolved}\n\t{type(resolved)}")
+                    if self.debug:
+                        print(f"\n\t\t => resolved to {resolved}\n\t{type(resolved)}")
 
                 elif isinstance(arg, DeferredSignalMeasure):
-                    # print(f"{self.__class__.__name__} to resolve arg:\n\t{arg}\n\t({type(arg)})")
+                    if self.debug:
+                        print(f"{self.__class__.__name__} to resolve arg:\n\t{arg}\n\t({type(arg)})")
+
                     resolved = deepcopy(arg)
                     for k, preproc in enumerate(resolved.preprocess):
                         resolved.preprocess[k] = preproc.resolve(objs)
@@ -149,14 +157,17 @@ class DeferredOperation:
                     for k, postproc in enumerate(resolved.postprocess):
                         resolved.postprocess[k] = postproc.resolve(objs)
 
-                    # print(f"\n\t\t => resolved to {resolved}\n\t{type(resolved)}")
+                    if self.debug:
+                        print(f"\n\t\t => resolved to {resolved}\n\t{type(resolved)}")
 
                 elif isinstance(arg, tuple):
                     resolved = list()
-                    # print(f"{self.__class__.__name__} to resolve recursively:")
+                    if self.debug:
+                        print(f"{self.__class__.__name__} to resolve recursively:")
 
                     for a_ in arg:
-                        # print(f"{self.__class__.__name__} to resolve a_:\n\t{a_}\n\t({type(a_)})")
+                        if self.debug:
+                            print(f"{self.__class__.__name__} to resolve a_:\n\t{a_}\n\t({type(a_)})")
                         res_a = a_
                         if isinstance(a_, str):
                             phMatch = self.placeholder.match(a_)
@@ -187,7 +198,9 @@ class DeferredOperation:
                             for k, postproc in enumerate(res_a.postprocess):
                                 res_a.postprocess[k] = postproc.resolve(objs)
 
-                        # print(f"\n\t\t => resolved to:\n\t{res_a}\n\t({type(res_a)})")
+                        if self.debug:
+                            print(f"\n\t\t => resolved to:\n\t{res_a}\n\t({type(res_a)})")
+
                         resolved.append(res_a)
 
                     if len(resolved) == 1:
@@ -252,6 +265,12 @@ class DeferredOperation:
 
             if self.debug:
                 print(f"\n=>res_args = {res_args}")
+
+            if self.debug:
+                print(f"{self.__class__.__name__}.__call_op_: op = {op}")
+
+            # if hasattr(op, "__call__"):
+            #     return op.__call__(obj, *res_args, **self.kwargs)
 
             return op(obj, *res_args, **self.kwargs)
 
@@ -1102,6 +1121,8 @@ Any aditional named or keyword parameters to be passed to `func`.
                 arg = self._exec_deferred_process_(arg, pre)
 
             if withLocation:
+                if self.debug:
+                    print(f"\n\t[{self.name}] -> withLocation: {withLocation}")
                 if isinstance(withLocation, typing.Callable):
                     locations = withLocation(arg)
 
@@ -1111,15 +1132,25 @@ Any aditional named or keyword parameters to be passed to `func`.
             else:
                 locations = self.locations
 
+            if isinstance(locations, typing.Sequence):
+                if all(isinstance(location, typing.Callable) for location in locations):
+                    locations = type(locations)(map(lambda l: l(arg), locations))
+
+            elif isinstance(locations, typing.Callable):
+                locations = locations(arg)
+
+            if self.debug:
+                print(f"\n\t[{self.name}] -> locations: {locations}")
             # REMEMBER:
             # func takes: location, posargs,  args
             # posargs come first so that we can insert a functool.partial before
             # passing the arg; the result of that functool then becomes the first
             # arg after the location, pased to func
 
-            if isinstance(self.func, (DeferredOperation, DeferredComputation)):
+            if isinstance(self.func, (DeferredOperation, DeferredComputation, DeferredCallChain, self.__class__)):
                 # these don't take location parameter!
                 fargs = self.posargs + (arg, )
+
             else:
                 if isinstance(locations, tuple):
                     fargs = locations + self.posargs + (arg, )
@@ -1137,7 +1168,8 @@ Any aditional named or keyword parameters to be passed to `func`.
                 print(f"\n\t »»» The call is:")
                 sfargs = ", ".join(list(map(lambda a: f"{a}", fargs)))
                 skwargs = ", ".join(list(map(lambda i: f"i[0] = i[1]", kwargs.items())))
-                print(f"\n\t{self.func.__name__}({sfargs}, {skwargs})")
+                fName  = self.func.name if hasattr(self.func, "name") else self.func.__name__
+                print(f"\n\t{fName}({sfargs}, {skwargs})")
 
             ret = self.func(*fargs, **kwargs)
 
@@ -1187,12 +1219,6 @@ Any aditional named or keyword parameters to be passed to `func`.
 
         # elif isinstance(self.locations, (neo.Epoch, DataZone)):
         #     c =
-
-
-
-
-
-
 
 
 @dataclass
@@ -1474,7 +1500,6 @@ When no funcs are defined, returns obj
 
 
 
-
 @functools.cache
 def __dsm_call__(func, *args, **kwargs):
     r"""Defined here, but won't work with numpy arrays, as they are not hashable.
@@ -1500,5 +1525,8 @@ DSM     = DeferredSignalMeasure
 DComp   = DeferredComputation
 DOp     = DeferredOperation
 DCC     = DeferredCallChain
+
+PartialFunctionDOp = DOp(functools.partial)
+
 
 __all__ = ("DeferredSignalMeasure", "DSM", "DeferredOperation", "DOp", "DeferredComputation", "DComp", "DeferredCallChain", "DCC" ,"itself")
