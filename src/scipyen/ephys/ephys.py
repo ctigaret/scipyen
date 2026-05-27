@@ -4569,6 +4569,7 @@ def adapt_location_to_lower_domain_bounds(obj, old: typing.Union[
                           pq.Quantity
                           ]
         ) -> object:
+    print(f"\nadapt_location_to_lower_domain_bounds[{type(obj).__name__}]: old = {old}, new = {new}\n")
     raise NotImplementedError(f"adapt_location_to_lower_domain_bounds does not support {type(obj).__name__} location type ")
 
 # @adapt_location_to_lower_domain_bounds.register(neo.Epoch)

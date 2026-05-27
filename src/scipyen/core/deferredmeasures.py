@@ -59,11 +59,53 @@ class DeferredComputation: pass # forward declaration
 
 @dataclass
 class DeferredOperation:
-    r""""""
+    r"""
+Fields:
+=======
+FIXME documentation does not reflect what it does FIXME
+:op:
+    Calable or sequence of callables, all with common syntax
+
+:args:
+    Optional positional parameters to be passed to ``op`` **after** the
+    parameter (s) pased to this object when called as a function.
+
+    Follows the same rules as ``pre_args``.
+
+:kwargs:
+    Mapping (e.g. dict) of keyword: value pairs, where keywords are strings,
+as expected by the syntax of ``op`` (named, or var-keyword parameters)
+
+:name:
+    A name for the instance of DeferredOperation
+:pre_args:
+    Optional positional parameters to be passed to ``op`` **before** the
+    parameter(s) pased to this object when called as a function.
+
+    Must be given as a tuple of parameters. A single parameter can also be
+passed here. However, when this single parameter is itself a tuple, it must be
+"wrapped" inside a tuple. The following example illustrates this for a single
+parameter which is the tuple (1,2,3):
+
+..
+
+    ((1,2,3), )
+
+
+Usage:
+======
+
+To be written
+
+
+"""
     op: typing.Union[typing.Callable, typing.Sequence[typing.Callable]]
     args: tuple = dataclasses.field(default_factory = tuple)
     kwargs: dict = dataclasses.field(default_factory = dict)
     name: str = dataclasses.field(default = "operation")
+    pre_args: tuple = dataclasses.field(default_factory = tuple)
+    opargs: tuple = dataclasses.field(default_factory = tuple)
+    opkwargs: dict = dataclasses.field(default_factory = dict)
 
     def __post_init__(self) -> None:
         self.placeholder = re.compile(r'<[0-9]*?>')
@@ -223,13 +265,34 @@ class DeferredOperation:
 
     def _call_op_(self, op, obj) -> object:
         r"""needed to allow exec'ing more than one call for the same object"""
-        if op in (operator.attrgetter, operator.itemgetter, operator.methodcaller):
-            if isinstance(self.args, str):
-                args = (self.args, )
+        if op in (operator.attrgetter, operator.itemgetter, operator.methodcaller,
+                  functools.partial):
+            if isinstance(self.pre_args, tuple):
+                pre_args = self.pre_args
             else:
-                args = self.args
+                pre_args = (self.pre_args, )
 
-            return op(*args, **self.kwargs)(obj)
+#             if isinstance(self.pre_args, str):
+#                 pre_args = (self.pre_args, )
+#             else:
+#                 pre_args = self.pre_args
+#
+            if isinstance(self.args, tuple):
+                args = self.args
+            else:
+                args = (self.args, )
+
+            # if isinstance(self.args, str):
+            #     args = (self.args, )
+            # else:
+            #     args = self.args
+
+            callargs = pre_args + args if len(pre_args) else args
+
+            # print(f"{self.__class__.__name__}._call_op_[{self.name}] for op: {op}:\n\tcallargs = {callargs}")
+
+            return op(*callargs, **self.kwargs)(obj)
+            # return op(*args, **self.kwargs)(obj)
 
         elif isinstance(op, np.ufunc):
             return op(obj)
@@ -868,6 +931,13 @@ Returns:
 
         elif isinstance(op, (tuple, list, collections.deque)):
             # print(f"\nop is {op}")
+
+            # NOTE: 2026-05-27 10:40:14 NEW API
+            # if len(op) == 2:
+
+
+            # NOTE: 2026-05-27 10:40:03
+            # deprecated code
             if len(op) in (2,3) and isinstance(op[0], typing.Callable):
                 dop = DeferredOperation(*op)
                 dop.debug = self.debug

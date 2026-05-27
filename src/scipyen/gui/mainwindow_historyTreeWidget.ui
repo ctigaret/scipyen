@@ -824,13 +824,13 @@ NOTE: you can click anywhere in the row to select</string>
     <iconset theme="folder"/>
    </property>
    <property name="toolTip">
-    <string>Scipyen's (limited) file system manager</string>
+    <string>Scipyen's file system navigator</string>
    </property>
    <property name="statusTip">
-    <string>Scipyen's (limited) file system manager</string>
+    <string>Scipyen's file system navigator</string>
    </property>
    <property name="whatsThis">
-    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Scipyen's (limited) file system manager. &lt;/p&gt;&lt;p&gt;For access to archive files, including archiving/extracting etc, please use the desktop's own file manager.&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Scipyen's file system navigator. &lt;/p&gt;&lt;p&gt;For access to archive files, including archiving/extracting etc, please use the desktop's own file manager.&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFeature::DockWidgetFloatable|QDockWidget::DockWidgetFeature::DockWidgetMovable</set>
