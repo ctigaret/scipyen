@@ -4569,20 +4569,17 @@ def adapt_location_to_lower_domain_bounds(obj, old: typing.Union[
                           pq.Quantity
                           ]
         ) -> object:
-    print(f"\nadapt_location_to_lower_domain_bounds[{type(obj).__name__}]: old = {old}, new = {new}\n")
+    # print(f"\nadapt_location_to_lower_domain_bounds[{type(obj).__name__}]: old = {old}, new = {new}\n")
     raise NotImplementedError(f"adapt_location_to_lower_domain_bounds does not support {type(obj).__name__} location type ")
-
-# @adapt_location_to_lower_domain_bounds.register(neo.Epoch)
-# @adapt_location_to_lower_domain_bounds.register(DataZone)
-# def _adapt_location_to_lower_domain_bounds_(obj: typing.Union[neo.Epoch, DataZone],
-#                                             old, new):
 
 @adapt_location_to_lower_domain_bounds.register(neo.Epoch)
 @adapt_location_to_lower_domain_bounds.register(DataZone)
-def _adapt_location_to_lower_domain_bounds_(obj: typing.Union[neo.Epoch, DataZone],
+def _adapt_location_to_lower_domain_bounds_(obj: typing.Union[
+                                                            neo.Epoch, DataZone
+                                                            ],
                                             old, new):
 
-    print(f"\nadapt_location_to_lower_domain_bounds[{type(obj).__name__}]: old = {old}, new = {new}\n")
+    # print(f"\nadapt_location_to_lower_domain_bounds[{type(obj).__name__}]: old = {old}, new = {new}\n")
 
     new_times = list(
         map(
@@ -4614,7 +4611,7 @@ def _adapt_location_to_lower_domain_bounds_(obj: typing.Union[neo.Epoch, DataZon
 @adapt_location_to_lower_domain_bounds.register(neo.Event)
 @adapt_location_to_lower_domain_bounds.register(DataMark)
 @adapt_location_to_lower_domain_bounds.register(TriggerEvent)
-def _adapt_location_to_lower_domain_bounds_(obj: typing.Union[neo.Event,
+def _adapt_location_to_lower_domain_bounds_(obj: typing.Union[neo.Event, # noqa
                                                               DataMark,
                                                               TriggerEvent],
                                             old, new):
@@ -4644,15 +4641,14 @@ def _adapt_location_to_lower_domain_bounds_(obj: typing.Union[neo.Event,
     return ret
 
 @adapt_location_to_lower_domain_bounds.register(DataCursor)
-def _adapt_location_to_lower_domain_bounds_(obj: DataCursor,
-                                            old, new):
+def _adapt_location_to_lower_domain_bounds_(obj: DataCursor, old, new): # noqa
     new_coord = adapt_coordinate_to_lower_boundary(obj, old, new)
 
     return DataCursor(new_coord, snap = obj.span, name = obj.name)
 
 @adapt_location_to_lower_domain_bounds.register(SignalCursor)
-def _adapt_location_to_lower_domain_bounds_(obj: SignalCursor,
-                                            old, new, axis: int = None):
+def _adapt_location_to_lower_domain_bounds_(obj: SignalCursor, old, new, # noqa
+                                            axis: int = None):
 
     if obj.cursorType == SignalCursorTypes.vertical:
         currentBounds = obj.xBounds()
@@ -4743,8 +4739,7 @@ def _adapt_location_to_lower_domain_bounds_(obj: SignalCursor,
     return obj
 
 @adapt_location_to_lower_domain_bounds.register(Interval)
-def _adapt_location_to_lower_domain_bounds_(obj: Interval,
-                                            old, new):
+def _adapt_location_to_lower_domain_bounds_(obj: Interval, old, new):  # noqa
 
     new_times = list(
         map(
