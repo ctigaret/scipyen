@@ -2216,10 +2216,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                              DataSignal,
                              IrregularlySampledDataSignal)
                     ):
-            x = np.atleast_1d(data.times.magnitude)
-            xUnits = data.times.units
-            y = np.atleast_1d(data.magnitude)
-            yUnits = data.units
+            x = np.atleast_1d(data.times.magnitude).flatten()
+            # xUnits = data.times.units
+            y = np.atleast_1d(data.magnitude).flatten()
+            # yUnits = data.units
 
         elif isinstance(data, np.ndarray):
             x = np.arange(np.atleast_1d(data).shape[0])
@@ -2414,18 +2414,25 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         else:
             entities_list = entities
 
-        if not all(isinstance(entity, pg.PlotDataItem) for entity in curveItems):
+        if not all(isinstance(entity, pg.PlotDataItem) for entity in entities_list):
             return
 
         if clear:
-            self._clear_curve_overlay(axis)
+            self._clear_curves_overlay_(axis)
 
-        for entity in entities_list:
+        dataPlotItems = list(filter(lambda i: (isinstance(i, pg.PlotDataItem)
+                                               and i not in entities_list),
+                                    axis.items)
+                            )
+
+        entityColors = self.defaultLineColorsList[len(dataPlotItems):]
+
+        for k, entity in enumerate(entities_list):
             if entity not in axis.items:
+                entity.setPen(pg.mkPen(entityColors[k], cosmetic=True, width=2))
                 axis.addItem(entity)
 
             return
-
 
     def _clear_targets_overlay_(self, axis):
         r"""Removes the targets overlay from this axis
@@ -2444,6 +2451,14 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         for i in items:
             axis.removeItem(i)
 
+    # def _remove_targets_overlay_(self, axis):
+    #     axis, axNdx = self._check_axis_spec_ndx_(axis)
+    #     cFrame = self.currentFrame
+    #     if cFrame in self._target_overlays_:
+    #         if axNdx in self._target_overlays_[cFrame]:
+    #             del self._target_overlays_[cFrame][axNdx]
+    #             self._clear_targets_overlay_(axis)
+
     def _clear_curves_overlay_(self, axis):
         axis, axNdx = self._check_axis_spec_ndx_(axis)
 
@@ -2458,6 +2473,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         for i in items:
             axis.removeItem(i)
+
+    # def _remove_curve_overlays_(self, axis):
+    #     axis, axNdx = self._check_axis_spec_ndx_(axis)
+    #     cFrame = self.currentFrame
+    #     if cFrame in self._curve_overlays_:
+    #         if axNdx in self._curve_overlays_[cFrame]:
+    #             self._curve_overlays_[cFrame][axNdx].clear()
+    #             del self._curve_overlays_[cFrame]
+    #             self._clear_curves_overlay_(axis)
 
     def _clear_labels_overlay_(self, axis):
         axis, axNdx = self._check_axis_spec_ndx_(axis)
@@ -2670,7 +2694,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             elif isinstance(item, (neo.AnalogSignal, neo.IrregularlySampledSignal,
                                    DataSignal, IrregularlySampledDataSignal)
                             ):
-                curveItems.append(self._make_targetItem(coords, **kwargs))
+                for ch in range(item.shape[1]):
+                    curveItems.append(self._make_overlay_plotitem(item[:,ch], **kwargs))
 
         # targetItems = [self._make_targetItem(coords, **kwargs) for coords in args]
 
@@ -2757,6 +2782,33 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # print(f"_target_overlays_ for axis {axNdx} in frame {cFrame}: {len(self._target_overlays_[cFrame][axNdx])}")
         self._plot_discrete_entities_(self._target_overlays_[cFrame][axNdx], axis, clear=clear)
 
+    def removeCurveOverlays(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None):
+        cFrame = self.frameIndex[self.currentFrame]
+        if axis is None:
+            for axNdx, axis in enumerate(self.axes):
+                if cFrame in self._curve_overlays_:
+                    if isinstance(self._curve_overlays_[cFrame], dict):
+                        if isinstance(self._curve_overlays_[cFrame].get(axNdx, None), (tuple, list)):
+                            self._curve_overlays_[cFrame][axNdx].clear()
+                        else:
+                            self._curve_overlays_[cFrame][axNdx] = list()
+
+                self._clear_curves_overlay_(axis)
+
+
+        else:
+            axis, axNdx = self._check_axis_spec_ndx_(axis)
+
+            if cFrame in self._curve_overlays_:
+                if isinstance(self._curve_overlays_[cFrame], dict):
+                    if isinstance(self._curve_overlays_[cFrame].get(axNdx, None), (tuple, list)):
+                        self._curve_overlays_[cFrame][axNdx].clear()
+                    else:
+                        self._curve_overlays_[cFrame][axNdx] = list()
+
+            # call this just in case we have overlays that escaped the cache mechanism
+            self._clear_curves_overlay_(axis)
+
     def removeTargetsOverlay(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None):
         r"""Remove targets overlaid in this axis.
         Target objects are also removed from the internal cache
@@ -2784,13 +2836,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if isinstance(self._target_overlays_[cFrame].get(axNdx, None), (tuple, list)):
                         self._target_overlays_[cFrame][axNdx].clear()
                     else:
-                        # self._target_overlays_[cFrame].pop(axNdx, None)
                         self._target_overlays_[cFrame][axNdx] = list()
 
-                    # if len(self._target_overlays_[cFrame]) == 0:
-                    #     self._target_overlays_.pop(cFrame)
-
-            # cal this just in case we have overlays that escaped the cache mechanism
+            # call this just in case we have overlays that escaped the cache mechanism
             self._clear_targets_overlay_(axis)
 
     def addLabel(self, text:str, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None,
@@ -10664,9 +10712,13 @@ Var-keyword parameters ("name=value" pairs):
         # OR array with shape (N,2);
         # "vectors" with shape (N,1) won't do
         # plotDataItems = [i for i in plotItem.listDataItems() if isinstance(i, plotDataItemClass)]
+        cFrame = self.currentFrame
+        axOverlayItems = self._curve_overlays_.get(cFrame, dict()).get(axNdx, list())
         plotDataItems = list(filter(lambda i: (isinstance(i, plotDataItemClass) and
-                                               i not in self._curve_overlays_[cFrame][axNdx])),
-                             plotItem.listDataItems())
+                                               i not in axOverlayItems),
+                                    plotItem.listDataItems()
+                                    )
+                             )
 
         if y.ndim == 1:
             y_nan_ndx = np.atleast_1d(np.isnan(y))
