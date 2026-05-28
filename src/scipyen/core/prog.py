@@ -1401,7 +1401,9 @@ def print_traceback(exc = None) -> str:
 
     return ret
 
-def scipywarn(message, category=None, stacklevel=1, source=None, out=None):
+def scipywarn(message, category=None, stacklevel=1, source=None, out=None,
+              with_traceback: bool = False,
+              *, skip_file_prefixes=()):
     from warnings import filters, defaultaction
 
     if isinstance(message, Warning):
@@ -1416,7 +1418,7 @@ def scipywarn(message, category=None, stacklevel=1, source=None, out=None):
             )
         )
     try:
-        if stacklevel <= 1 or _is_internal_frame(sys._getframe(1)):
+        if stacklevel <= 1 or warnings._is_internal_frame(sys._getframe(1)):
             # If frame is too small to care or if the warning originated in
             # internal code, then do not try to hide any frames.
             frame = sys._getframe(stacklevel)
@@ -1424,7 +1426,10 @@ def scipywarn(message, category=None, stacklevel=1, source=None, out=None):
             frame = sys._getframe(1)
             # Look for one frame less since the above line starts us off.
             for x in range(stacklevel - 1):
-                frame = _next_external_frame(frame)
+                frame = warnings._next_external_frame(
+                    frame,
+                    skip_file_prefixes=skip_file_prefixes
+                    )
                 if frame is None:
                     raise ValueError
     except ValueError:
@@ -1510,7 +1515,10 @@ def scipywarn(message, category=None, stacklevel=1, source=None, out=None):
     # ### END
 
     # Print message and context
+    if with_traceback:
+        traceback.print_stack(file=out)
     msg = WarningMessage(message, category, filename, lineno, file=out, source=source)
+
     _myshowarning(msg)
 
 
@@ -1530,7 +1538,6 @@ def _myshowarning(
         s = f"In {msg.filename}, line {msg.lineno}: \n{category} {msg.message}\n"
     else:
         s = f"In {msg.filename}, line {msg.lineno}: \n\x1b[0;33m{category}\x1b[0m: {msg.message}\n"
-    # s =  f"{msg.filename}:{msg.lineno}:\n\x1b[0;33;47m{category}\x1b[0m:\n {msg.message}\n"
     try:
         file.write(s)
     except:
@@ -1569,16 +1576,6 @@ def showwarning(message, category, filename, lineno, file=None, line=None):
     except OSError:
         # the file (probably stderr) is invalid - this warning gets lost.
         pass
-    # return text
-
-
-# def formatwarning(message, category, filename, lineno, line=None):
-#     r"""To replace stock Python warnings.formatwarning
-#     TODO
-#     Do NOT use yet
-#     """
-#     s =  f"{filename}:{lineno}: {category}: {message}\n"
-#     return s
 
 
 def term_has_colors():
@@ -1606,6 +1603,7 @@ def test_ANSI():
 def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
     log = file if hasattr(file, "write") else sys.stderr
     traceback.print_stack(file=log)
+    # scipywarn(message, category)
     log.write(warnings.formatwarning(message, category, filename, lineno, line))
 
 

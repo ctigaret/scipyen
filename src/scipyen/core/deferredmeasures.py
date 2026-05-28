@@ -1553,6 +1553,9 @@ calls that expect more than one parameter to a call expecting a single one.
 
     name: str = dataclasses.field(default = "callchain")
 
+    def __post_init__(self) -> None:
+        self.debug: bool = False
+
     def __call__(self, obj: object): #*args, **kwargs):
         r"""
 ``obj`` is passed to the  *first* function in ``funcs``, the result of which is

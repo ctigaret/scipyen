@@ -508,12 +508,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     defaultCursorColors = guicursors.DefaultCursorColors
     defaultLinkedCursorColors = guicursors.DefaultLinkedCursorColors
     defaultCursorHoverColor = guicursors.DefaultCursorHoverColor
-    # defaultCursorColors = Bunch({"crosshair":"#C173B088", "horizontal":"#B1D28F88", "vertical":"#ff007f88"})
-    # defaultLinkedCursorColors = Bunch({"crosshair":QtGui.QColor(defaultCursorColors["crosshair"]).darker().name(QtGui.QColor.HexArgb),
-    #                                    "horizontal":QtGui.QColor(defaultCursorColors["horizontal"]).darker().name(QtGui.QColor.HexArgb),
-    #                                    "vertical":QtGui.QColor(defaultCursorColors["vertical"]).darker().name(QtGui.QColor.HexArgb)})
-    #
-    # defaultCursorHoverColor = "red"
 
     defaultLeftAxisLabelSpace = 40
 
@@ -686,7 +680,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #   after a cycle of changes in the plot items layout as above...
         #
         #
-
         self._cached_cursors_ = dict()
 
         # NOTE: 2023-01-01 22:56:20 see NOTE: 2023-01-01 22:48:10 point (1) above
@@ -702,6 +695,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         self._events_axis_ = None
         self._default_events_axis_name_ = "Events"
+
+        self._curve_overlays_ = dict()
 
         self._target_overlays_ = dict()
 
@@ -2177,7 +2172,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         return ret
 
-    def _make_targetItem(self, data:typing.Union[tuple, list, QtCore.QPointF, QtCore.QPoint, pg.Point], **kwargs):
+    def _make_targetItem(self, data: typing.Union[
+                                                    tuple, list,
+                                                    QtCore.QPointF,
+                                                    QtCore.QPoint,
+                                                    pg.Point
+                                                 ],
+                        **kwargs):
         r"""Generates a pg.TargetItem
         Parameters:
         ==========
@@ -2201,6 +2202,30 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 raise ValueError(f"data is expected to have two or three elements; got {len(data)} instead")
 
         return pg.TargetItem(data, **kwargs)
+
+    def _make_overlay_plotitem(self, data: typing.Union[
+                                                    neo.AnalogSignal,
+                                                    neo.IrregularlySampledSignal,
+                                                    DataSignal,
+                                                    IrregularlySampledDataSignal,
+                                                    np.ndarray
+                                                    ],
+                                **kwargs):
+        if isinstance(data, (neo.AnalogSignal,
+                             neo.IrregularlySampledSignal,
+                             DataSignal,
+                             IrregularlySampledDataSignal)
+                    ):
+            x = np.atleast_1d(data.times.magnitude)
+            xUnits = data.times.units
+            y = np.atleast_1d(data.magnitude)
+            yUnits = data.units
+
+        elif isinstance(data, np.ndarray):
+            x = np.arange(np.atleast_1d(data).shape[0])
+            y = np.atleast_1d(data)[:,0]
+
+        return pg.PlotDataItem(x,y, **kwargs)
 
     def _clear_lris_(self):
         for k, ax in enumerate(self.axes):
@@ -2374,6 +2399,34 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         except:
             traceback.print_exc()
 
+    def _plot_curve_overlays_(self, entities, axis, clear):
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+
+        if axis not in self.signalAxes:
+            return
+
+        if len(entities) == 0:
+            return
+
+        if isinstance(entities, dict):
+            entities_list  = list(entities.values())
+
+        else:
+            entities_list = entities
+
+        if not all(isinstance(entity, pg.PlotDataItem) for entity in curveItems):
+            return
+
+        if clear:
+            self._clear_curve_overlay(axis)
+
+        for entity in entities_list:
+            if entity not in axis.items:
+                axis.addItem(entity)
+
+            return
+
+
     def _clear_targets_overlay_(self, axis):
         r"""Removes the targets overlay from this axis
             Cached targets are left in place
@@ -2388,6 +2441,21 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         axis, axNdx = self._check_axis_spec_ndx_(axis)
         items = [i for i in axis.items if isinstance(i, pg.TargetItem)]
         # print(f"{self.windowTitle()} _clear_targets_overlay_ {len(items)} targets")
+        for i in items:
+            axis.removeItem(i)
+
+    def _clear_curves_overlay_(self, axis):
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+
+        cFrame = self.frameIndex[self.currentFrame]
+
+        if axNdx not in self._curve_overlays_[cFrame]:
+            return
+
+        items = list(filter(lambda i: (isinstance(i, pg.PlotDataItem) and
+                                       i in self._curve_overlays_[cFrame]),
+                            axis.items))
+
         for i in items:
             axis.removeItem(i)
 
@@ -2586,7 +2654,47 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         super().showEvent(evt)
         evt.accept()
 
-    def overlayTargets(self, *args, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None, clear:bool=False, **kwargs):
+    def overlayCurves(self, *args, axis:typing.Optional[
+                                        typing.Union[int, pg.PlotItem]
+                                        ]=None,
+                     clear:bool=False, **kwargs):
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+
+        curveItems = list()
+
+        for kc, item in enumerate(args):
+            # print(f"overlayTargets target {kc} is a {type(coords)}")
+            if isinstance(item, pg.PlotDataItem):
+                curveItems.append(item)
+
+            elif isinstance(item, (neo.AnalogSignal, neo.IrregularlySampledSignal,
+                                   DataSignal, IrregularlySampledDataSignal)
+                            ):
+                curveItems.append(self._make_targetItem(coords, **kwargs))
+
+        # targetItems = [self._make_targetItem(coords, **kwargs) for coords in args]
+
+        cFrame = self.frameIndex[self.currentFrame]
+
+        # NOTE: 2022-12-18 13:30:40
+        # target overlays is a dict mapping frame index to a dict that maps
+        # index of axis in the frame to a sequence of TargetItem objects
+
+        if cFrame not in self._curve_overlays_:
+            self._curve_overlays_[cFrame] = dict()
+
+        if axNdx in self._curve_overlays_[cFrame] and isinstance(self._curve_overlays_[cFrame][axNdx], list):
+            self._curve_overlays_[cFrame][axNdx].extend(curveItems)
+        else:
+            self._curve_overlays_[cFrame][axNdx] = curveItems
+
+        # print(f"_curve_overlays_ for axis {axNdx} in frame {cFrame}: {len(self._curve_overlays_[cFrame][axNdx])}")
+        self._plot_curve_overlays_(self._curve_overlays_[cFrame][axNdx], axis, clear=clear)
+
+    def overlayTargets(self, *args, axis:typing.Optional[
+                                        typing.Union[int, pg.PlotItem]
+                                        ]=None,
+                       clear:bool=False, **kwargs):
         r"""Overlays "target" glyphs on the given axis, for the current frame.
         Targets are also added to an internal cache.
 
@@ -8752,6 +8860,7 @@ Var-keyword parameters ("name=value" pairs):
 
         """
 
+        # ### BEGIN Description
         # Delegates plotting as follows:
         # ------------------------------
         # neo.Segment                     ↦ _plotSegment_ # needed to pick up which signal from segment
@@ -8777,6 +8886,7 @@ Var-keyword parameters ("name=value" pairs):
         #         vigra.filters.Kernel1D  (NOTE  this is converted to two numpy arrays)
         #
         # Anything else                   ↦ ignored
+        # ### END   Description
 
 
         # print("###")
@@ -8860,18 +8970,9 @@ Var-keyword parameters ("name=value" pairs):
                     newX = ephys.adapt_coordinate_to_lower_boundary(c.x, c.xBounds()[0], dataxmin)
                     c.setBounds()
                     c.x = newX
-                    # relX = c.x - c.xBounds()[0]
-                    # c.setBounds()
-                    # c.x = dataxmin + relX
 
                 if not c.isVertical:
-                #     # print(f"{self.__class__.__name__}.displayFrame for cursor in axis {k}: cursor type {c.cursorType}, coordinates: {c.y}; bounds: {c.yBounds()}")
-                #     newY = ephys.adapt_coordinate_to_lower_boundary(c.y, c.yBounds()[0], dataymin)
                     c.setBounds()
-                #     c.y = newY
-                #     # relY = c.y - c.yBounds()[0]
-                #     # c.setBounds()
-                #     # c.y = dataymin+relY
 
         # NOTE: 2022-11-22 11:49:47
         # Finally, check for target overlays
@@ -9246,6 +9347,15 @@ Var-keyword parameters ("name=value" pairs):
             brush = next(brushes)
             hoverBrush = QtGui.QBrush(QtGui.QColor(brush.color().lighter()))
             self._plot_epoch_data_(epoch, epoch_brush = brush, epoch_hoverBrush = hoverBrush)
+
+#     def plotOverlay(self, obj, axis, *args, **kwargs):
+#         axis = self.getAxis(axis)
+#
+#         axNsx = self.axes.index(axis)
+#         self._current_array_data_overlay_[axNdx] = obj
+#
+#
+#         self.displayFrame()
 
     @singledispatchmethod
     def _plot_data_(self, obj, *args, **kwargs):
@@ -10497,6 +10607,8 @@ Var-keyword parameters ("name=value" pairs):
         #     print(f"\tcaller\t {s.function} at line {s.lineno}")
         # ### END debug
 
+        axNdx = self.axes.index(plotItem)
+
         y = np.atleast_1d(y)
 
         if y.ndim > 2:
@@ -10551,8 +10663,10 @@ Var-keyword parameters ("name=value" pairs):
         # rewriting into a pg.PlotDataItem needs vector (array with shape (N,))
         # OR array with shape (N,2);
         # "vectors" with shape (N,1) won't do
-        # plotDataItems = [i for i in plotItem.listDataItems() if isinstance(i, pg.PlotDataItem)]
-        plotDataItems = [i for i in plotItem.listDataItems() if isinstance(i, plotDataItemClass)]
+        # plotDataItems = [i for i in plotItem.listDataItems() if isinstance(i, plotDataItemClass)]
+        plotDataItems = list(filter(lambda i: (isinstance(i, plotDataItemClass) and
+                                               i not in self._curve_overlays_[cFrame][axNdx])),
+                             plotItem.listDataItems())
 
         if y.ndim == 1:
             y_nan_ndx = np.atleast_1d(np.isnan(y))
@@ -10693,10 +10807,6 @@ Var-keyword parameters ("name=value" pairs):
 
 
         plotItem.setLabels(bottom = [xlabel], left=[ylabel])
-        # textOption = plotItem.axes["left"]["item"].label.document().defaultTextOption()
-        # textOption.setWrapMode(QtGui.QTextOption.WordWrap)
-        # plotItem.axes["left"]["item"].label.document().setDefaultTextOption(textOption)
-        # plotItem.axes["left"]["item"].label.setTextWidth(2*plotItem.height()/3)
 
         if isinstance(title, str) and len(title.strip()):
             plotItem.setTitle(title)
@@ -10712,12 +10822,6 @@ Var-keyword parameters ("name=value" pairs):
                 lbl = lbl[3 : lbl.find("</B>")]
                 plotItem.setLabel("left", lbl)
 
-
-#         if xUnits is None:
-#             xUnits = pq.dimensionless
-#
-#         if yUnits is None:
-#             yUnits = pq.dimensionless
 
         # NOTE: 2025-07-14 21:49:57
         # as plotItem inherits from QGraphicsItem, we can use the user's data

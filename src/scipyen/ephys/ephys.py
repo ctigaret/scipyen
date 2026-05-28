@@ -3018,22 +3018,6 @@ def _get_location_boundary_(loc: typing.Union[DataCursor, SignalCursor], # noqa
 
     return t0 if start else t1
 
-# @singledispatch
-# def signal_filter(loc: object,
-#                   func: typing.Callable,
-#                   fargs, fkwargs,
-#                   signal,
-#                   /,
-#                   channel = None, relative=True):
-#     raise NotImplementedError(f"Locations of type {type(loc)} are not supported")
-#
-# @signal_filter.register(DeferredSignalMeasure)
-# @signal_filter.register(types.NoneType)
-# @signal_filter.register(tuple)
-# @signal_filter.register(list)
-# @signal_filter.register(collections.deque)
-# def _signal_filter(loc, func, fargs, fkwargs)
-
 @singledispatch
 def signal_fit(loc:object,
                model: typing.Callable,
@@ -3042,7 +3026,7 @@ def signal_fit(loc:object,
                /,
                adjustFitTable: dict = dict(),
                channel: typing.Optional[int] = None,
-               relative: bool = True) -> typing.Optional[
+               ) -> typing.Optional[
                    typing.Union[
                        tuple,
                        typing.Sequence[tuple]
@@ -3099,8 +3083,6 @@ Parameters:
 
     When None, the fitting will proceed through **all** channels
 
-:relative: see signal_reduce function
-
 Returns
 --------
 
@@ -3155,7 +3137,7 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
                  /,
                  adjustFitTable: dict = dict(),
                  channel: typing.Optional[int]=None,
-                 relative: bool = True) -> typing.Optional[
+                 ) -> typing.Optional[
                    typing.Union[
                        tuple,
                        typing.Sequence[tuple]
@@ -3198,7 +3180,7 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
 
         elif len(loc) == 2:
             t0, t1 = loc
-            sg = __slice_signal__(t0,t1, signal, channel, relative)
+            sg = __slice_signal__(t0,t1, signal, channel) #, relative)
 
             return __do_fit__(sg, model, fitTable, adjustFitTable, channel)
 
@@ -3209,7 +3191,7 @@ def _signal_fit_(loc: typing.Union[typing.Sequence[numbers.Number],
         result = list()
         for loc_ in loc:
             t0, t1 = loc_
-            sg = __slice_signal__(t0, t1, signal, channel, relative)
+            sg = __slice_signal__(t0, t1, signal, channel) # , relative)
             ret = __do_fit__(sg, model, fitTable, adjustFitTable, channel)
 
         return np.vstack(result)
@@ -3227,7 +3209,7 @@ def _signal_fit_(loc: typing.Union[neo.Epoch, DataZone, Interval],  # noqa
                  /,
                  adjustFitTable: dict = dict(),
                  channel: typing.Optional[int] = None,
-                 relative: bool = True) -> typing.Optional[
+                 ) -> typing.Optional[
                    typing.Union[
                        tuple,
                        typing.Sequence[tuple]
@@ -3258,7 +3240,7 @@ def _signal_fit_(loc: typing.Union[neo.Epoch, DataZone, Interval],  # noqa
         if not isinstance(i, Interval):
             t1 = t0 + t1
 
-        ret = signal_fit([t0, t1], func, fitTable, signal, adjustFitTable, channel, relative)
+        ret = signal_fit([t0, t1], func, fitTable, signal, adjustFitTable, channel) #, relative)
 
         result.append(ret)
 
@@ -3276,7 +3258,7 @@ def _signal_fit_(loc: typing.Union[DataCursor, SignalCursor], # noqa
                  /,
                  adjustFitTable: dict = dict(),
                  channel: typing.Optional[int] = None,
-                 relative: bool = True) -> typing.Optional[
+                 ) -> typing.Optional[
                    typing.Union[
                        tuple,
                        typing.Sequence[tuple]
@@ -3299,13 +3281,14 @@ def _signal_fit_(loc: typing.Union[DataCursor, SignalCursor], # noqa
 
     t0, t1 = (coord - span/2, coord + span/2)
 
-    return signal_fit([t0,t1], model, fitTable, signal, adjustFitTable, channel, relative)
+    return signal_fit([t0,t1], model, fitTable, signal, adjustFitTable, channel) #, relative)
 
 @singledispatch
 def signal_reduce(loc: object, func: typing.Callable,
                   signal: typing.Union[neo.AnalogSignal, DataSignal], /,
                   channel: typing.Optional[int] = None,
-                  relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+                  ) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+                  # relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
     r""" Applies a reducing function to a signal, within the location's intervals.
 
 .. |nbsp| unicode:: 0xA0
@@ -3344,9 +3327,6 @@ Named parameters:
 
     Therefore, 'channel' must be in range(-signal.shape[1], signal.shape[1])
 
-:relative: When True (default) all times in the 'loc' are set to be relative to the signal.t_start.
-
-    I.e,, signal.t_start is subtracted from their values.
 
 Returns:
 --------
@@ -3418,11 +3398,11 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
                     func: typing.Callable,
                     signal: typing.Union[neo.AnalogSignal, DataSignal], /,
                     channel: typing.Optional[int] = None,
-                    relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+                    ) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+                    # relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
 
     if loc is None:
         return __do_reduce__(func, signal, channel)
-        # return __do_reduce__(t0, t1, func, signal, channel, relative)
 
     elif isinstance(loc, (DeferredSignalMeasure, DeferredComputation)): # noqa
         sg = loc(signal)
@@ -3450,7 +3430,7 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
         elif len(loc) == 2:
             t0, t1 = loc
             # print(f"\n__signal_reduce__ t0 = {t0}, t1 = {t1}\n")
-            sg = __slice_signal__(t0, t1, signal, channel, relative)
+            sg = __slice_signal__(t0, t1, signal, channel) #, relative)
 
             return __do_reduce__(func, sg, channel)
 
@@ -3467,7 +3447,7 @@ def _signal_reduce_(loc: typing.Union[typing.Sequence[numbers.Number],
             else:
                 t0, t1 = loc_
                 # print(f"\n__signal_reduce__ t0 = {t0}, t1 = {t1}\n")
-                sg = __slice_signal__(t0, t1, signal, channel, relative)
+                sg = __slice_signal__(t0, t1, signal, channel) #, relative)
 
             ret = __do_reduce__(func, sg, channel)
             result.append(ret)
@@ -3497,7 +3477,8 @@ def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval], # noqa
                     func: typing.Callable,
                     signal: typing.Union[neo.AnalogSignal, DataSignal], /,
                     channel: typing.Optional[int] = None,
-                    relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+                    ) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+                    # relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
 
     if loc.ndim > 0:
         intervals = list(sorted(list(map(lambda k: loc[k], range(loc.size))),
@@ -3526,7 +3507,7 @@ def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval], # noqa
             t1 = t0 + t1
 
         # print(f"\n\t»»» t0 = {t0}, t1 = {t1} «««\n")
-        ret = signal_reduce([t0, t1], func, signal, channel, relative)
+        ret = signal_reduce([t0, t1], func, signal, channel) #, relative)
         # print(f"_signal_reduce_<{i}: {type(i)}> -> interval {ki}: t0 = {t0}, t1 = {t1} => {ret} ({type(ret)})")
 
         result.append(ret)
@@ -3534,26 +3515,6 @@ def _signal_reduce_(loc: typing.Union[neo.Epoch, DataZone, Interval], # noqa
         # print(f"\n«««\n")
 
     return result
-    # if all(isinstance(ret, (neo.AnalogSignal, DataSignal)) for ret in result):
-    #     return neoutils.concatenate_signals(result)
-    #
-    # elif all(isinstance(ret, pq.Quantity) for ret in result):
-    #     if len(result) == 1:
-    #         return result[0]
-    #     return np.vstack(result) * result[0].units
-    #
-    # elif all(isinstance(ret, np.ndarray) for ret in result):
-    #     if len(result) == 1:
-    #         return result[0] * signal.units
-    #     return np.vstack(result) * signal.units
-    #
-    # elif all(isinstance(ret, (np.floating, float)) for ret in result):
-    #     if len(result) == 1:
-    #         return result[0] * signal.units
-    #     return np.vstack(result) * signal.units
-    #
-    # else:
-    #     return result
 
 @signal_reduce.register(DataCursor)
 @signal_reduce.register(SignalCursor)
@@ -3561,7 +3522,8 @@ def _signal_reduce_(loc: typing.Union[DataCursor, SignalCursor], # noqa
                     func: types.FunctionType,
                     signal: typing.Union[neo.AnalogSignal, DataSignal], /,
                     channel: typing.Optional[int] = None,
-                    relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+                    ) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
+                    # relative: bool = True) -> typing.Union[pq.Quantity, typing.Sequence[pq.Quantity]]:
     if isinstance(loc, SignalCursor):
         assert loc.cursorType != SignalCursorTypes.horizontal, "Only vertical and crossshair cursors are supported"
         δx = loc.x - loc.xBounds()[0]
@@ -3584,103 +3546,80 @@ def _signal_reduce_(loc: typing.Union[DataCursor, SignalCursor], # noqa
 
     t0, t1 = (coord - span/2, coord + span/2)
 
-    return signal_reduce([t0,t1], func, signal, channel, relative)
+    return signal_reduce([t0,t1], func, signal, channel) #, relative)
 
-def signal_max(loc, signal, /, channel = None, relative = True):
-    return signal_reduce(loc, np.max, signal, channel, relative) # * signal.units
-    # if not isinstance(ret, pq.Quantity):
-    #     ret *= signal.units
-    # return ret
+def signal_max(loc, signal, /, channel = None): #, relative = True):
+    return signal_reduce(loc, np.max, signal, channel) #, relative) # * signal.units
 
-def signal_argmax(loc, signal, /, channel = None, relative = True):
-    # CAUTION: 2026-05-03 09:25:45
-    # np.argmax will report the sample of the max WITHIN the boundaries of loc!
-    # therefore, this HAS to be added to the number of samples UP TO the earliest
-    # boundary of 'loc'
-    # print(f"\n***\nsignal_argmax: signal length: {signal.shape[0]}, t_start: {signal.t_start}, t_stop: {signal.t_stop}")
-    # if relative and signal.t_start != 0:
-    #     signal = signal.copy()
-    #     signal.t_start = 0 * signal.times.units
+def signal_argmax(loc, signal, /, channel = None): #, relative = True):
     loc_bounds = get_location_boundary(loc, True, True)
-    # print(f"\n\tloc_bounds = {loc_bounds}\n")
-    if relative:
-        loc_bounds = adjust_time_relative_to_signal(signal, loc_bounds)
     starts = signal.time_index(loc_bounds)
-    # print(f"\n\tasjusted loc_bounds = {loc_bounds}, starts -> {starts}\n")
-    ext = signal_reduce(loc, np.argmax, signal, channel, relative)
-    # print(f"\t ext -> {ext}")
+    ext = signal_reduce(loc, np.argmax, signal, channel) #, relative)
     return starts + ext
-    # return starts + signal_reduce(loc, np.argmax, signal, channel, relative)
 
-def signal_domain_max(loc, signal, /, channel = None, relative = True):
+def signal_domain_max(loc, signal, /, channel = None): #, relative = True):
     # print(f"\n***\nsignal_domain_max: signal length: {signal.shape[0]}, t_start: {signal.t_start}, t_stop: {signal.t_stop}")
-    ndx = signal_argmax(loc, signal, channel, relative)
+    ndx = signal_argmax(loc, signal, channel) #, relative)
     # print(f"\n\tsignal_domain_max -> ndx = {ndx}\n***\n")
     return signal.times[ndx]
 
-def signal_min(loc, signal, /, channel = None, relative = True):
-    return signal_reduce(loc, np.min, signal, channel, relative) # * signal.units
+def signal_min(loc, signal, /, channel = None): #, relative = True):
+    return signal_reduce(loc, np.min, signal, channel)# , relative) # * signal.units
     # if not isinstance(ret, pq.Quantity):
     #     ret *= signal.units
     # return ret
 
-def signal_argmin(loc, signal, /, channel = None, relative = True):
-    # print(f"\nsignal_argmin: signal length: {signal.shape[0]}, t_start: {signal.t_start}, t_stop: {signal.t_stop}")
-    # if relative and signal.t_start != 0:
-    #     signal = signal.copy()
-    #     signal.t_start = 0 * signal.times.units
+def signal_argmin(loc, signal, /, channel = None): #, relative = True):
     loc_bounds = get_location_boundary(loc, True, True)
-    # print(f"\n\tloc_bounds = {loc_bounds}\n")
-    if relative:
-        loc_bounds = adjust_time_relative_to_signal(signal, loc_bounds)
     starts = signal.time_index(loc_bounds)# - signal.time_index(signal.t_start)
-    # print(f"\n\tadjusted loc_bounds = {loc_bounds}, starts -> {starts}\n")
-    ext = signal_reduce(loc, np.argmin, signal, channel, relative)
+    ext = signal_reduce(loc, np.argmin, signal, channel) #, relative)
     # print(f"\n\text -> {ext}") # this is the time index in the signal AFTER having been sliced by loc!
     return starts + ext
 
-def signal_domain_min(loc, signal, /, channel = None, relative = True):
+def signal_domain_min(loc, signal, /, channel = None): # , relative = True):
     # print(f"\nsignal_domain_min: signal length: {signal.shape[0]}, t_start: {signal.t_start}, t_stop: {signal.t_stop}")
-    ndx = signal_argmin(loc, signal, channel, relative)
+    ndx = signal_argmin(loc, signal, channel)# , relative)
     # print(f"\n\tsignal_domain_min -> ndx = {ndx}")
     return signal.times[ndx]
 
-def signal_maxmin(loc, signal, /, channel =  None, relative = True):
-    return signal_reduce(loc, sigp.maxmin, signal, channel, relative) * signal.units
+def signal_maxmin(loc, signal, /, channel =  None):# , relative = True):
+    return signal_reduce(loc, sigp.maxmin, signal, channel) * signal.units
+    # return signal_reduce(loc, sigp.maxmin, signal, channel, relative) * signal.units
     # if not isinstance(ret, pq.Quantity): # BUG 2026-05-11 01:02:33 FIXME
     #     ret *= signal.units
     # return ret
 
-def signal_argmaxmin(loc, signal, /, channel = None, relative = True):
+def signal_argmaxmin(loc, signal, /, channel = None):# , relative = True):
     loc_bounds = get_location_boundary(loc, True, True)
-    if relative:
-        loc_bounds += signal.t_start
+    # if relative:
+    #     loc_bounds += signal.t_start
     starts = signal.time_index(loc_bounds)
-    return starts + signal_reduce(loc, sigp.maxmin, signal, channel, relative)
+    return starts + signal_reduce(loc, sigp.maxmin, signal, channel)# , relative)
 
-def signal_domain_maxmin(loc, signal, /, channel = None, relative = True):
-    ndx = signal_argmaxmin(loc, signal, channel, relative)
+def signal_domain_maxmin(loc, signal, /, channel = None): #, relative = True):
+    ndx = signal_argmaxmin(loc, signal, channel)# , relative)
     return signal.times[ndx]
 
-def signal_minmax(loc, signal, /, channel = None, relative = True):
-    return signal_reduce(loc, sigp.minmax, signal, channel, relative) * signal.units
+def signal_minmax(loc, signal, /, channel = None): #, relative = True):
+    return signal_reduce(loc, sigp.minmax, signal, channel) * signal.units
+    # return signal_reduce(loc, sigp.minmax, signal, channel, relative) * signal.units
     # if not isinstance(ret, pq.Quantity):
     #     ret *= signal.units
     # return ret
 
-def signal_argminmax(loc, signal, /, channel = None, relative = True):
+def signal_argminmax(loc, signal, /, channel = None): #, relative = True):
     loc_bounds = get_location_boundary(loc, True, True)
-    if relative:
-        loc_bounds += signal.t_start
+    # if relative:
+    #     loc_bounds += signal.t_start
     starts = signal.time_index(loc_bounds)
-    return starts + signal_reduce(loc, sigp.maxmin, signal, channel, relative)
+    return starts + signal_reduce(loc, sigp.maxmin, signal, channel) #, relative)
 
-def signal_domain_minmax(loc, signal, /, channel = None, relative = True):
-    ndx = signal_argminmax(loc, signal, channel, relative)
+def signal_domain_minmax(loc, signal, /, channel = None): # , relative = True):
+    ndx = signal_argminmax(loc, signal, channel) #, relative)
     return signal.times[ndx]
 
-def signal_average(loc, signal, /, channel = None, relative = True):
-    ret = signal_reduce(loc, np.nanmean, signal, channel, relative)
+def signal_average(loc, signal, /, channel = None):# , relative = True):
+    ret = signal_reduce(loc, np.nanmean, signal, channel)# , relative)
     if not isinstance(ret, pq.Quantity):
         ret *= signal.units
     return ret
@@ -3689,15 +3628,15 @@ def signal_average(loc, signal, /, channel = None, relative = True):
 
 @singledispatch
 def signal_slice(loc, signal, /, channel = None,
-                 outer: bool = True,
-                 relative: bool = True) -> typing.Union[neo.AnalogSignal,
+                 outer: bool = True) -> typing.Union[neo.AnalogSignal,
                                                         DataSignal]:
+                 # relative: bool = True) -> typing.Union[neo.AnalogSignal,
+                 #                                        DataSignal]:
     raise NotImplementedError(f"Locations of type {type(loc).__name__} are not supported")
 
 @signal_slice.register(types.NoneType)
 def _signal_slice_(loc: types.NoneType, signal, /, channel = None,
-                 outer: bool = True,
-                 relative: bool = True) -> typing.Union[neo.AnalogSignal,
+                 outer: bool = True) -> typing.Union[neo.AnalogSignal,
                                                         DataSignal]:
     return signal
 
@@ -3712,8 +3651,10 @@ def _signal_slice_(loc: typing.Union[DeferredSignalMeasure, # noqa
                  signal, /,
                  channel = None,
                  outer: bool = True,
-                 relative: bool = True) -> typing.Union[neo.AnalogSignal,
+                 ) -> typing.Union[neo.AnalogSignal,
                                                         DataSignal]:
+                 # relative: bool = True) -> typing.Union[neo.AnalogSignal,
+                 #                                        DataSignal]:
 
     loc = loc(signal)
     return slice_signal(loc, signal)
@@ -3746,8 +3687,10 @@ def _signal_slice_(loc: typing.Union[typing.Sequence[numbers.Number],
                    signal, /,
                    channel = None,
                    outer: bool = True,
-                   relative: bool = True) -> typing.Union[neo.AnalogSignal,
+                   ) -> typing.Union[neo.AnalogSignal,
                                                         DataSignal]:
+                   # relative: bool = True) -> typing.Union[neo.AnalogSignal,
+                   #                                      DataSignal]:
 
     # if isinstance(loc, typing.Callable):
     #     loc = loc(signal)
@@ -3761,13 +3704,13 @@ def _signal_slice_(loc: typing.Union[typing.Sequence[numbers.Number],
     # WARNING 2026-05-07 12:36:09
     # this will FAIL WHEN LocationMasure DOES NOT RETURN a domain scalar!
     if isinstance(t0, DeferredSignalMeasure):
-        t0_ = t0(signal, channel=channel, relative=relative)
+        t0_ = t0(signal, channel=channel) #, relative=relative)
         if isinstance(t0_, pq.Quantity) and not scq.unitsConvertible(t0_, signal.times.units):
             raise ValueError(f"Location measure {t0} generated data with incompatible physical dimensionality {t0_} ")
         t0 = t0_
 
     if isinstance(t1, DeferredSignalMeasure):
-        t1_ = t1(signal, channel=channel, relative=relative)
+        t1_ = t1(signal, channel=channel) #, relative=relative)
         if isinstance(t1_, pq.Quantity) and not scq.unitsConvertible(t1_, signal.times.units):
             raise ValueError(f"Location measure {t1} generated data with incompatible physical dimensionality {t1_} ")
         t1 = t1_
@@ -3780,10 +3723,10 @@ def _signal_slice_(loc: typing.Union[typing.Sequence[numbers.Number],
 
     # print(f"\n***\n_signal_slice_ t0 = {t0}, t1 = {t1}")
 
-    if relative:
-        # t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
-        t0 = adjust_time_relative_to_signal(signal, t0)
-        t1 = adjust_time_relative_to_signal(signal, t1)
+    # if relative:
+    #     # t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
+    #     t0 = adjust_time_relative_to_signal(signal, t0)
+    #     t1 = adjust_time_relative_to_signal(signal, t1)
 
     # print(f"\n\t_signal_slice_ adjusted t0 = {t0}, t1 = {t1}\n***\n")
 
@@ -3806,35 +3749,18 @@ def _signal_slice_(loc: typing.Union[neo.Epoch, DataZone, Interval,
                                      DataCursor, SignalCursor], signal, /,
                    channel = None,
                    outer: bool = True,
-                   relative: bool = True) -> typing.Union[neo.AnalogSignal,
+                   ) -> typing.Union[neo.AnalogSignal,
                                                         DataSignal]:
+                   # relative: bool = True) -> typing.Union[neo.AnalogSignal,
+                   #                                      DataSignal]:
     t0 = get_location_boundary(loc, True, outer) #+ signal.t_start
     t1 = get_location_boundary(loc, False, outer)# + signal.t_start
 
     # print(f"_signal_slice_[{type(loc)}]: t0 = {t0}, t1 = {t1}")
 
-    return signal_slice((t0, t1), signal, channel, outer, relative)
+    return signal_slice((t0, t1), signal, channel, outer) # , relative)
 
-    # if relative:
-    #     if all(isinstance(t, pq.Quantity) for t in (t0,t1)):
-    #         t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
-    #
-    #     elif all(isinstance(t, typing.Sequence) for t in (t0, t1)):
-    #         t0,t1 = zip(*list(map(lambda xx: adjust_time_relative_to_signal(signal, *xx),
-    #                               zip(t0, t1))))
-    #
-    # if isinstance(t0, typing.Sequence):
-    #     if isinstance(channel, int):
-    #         return list(map(lambda xx: signal.time_slice(*xx)[:,channel], zip(t0, t1)))
-    #     else:
-    #         return list(map(lambda xx: signal.time_slice(*xx), zip(t0, t1)))
-    # else:
-    #     ret = signal.time_slice(t0, t1)
-    #     if isinstance(channel, int):
-    #         ret = ret[:,channel]
-    #     return ret
-
-def signal_chord_slope(loc, signal, /, channel = None, outer: bool = True, relative = True):
+def signal_chord_slope(loc, signal, /, channel = None, outer: bool = True): #, relative = True):
     r"""Calculates the signal chord slope between two time points t0 and t1.
 
 .. |nbsp| unicode:: 0xA0
@@ -3858,10 +3784,10 @@ See signal_chord_slope2() for a verison taking two locations.
     slope = lambda x0, x1, y0, y1: (y1-y0) / (t1-t0)
 
     if all(isinstance(t, pq.Quantity) for t in (t0,t1)):
-        if relative:
-            # t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
-            t0 = adjust_time_relative_to_signal(signal, t0)
-            t1 = adjust_time_relative_to_signal(signal, t1)
+        # if relative:
+        #     # t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
+        #     t0 = adjust_time_relative_to_signal(signal, t0)
+        #     t1 = adjust_time_relative_to_signal(signal, t1)
 
         if t1 == t0:
             raise ValueError(f"The signal slice between t0 = {t0} and t1 = {t1} has zero length")
@@ -3907,7 +3833,7 @@ See signal_chord_slope2() for a verison taking two locations.
         else:
             return list(map(lambda x: slope(*x).simplified, zip(t0, t1, v0, v1)))
 
-def signal_chord_slope2(loc0, loc1, signal, /, channel = None, relative = True):
+def signal_chord_slope2(loc0, loc1, signal, /, channel = None): #, relative = True):
     r"""Calculates signal chord slope between the mid-points of two locations.
 
 .. |nbsp| unicode:: 0xA0
@@ -3979,8 +3905,8 @@ Best used with two DataCursor or two SignalCursor objects.
     if isinstance(t1, float):
         t1 = t1 * signal.times.units
 
-    if relative:
-        t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
+    # if relative:
+    #     t0, t1 = adjust_time_relative_to_signal(signal, t0, t1)
 
     # print(f"signal_chord_slope2: t0 = {t0}, t1 = {t1}")
 
@@ -4552,8 +4478,15 @@ Coordinate adapted to the new domain boundary
 
     if new == old:
         ret = val
+
+    # elif val < new:
+    #     ret = val + new
+
     else:
         ret = val - old + new
+
+    # if ret < new:
+    #     ret += new
     # print(f"\n\t => ret = {ret}")
 
     return ret
@@ -7070,7 +7003,7 @@ def getProtocol(x:typing.Union[neo.Block, pab.pyabf.ABF]) -> ElectrophysiologyPr
         return
     return pab.ABFProtocol(x)
 
-def __slice_signal__(t0, t1, sg, ch, rel):
+def __slice_signal__(t0, t1, sg, ch): #, rel):
     r"""Helper function for signal_fit & signal_reduce."""
     # print(f"\n***\n__slice_signal__({t0}, {t1}, rel = {rel})\n\tt_start: {sg.t_start}, t_stop: {sg.t_stop}")
     if isinstance(t0, DeferredSignalMeasure):
@@ -7109,18 +7042,23 @@ def __slice_signal__(t0, t1, sg, ch, rel):
     # print(f"\n\t__slice_signal__ adjusted t0 = {t0}, t1 = {t1}\n***\n\n")
 
     if t0 < sg.t_start:
-        scipywarn(f"__slice_signal__: t0 {t0} is earlier than signal's domain start {sg.t_start}")
+        scipywarn(f"__slice_signal__: t0 {t0} is earlier than signal's domain start {sg.t_start}",
+                  with_traceback=True)
         return np.nan
     if t0 > sg.t_stop:
-        scipywarn(f"__slice_signal__: t0 {t0} is later than signal's domain stop {sg.t_stop}")
+        scipywarn(f"__slice_signal__: t0 {t0} is later than signal's domain stop {sg.t_stop}",
+                  with_traceback=True)
         return np.nan
 
     if t1 < sg.t_start:
-        scipywarn(f"__slice_signal__: t1 {t1} is earlier than signal's domain start {sg.t_start}")
+        scipywarn(f"__slice_signal__: t1 {t1} is earlier than signal's domain start {sg.t_start}",
+                  with_traceback=True)
         return np.nan
 
     if t1 > sg.t_stop:
-        scipywarn(f"__slice_signal__: t1 {t1} is later than signal's domain stop {sg.t_stop}")
+        # scipywarn(f"__slice_signal__: t1 {t1} is later than signal's domain stop {sg.t_stop}",
+        #           with_traceback=False)
+        t1 = sg.t_stop
 
     # t0, t1 = sorted((t0,t1))
 
@@ -7200,6 +7138,33 @@ def __get_initial_and_bounds__(fT):
 
         return initial, bounds
 
+def _construct_signal_from_fitted_curve_(fitCurve, fitResult, fitted_signal):
+    if isinstance(fitted_signal, (neo.AnalogSignal, neo.IrregularlySampledSignal)):
+        result = neo.AnalogSignal(fitCurve, units = fitted_signal.units,
+                                  t_start = fitted_signal.t_start,
+                                  sampling_rate = fitted_signal.sampling_rate,
+                                  name = f"Fitted {fitted_signal.name}",
+                                  )
+
+    elif isinstance(fitted_signal, (DataSignal, IrregularlySampledDataSignal)):
+        result = DataSignal(fitCurve, units = fitted_signal.units,
+                            domain_units = fitted_signal.domain_units,
+                            t_start = fitted_signal.t_start,
+                            sampling_rate = fitted_signal.sampling_rate,
+                            name = f"Fitted {fitted_signal.name}",
+                            domain_name = fitted_signal.domain_name
+                            )
+
+    else:
+        raise TypeError(f"'fitted_signal' ws expected to be a neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal; instead, got a {type(fitted_signal).__name__}")
+
+    result.annotations["ModelFunction"] = fitResult.ModelFunction
+    result.annotations["Fit"] = fitResult.Fit.__dict__
+    result.annotations["Coefficients"] = dict(zip(fitResult.Coefficients.Names, fitResult.Coefficients.Fitted))
+    result.annotations["Coefficients"]["GoF"] = fitResult.Coefficients.GoF.__dict__
+
+    return result
+
 def __do_fit__(sg, mdl, fT, fTadj, ch):
     result = list()
     if len(fTadj) == 0:
@@ -7213,7 +7178,10 @@ def __do_fit__(sg, mdl, fT, fTadj, ch):
 
         # print(f"initial = {initial}\nbounds = {bounds}")
         fC, fR = crvf.fit_model(sg, mdl, initial, bounds=bounds)
-        result.append((fC, fR))
+
+        fCsig = _construct_signal_from_fitted_curve_(fC, fR, sg)
+
+        result.append((fCsig, fR))
 
     else:
         if isinstance(ch, int):
@@ -7226,7 +7194,10 @@ def __do_fit__(sg, mdl, fT, fTadj, ch):
 
             fC, fR = crvf.fit_model(sg[:,ch], mdl, initial,
                                     bounds=bounds)
-            result.append((fC, fR))
+
+            fCsig = _construct_signal_from_fitted_curve_(fC, fR, sg)
+
+            result.append((fCsig, fR))
 
         elif ch is None:
             for ch in range(sg.shape[1]):
@@ -7236,7 +7207,8 @@ def __do_fit__(sg, mdl, fT, fTadj, ch):
 
                 fC, fR = crvf.fit_model(sg[:,ch], mdl, initial,
                                         bounds=bounds)
-                result.append((fC, fR))
+                fCsig = _construct_signal_from_fitted_curve_(fC, fR, sg[:,ch])
+                result.append((fCsig, fR))
 
         else:
             raise TypeError(f"'channel' expected to be an int or None; instead, got {type(channel).__name__}")
