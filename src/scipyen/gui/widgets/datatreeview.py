@@ -255,6 +255,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                 if col >=0 and col < 3:
                     self.resizeColumnToContents(col)
 
+            self.proxyModel.sort(-1)
+
     @property
     def hasData(self) -> bool:
         return self.model()._modelData_ is not None

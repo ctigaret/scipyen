@@ -2399,7 +2399,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         except:
             traceback.print_exc()
 
-    def _plot_curve_overlays_(self, entities, axis, clear):
+    def _plot_curve_overlays_(self, entities, axis, clear:bool = False):
         axis, axNdx = self._check_axis_spec_ndx_(axis)
 
         if axis not in self.signalAxes:
@@ -2451,20 +2451,12 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         for i in items:
             axis.removeItem(i)
 
-    # def _remove_targets_overlay_(self, axis):
-    #     axis, axNdx = self._check_axis_spec_ndx_(axis)
-    #     cFrame = self.currentFrame
-    #     if cFrame in self._target_overlays_:
-    #         if axNdx in self._target_overlays_[cFrame]:
-    #             del self._target_overlays_[cFrame][axNdx]
-    #             self._clear_targets_overlay_(axis)
-
     def _clear_curves_overlay_(self, axis):
         axis, axNdx = self._check_axis_spec_ndx_(axis)
 
         cFrame = self.frameIndex[self.currentFrame]
 
-        if axNdx not in self._curve_overlays_[cFrame]:
+        if cFrame not in self._curve_overlays_ or axNdx not in self._curve_overlays_[cFrame]:
             return
 
         items = list(filter(lambda i: (isinstance(i, pg.PlotDataItem) and
@@ -2473,15 +2465,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         for i in items:
             axis.removeItem(i)
-
-    # def _remove_curve_overlays_(self, axis):
-    #     axis, axNdx = self._check_axis_spec_ndx_(axis)
-    #     cFrame = self.currentFrame
-    #     if cFrame in self._curve_overlays_:
-    #         if axNdx in self._curve_overlays_[cFrame]:
-    #             self._curve_overlays_[cFrame][axNdx].clear()
-    #             del self._curve_overlays_[cFrame]
-    #             self._clear_curves_overlay_(axis)
 
     def _clear_labels_overlay_(self, axis):
         axis, axNdx = self._check_axis_spec_ndx_(axis)
@@ -9032,6 +9015,11 @@ Var-keyword parameters ("name=value" pairs):
 
         for k, ax in enumerate(self.axes):
             if ax.isVisible():
+                self._clear_curves_overlay_(ax)
+                if cFrame in self._curve_overlays_:
+                    curveItems = self._curve_overlays_[cFrame].get(k, list())
+                    if len(curveItems):
+                        self._plot_curve_overlays_(curveItems, ax)
                 self._clear_targets_overlay_(ax)
                 if cFrame in self._target_overlays_:
                     targetItems = self._target_overlays_[cFrame].get(k, list())
