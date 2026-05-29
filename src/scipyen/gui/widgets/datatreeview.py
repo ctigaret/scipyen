@@ -294,7 +294,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                         filter(lambda i: i.column() == 0,
                                map(
                                    # lambda i: self.model().itemFromIndex(i),
-                                   lambda i: self.model.itemFromIndex(self.proxyModel.mapToSource(i)),
+                                   lambda i: self.sourceModel.itemFromIndex(self.proxyModel.mapToSource(i)),
                                    self.selectedIndexes()
                                    )
                                )
@@ -310,7 +310,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                     map(
                         lambda i: (
                                     i.data(QtCore.Qt.DisplayRole),
-                                    self.model().getDataObjectForLeaf(i)
+                                    self.sourceModel.getDataObjectForLeaf(i)
+                                    # self.model().getDataObjectForLeaf(i)
                                     ),
                         list(
                             filter(
@@ -337,21 +338,24 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
         # l_pathToStr = lambda s: s.replace(".", "_").replace("[", "_").replace("]", "_") is isinstance(s, str) else ""
 
+        l_getName = lambda i: self.sourceModel.getPathForLeaf(i) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
         # l_getName = lambda i: self.model().getPathForLeaf(i) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
-        l_getName = lambda i: self.sourceModel.getPathForLeaf(self.proxyModel.mapToSource(i)) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
+        # l_getName = lambda i: self.sourceModel.getPathForLeaf(self.proxyModel.mapToSource(i)) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
 
         selection = list(
                         map(
                             lambda i: (
                                         l_getName(i),
-                                        self.sourceModel.getDataObjectForLeaf(self.proxyModel.maptoSource(i))
+                                        self.sourceModel.getDataObjectForLeaf(i)
+                                        # self.sourceModel.getDataObjectForLeaf(self.proxyModel.maptoSource(i))
                                         # self.model().getDataObjectForLeaf(i)
                                         ),
                             list(
                                 filter(
                                     (
                                         lambda i: i.column() == 0
-                                        and not self.proxyModeol.mapToSource(i).data(StandaloneEditorWidgetRole) # noqa
+                                        and not i.data(StandaloneEditorWidgetRole) # noqa
+                                        # and not self.proxyModel.mapToSource(i).data(StandaloneEditorWidgetRole) # noqa
                                     ),
                                     items
                                     )
