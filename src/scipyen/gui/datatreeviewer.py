@@ -203,6 +203,8 @@ A lot of things copied from there, EXCEPT that it now uses
         self._showValuesOnly_: bool = kwargs.get("showValuesOnly", True)
         self._useTableEditor_ = useTableEditor
         self._readOnly_ = readOnly is True
+        self._alwaysSortRows_: bool = False
+        self._slowInlineTables_: bool = False
 
         if inspect.isfunction(predicate):
             if not self._showMethods_:
@@ -298,11 +300,17 @@ A lot of things copied from there, EXCEPT that it now uses
             QtGui.QIcon.fromTheme("view-refresh"), "Refresh")
         refreshAction.triggered.connect(self.slot_refreshDataDisplay)
 
-        inlineTablesAction = self.toolBar.addAction(
+        self.alwaysSortAction = self.toolBar.addAction(
+            QtGui.QIcon.fromTheme("sort-name"), "Always sort rows ascending")
+        self.alwaysSortAction.setCheckable(True)
+        self.alwaysSortAction.setChecked(True)
+        self.alwaysSortAction.toggled.connect(self.slot_alwaysSortRows)
+
+        self.inlineTablesAction = self.toolBar.addAction(
             QtGui.QIcon.fromTheme("table"), "Inline Tables")
-        inlineTablesAction.setCheckable(True)
-        inlineTablesAction.setChecked(False)
-        inlineTablesAction.toggled.connect(self.slot_setInlineTables)
+        self.inlineTablesAction.setCheckable(True)
+        self.inlineTablesAction.setChecked(False)
+        self.inlineTablesAction.toggled.connect(self.slot_setInlineTables)
 
         collapseAllAction = self.toolBar.addAction(
             QtGui.QIcon.fromTheme("collapse-all"), "Collapse All")
@@ -532,11 +540,9 @@ A lot of things copied from there, EXCEPT that it now uses
     @Slot(QtCore.QModelIndex)
     def _slot_indexCollapsed(self, index: QtCore.QModelIndex):
         column = index.column()
-        # print(f"{self.__class__.__name__}._slot_indexCollapsed(index={index})")
         self.treeView.resizeColumnToContents(column)
         if column < (self.treeView.model().columnCount()-1):
             self.treeView.resizeColumnToContents(column+1)
-        # self.treeView.resizeColumnToContents(index.column())
 
     @Slot()
     @safewrapper
@@ -570,9 +576,11 @@ A lot of things copied from there, EXCEPT that it now uses
     @Slot(bool)
     @safewrapper
     def slot_setInlineTables(self, value: bool):
-        if value != self.model.inlineTables:
-            self.model.inlineTables = value is True
-            self.slot_refreshDataDisplay()
+        self.showInlineTables = value is True
+
+    @Slot(bool)
+    def slot_alwaysSortRows(self, val: bool):
+        self.alwaysSortRows = val is True
 
     @Slot()
     @safewrapper
@@ -944,6 +952,36 @@ A lot of things copied from there, EXCEPT that it now uses
                 self.treeView.readOnly = readOnly
                 self.view(obj, name)
                 # if obj is not None:
+
+    @property
+    def alwaysSortRows(self) -> bool:
+        return self._alwaysSortRows_
+
+    @markConfigurable("AlwaysSortRows", "qt", trait_notifier = True)
+    @alwaysSortRows.setter
+    def alwaysSortRows(self, val: bool):
+        if self._alwaysSortRows_ != val:
+            self._alwaysSortRows_ = val is True
+            sigBlock = QtCore.QSignalBlocker(self.alwaysSortAction)
+            self.alwaysSortAction.setChecked(self._alwaysSortRows_)
+            if self._alwaysSortRows_ != self.model.sortedRows:
+                self.model.sortedRows = self._alwaysSortRows_
+                self.slot_refreshDataDisplay()
+
+    @property
+    def showInlineTables(self) -> bool:
+        return self._showInlineTables_
+
+    @markConfigurable("ShowInlineTables", "qt", trait_notifier = True)
+    @showInlineTables.setter
+    def showInlineTables(self, val: bool):
+        self._showInlineTables_ = val is True
+        sigBlock = QtCore.QSignalBlocker(self.inlineTablesAction)
+        self.inlineTablesAction.setChecked(self._slowInlineTables_)
+        if val != self.model.inlineTables:
+            self.model.inlineTables = self._showInlineTables_
+            self.showInlineTables = self._showInlineTables_
+            self.slot_refreshDataDisplay()
 
     @property
     def initialExpandDepth(self) -> int:

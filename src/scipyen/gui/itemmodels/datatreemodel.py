@@ -232,6 +232,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
         self._topObjectItem_: typing.Optional[QtGui.QStandardItem] = None
         self._readOnly: bool = False
 
+        self._sortedRows_: bool = False
+
         self._supportedDataTypes_ = kwargs.pop("supportedTypes", tuple())
         if not isinstance(self._supportedDataTypes_, tuple) or not all(
             isinstance(v, type) for v in self._supportedDataTypes_
@@ -560,7 +562,14 @@ class DataTreeModel(QtGui.QStandardItemModel):
             return pItem
 
         # print(f"{self.__class__.__name__}._buildBranch_")
-        for key, value in obj.items():
+
+        if self._sortedRows_:
+            keyvals = sorted(obj.items())
+        else:
+            keyvals = list(obj.items())
+
+        # for key, value in obj.items():
+        for (key, value) in keyvals:
             # print(f"\tkey  {key} ->  {type(value)}")
             if isinstance(key, str):
                 keyName = key
@@ -595,6 +604,14 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
 
         return pItem
+
+    @property
+    def sortedRows(self) -> bool:
+        return self._sortedRows_
+
+    @sortedRows.setter
+    def sortedRows(self, val: bool):
+        self._sortedRows_ = val is True
 
     @property
     def showMethods(self) -> bool:

@@ -87,6 +87,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         autoResizeColumns = kwargs.pop("autoResizeColumns", {0,1})
         assert (isinstance(autoResizeColumns, set) and all((isinstance(v, int) and v in range(3)) for v in autoResizeColumns)), f"Invalid value for 'autoResizeColumns'; expecting a set of ints, each in range(3); instead, got {autoResizeColumns}"
         self.autoResizeColumns: set[int] = kwargs.pop("autoResizeColumns", set())
+
+        self._alwaysSortRows_: bool = False
         super().__init__(parent=parent)
 
         # NOTE: 2026-03-31 22:47:04
@@ -253,6 +255,19 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     @property
     def data(self) -> object:
         return self.model()._modelData_
+
+    @property
+    def alwaysSortRows(self) -> bool:
+        return self._alwaysSortRows_
+
+    @alwaysSortRows.setter
+    def alwaysSortRows(self, val: bool):
+        self._alwaysSortRows_ = val is True
+        needsRefresh = self.model().sortedRows != self._alwaysSortRows_
+        self.model().sortedRows = self._alwaysSortRows_
+        if needsRefresh:
+            data = self.data
+            self.model().setData(data)
 
     @property
     def readOnly(self: typing.Self) -> bool:
