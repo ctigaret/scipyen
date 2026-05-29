@@ -267,7 +267,7 @@ A lot of things copied from there, EXCEPT that it now uses
                                      # ,
                                      # readOnly = self._readOnly_)
 
-        self.model = self.treeView.model()
+        self.model = self.treeView.sourceModel
 
         self.treeView.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
@@ -300,11 +300,11 @@ A lot of things copied from there, EXCEPT that it now uses
             QtGui.QIcon.fromTheme("view-refresh"), "Refresh")
         refreshAction.triggered.connect(self.slot_refreshDataDisplay)
 
-        self.alwaysSortAction = self.toolBar.addAction(
-            QtGui.QIcon.fromTheme("sort-name"), "Always sort rows ascending")
-        self.alwaysSortAction.setCheckable(True)
-        self.alwaysSortAction.setChecked(True)
-        self.alwaysSortAction.toggled.connect(self.slot_alwaysSortRows)
+        # self.alwaysSortAction = self.toolBar.addAction(
+        #     QtGui.QIcon.fromTheme("sort-name"), "Always sort rows ascending")
+        # self.alwaysSortAction.setCheckable(True)
+        # self.alwaysSortAction.setChecked(True)
+        # self.alwaysSortAction.toggled.connect(self.slot_alwaysSortRows)
 
         self.inlineTablesAction = self.toolBar.addAction(
             QtGui.QIcon.fromTheme("table"), "Inline Tables")
@@ -512,7 +512,7 @@ A lot of things copied from there, EXCEPT that it now uses
             return
 
         item_paths = self.treeView.getSelectedPaths()
-        self.exportPathsToClipboard(item_paths)
+        self._exportPathsToClipboard_(item_paths)
 
     @Slot()
     def slot_exportToConsole(self: typing.Self):
@@ -520,7 +520,7 @@ A lot of things copied from there, EXCEPT that it now uses
             return
 
         item_paths = self.treeView.getSelectedPaths()
-        self.exportPathsToClipboard(item_paths)
+        self._exportPathsToClipboard_(item_paths)
         self._scipyenWindow_.console.paste()
 
     @Slot()
@@ -534,14 +534,14 @@ A lot of things copied from there, EXCEPT that it now uses
         # print(f"{self.__class__.__name__}._slot_indexExpanded(index={index})")
         column = index.column()
         self.treeView.resizeColumnToContents(column)
-        if column < (self.treeView.model().columnCount()-1):
+        if column < (self.treeView.sourceModel.columnCount()-1):
             self.treeView.resizeColumnToContents(column+1)
 
     @Slot(QtCore.QModelIndex)
     def _slot_indexCollapsed(self, index: QtCore.QModelIndex):
         column = index.column()
         self.treeView.resizeColumnToContents(column)
-        if column < (self.treeView.model().columnCount()-1):
+        if column < (self.treeView.sourceModel.columnCount()-1):
             self.treeView.resizeColumnToContents(column+1)
 
     @Slot()
@@ -578,9 +578,9 @@ A lot of things copied from there, EXCEPT that it now uses
     def slot_setInlineTables(self, value: bool):
         self.showInlineTables = value is True
 
-    @Slot(bool)
-    def slot_alwaysSortRows(self, val: bool):
-        self.alwaysSortRows = val is True
+    # @Slot(bool)
+    # def slot_alwaysSortRows(self, val: bool):
+    #     self.alwaysSortRows = val is True
 
     @Slot()
     @safewrapper
@@ -717,7 +717,7 @@ A lot of things copied from there, EXCEPT that it now uses
         self._obj_to_view_ = (dataclasses.MISSING, "")
 
     @safewrapper
-    def exportPathsToClipboard(self, item_paths):
+    def _exportPathsToClipboard_(self, item_paths):
         if self._scipyenWindow_ is None:
             return
 
@@ -938,7 +938,7 @@ A lot of things copied from there, EXCEPT that it now uses
 
         if item.column() == 0:
             readOnly = item.data(ReadOnlyRole) is True
-            obj = self.treeView.model().getDataObjectForLeaf(item)
+            obj = self.treeView.sourceModel.getDataObjectForLeaf(item)
             if obj is None:
                 return
             name = item.data(QtCore.Qt.DisplayRole)
@@ -953,20 +953,20 @@ A lot of things copied from there, EXCEPT that it now uses
                 self.view(obj, name)
                 # if obj is not None:
 
-    @property
-    def alwaysSortRows(self) -> bool:
-        return self._alwaysSortRows_
-
-    @markConfigurable("AlwaysSortRows", "qt", trait_notifier = True)
-    @alwaysSortRows.setter
-    def alwaysSortRows(self, val: bool):
-        if self._alwaysSortRows_ != val:
-            self._alwaysSortRows_ = val is True
-            sigBlock = QtCore.QSignalBlocker(self.alwaysSortAction)
-            self.alwaysSortAction.setChecked(self._alwaysSortRows_)
-            if self._alwaysSortRows_ != self.model.sortedRows:
-                self.model.sortedRows = self._alwaysSortRows_
-                self.slot_refreshDataDisplay()
+    # @property
+    # def alwaysSortRows(self) -> bool:
+    #     return self._alwaysSortRows_
+    #
+    # @markConfigurable("AlwaysSortRows", "qt", trait_notifier = True)
+    # @alwaysSortRows.setter
+    # def alwaysSortRows(self, val: bool):
+    #     if self._alwaysSortRows_ != val:
+    #         self._alwaysSortRows_ = val is True
+    #         sigBlock = QtCore.QSignalBlocker(self.alwaysSortAction)
+    #         self.alwaysSortAction.setChecked(self._alwaysSortRows_)
+    #         if self._alwaysSortRows_ != self.model.sortedRows:
+    #             self.model.sortedRows = self._alwaysSortRows_
+    #             self.slot_refreshDataDisplay()
 
     @property
     def showInlineTables(self) -> bool:

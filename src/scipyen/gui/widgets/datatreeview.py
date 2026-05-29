@@ -88,7 +88,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         assert (isinstance(autoResizeColumns, set) and all((isinstance(v, int) and v in range(3)) for v in autoResizeColumns)), f"Invalid value for 'autoResizeColumns'; expecting a set of ints, each in range(3); instead, got {autoResizeColumns}"
         self.autoResizeColumns: set[int] = kwargs.pop("autoResizeColumns", set())
 
-        self._alwaysSortRows_: bool = False
+        # self._alwaysSortRows_: bool = False
         super().__init__(parent=parent)
 
         # NOTE: 2026-03-31 22:47:04
@@ -97,8 +97,15 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         # NOTE: 2026-04-01 10:41:46
         self.setExpandsOnDoubleClick(False)
 
-        super().setModel(DataTreeModel(showMethods = self._showCallables_,
-                                       valuesOnly = self._showValuesOnly_))
+        self.sourceModel = DataTreeModel(showMethods = self._showCallables_,
+                                       valuesOnly = self._showValuesOnly_,
+                                       parent=self)
+
+        self.proxyModel = QtCore.QSortFilterProxyModel(self)
+        self.proxyModel.setSourceModel(self.sourceModel)
+
+        super().setModel(self.proxyModel)
+        self.setSortingEnabled(True)
 
         self._defaultDelegate_ = self.itemDelegate()
         self._delegate_ = PythonItemDelegate(parent = self)
@@ -112,7 +119,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        if self.model()._modelData_ is None:
+        if self.sourceModel._modelData_ is None:
             painter = QtGui.QPainter(self.viewport())
             painter.save()
             col = self.palette().placeholderText().color()
@@ -231,9 +238,9 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                 name: typing.Optional[str] = None):
         signalBlocker = QtCore.QSignalBlocker(self.model()) #noqa
         # model = self.model()
-        self.model().clear()
-        self.model().setModelData(obj, name)
-        root = self.model().invisibleRootItem()
+        self.sourceModel.clear()
+        self.sourceModel.setModelData(obj, name)
+        root = self.sourceModel.invisibleRootItem()
         if root.hasChildren():
             # NOTE: 2026-02-08 15:23:06
             # there is exactly one of these and it is the visible "root" of the
@@ -256,18 +263,18 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     def data(self) -> object:
         return self.model()._modelData_
 
-    @property
-    def alwaysSortRows(self) -> bool:
-        return self._alwaysSortRows_
-
-    @alwaysSortRows.setter
-    def alwaysSortRows(self, val: bool):
-        self._alwaysSortRows_ = val is True
-        needsRefresh = self.model().sortedRows != self._alwaysSortRows_
-        self.model().sortedRows = self._alwaysSortRows_
-        if needsRefresh:
-            data = self.data
-            self.model().setData(data)
+    # @property
+    # def alwaysSortRows(self) -> bool:
+    #     return self._alwaysSortRows_
+    #
+    # @alwaysSortRows.setter
+    # def alwaysSortRows(self, val: bool):
+    #     self._alwaysSortRows_ = val is True
+    #     needsRefresh = self.model().sortedRows != self._alwaysSortRows_
+    #     self.model().sortedRows = self._alwaysSortRows_
+    #     if needsRefresh:
+    #         data = self.data
+    #         self.model().setData(data)
 
     @property
     def readOnly(self: typing.Self) -> bool:
@@ -286,7 +293,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         return list(
                         filter(lambda i: i.column() == 0,
                                map(
-                                   lambda i: self.model().itemFromIndex(i),
+                                   # lambda i: self.model().itemFromIndex(i),
+                                   lambda i: self.model.itemFromIndex(self.proxyModel.mapToSource(i)),
                                    self.selectedIndexes()
                                    )
                                )
@@ -329,19 +337,21 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
         # l_pathToStr = lambda s: s.replace(".", "_").replace("[", "_").replace("]", "_") is isinstance(s, str) else ""
 
-        l_getName = lambda i: self.model().getPathForLeaf(i) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
+        # l_getName = lambda i: self.model().getPathForLeaf(i) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
+        l_getName = lambda i: self.sourceModel.getPathForLeaf(self.proxyModel.mapToSource(i)) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
 
         selection = list(
                         map(
                             lambda i: (
                                         l_getName(i),
-                                        self.model().getDataObjectForLeaf(i)
+                                        self.sourceModel.getDataObjectForLeaf(self.proxyModel.maptoSource(i))
+                                        # self.model().getDataObjectForLeaf(i)
                                         ),
                             list(
                                 filter(
                                     (
                                         lambda i: i.column() == 0
-                                        and not i.data(StandaloneEditorWidgetRole) # noqa
+                                        and not self.proxyModeol.mapToSource(i).data(StandaloneEditorWidgetRole) # noqa
                                     ),
                                     items
                                     )
@@ -397,12 +407,12 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self.setData(data, root_title)
 
     def clear(self: typing.Self):
-        self.model().clear()
+        self.sourceModel.clear()
 
     def mouseDoubleClickEvent(self: typing.Self, evt: QtGui.QMouseEvent):
         pos = evt.position().toPoint()
-        index = self.indexAt(pos)
-        item = self.model().itemFromIndex(index)
+        index = self.proxyModel.mapToSource(self.indexAt(pos))
+        item = self.sourceModel.itemFromIndex(index)
         if item.column() == 0:
             self.sig_itemDoubleClicked.emit(item)
         super().mouseDoubleClickEvent(evt)
