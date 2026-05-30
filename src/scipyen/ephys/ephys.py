@@ -4575,9 +4575,9 @@ def _adapt_location_to_lower_domain_bounds_(obj: typing.Union[neo.Event, # noqa
 
 @adapt_location_to_lower_domain_bounds.register(DataCursor)
 def _adapt_location_to_lower_domain_bounds_(obj: DataCursor, old, new): # noqa
-    new_coord = adapt_coordinate_to_lower_boundary(obj, old, new)
+    new_coord = adapt_coordinate_to_lower_boundary(obj.coord, old, new)
 
-    return DataCursor(new_coord, snap = obj.span, name = obj.name)
+    return DataCursor(new_coord, span = obj.span, name = obj.name)
 
 @adapt_location_to_lower_domain_bounds.register(SignalCursor)
 def _adapt_location_to_lower_domain_bounds_(obj: SignalCursor, old, new, # noqa

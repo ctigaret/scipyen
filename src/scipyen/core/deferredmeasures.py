@@ -1193,6 +1193,7 @@ Any aditional named or keyword parameters to be passed to `func`.
             if withLocation:
                 if self.debug:
                     print(f"\n\t[{self.name}] -> withLocation: {withLocation}")
+
                 if isinstance(withLocation, typing.Callable):
                     locations = withLocation(arg)
 
