@@ -369,7 +369,7 @@ Attributes:
 :func:
     Function with specific signature requirements, used to calculate the signal measure.
 
-    The signature requirements are:
+    The signature requirements for ``func`` are:
 
 ::
 
@@ -399,7 +399,7 @@ using ALL the supplied |nbsp| locators.
 
 The arguments of ``func`` are:
 
-* one or two location objects,
+* one or two location objects (see below),
 
 * a function (Callable) object which operates on ``signal`` **at** the given location ``loc`` **or between** locations ``loc0`` and ``loc1``.
 
@@ -421,19 +421,20 @@ See ephys.signal_* family of functions for example of suitable functions.
 
     A *location* is an object with one of the following types ('locator' types):
 
-    * ``SignalCursor``
-
-    * ``DataCursor`` This is an abstraction of a vertical or horizontal SignalCursor, which stores only the cursor's coordinates, NOT its type. |nbsp|
-        Useful when no SignalViewer axes are available.
+    * ``neo.Epoch``
 
     * ``DataZone``
 
     * ``Interval``
 
-    * ``neo.Epoch``
+    * ``DataCursor`` This is an abstraction of a vertical or horizontal SignalCursor, which stores only the cursor's coordinates, NOT its type. |nbsp|
+        Useful when no SignalViewer axes are available.
 
-    * A ``collections.abc.Sequence[typing.Union[SignalCursor, DataCursor, neo.Epoch, DataZone, Interval]]`` |nbsp|
-    e.g., a ``tuple`` or ``list`` of any of the above, and *homogeneous* in the type of its elements.
+    * ``SignalCursor``
+
+    * A ``collections.abc.Sequence`` (e.g., a ``tuple`` or ``list``) containing
+        any of the above types. The collection must be *homogeneous* i.e., all
+        its elements must be objects of the same type.
 
     * A functor generating a *locator* object as above; this includes DeferredSignalMeasure objects or
         sequence of DeferredSignalMeasure objects, with the precondition that each
@@ -801,6 +802,19 @@ Changelog:
 
     use_cache: bool = False # needs more work!
 
+    @property
+    def nLocations(self) -> int:
+        r"""Return how many locations were used at initialization.
+
+Useful when calling self.withLocation.
+    """
+        if self.locations is None:
+            return 0
+
+        if isinstance(self.locations, typing.Sequence):
+            return len(self.locations)
+
+        return 1
 
     def __post_init__(self) -> None:
         self.placeholder = re.compile(r'<[0-9]*?>')
@@ -1272,8 +1286,27 @@ Any aditional named or keyword parameters to be passed to `func`.
         return result
 
     def withLocation(self, loc) -> typing.Self:
+        r"""Creates a copy of this object with new location(s).
+
+:loc:
+    A location or sequence of location objects.
+
+    """
+        # NOTE: 2026-05-30 15:57:53
+        # disallow changing the number of locations, unless the current locations
+        # is None, or an empty sequence
+        #
+        # In any case, must make sure that the number of locations is what
+        # ``self.func`` expects
         ret = deepcopy(self)
-        ret.locations = loc
+        if isinstance(loc, typing.Sequence):
+            if self.locations is not None and len(loc) != self.nLocations:
+                raise ValueError(f"The {self.__class__.__name__}[{self.name}] object requires {self.nLocations} locations but {len(loc)} were supplied")
+            ret.locations = loc
+        else:
+            if isinstance(self.locations, typing.Sequence) and self.nLocations != 0:
+                raise ValueError(f"The {self.__class__.__name__}[{self.name}] object requires a sequence of {self.nLocations} locations but only one location was supplied")
+            ret.locations = loc
         return ret
 
     def toSignalCursors(self, viewer = None):
