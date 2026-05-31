@@ -2418,7 +2418,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             return
 
         if clear:
-            self._clear_curves_overlay_(axis)
+            self._clear_curves_overlay_(axis, self.frameIndex[self.currentFrame], False)
 
         dataPlotItems = list(filter(lambda i: (isinstance(i, pg.PlotDataItem)
                                                and i not in entities_list),
@@ -2451,20 +2451,31 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         for i in items:
             axis.removeItem(i)
 
-    def _clear_curves_overlay_(self, axis):
+    def _clear_curves_overlay_(self, axis, frameNdx: int = None,
+                               removeOverlaysFromCache: bool = False):
+        r"""Removed overlaid curves from the specified axis in the specified frame.
+    Optionally also removes the curve overlays from the internal cache
+    """
         axis, axNdx = self._check_axis_spec_ndx_(axis)
-
-        cFrame = self.frameIndex[self.currentFrame]
+        if not isinstance(frameNdx, int) or (frameNdx < 0 or frameNdx >= self.nFrames):
+            cFrame = self.frameIndex[self.currentFrame]
+        else:
+            cFrame = frameNdx
 
         if cFrame not in self._curve_overlays_ or axNdx not in self._curve_overlays_[cFrame]:
             return
 
         items = list(filter(lambda i: (isinstance(i, pg.PlotDataItem) and
-                                       i in self._curve_overlays_[cFrame]),
+                                       i in self._curve_overlays_[cFrame][axNdx]),
                             axis.items))
 
         for i in items:
             axis.removeItem(i)
+
+        if removeOverlaysFromCache:
+            if len(self._curve_overlays_[cFrame][axNdx]):
+                self._curve_overlays_[cFrame][axNdx].clear()
+                self._curve_overlays_[cFrame].pop(axNdx, None)
 
     def _clear_labels_overlay_(self, axis):
         axis, axNdx = self._check_axis_spec_ndx_(axis)
@@ -2661,40 +2672,92 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         super().showEvent(evt)
         evt.accept()
 
-    def overlayCurves(self, *args, axis:typing.Optional[
-                                        typing.Union[int, pg.PlotItem]
-                                        ]=None,
-                     clear:bool=False, **kwargs):
+    def addCurvesOverlay(self, frameNdx: int,  curves: tuple,
+                        axis:typing.Optional[
+                                                typing.Union[int, pg.PlotItem]
+                                            ]=None,
+                        clear:bool=False, **kwargs):
+        r"""Adds curve overlay without plotting"""
+        if frameNdx < 0 or frameNdx >= self.nFrames:
+            scipywarn(f"{self.__class__.__name__}.addCurvesOverlay: Invalid frame index {frameNdx}")
+            return
         axis, axNdx = self._check_axis_spec_ndx_(axis)
 
         curveItems = list()
 
-        for kc, item in enumerate(args):
-            # print(f"overlayTargets target {kc} is a {type(coords)}")
-            if isinstance(item, pg.PlotDataItem):
-                curveItems.append(item)
+        if isinstance(curves, (neo.AnalogSignal, neo.IrregularlySampledSignal,
+                                   DataSignal, IrregularlySampledDataSignal)):
+            for ch in range(curves.shape[1]):
+                curveItems.append(self._make_overlay_plotitem(curves[:,ch], **kwargs))
 
-            elif isinstance(item, (neo.AnalogSignal, neo.IrregularlySampledSignal,
-                                   DataSignal, IrregularlySampledDataSignal)
-                            ):
-                for ch in range(item.shape[1]):
-                    curveItems.append(self._make_overlay_plotitem(item[:,ch], **kwargs))
+        elif isinstance(curves, pg.PlotDataItem):
+            curveItems.append(curves)
+
+        elif isinstance(curve, typing.Sequence):
+            if len(curves) == 0:
+                scipywarn(f"{self.__class__.__name__}.addCurvesOverlay: no curves to overlay!")
+                return
+
+            for kc, item in enumerate(curves):
+                # print(f"overlayTargets target {kc} is a {type(coords)}")
+                if isinstance(item, pg.PlotDataItem):
+                    curveItems.append(item)
+
+                elif isinstance(item, (neo.AnalogSignal, neo.IrregularlySampledSignal,
+                                        DataSignal, IrregularlySampledDataSignal)
+                                ):
+                    for ch in range(item.shape[1]):
+                        curveItems.append(self._make_overlay_plotitem(item[:,ch], **kwargs))
+
+        else:
+            scipywarn(f"{self.__class__.__name__}.addCurvesOverlay: no curves to overlay!")
+            return
+
+        print(f"{self.__class__.__name__}.addCurvesOverlay: curveItems = {curveItems}")
+
+        if frameNdx not in self._curve_overlays_:
+            self._curve_overlays_[frameNdx] = dict()
+        elif clear:
+            self._clear_curves_overlay_(axNdx, frameNdx, True)
+
+        if axNdx in self._curve_overlays_[frameNdx] and isinstance(self._curve_overlays_[frameNdx][axNdx], list):
+            self._curve_overlays_[frameNdx][axNdx].extend(curveItems)
+        else:
+            self._curve_overlays_[frameNdx][axNdx] = curveItems
+
+    def overlayCurves(self, curves: tuple, axis:typing.Optional[
+                                        typing.Union[int, pg.PlotItem]
+                                        ]=None,
+                     clear:bool=False, **kwargs):
+        r"""Plots curve overlays to the currently displayed frame"""
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+
+        # curveItems = list()
+        #
+        # for kc, item in enumerate(args):
+        #     # print(f"overlayTargets target {kc} is a {type(coords)}")
+        #     if isinstance(item, pg.PlotDataItem):
+        #         curveItems.append(item)
+        #
+        #     elif isinstance(item, (neo.AnalogSignal, neo.IrregularlySampledSignal,
+        #                            DataSignal, IrregularlySampledDataSignal)
+        #                     ):
+        #         for ch in range(item.shape[1]):
+        #             curveItems.append(self._make_overlay_plotitem(item[:,ch], **kwargs))
 
         # targetItems = [self._make_targetItem(coords, **kwargs) for coords in args]
 
         cFrame = self.frameIndex[self.currentFrame]
 
-        # NOTE: 2022-12-18 13:30:40
-        # target overlays is a dict mapping frame index to a dict that maps
-        # index of axis in the frame to a sequence of TargetItem objects
+        self.addCurvesOverlay(cFrame, curves, axis=axis, clear=clear)
 
-        if cFrame not in self._curve_overlays_:
-            self._curve_overlays_[cFrame] = dict()
-
-        if axNdx in self._curve_overlays_[cFrame] and isinstance(self._curve_overlays_[cFrame][axNdx], list):
-            self._curve_overlays_[cFrame][axNdx].extend(curveItems)
-        else:
-            self._curve_overlays_[cFrame][axNdx] = curveItems
+        # if cFrame not in self._curve_overlays_:
+        #     self._curve_overlays_[cFrame] = dict()
+        #
+        # if axNdx in self._curve_overlays_[cFrame] and isinstance(self._curve_overlays_[cFrame][axNdx], list):
+        #     self._curve_overlays_[cFrame][axNdx].extend(curveItems)
+        # else:
+        #     self._curve_overlays_[cFrame][axNdx] = curveItems
 
         # print(f"_curve_overlays_ for axis {axNdx} in frame {cFrame}: {len(self._curve_overlays_[cFrame][axNdx])}")
         self._plot_curve_overlays_(self._curve_overlays_[cFrame][axNdx], axis, clear=clear)
@@ -9020,6 +9083,7 @@ Var-keyword parameters ("name=value" pairs):
                     curveItems = self._curve_overlays_[cFrame].get(k, list())
                     if len(curveItems):
                         self._plot_curve_overlays_(curveItems, ax)
+
                 self._clear_targets_overlay_(ax)
                 if cFrame in self._target_overlays_:
                     targetItems = self._target_overlays_[cFrame].get(k, list())
@@ -11569,6 +11633,7 @@ Var-keyword parameters ("name=value" pairs):
         self._clear_lris_()
         for ax in self.axes:
             self.removeTargetsOverlay(ax)
+            self.removeCurveOverlays(ax)
             ax.clear()
             ax.setVisible(False)
 
