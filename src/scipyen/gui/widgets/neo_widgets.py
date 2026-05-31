@@ -142,6 +142,7 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         self.timesLineEdit.setClearButtonEnabled(True)
         self.timesLineEdit.installEventFilter(self)
         self.timesLineEdit.setToolTip("Right click for options")
+        self.timesLineEdit.setWhatsThis("Right click for options")
         self.timesLineEdit.setValidator(NumericStringValidator(self))
 
         self.timesLineEdit.textChanged.connect(self._slot_timesChanged)
@@ -150,17 +151,13 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
     def _update_(self):
         signalBlockers = QtCore.QSignalBlocker(self.timesLineEdit)
         if isinstance(self._times_, np.ndarray):
-            # if not isinstance(self._precision_, int):
-            #     pass
             if dt.is_vector(self._times_) or self._times_.ndim == 0:
                 text = scq.quantity2str(self._times_ * self._units_)
-                # text = ", ".join(list(map(lambda q: scq.quantity2str(q, precision=self._precision_), self._data_.times)))
                 self.timesLineEdit.setText(text)
-                # self.timesLineEdit.setText(strutils.numbers2str(self._times_))
                 self.timesLineEdit.setReadOnly(False)
             else:
                 self.timesLineEdit.setText(f"Array with shape {self._times_.shape}")
-                # self.timesLineEdit.setReadOnly(True)
+
             # NOTE: 2026-03-14 09:21:01
             # when performing the inverse conversion, KEEP IN MIND THE FOLLOWING:
             # by default, strutils.numbers2str():

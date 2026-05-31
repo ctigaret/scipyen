@@ -3611,13 +3611,19 @@ True                epoch_letter ↦ a tuple as above
 
 
     def getDigitalTriggers(self, sweep:int = 0,
-                    dac: typing.Optional[typing.Union[ABFOutputConfiguration, int, str]]=None,
-                    digChannel: typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
-                    byDIGIndex:bool=False,
-                    relativeToRunStart:typing.Optional[bool]=True,
-                    useHoldingTime:bool=False,
-                    # enableEmptyEvent:bool = False,
-                    **kwargs
+                            dac: typing.Optional[
+                                typing.Union[ABFOutputConfiguration, int, str]
+                                ]=None,
+                            digChannel: typing.Optional[
+                                typing.Union[int, typing.Sequence[int]]
+                                ] = None,
+                            byDIGIndex:bool=False,
+                            relativeToRunStart:typing.Optional[
+                                typing.Union[bool, Tribool]
+                                ]=Tribool(True),
+                            useHoldingTime:bool=False,
+                            # enableEmptyEvent:bool = False,
+                            **kwargs
                     ) -> typing.Sequence[TriggerEvent] | TriggerEvent | None:
         r"""Trigger events emitted by the epochs in this DAC.
         The method considers that there is one TriggerEvent for each DIG
@@ -3732,6 +3738,13 @@ True                epoch_letter ↦ a tuple as above
 
 
         """
+        if isinstance(relativeToRunStart, bool):
+            relativeToRunStart = Tribool(relativeToRunStart)
+        elif relativeToRunStart is None:
+            relativeToRunStart = Tribool()
+        elif not isinstance(relativeToRunStart, Tribool):
+            raise TypeError(f"'relativeToRunStart' must be a bool, Tribool, or None; got {type(relativeToRunStart).__name__} instead")
+
         if sweep not in range(self.nSweeps):
             raise ValueError(f"Invalid sweep index {sweep} for {self.nSweeps} sweeps")
 
@@ -3839,11 +3852,22 @@ True                epoch_letter ↦ a tuple as above
         else:
             raise TypeError(f"Expecting digChannel an int or sequence of int; instead got {digChannel}")
 
-        t0 = t1 = self.holdingTime.rescale(pq.s)
-        shift = (0 if not isinstance(relativeToRunStart, bool)
-                 else self.sweepInterval if relativeToRunStart
-                 else self.sweepDuration)
+        # t0 = t1 = self.holdingTime.rescale(pq.s)
+
+        if relativeToRunStart.value is True:
+            shift = self.sweepInterval
+
+        elif relativeToRunStart.value is False:
+            shift = self.sweepDuration
+
+        else:
+            shift = 0
+
+        # print(f"{self.__class__.__name__}.getDigitalTriggers -> shift = {shift}")
+
         shift *= sweep
+        # print(f"{self.__class__.__name__}.getDigitalTriggers -> shift = {shift}")
+
         if useHoldingTime:
             shift += self.holdingTime
 

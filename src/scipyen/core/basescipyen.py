@@ -115,7 +115,7 @@ class BaseScipyenData(ScipyenDataclass):
                 self._file_datetime = getFileCreationDateTime(self.file_origin)
 
 
-class BaseResult(types.SimpleNamespace):
+class BaseResult(types.SimpleNamespace): # TODO 2026-05-31 21:14:33
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

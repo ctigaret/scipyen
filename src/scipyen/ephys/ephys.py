@@ -186,6 +186,7 @@ import quantities as pq
 import neo
 import h5py
 import pandas as pd
+from tribool import Tribool
 # import pyabf
 
 from scipy import optimize
@@ -864,11 +865,6 @@ class RecordingSource():
                             track_order=track_order,
                             entity_cache=entity_cache)
 
-        # h5io.toHDF5(self.pathways, entity, name="pathways", oname="pathways",
-        #                     compression=compression, chunks=chunks,
-        #                     track_order=track_order,
-        #                     entity_cache=entity_cache)
-
         h5io.storeEntityInCache(entity_cache, self, entity)
         return entity
 
@@ -1138,8 +1134,11 @@ class RecordingSource():
             return result[0]
         return result
 
-    def getPathwaysByStimulationType(self, digital:typing.Optional[bool]=None,
-                                     asDict:bool=False) -> typing.Union[tuple, dict[str, tuple]]:
+    def getPathwaysByStimulationType(self, digital: typing.Optional[
+                                                    typing.Union[bool, Tribool]
+                                                    ] = Tribool(),
+                                     asDict:bool=False
+                                     ) -> typing.Union[tuple, dict[str, tuple]]:
         r"""Groups the synaptic pathways in this recording source by their means of activation.
 
         A synaptic pathway is activated by stimulating its synaptic inputs¹ using a
@@ -1201,12 +1200,19 @@ class RecordingSource():
             return tuple(), tuple()
 
         if isinstance(digital, bool):
-            if digital:
-                dac_stim = tuple()
-                dig_stim = tuple(x for x in pathways if x.stimulus.dig)
-            else:
-                dac_stim = tuple()
-                dig_stim = tuple(x for x in pathways if not x.stimulus.dig)
+            digital = Tribool(digital)
+        elif digital is None:
+            digital = Tribool()
+        elif not isinstance(digital, Tribool):
+            raise TypeError(f"'digital' parameters expected to be a Tribool, a bool, or None; instead got {type(digital).__name__}")
+
+
+        if digital.value is True:
+            dac_stim = tuple()
+            dig_stim = tuple(x for x in pathways if x.stimulus.dig)
+        elif digital.value is False:
+            dac_stim = tuple(x for x in pathways if not x.stimulus.dig)
+            dig_stim = tuple()
         else:
             dac_stim, dig_stim = tuple(tuple(x) for x in more_itertools.partition(lambda x: x.stimulus.dig, pathways))
 
@@ -2463,8 +2469,10 @@ class DataListener(QtCore.QObject):
         print(f"{self.__class__.__name__}.slot_filesNew {newItems}")
         pass
 
-class Analysis(BaseScipyenData):
-    r"""TODO Finalize me !!!"""
+class Analysis(BaseScipyenData): # TODO 2026-05-31 21:15:19
+    r"""TODO Finalize me !!!
+    See deferredmeasures !
+"""
     _data_attributes_ = (
         ("measurements", list, list()),     # list of time-varying measurements, by default is empty
                                             # e.g., EPSP amplitude(s), fEPSP slope(s), RS, Rin, DC
