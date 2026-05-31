@@ -25,7 +25,7 @@ Classes defined in other Scipyen modules and imported in this module:
  'CalibrationData',
  'ChannelCalibrationData',
  'DataBag',
- 'ProtocolEditorDialog',
+ 'TriggerProtocolsEditorDialog',
  'ScanData',
  'ScanDataOptions',
  'TriggerDetectDialog',
@@ -92,7 +92,7 @@ import iolib.pictio as pio
 # from gui import icons_rc # as icons_rc
 # from gui import quickdialog as qd
 # from gui.triggerdetectgui import TriggerDetectDialog, TriggerDetectWidget
-# from gui.protocoleditordialog import ProtocolEditorDialog
+# from gui.triggerprotocolseditordialog import TriggerProtocolsEditorDialog
 # from gui import pictgui as pgui
 # from gui.workspacegui import WorkspaceGuiMixin
 # import gui.signalviewer as sv

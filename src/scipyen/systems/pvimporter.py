@@ -54,7 +54,7 @@ from systems.PrairieView import *
 from systems.PrairieView import loadPrairieViewXML
 from gui import quickdialog as qd
 from gui.triggerdetectgui import TriggerDetectDialog, TriggerDetectWidget
-from gui.protocoleditordialog import ProtocolEditorDialog
+from gui.triggerprotocolseditordialog import TriggerProtocolsEditorDialog
 from gui import pictgui as pgui
 from gui.workspacegui import WorkspaceGuiMixin
 import gui.signalviewer as sv
@@ -287,9 +287,9 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
         # created in _slot_startTriggerEventDetectionGui()
         self.eventDetectionDialog = None # when a TriggerDetectDialog, this caches the detection options & events
 
-        self.protocolEditorDialog = ProtocolEditorDialog(title = "Edit Trigger Protocols")
+        self.protocolEditorDialog = TriggerProtocolsEditorDialog(title = "Edit Trigger Protocols")
 
-        # the ProtocolEditorDialog works on a reference to the list of
+        # the TriggerProtocolsEditorDialog works on a reference to the list of
         # TriggerProtocols stored in here.
         self.protocolEditorDialog.triggerProtocols = self.triggerProtocols
         self.protocolEditorDialog.sig_detectTriggers.connect(self._slot_startTriggerEventDetectionGui)

@@ -3254,8 +3254,6 @@ True                epoch_letter ↦ a tuple as above
         else:
             return tuple(map(lambda x: x[0], filter(lambda x: x[1] !=0, enumerate(digPattern))))
 
-
-
     def getEpochDigitalTriggers(self, epoch: typing.Union[ABFEpoch, str, int], /,
                              sweep:int = 0,
                              dac:typing.Optional[typing.Union[ABFOutputConfiguration, int, str]] = None,

@@ -519,7 +519,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
         # TODO: 2022-11-08 08:36:52
         # create an EpochWidget for gui.quickdialog, to edit/generate
         # neo.Epoch with intervals
-        # SUGGEST: use ProtocolEditorDialog as a model of what an
+        # SUGGEST: use TriggerProtocolsEditorDialog as a model of what an
         # EpochEditor may look like:
         # A QListView with Epoch names (thus being able to handle more
         # than one Epoch)
@@ -537,7 +537,7 @@ class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     @Slot()
     def _slot_editTriggers(self):
         # TODO: 2022-11-08 08:36:10
-        # use gui.protocoleditordialog.ProtocolEditorDialog
+        # use gui.triggerprotocolseditordialog.TriggerProtocolsEditorDialog
         # but with the following functions enabled conditionally:
         #
         # trigger detection ↔ is there ephysdata available
