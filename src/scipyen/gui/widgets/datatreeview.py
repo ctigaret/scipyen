@@ -200,38 +200,12 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                 if infoItem:
                     self._setupChildDataItem_(infoItem) #, objData)
 
-        # elif index.column() == 2:
         elif item.column() == 2:
             signalBlocker = QtCore.QSignalBlocker(self.model()) # noqa
             parentItem = item.parent()
             if parentItem:
                 objItem = parentItem.child(item.row(), 0)
                 objType = objItem.data(ObjectTypeRole) # noqa
-            # infoItem = model.itemFromIndex(index)
-            # parentItem = infoItem.parent()
-            # if parentItem:
-            #     objItem = parentItem.child(infoItem.row(), 0)
-            #     objType = objItem.data(ObjectTypeRole) # noqa
-
-            # NOTE: 2026-02-12 14:58:10
-            # inhibit editing for immutable collections - e.g. tuple, for now
-            # parentType = parentItem.data(ObjectTypeRole) # noqa
-            # TODO 2026-02-12 14:59:32 to expand in parentheses as needed
-            # if (
-            #     (
-            #         parentType in (tuple, frozenset)
-            #         or infoItem.data(ReadOnlyRole) is True # noqa
-            #         )
-            #     or self.model().readOnly
-            #     ):
-            #     flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
-            #
-            # else:
-            #     self.setItemDelegateForColumn(index.column(), self._delegate_)
-            #     self.setItemDelegateForRow(index.row(), self._delegate_)
-            #     flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
-            #
-            # infoItem.setFlags(flags)
 
     # @prog.timefunc
     def setData(self: typing.Self, obj: object,
@@ -255,6 +229,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                 if col >=0 and col < 3:
                     self.resizeColumnToContents(col)
 
+            self.proxyModel.setSourceModel(self.sourceModel)
             self.proxyModel.sort(-1)
 
     @property

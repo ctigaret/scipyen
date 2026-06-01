@@ -3468,7 +3468,8 @@ def suggest_rise_fraction_indexes(sig: np.ndarray,
 
     inward = target < ref
 
-    δval = target-ref
+    # δval = target-ref
+    δval = targetval-refval
 
     if inward:
         bottom = refval + δval * maxpc
@@ -3518,7 +3519,7 @@ def rising_phase_fraction_times(sig: typing.Union[neo.AnalogSignal, DataSignal],
                       targetval: np.ndarray | pq.Quantity,
                       minpc: float, maxpc: float, asArray:bool = False) -> tuple | None:
     if not isinstance(sig, (neo.AnalogSignal, DataSignal)):
-        raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal object; instead, ot a {type(sig).__name__}")
+        raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal object; instead, got a {type(sig).__name__}")
 
     ndx = suggest_rise_fraction_indexes(sig, refval, targetval, minpc, maxpc, False)
 

@@ -348,6 +348,15 @@ def is_callable(x):
 
     return ret
 
+def asTribool(x: typing.Optional[typing.Union[bool, Tribool]] = None) -> Tribool:
+    if isinstance(x, bool):
+        return Tribool(x)
+    elif isinstance(x, Tribool):
+        return x
+    else:
+        return Tribool()
+
+
 def is_vector(x):
     r"""Returns True if x is a numpy array encapsulating a vector.
 
