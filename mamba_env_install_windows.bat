@@ -18,7 +18,7 @@ set default_env_path="c:\scipyenv"
 set /P env_path="Enter the full path name of the new environment (no spaces, please, default is: %default_env_path%): "
 if [%env_path%] equ [] set env_path=%default_env_path%
 echo Creating mamba environment %env_path%
-call mamba create --prefix %env_path% --file mambaprojects\win32\scipyenv.yml || goto eof
+call mamba -vvv create --prefix %env_path% --file mambaprojects\win32\scipyenv.yml || goto eof
 rem  call mamba create -n "scipyenv" --file mambaprojects\win32\scipyenv.yml || goto eof
 :activate_env
 echo:

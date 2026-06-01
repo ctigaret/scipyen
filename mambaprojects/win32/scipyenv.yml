@@ -10,7 +10,7 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - python>=3.13
+  - python>=3.12
   - pip
   - sphinx
   - isodate
@@ -32,7 +32,7 @@ dependencies:
   - conda-forge::pywin32
   - conda-forge::jupyter_cms
   - conda-forge::jupyter_qtconsole_colorschemes
-  - conda-forge::biopython
+  # - conda-forge::biopython
   - conda-forge::brainglobe-atlasapi
   - conda-forge::napari
   - conda-forge::brainglobe-napari-io
