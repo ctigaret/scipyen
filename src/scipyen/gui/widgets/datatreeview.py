@@ -148,7 +148,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         if not self.model():
             return
 
-        model = self.model()
+        model = self.sourceModel
+        # model = self.model()
         # index = item.index()
         objData = item.data(ObjectDataRole) # noqa
         objType = item.data(ObjectTypeRole) # noqa
@@ -179,7 +180,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                                                                         choices = list(),
                                                                         inModel = False,
                                                                         parent = self)
-                            if self.model().readOnly or item.data(ReadOnlyRole) is True:
+                            # if self.model().readOnly or item.data(ReadOnlyRole) is True:
+                            if model.readOnly or item.data(ReadOnlyRole) is True:
                                 if hasattr(editorWidget,  "readOnly") and type(editorWidget).readOnly.__name__ == "property":
                                     editorWidget.readOnly = True
                                 elif hasattr(editorWidget, "setReadOnly") and isinstance(type(editorWidget).setReadOnly, (types.FunctionType, types.MethodType)):
@@ -213,6 +215,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         signalBlocker = QtCore.QSignalBlocker(self.model()) #noqa
         # model = self.model()
         self.sourceModel.clear()
+        # self.proxyModel.clear()
         self.sourceModel.setModelData(obj, name)
         root = self.sourceModel.invisibleRootItem()
         if root.hasChildren():
