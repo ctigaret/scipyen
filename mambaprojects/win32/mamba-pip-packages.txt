@@ -1,0 +1,17 @@
+pyqt6 # also install inter alia: pyqt6-qt6, pyqt6-sip
+pyqt6-charts
+pyqt6-webengine
+tribool
+pyabf
+openmath
+openexpressions
+cattrs
+hdf5view
+imreg-dft
+modelspec
+python-magic
+winshell
+entrez-utils
+ncbi-taxonomist
+taxoniq
+nixio
