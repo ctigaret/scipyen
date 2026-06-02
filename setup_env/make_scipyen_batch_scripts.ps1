@@ -33,7 +33,7 @@ $repodir=$p
 $myScipyenLaunchScript=Join-Path -Path $repodir -ChildPath "src\scipyen\scipyen.py"
 $myCondaEnv=$Env:CONDA_PREFIX
 $myAnaconda=$Env:CONDA_PREFIX_1
-# $myActivate=Join-Path -Path $myAnaconda -ChildPath "Scripts\activate.bat"
+$myActivate=Join-Path -Path $myAnaconda -ChildPath "Scripts\activate.bat"
 $program="cmd.exe"
 $setQTAPI=@"
 set QT_API=pyqt6
@@ -42,6 +42,7 @@ set FORCE_QT_API=1
 "@
 
 # $activateArgs1= "$myActivate $myAnaconda"
+# $activateArgs2= "conda activate $myCondaEnv"
 $activateArgs2= "mamba activate $myCondaEnv"
 
 $launchArgs="python -Xfrozen_modules=off $myScipyenLaunchScript"
