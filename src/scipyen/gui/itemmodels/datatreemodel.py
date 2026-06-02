@@ -261,14 +261,14 @@ class DataTreeModel(QtGui.QStandardItemModel):
     def inlineTables(self, val: bool):
         if val != self._inlineTables_:
             self._inlineTables_ = val is True
-            obj = self._modelData_
-            rootTitle = self._rootTitle_
-            predicate = self._predicate_
-            showPrivate = self._showPrivate_
-            hideRoot = self._hideRoot_
-            readOnly = self._readOnly_
-            self.setModelData(obj, rootTitle, predicate, showPrivate,
-                              hideRoot, readOnly)
+            # obj = self._modelData_
+            # rootTitle = self._rootTitle_
+            # predicate = self._predicate_
+            # showPrivate = self._showPrivate_
+            # hideRoot = self._hideRoot_
+            # readOnly = self._readOnly_
+            # self.setModelData(obj, rootTitle, predicate, showPrivate,
+            #                   hideRoot, readOnly)
 
     @property
     def readOnly(self: typing.Self) -> bool:
@@ -2143,9 +2143,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 if path[-1] == self._topObjectItem_.data(QtCore.Qt.DisplayRole):
                     path[-1] = "self._modelData_"
 
-            accessExpr = "".join(list(reversed(path)))
-            # print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> accessExpr = {accessExpr}")
-            return eval(accessExpr)
+                accessExpr = "".join(list(reversed(path)))
+                # print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> accessExpr = {accessExpr}")
+                return eval(accessExpr)
 
         else:
             return leaf.data(ObjectDataRole) # noqa
