@@ -199,12 +199,13 @@ A lot of things copied from there, EXCEPT that it now uses
         """
         self._showMethods_:bool=kwargs.get("showMethods", False)
         self._showPrivateMembers_:bool = kwargs.get("showPrivate", False)
+        self._showIntrospection_: bool = kwargs.get("introspect", False)
         self._showCallables_: bool = kwargs.get("showCallables", False)
         self._showValuesOnly_: bool = kwargs.get("showValuesOnly", True)
         self._useTableEditor_ = useTableEditor
         self._readOnly_ = readOnly is True
         self._alwaysSortRows_: bool = False
-        self._slowInlineTables_: bool = False
+        self._showInlineTables_: bool = False
 
         if inspect.isfunction(predicate):
             if not self._showMethods_:
@@ -324,33 +325,33 @@ A lot of things copied from there, EXCEPT that it now uses
             QtGui.QIcon.fromTheme("resizecol"), "Fit Columns Size to Contents")
         resizeColumnsAction.triggered.connect(self.slot_resizeFitColumns)
 
-        showCallablesAction = self.toolBar.addAction(
+        self.showCallablesAction = self.toolBar.addAction(
             QtGui.QIcon.fromTheme("code-function"), "Show Function and Method Members")
-        showCallablesAction.setCheckable(True)
-        showCallablesAction.setChecked(False)
+        self.showCallablesAction.setCheckable(True)
+        self.showCallablesAction.setChecked(False)
 
-        showCallablesAction.toggled.connect(self.slot_showCallables)
+        self.showCallablesAction.toggled.connect(self.slot_showCallables)
 
-        showValuesOnlyAction = self.toolBar.addAction(
+        self.showValuesOnlyAction = self.toolBar.addAction(
             QtGui.QIcon.fromTheme("object"), "Show Value Objects Only")
-        showValuesOnlyAction.setCheckable(True)
-        showValuesOnlyAction.setChecked(False)
+        self.showValuesOnlyAction.setCheckable(True)
+        self.showValuesOnlyAction.setChecked(False)
 
-        showValuesOnlyAction.toggled.connect(self.slot_showValuesOnly)
+        self.showValuesOnlyAction.toggled.connect(self.slot_showValuesOnly)
 
-        showPrivateMembers = self.toolBar.addAction(
+        self.showPrivateMembersAction = self.toolBar.addAction(
             QtGui.QIcon.fromTheme("view-private"), "Show private members")
-        showPrivateMembers.setCheckable(True)
-        showPrivateMembers.setChecked(False)
+        self.showPrivateMembersAction.setCheckable(True)
+        self.showPrivateMembersAction.setChecked(False)
 
-        showPrivateMembers.toggled.connect(self.slot_showPrivateMembers)
+        self.showPrivateMembersAction.toggled.connect(self.slot_showPrivateMembers)
 
-        showIntrospect = self.toolBar.addAction(
+        self.showIntrospectAction = self.toolBar.addAction(
             QtGui.QIcon.fromTheme("view-list-details"), "Introspect")
-        showIntrospect.setCheckable(True)
-        showIntrospect.setChecked(False)
+        self.showIntrospectAction.setCheckable(True)
+        self.showIntrospectAction.setChecked(False)
 
-        showIntrospect.toggled.connect(self.slot_showIntrospect)
+        self.showIntrospectAction.toggled.connect(self.slot_showIntrospect)
 
         self.goFirst = self.toolBar.addAction(QtGui.QIcon.fromTheme("go-first-symbolic"), "First view")
         self.goFirst.triggered.connect(self.slot_goFirst)
@@ -560,23 +561,26 @@ A lot of things copied from there, EXCEPT that it now uses
     @Slot(bool)
     @safewrapper
     def slot_showValuesOnly(self, value: bool):
-        self.model.showValuesOnly = value is True
-        self.slot_refreshDataDisplay()
+        self.showValuesOnly = value is True
 
     @Slot(bool)
     def slot_showPrivateMembers(self, value: bool):
-        self.model.showPrivateMembers = value is True
-        self.slot_refreshDataDisplay()
+        self.showPrivateMembers = value is True
+        # self.model.showPrivateMembers = value is True
+        # self.slot_refreshDataDisplay()
 
     @Slot(bool)
     def slot_showIntrospect(self, value: bool):
-        self.model.showIntrospection = value is True
-        self.slot_refreshDataDisplay()
+        self.showIntrospection = value is True
+        # self.model.showIntrospection = value is True
+        # self.slot_refreshDataDisplay()
 
     @Slot(bool)
     @safewrapper
     def slot_setInlineTables(self, value: bool):
         self.showInlineTables = value is True
+        # self.model.inlineTables = value is True
+        # self.slot_refreshDataDisplay()
 
     # @Slot(bool)
     # def slot_alwaysSortRows(self, val: bool):
@@ -861,9 +865,13 @@ A lot of things copied from there, EXCEPT that it now uses
             self.update_title(doc_title = name, win_title=self._winTitle_)
             what = {"data": obj, "predicate": self.predicate,
                     "root_title": name,
-                    "showPrivate": self._showPrivateMembers_,
-                    "dataTypeStr": type(obj).__name__,
-                    "readOnly": self.readOnly}
+                    "readOnly": self.readOnly,
+                    "showPrivate": self.showPrivateMembers,
+                    "valuesOnly": self.showValuesOnly,
+                    "inlineTables": self.showInlineTables,
+                    "introspect": self.showIntrospection,
+                    # "dataTypeStr": type(obj).__name__,
+                    }
             self._sig_setTreeViewData_.emit(what)
 
     @Slot()
@@ -977,11 +985,12 @@ A lot of things copied from there, EXCEPT that it now uses
     def showInlineTables(self, val: bool):
         self._showInlineTables_ = val is True
         sigBlock = QtCore.QSignalBlocker(self.inlineTablesAction)
-        self.inlineTablesAction.setChecked(self._slowInlineTables_)
-        if val != self.model.inlineTables:
+        self.inlineTablesAction.setChecked(self._showInlineTables_)
+        if self._data_ is not None and val != self.model.inlineTables:
             self.model.inlineTables = self._showInlineTables_
-            self.showInlineTables = self._showInlineTables_
             self.slot_refreshDataDisplay()
+            # self.slot_setInlineTables(self._showInlineTables_)
+            # self.showInlineTables = self._showInlineTables_
 
     @property
     def initialExpandDepth(self) -> int:
@@ -1032,6 +1041,34 @@ A lot of things copied from there, EXCEPT that it now uses
         self._readOnly_ = val is True
 
     @property
+    def showPrivateMembers(self) -> bool:
+        return self._showPrivateMembers_
+
+    @markConfigurable("ShowPrivateMembers", "Qt", trait_notifier = True)
+    @showPrivateMembers.setter
+    def showPrivateMembers(self, value: bool):
+        self._showPrivateMembers_ = value is True
+        if self.model.showPrivateMembers != self._showPrivateMembers_:
+            self.model.showPrivateMembers = self._showPrivateMembers_
+            self.slot_refreshDataDisplay()
+        signalBlockers = QtCore.QSignalBlocker(self.showPrivateMembersAction)
+        self.showPrivateMembersAction.setChecked(self._showPrivateMembers_)
+
+    @property
+    def showIntrospection(self) -> bool:
+        return self._showIntrospection_
+
+    @markConfigurable("IntrospectObjects", "Qt", trait_notifier = True)
+    @showIntrospection.setter
+    def showIntrospection(self, value: bool):
+        self._showIntrospection_ = value is True
+        if self.model.showIntrospection != self._showIntrospection_:
+            self.model.showIntrospection = self._showIntrospection_
+            self.slot_refreshDataDisplay()
+        signalBlockers = QtCore.QSignalBlocker(self.showIntrospectAction)
+        self.showIntrospectAction.setChecked(self._showIntrospection_)
+
+    @property
     def showValuesOnly(self) -> bool:
         return self._showValuesOnly_
 
@@ -1039,15 +1076,14 @@ A lot of things copied from there, EXCEPT that it now uses
     @showValuesOnly.setter
     def showValuesOnly(self, val: bool):
         self._showValuesOnly_ = val is True
-        showValuesOnlyAction = list(filter(lambda c: isinstance(c, QtGui.QAction) and c.text() == "Show Value Objects Only",
-                                          self.toolBar.children()))
-        if len(showValuesOnlyAction):
-            showValuesOnlyAction = showValuesOnlyAction[0]
-            signalBlockers = QtCore.QSignalBlocker(showValuesOnlyAction)
-            showValuesOnlyAction.setChecked(self._showValuesOnly_)
+        if self.model.showValuesOnly != self._showValuesOnly_:
+            self.model.showValuesOnly = value is True
+            self.slot_refreshDataDisplay()
+        signalBlockers = QtCore.QSignalBlocker(self.showValuesOnlyAction)
+        self.showValuesOnlyAction.setChecked(self._showValuesOnly_)
 
-        if self._data_ is not None:
-            self.slot_showValuesOnly(self._showValuesOnly_)
+        # if self._data_ is not None:
+        #     self.slot_showValuesOnly(self._showValuesOnly_)
 
 
     @property
@@ -1058,13 +1094,15 @@ A lot of things copied from there, EXCEPT that it now uses
     @showCallables.setter
     def showCallables(self, value: bool):
         self._showCallables_ = value is True
+        signalBlockers = QtCore.QSignalBlocker(self.showCallablesAction)
+        self.showCallablesAction.setChecked(self._showCallables_)
 
-        showCallablesAction = list(filter(lambda c: isinstance(c, QtGui.QAction) and c.text() == "Show Functions and Methods",
-                                          self.toolBar.children()))
-        if len(showCallablesAction):
-            showCallablesAction = showCallablesAction[0]
-            signalBlockers = QtCore.QSignalBlocker(showCallablesAction)
-            showCallablesAction.setChecked(self._showCallables_)
+        # showCallablesAction = list(filter(lambda c: isinstance(c, QtGui.QAction) and c.text() == "Show Functions and Methods",
+        #                                   self.toolBar.children()))
+        # if len(showCallablesAction):
+        #     showCallablesAction = showCallablesAction[0]
+        #     signalBlockers = QtCore.QSignalBlocker(showCallablesAction)
+        #     showCallablesAction.setChecked(self._showCallables_)
 
         if self._data_ is not None:
             self.slot_showCallables(self._showCallables_)

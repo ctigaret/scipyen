@@ -135,7 +135,6 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     def _setupChildDataItem_(self: typing.Self, item: QtGui.QStandardItem): #,
                              # objData: typing.Optional[typing.Any] = None):
         r"""Sets up the editor widgets for the items in the tree model.
-    * if the
 
     """
         # NOTE: 2026-02-09 21:41:40
@@ -154,7 +153,6 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         objData = item.data(ObjectDataRole) # noqa
         objType = item.data(ObjectTypeRole) # noqa
 
-        # if index.column() == 0 and item.hasChildren():
         if item.column() == 0 and item.hasChildren():
             for row in range(item.rowCount()):
                 childItem = item.child(row, 0)
@@ -165,7 +163,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
                         # NOTE: 2026-04-01 11:03:24
                         # this sets the child in row 0 to span all columns
-                        self.setFirstColumnSpanned(0, item.index(), True)
+                        self.setFirstColumnSpanned(0, self.proxyModel.mapFromSource(item.index()), True)
+                        # self.setFirstColumnSpanned(0, item.index(), True)
 
                         # self.setItemDelegateForColumn(childItem.column(), self._delegate_)
                         # self.setItemDelegateForRow(childItem.row(), self._delegate_)
@@ -176,6 +175,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                         #
 
                         if hasattr(model, "_inlineTables_") and model._inlineTables_:
+                            # print(f"{self.__class__.__name__}._setupChildDataItem_ for _inlineTables_")
                             editorWidget = self._delegate_.createWidget(objData,
                                                                         choices = list(),
                                                                         inModel = False,
@@ -186,13 +186,10 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                                     editorWidget.readOnly = True
                                 elif hasattr(editorWidget, "setReadOnly") and isinstance(type(editorWidget).setReadOnly, (types.FunctionType, types.MethodType)):
                                     editorWidget.setReadOnly(True)
-                            self.setIndexWidget(childItem.index(), editorWidget)
 
-                        # # self.setIndexWidget(item.child(0).index(), editorWidget)
-                        # # self.setIndexWidget(childIndex, editorWidget)
-                        # # childItem.setFlags(flags)
-                        # # item.child(0).setFlags(flags)
-                        #
+                            self.setIndexWidget(self.proxyModel.mapFromSource(childItem.index()), editorWidget)
+                            # self.setIndexWidget(childItem.index(), editorWidget)
+
                         # ### END   2026-04-01 10:52:25 Too slow, but working; DO NOT DELETE
 
                         continue
@@ -211,11 +208,20 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
     # @prog.timefunc
     def setData(self: typing.Self, obj: object,
-                name: typing.Optional[str] = None):
+                name: typing.Optional[str] = None,
+                showPrivate: bool = False,
+                valuesOnly: bool = True,
+                inlineTables: bool = False,
+                introspect: bool = False):
         signalBlocker = QtCore.QSignalBlocker(self.model()) #noqa
         # model = self.model()
         self.sourceModel.clear()
         # self.proxyModel.clear()
+        self.sourceModel.inlineTables = inlineTables
+        self.sourceModel.showValuesOnly = valuesOnly
+        self.sourceModel.showPrivateMembers = showPrivate
+        self.sourceModel.showIntrospection = introspect
+
         self.sourceModel.setModelData(obj, name)
         root = self.sourceModel.invisibleRootItem()
         if root.hasChildren():
@@ -228,20 +234,25 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                 self.collapseAll()
             else:
                 self.expandToDepth(self.initialExpandDepth)
+
             for col in self.autoResizeColumns:
                 if col >=0 and col < 3:
                     self.resizeColumnToContents(col)
 
+            # self.proxyModel.setDynamicSortFilter(False)
             self.proxyModel.setSourceModel(self.sourceModel)
             self.proxyModel.sort(-1)
+            # self.proxyModel.setDynamicSortFilter(True)
 
     @property
     def hasData(self) -> bool:
-        return self.model()._modelData_ is not None
+        return self.sourceModel._modelData_ is not None
+        # return self.model()._modelData_ is not None
 
     @property
     def data(self) -> object:
-        return self.model()._modelData_
+        return self.sourceModel._modelData_
+        # return self.model()._modelData_
 
     # @property
     # def alwaysSortRows(self) -> bool:
@@ -263,7 +274,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     @readOnly.setter
     def readOnly(self: typing.Self, val: bool):
         self._readOnly_ = val is True
-        self.model().readonly = self._readOnly_
+        # self.model().readonly = self._readOnly_
+        self.sourceModel.readonly = self._readOnly_
         # TODO: 2026-02-09 12:50:43
         # set all editors in column 1 to readOnly
         # set all delegates in column 2 to readOnly
@@ -388,7 +400,12 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         data = what.get("data", None)
         root_title = what.get("root_title", "")
         self.readOnly = what.get("readOnly", False)
-        self.setData(data, root_title)
+        showPrivate = what.get("showPrivate", False)
+        valuesOnly = what.get("valuesOnly", True)
+        inlineTables = what.get("inlineTables", False)
+        introspect = what.get("introspect", False)
+
+        self.setData(data, root_title, showPrivate, valuesOnly, inlineTables, introspect)
 
     def clear(self: typing.Self):
         self.sourceModel.clear()
