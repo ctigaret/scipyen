@@ -42,7 +42,7 @@ set FORCE_QT_API=1
 "@
 
 # $activateArgs1= "$myActivate $myAnaconda"
-$activateArgs2= "conda activate $myCondaEnv"
+$activateArgs2= "mamba activate $myCondaEnv"
 
 $launchArgs="python -Xfrozen_modules=off $myScipyenLaunchScript"
 
