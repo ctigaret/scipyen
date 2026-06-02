@@ -9,30 +9,25 @@ $myWindowsPrincipal=new-object System.Security.Principal.WindowsPrincipal($myWin
 # Get the security principal for the Administrator role
 $adminRole=[System.Security.Principal.WindowsBuiltInRole]::Administrator
 
-# if ($myWindowsPrincipal.IsInRole($adminRole))
-# {
-#     $desktop=$shell.SpecialFolders.Item("AllUsersDesktop")
-#     $wdir=$shell.SpecialFolders.Item("AllUsersDesktop")
-# }
-# else
-# {
-#     $desktop=$shell.SpecialFolders.Item("Desktop")
-#     $wdir=Join-Path -Path $Home -ChildPath "Documents"
-# }
-
-$srcdir=Split-Path -Path $MyInvocation.InvocationName -Parent
+$topdir=Split-Path -Path $MyInvocation.InvocationName -Parent
+$srcdir=Split-Path -Path $topdir -Parent
+echo $srcdir
 $myDrive=Split-Path -Path $MyInvocation.InvocationName -Qualifier
+echo $myDrive
 # find out where is this repository located
-$p=$srcdir
-while ( !(Test-Path -Path (Join-Path -Path $p -ChildPath ".git")))
-{
-    $p = Split-Path -Path $p
-}
-$repodir=$p
+# $p=$srcdir
+#while ( !(Test-Path -Path (Join-Path -Path $p -ChildPath ".git")))
+# {
+#     $p = Split-Path -Path $p
+# }
+# $repodir=$srcdir
 
-$myScipyenLaunchScript=Join-Path -Path $repodir -ChildPath "src\scipyen\scipyen.py"
+$myScipyenLaunchScript=Join-Path -Path $srcdir -ChildPath "src\scipyen\scipyen.py"
+echo $Env
 $myCondaEnv=$Env:CONDA_PREFIX
-$myAnaconda=$Env:CONDA_PREFIX_1
+echo $myCondaEnv
+$myAnaconda="c:\ProgramData\miniforge3"
+echo $myAnaconda
 $myActivate=Join-Path -Path $myAnaconda -ChildPath "Scripts\activate.bat"
 $program="cmd.exe"
 $setQTAPI=@"
