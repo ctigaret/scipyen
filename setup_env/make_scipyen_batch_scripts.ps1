@@ -26,9 +26,10 @@ $myScipyenLaunchScript=Join-Path -Path $srcdir -ChildPath "src\scipyen\scipyen.p
 echo $Env
 $myCondaEnv=$Env:CONDA_PREFIX
 echo $myCondaEnv
-$myAnaconda="c:\ProgramData\miniforge3"
-echo $myAnaconda
-$myActivate=Join-Path -Path $myAnaconda -ChildPath "Scripts\activate.bat"
+# NO NEED for these, just make sure you have called conda init from Miniforge prompt right after having installed miniforge3
+# $myAnaconda="c:\ProgramData\miniforge3"
+# echo $myAnaconda
+# $myActivate=Join-Path -Path $myAnaconda -ChildPath "Scripts\activate.bat"
 $program="cmd.exe"
 $setQTAPI=@"
 set QT_API=pyqt6

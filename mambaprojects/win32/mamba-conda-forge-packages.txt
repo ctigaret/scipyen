@@ -1,4 +1,6 @@
-uv
+pyqt6
+pyqt6-charts
+pyqt6-webengine
 confuse
 sphinx # also installs inter alia (+): pygments, colorama, docutils, markupsafe
 isodate

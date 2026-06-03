@@ -18,7 +18,7 @@ set default_env_path="c:\scipyenv"
 set /P env_path="Enter the full path name of the new environment (no spaces, please, default is: %default_env_path%): "
 if [%env_path%] equ [] set env_path=%default_env_path%
 echo Creating mamba environment %env_path%
-call mamba -vvv create --prefix %env_path% --file mambaprojects\win32\scipyenv.yml || goto eof
+call mamba -vvv create --use-uv --prefix %env_path% --file mambaprojects\win32\scipyenv.yml || goto eof
 rem  call mamba create -n "scipyenv" --file mambaprojects\win32\scipyenv.yml || goto eof
 :activate_env
 echo:
@@ -28,7 +28,7 @@ call mamba activate %env_path% || goto eof
 echo Installing pip packages
 call uv pip install -r mambaprojects\win32\mamba-pip-packages.txt || goto eof
 echo Installing conda-forge packages
-call mamba -vvv install --yes --use-uv --file mambaprojects\win32\mamba-conda-forge-packages.txt | goto eof
+call mamba -vvv install --yes --use-uv --file mambaprojects\win32\mamba-conda-forge-packages.txt || goto eof
 
 REM manually (follow commented lines in mambaprojects\win32\scipyenv.yml)
 REM goto eof
