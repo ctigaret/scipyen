@@ -4,7 +4,7 @@ CHANGELOG:
 
 use minforge to create an environment for your OWN use
 
-Before using Scipyen you musy create a virtual environmment, following the steps below:
+Before using Scipyen you must create a virtual environmment, following the steps below:
 
 0. install github cli, authorise youself with scipyen's github, then choose a suitable location (e.g. c: drive)
 you will need ~ 5-8 GiB free disk space to contain the environment, then clone the scipyen repository.
@@ -53,7 +53,7 @@ mamba activate scipyenv
 set JUPYTER_RUNTIME_DIR=%USERPROFILE%\.local\share\jupyter
 
 5.1 also do this permanently in Windows setings dialog (by hand ⌢ )
-    -> restart the shell the run the following commands to confirm that Qtconsole works
+    -> restart the shell then run the following commands to confirm that Qtconsole works
 
     activate scipyenv
 
