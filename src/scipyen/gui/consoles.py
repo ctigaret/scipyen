@@ -322,24 +322,28 @@ class ScipyenInProcessKernelClient(QtInProcessKernelClient):
         inherited from jupyter_core.utils.run_sync that crept up in / around
         jupyter_core 5.8.1
         """
-        kernel = self.kernel
-        if kernel is None:
-            msg = "Cannot send request. No kernel exists."
-            raise RuntimeError(msg)
+        try:
+            super()._dispatch_to_kernel(msg)
+        except:
+            traceback.print_exc()
+            kernel = self.kernel
+            if kernel is None:
+                msg = "Cannot send request. No kernel exists."
+                raise RuntimeError(msg)
 
-        stream = kernel.shell_stream
-        self.session.send(stream, msg)
-        msg_parts = stream.recv_multipart()
-        # if run_sync is not None:
-        #     dispatch_shell = run_sync(kernel.dispatch_shell)
-        #     dispatch_shell(msg_parts)
-        # else:
-        #     loop = asyncio.get_event_loop()  # type:ignore[unreachable]
-        #     loop.run_until_complete(kernel.dispatch_shell(msg_parts))
-        loop = asyncio.get_event_loop()  # type:ignore[unreachable]
-        loop.run_until_complete(kernel.dispatch_shell(msg_parts))
-        idents, reply_msg = self.session.recv(stream, copy=False)
-        self.shell_channel.call_handlers_later(reply_msg)
+            stream = kernel.shell_stream
+            self.session.send(stream, msg)
+            msg_parts = stream.recv_multipart()
+            # if run_sync is not None:
+            #     dispatch_shell = run_sync(kernel.dispatch_shell)
+            #     dispatch_shell(msg_parts)
+            # else:
+            #     loop = asyncio.get_event_loop()  # type:ignore[unreachable]
+            #     loop.run_until_complete(kernel.dispatch_shell(msg_parts))
+            loop = asyncio.get_event_loop()  # type:ignore[unreachable]
+            loop.run_until_complete(kernel.dispatch_shell(msg_parts))
+            idents, reply_msg = self.session.recv(stream, copy=False)
+            self.shell_channel.call_handlers_later(reply_msg)
     
 class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     r"""

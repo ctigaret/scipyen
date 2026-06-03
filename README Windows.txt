@@ -211,5 +211,11 @@ nixio
 
 set QT_API=pyqt6
 
-python -Xfrozen_modules_off c:\scipyen\src\scipyen\scipyen.py
+python -Xfrozen_modules=off c:\scipyen\src\scipyen\scipyen.py
+
+8. install Kepler console themes
+
+
+cd c:/scipyen/src/scipyen/gui/scipyen_console_styles/
+uv pip install --no-deps .
 

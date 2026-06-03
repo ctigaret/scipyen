@@ -1504,7 +1504,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             myparent=self
 
         super().__init__(parent)
-        WorkspaceGuiMixin.__init__(self, parent=myparent)
+        WorkspaceGuiMixin.__init__(self, parent=myparent, scipyenWindow=self)
 
         self.__version__ = __verstr__
 
