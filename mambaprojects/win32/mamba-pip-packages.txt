@@ -1,14 +1,19 @@
-# tribool
-# pyabf
-# openmath
-# openexpressions
-# cattrs
-# hdf5view
-# imreg-dft
-# modelspec
-# python-magic
-# winshell
-# entrez-utils
-# ncbi-taxonomist
-# taxoniq
+confuse
+isodate
+drawsvg
+python-magic
+winshell
+tribool
+pyabf
+openmath
+openexpressions
+cattrs
+hdf5view
+imreg-dft
+modelspec
+python-magic
+winshell
+entrez-utils
+ncbi-taxonomist
+taxoniq
 nixio

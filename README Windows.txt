@@ -9,7 +9,7 @@ Before using Scipyen you must create a virtual environmment, following the steps
 0. install github cli, authorise youself with scipyen's github, then choose a suitable location (e.g. c: drive)
 you will need ~ 5-8 GiB free disk space to contain the environment, then clone the scipyen repository.
 
-NOTE: since you;re already reading this I assume you have already perfomred this step
+NOTE: since you're already reading this I assume you have already perfomred this step
 
 You also want to clone the scipyen_plugins repository
 
@@ -20,8 +20,7 @@ other characters than 'a' to 'z', 'A' to 'Z', '0' to '9' and '_' (underscore) or
 
 For example, to install the latest release as of 2026-06-02 12:52:14:
 • go to https://github.com/conda-forge/miniforge/releases/tag/26.3.2-3
-• download the Windows installer
-https://github.com/conda-forge/miniforge/releases/download/26.3.2-3/Miniforge3-26.3.2-3-Windows-x86_64.exe
+• download the Windows installer https://github.com/conda-forge/miniforge/releases/download/26.3.2-3/Miniforge3-26.3.2-3-Windows-x86_64.exe
 • run the installer
 • open the newly created miniforge prompt and run
 
@@ -42,7 +41,7 @@ https://github.com/conda-forge/miniforge/releases/download/26.3.2-3/Miniforge3-2
 
 3. open the command prompt, go to your LOCAL respository (i.e. THIS directory) and run
 
-mamba create -n scipyenv --file mambaprojects\ein32\scipyenv.yml
+mamba create -n scipyenv --file mambaprojects\win32\scipyenv.yml
 
 4. activate the new environment -- AS A RULE OF THUMB ALWAYS CALL activate scipyenv; you ONLY need to call mamba activate sciopyenv if you are NOT running inside a Miniforge prompt
 
@@ -60,25 +59,26 @@ set JUPYTER_RUNTIME_DIR=%USERPROFILE%\.local\share\jupyter
     jupyter qtconsole
 
 
-From here onwards, all commands must be run with scipyen environment activated;
-unfortunately, you will have to execute them manually, inspect the output for any
-errors and BEFORE answering the (Y/n) prompt - this allows you to navigate, and possibly,
-manually solve any issues that arise (if there weren't any, all these packages would have
-been inclued in the ``dependencies`` section of the ``scipyenv.yml`` environment specification
-file above ⌢ ...)
+From here onwards, all commands must be run with scipyen environment activated.
+
+Unfortunately, this means you will have to execute them manually and inspect the
+output for any errors and BEFORE answering the (Y/n) prompt; when necessary, try
+to manually solve any issues that arise (if there weren't any, all these packages
+would have been inclued in the ``dependencies`` section of the ``scipyenv.yml``
+environment specification file above ⌢ ...)
 
 NOTE: Not sure --use-uv is of any use
 
 
-6. generate qtconsole configuration # =>  ~\.jupyte3r\jupyter_qtconsole_config.py
+6. generate qtconsole configuration # =>  ~\.jupyter\jupyter_qtconsole_config.py
 
 jupyter qtconsole --generate-config
 
 7. install additional stuff
 
-7.1 matplotlib -- needs tom be done via pip as conda-forge packages depend on pyside6
+7.1 matplotlib -- needs to be done via pip as the conda-forge packages depend on pyside6 and messes up pyqt6
 
-us pip instal matplotlib
+uv pip instal matplotlib
 
 
 7.2 vigra, also pulls fftw, glpk, hdf5, imath, libboost, openexr, openjph, vs2015_runtime
@@ -97,7 +97,7 @@ mamba install --use-uv treelib
 
 mamba install --use-uv pyxdg
 
-7.10 pytparallel, also pulls tqdm
+7.10 ipyparallel, also pulls tqdm
 mamba install --use-uv ipyparallel
 
 7.11 pywavelets
@@ -122,7 +122,7 @@ mamba install --use-uv cmocean
 mamba install --use-uv pandas
 
 7.18 pandas-flavor, also pulls xarray
-mamba install --use-uv pandas
+mamba install --use-uv pandas-flavor
 
 7.19 pyserial
 mamba install --use-uv pyserial
@@ -137,7 +137,7 @@ mamba install --use-uv pyinstaller
 mamba install --use-uv opencv
 
 7.23 shapely, also pulls geos
-mamba install --use-uv opencv
+mamba install --use-uv shapely
 
 7.24 seaborn, also pulls patsy, statsmodels, and (IF NOT ALREADY PRESENT) scipy, pandas
 mamba install --use-uv seaborn
