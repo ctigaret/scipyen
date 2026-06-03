@@ -1,16 +1,14 @@
-pyqt6-charts
-pyqt6-webengine
-tribool
-pyabf
-openmath
-openexpressions
-cattrs
-hdf5view
-imreg-dft
-modelspec
-python-magic
-winshell
-entrez-utils
-ncbi-taxonomist
-taxoniq
+# tribool
+# pyabf
+# openmath
+# openexpressions
+# cattrs
+# hdf5view
+# imreg-dft
+# modelspec
+# python-magic
+# winshell
+# entrez-utils
+# ncbi-taxonomist
+# taxoniq
 nixio

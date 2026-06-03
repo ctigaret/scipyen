@@ -1,47 +1,45 @@
-pyqt6
-pyqt6-charts
-pyqt6-webengine
-confuse
-sphinx # also installs inter alia (+): pygments, colorama, docutils, markupsafe
-isodate
-cmasher # + qhull, numpy, pillow, pyparsing, colorspacious, contourpy, matplotlib-base
-more-itertools
-docrepr
-markdown
-restructuredtext_lint
-pyxdg
-marko
-jupyter # + pywin32, matplotlib-inline, json5, cpython,
-qtconsole # + pyqt5, pyq5-sip, qtpy, qt-main
-jupyterthemes
-matplotlib # + pyside6, qt6-main
-ipyparallel # + tqdm
-jupyter_qtconsole_colorschemes
-sympy # + mpmath
-python-neo # + quantities
-seaborn # + patsy, scipy, pandas, statsmodels
-cmocean
-pyserial
-termcolor2 # + termcolor
-pandas-flavor # + xarray
-shapely # + geos
-vigra # + fftw, glpk, hdf5, imath, libboost, openexr, openjph, vs2015_runtime
-qimage2ndarray
-pyqtgraph
-opencv # + py-opencv,
-pingouin # + scikit-learn
-scikit-image # + imageio, imagecodecs, tiffile, zip
-scikit-bio # + h5py
-pywavelets
-pynwb
-inflect
-dill
+# # matplotlib # needs pyside6 ?!? + pyside6, qt6-main => NEEDS to be installed via uv pip !!!
+# jupyterthemes
+# jupyter_qtconsole_colorschemes
+# pyqtgraph
+# pyqt6
+# pyqt6-charts
+# pyqt6-webengine
+# confuse
+# sphinx # also installs inter alia (+): pygments, colorama, docutils, markupsafe
+# isodate
+# cmasher # + qhull, numpy, pillow, pyparsing, colorspacious, contourpy, matplotlib-base
+# more-itertools
+# docrepr
+# markdown
+# restructuredtext_lint
+# pyxdg
+# marko
+# ipyparallel # + tqdm
+# sympy # + mpmath
+# python-neo # + quantities
+# seaborn # + patsy, scipy, pandas, statsmodels
+# cmocean
+# pyserial
+# termcolor2 # + termcolor
+# pandas-flavor # + xarray
+# shapely # + geos
+# vigra # + fftw, glpk, hdf5, imath, libboost, openexr, openjph, vs2015_runtime
+# qimage2ndarray
+# opencv # + py-opencv,
+# pingouin # + scikit-learn
+# scikit-image # + imageio, imagecodecs, tiffile, zip
+# scikit-bio # + h5py
+# pywavelets
+# pynwb
+# inflect
+# dill
 researchpy
 pickleshare
-pyinstaller
+# pyinstaller
 libNeuroML
-brainglobe-atlasapi # + CAUTION reinstalls vigra, vtk*, libboost, opencv, pytables (but same versions ?!?)
-brainglobe-napari-io # + napari, bokeh, numba, numpydocs, superqt, vispy CAUTION reinstalls/downgrades ipykernel
-brainglobe-segmentation
-brainrender-napari
-drawsvg
+# drawsvg
+# brainglobe-atlasapi # + CAUTION reinstalls vigra, vtk*, libboost, opencv, pytables (but same versions ?!?)
+# brainglobe-napari-io # + napari, bokeh, numba, numpydocs, superqt, vispy CAUTION reinstalls/downgrades ipykernel
+# brainglobe-segmentation
+# brainrender-napari

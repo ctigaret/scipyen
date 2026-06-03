@@ -5,7 +5,7 @@ rem  # SPDX-License-Identifier: GPL-3.0-or-later
 rem  # SPDX-License-Identifier: LGPL-2.1-or-later
 rem  
 echo This script requires mambaforge installed from https://github.com/conda-forge/miniforge#mambaforge
-echo and must be run from a mamba (Microforge) prompt launched as administrator
+echo and must be run from a mamba (Microforge) prompt
 @echo off
 rem  setlocal enabledelayedexpansion enableextensions
 set mypath=%0
@@ -18,17 +18,19 @@ set default_env_path="c:\scipyenv"
 set /P env_path="Enter the full path name of the new environment (no spaces, please, default is: %default_env_path%): "
 if [%env_path%] equ [] set env_path=%default_env_path%
 echo Creating mamba environment %env_path%
-call mamba -vvv create --use-uv --prefix %env_path% --file mambaprojects\win32\scipyenv.yml || goto eof
+call mamba -vvv create --use-uv --yes --prefix %env_path% --file mambaprojects\win32\scipyenv.yml || goto eof
 rem  call mamba create -n "scipyenv" --file mambaprojects\win32\scipyenv.yml || goto eof
 :activate_env
 echo:
 echo Activating mamba environment %env_path%
 call conda deactivate
 call mamba activate %env_path% || goto eof
-echo Installing pip packages
-call uv pip install -r mambaprojects\win32\mamba-pip-packages.txt || goto eof
+:install_coda_pkg
 echo Installing conda-forge packages
 call mamba -vvv install --yes --use-uv --file mambaprojects\win32\mamba-conda-forge-packages.txt || goto eof
+:install_pip_pkg
+echo Installing pip packages
+call uv pip install -r mambaprojects\win32\mamba-pip-packages.txt || goto eof
 
 REM manually (follow commented lines in mambaprojects\win32\scipyenv.yml)
 REM goto eof

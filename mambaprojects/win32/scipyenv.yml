@@ -10,7 +10,14 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - python>=3.13
+  # - pyside6 # also install inter alia: pyqt6-qt6, pyqt6-sip
+  - pyqt6
+  - pyqt6-charts
+  # - pyqt6-webengine
+  - jupyter # + pywin32, matplotlib-inline, json5, cpython,
+  - qtconsole # + pyqt5, pyq5-sip, qtpy, qt-main
+
+#   - python>=3.13
   # NOTE: 2026-06-01 23:14:42 these work, but install manually after activating the environment then
   # call mamba install uv, ... etc... WILL take a lot of time...
   # - uv
@@ -24,8 +31,6 @@ dependencies:
   # - restructuredtext_lint
   # - pyxdg
   # - marko
-  # - jupyter # + pywin32, matplotlib-inline, json5, cpython,
-  # - qtconsole # + pyqt5, pyq5-sip, qtpy, qt-main
   # - jupyterthemes
 
   # ### BEGIN the following NEEDS uv pip install:
