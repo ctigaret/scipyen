@@ -325,8 +325,8 @@ from . import consoles # noqa
 from . import guiutils # noqa
 from . import scipyenviewer # noqa
 from . import quickdialog as qd # noqa
-# from . import resources_rc #as resources_rc
-# from . import icons_rc
+# from .resources import resources_rc #as resources_rc
+from .resources import icons_rc
 from . import pictgui as pgui # noqa
 from . import xmlviewer as xv # noqa
 from . import textviewer as tv # noqa

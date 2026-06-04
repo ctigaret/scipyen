@@ -261,14 +261,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
     def inlineTables(self, val: bool):
         if val != self._inlineTables_:
             self._inlineTables_ = val is True
-            # obj = self._modelData_
-            # rootTitle = self._rootTitle_
-            # predicate = self._predicate_
-            # showPrivate = self._showPrivate_
-            # hideRoot = self._hideRoot_
-            # readOnly = self._readOnly_
-            # self.setModelData(obj, rootTitle, predicate, showPrivate,
-            #                   hideRoot, readOnly)
 
     @property
     def readOnly(self: typing.Self) -> bool:
