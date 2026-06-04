@@ -241,7 +241,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
             # self.proxyModel.setDynamicSortFilter(False)
             # self.proxyModel.setSourceModel(self.sourceModel)
-            # self.proxyModel.sort(-1)
+            self.proxyModel.sort(-1)
             # self.proxyModel.setDynamicSortFilter(True)
 
     @property
