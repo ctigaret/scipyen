@@ -2884,9 +2884,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @markConfigurable("FileSystemTimeDisplay", "Qt")
     @fileSystemTimeFormat.setter
     def fileSystemTimeFormat(self, val: str) -> None:
-        if isinstance(val, str) and val in ("LongFormat", "ShortFormat", "NarrowFormat"):
+        if isinstance(val, str) and val in ("LongFormat", "ShortFormat", "NarrowFormat", "Fancy Short", "Fancy Narrow"):
             self._fileSystemTimeDisplayFormat_ = val
-            self.fileSystemModel.timeFormat = getattr(QtCore.QLocale.FormatType, self._fileSystemTimeDisplayFormat_)
+            self.fileSystemModel.timeFormat = self._fileSystemTimeDisplayFormat_
+            # if self._fileSystemTimeDisplayFormat_.startswith("Fancy"):
+            #     short = self._fileSystemTimeDisplayFormat_.endswith("Short")
+            #     tFormat = QtCore.QLocale.ShortFormat if short else QtCore.QLocale.LongFormat
+            # self.fileSystemModel.timeFormat = getattr(QtCore.QLocale.FormatType,
+            #                                           self._fileSystemTimeDisplayFormat_)
         else:
             self._fileSystemTimeDisplayFormat_ = "Standard"
             self.fileSystemModel.timeFormat = None
@@ -2895,7 +2900,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @Slot()
     def _slot_setFilesystemTimeDisplayFormat(self):
-        formats = ("LongFormat", "NarrowFormat", "ShortFormat", "Standard")
+        formats = ("LongFormat", "NarrowFormat", "ShortFormat", "Fancy Short", "Fancy Narrow", "Standard")
         dlg = qd.QuickDialog(self, "File Time Display Format", True, False)
         cb = qd.QuickDialogComboBox(dlg, "Format:")
         dlg.addWidget(cb)
@@ -5768,7 +5773,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             ndx for ndx in indexList if ndx not in internal_var_indices]
 
         cm = QtWidgets.QMenu("Selected variables", self)
-        cm.setIcon(QtGui.QIcon.fromTheme("object"))
+        # icon = QtGui.QIcon.fromTheme("object")
+        icon = guiutils.getIcon("object", "object-group")
+        # if icon.isNull():
+        #     themeName = guiutils.autoChooseThemeName()
+        #     icon = QtGui.QIcon(f":/icons/{themeName}/actions/object-group")
+        cm.setIcon(icon)
         cm.setToolTipsVisible(True)
 
         if len(internal_var_indices):
@@ -6377,18 +6387,22 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # menuScripts is now def'ed in the ui file
         # self.menuScripts = QtWidgets.QMenu("Scripts", self)
         # self.menubar.insertMenu(self.menuHelp.menuAction(), self.menuScripts)
-        self.actionScriptRun = QAction(QtGui.QIcon.fromTheme("system-run"), "Run...", self)
+        # self.actionScriptRun = QAction(QtGui.QIcon.fromTheme("system-run"), "Run...", self)
+        self.actionScriptRun = QAction(guiutils.getIcon("system-run"), "Run...", self)
         self.actionScriptRun.triggered.connect(self.slot_runPythonScript)
         self.menuScripts.addAction(self.actionScriptRun)
         self.actionScriptToConsole = QAction(QtGui.QIcon.fromTheme("scriptnew"), "To Console...", self)
+        self.actionScriptToConsole = QAction(guiutils.getIcon("scriptnew"), "To Console...", self)
         self.actionScriptToConsole.triggered.connect(self.slot_pastePythonScript)
         self.menuScripts.addAction(self.actionScriptToConsole)
         self.menuScripts.addSeparator()
         self.recentScriptsMenu = QtWidgets.QMenu("Recent Scripts", self)
-        self.recentScriptsMenu.setIcon(QtGui.QIcon.fromTheme("document-open-recent"))
+        # self.recentScriptsMenu.setIcon(QtGui.QIcon.fromTheme("document-open-recent"))
+        self.recentScriptsMenu.setIcon(guiutils.getIcon("document-open-recent"))
         self.menuScripts.addMenu(self.recentScriptsMenu)
         self.menuScripts.addSeparator()
-        self.actionManageScripts = QAction(QtGui.QIcon.fromTheme("scriptnew"), "Script Manager", self)
+        # self.actionManageScripts = QAction(QtGui.QIcon.fromTheme("scriptnew"), "Script Manager", self)
+        self.actionManageScripts = QAction(guiutils.getIcon("scriptnew"), "Script Manager", self)
         self.actionManageScripts.triggered.connect(self.slot_showScriptsManagerWindow)
         self.menuScripts.addAction(self.actionManageScripts)
         # ### END scripts menu
@@ -6407,7 +6421,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.actionPython_help.triggered.connect(self._slot_PythonHelp)
 
         self.whatsThisAction = QtWidgets.QWhatsThis.createAction(self)
-        self.whatsThisAction.setIcon(QtGui.QIcon.fromTheme("help-whatsthis"))
+        # self.whatsThisAction.setIcon(QtGui.QIcon.fromTheme("help-whatsthis"))
+        self.whatsThisAction.setIcon(guiutils.getIcon("help-whatsthis"))
         self.menuHelp.addSeparator()
         self.menuHelp.addAction(self.whatsThisAction)
         # ### END   Help menu
@@ -6416,13 +6431,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.actionOpen_System_Terminal.triggered.connect(self.slot_openCurrentDirInSystemTerminal)
 
-        self.actionConsole = QAction(QtGui.QIcon.fromTheme("scriptnew"), "Scipyen Console", self)
+        # self.actionConsole = QAction(QtGui.QIcon.fromTheme("scriptnew"), "Scipyen Console", self)
+        self.actionConsole = QAction(guiutils.getIcon("scriptnew"), "Scipyen Console", self)
 
         self.actionConsole.triggered.connect(self.slot_initQtConsole)
         self.menuConsoles.addAction(self.actionConsole)
 
         if not self._pyinstaller_bundled_:
-            self.actionExternalIPython = QAction(QtGui.QIcon.fromTheme("scriptnew"), "External IPython", self)
+            # self.actionExternalIPython = QAction(QtGui.QIcon.fromTheme("scriptnew"), "External IPython", self)
+            self.actionExternalIPython = QAction(guiutils.getIcon("scriptnew"), "External IPython", self)
 
             self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
 
@@ -6430,18 +6447,21 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             if has_neuron:
                 self.actionExternalNrnIPython = QAction(
-                    QtGui.QIcon.fromTheme("scriptnew"), "External IPython for NEURON", self)
+                    # QtGui.QIcon.fromTheme("scriptnew"), "External IPython for NEURON", self)
+                    guiutils.getIcon("scriptnew"), "External IPython for NEURON", self)
                 self.actionExternalNrnIPython.triggered.connect(
                     self.slot_launchExternalNeuronIPython)
                 self.menuConsoles.addAction(self.actionExternalNrnIPython)
 
             self.menuWith_Running_Kernel = QtWidgets.QMenu("With Running Kernel", self)
-            self.menuWith_Running_Kernel.setIcon(QtGui.QIcon.fromTheme("run-build"))
+            # self.menuWith_Running_Kernel.setIcon(QtGui.QIcon.fromTheme("run-build"))
+            self.menuWith_Running_Kernel.setIcon(guiutils.getIcon("run-build"))
 
             self.menuConsoles.addMenu(self.menuWith_Running_Kernel)
 
             self.actionRunning_IPython = QAction(
-                QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel ...", self)
+                # QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel ...", self)
+                guiutils.getIcon("scriptnew"), "Choose kernel ...", self)
 
             self.actionRunning_IPython.triggered.connect(
                 self.slot_launchExternalRunningIPython)
@@ -6450,7 +6470,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             if has_neuron:
                 self.actionRunning_IPython_for_Neuron = QAction(
-                    QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel and launch NEURON", self)
+                    # QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel and launch NEURON", self)
+                    guiutils.getIcon("scriptnew"), "Choose kernel and launch NEURON", self)
 
                 self.actionRunning_IPython_for_Neuron.triggered.connect(
                     self.slot_launchExternalRunningIPythonNeuron)
@@ -6484,7 +6505,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # NOTE: File menu - some actions defined in mainwindow.ui
         self.actionImport_PrairieView_data.triggered.connect(self.slot_importPrairieView)
         self.recentFilesMenu = QtWidgets.QMenu("Open recent...", self)
-        self.recentFilesMenu.setIcon(QtGui.QIcon.fromTheme("document-open-recent"))
+        # self.recentFilesMenu.setIcon(QtGui.QIcon.fromTheme("document-open-recent"))
+        self.recentFilesMenu.setIcon(guiutils.getIcon("document-open-recent"))
         # self.menuFile.insertMenu(self.actionOpen, self.recentFilesMenu)
         self.menuFile.insertMenu(self.menuImport.menuAction(), self.recentFilesMenu)
 
@@ -6493,7 +6515,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.recentDirectoriesMenu = navigator.UrlNavigatorMenu("Recent Working Directories", self)
         self.recentDirectoriesMenu.mouseButtonClicked.connect(self.slot_recentDirActivated)
         # self.recentDirectoriesMenu.setLayoutDirection(QtCore.Qt.LeftToRight)
-        self.recentDirectoriesMenu.setIcon(QtGui.QIcon.fromTheme("folder-open-recent"))
+        # self.recentDirectoriesMenu.setIcon(QtGui.QIcon.fromTheme("folder-open-recent"))
+        self.recentDirectoriesMenu.setIcon(guiutils.getIcon("folder-open-recent"))
         # self.recentDirectoriesMenu.sig_closed.connect(self._slot_recenDirsMenuClosed)
 
         self.menuFile.insertMenu(self.actionReload_Plugins, self.recentDirectoriesMenu)
@@ -6513,10 +6536,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
 
         self.newViewersMenu = QtWidgets.QMenu("New", self)
-        self.newViewersMenu.setIcon(QtGui.QIcon.fromTheme("window-new"))
+        # self.newViewersMenu.setIcon(QtGui.QIcon.fromTheme("window-new"))
+        self.newViewersMenu.setIcon(guiutils.getIcon("window-new"))
         self.newViewersMenu.setTearOffEnabled(True)
         self.newViewersMenu.setToolTipsVisible(True)
-        self.newViewersMenu.addAction(QtGui.QIcon.fromTheme("window"),"Figure", lambda: self.newViewer(mpl.figure.Figure))
+        self.newViewersMenu.addAction(guiutils.getIcon("window"),"Figure", lambda: self.newViewer(mpl.figure.Figure))
+        # self.newViewersMenu.addAction(QtGui.QIcon.fromTheme("window"),"Figure", lambda: self.newViewer(mpl.figure.Figure))
         self.menuViewers.addMenu(self.newViewersMenu)
         #
         # ### END   Menus and actions
@@ -6525,24 +6550,31 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         #
 
         # add new viewers menu as toolbar action, too
-        self.newViewersAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("window-new"), "New Viewer")
+        # self.newViewersAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("window-new"), "New Viewer")
+        self.newViewersAction = self.toolBar.addAction(guiutils.getIcon("window-new"), "New Viewer")
         self.newViewersAction.setMenu(self.newViewersMenu)
-        self.consolesAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("akonadiconsole"), "Consoles")
+        # self.consolesAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("akonadiconsole"), "Consoles")
+        self.consolesAction = self.toolBar.addAction(guiutils.getIcon("akonadiconsole"), "Consoles")
         # this one is defined in the ui file mainwindow.ui
         self.consolesAction.setMenu(self.menuConsoles)
-        self.scriptsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("dialog-scripts"), "Scripts")
+        # self.scriptsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("dialog-scripts"), "Scripts")
+        self.scriptsAction = self.toolBar.addAction(guiutils.getIcon("dialog-scripts"), "Scripts")
         self.scriptsAction.setMenu(self.menuScripts)
-        self.applicationsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("homerun"), "Applications")
+        self.applicationsAction = self.toolBar.addAction(guiutils.getIcon("homerun", "window-list"), "Applications")
+        # self.applicationsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("homerun"), "Applications")
         self.applicationsAction.setMenu(self.menuApplications)
-        self.refreshViewAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
+        self.refreshViewAction = self.toolBar.addAction(guiutils.getIcon("view-refresh"), "Refresh Active View")
+        # self.refreshViewAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
         self.refreshViewAction.triggered.connect(self.slot_refreshView)
         self.actionHide_Filtered_out_File_Names.setChecked(self._fileNamesFiltersHides_)
         self.actionHide_Filtered_out_File_Names.toggled.connect(self._slot_hideFilteredFileNames)
         self.hideFilteredOutnamesToolButton.setChecked(self._fileNamesFiltersHides_)
         self.hideFilteredOutnamesToolButton.toggled.connect(self._slot_hideFilteredFileNames)
-        self.helpTbAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("help-contents"), "Help")
+        self.helpTbAction = self.toolBar.addAction(guiutils.getIcon("help-contents"), "Help")
+        # self.helpTbAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("help-contents"), "Help")
         self.helpTbAction.setMenu(self.menuHelp)
-        self.settingsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("settings-configure"), "Settings")
+        self.settingsAction = self.toolBar.addAction(guiutils.getIcon("settings-configure", "configure"), "Settings")
+        # self.settingsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("settings-configure"), "Settings")
         self.settingsAction.setMenu(self.menuSettings)
         # NOTE: 2024-06-01 18:08:54
         # 'whats this' action should be the last action added to the toolbar
@@ -6590,7 +6622,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.actionUseShellAutomagic.toggled.connect(self._slot_UseShellAutomagic)
 
-        self.lockToolBarAction = QAction(QtGui.QIcon.fromTheme("lock-symbolic"), "Lock Toolbar Positions", self)
+        self.lockToolBarAction = QAction(guiutils.getIcon("lock-symbolic"), "Lock Toolbar Positions", self)
+        # self.lockToolBarAction = QAction(QtGui.QIcon.fromTheme("lock-symbolic"), "Lock Toolbar Positions", self)
         self.lockToolBarAction.setCheckable(True)
         self.lockToolBarAction.setChecked(self._lockedToolBar)
         self.lockToolBarAction.toggled[bool].connect(self._slot_changeToolBarLockedState)
@@ -6712,9 +6745,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.varNameFilterFinderComboBox.lineEdit().undoAvailable = True
         self.varNameFilterFinderComboBox.lineEdit().redoAvailable = True
 
-        self.removeVarNameFromFinderListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
+        self.removeVarNameFromFinderListAction = QAction(guiutils.getIcon("edit-delete"),
                                                                    "Remove item from list",
                                                                    self.varNameFilterFinderComboBox.lineEdit())
+        # self.removeVarNameFromFinderListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
+        #                                                            "Remove item from list",
+        #                                                            self.varNameFilterFinderComboBox.lineEdit())
 
         self.removeVarNameFromFinderListAction.triggered.connect(
             self.slot_removeVarNameFromFinderHistory)
@@ -6772,17 +6808,23 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.fileSystemFilter.lineEdit().setClearButtonEnabled(True)
         self.fileSystemFilter.lineEdit().setPlaceholderText("Enter file name filter...")
 
-        self.removeFileFilterFromListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
+        self.removeFileFilterFromListAction = QAction(guiutils.getIcon("edit-delete"),
                                                                 "Remove this filter from history",
                                                                 self.fileSystemFilter.lineEdit())
+        # self.removeFileFilterFromListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
+        #                                                         "Remove this filter from history",
+        #                                                         self.fileSystemFilter.lineEdit())
 
         self.removeFileFilterFromListAction.setToolTip("Remove this filter from history")
 
         self.removeFileFilterFromListAction.triggered.connect(self.slot_removeFileFilterFromHistory)
 
-        self.clearFileFilterListAction = QAction(QtGui.QIcon.fromTheme("final_activity"),
+        self.clearFileFilterListAction = QAction(guiutils.getIcon("final_activity"),
                                                            "Clear filter list",
                                                            self.fileSystemFilter.lineEdit())
+        # self.clearFileFilterListAction = QAction(QtGui.QIcon.fromTheme("final_activity"),
+        #                                                    "Clear filter list",
+        #                                                    self.fileSystemFilter.lineEdit())
 
         self.clearFileFilterListAction.setToolTip("Clear file filter history")
 
@@ -6851,9 +6893,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.commandHistoryFinderComboBox.lineEdit().undoAvailable = True
         self.commandHistoryFinderComboBox.lineEdit().redoAvailable = True
 
-        self.removeItemFromCommandFinderListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
+        self.removeItemFromCommandFinderListAction = QAction(guiutils.getIcon("edit-delete"),
                                                                        "Remove item from list",
                                                                        self.commandHistoryFinderComboBox.lineEdit())
+        # self.removeItemFromCommandFinderListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
+        #                                                                "Remove item from list",
+        #                                                                self.commandHistoryFinderComboBox.lineEdit())
 
         self.removeItemFromCommandFinderListAction.triggered.connect(
             self.slot_removeItemFromCommandFinderHistory)
@@ -6910,7 +6955,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         # NOTE: 2021-08-17 12:36:49 TODO custom icon ?
         # see also NOTE: 2021-08-17 10:06:24 in scipyen.py
-        icon = QtGui.QIcon.fromTheme("pythonbackend")
+        icon = guiutils.getIcon("pythonbackend")
+        # icon = QtGui.QIcon.fromTheme("pythonbackend")
         # self.setWindowIcon(icon) # this doesn't work? -- next line does
         QtWidgets.QApplication.setWindowIcon(icon)
 
@@ -7359,8 +7405,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         if len(self._recentFiles) > 0:
             if self._maxRecentFiles > 10:
-                clearAction = self.recentFilesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
+                clearAction = self.recentFilesMenu.addAction(guiutils.getIcon("edit-clear-history"),
                     "Clear Recent Files List")
+                # clearAction = self.recentFilesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
+                #     "Clear Recent Files List")
                 clearAction.triggered.connect(self._clearRecentFiles_)
                 self.recentFilesMenu.addSeparator()
 
@@ -7381,8 +7429,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             if self._maxRecentFiles <= 10:
                 self.recentFilesMenu.addSeparator()
-                clearAction = self.recentFilesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
+                clearAction = self.recentFilesMenu.addAction(guiutils.getIcon("edit-clear-history"),
                     "Clear Recent Files List")
+                # clearAction = self.recentFilesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
+                #     "Clear Recent Files List")
                 clearAction.triggered.connect(self._clearRecentFiles_)
 
     if __has_qtdbus__:
@@ -7427,8 +7477,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         if len(self.recentDirectories) > 0:
             if self._maxRecentDirectories > 10:
-                clearDirAction = self.recentDirectoriesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
+                clearDirAction = self.recentDirectoriesMenu.addAction(guiutils.getIcon("edit-clear-history"),
                     "Clear Recent Directories List")
+                # clearDirAction = self.recentDirectoriesMenu.addAction(QtGui.QIcon.fromTheme("edit-clear-history"),
+                #     "Clear Recent Directories List")
                 clearDirAction.triggered.connect(self._clearRecentDirectories_)
                 self.recentDirectoriesMenu.addSeparator()
 
@@ -7647,7 +7699,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     # print(f"\tisDir {info.isDir()}")
                     cm.addSeparator()
                     if info.exists() and info.isDir() and info.isWritable():
-                        createNewFolderAction = cm.addAction(QtGui.QIcon.fromTheme("folder-new"), "Create New Folder")
+                        createNewFolderAction = cm.addAction(guiutils.getIcon("folder-new"), "Create New Folder")
+                        # createNewFolderAction = cm.addAction(QtGui.QIcon.fromTheme("folder-new"), "Create New Folder")
                         createNewFolderAction.triggered.connect(self._slot_createNewFolder)
                         cm.addSeparator()
                         action_0 = createNewFolderAction
@@ -7656,12 +7709,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 if all(i.exists() for i in infos):
                     if len(infos) == 1:
                         if infos[0].isDir():
-                            openIcon = QtGui.QIcon.fromTheme("document-open-folder")
+                            openIcon = guiutils.getIcon("document-open-folder")
+                            # openIcon = QtGui.QIcon.fromTheme("document-open-folder")
                         else:
-                            openIcon = QtGui.QIcon.fromTheme("document-open")
+                            openIcon = guiutils.getIcon("document-open")
+                            # openIcon = QtGui.QIcon.fromTheme("document-open")
 
                     else:
-                        openIcon = QtGui.QIcon.fromTheme("project-open")
+                        openIcon = guiutils.getIcon("project-open")
+                        # openIcon = QtGui.QIcon.fromTheme("project-open")
                     openFileObjects = cm.addAction(openIcon, "Open")
                     openFileObjects.triggered.connect(self.slot_openSelectedFileItems)
 
@@ -7669,45 +7725,55 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     scripts = set([f for f in fileNames if pio.is_python_source(f)])
 
                     if len(fileNames - spreads) == 0:
-                        importAsDataFrame = cm.addAction(QtGui.QIcon.fromTheme("document-open"), "Open as DataFrame")
+                        importAsDataFrame = cm.addAction(guiutils.getIcon("document-open"), "Open as DataFrame")
+                        # importAsDataFrame = cm.addAction(QtGui.QIcon.fromTheme("document-open"), "Open as DataFrame")
                         importAsDataFrame.triggered.connect(self.slot_importDataFrame)
 
                     if len(fileNames - scripts) == 0:
-                        addToScriptManager = cm.addAction(QtGui.QIcon.fromTheme("open-for-editing"), "Add to Script Manager")
+                        addToScriptManager = cm.addAction(guiutils.getIcon("open-for-editing"), "Add to Script Manager")
+                        # addToScriptManager = cm.addAction(QtGui.QIcon.fromTheme("open-for-editing"), "Add to Script Manager")
                         addToScriptManager.triggered.connect(
                             self._slot_cm_AddPythonScriptToManager)
 
-                    fileNamesToConsole = cm.addAction(QtGui.QIcon.fromTheme("text-field-framed"), "Send Name(s) to Console")
+                    fileNamesToConsole = cm.addAction(guiutils.getIcon("text-field-framed"), "Send Name(s) to Console")
+                    # fileNamesToConsole = cm.addAction(QtGui.QIcon.fromTheme("text-field-framed"), "Send Name(s) to Console")
                     fileNamesToConsole.triggered.connect(self._sendFileNamesToConsole_)
 
                     cm.addSeparator()
-                    openFilesInSystemApp = cm.addAction(QtGui.QIcon.fromTheme("application-menu"), "Open With Default Application")
+                    openFilesInSystemApp = cm.addAction(guiutils.getIcon("application-menu"), "Open With Default Application")
+                    # openFilesInSystemApp = cm.addAction(QtGui.QIcon.fromTheme("application-menu"), "Open With Default Application")
                     openFilesInSystemApp.triggered.connect(self.slot_systemOpenSelectedFiles)
 
 
                     if all(i.isWritable() for i in parentInfos):
                         cm.addSeparator()
-                        cutFilesAction = cm.addAction(QtGui.QIcon.fromTheme("edit-cut"),"Cut")
+                        cutFilesAction = cm.addAction(guiutils.getIcon("edit-cut"),"Cut")
+                        # cutFilesAction = cm.addAction(QtGui.QIcon.fromTheme("edit-cut"),"Cut")
                         cutFilesAction.triggered.connect(self._slot_cutFileSystemItems)
 
-                        copyFileItemsAction = cm.addAction(QtGui.QIcon.fromTheme("edit-copy"),"Copy")
+                        copyFileItemsAction = cm.addAction(guiutils.getIcon("edit-copy"),"Copy")
+                        # copyFileItemsAction = cm.addAction(QtGui.QIcon.fromTheme("edit-copy"),"Copy")
                         copyFileItemsAction.triggered.connect(self._slot_copyFileSystemItems)
 
-                        pasteAction = cm.addAction(QtGui.QIcon.fromTheme("edit-paste"), pasteActionName)
+                        pasteAction = cm.addAction(guiutils.getIcon("edit-paste"), pasteActionName)
+                        # pasteAction = cm.addAction(QtGui.QIcon.fromTheme("edit-paste"), pasteActionName)
                         pasteAction.triggered.connect(self._slot_pasteIntoFileSystemDirectory)
                         paste_action = pasteAction
 
                         if len(selectedItems) == 1:
                             cm.addSeparator()
-                            renameAction = cm.addAction(QtGui.QIcon.fromTheme("edit-rename"),"Rename")
+                            renameAction = cm.addAction(guiutils.getIcon("edit-rename"),"Rename")
+                            # renameAction = cm.addAction(QtGui.QIcon.fromTheme("edit-rename"),"Rename")
                             renameAction.triggered.connect(self._slot_renameFileSystemItem)
 
                         cm.addSeparator()
                         if QtCore.QFile.supportsMoveToTrash():
-                            trashAction = cm.addAction(QtGui.QIcon.fromTheme("trash-empty"),"Move To Wastebin")
+                            trashAction = cm.addAction(guiutils.getIcon("trash-empty"),"Move To Wastebin")
+                            # trashAction = cm.addAction(QtGui.QIcon.fromTheme("trash-empty"),"Move To Wastebin")
                             trashAction.triggered.connect(self._slot_trashFileItems)
 
-                        deleteAction = cm.addAction(QtGui.QIcon.fromTheme("edit-delete"),"Delete")
+                        deleteAction = cm.addAction(guiutils.getIcon("edit-delete"),"Delete")
+                        # deleteAction = cm.addAction(QtGui.QIcon.fromTheme("edit-delete"),"Delete")
                         deleteAction.triggered.connect(self._slot_deleteFileItems)
                         cm.addSeparator()
 
@@ -7720,24 +7786,30 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             cm = QtWidgets.QMenu("", self)
 
         if create_new is None:
-            createNewFolderAction = cm.addAction(QtGui.QIcon.fromTheme("folder-new"), "Create New Folder")
+            createNewFolderAction = cm.addAction(guiutils.getIcon("folder-new"), "Create New Folder")
+            # createNewFolderAction = cm.addAction(QtGui.QIcon.fromTheme("folder-new"), "Create New Folder")
             createNewFolderAction.triggered.connect(self._slot_createNewFolder)
             create_new = createNewFolderAction
             cm.addSeparator()
 
         if paste_action is None:
-            pasteAction = cm.addAction(QtGui.QIcon.fromTheme("edit-paste"), pasteActionName)
+            pasteAction = cm.addAction(guiutils.getIcon("edit-paste"), pasteActionName)
+            # pasteAction = cm.addAction(QtGui.QIcon.fromTheme("edit-paste"), pasteActionName)
             pasteAction.triggered.connect(self._slot_pasteIntoFileSystemDirectory)
             paste_action = pasteAction
 
 
-        openFolderInFileManager = cm.addAction(QtGui.QIcon.fromTheme("document-open-folder"),
+        openFolderInFileManager = cm.addAction(guiutils.getIcon("document-open-folder"),
             "Open This Folder In File Manager")
+        # openFolderInFileManager = cm.addAction(QtGui.QIcon.fromTheme("document-open-folder"),
+        #     "Open This Folder In File Manager")
         openFolderInFileManager.triggered.connect(
             self.slot_systemOpenCurrentFolder)
 
-        openParentFolderInSystemApp = cm.addAction(QtGui.QIcon.fromTheme("go-parent-folder"),
+        openParentFolderInSystemApp = cm.addAction(guiutils.getIcon("go-parent-folder"),
             "Open Parent Folder In File Manager")
+        # openParentFolderInSystemApp = cm.addAction(QtGui.QIcon.fromTheme("go-parent-folder"),
+        #     "Open Parent Folder In File Manager")
         openParentFolderInSystemApp.triggered.connect(
             self.slot_systemOpenParentFolderForSelectedItems)
 
@@ -10924,8 +10996,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 newViewerActions = self.newViewersMenu.actions()
                 if len(newViewerActions) == 0:
                     for v in sortedViewers:
-                        self.newViewersMenu.addAction(QtGui.QIcon.fromTheme("window"),
+                        self.newViewersMenu.addAction(guiutils.getIcon("window"),
                             v[0], self.slot_newViewerMenuAction)
+                        # self.newViewersMenu.addAction(QtGui.QIcon.fromTheme("window"),
+                        #     v[0], self.slot_newViewerMenuAction)
                 else:
                     actions = self.newViewersMenu.actions()
                     labels = sorted(list(action.text() for action in actions))
@@ -10940,14 +11014,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                             if beforeActionLabel in labels:
                                 beforeNdx = labels.index(beforeActionLabel)
                                 beforeAction = actions[beforeNdx]
-                                newAction = QAction(QtGui.QIcon.fromTheme("window"),v[0])
+                                newAction = QAction(guiutils.getIcon("window"),v[0])
+                                # newAction = QAction(QtGui.QIcon.fromTheme("window"),v[0])
                                 newAction.triggered.connect(
                                     self.slot_newViewerMenuAction)
                                 self.newViewersMenu.insertAction(
                                     beforeAction, newAction)
                             else:
-                                self.newViewersMenu.addAction(QtGui.QIcon.fromTheme("window"),
+                                self.newViewersMenu.addAction(guiutils.getIcon("window"),
                                     v[0], self.slot_newViewerMenuAction)
+                                # self.newViewersMenu.addAction(QtGui.QIcon.fromTheme("window"),
+                                #     v[0], self.slot_newViewerMenuAction)
 
         # NOTE: 2016-04-03 00:25:00 - do NOT delete - keep for future reference
         # (i.e., don't make this mistake again...)

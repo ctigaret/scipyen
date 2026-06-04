@@ -61,24 +61,40 @@ class FileSystemModel(QtGui.QFileSystemModel):
             if role == QtCore.Qt.ForegroundRole:
                 return QtWidgets.QApplication.palette().brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
 
-        if isinstance(self.timeFormat, QtCore.QLocale.FormatType):
+        if isinstance(self.timeFormat, (QtCore.QLocale.FormatType, str)):
             if role == QtCore.Qt.DisplayRole and index.column() == 3:
                 lastMod = index.data(self.FileInfoRole).lastModified() # a QDateTime
-                return QtCore.QVariant(guiutils.formatRelativeDateTime(lastMod, self.timeFormat))
+                if isinstance(self.timeFormat, QtCore.QLocale.FormatType):
+                    return QtCore.QVariant(guiutils.formatRelativeDateTime(lastMod, self.timeFormat))
+                elif isinstance(self.timeFormat, str) and self.timeFormat in ("Fancy Short", "Fancy Narrow"):
+                    tFormat = QtCore.QLocale.ShortFormat if self.timeFormat == "Fancy Short" else QtCore.QLocale.NarrowFormat
+                    return QtCore.QVariant(guiutils.formatRelativeDateTime(lastMod, tFormat, fancy=True))
 
         return super().data(index, role)
 
     @property
-    def timeFormat(self) -> QtCore.QLocale.FormatType | None:
+    def timeFormat(self) -> typing.Optional[typing.Union[QtCore.QLocale.FormatType, str]]:# QtCore.QLocale.FormatType | None:
         return self._modifiedTimeFormat_
 
     @timeFormat.setter
-    def timeFormat(self, val: QtCore.QLocale.FormatType) -> None:
-        if not isinstance(val, QtCore.QLocale.FormatType):
-            self._modifiedTimeFormat_ = None
+    def timeFormat(self, val: typing.Union[QtCore.QLocale.FormatType, str]) -> None:
+        if isinstance(val, QtCore.QLocale.FormatType):
+            self._modifiedTimeFormat_ = val
+
+        elif isinstance(val, str) and val in (
+            "LongFormat", "ShortFormat", "NarrowFormat", "Standard",
+            "Fancy Short", "Fancy Narrow"
+            ):
+
+            if val in ("LongFormat", "ShortFormat", "NarrowFormat"):
+                self._modifiedTimeFormat_ = getattr(QtCore.QLocale.FormatType, val)
+            elif val == "Standard":
+                self._modifiedTimeFormat_ = None
+            else:
+                self._modifiedTimeFormat_ = val
 
         else:
-            self._modifiedTimeFormat_ = val
+            self._modifiedTimeFormat_ = None
 
     @property
     def cutIndexes(self) -> list:

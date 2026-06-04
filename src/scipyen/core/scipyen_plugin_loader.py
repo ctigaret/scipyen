@@ -333,13 +333,21 @@ def find_plugins(path:typing.Union[str, pathlib.Path],
     r"""Loads and located plugins in a directory tree rooted at `path`
     """
     # ### BEGIN check call parameters
-    if isinstance(path, pathlib.Path) and path.is_dir() and path.exists():
+    if isinstance(path, pathlib.Path):
+        if not path.is_dir() or path.exists():
+            prog.scipywarn(f"Plugins directory {str(path)} does not exist ")
+            return
+
         path = path.absolute()
-        
-    elif not isinstance(path, str) or len(path.strip()) == 0 or not os.path.isdir(path) or not os.path.exists(path):
+
+    elif not isinstance(path, str) or len(path.strip()) == 0:
         prog.scipywarn(f"Expecting a string or a pathlib.Path for an absolute pathway to an existing directory; instead got {path} ")
         return
-    
+
+    elif not os.path.isdir(path) or not os.path.exists(path):
+        prog.scipywarn(f"Plugins directory {path} does not exist ")
+        return
+
     if isinstance(scipyendir, pathlib.Path) and scipyendir.is_dir() and scipyendir.exists():
         scipyendir = scipyendir.absolute()
         

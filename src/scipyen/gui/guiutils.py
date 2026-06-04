@@ -582,7 +582,9 @@ def formatRelativeDate(date: QtCore.QDate, fmt: QtCore.QLocale.FormatType) -> st
     elif daysTo == -2:
         return "Two days ago"
 
-def formatRelativeDateTime(dateTime: QtCore.QDateTime, fmt: QtCore.QLocale.FormatType) -> str:
+def formatRelativeDateTime(dateTime: QtCore.QDateTime,
+                           fmt: QtCore.QLocale.FormatType,
+                           fancy: bool = False) -> str:
     now = QtCore.QDateTime.currentDateTime()
 
     secsToNow = dateTime.secsTo(now)
@@ -592,7 +594,10 @@ def formatRelativeDateTime(dateTime: QtCore.QDateTime, fmt: QtCore.QLocale.Forma
         rMinutesToNow = int(np.round(minutesToNow))
         intMinutesToNow = secsToNow // 60
 
-        pfx = f"Nearly {rMinutesToNow}" if intMinutesToNow < rMinutesToNow else f"Over {intMinutesToNow}"
+        if fancy:
+            pfx = f"Nearly {rMinutesToNow}" if intMinutesToNow < rMinutesToNow else f"Over {intMinutesToNow}"
+        else:
+            pfx = f"{rMinutesToNow}"
 
         if minutesToNow <= 1:
             return "Just now"
@@ -630,6 +635,22 @@ def formatRelativeDateTime(dateTime: QtCore.QDateTime, fmt: QtCore.QLocale.Forma
     formattedDate = f"{dateString} at {QtCore.QLocale.system().toString(dateTime.time(), timeFormatType)}"
 
     return formattedDate.replace(formattedDate[0], formattedDate[0].upper())
+
+def autoChooseThemeName() -> str:
+    windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+    _,_,v,_ = windowColor.getHsv()
+    themeName="breeze" if v > 128 else "breeze-dark"
+    return themeName
+
+def getIcon(name: str, rc_fallback: str | None = None, **kwargs) ->  QtGui.QIcon:
+    icon = QtGui.QIcon.fromTheme(name)
+    group = kwargs.pop("group", "actions")
+    if icon.isNull():
+        themeName = autoChooseThemeName()
+        icon = QtGui.QIcon(f":/icons/{themeName}/{group}/{name}")
+        if icon.isNull() and isinstance(rc_fallback, str) and len(rc_fallback.strip()):
+            icon = QtGui.QIcon(f":/icons/{themeName}/{group}/{rc_fallback}")
+    return icon
 
 def process_qrc_icon_theme(theme_name): # TODO
     theme_resource_index = QtCore.QFile(f":/icons/{theme_name}/index.theme")
