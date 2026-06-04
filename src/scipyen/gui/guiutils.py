@@ -630,3 +630,10 @@ def formatRelativeDateTime(dateTime: QtCore.QDateTime, fmt: QtCore.QLocale.Forma
     formattedDate = f"{dateString} at {QtCore.QLocale.system().toString(dateTime.time(), timeFormatType)}"
 
     return formattedDate.replace(formattedDate[0], formattedDate[0].upper())
+
+def process_qrc_icon_theme(theme_name): # TODO
+    theme_resource_index = QtCore.QFile(f":/icons/{theme_name}/index.theme")
+    if not theme_resource_index.exists():
+        return
+
+    theme_spec_contents = dict()
