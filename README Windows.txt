@@ -81,6 +81,16 @@ jupyter qtconsole --generate-config
 uv pip instal matplotlib
 
 
+7.2: call mamba --use-uv --yes install --file mamba-conda-forge-packages.txt
+
+7.3 call uv pip install -r mamba-pip-packages.txt
+
+7.4 install Kepler console themes
+
+cd c:/scipyen/src/scipyen/gui/scipyen_console_styles/
+uv pip install --no-deps .
+
+# -- OBSOLETE ------------------------------------------------------------------------------------------------ #
 7.2 vigra, also pulls fftw, glpk, hdf5, imath, libboost, openexr, openjph, vs2015_runtime
 
 mamba install --use-uv vigra
@@ -178,15 +188,13 @@ mamba install --use-uv marko
 7.35 meshio, also pulls cftime, hdf4 importlib_metadata, netcdf4, rich, mdurl, markdown-it-py
 mamba install --use-uv meshio
 
-7.36 ancillaries
-• ancillaries 1
+7.36 jupyterthemes jupyter_qtconsole_colorschemes
 mamba install --use-uv jupyterthemes jupyter_qtconsole_colorschemes
 
-• ancillaries 2 - the following need installed invidiually by calling uv pip install <package>
+7.37 ancillaries the following need installed invidiually by calling uv pip install <package>
 
 confuse, isodate, drawsvg
 
-•  ancillaries 3 (call ``uv pip install <package_name>`` for each)
 tribool, pyabf, hdf5view, imreg-dft,
 
 modelspec (also pulls cattrs, dnspython, docstring-parser, pymongo
