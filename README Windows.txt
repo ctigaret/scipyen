@@ -90,6 +90,13 @@ uv pip instal matplotlib
 cd c:/scipyen/src/scipyen/gui/scipyen_console_styles/
 uv pip install --no-deps .
 
+8. NOW is a good time to test scipyen
+
+set QT_API=pyqt6
+
+python -Xfrozen_modules=off c:\scipyen\src\scipyen\scipyen.py
+
+
 # -- OBSOLETE ------------------------------------------------------------------------------------------------ #
 7.2 vigra, also pulls fftw, glpk, hdf5, imath, libboost, openexr, openjph, vs2015_runtime
 
