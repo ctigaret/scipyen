@@ -87,7 +87,7 @@ set JUPYTER_RUNTIME_DIR=%USERPROFILE%\.local\share\jupyter
 5.1 also do this permanently in Windows setings dialog (by hand ⌢ )
     -> restart the shell then run the following commands to confirm that QtConsole works
 
-    activate scipyenv
+    activate scipyenv (or activate c:\scipyenv, but make sure to give actual location)
 
     jupyter qtconsole
 
@@ -100,10 +100,8 @@ to manually solve any issues that arise (if there weren't any, all these package
 would have been inclued in the ``dependencies`` section of the ``scipyenv.yml``
 environment specification file above ⌢ ...)
 
-NOTE: Not sure --use-uv is of any use
 
-
-6. generate qtconsole configuration # =>  ~\.jupyter\jupyter_qtconsole_config.py
+6 - optional: generate qtconsole configuration # =>  ~\.jupyter\jupyter_qtconsole_config.py
 
 jupyter qtconsole --generate-config
 
@@ -113,9 +111,13 @@ jupyter qtconsole --generate-config
 
 uv pip install matplotlib
 
-7.2: call mamba --use-uv --yes install --file c:\scipyen\mambaprojects\win32\mamba-conda-forge-packages.txt
+7.2: call
 
-7.3 call uv pip install -r c:\scipyen\mambaprojects\win32\mamba-pip-packages.txt
+mamba --use-uv --yes install --file c:\scipyen\mambaprojects\win32\mamba-conda-forge-packages.txt
+
+7.3 call
+
+uv pip install -r c:\scipyen\mambaprojects\win32\mamba-pip-packages.txt
 
 7.4 install Kepler console themes
 
