@@ -1720,6 +1720,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._toolButtonStyle_:int = QtCore.Qt.ToolButtonFollowStyle.value
 
         self._configureUI_()
+        self.adaptToRCIcons()
 
         self._scriptManager_ = ScriptManager(parent=myparent)
 
@@ -6388,11 +6389,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.menuScripts = QtWidgets.QMenu("Scripts", self)
         # self.menubar.insertMenu(self.menuHelp.menuAction(), self.menuScripts)
         # self.actionScriptRun = QAction(QtGui.QIcon.fromTheme("system-run"), "Run...", self)
+        self.menuScripts.setIcon(guiutils.getIcon("automated-tasks"))
         self.actionScriptRun = QAction(guiutils.getIcon("system-run"), "Run...", self)
         self.actionScriptRun.triggered.connect(self.slot_runPythonScript)
         self.menuScripts.addAction(self.actionScriptRun)
-        self.actionScriptToConsole = QAction(QtGui.QIcon.fromTheme("scriptnew"), "To Console...", self)
-        self.actionScriptToConsole = QAction(guiutils.getIcon("scriptnew"), "To Console...", self)
+        # self.actionScriptToConsole = QAction(QtGui.QIcon.fromTheme("scriptnew", "dialog-scripts"), "To Console...", self)
+        self.actionScriptToConsole = QAction(guiutils.getIcon("scriptnew", "dialog-scripts"), "To Console...", self)
         self.actionScriptToConsole.triggered.connect(self.slot_pastePythonScript)
         self.menuScripts.addAction(self.actionScriptToConsole)
         self.menuScripts.addSeparator()
@@ -6402,7 +6404,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.menuScripts.addMenu(self.recentScriptsMenu)
         self.menuScripts.addSeparator()
         # self.actionManageScripts = QAction(QtGui.QIcon.fromTheme("scriptnew"), "Script Manager", self)
-        self.actionManageScripts = QAction(guiutils.getIcon("scriptnew"), "Script Manager", self)
+        self.actionManageScripts = QAction(guiutils.getIcon("scriptnew", "dialog-scripts"), "Script Manager", self)
         self.actionManageScripts.triggered.connect(self.slot_showScriptsManagerWindow)
         self.menuScripts.addAction(self.actionManageScripts)
         # ### END scripts menu
@@ -6411,6 +6413,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.menuApplications = QtWidgets.QMenu("Applications", self) # NOTE: 2024-09-26 12:02:54 def'ed in the ui file
         self.menuApplications.setTearOffEnabled(True)
         self.menuApplications.setToolTipsVisible(True)
+        self.menuApplications.setIcon(guiutils.getIcon("homerun", "window-list"))
         self.menubar.insertMenu(self.menuHelp.menuAction(), self.menuApplications)
         # ### END   Applications menu
 
@@ -6425,6 +6428,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.whatsThisAction.setIcon(guiutils.getIcon("help-whatsthis"))
         self.menuHelp.addSeparator()
         self.menuHelp.addAction(self.whatsThisAction)
+        self.menuHelp.setIcon(guiutils.getIcon("help-contents"))
         # ### END   Help menu
 
         self.actionQuit.triggered.connect(self.slot_Quit)
@@ -6432,14 +6436,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.actionOpen_System_Terminal.triggered.connect(self.slot_openCurrentDirInSystemTerminal)
 
         # self.actionConsole = QAction(QtGui.QIcon.fromTheme("scriptnew"), "Scipyen Console", self)
-        self.actionConsole = QAction(guiutils.getIcon("scriptnew"), "Scipyen Console", self)
+        self.actionConsole = QAction(guiutils.getIcon("scriptnew", "dialog-scripts"), "Scipyen Console", self)
 
         self.actionConsole.triggered.connect(self.slot_initQtConsole)
         self.menuConsoles.addAction(self.actionConsole)
 
         if not self._pyinstaller_bundled_:
             # self.actionExternalIPython = QAction(QtGui.QIcon.fromTheme("scriptnew"), "External IPython", self)
-            self.actionExternalIPython = QAction(guiutils.getIcon("scriptnew"), "External IPython", self)
+            self.actionExternalIPython = QAction(guiutils.getIcon("scriptnew", "dialog-scripts"), "External IPython", self)
 
             self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
 
@@ -6448,7 +6452,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if has_neuron:
                 self.actionExternalNrnIPython = QAction(
                     # QtGui.QIcon.fromTheme("scriptnew"), "External IPython for NEURON", self)
-                    guiutils.getIcon("scriptnew"), "External IPython for NEURON", self)
+                    guiutils.getIcon("scriptnew", "dialog-scripts"), "External IPython for NEURON", self)
                 self.actionExternalNrnIPython.triggered.connect(
                     self.slot_launchExternalNeuronIPython)
                 self.menuConsoles.addAction(self.actionExternalNrnIPython)
@@ -6461,7 +6465,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             self.actionRunning_IPython = QAction(
                 # QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel ...", self)
-                guiutils.getIcon("scriptnew"), "Choose kernel ...", self)
+                guiutils.getIcon("scriptnew", "dialog-scripts"), "Choose kernel ...", self)
 
             self.actionRunning_IPython.triggered.connect(
                 self.slot_launchExternalRunningIPython)
@@ -6471,7 +6475,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if has_neuron:
                 self.actionRunning_IPython_for_Neuron = QAction(
                     # QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel and launch NEURON", self)
-                    guiutils.getIcon("scriptnew"), "Choose kernel and launch NEURON", self)
+                    guiutils.getIcon("scriptnew", "dialog-scripts"), "Choose kernel and launch NEURON", self)
 
                 self.actionRunning_IPython_for_Neuron.triggered.connect(
                     self.slot_launchExternalRunningIPythonNeuron)
@@ -6492,6 +6496,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.actionReload_Plugins.triggered.connect(self.slot_reloadPlugins)
         self.actionSave.triggered.connect(self.slot_saveFile)
         self.actionChange_Working_Directory.triggered.connect(self.slot_selectWorkDir)
+        self.actionChange_Working_Directory.setIcon(guiutils.getIcon("document-open-folder"))
         # self.actionSave_pickle.triggered.connect(self.slot_saveSelectedVariables)
 
         # NOTE: 2017-07-07 22:14:40
@@ -6544,6 +6549,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.newViewersMenu.addAction(QtGui.QIcon.fromTheme("window"),"Figure", lambda: self.newViewer(mpl.figure.Figure))
         self.menuViewers.addMenu(self.newViewersMenu)
         #
+        self.menuView.setIcon(guiutils.getIcon("quickview", "view-preview"))
+        self.menuConsoles.setIcon(guiutils.getIcon("akonadiconsole"))
+        self.menuSettings.setIcon(guiutils.getIcon("settings-configure", "configure"))
+
+        self.menuFile.setIcon(guiutils.getIcon("system-file-manager-symbolic","system-file-manager"))
         # ### END   Menus and actions
 
         # ### BEGIN Main Toolbar
@@ -6836,13 +6846,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.selDirBtn.released.connect(self.slot_selectWorkDir)
         self.selDirBtn.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.selDirBtn.setMenu(self.recentDirectoriesMenu)
+        self.selDirBtn.setIcon(guiutils.getIcon("document-open-folder"))
 
         # NOTE: 2023-09-28 12:13:22
         self.openTermBtn.released.connect(self.slot_openCurrentDirInSystemTerminal)
+        self.openTermBtn.setIcon(guiutils.getIcon("scriptnew", "dialog-scripts"))
         self.systemOpenFolderBtn.released.connect(self.slot_systemOpenCurrentFolder)
+        self.systemOpenFolderBtn.setIcon(guiutils.getIcon("document-open-folder"))
         self.systemOpenParentFolderBtn.released.connect(self.slot_systemOpenParentFolder2)
+        self.systemOpenParentFolderBtn.setIcon(guiutils.getIcon("go-parent-folder"))
 
         self.toggleFilesFilterToolBtn.toggled.connect(self.slot_showFilesFilter)
+        self.toggleFilesFilterToolBtn.setIcon(guiutils.getIcon("view-filter"))
         self.hideFilesFilterToolBtn.released.connect(self.slot_hideFilesFilter)
 
 
@@ -6870,7 +6885,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
 
         self.historyCommandsExecuteToolButton.clicked.connect(self._execHistorySelection_)
+        self.historyCommandsExecuteToolButton.setIcon(guiutils.getIcon("run-build"))
         self.historyCommandsToConsoleToolButton.clicked.connect(self._historyToConsole_)
+        self.historyCommandsToConsoleToolButton.setIcon(guiutils.getIcon("akonadiconsole"))
         self.saveHistoryToolbutton.clicked.connect(self._saveHistorySelection_)
         self.copyHistoryCommands.clicked.connect(self._copyHistorySelection_)
 
@@ -6944,54 +6961,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # use QueuedConnection to eliminate flicker on recent directories menu
         # after selecting a directory
         self.sig_changedDirectory.connect(self._slot_set_recentDirectory, type=QtCore.Qt.QueuedConnection)
-
-        # NOTE 2026-06-05 12:25:00
-        # adapt icons for widgets in case no freedesktop-like themes are
-        # avaliable on the system
-        self._adapt_to_rc_icons_()
-        # actionsWithNullIcons = dict(
-        #     map(
-        #         lambda a: (a.icon().name(), a),
-        #         filter(
-        #             lambda a: (a.icon().isNull() and len(a.icon().name().strip()) == 0),
-        #             filter(
-        #                 lambda w: isinstance(w, QAction), self.children())
-        #                 )
-        #             )
-        #         )
-        #     )
-
-        # if len(actionsWithNullIcons)
-
-    def _adapt_to_rc_icons_(self, obj: typing.Optional[
-        QtWidgets.QWidget | QAction
-        ] = None):
-        if obj is None:
-            obj = self
-
-        if isinstance(obj, QAction):
-            if obj.icon().isNull() and len(obj.icon().name().strip()):
-                obj.setIcon(guiutils.getIcon(obj.icon().name()))
-
-        elif isinstance(obj, QtWidgets.QWidget):
-            if hasattr(obj, "icon") and hasattr(obj, "setIcon"):
-                icon = obj.icon()
-                if icon.isNull() and len(icon.name().strip()):
-                    obj.setIcon(guiutils.getIcon(icon.name()))
-
-            elif hasattr(obj, "windowIcon") and hasattr(obj, "setWindowIcon"):
-                icon = obj.windowIcon()
-                if icon.isNull() and len(icon.name().strip()):
-                    obj.setWindowIcon(guiutils.getIcon(icon.name()))
-
-        if hasattr(obj, "children"):
-            children = obj.children()
-            if len(children):
-                for child in children:
-                    self._adapt_to_rc_icons_(child)
-
-
-
 
     @Slot()
     @safewrapper

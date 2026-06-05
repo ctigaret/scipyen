@@ -649,8 +649,40 @@ def getIcon(name: str, rc_fallback: str | None = None, **kwargs) ->  QtGui.QIcon
         themeName = autoChooseThemeName()
         icon = QtGui.QIcon(f":/icons/{themeName}/{group}/{name}")
         if icon.isNull() and isinstance(rc_fallback, str) and len(rc_fallback.strip()):
+            # print(f"guiutils.getIcon: themeName = '{themeName}', group='{group}', rc_fallback = '{rc_fallback}'")
             icon = QtGui.QIcon(f":/icons/{themeName}/{group}/{rc_fallback}")
+            if icon.isNull():
+                ret = getRCIconGroup(themeName, rc_fallback)
+                # print(len(ret))
+                if len(ret):
+                    for key, val in ret.items():
+                        # print (f"{themeName}/{key} ↦ {val}")
+                        if any(rc_fallback in s.split(".")[0] for s in val):
+                            return QtGui.QIcon(f":/icons/{themeName}/{key}/{rc_fallback}")
     return icon
+
+def getRCIconNames(themeName: str = "breeze-dark") -> dict:
+    if not isinstance(themeName, str) or len(themeName.strip()) == 0:
+        themeName = autoChooseThemeName()
+    return dict(map(lambda g: (g, QtCore.QDir(f":/icons/{themeName}/{g}").entryList()), QtCore.QDir(f":/icons/{themeName}/").entryList()))
+
+def getRCIconGroup(themeName: str, test:str) -> dict:
+    if not isinstance(themeName, str) or len(themeName.strip()) == 0:
+        themeName = autoChooseThemeName()
+    iconNames = getRCIconNames(themeName)
+
+    ret = dict(
+        filter(
+            lambda i: len(i[1])>0,
+            map(
+                lambda i: (i[0], list(filter(lambda s: test in s, i[1]))),
+                iconNames.items()
+                )
+            )
+        )
+    return ret
+
+
 
 def checkIconInResources(name: str, group: str = "actions") -> bool:
     themeName = autoChooseThemeName()

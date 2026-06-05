@@ -1582,3 +1582,47 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             except:
                 traceback.print_exc()
 
+    def adaptToRCIcons(self, obj: typing.Optional[
+        QtWidgets.QWidget | QAction
+        ] = None):
+        if obj is None:
+            obj = self
+
+
+        if isinstance(obj, QAction):
+            if obj.icon().isNull() and len(obj.icon().name().strip()):
+                obj.setIcon(guiutils.getIcon(obj.icon().name()))
+
+        elif isinstance(obj, QtWidgets.QWidget):
+            if hasattr(obj, "icon") and hasattr(obj, "setIcon"):
+                icon = obj.icon()
+                if icon.isNull() and len(icon.name().strip()):
+                    obj.setIcon(guiutils.getIcon(icon.name()))
+
+            elif hasattr(obj, "windowIcon") and hasattr(obj, "setWindowIcon"):
+                icon = obj.windowIcon()
+                if icon.isNull() and len(icon.name().strip()):
+                    if icon.name() == "scriptnew":
+                        altname = "dialog-scripts"
+                    elif icon.name() == "object":
+                        altname = "object-group"
+                    elif icon.name() == "homerun":
+                        altname = "window-list"
+
+                    elif icon.name() == "settings-configure":
+                        altname = "configure"
+                    else:
+                        altname = None
+                    obj.setWindowIcon(guiutils.getIcon(icon.name(), altname))
+
+        if hasattr(obj, "children"):
+            children = obj.children()
+            if len(children):
+                for child in children:
+                    self.adaptToRCIcons(child)
+
+        # NOTE: 2026-06-05 13:01:59
+        # the following still need individual updates -- why ?!?
+        # obj_name = obj.objectName()
+        #
+        # if obj_name == "selDirBtn"
