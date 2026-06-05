@@ -329,6 +329,8 @@ from . import quickdialog as qd # noqa
 # from .resources import icons_rc
 from .resources import breeze_icons_rc
 from .resources import breeze_dark_icons_rc
+from .resources import extra_icons_rc
+from .resources import images_rc
 from . import pictgui as pgui # noqa
 from . import xmlviewer as xv # noqa
 from . import textviewer as tv # noqa
@@ -6963,6 +6965,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # NOTE: 2021-08-17 12:36:49 TODO custom icon ?
         # see also NOTE: 2021-08-17 10:06:24 in scipyen.py
         icon = guiutils.getIcon("pythonbackend")
+        if icon.isNull():
+            icon = QtGui.QIcon(":/icons/extra-icons/pythonbackend")
         QtWidgets.QApplication.setWindowIcon(icon)
 
         # NOTE: 2025-11-28 20:49:40
