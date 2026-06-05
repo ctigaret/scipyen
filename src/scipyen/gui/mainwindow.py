@@ -6748,9 +6748,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.removeVarNameFromFinderListAction = QAction(guiutils.getIcon("edit-delete"),
                                                                    "Remove item from list",
                                                                    self.varNameFilterFinderComboBox.lineEdit())
-        # self.removeVarNameFromFinderListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
-        #                                                            "Remove item from list",
-        #                                                            self.varNameFilterFinderComboBox.lineEdit())
 
         self.removeVarNameFromFinderListAction.triggered.connect(
             self.slot_removeVarNameFromFinderHistory)
@@ -6797,10 +6794,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.dirFileMonitor.fileChanged.connect(self._slot_monitoredFileChanged)
 
         self.navigator.urlChanged[QtCore.QUrl].connect(self.slot_chDirUrl)
+
         if sys.platform.startswith("win32"):
             target = os.environ['USERPROFILE']
         else:
             target = os.environ['HOME']
+
         self.navigator.setHomeUrl(QtCore.QUrl(pathlib.Path(target).as_uri()))
         self.navigator.newLook = self.useNewNavigatorLook
         # self.navigator.newWindowRequested.connect()
@@ -6811,9 +6810,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.removeFileFilterFromListAction = QAction(guiutils.getIcon("edit-delete"),
                                                                 "Remove this filter from history",
                                                                 self.fileSystemFilter.lineEdit())
-        # self.removeFileFilterFromListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
-        #                                                         "Remove this filter from history",
-        #                                                         self.fileSystemFilter.lineEdit())
 
         self.removeFileFilterFromListAction.setToolTip("Remove this filter from history")
 
@@ -6822,9 +6818,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.clearFileFilterListAction = QAction(guiutils.getIcon("final_activity"),
                                                            "Clear filter list",
                                                            self.fileSystemFilter.lineEdit())
-        # self.clearFileFilterListAction = QAction(QtGui.QIcon.fromTheme("final_activity"),
-        #                                                    "Clear filter list",
-        #                                                    self.fileSystemFilter.lineEdit())
 
         self.clearFileFilterListAction.setToolTip("Clear file filter history")
 
@@ -6839,7 +6832,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.dirUpBtn.released.connect(self.slot_goToParentDir)
         self.dirBackBtn.released.connect(self.slot_goToPrevDir)
         self.dirFwdBtn.released.connect(self.slot_goToNextDir)
-        # self.selDirBtn.released.connect(self.slot_selectDir)
+
         self.selDirBtn.released.connect(self.slot_selectWorkDir)
         self.selDirBtn.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.selDirBtn.setMenu(self.recentDirectoriesMenu)
@@ -6896,21 +6889,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.removeItemFromCommandFinderListAction = QAction(guiutils.getIcon("edit-delete"),
                                                                        "Remove item from list",
                                                                        self.commandHistoryFinderComboBox.lineEdit())
-        # self.removeItemFromCommandFinderListAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
-        #                                                                "Remove item from list",
-        #                                                                self.commandHistoryFinderComboBox.lineEdit())
 
         self.removeItemFromCommandFinderListAction.triggered.connect(
             self.slot_removeItemFromCommandFinderHistory)
 
-        # self.useLastHistoryCommandSearchAction = QAction(QtGui.QIcon.fromTheme("document-open-recent"),
-        #                                                  "Show Last Command Search at Startup",
-        #                                                  self)
-        # self.menuSettings.insertAction(self.useLastHistoryCommandSearchAction, self.actionSet_user_plugins_directory)
-        # # self.menuSettings.addAction(self.useLastHistoryCommandSearchAction)
-        #
-        # self.useLastHistoryCommandSearchAction.setCheckable(True)
-        # self.useLastHistoryCommandSearchAction.setChecked(False)
         self.useLastHistoryCommandSearchAction.toggled.connect(self._slot_toggleUseLastHistoryCommandSearch)
 
 
@@ -6924,10 +6906,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         # ### BEGIN console dock — NOT USED !
         #
-        self.consoleDockWidget = QtWidgets.QDockWidget("Console", self, objectName="consoleDockWidget")
+        self.consoleDockWidget = QtWidgets.QDockWidget("Console", self,
+                                                       objectName="consoleDockWidget")
         self.consoleDockWidget.setAllowedAreas(QtCore.Qt.AllDockWidgetAreas)
         self.consoleDockWidget.setFeatures(QtWidgets.QDockWidget.DockWidgetMovable | QtWidgets.QDockWidget.DockWidgetFloatable)
-        # self.consoleDockWidget.setFeatures(QtWidgets.QDockWidget.AllDockWidgetFeatures)# NOTE 2024-05-02 12:21:54 deprecated even in Qt 5 !!!
         self.consoleDockWidget.setVisible(False)
 
         #
@@ -6956,14 +6938,60 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # NOTE: 2021-08-17 12:36:49 TODO custom icon ?
         # see also NOTE: 2021-08-17 10:06:24 in scipyen.py
         icon = guiutils.getIcon("pythonbackend")
-        # icon = QtGui.QIcon.fromTheme("pythonbackend")
-        # self.setWindowIcon(icon) # this doesn't work? -- next line does
         QtWidgets.QApplication.setWindowIcon(icon)
 
         # NOTE: 2025-11-28 20:49:40
         # use QueuedConnection to eliminate flicker on recent directories menu
         # after selecting a directory
         self.sig_changedDirectory.connect(self._slot_set_recentDirectory, type=QtCore.Qt.QueuedConnection)
+
+        # NOTE 2026-06-05 12:25:00
+        # adapt icons for widgets in case no freedesktop-like themes are
+        # avaliable on the system
+        self._adapt_to_rc_icons_()
+        # actionsWithNullIcons = dict(
+        #     map(
+        #         lambda a: (a.icon().name(), a),
+        #         filter(
+        #             lambda a: (a.icon().isNull() and len(a.icon().name().strip()) == 0),
+        #             filter(
+        #                 lambda w: isinstance(w, QAction), self.children())
+        #                 )
+        #             )
+        #         )
+        #     )
+
+        # if len(actionsWithNullIcons)
+
+    def _adapt_to_rc_icons_(self, obj: typing.Optional[
+        QtWidgets.QWidget | QAction
+        ] = None):
+        if obj is None:
+            obj = self
+
+        if isinstance(obj, QAction):
+            if obj.icon().isNull() and len(obj.icon().name().strip()):
+                obj.setIcon(guiutils.getIcon(obj.icon().name()))
+
+        elif isinstance(obj, QtWidgets.QWidget):
+            if hasattr(obj, "icon") and hasattr(obj, "setIcon"):
+                icon = obj.icon()
+                if icon.isNull() and len(icon.name().strip()):
+                    obj.setIcon(guiutils.getIcon(icon.name()))
+
+            elif hasattr(obj, "windowIcon") and hasattr(obj, "setWindowIcon"):
+                icon = obj.windowIcon()
+                if icon.isNull() and len(icon.name().strip()):
+                    obj.setWindowIcon(guiutils.getIcon(icon.name()))
+
+        if hasattr(obj, "children"):
+            children = obj.children()
+            if len(children):
+                for child in children:
+                    self._adapt_to_rc_icons_(child)
+
+
+
 
     @Slot()
     @safewrapper

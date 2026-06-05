@@ -949,7 +949,7 @@ NOTE: you can click anywhere in the row to select</string>
           <string>Select working directory</string>
          </property>
          <property name="text">
-          <string>&amp;Select working directory</string>
+          <string>&amp;Select Working directory</string>
          </property>
          <property name="icon">
           <iconset theme="document-open-folder"/>
