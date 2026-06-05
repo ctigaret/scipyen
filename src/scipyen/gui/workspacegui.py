@@ -1585,6 +1585,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     def adaptToRCIcons(self, obj: typing.Optional[
         QtWidgets.QWidget | QAction
         ] = None):
+        from gui import guiutils
         if obj is None:
             obj = self
 
@@ -1611,6 +1612,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
                     elif icon.name() == "settings-configure":
                         altname = "configure"
+
+                    elif icon.name().endswith("-symbolic"):
+                        altname = icon.name().strip("-symbolic")
                     else:
                         altname = None
                     obj.setWindowIcon(guiutils.getIcon(icon.name(), altname))

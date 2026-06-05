@@ -20,11 +20,13 @@ other characters than 'a' to 'z', 'A' to 'Z', '0' to '9' and '_' (underscore) or
 
 NOTE: Can also install for all users
 
-For example, to install the latest release as of 2026-06-02 12:52:14:
-• go to https://github.com/conda-forge/miniforge/releases/tag/26.3.2-3
+• For example, to install the latest release as of 2026-06-02 12:52:14:
+    go to https://github.com/conda-forge/miniforge/releases/tag/26.3.2-3
 • download the Windows installer https://github.com/conda-forge/miniforge/releases/download/26.3.2-3/Miniforge3-26.3.2-3-Windows-x86_64.exe
 • run the installer
-• open the newly created miniforge prompt and run
+
+• ATTENTION, MANDATORY:
+    open the newly created miniforge prompt and run
 
     conda init
 
@@ -129,12 +131,21 @@ python -Xfrozen_modules=off c:\scipyen\src\scipyen\scipyen.py
 9. make a batch file (assuming you have run ``conda init`` earlier)
 with the following contents (MAKE SURE TO ADAPT paths to your own installation:
 
-activate c:\scipyenv
+echo off
+activate C:\scipyenv && (
 
 set QT_API=pyqt6
+set PYQTGRAPH_QT_LIB=PyQt6
+set FORCE_QT_API=1
 
-python -Xfrozen_modules=off c:\scipyen\src\scipyen\scipyen.py
+python -Xfrozen_modules=off C:\scipyen\src\scipyen\scipyen.py
 
-Save this as scipyen.bat somewhere in your OWN PATH environment variable
+)
+
+Save this as scipyen.bat somewhere in your OWN PATH environment variable.
+I prefer to place is in <home>\Scripts, and add this folder to your PATH
+environment valriable (using the Windows Settings app)
+
+.
 
 

@@ -17,3 +17,4 @@ entrez-utils
 ncbi-taxonomist
 taxoniq
 nixio
+latex2svg @ git+https://github.com/Moonbase59/latex2svg.git#egg=latex2svg

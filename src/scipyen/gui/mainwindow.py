@@ -6514,7 +6514,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.recentFilesMenu.setIcon(guiutils.getIcon("document-open-recent"))
         # self.menuFile.insertMenu(self.actionOpen, self.recentFilesMenu)
         self.menuFile.insertMenu(self.menuImport.menuAction(), self.recentFilesMenu)
-
+        self.menuImport.setIcon(guiutils.getIcon("document-import"))
         # NOTE: 2025-01-24 22:22:20 switch to UrlNavigatorMenu
         # self.recentDirectoriesMenu = QtWidgets.QMenu("Recent Working Directories", self)
         self.recentDirectoriesMenu = navigator.UrlNavigatorMenu("Recent Working Directories", self)
@@ -6736,11 +6736,19 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.sendVarnameToConsoleToolBtn.clicked.connect(self.slot_pasteWorkspaceSelection)
         self.renameVarnameToolBtn.clicked.connect(self.slot_renameWorkspaceVar)
         self.displayVariableToolBtn.setMenu(self.menuSelected_Image_or_Volume)
+        self.displayVariableToolBtn.setIcon(guiutils.getIcon("quickview-symbolic", "view-visible"))
         self.saveVariableToolBtn.clicked.connect(self.slot_saveSelectedVariables)
         self.removeSelectedVarsToolBtn.clicked.connect(self.slot_deleteSelectedWorkspaceObjects)
         self.clearWorkspaceToolBtn.clicked.connect(self._slot_clearInternalWorkspace)
+        self.saveVariableToolBtn.setIcon(guiutils.getIcon("document-save-symbolic", "document-save"))
         # self.actionDisplay_In_Console.triggered.connect(self.slot_consoleDisplaySelectedVariables)
-
+        self.sendVarnameToConsoleToolBtn.setIcon(guiutils.getIcon("edit-paste-symbolic", "edit-paste"))
+        self.renameVarnameToolBtn.setIcon(guiutils.getIcon("edit-rename-symbolic", "edit-rename"))
+        self.removeSelectedVarsToolBtn.setIcon(guiutils.getIcon("edit-delete-symbolic", "edit-delete"))
+        editClearIcon = guiutils.getIcon("edit-clear-all-symbolic", "edit-clear-history")
+        if editClearIcon.isNull():
+            editClearIcon = guiutils.getIcon("edit-clear")
+        self.clearWorkspaceToolBtn.setIcon(editClearIcon)
         self.dockWidgetWorkspace.visibilityChanged[bool].connect(
             self.slot_dockWidgetVisibilityChanged)
 
@@ -11169,15 +11177,20 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         if isinstance(before, QAction):
             newAction = QAction(menuItemLabel)
+            # newAction.setIcon(guiutils.getIcon("plugins"))
             parentMenu.insertAction(before, newAction)
         else:
             newAction = parentMenu.addAction(menuItemLabel)
 
+        newAction.setIcon(guiutils.getIcon("plugins"))
+
         if parentMenu == self.menuBar():
+            newAction.setObjectname("menuItemLabel")
             parentMenu.update()
 
         newAction.triggered.connect(self.slot_wrapPluginFunction(
             f, n_outputs, arg_types, arg_names, arg_defaults, var_args, kw_args))
+
 
         return newAction
 
@@ -11254,11 +11267,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         from gui import guiutils
         pluginMenuActions = list()
 
-        # menuBarTree = guiutils.getMenuActionsTree(self.menuBar())
-
-        # if "simple_plugin" in v[0]:
-        #     print(f"{self.__class__.__name__}.installPluginMenu: v[1] = {v[1]}")
-
         if isinstance(v[1], dict) and len(v[1]) > 0:  # the nested dict
             # the plugin's init_scipyen_plugin function outputs a mapping
             # of a str or sequence of str, to a function or sequence of functions
@@ -11272,6 +11280,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     continue
 
                 pMenu = self.menuBar()
+
                 for k, p in enumerate(menuPathList):
                     action = self._findAction_(pMenu, p)
                     if action: # action found pMenu[0]
@@ -11282,144 +11291,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                         else:
                             # if p is the last in menuPathList, then ...
                             pass
-
-
-                    # actionNames = list(map(lambda a: a.text().replace("&", ""), self.menuBar().actions()))
-                    # if p in actionNames:
-                    #     action =
-                    # if p in menuBarTree:
-                    #     action, branch = menuBarTree[p]
-
-
-
-#                 # ### BEGIN legacy pyqt5 code
-#
-#                 parentMenu = self.menuBar()
-#                 currentMenu = None
-#
-#                 for item in menuPathList:
-#                     currentMenu = self._locateMenuByItemText_(parentMenu, item)
-#                     # ok = False
-#                     # try:
-#                     #     currentMenu = self._locateMenuByItemText_(parentMenu, item)
-#                     #     ok = True
-#                     # except:
-#                     #     currentMenu = None
-#                     #     traceback.print_exc()
-#                     # if not ok:
-#                     #     continue
-#                     if qtutils.isQObjectAlive(parentMenu):
-#                         siblingActionLabels = list(map(lambda a: a.text().replace('&', ''), filter(lambda a: qtutils.isQObjectAlive(a), parentMenu.actions())))
-#                         # print(f"item {item}, siblingActionLabels: {siblingActionLabels}")
-#                         if currentMenu is None:
-#                             # last item is the menu item (action)
-#                             if item == menuPathList[-1]:
-#                                 if item in siblingActionLabels:  # avoid name clashes
-#                                     item = ' '.join(
-#                                         [item, "(", ff.__module__, ")"])
-#
-#                                 beforeAction = None
-#                                 beforeActionLabel = None
-#                                 if parentMenu != self.menuBar():
-#                                     actionLabels = [item] + siblingActionLabels
-#                                     actionLabels = sorted(actionLabels)
-#                                     ndx = actionLabels.index(item)
-#                                     if ndx < (len(actionLabels) - 1):
-#                                         beforeActionLabel = actionLabels[ndx+1]
-#
-#                                     if isinstance(beforeActionLabel, str) and beforeActionLabel in siblingActionLabels:
-#                                         beforeNdx = siblingActionLabels.index(
-#                                             beforeActionLabel)
-#                                         beforeAction = parentMenu.actions()[
-#                                             beforeNdx]
-#
-#                                 # else:
-#                                 #     parentMenu.
-#
-#                                 if inspect.isfunction(ff):
-#                                     menuAction = self._installPluginFunction_(
-#                                         ff, item, parentMenu, before=beforeAction)
-#                                     # if "simple_plugin" in v[0]:
-#                                     #     print(f"menuAction: {menuAction}")
-#                                     if isinstance(menuAction, QAction):
-#                                         pluginMenuActions.append((menuAction, ff))
-#
-#                                 elif isinstance(ff, (tuple, list)):
-#                                     if len(ff) > 1:
-#                                         newMenu = parentMenu.addMenu(item)
-#                                         for f in ff:
-#                                             if inspect.isfunction(f):
-#                                                 menuAction = self._installPluginFunction_(
-#                                                     f, f.__name__, newMenu)
-#                                                 if isinstance(menuAction, QAction):
-#                                                     pluginMenuActions.append(
-#                                                         (menuAction, f))
-#                                             else:
-#                                                 raise TypeError(
-#                                                     "function object expected")
-#                                     else:
-#                                         menuAction = self._installPluginFunction_(
-#                                             ff[0], item, parentMenu)
-#                                         if isinstance(menuAction, QAction):
-#                                             pluginMenuActions.append(
-#                                                 (menuAction, ff[0]))
-#
-#                                 else:
-#                                     raise TypeError(
-#                                         " a function object or a list of function objects was expected")
-#                             else:
-#                                 parentMenu = parentMenu.addMenu(item)
-#                                 continue
-#                         else:
-#                             continue
-#
-#                     else:
-#                         if qtutils.isQObjectAlive(currentMenu):
-#                             parentMenu = currentMenu
-#                         else:
-#                             continue
-#                 # ### END   legacy pyqt5 code
-        # else:
-        #     # the plugin's init_scipyen_plugin function does not advertise a
-        #     # menupath ⇒ use the plugin module name as submenu of a canonical
-        #     # Plugins menu
-        #     ff = v[1]
-        #     pluginsMenu = self._locateMenuByItemText_(
-        #         self.menuBar(), "Plugins")
-        #     if pluginsMenu is None:
-        #         pluginsMenu = self.menuBar().addMenu("Plugins")
-        #
-        #     # if 'function' in type(v[1]).__name__:
-        #     if inspect.isfunction(ff):
-        #         newMenu = pluginsMenu.addMenu(pname)
-        #
-        #         menuAction = self._installPluginFunction_(
-        #             ff, ff.__name__, newMenu)
-        #         if isinstance(menuAction, QAction):
-        #             pluginMenuActions.append((menuAction, ff))
-        #
-        #     elif isinstance(ff, (tuple, list)):
-        #         newMenu = pluginsMenu.addMenu(pname)
-        #         if len(ff) == 1:
-        #             # if 'function' in type(ff[0]).__name__:
-        #             if inspect.isfunction(ff[0]):
-        #                 menuAction = self._installPluginFunction_(
-        #                     ff[0], ff[0].__name__, newMenu)
-        #                 if isinstance(menuAction, QAction):
-        #                     pluginMenuActions.append((menuAction, ff[0]))
-        #             else:
-        #                 raise TypeError("function object expected")
-        #
-        #         elif len(ff) > 1:
-        #             for f in ff:
-        #                 # if 'function' in type(f).__name__:
-        #                 if inspect.isfunction(f):
-        #                     menuAction = self._installPluginFunction_(
-        #                         f, f.__name__, newMenu)
-        #                     if isinstance(menuAction, QAction):
-        #                         pluginMenuActions.append((menuAction, f))
-        #                 else:
-        #                     raise TypeError("function object expected")
 
         return pluginMenuActions
 
@@ -11550,15 +11421,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
                 for item in menuPathList:
                     currentMenu = self._locateMenuByItemText_(parentMenu, item)
-                    # ok = False
-                    # try:
-                    #     currentMenu = self._locateMenuByItemText_(parentMenu, item)
-                    #     ok = True
-                    # except:
-                    #     currentMenu = None
-                    #     traceback.print_exc()
-                    # if not ok:
-                    #     continue
                     siblingActionLabels = list(map(lambda a: a.text().replace('&', ''), parentMenu.actions()))
                     # print(f"item {item}, siblingActionLabels: {siblingActionLabels}")
                     if currentMenu is None:
@@ -11583,14 +11445,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                                     beforeAction = parentMenu.actions()[
                                         beforeNdx]
 
-                            # else:
-                            #     parentMenu.
-
                             if inspect.isfunction(ff):
                                 menuAction = self._installPluginFunction_(
                                     ff, item, parentMenu, before=beforeAction)
-                                # if "simple_plugin" in v[0]:
-                                #     print(f"menuAction: {menuAction}")
+
                                 if isinstance(menuAction, QAction):
                                     pluginMenuActions.append((menuAction, ff))
 
@@ -11601,6 +11459,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                                         if inspect.isfunction(f):
                                             menuAction = self._installPluginFunction_(
                                                 f, f.__name__, newMenu)
+
                                             if isinstance(menuAction, QAction):
                                                 pluginMenuActions.append(
                                                     (menuAction, f))
@@ -11632,6 +11491,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 self.menuBar(), "Plugins")
             if pluginsMenu is None:
                 pluginsMenu = self.menuBar().addMenu("Plugins")
+                pluginsMenu.setIcon(guiutils.getIcon("plugins"))
 
             # if 'function' in type(v[1]).__name__:
             if inspect.isfunction(ff):
