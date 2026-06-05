@@ -3291,6 +3291,9 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
                                 sequence_types, sequence_typenames, 
                                 set_types, set_typenames, signal_types, is_namedtuple, 
                                 UnitTypes, )
+
+    from gui.guiutils import getIcon
+
     # NOTE: 2021-07-19 10:41:55
     # FIXME for the above 2021-07-19 10:01:35:
     # eliding is now created in gui.WorkspaceModel._get_item_for_object
@@ -3306,7 +3309,8 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
         #TODO construct handlers for other object types as well including 
         #Qt objects (maybe)
             
-    icon = QtGui.QIcon.fromTheme("object")
+    # icon = QtGui.QIcon.fromTheme("object")
+    icon = getIcon("object", "object-group")
     
     result = dict(map(lambda x: (x, {"display":"", "tooltip":""}), standard_obj_summary_headers))
     
@@ -3324,7 +3328,8 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
     ttip = f"{typename}"
     
     if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
-        icon = QtGui.QIcon.fromTheme("window")
+        icon = getIcon("window")
+        # icon = QtGui.QIcon.fromTheme("window")
         if isinstance(obj, QtWidgets.QMainWindow):
             ttip = "\n".join([f"Window: {obj.windowTitle()}", ttip])
         
@@ -3343,20 +3348,25 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
     
     if tt == "instance":
         tt = abbreviated_type_names.get(clsname, clsname)
-        icon = QtGui.QIcon.fromTheme("class")
+        icon = getIcon("class")
+        # icon = QtGui.QIcon.fromTheme("class")
         
     if tt == "function" or "function" in tt or "method" in tt:
-        icon = QtGui.QIcon.fromTheme("code-function")
+        icon = getIcon("code-function")
+        # icon = QtGui.QIcon.fromTheme("code-function")
 
     if tt == "module":
-        icon = QtGui.QIcon.fromTheme("class-or-package")
+        icon = getIcon("class-or-package")
+        # icon = QtGui.QIcon.fromTheme("class-or-package")
         
     if tt.lower() == "macro":
-        icon = QtGui.QIcon.fromTheme("component")
+        icon = getIcon("component")
+        # icon = QtGui.QIcon.fromTheme("component")
         
     if objtype is type or type in inspect.getmro(objtype):
         tt += f" <{obj.__name__}>"
-        icon = QtGui.QIcon.fromTheme("datatype") if obj.__name__ in builtins.__dict__ else QtGui.QIcon.fromTheme("class")
+        icon = getIcon("datatype") if obj.__name__ in builtins.__dict__ else getIcon("class")
+        # icon = QtGui.QIcon.fromTheme("datatype") if obj.__name__ in builtins.__dict__ else QtGui.QIcon.fromTheme("class")
         
     ttip = tt
         
@@ -3673,28 +3683,35 @@ def augment_obj_prop_dict(prop_dict):
     if 'Icon' not in prop_dict.keys(): # don't overwrite what summarize_object_properties did
         tt = prop_dict["Object Type"]["display"]
         
-        icon = QtGui.QIcon.fromTheme("object")
+        icon = getIcon("object", "object-group")
+        # icon = QtGui.QIcon.fromTheme("object")
         
         if "<" in tt and ">" in tt:
             tt, dundername = tt.split(" ")
-            icon = QtGui.QIcon.fromTheme("datatype") if dundername in builtins.__dict__ else QtGui.QIcon.fromTheme("class")
+            icon = getIcon("datatype") if dundername in builtins.__dict__ else getIcon("class")
+            # icon = QtGui.QIcon.fromTheme("datatype") if dundername in builtins.__dict__ else QtGui.QIcon.fromTheme("class")
             
         
         elif tt == "type":
-            icon = QtGui.QIcon.fromTheme("class")
+            icon = getIcon("class")
+            # icon = QtGui.QIcon.fromTheme("class")
         
         if "instance" in tt == "instance":
             tt = abbreviated_type_names.get(clsname, clsname)
-            icon = QtGui.QIcon.fromTheme("class")
+            icon = getIcon("class")
+            # icon = QtGui.QIcon.fromTheme("class")
             
         if tt == "function" or "function" in tt or "method" in tt:
-            icon = QtGui.QIcon.fromTheme("code-function")
+            icon = getIcon("code-function")
+            # icon = QtGui.QIcon.fromTheme("code-function")
 
         if tt == "module":
-            icon = QtGui.QIcon.fromTheme("class-or-package")
+            icon = getIcon("class-or-package")
+            # icon = QtGui.QIcon.fromTheme("class-or-package")
             
         if tt.lower() == "macro":
-            icon = QtGui.QIcon.fromTheme("component")
+            icon = getIcon("component")
+            # icon = QtGui.QIcon.fromTheme("component")
         
         
         prop_dict["Icon"] = icon

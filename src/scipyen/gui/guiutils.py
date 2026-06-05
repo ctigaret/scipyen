@@ -652,6 +652,11 @@ def getIcon(name: str, rc_fallback: str | None = None, **kwargs) ->  QtGui.QIcon
             icon = QtGui.QIcon(f":/icons/{themeName}/{group}/{rc_fallback}")
     return icon
 
+def checkIconInResources(name: str, group: str = "actions") -> bool:
+    themeName = autoChooseThemeName()
+    icon = QtGui.QIcon(f":/icons/{themeName}/{group}/{name}")
+    return not icon.isNull()
+
 def process_qrc_icon_theme(theme_name): # TODO
     theme_resource_index = QtCore.QFile(f":/icons/{theme_name}/index.theme")
     if not theme_resource_index.exists():
