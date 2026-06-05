@@ -6968,6 +6968,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if icon.isNull():
             icon = QtGui.QIcon(":/icons/extra-icons/pythonbackend")
         QtWidgets.QApplication.setWindowIcon(icon)
+        self.setWindowIcon(icon)
 
         # NOTE: 2025-11-28 20:49:40
         # use QueuedConnection to eliminate flicker on recent directories menu
