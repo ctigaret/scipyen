@@ -11057,10 +11057,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 if len(parentAM):
                     parentActionLabels, parentActionMenus = zip(*parentAM)
 
-                # parentActionLabels = [i.text().replace('&', '')
-                #                     for i in parent.actions()]
-                # parentActionMenus = [i.menu() for i in parent.actions()]
-
                     if itemText in parentActionLabels:
                         return parentActionMenus[parentActionLabels.index(itemText)]
         else:
@@ -11075,7 +11071,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                                 parentMenu: QtWidgets.QMenu,
                                 before: typing.Optional[QAction] = None,
                                 n_outputs=None, inArgTypes=None):
-        ''' Creates a QAction for calling the module-level function `f`.
+        r''' Creates a QAction for calling the module-level function `f`.
         Implements the actual logic of installing individual plugin functions
         advertised by the init_scipyen_plugin function defined in the plugin module.
 
@@ -11098,14 +11094,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 of the parnet menu
 
         '''
-        # if "simple_plugin" in f.__module__:
-        #     print(f"{self.__class__.__name__}._installPluginFunction_:")
-        #     print(f"\t f = {f}")
-        #     print(f"\t menuItemLabel = {menuItemLabel}")
-        #     print(f"\t parentMenu = {parentMenu}")
-        #     print(f"\t before = {before}")
-        # NOTE: TODO: in python 3: use inspect.getfullargspec(f)
-        # to parse *args, **kwargs syntax !!!
         argSpec = inspect.getfullargspec(f)
 
         arg_names = argSpec.args
@@ -11190,7 +11178,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         newAction.triggered.connect(self.slot_wrapPluginFunction(
             f, n_outputs, arg_types, arg_names, arg_defaults, var_args, kw_args))
-
 
         return newAction
 
@@ -11331,7 +11318,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 action = QAction()
 
     def installPluginMenu(self, pname, v):
-        '''Installs a GUI menu for the  plugin named pname.
+        r'''Installs a GUI menu for the  plugin named pname.
 
         Parameters:
         ===========
@@ -11455,6 +11442,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                             elif isinstance(ff, (tuple, list)):
                                 if len(ff) > 1:
                                     newMenu = parentMenu.addMenu(item)
+                                    newMenu.setIcon(guiutils.getIcon("plugins"))
                                     for f in ff:
                                         if inspect.isfunction(f):
                                             menuAction = self._installPluginFunction_(
@@ -11478,6 +11466,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                                     " a function object or a list of function objects was expected")
                         else:
                             parentMenu = parentMenu.addMenu(item)
+                            parentMenu.setIcon(guiutils.getIcon("plugins"))
                             continue
                     else:
                         parentMenu = currentMenu
@@ -11487,11 +11476,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             # menupath ⇒ use the plugin module name as submenu of a canonical
             # Plugins menu
             ff = v[1]
+            # needsPluginMenu = False
             pluginsMenu = self._locateMenuByItemText_(
                 self.menuBar(), "Plugins")
             if pluginsMenu is None:
                 pluginsMenu = self.menuBar().addMenu("Plugins")
+                # pluginsMenu = QtWidgets.QMenu("Plugins")
                 pluginsMenu.setIcon(guiutils.getIcon("plugins"))
+                # needsPluginMenu = True
 
             # if 'function' in type(v[1]).__name__:
             if inspect.isfunction(ff):
@@ -11524,6 +11516,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                                 pluginMenuActions.append((menuAction, f))
                         else:
                             raise TypeError("function object expected")
+
+            # if needsPluginMenu and len(pluginsMenu.children()):
+            #     self.menuBar().addMenu(pluginsMenu)
 
         return pluginMenuActions
 
