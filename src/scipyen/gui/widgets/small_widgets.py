@@ -811,8 +811,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     _default_units_:pq.Quantity         =  pq.dimensionless
     # _default_internal_minimum_:float    = -math.inf
     # _default_internal_maximum_:float    =  math.inf
-    _default_internal_minimum_:float    = sys.float_info.min
     _default_internal_maximum_:float    = sys.float_info.max
+    # _default_internal_minimum_:float    = sys.float_info.min # WRONG!!!
+    _default_internal_minimum_:float    = -sys.float_info.max
 
     _default_singleStep_:int = 1
     _default_stepType_:QtWidgets.QAbstractSpinBox.StepType = QtWidgets.QAbstractSpinBox.DefaultStepType
@@ -1807,10 +1808,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         newMagnitude = oldMagnitude + δVal
         self._magnitude_ = newMagnitude
         decimals = self._decimals_
-        self._lineEdit_.lazy = True
+        # self._lineEdit_.lazy = True
         print(f"{self.__class__.__name__}.stepBy => old magnitude = {oldMagnitude}, new magnitude = {newMagnitude}, value: {self.value()}\n")
         self._update_(forceSgStep = sgStep)
-        self._lineEdit_.lazy = False
+        # self._lineEdit_.lazy = False
         self.sig_valueChanged.emit(self.value())
 
     def singleStep(self) -> typing.Union[pq.Quantity, float, int]:
@@ -1861,6 +1862,1168 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         else:
             super().setSuffix(self._suffix_)
             super().setPrefix(self._prefix_)
+
+        self.update()
+
+    @property
+    def forceDimensionless(self) -> bool:
+        return self._forceDimensionless_
+
+    @forceDimensionless.setter
+    def forceDimensionless(self, val:bool):
+        self._forceDimensionless_ = val
+        self.update()
+
+Ui_QuantitySpinBox, QWidget = loadUiType(
+    os.path.join(__module_path__,
+                 "quantityspinbox.ui")
+    )
+
+class QuantitySpinBox2(Ui_QuantitySpinBox, QWidget):
+    r"""Subclass of QDoubleSpinBox aware of Python quantities.
+    Single step, number of decimals and units suffix are all configurable.
+
+    Most methods are inherited directly from QDoubleSpinBox, with the following
+    exceptions:
+
+    • setMinimum(), setMaximum(), setRange(), are overloaded to accept quantity
+    scalars as well as float arguments, or None;
+        ∘ when None, the 'minimum' and 'maximum' properties will be set to
+            -math.inf and math.inf, respectively.
+
+    • minimum() and maximum() are overloaded to return python Quantity scalars
+        WARNING: This means that the minimum() and maximum() values will ALWAYS
+        be quantities (even if their units are `dimensionless`)
+
+    By default, the 'minimum' property is set to -math.inf.
+
+    """
+    sig_valueChanged:Signal = Signal(object, name="sig_valueChanged")
+
+    _default_units_:pq.Quantity         =  pq.dimensionless
+    # _default_internal_minimum_:float    = -math.inf
+    # _default_internal_maximum_:float    =  math.inf
+    _default_internal_maximum_:float    = sys.float_info.max
+    # _default_internal_minimum_:float    = sys.float_info.min # WRONG!!!
+    _default_internal_minimum_:float    = -sys.float_info.max
+
+    _default_singleStep_:int = 1
+    _default_stepType_:QtWidgets.QAbstractSpinBox.StepType = QtWidgets.QAbstractSpinBox.DefaultStepType
+    _default_decimals_:int = np.get_printoptions()["precision"]
+
+    def __init__(self, parent: typing.Optional[QtWidgets.QWidget]=None,
+                 units: typing.Optional[typing.Union[pq.Quantity,
+                                                     float, int, complex,
+                                                     np.integer, np.floating,
+                                                     np.complexfloating]] = None,
+                 /,
+                 singleStep: typing.Optional[float] = None,
+                 stepType: typing.Optional[QtWidgets.QAbstractSpinBox.StepType] = None,
+                 decimals: typing.Optional[int] = None,
+                 minimum: typing.Optional[typing.Union[pq.Quantity, float]] = None,
+                 maximum: typing.Optional[typing.Union[pq.Quantity, float]] = None,
+                 unitsFamily: typing.Optional[str] = None,
+                 fixUnitFamily: typing.Optional[typing.Union[str, bool]] = None,
+                 rescaleWithUnitsChange: bool = False,
+                 keepDimensionless: bool = False,
+                 disableUnitChange: bool = False,
+                 enforceImmutableUnits: bool = False,
+                 ):
+        r"""
+        Named parameters:
+        =================
+        parent: parent widget; optional, default is None
+        units: initial units, or initial value; optional, default is pq.dimensionless
+        unitFamily: restrict to units in given family; optional, default is None
+
+        """
+        # minimum, maximum: min & max values of the spin box - to be set manually
+
+        QWidget.__init__(self, parent=parent)
+
+        self.setupUi(self)
+
+        self._spinBox_.installEventFilter(self)
+        # self._layout_ = QtWidgets.QGridLayout(parent=self)
+        # self._layout_.setSpacing(0)
+        # self._layout_.setContentsMargins(0,0,0,0)
+        # self._layout_.setColumnStretch(0,1)
+        # self._layout_.setRowStretch(0,1)
+        # self._spinBox_ = QtWidgets.QDoubleSpinBox(parent=self)
+        # self._spinBox_.setFrame(False)
+        # self._spinBox_.setSizePolicy(
+        #     QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding,
+        #                           QtWidgets.QSizePolicy.Fixed,
+        #                           QtWidgets.QSizePolicy.SpinBox)
+        #     )
+        # self._layout_.addWidget(self._spinBox_, 0, 0, QtCore.Qt.AlignCenter)
+        # self.setLayout(self._layout_)
+
+
+
+        # FIXME/TODO: 2022-11-07 13:32:41
+        # This setting is not right; NA should be somewhat mapped to NA, NOT
+        # to minimum - what do we do if minimum is set to 0 which is a valid value?
+        # super().setSpecialValueText("NA") # shown when value is at minimum
+
+        # self._default_units_ = pq.dimensionless
+
+        # self._lineEdit_ = LazyLineEdit(self)
+        self._lineEdit_ = LineEdit(self)
+
+        self._spinBox_.setLineEdit(self._lineEdit_)
+        # super().setLineEdit(self._lineEdit_)
+        # self.setLineEdit(self._lineEdit_)
+
+        self._keepDimensionless_: bool = keepDimensionless
+        self._disableUnitChange_: bool = disableUnitChange
+        self._enforceImmutableUnits_: bool = enforceImmutableUnits
+        if self._enforceImmutableUnits_:
+            self._disableUnitChange_ = True
+        self._restrictedToFamily_: typing.Optional[str] = None
+        self._rescaleOnUnitChange_: bool = False
+        self._forceDimensionless_: bool = False
+
+        self._validText_: QtGui.QValidator.State = QtGui.QValidator.Invalid
+
+        self._units_: pq.Quantity = self._default_units_
+        self._magnitude_: float = 0.0
+        self._prefix_ = ""
+        self._suffix_ = ""
+        self._specialValueText_: str = ""
+        self._fixSingleStep_: bool = False
+
+        if isinstance(units, pq.Quantity):
+            self._units_ = units.units
+
+            if not isinstance(units, pq.UnitQuantity):
+                if units.size != 1:
+                    raise TypeError(f"Expecting a scalar quantity; instead, got a Quantity array with {units.size} elements")
+
+                self._magnitude_ = float(units.magnitude)
+
+        else:
+            if isinstance(units, (float, np.floating)):
+                self._magnitude_ = units
+
+            elif isinstance(units, (int, np.integer)):
+                self._magnitude_ = float(units)
+
+            elif isinstance(units, (complex, np.complexfloating)):
+                self._magnitude_ = abs(units)
+
+            elif units is not None:
+                raise TypeError(f"Invalid 'units' argument: {units}")
+
+            self._units_ = self._default_units_
+
+        self._unitFamily_ = scq.getUnitFamily(self._units_)
+
+        if self._units_.dimensionality == pq.dimensionless.dimensionality:
+            self._suffix_ = ""
+            self._prefix_ = ""
+        else:
+            if not (self._keepDimensionless_ or self._forceDimensionless_):
+                symbol = self._units_.dimensionality.unicode
+                if self._unitFamily_ == "Currency":
+                    self._suffix_ = ""
+                    self._prefix_ = f"{symbol} "
+                else:
+                    self._suffix_ = f" {symbol}"
+                    self._prefix_ = ""
+
+
+        if isinstance(singleStep,float):
+            self._singleStep_ = singleStep
+
+        elif singleStep is None:
+            self._singleStep_ = self._default_singleStep_
+        else:
+            raise TypeError(f"singleStep expected to be a float or None; instead, got {singleStep}")
+
+        if isinstance(decimals, int) and decimals >= 0:
+            self._decimals_ = decimals
+
+        elif decimals is None:
+            # self._decimals_ = np.get_printoptions()["precision"]
+            self._decimals_ = self._default_decimals_
+
+        else:
+            raise TypeError(f"decimals expected to be an int >= 0 or None; instead, got {decimals}")
+
+        # print(f"{self.objectName()}: {self.__class__.__name__}.__init__:  decimals -> {self.decimals}")
+
+        self._internal_minimum = self._default_internal_minimum_
+        self._internal_maximum = self._default_internal_maximum_
+
+        self.setContextMenuPolicy(QtCore.Qt.DefaultContextMenu)
+        # print(f"{self.objectName()}: {self.__class__.__name__}.__init__ DONE")
+
+        self._spinBox_.setSuffix(self._suffix_)
+        self._spinBox_.setPrefix(self._prefix_)
+        # super().setSuffix(self._suffix_)
+        # super().setPrefix(self._prefix_)
+
+        self.setSingleStep(self._singleStep_)
+        self.setDecimals(self._decimals_) # also calls super().setDecimals(…)
+        # super().setValue(self._magnitude_) # will also set prefix suffix and specialValueText
+
+        if isinstance(stepType, QtWidgets.QAbstractSpinBox.StepType):
+            self._stepType_ = stepType
+        else:
+            self._stepType_ = self._default_stepType_
+
+        self._spinBox_.setStepType(self._stepType_)
+        # super().setStepType(self._stepType_)
+
+        # super().setRange(self._internal_minimum, self._internal_maximum)
+        self._spinBox_.setRange(self._internal_minimum, self._internal_maximum)
+
+        self.setValue(self._magnitude_ * self._units_)
+
+        # super().valueChanged.connect(self._slot_valueChanged)
+        # self.lineEdit().setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        # self._lineEdit_.sig_enterPressed.connect(self._slot_valueTextChanged)
+        self._spinBox_.lineEdit().sig_enterPressed.connect(self._slot_valueTextChanged)
+        # super().lineEdit().sig_enterPressed.connect(self._slot_valueTextChanged)
+
+        # self.lineEdit().installEventFilter(self)
+
+    @property
+    def fixSingleStep(self) -> bool:
+        return self._fixSingleStep_
+
+    @fixSingleStep.setter
+    def fixSingleStep(self, val:bool):
+        self._fixSingleStep_ = val is True
+
+    @property
+    def units(self) -> pq.Quantity:
+        if not (self._keepDimensionless_ or self._forceDimensionless_):
+            return self._units_
+
+    def getUnits(self) -> pq.Quantity:
+        return self.units
+
+    @units.setter
+    def units(self, value:typing.Optional[pq.Quantity] = None):
+        self.setUnits(value)
+
+    def setUnits(self, value:typing.Optional[pq.Quantity] = None):
+        # print(f"{self.__class__.__name__}.setUnits: value = {value}")
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return
+
+        if not isinstance(value, pq.Quantity):
+            value = pq.dimensionless
+
+        if self._rescaleOnUnitChange_ and scq.unitsConvertible(value, self._units_) and float(self.value()) not in (math.nan, np.nan, -math.inf, math.inf, -np.inf, np.inf):
+            newval = self.value().rescale(value)
+            newfval = float(newval.magnitude)
+            ratio = newfval/self._magnitude_
+            self._singleStep_ *= ratio
+            self._magnitude_ = float(newval.magnitude)
+            self._units_ = newval.units
+            # self.setValue(self._magnitude_)
+            self.setSingleStep(self._singleStep_)
+        else:
+            self._units_ = value.units
+
+        self._unitFamily_ = scq.getUnitFamily(self._units_)
+
+        self._suffix_ = ""
+        self._prefix_ = ""
+
+        if self._units_.dimensionality != pq.dimensionless.dimensionality:
+            symbol = self._units_.dimensionality.unicode
+            if self._unitFamily_ == "Currency":
+                self._suffix_ = ""
+                self._prefix_ = f"{symbol} "
+            else:
+                self._suffix_ = f" {symbol}"
+                self._prefix_ = ""
+
+        else:
+            self._suffix_ = ""
+            self._prefix_ = ""
+
+        if self._magnitude_ is pd.NA:
+            text = "<NA>"
+            self._specialValueText_ = text
+
+        elif np.isnan(self._magnitude_):
+            text = "NaN"
+            self._specialValueText_ = text
+            # super().setSpecialValueText(text)
+
+        elif np.isinf(self._magnitude_):
+            text = "-Inf" if self._magnitude_ in (-np.inf, -math.inf) else "Inf"
+            self._specialValueText_ = text
+            # super().setSpecialValueText(text)
+        else:
+            text = f"{self._magnitude_:.{self.decimals}}"
+            self._specialValueText_ = ""
+            # super().setSpecialValueText("")
+
+        # super().setSuffix(self._suffix_)
+        # super().setPrefix(self._prefix_)
+        self._spinBox_.setSuffix(self._suffix_)
+        self._spinBox_.setPrefix(self._prefix_)
+
+        if len(self._specialValueText_):
+            text = self._specialValueText_
+
+        if len(self._prefix_):
+            text = f"{self._prefix_}{text}"
+
+        if len(self._suffix_):
+            text = f"{text}{self._suffix_}"
+
+        # super().setSpecialValueText(self._specialValueText_)
+        # super().setValue(self._magnitude_)
+        # self.setValue(self._magnitude_)
+
+        # print(f"{self.objectName()}: {self.__class__.__name__}.units.setter({value}): text -> {text}")
+        signalBlock = QtCore.QSignalBlocker(self._spinBox_.lineEdit())
+        self._spinBox_.lineEdit().setText(text)
+
+        self.sig_valueChanged.emit(self.value())
+
+    def lineEdit(self) -> QtWidgets.QLineEdit:
+        return self._spinBox_.lineEdit()
+
+    @Slot(str)
+    def _slot_valueTextChanged(self, s:str):
+        # print(f"{self.__class__.__name__}._slot_valueTextChanged")
+
+        if self._validText_ == QtGui.QValidator.Acceptable:
+            try:
+                val = self.valueFromText(s)
+                # if objectName.endswith("startSpinBox"):
+                #     print(f"{oname}{self.__class__.__name__}._slot_valueTextChanged(s = '{s}') -> val = {val}")
+                if isinstance(val, (pq.Quantity, float)):
+                    self._magnitude_ = float(val)
+                    # self.setValue(self._magnitude_ * self._units)
+                    self.sig_valueChanged.emit(self.value())
+            except:
+                traceback.print_exc()
+
+    @Slot(bool)
+    def _slot_keepDimensionless(self, val:bool):
+        self.keepDimensionless = val
+
+    def contextMenuEvent(self, evt):
+        # print(f"{self.objectName()}: {self.__class__.__name__}.contextMenuEvent: _enforceImmutableUnits_ = {self._enforceImmutableUnits_}")
+        cm = QtWidgets.QMenu("Options", self)
+        if not (self._keepDimensionless_ or self._forceDimensionless_ or self._disableUnitChange_ or self._enforceImmutableUnits_):
+            setUnitsAction = cm.addAction("Set units")
+            setUnitsAction.triggered.connect(self._slot_setUnitsGUI)
+        setDecimalsAction = cm.addAction("Set decimals")
+        setDecimalsAction.triggered.connect(self._slot_setDecimalsGUI)
+        setSingleStepAction = cm.addAction("Set single step")
+        setSingleStepAction.triggered.connect(self._slot_setSingleStepGUI)
+        adaptiveStepAction = cm.addAction("Adaptive step")
+        adaptiveStepAction.setCheckable(True)
+        adaptiveStepAction.setChecked(self.stepType() == QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+        adaptiveStepAction.toggled.connect(self._slot_setAdaptiveStep)
+        setRangeAction = cm.addAction("Set range (min, max)")
+        setRangeAction.triggered.connect(self._slot_setRangeGUI)
+        if not (self._keepDimensionless_ or self._forceDimensionless_ or self._disableUnitChange_):
+            cm.addSeparator()
+            rescaleValueAction = cm.addAction("Rescale on unit change")
+            rescaleValueAction.setCheckable(True)
+            rescaleValueAction.setChecked(self._rescaleOnUnitChange_)
+            rescaleValueAction.toggled.connect(self._slot_rescaleValueChanged)
+            restrictAction = cm.addAction("Fix units family")
+            restrictAction.setCheckable(True)
+            restrictAction.setChecked(isinstance(self._restrictedToFamily_, str) and self._restrictedToFamily_ in scq.UNITS_DICT)
+            restrictAction.toggled.connect(self._slot_familyRestrictionChanged)
+
+        cm.addSeparator()
+        if not (self._forceDimensionless_ or self._disableUnitChange_):
+            toggleDimensionlessAction = cm.addAction("Ignore dimensionality")
+            toggleDimensionlessAction.setCheckable(True)
+            toggleDimensionlessAction.setChecked(self._keepDimensionless_)
+            toggleDimensionlessAction.toggled.connect(self._slot_keepDimensionless)
+
+        if not self._enforceImmutableUnits_:
+            toggleUnitChange = cm.addAction("Immutable units")
+            toggleUnitChange.setCheckable(True)
+            toggleUnitChange.setChecked(self._disableUnitChange_)
+            toggleUnitChange.toggled.connect(self._slot_toggleImmutableUnits)
+
+        resetAction = cm.addAction("Reset")
+        resetAction.triggered.connect(self._slot_reset)
+        cm.popup(self.mapToGlobal(evt.pos()))
+
+    def setMinimum(self, value:typing.Optional[typing.Union[float, pq.Quantity]]=None):
+        r"""Overloads QDoubleSpinBox.setMinimum, to accept:
+        • a None
+        • a float
+        • a scalar Quantity
+
+        When None, the minimum value will be set to -math.inf
+        """
+        if value is None:
+            self._spinBox_.setMinimum(self._default_internal_minimum_)
+            # super().setMinimum(self._default_internal_minimum_)
+
+        elif isinstance(value, float):
+            self._spinBox_.setMinimum(value)
+            # super().setMinimum(value)
+
+        elif isinstance(value, pq.Quantity):
+            if value.size > 1:
+                raise TypeError(f"Expecting a scalar quantity, not an array")
+            val = float(value.magnitude)
+            units = value.units
+            self._spinBox_.setMinimum(val)
+            # super().setMinimum(val)
+            self.units = units
+
+        # self._internal_minimum = super().minimum()
+
+    def setMaximum(self, value:typing.Optional[typing.Union[float, pq.Quantity]]=None):
+        r"""Overloads QDoubleSpinBox.setMaximum, to accept:
+        • a None
+        • a float
+        • a scalar Quantity
+
+        When None, the maximum value will be set to math.inf
+        """
+        if value is None:
+            self._spinBox_.setMaximum(self._default_internal_maximum_)
+            # super().setMaximum(self._default_internal_maximum_)
+
+        elif isinstance(value, float):
+            self._spinBox_.setMaximum(value)
+            # super().setMaximum(value)
+
+        elif isinstance(value, pq.Quantity):
+            if value.size > 1:
+                raise TypeError(f"Expecting a scalar quantity, not an array")
+            val = float(value.magnitude)
+            units = value.units
+            self._spinBox_.setMaximum(val)
+            # super().setMaximum(val)
+            self.units = units
+
+        # self._internal_maximum = super().maximum()
+
+    def setRange(self, minimum:typing.Optional[typing.Union[float, pq.Quantity]]=None, maximum:typing.Optional[typing.Union[float, pq.Quantity]]=None):
+        r"""Overloads QDoubleSpinBox.setRange to accept:
+        • floats
+        • scalar Quantity
+        • None
+
+        for either 'minimum' or 'maximum'
+
+        When either is None, the 'minimum' and 'maximum' will be set to
+        -math.inf and math.inf, respectively.
+        """
+
+        if all(isinstance(v, pq.Quantity) for v in (minimum, maximum)):
+            # NOTE: 2022-11-07 09:55:43
+            # sanity check when both are quantities
+            if any(v.size > 1 for v in (minimum, maximum)):
+                raise TypeError("Expecting scalar quantities for both minimum and maximum ")
+
+            if scq.unitsConvertible(minimum, maximum):
+                # NOTE: 2022-11-09 09:07:15
+                # rescale to minimum units explicitly,
+                # in case minimum magnitude is 0 (and thus raise exception)
+                maximum = maximum.rescale(minimum.units)
+
+            else:
+                raise TypeError(f"{minimum} and {maximum} have incompatible units")
+
+        else:
+            # NOTE: 2022-11-07 09:57:07
+            # DO accept None
+            if minimum is None:
+                minimum = -math.inf
+
+            if maximum is None:
+                maximum = math.inf
+
+            # NOTE: 2022-11-07 09:55:58
+            # propagate units from one the other if only one is a quantity
+            if isinstance(minimum, pq.Quantity):
+                if minimum.size > 1:
+                    raise TypeError("Expecting a scalar quantity for 'minimum")
+                maximum = maximum * minimum.units
+
+            elif isinstance(maximum, pq.Quantity):
+                if maximum.size>1:
+                    raise TypeError("Expecting a scalar quantity for maximum")
+                minimum = minimum * maximum.units
+
+            elif not all(isinstance(v, (float, type(None))) for v in (minimum, maximum)):
+                # NOTE: 2022-11-07 09:56:09
+                # finally, only accept  scalar floats or None
+                raise TypeError("Expecting floats, scalar quantities or None as minimum and maximum")
+
+        minVal = float(minimum.magnitude) if isinstance(minimum, pq.Quantity) else minimum
+        minUnits = minimum.units if isinstance(minimum, pq.Quantity) else None
+        maxVal = float(maximum.magnitude) if isinstance(maximum, pq.Quantity) else maximum
+        maxUnits = maximum.units if isinstance(maximum, pq.Quantity) else None
+
+        # NOTE: 2022-11-07 10:00:21
+        # both minUnits and maxUnits should have been checked and now be identical
+        # see NOTE: 2022-11-07 09:55:43 and NOTE: 2022-11-07 09:55:58
+        #
+        self._spinBox_.setMinimum(minVal)
+        self._spinBox_.setMaximum(maxVal)
+        # super().setMinimum(minVal)
+        # super().setMaximum(maxVal)
+        self.units = minUnits
+
+    def minimum(self):
+        # ret = super().minimum()
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return ret
+        return ret  * self.units
+
+    def maximum(self):
+        # ret = super().maximum()
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return ret
+        return ret * self.units
+
+    def specialValueText(self) -> str:
+        return self._specialValueText_
+
+    def setSpecialValueText(self, val:str):
+        if not isinstance(val, str):
+            val = ""
+
+        self._specialValueText_ = ""
+
+        self._spinBox_.setSpecialValueText(self._specialValueText_)
+
+    def eventFilter(self, obj, ev) -> bool: # TODO 2026-06-06 23:18:32 finalize me
+        if obj == self._spinBox_:
+            if ev.type() == QtCore.Event.Scroll:
+                return True
+            else:
+                return False
+        else:
+            return super().eventFilter(obj, ev)
+
+    def value(self) -> typing.Union[pq.Quantity, float, type(pd.NA)]:
+        r""" Reimplements QDoubleSpinBox.value() to return a quantity
+        """
+        if self.specialValueText() == "NA":
+            return pd.NA
+
+        elif self.specialValueText() == "NaN":
+            return np.nan if self._keepDimensionless_ else np.nan * self.units
+
+        else:
+            ret = self._magnitude_
+            if self._keepDimensionless_ or self._forceDimensionless_:
+                return ret
+
+            return ret * self.units
+
+    def getDecimals(self) -> int:
+        """
+    """
+        return self._decimals_
+
+    @property
+    def defaultSingleStep(self) -> float:
+        return self._default_singleStep_
+
+    @property
+    def decimals(self) -> int:
+        return self._decimals_
+
+    @decimals.setter
+    def decimals(self, val:int):
+        self.setDecimals(val)
+
+    def setDecimals(self, val:int):
+        if val < 0:
+            val = 0
+        self._decimals_ = val
+        self._spinBox_.setDecimals(self._decimals_)
+        # super().setDecimals(self._decimals_)
+
+    def validate(self, text:str, pos:int):
+        validator = InftyDoubleValidator(parent=self)
+        validator.suffix = self.suffix()
+        validator.prefix = self.prefix()
+        validator.setDecimals(self.getDecimals())
+        valid = validator.validate(text, pos)
+        self._validText_ = valid[0]
+
+        if valid[0] == QtGui.QValidator.Acceptable:
+            v = valid[1]
+            if len(self.suffix()) and self.suffix() in v:
+                sfndx = v.find(self.suffix())
+                if sfndx > 0:
+                    v = v[:sfndx]
+            if len(self.prefix()):
+                v = v[len(self.prefix()):]
+
+            v = v.strip()
+
+            self._magnitude_ = float(v)
+            # NOTE: 2026-01-20 14:32:14
+            # do NOT emit sig_valueChanged signal as it will create an inifinite loop
+            # try:
+            #     newVal = self._magnitude_ * self._units_.units if isinstance(self._units_, pq.Quantity) else self._magnitude_*pq.dimensionless
+            #     self.sig_valueChanged.emit(newVal)
+            # except:
+            #     traceback.print_exc()
+
+        return valid
+
+    def valueFromText(self, text:str):
+        print(f"{self.__class__.__name__}.valueFromText({text}) called")
+        suffix = self._suffix_
+        prefix = self._prefix_
+        s = text
+        if len(suffix):
+            sfndx = s.find(suffix)
+            if sfndx > 0:
+                s = s[:sfndx]
+
+        if len(prefix):
+            s = s[len(prefix):]
+
+        s = s.strip()
+
+        s = s.replace(",", "") # BUG: 2026-01-20 14:18:03 FIXME/TODO use locales!
+
+        if s == "NA":
+            ret = pd.NA
+        elif s.lower() == "nan":
+            ret = math.nan * self.units
+        else:
+            if len(s.strip()) == 0:
+                ret = math.nan
+            else:
+                if s.startswith("e"):
+                    s = "1"+s
+                elif s.startswith("+e"):
+                    s = s.replace("+e", "+1e")
+                elif s.startswith("-e"):
+                    s = s.replace("-e", "-1e")
+
+                ret = float(s)
+                # try:
+                # except ValueError:
+                #     pass
+            units = self.units
+            ret = ret * units.units if isinstance(units, pq.Quantity) else ret
+
+        return ret
+
+
+    def textFromValue(self, value:typing.Union[float, pq.Quantity, np.ndarray]):
+        # print(f"{self.objectName()}: {self.__class__.__name__}.textFromValue({value})")
+        if isinstance(value, (pq.Quantity, np.ndarray)):
+            if value.size > 1:
+                return "NA"
+
+            units = value.units if isinstance(value, pq.Quantity) else pq.dimensionless
+
+            prefix = ""
+            suffix = ""
+            family = scq.getUnitFamily(units)
+            if family == "Currency":
+                prefix = f"{units.dimensionality.unicode}"
+            else:
+                suffix = f"{units.dimensionality.unicode}"
+
+            fval = float(value.magnitude)
+
+            if np.isnan(fval):
+                ret = "NaN"
+            elif np.isinf(fval):
+                ret = "-Inf" if fval in (-np.inf, -math.inf) else "Inf"
+            else:
+                ret = f"{fval:.{self.decimals}}"
+                # ret = super().textFromValue(float(value.magnitude))
+
+            if len(prefix):
+                ret = f"{prefix} {ret}"
+            if len(suffix):
+                ret = f"{ret} {suffix}"
+
+            # print(f"\t ret -> {ret}")
+
+            return ret
+
+        elif isinstance(value, float):
+            if np.isnan(value):
+                ret = "NaN"
+            elif np.isinf(value):
+                ret = "-Inf" if value == -np.inf else "Inf"
+            else:
+                ret = f"{value:.{self.decimals}}"
+                # ret = super().textFromValue(value)
+
+            # print(f"\t ret -> {ret}")
+            return ret
+
+        else:
+            return "NA"
+
+    def setValue(self, value:typing.Union[pq.Quantity, float, int, type(pd.NA)]):
+        r"""Also allows changing the units if not convertible to current ones.
+        Otherwise the value will be rescaled to current units.
+    WARNING: This is different from the case when new units are chosen while
+    self.rescaleOnUnitChange is True.
+    """
+        from core.regexps import SCIENTIFIC_NUMBER_FORMAT_MATCH
+        # traceback.print_stack()
+
+        # print(f"{self.__class__.__name__}[{self.objectName()}].setValue({value})")
+
+        if isinstance(value, pq.Quantity):
+            if value.size > 1:
+                # return # Only scalar quantities are allowed
+                raise TypeError("Only scalar quantities are allowed; Quantity arrays should have size 1")
+
+            fval = float(value.magnitude.flatten()[0])
+
+            if not (self._keepDimensionless_ or self._forceDimensionless_):
+                if value.units != self.units:
+                    if scq.unitsConvertible(self.units, value.units):
+                        if fval > -math.inf and fval < math.inf:
+                            fval = float(value.rescale(self.units).magnitude)
+                    else:
+                        self.units = value.units
+
+            self._magnitude_ = fval
+
+        elif value is pd.NA or value in(math.nan, np.nan):
+            self._magnitude_ = value
+            self.units = None
+
+        elif isinstance(value, float):
+            self._magnitude_ = value
+            self.units = None
+
+        elif isinstance(value, int):
+            self._magnitude_ = float(value)
+            self.units = None
+
+        elif isinstance(value, (np.float64, np.int64)):
+            self._magnitude_ = float(value)
+            self.units = None
+
+        elif isinstance(value, np.ndarray):
+            if not issubclass(value.dtype.type, np.floating):
+                raise TypeError(f"Only floating point arrays; instead, got {value.dtype.type}")
+
+            if value.size > 1:
+                raise TypeError("Only scalar values are allowed; arrays should have size 1")
+
+            self._magnitude_ = value.flatten()[0]
+
+        else:
+            raise ValueError(f"Incompatible value: {value} ({type(value).__name__})")
+
+        # print(f"{self.__class__.__name__}.setValue({value}) -> self._magnitude_ = {self._magnitude_}")
+
+        self._update_()
+
+    def _update_(self,
+                 forceSgStep: typing.Optional[typing.Union[int, float]] = None,
+                 forceDecimals: typing.Optional[int] = None):
+        signalBlockers = list(map(QtCore.QSignalBlocker, (self, self.lineEdit())))
+        print(f"{self.__class__.__name__}[{self.objectName()}]._update_:")
+        print(f"\tmagnitude -> {self._magnitude_}")
+        print(f"\tunits -> {self._units_}")
+        print(f"\tdecimals -> {self._decimals_}")
+        print(f"\tsingle step -> {self._singleStep_}")
+        if self._magnitude_ is pd.NA:
+            self.setMinimum(-math.inf)
+            specialText = r"NA"
+            text = specialText
+
+            self._specialValueText_ = specialText
+
+            if len(self._prefix_):
+                text = f"{self._prefix_} {self._specialValueText_}"
+
+            if len(self._suffix_):
+                text = f"{text} {self._suffix_}"
+
+        elif self._magnitude_ in (math.nan, np.nan):
+            self.setMinimum(-math.inf)
+            specialText = r"NaN"
+            text = specialText
+            self._specialValueText_ = specialText
+
+            if len(self._prefix_):
+                text = f"{self._prefix_} {self._specialValueText_}"
+
+            if len(self._suffix_):
+                text = f"{text} {self._suffix_}"
+
+        elif isinstance(self._magnitude_, (float, int)):
+            if self._magnitude_ in (-math.inf, -np.inf):
+                specialText = r"-Inf"
+                text = specialText
+
+            elif self._magnitude_ in (math.inf, np.inf):
+                specialText = r"Inf"
+                text = specialText
+
+            else:
+                # NOTE: 2026-03-29 12:14:37
+                # the next line formats self._magnitude_ according to the number of decimals
+                # HOWEVER, this does NOT work when the generated text is in scientific format
+                # e.g., '1e-8'
+                text = f"{self._magnitude_:.{self.decimals+1}}"
+
+                mantissa, exponent, decimals = strutils.parse_sci_string(text)
+                # print(f"{self.__class__.__name__}._update_ -> mantissa = {mantissa}, exponent = {exponent}, decimals = {decimals}")
+                if exponent != 0:
+                    sign = "+" if exponent > 0 else "" # '-' wil be automatically inserted by Python library
+                    text = f"{mantissa:.{self.decimals}}e{sign}{exponent}"
+                # else:
+                #     text = f"{self._magnitude_:.{self.decimals+1}}"
+
+                print(f"\ttext -> {text}")
+
+                if not isinstance(forceSgStep, (int, float)) and not self.fixSingleStep:
+                    if self._magnitude_ < self._singleStep_:
+                        if exponent < 0 and abs(exponent) > self.decimals:
+                            step = 10**exponent
+                        else:
+                            step = 10**(-self.decimals + exponent)
+                        # print(f"\tnew step proposed: {step}")
+                        self.setSingleStep(step) # good fallback?
+                        self.fixSingleStep = False
+
+                    elif self._magnitude_ > self._singleStep_:
+                        if exponent > self.decimals:
+                            step = 10**(exponent - self.decimals)
+                            # print(f"\tnew step proposed: {step}")
+                            self.setSingleStep(step) # good fallback?
+                            self.fixSingleStep = False
+
+                specialText = ""
+
+            self._specialValueText_ = specialText
+            print(f"\t_specialValueText_ -> {self._specialValueText_}")
+
+            if len(self._specialValueText_):
+                text = self._specialValueText_
+
+            if len(self._prefix_):
+                text = f"{self._prefix_} {text} "
+
+            if len(self._suffix_):
+                text = f"{text} {self._suffix_}"
+
+        else:
+            raise TypeError(f"_magnitude_ expected to be a scalar quantity, a float or pd.NA; instead, got {type(value).__name__}")
+
+        print(f"\ttext -> {text}")
+
+        # print(f"{self.__class__.__name__}[{self.objectName()}]._update_()")
+        # super().setDecimals(self._decimals_)
+        self._spinBox_.setDecimals(self._decimals_)
+        print(f"\n\t -> decimals {self._decimals_}")
+        self._spinBox_.setValue(self._magnitude_)
+        # super().setValue(self._magnitude_)
+        print(f"\n\t -> magnitude {self._magnitude_}")
+        self._spinBox_.setSpecialValueText(self._specialValueText_)
+        # super().setSpecialValueText(self._specialValueText_)
+        print(f"\n\t -> specialValueText {self._specialValueText_}")
+        print(f"\n\t -> text {text}")
+        # if len(self._suffix_):
+        #     text = f"{text}{self._suffix_}"
+        self.lineEdit().setText(text)
+
+        # print(f"{self.__class__.__name__}._update_ -> decimals = {self.decimals}, text = {text}")
+
+    @property
+    def disableUnitChange(self) -> bool:
+        return self._disableUnitChange_
+
+    @disableUnitChange.setter
+    def disableUnitChange(self, val:bool):
+        self._disableUnitChange_ = val
+
+    @property
+    def rescaleOnUnitChange(self)->bool:
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return False
+        return self._rescaleOnUnitChange_
+
+    @rescaleOnUnitChange.setter
+    def rescaleOnUnitChange(self, val:bool):
+        if not (self._keepDimensionless_ or self._forceDimensionless_):
+            self._rescaleOnUnitChange_ = val
+
+    @property
+    def unitFamily(self):
+        if not (self._keepDimensionless_ or self._forceDimensionless_):
+            return self._unitFamily_
+
+    @property
+    def familyRestriction(self) -> str:
+        if not (self._keepDimensionless_ or self._forceDimensionless_):
+            return self._restrictedToFamily_
+
+    @familyRestriction.setter
+    def familyRestriction(self, value:typing.Optional[typing.Union[str, bool]] = None):
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return
+
+        if isinstance(value, str):
+            if value in scq.UNITS_DICT:
+                self._restrictedToFamily_ = value
+
+            elif isinstance(value, bool):
+                if value:
+                    self._restrictedToFamily_ = scq.getUnitFamily(self.units)
+        else:
+            self._restrictedToFamily_ = None
+
+    @Slot()
+    def _slot_setUnitsGUI(self):
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return
+        dlg = qd.QuickDialog(parent = self, title="Set units")
+        quantityWidget = QuantityChooserWidget(parent = dlg)
+        quantityWidget.units = self._units_
+        if isinstance(self._restrictedToFamily_, str) and self._restrictedToFamily_ in scq.UNITS_DICT:
+            quantityWidget.familyRestriction = self._restrictedToFamily_
+        else:
+            quantityWidget.familyRestriction = None
+
+        dlg.addWidget(quantityWidget)
+        dlg.adjustSize()
+        if dlg.exec():
+            self.units = quantityWidget.units
+
+    @Slot()
+    def _slot_setSingleStepGUI(self):
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return
+        dlg = qd.QuickDialog(parent=self, title="Set single step")
+        # stepInput = qd.HSpinBox(dlg, "Step (float)", widget_type="d")
+        stepInput = qd.HSpinBox(dlg, "Step (float|Scalar quantity):", widget_type="q")
+        stepInput.familyRestriction = scq.getUnitFamily(self.units)
+        stepInput.rescaleOnUnitChange = True
+        stepInput.units = self.units
+        stepInput.setDecimals(3)
+        stepInput.setValue(self.singleStep())
+        adaptiveCheckBox = qd.CheckBox(dlg, "Adaptive")
+        adaptiveCheckBox.setChecked(self.stepType() == QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+        dlg.addWidget(stepInput)
+        dlg.addWidget(adaptiveCheckBox)
+        dlg.adjustSize()
+        if dlg.exec():
+            value = stepInput.value()
+            stepType = QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType if adaptiveCheckBox.isChecked() else QtWidgets.QAbstractSpinBox.DefaultStepType
+            if value != self.singleStep():
+                self.setSingleStep(value)
+
+            if stepType != self.stepType():
+                self.setStepType(stepType)
+
+    @Slot(bool)
+    def _slot_toggleImmutableUnits(self, val:bool):
+        self.disableUnitChange = val
+
+    @Slot(bool)
+    def _slot_familyRestrictionChanged(self, value:bool):
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return
+
+        if value:
+            family = scq.getUnitFamily(self.units)
+            self._restrictedToFamily_ = family
+        else:
+            self._restrictedToFamily_ = None
+
+    @Slot(bool)
+    def _slot_setAdaptiveStep(self, value:bool):
+        stepType = QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType if value else QtWidgets.QAbstractSpinBox.DefaultStepType
+
+        if stepType != self.stepType():
+            self.setStepType(stepType)
+
+    @Slot(bool)
+    def _slot_rescaleValueChanged(self, value:bool):
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return
+        self._rescaleOnUnitChange_ = value
+
+    @Slot()
+    def _slot_setDecimalsGUI(self):
+        dlg = qd.QuickDialog(parent=self, title="Set decimals")
+        decimalsInput = qd.HSpinBox(dlg, "Decimals (int) >= 0:")
+        decimalsInput.setValue(self._decimals_)
+        decimalsInput.setMinimum(0)
+        dlg.addWidget(decimalsInput)
+        dlg.adjustSize()
+        if dlg.exec():
+            value = decimalsInput.value()
+            if value < 0:
+                value  = 0
+            self.setDecimals(value)
+
+    @Slot()
+    def _slot_setRangeGUI(self):
+        dlg = qd.QuickDialog(parent=self, title="Set range (min, max)")
+        group = qd.DialogGroup(dlg)
+        unitsLabel = ""
+        if not (self._keepDimensionless_ or self._forceDimensionless_):
+            unitsLabel = self._prefix_ if len(self._prefix_) else self._suffix_ if len(self._suffix_) else ""
+        minimumInput = qd.HSpinBox(group, f"Minimum:", widget_type="q", decimals=3)
+        minimumInput.setValue(self._default_internal_minimum_ * self.units)
+        maximumInput = qd.HSpinBox(group, f"Maximum:", widget_type="q", decimals=3)
+        maximumInput.setValue(self._default_internal_maximum_ * self.units)
+        group.addWidget(minimumInput)
+        group.addWidget(maximumInput)
+        dlg.addWidget(group)
+        dlg.adjustSize()
+
+        if dlg.exec():
+            minimum = minimumInput.value()
+            maximum = maximumInput.value()
+            self.setMinimum(minimum)
+            self.setMaximum(maximum)
+
+    @Slot()
+    def _slot_reset(self):
+        self.setSingleStep(self._default_singleStep_)
+        self.setDecimals(self._default_decimals_)
+        self.units = self._default_units_
+        self._magnitude_ = 0.
+
+    def _calculateAdaptiveDecimalStep(self, steps:int) -> float:
+        """Subject to future teaks, this is almost exactly what
+    QAbstractSpinBox.calculateAdaptiveDecimalStep() does.
+    The difference is that we use self._magnitude_ instead of self.value()
+    """
+        value = self._magnitude_
+        decimals = self.decimals
+        minStep = math.pow(10, -decimals)
+        absVal = abs(value)
+
+        if absVal < minStep:
+            return minStep
+
+        valNeg = value < 0
+        stepsNeg = steps < 0
+
+        if valNeg != stepsNeg:
+            absVal /= 1.01
+
+        shift = math.pow(10, 1 - math.floor(math.log(10, absVal)))
+        absRound = round(absVal * shift, decimals) / shift
+        logVal = math.floor(math.log(10, absRound)) - 1
+        return max(minStep, math.pow(10, logVal))
+
+    def stepBy(self, steps:int):
+        signalBlocker = QtCore.QSignalBlocker(self._lineEdit_)
+        step = self._singleStep_ * steps
+        print(f"{self.__class__.__name__}.stepBy({steps}) --> singleStep = {self._singleStep_}")
+        # print(f"\tsingle step = {self._singleStep_}; step  = {step}")
+        # print(f"\tcurrent magnitude: {self._magnitude_}")
+        if isinstance(self._singleStep_, pq.Quantity):
+            if self._singleStep_.size != 1:
+                raise ValueError(f"Single step must be a scalar; instead got {self._singleStep_}")
+
+            stepUnits = self._singleStep_.units
+
+            if isinstance(self._units_, pq.Quantity):
+                print(f"\t stepUnits = {stepUnits}, self._units_ = {self.units}")
+                if all(self._units_ != pq.dimensionless) and all(stepUnits != self._units_):
+                    if not scq.unitsConvertible(stepUnits, self._units_):
+                        raise ValueError(f"Step units ({stepUnits}) are incompatible with value's units ({self._units_})")
+
+                    sgStep = self._singleStep_.rescale(self._units_).magnitude
+
+                else:
+                    sgStep = self._singleStep_.magnitude
+            else:
+                sgStep = self._singleStep_.magnitude
+
+        elif isinstance(self._singleStep_, (int, float)):
+
+            sgStep = self._singleStep_
+
+        else:
+            raise TypeError(f"singleStep has wrong object type: {type(self._singleStep_).__name__}")
+
+        δVal = sgStep * steps
+        print(f"{self.__class__.__name__}.stepBy -> changed by {δVal}, for sgStep = {sgStep}")
+        oldMagnitude = self._magnitude_
+        newMagnitude = oldMagnitude + δVal
+        self._magnitude_ = newMagnitude
+        decimals = self._decimals_
+        self._lineEdit_.lazy = True
+        print(f"{self.__class__.__name__}.stepBy => old magnitude = {oldMagnitude}, new magnitude = {newMagnitude}, value: {self.value()}\n")
+        self._update_(forceSgStep = sgStep)
+        self._lineEdit_.lazy = False
+        self.sig_valueChanged.emit(self.value())
+
+    def singleStep(self) -> typing.Union[pq.Quantity, float, int]:
+        ret = self._singleStep_
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            return ret
+        else:
+            return ret * self.units
+
+    def setSingleStep(self, value:float|pq.Quantity):
+        print(f"{self.__class__.__name__}.setSingleStep({value})")
+        if isinstance(value, pq.Quantity):
+            if value.size != 1:
+                raise TypeError("Scalar quantity expected")
+
+            if value.units != self.units:
+                if isinstance(self.units, pq.Quantity):
+                    if not scq.unitsConvertible(value, self.units):
+                        raise ValueError(f"Cannot set single step with units ({value.units}) that are not scalable to the current units ({self.units})")
+                    v = float(value.rescale(self.units).magnitude)
+
+                else:
+                    v = float(value.units)
+
+            else:
+                v = float(value.units)
+
+        elif isinstance(value, (float, int)):
+            v = float(value)
+        else:
+            raise TypeError(f"Expecting a scalar quantity or float; instead, got a {type(value).__name__}")
+
+        self._singleStep_ = v
+        self._spinBox_.setSingleStep(self._singleStep_)
+        self.fixSingleStep = True
+
+        # super().setSingleStep(self._singleStep_)
+
+    @property
+    def keepDimensionless(self) -> bool:
+        return self._keepDimensionless_
+
+    @keepDimensionless.setter
+    def keepDimensionless(self, val:bool):
+        self._keepDimensionless_ = val
+        if self._keepDimensionless_ or self._forceDimensionless_:
+            self._spinBox_.setSuffix("")
+            self._spinBox_.setPrefix("")
+            # super().setSuffix("")
+            # super().setPrefix("")
+        else:
+            self._spinBox_.setSuffix(self._suffix_)
+            self._spinBox_.setPrefix(self._prefix_)
+            # super().setSuffix(self._suffix_)
+            # super().setPrefix(self._prefix_)
 
         self.update()
 
