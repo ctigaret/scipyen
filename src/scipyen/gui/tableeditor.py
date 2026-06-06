@@ -254,6 +254,7 @@ class TableEditor(ScipyenViewer):
 
     def _configureUI_(self):
         r"""Initializes and configures the GUI elements.
+    NOTE: There is NO UI file for this.
         """
         # NOTE: 2019-01-12 12:21:34
         # CAUTION: setting section resize mode policies to ResizeToContents has

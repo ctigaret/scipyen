@@ -48,6 +48,8 @@ except:
     __has_qtdbus__ = False
 
 from ephys.ephys import SynapticStimulus
+from core.prog import scipywarn
+from gui import guiutils
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -73,8 +75,13 @@ class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
 
         QWidget.__init__(self, parent=parent)
 
-        if not isinstance(obj, SynapticStimulus):
-            scipywarn(f"This widget does not support objects of type {type(obj).__name__}")
+        # self._hasData_ = False
+
+        # if obj is None:
+        #     obj = SynapticStimulus()
+
+        if not isinstance(obj, SynapticStimulus): # and obj is not None:
+            # scipywarn(f"This widget does not support objects of type {type(obj).__name__}")
             self._data_ = None
         else:
             self._data_ = obj
@@ -85,9 +92,9 @@ class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
             self._digital_ = self._data_.dig
 
         else:
-            self._name_ = self.defaultName
-            self._channel_ = self.defaultChannel
-            self._digital_ = self.defaultDigital
+            self._name_ = None
+            self._channel_ = None
+            self._digital_ = None
 
         self._configureUI_()
 
@@ -99,7 +106,8 @@ class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
         self.nameLineEdit.setToolTip("Name of the stimulus")
         self.nameLineEdit.setWhatsThis("Name of the stimulus")
         self.nameLineEdit.setStatusTip("Name of the stimulus")
-        self.nameLineEdit.setText(self._name_)
+        if isinstance(self._name_, str) and len(self._name_.strip()):
+            self.nameLineEdit.setText(self._name_)
         self.nameLineEdit.textChanged.connect(self._slot_nameChanged)
 
         self.outputChannelSpinBox.setToolTip("Output channel index")
@@ -111,29 +119,55 @@ class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
         self.isDigitalCheckBox.setToolTip("Is digital channel")
         self.isDigitalCheckBox.setWhatsThis("Is digital channel")
         self.isDigitalCheckBox.setStatusTip("Is digital channel")
-        self.isDigitalCheckBox.setChecked(self._digital_ is True)
+        if isinstance(self._digital_, bool):
+            self.isDigitalCheckBox.setChecked(self._digital_ is True)
         self.isDigitalCheckBox.toggled.connect(self._slot_isDigitalChanged)
+
+        self.createStimulusPushButton.setText("")
+        self.createStimulusPushButton.setIcon(guiutils.getIcon("list-add"))
+        self.createStimulusPushButton.setToolTip("Create stimulus")
+        self.createStimulusPushButton.setWhatsThis("Create stimulus")
+        self.createStimulusPushButton.setStatusTip("Create stimulus")
+
+        self.createStimulusPushButton.clicked.connect(self._slot_new)
 
     @Slot(str)
     def _slot_nameChanged(self, val:str):
         self._name_ = val
-        self.sig_valueChanged.emit(self.value())
+        self._make_value_()
+        if isinstance(self._data_ , SynapticStimulus):
+            self.sig_valueChanged.emit(self.value())
 
     @Slot(bool)
     def _slot_isDigitalChanged(self, val: bool):
         self._digital_ = val is True
-        self.sig_valueChanged.emit(self.value())
+        self._make_value_()
+        if isinstance(self._data_ , SynapticStimulus):
+            self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
     def _slot_outputChannelChanged(self, val:int):
         self._channel_ = val
-        self.sig_valueChanged.emit(self.value())
+        self._make_value_()
+        if isinstance(self._data_ , SynapticStimulus):
+            self.sig_valueChanged.emit(self.value())
+
+    @Slot()
+    def _slot_new(self):
+        self._make_value_()
+
+    def _make_value_(self):
+        if (isinstance(self._name_, str) and
+            isinstance(self._channel_, int) and
+            isinstance(self._digital_, bool)
+            ):
+            self._data_ = SynapticStimulus(self._name_, self._channel_, self._digital_)
 
     def setValue(self, val:typing.Optional[SynapticStimulus] = None):
         if isinstance(val, SynapticStimulus):
             self._name_ = val.name
             self._channel_ = val.channel
-            self._digital_ = val.digital is True
+            self._digital_ = val.dig is True
 
             sigBlock = list(map(
                                 lambda w: QtCore.QSignalBlocker(w),
@@ -148,7 +182,6 @@ class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
             self.isDigitalCheckBox.setChecked(self._digital_ is True)
 
     def value(self) -> SynapticStimulus:
-        self._data_ = SynapticStimulus(self._name_, self._channel_, self._digital_)
         return self._data_
 
 

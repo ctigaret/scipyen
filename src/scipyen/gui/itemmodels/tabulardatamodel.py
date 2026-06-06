@@ -78,6 +78,7 @@ from core.datatypes import array_slice
 from core.sysutils import adapt_ui_path
 from core import scipyen_quantities as scq
 from core import neoutils
+from ephys import ephys
 
 #### END pict.core modules
 
@@ -263,12 +264,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         if not modelIndex.isValid():
             return QtCore.Qt.ItemIsEnabled
 
-        # if self._readOnly_:
-        #     return QtCore.Qt.ItemIsSelectable
-
         return QtCore.Qt.ItemIsEditable | super().flags(modelIndex)
-
-        #return QtCore.Qt.ItemIsEditable | QtCore.Qt.ItemIsSelectable
 
     def setData(self: typing.Self, modelIndex: QtCore.QModelIndex,
                 value: object, role=QtCore.Qt.EditRole) -> bool:
@@ -405,6 +401,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         )
                     )
                 self._modelDataColumns_ = len(self._modelDataHeaderSections_)
+
+            elif isinstance(data, ephys.AuxiliaryInputList):
+                self._modelData_ = data
+                self._original_data_ = data
+                self._modelDataRows_ = len(data)
+                self._is_vigra_filter_kernel_ = 1
+                self._canAddRemoveRows_ = True
+                self._canAddRemoveColumns_ = True
 
             elif isinstance(data, np.ndarray):
                 # trying to streamline this
@@ -588,8 +592,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._canAddRemoveColumns_ = False
 
             self._displayedRows_ = 0
-
-            # print(f"{self.__class__.__name__}.setModelData({type(data).__name__}) execution during model reset took {timer1.elapsed()} milliseconds")
 
             self.endResetModel()
 
@@ -1002,6 +1004,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                 if isinstance(val, datetime.datetime):
                     ret = val if role == QtCore.Qt.EditRole else val.isoformat(" ")
+
                 else:
                     ret = val if role == QtCore.Qt.EditRole else f"{val}"
 
@@ -1025,10 +1028,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                 if isinstance(val, datetime.datetime):
                     ret = val if role == QtCore.Qt.EditRole else ret.isoformat(" ")
-                else:
+
+                else: # by default, value is a Quantity, here
                     ret = val if role == QtCore.Qt.EditRole else f"{val.magnitude}"
 
             elif isinstance(self._modelData_, np.ndarray):
+                # NOTE: 2026-06-06 16:05:25 this MAY be a general (generic) Quantity array, too!
                 if self._modelData_.ndim  == 0: # e.g. pq object
                     val = np.atleast_1d(self._modelData_)[row]
 
@@ -1041,8 +1046,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                 if isinstance(val, datetime.datetime):
                     ret = val if role == QtCore.Qt.EditRole else ret.isoformat(" ")
-                else:
-                    ret = val if role == QtCore.Qt.EditRole else f"{val}" #" f"{val.magnitude}" if isinstance(self._modelData_, pq.Quantity) else f"{val}"
+
+                else: # allow for python Quantity arrays, here
+                    ret = val if role == QtCore.Qt.EditRole else f"{val.magnitude}" if isinstance(self._modelData_, pq.Quantity) else f"{val}"
+                    # ret = val if role == QtCore.Qt.EditRole else f"{val}" #" f"{val.magnitude}" if isinstance(self._modelData_, pq.Quantity) else f"{val}"
 
             else:
                 return QtCore.QVariant()
@@ -1083,8 +1090,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             if isinstance(self._modelData_, pd.DataFrame):
                 if row >= self._modelData_.shape[0]:
                     return False
+
                 self._modelData_.iloc[row, col] = pyvalue
-                # self._modelData_.at[row, col] = pyvalue
                 return True
 
             elif isinstance(self._modelData_, pd.Series):

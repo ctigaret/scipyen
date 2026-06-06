@@ -184,6 +184,7 @@ from dataclasses import (dataclass, MISSING)
 import numpy as np
 import quantities as pq
 import neo
+from neo.core.objectlist import ObjectList as NeoObjectList
 import h5py
 import pandas as pd
 from tribool import Tribool
@@ -229,10 +230,9 @@ from core.prog import (safewrapper, with_doc, get_func_param_types, scipywarn)
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 from core.datazone import (DataZone, Interval)
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, )
-from core.triggerprotocols import TriggerProtocol
-
+from core.triggerprotocols import TriggerProtocol, TriggerProtocolList
 from core.typeenum import TypeEnum
-from core.scipyendataclasses import (Episode, Schedule,)
+from core.scipyendataclasses import (Episode, Schedule, ScipyenDataclass)
 from core import datatypes
 from core.datatypes import (check_type, type2str)
 from core import workspacefunctions
@@ -528,6 +528,169 @@ SynapticStimulus.name.__doc__ = "str: the name of this synaptic simulus; default
 SynapticStimulus.channel.__doc__ = "int, str: index or name of the output channel sending TTL triggers"
 SynapticStimulus.dig.__doc__ = "bool: indicates if the triggering channel if a digital output (True) or a DAC (False)"
 
+class SynapticStimulusList(NeoObjectList):
+    allowed_contents = (SynapticStimulus, )
+
+    def __init__(self, *items, name:typing.Optional[str] = None,
+                 parent: object = None):
+        self.name = "" if not isinstance(name, str) else name
+        self._items = list()
+
+        if len(items):
+            if len(items) == 1 and isinstance(items[0], typing.Sequence):
+                items = items[0]
+
+            if any(
+                not isinstance(i, self.allowed_contents)
+                or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents)))
+                for i in items):
+                raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(item).__name__}")
+
+            self._items = list(items)
+
+        if parent is not None and ScipyenDataclass not in inspect.getmro(type(parent)):
+            raise TypeError(f"Parent must be a ScipyenDataclass or None; got {type(parent).__name__} instead")
+
+        self._parent = parent
+
+    @property
+    def parent(self) -> ScipyenDataclass | None:
+        return self._parent
+
+    def __iter__(self):
+        """Implement iter(self)"""
+        for item in self._items:
+            yield item
+
+    def __getitem__(self, i: int) -> SynapticStimulus | None:
+        """x.__getitem__(y) <==> x[y]"""
+        if len(self._items) == 0:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+        if i < len(self._items) and i >= -len(self._items):
+            return self._items[i]
+
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+    def __setitem__(self, i: int, value: SynapticStimulus):
+        if not isinstance(value, self.allowed_contents):
+            raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(value).__name__}")
+
+        if len(self._items) == 0:
+            raise ValueError(f"Index {i} out of range for {len(self._items)} items")
+
+        if i < len(self._items) and i >= -len(self._items):
+            self._items[i] = value
+
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+    def __str__(self):
+        """Return str(self)"""
+        return f"<{self.__class__.__name__}> with {len(self._items)} {self.allowed_contents[0].__name__} objects"
+
+    def __repr__(self):
+        header = f"<{self.__class__.__name__}>"
+        if isinstance(self.name, str) and len(self.name.strip()):
+            header += f" '{self.name}'"
+
+        s = [f"{header} with {len(self._items)} {self.allowed_contents[0].__name__} objects",
+            ]
+
+        if len(self._items):
+            s[0]+= ":"
+            s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
+
+        return "\n".join(s)
+
+    def __len__(self):
+        """Return len(self)"""
+        return len(self._items)
+
+    def _add_items(self, other: typing.Self, in_place=False) -> typing.Self:
+        self._items = self._items + other._items
+        return self
+
+    def __add__(self, other):
+        """Return self + other"""
+        ret = self.__class__(self._items, parent=self.parent)
+        if isinstance(other, self.__class__):
+            return ret._add_items(other)
+
+        elif isinstance(other, self.allowed_contents):
+            ret._items.append(other)
+            return ret
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            ret._items.extend(list(other))
+            return ret
+
+        else:
+            return ret
+
+    def __iadd__(self, other):
+        """Return self"""
+        if isinstance(other, self.__class__):
+            return self._add_items(other, in_place=True)
+
+        elif isinstance(other, self.allowed_contents):
+            self._items.append(other)
+            return self
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            self._items.extend(list(other))
+            return self
+
+        else:
+            return self
+
+    def __radd__(self, other):
+        """Return other + self"""
+        ret = self.__class__(self._items, parent=self.parent)
+        if isinstance(other, self.__class__):
+            return other._add_items(ret)
+
+        elif isinstance(other, self.allowed_contents):
+            ret._items.append(other)
+            return ret
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            ret._items.extend(list(other))
+            return ret
+        else:
+            return ret
+
+    def append(self, obj):
+        """
+        Appends a SynapticStimulus
+
+        Parameters
+        ----------
+        obj: SynapticStimulus
+
+        """
+        if not isinstance(obj, self.allowed_contents):
+            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
+        self._items.append(obj)
+
+    def extend(self, iterable):
+        """Extends with additional SynapticStimulus objects from an iterable
+
+        Parameters
+        ----------
+        iterable: iterable[SynapticStimulus]
+
+        """
+        if all (isinstance(o, self.allowed_contents) for o in iterable):
+            self._items.extend(iterable)
+        else:
+            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
+
+
 def synstim(name:str, channel:typing.Optional[int]=None, dig:bool=True) -> SynapticStimulus:
     r"""Shorthand constructor of SynapticStimulus (saves typing)"""
     return SynapticStimulus(name, channel, dig)
@@ -536,7 +699,7 @@ class __BaseAuxInput__(typing.NamedTuple):
     name: str = "aux_in"
     adc: int = 0
     # adc: typing.Union[int, str] = 0
-    cmd: typing.Optional[bool] = None # reflects an input that "copies" a command signal
+    cmd: Tribool = Tribool() # reflects an input that "copies" a command signal
 
 class AuxiliaryInput(__BaseAuxInput__):
     __slots__ = ()
@@ -660,7 +823,169 @@ class AuxiliaryInput(__BaseAuxInput__):
 
 AuxiliaryInput.name.__doc__ = "str: name of the auxiliary input specification; default is 'aux_in'"
 AuxiliaryInput.adc.__doc__  = "int, str, None: index or name of the ADC channel used to record the auxiliary input; default is None."
-AuxiliaryInput.cmd.__doc__  = "bool, None: indicates if the auxiliary ADC records a clamping command signal (True), a trigger (TTL-like) signal (False) or any other analog input (None); default is None"
+AuxiliaryInput.cmd.__doc__  = "Tribool, None: indicates if the auxiliary ADC records a clamping command signal (True), a trigger (TTL-like) signal (False) or any other analog input (None); default is None"
+
+class AuxiliaryInputList(NeoObjectList):
+    allowed_contents = (AuxiliaryInput, )
+
+    def __init__(self, *items, name:typing.Optional[str] = None,
+                 parent: object = None):
+        self.name = "" if not isinstance(name, str) else name
+        self._items = list()
+
+        if len(items):
+            if len(items) == 1 and isinstance(items[0], typing.Sequence):
+                items = items[0]
+
+            if any(
+                not isinstance(i, self.allowed_contents)
+                or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents)))
+                for i in items):
+                raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(item).__name__}")
+
+            self._items = list(items)
+
+        if parent is not None and ScipyenDataclass not in inspect.getmro(type(parent)):
+            raise TypeError(f"Parent must be a ScipyenDataclass or None; got {type(parent).__name__} instead")
+
+        self._parent = parent
+
+    @property
+    def parent(self) -> ScipyenDataclass | None:
+        return self._parent
+
+    def __iter__(self):
+        """Implement iter(self)"""
+        for item in self._items:
+            yield item
+
+    def __getitem__(self, i: int) -> AuxiliaryInput | None:
+        """x.__getitem__(y) <==> x[y]"""
+        if len(self._items) == 0:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+        if i < len(self._items) and i >= -len(self._items):
+            return self._items[i]
+
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+    def __setitem__(self, i: int, value: AuxiliaryInput):
+        if not isinstance(value, self.allowed_contents):
+            raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(value).__name__}")
+
+        if len(self._items) == 0:
+            raise ValueError(f"Index {i} out of range for {len(self._items)} items")
+
+        if i < len(self._items) and i >= -len(self._items):
+            self._items[i] = value
+
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+    def __str__(self):
+        """Return str(self)"""
+        return f"<{self.__class__.__name__}> with {len(self._items)} {self.allowed_contents[0].__name__} objects"
+
+    def __repr__(self):
+        header = f"<{self.__class__.__name__}>"
+        if isinstance(self.name, str) and len(self.name.strip()):
+            header += f" '{self.name}'"
+
+        s = [f"{header} with {len(self._items)} {self.allowed_contents[0].__name__} objects",
+            ]
+
+        if len(self._items):
+            s[0]+= ":"
+            s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
+
+        return "\n".join(s)
+
+    def __len__(self):
+        """Return len(self)"""
+        return len(self._items)
+
+    def _add_items(self, other: typing.Self, in_place=False) -> typing.Self:
+        self._items = self._items + other._items
+        return self
+
+    def __add__(self, other):
+        """Return self + other"""
+        ret = self.__class__(self._items, parent=self.parent)
+        if isinstance(other, self.__class__):
+            return ret._add_items(other)
+
+        elif isinstance(other, self.allowed_contents):
+            ret._items.append(other)
+            return ret
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            ret._items.extend(list(other))
+            return ret
+
+        else:
+            return ret
+
+    def __iadd__(self, other):
+        """Return self"""
+        if isinstance(other, self.__class__):
+            return self._add_items(other, in_place=True)
+
+        elif isinstance(other, self.allowed_contents):
+            self._items.append(other)
+            return self
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            self._items.extend(list(other))
+            return self
+
+        else:
+            return self
+
+    def __radd__(self, other):
+        """Return other + self"""
+        ret = self.__class__(self._items, parent=self.parent)
+        if isinstance(other, self.__class__):
+            return other._add_items(ret)
+
+        elif isinstance(other, self.allowed_contents):
+            ret._items.append(other)
+            return ret
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            ret._items.extend(list(other))
+            return ret
+        else:
+            return ret
+
+    def append(self, obj):
+        """
+        Appends an AuxiliaryInput
+
+        Parameters
+        ----------
+        obj: AuxiliaryInput
+
+        """
+        if not isinstance(obj, self.allowed_contents):
+            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
+        self._items.append(obj)
+
+    def extend(self, iterable):
+        """Extends with additional AuxiliaryInput objects from an iterable
+
+        Parameters
+        ----------
+        iterable: iterable[AuxiliaryInput]
+
+        """
+        if all (isinstance(o, self.allowed_contents) for o in iterable):
+            self._items.extend(iterable)
+        else:
+            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
 
 def auxinput(name:str, adc:typing.Optional[int]=None, cmd:typing.Optional[bool]=None) -> AuxiliaryInput:
     r"""Constructs a run-of-the-mill AuxiliaryInput"""
@@ -796,6 +1121,169 @@ AuxiliaryOutput.name.__doc__ = "str: name of this auxiliary output specification
 AuxiliaryOutput.channel.__doc__ = "int, str: specifies the auxiliary output channel (index or name if a DAC channel, otherwise index only); default is 0"
 AuxiliaryOutput.digttl.__doc__ = "bool, or None: flag to indicate if the output is used to send out triggers via a DIG (True), emulated via a DAC (False) or other waveforms (None); default is None"
 
+class AuxiliaryOutputList(NeoObjectList):
+    allowed_contents = (AuxiliaryOutput, )
+
+    def __init__(self, *items, name:typing.Optional[str] = None,
+                 parent: object = None):
+        self.name = "" if not isinstance(name, str) else name
+        self._items = list()
+
+        if len(items):
+            if len(items) == 1 and isinstance(items[0], typing.Sequence):
+                items = items[0]
+
+            if any(
+                not isinstance(i, self.allowed_contents)
+                or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents)))
+                for i in items):
+                raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(item).__name__}")
+
+            self._items = list(items)
+
+        if parent is not None and ScipyenDataclass not in inspect.getmro(type(parent)):
+            raise TypeError(f"Parent must be a ScipyenDataclass or None; got {type(parent).__name__} instead")
+
+        self._parent = parent
+
+    @property
+    def parent(self) -> ScipyenDataclass | None:
+        return self._parent
+
+    def __iter__(self):
+        """Implement iter(self)"""
+        for item in self._items:
+            yield item
+
+    def __getitem__(self, i: int) -> AuxiliaryOutput | None:
+        """x.__getitem__(y) <==> x[y]"""
+        if len(self._items) == 0:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+        if i < len(self._items) and i >= -len(self._items):
+            return self._items[i]
+
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+    def __setitem__(self, i: int, value: AuxiliaryOutput):
+        if not isinstance(value, self.allowed_contents):
+            raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(value).__name__}")
+
+        if len(self._items) == 0:
+            raise ValueError(f"Index {i} out of range for {len(self._items)} items")
+
+        if i < len(self._items) and i >= -len(self._items):
+            self._items[i] = value
+
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+    def __str__(self):
+        """Return str(self)"""
+        return f"<{self.__class__.__name__}> with {len(self._items)} {self.allowed_contents[0].__name__} objects"
+
+    def __repr__(self):
+        header = f"<{self.__class__.__name__}>"
+        if isinstance(self.name, str) and len(self.name.strip()):
+            header += f" '{self.name}'"
+
+        s = [f"{header} with {len(self._items)} {self.allowed_contents[0].__name__} objects",
+            ]
+
+        if len(self._items):
+            s[0]+= ":"
+            s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
+
+        return "\n".join(s)
+
+    def __len__(self):
+        """Return len(self)"""
+        return len(self._items)
+
+    def _add_items(self, other: typing.Self, in_place=False) -> typing.Self:
+        self._items = self._items + other._items
+        return self
+
+    def __add__(self, other):
+        """Return self + other"""
+        ret = self.__class__(self._items, parent=self.parent)
+        if isinstance(other, self.__class__):
+            return ret._add_items(other)
+
+        elif isinstance(other, self.allowed_contents):
+            ret._items.append(other)
+            return ret
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            ret._items.extend(list(other))
+            return ret
+
+        else:
+            return ret
+
+    def __iadd__(self, other):
+        """Return self"""
+        if isinstance(other, self.__class__):
+            return self._add_items(other, in_place=True)
+
+        elif isinstance(other, self.allowed_contents):
+            self._items.append(other)
+            return self
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            self._items.extend(list(other))
+            return self
+
+        else:
+            return self
+
+    def __radd__(self, other):
+        """Return other + self"""
+        ret = self.__class__(self._items, parent=self.parent)
+        if isinstance(other, self.__class__):
+            return other._add_items(ret)
+
+        elif isinstance(other, self.allowed_contents):
+            ret._items.append(other)
+            return ret
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            ret._items.extend(list(other))
+            return ret
+        else:
+            return ret
+
+    def append(self, obj):
+        """
+        Appends an AuxiliaryOutput
+
+        Parameters
+        ----------
+        obj: AuxiliaryOutput
+
+        """
+        if not isinstance(obj, self.allowed_contents):
+            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
+        self._items.append(obj)
+
+    def extend(self, iterable):
+        """Extends with additional AuxiliaryOutput objects from an iterable
+
+        Parameters
+        ----------
+        iterable: iterable[AuxiliaryOutput]
+
+        """
+        if all (isinstance(o, self.allowed_contents) for o in iterable):
+            self._items.extend(iterable)
+        else:
+            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
+
+
 def auxoutput(name:str, channel:typing.Optional[int]=None, digttl:typing.Optional[bool]=None) -> AuxiliaryOutput:
     r"""Constructs a run-of-the-mill AuxiliaryOutput"""
     if channel is None:
@@ -811,14 +1299,14 @@ class RecordingSource():
     name: str = "cell"
     adc: int = 0
     dac: typing.Optional[int] = None
-    syn: typing.Optional[typing.Union[SynapticStimulus, typing.Sequence[SynapticStimulus]]]     = dataclasses.field(default_factory=list)
-    auxin: typing.Optional[typing.Union[AuxiliaryInput,   typing.Sequence[AuxiliaryInput]]]     = dataclasses.field(default_factory=list)
-    auxout: typing.Optional[typing.Union[AuxiliaryOutput,  typing.Sequence[AuxiliaryOutput]]]   = dataclasses.field(default_factory=list)
+    syn: typing.Optional[SynapticStimulusList]     = dataclasses.field(default_factory=SynapticStimulusList)
+    auxin: typing.Optional[AuxiliaryInputList]     = dataclasses.field(default_factory=AuxiliaryInputList)
+    auxout: typing.Optional[AuxiliaryOutputList]   = dataclasses.field(default_factory=AuxiliaryOutputList)
     electrodeMode: ElectrodeMode = dataclasses.field(default=ElectrodeMode.Null)
-    # pathways: dataclasses.InitVar[typing.Sequence[SynapticPathway]] = tuple()
 
     def __post_init__(self):
-        pathways = list()
+        # pathways = list()
+        pathways = SynapticPathwayList(name=self.name)
         for syn in self.syn:
             if isinstance(syn, SynapticStimulus):
                 pathways.append(SynapticPathway(stimulus = syn,
@@ -826,7 +1314,8 @@ class RecordingSource():
                                         dac = self.dac,
                                         electrode = self.electrodeMode))
 
-        self.pathways = tuple(pathways)
+        self.pathways = pathways
+        # self.pathways = tuple(pathways)
 
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
@@ -2212,7 +2701,6 @@ class RecordingSchedule(Schedule):
 
         return cls(name, episodes=episodes)
 
-
 @dataclass
 class SynapticPathway:
     r"""Logical association of a SynapticStimulus with a recording configuration.
@@ -2436,6 +2924,171 @@ class SynapticPathway:
         initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
 
         return cls(**initkwargs)
+
+
+class SynapticPathwayList(NeoObjectList):
+    allowed_contents  = (SynapticPathway, )
+
+    def __init__(self, *items, name:typing.Optional[str] = None,
+                 parent: object = None):
+
+        self.name = "" if not isinstance(name, str) else name
+        self._items = list()
+
+        if len(items):
+            if len(items) == 1 and isinstance(items[0], typing.Sequence):
+                items = items[0]
+
+            if any(
+                not isinstance(i, self.allowed_contents)
+                or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents)))
+                for i in items):
+                raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(item).__name__}")
+
+            self._items = list(items)
+
+        if parent is not None and ScipyenDataclass not in inspect.getmro(type(parent)):
+            raise TypeError(f"Parent must be a ScipyenDataclass or None; got {type(parent).__name__} instead")
+
+        self._parent = parent
+
+    @property
+    def parent(self) -> ScipyenDataclass | None:
+        return self._parent
+
+    def __iter__(self):
+        """Implement iter(self)"""
+        for item in self._items:
+            yield item
+
+    def __getitem__(self, i: int) -> SynapticPathway | None:
+        """x.__getitem__(y) <==> x[y]"""
+        if len(self._items) == 0:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+        if i < len(self._items) and i >= -len(self._items):
+            return self._items[i]
+
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+    def __setitem__(self, i: int, value: SynapticPathway):
+        if not isinstance(value, self.allowed_contents):
+            raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(value).__name__}")
+
+        if len(self._items) == 0:
+            raise ValueError(f"Index {i} out of range for {len(self._items)} items")
+
+        if i < len(self._items) and i >= -len(self._items):
+            self._items[i] = value
+
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+    def __str__(self):
+        """Return str(self)"""
+        return f"<{self.__class__.__name__}> with {len(self._items)} {self.allowed_contents[0].__name__} objects"
+
+    def __repr__(self):
+        header = f"<{self.__class__.__name__}>"
+        if isinstance(self.name, str) and len(self.name.strip()):
+            header += f" '{self.name}'"
+
+        s = [f"{header} with {len(self._items)} {self.allowed_contents[0].__name__} objects",
+            ]
+
+        if len(self._items):
+            s[0]+= ":"
+            s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
+
+        return "\n".join(s)
+
+    def __len__(self):
+        """Return len(self)"""
+        return len(self._items)
+
+    def _add_items(self, other: typing.Self, in_place=False) -> typing.Self:
+        self._items = self._items + other._items
+        return self
+
+    def __add__(self, other):
+        """Return self + other"""
+        ret = self.__class__(self._items, parent=self.parent)
+        if isinstance(other, self.__class__):
+            return ret._add_items(other)
+
+        elif isinstance(other, self.allowed_contents):
+            ret._items.append(other)
+            return ret
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            ret._items.extend(list(other))
+            return ret
+
+        else:
+            return ret
+
+    def __iadd__(self, other):
+        """Return self"""
+        if isinstance(other, self.__class__):
+            return self._add_items(other, in_place=True)
+
+        elif isinstance(other, self.allowed_contents):
+            self._items.append(other)
+            return self
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            self._items.extend(list(other))
+            return self
+
+        else:
+            return self
+
+    def __radd__(self, other):
+        """Return other + self"""
+        ret = self.__class__(self._items, parent=self.parent)
+        if isinstance(other, self.__class__):
+            return other._add_items(ret)
+
+        elif isinstance(other, self.allowed_contents):
+            ret._items.append(other)
+            return ret
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            ret._items.extend(list(other))
+            return ret
+        else:
+            return ret
+
+    def append(self, obj):
+        """
+        Appends a SynapticStimulus
+
+        Parameters
+        ----------
+        obj: SynapticStimulus
+
+        """
+        if not isinstance(obj, self.allowed_contents):
+            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
+        self._items.append(obj)
+
+    def extend(self, iterable):
+        """Extends with additional SynapticStimulus objects from an iterable
+
+        Parameters
+        ----------
+        iterable: iterable[SynapticStimulus]
+
+        """
+        if all (isinstance(o, self.allowed_contents) for o in iterable):
+            self._items.extend(iterable)
+        else:
+            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
+
 
 class DataListener(QtCore.QObject):
     r"""

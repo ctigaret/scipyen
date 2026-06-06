@@ -59,17 +59,30 @@ from iolib.navigation.navigator import UrlNavigatorButtonBase
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 class ElidedPushButton(UrlNavigatorButtonBase):
-    def __init__(self, text: str = "", elideText: bool = True, parent = None):
-        super().__init__(parent=parent)
+    def __init__(self, parent = None, text: str = "", elideText: bool = True):
+        txt_ = None
+        if isinstance(parent, QtWidgets.QWidget):
+            parent_ = parent
+        else:
+            if isinstance(parent, str):
+                txt_ = parent
+            parent_ = None
+        super().__init__(parent=parent_)
+
+        if isinstance(parent_, QtWidgets.QWidget) and hasattr(parent_, "addWidget"):
+            parent_.addWidget(self)
+
         self.setMouseTracking(True)
         self._elideText_ = elideText is True
         self.setElideTextAction = QtGui.QAction("Elide text", self)
         self.setElideTextAction.setCheckable(True)
         self.setElideTextAction.setChecked(self._elideText_ is True)
         self.setElideTextAction.toggled.connect(self._slot_setElideText)
-        self._text_ = ""
-        if isinstance(text, str) and len(text.strip()):
-            self.setText(text)
+        if self._text_ is None and isinstance(text, str) and len(text.strip()):
+            txt_ = text
+        else:
+            txt_ = ""
+        self.setText(txt_)
 
     def paintEvent(self, evt: QtGui.QPaintEvent):
         painter = QtGui.QPainter(self)
@@ -273,7 +286,15 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
                     For a list of units families, type `scq.unitFamilies()` in
                     Scipyen's console
         """
-        QWidget.__init__(self, parent=parent)
+        if isinstance(parent, QtWidgets.QWidget):
+            parent_ = parent
+        else:
+            parent_ = None
+
+        QWidget.__init__(self, parent=parent_)
+
+        if isinstance(parent_, QtWidgets.QWidget) and hasattr(parent_, "addWidget"):
+            parent_.addWidget(self)
 
         _irreds = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])]
         _derived = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])==0]
@@ -475,11 +496,18 @@ class LineEdit(QtWidgets.QLineEdit):
 """
     sig_enterPressed = Signal(str, name="sig_enterPressed")
     sig_lazy = Signal(bool, name="sig_lazy")
-    def __init__(self, contents: typing.Optional[str] = None,
-                 parent: typing.Optional[QtWidgets.QWidget] = None,
+    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
+                 contents: typing.Optional[str] = None,
                  lazy: bool = False,
                  validator: typing.Optional[QtGui.QValidator] = None):
+        if isinstance(parent, QtWidgets.QWidget):
+            parent_ = parent
+        else:
+            parent_ = None
         super().__init__(parent=parent)
+        if isinstance(parent_, QtWidgets.QWidget) and hasattr(parent_, "addWidget"):
+            parent_.addWidget(self)
+
         self._variable_ = contents
         self._lazy_: bool = lazy is True
         self._custom_menu_: typing.Optional[QtWidgets.QMenu] = None
@@ -623,21 +651,31 @@ class ArrayEditorWidget(QtWidgets.QFrame):
     r"""Widget for editing (small) numeric arrays"""
     sig_valueChanged = Signal(object, name = "sig_valueChanged")
 
-    def __init__(self, value: typing.Optional[
+    def __init__(self, parent = None,
+                 value: typing.Optional[
                         typing.Union[np.ndarray, typing.Sequence, typing.Set]
                         ] = None,
-                 parent = None):
-        super().__init__(parent = parent)
+                 ):
+        value_ = None
         if isinstance(parent, QtWidgets.QWidget):
-            parent.addWidget(self)
+            parent_ = parent
+        else:
+            # if isinstance(parent, (np.ndarray, typin.Sequence, typing.Set)):
+            if (isinstance(parent, np.ndarray) and issubclass(parent.dtype.type, np.number)
+                or (isinstance(parent, (typing.Sequence, typing.Set)) and all(isinstance(v, numbers.Number) for v in parent))):
+                value_ = parent
+            parent_ = None
+
+        super().__init__(parent = parent_)
+
+        if isinstance(parent_, QtWidgets.QWidget) and hasattr(parent_, "addWidget"):
+            parent_.addWidget(self)
 
         self._inputWidget_ = None
 
-        if (isinstance(value, np.ndarray) and issubclass(value.dtype.type, np.number)
-            or (isinstance(value, (typing.Sequence, typing.Set)) and all(isinstance(v, numbers.Number) for v in value))):
-            self._value_ = value
-        else:
-            self._value_ = None
+        if value_ is None and (isinstance(value, np.ndarray) and issubclass(value.dtype.type, np.number)
+                or (isinstance(value, (typing.Sequence, typing.Set)) and all(isinstance(v, numbers.Number) for v in value))):
+                value_ = value
 
         self._configureUI_()
 
@@ -785,11 +823,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                                                      float, int, complex,
                                                      np.integer, np.floating,
                                                      np.complexfloating]] = None,
+                 /,
                  singleStep: typing.Optional[float] = None,
                  stepType: typing.Optional[QtWidgets.QAbstractSpinBox.StepType] = None,
                  decimals: typing.Optional[int] = None,
-                 # minimum: typing.Optional[typing.Union[pq.Quantity, float]] = sys.float_info.min,
-                 # maximum: typing.Optional[typing.Union[pq.Quantity, float]] = sys.float_info.max,
                  minimum: typing.Optional[typing.Union[pq.Quantity, float]] = None,
                  maximum: typing.Optional[typing.Union[pq.Quantity, float]] = None,
                  unitsFamily: typing.Optional[str] = None,
@@ -840,6 +877,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self._prefix_ = ""
         self._suffix_ = ""
         self._specialValueText_: str = ""
+        self._fixSingleStep_: bool = False
 
         if isinstance(units, pq.Quantity):
             self._units_ = units.units
@@ -889,14 +927,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         else:
             raise TypeError(f"singleStep expected to be a float or None; instead, got {singleStep}")
 
-
         if isinstance(decimals, int) and decimals >= 0:
             self._decimals_ = decimals
 
         elif decimals is None:
-            self._decimals_ = np.get_printoptions()["precision"]
-            # self._decimals_ = -int(math.log10(abs(self._singleStep_))) if (self._singleStep_ < 1 and self._singleStep_ > -1) else self._default_decimals_
-            # self._decimals_ = self._default_decimals_
+            # self._decimals_ = np.get_printoptions()["precision"]
+            self._decimals_ = self._default_decimals_
 
         else:
             raise TypeError(f"decimals expected to be an int >= 0 or None; instead, got {decimals}")
@@ -913,7 +949,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         # super().setPrefix(self._prefix_)
 
         self.setSingleStep(self._singleStep_)
-        self.setDecimals(self._decimals_)
+        self.setDecimals(self._decimals_) # also calls super().setDecimals(…)
         # super().setValue(self._magnitude_) # will also set prefix suffix and specialValueText
 
         if isinstance(stepType, QtWidgets.QAbstractSpinBox.StepType):
@@ -925,9 +961,6 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         super().setRange(self._internal_minimum, self._internal_maximum)
 
-        # if isinstance(units, pq.Quantity) and not isinstance(units, pq.UnitQuantity):
-        #     self.setValue(units)
-
         self.setValue(self._magnitude_ * self._units_)
 
         # super().valueChanged.connect(self._slot_valueChanged)
@@ -936,6 +969,14 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         super().lineEdit().sig_enterPressed.connect(self._slot_valueTextChanged)
 
         # self.lineEdit().installEventFilter(self)
+
+    @property
+    def fixSingleStep(self) -> bool:
+        return self._fixSingleStep_
+
+    @fixSingleStep.setter
+    def fixSingleStep(self, val:bool):
+        self._fixSingleStep_ = val is True
 
     @property
     def units(self) -> pq.Quantity:
@@ -1239,6 +1280,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         return self._decimals_
 
     @property
+    def defaultSingleStep(self) -> float:
+        return self._default_singleStep_
+
+    @property
     def decimals(self) -> int:
         return self._decimals_
 
@@ -1283,6 +1328,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         return valid
 
     def valueFromText(self, text:str):
+        print(f"{self.__class__.__name__}.valueFromText({text}) called")
         suffix = self._suffix_
         prefix = self._prefix_
         s = text
@@ -1429,13 +1475,19 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         else:
             raise ValueError(f"Incompatible value: {value} ({type(value).__name__})")
 
+        # print(f"{self.__class__.__name__}.setValue({value}) -> self._magnitude_ = {self._magnitude_}")
+
         self._update_()
 
     def _update_(self,
                  forceSgStep: typing.Optional[typing.Union[int, float]] = None,
                  forceDecimals: typing.Optional[int] = None):
         signalBlockers = list(map(QtCore.QSignalBlocker, (self, self.lineEdit())))
-        # super().setValue(self._magnitude_)
+        print(f"{self.__class__.__name__}[{self.objectName()}]._update_:")
+        print(f"\tmagnitude -> {self._magnitude_}")
+        print(f"\tunits -> {self._units_}")
+        print(f"\tdecimals -> {self._decimals_}")
+        print(f"\tsingle step -> {self._singleStep_}")
         if self._magnitude_ is pd.NA:
             self.setMinimum(-math.inf)
             specialText = r"NA"
@@ -1448,11 +1500,6 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
             if len(self._suffix_):
                 text = f"{text} {self._suffix_}"
-
-            # super().setSpecialValueText(self._specialValueText_)
-            # super().setValue(self._magnitude_)
-
-            # self.lineEdit().setText(text)
 
         elif self._magnitude_ in (math.nan, np.nan):
             self.setMinimum(-math.inf)
@@ -1487,10 +1534,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 if exponent != 0:
                     sign = "+" if exponent > 0 else "" # '-' wil be automatically inserted by Python library
                     text = f"{mantissa:.{self.decimals}}e{sign}{exponent}"
-                else:
-                    text = f"{self._magnitude_:.{self.decimals}}"
+                # else:
+                #     text = f"{self._magnitude_:.{self.decimals+1}}"
 
-                if not isinstance(forceSgStep, (int, float)):
+                print(f"\ttext -> {text}")
+
+                if not isinstance(forceSgStep, (int, float)) and not self.fixSingleStep:
                     if self._magnitude_ < self._singleStep_:
                         if exponent < 0 and abs(exponent) > self.decimals:
                             step = 10**exponent
@@ -1498,16 +1547,19 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                             step = 10**(-self.decimals + exponent)
                         # print(f"\tnew step proposed: {step}")
                         self.setSingleStep(step) # good fallback?
+                        self.fixSingleStep = False
 
                     elif self._magnitude_ > self._singleStep_:
                         if exponent > self.decimals:
                             step = 10**(exponent - self.decimals)
                             # print(f"\tnew step proposed: {step}")
                             self.setSingleStep(step) # good fallback?
+                            self.fixSingleStep = False
 
                 specialText = ""
 
             self._specialValueText_ = specialText
+            print(f"\t_specialValueText_ -> {self._specialValueText_}")
 
             if len(self._specialValueText_):
                 text = self._specialValueText_
@@ -1520,15 +1572,20 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         else:
             raise TypeError(f"_magnitude_ expected to be a scalar quantity, a float or pd.NA; instead, got {type(value).__name__}")
+
+        print(f"\ttext -> {text}")
+
         # print(f"{self.__class__.__name__}[{self.objectName()}]._update_()")
-        # print(f"\n\t -> decimals {self._decimals_}")
         super().setDecimals(self._decimals_)
-        # print(f"\n\t -> magnitude {self._magnitude_}")
+        print(f"\n\t -> decimals {self._decimals_}")
         super().setValue(self._magnitude_)
-        # print(f"\n\t -> specialValueText {self._specialValueText_}")
+        print(f"\n\t -> magnitude {self._magnitude_}")
         super().setSpecialValueText(self._specialValueText_)
-        # print(f"\n\t -> text {text}")
+        print(f"\n\t -> specialValueText {self._specialValueText_}")
+        print(f"\n\t -> text {text}")
         self.lineEdit().setText(text)
+
+        # print(f"{self.__class__.__name__}._update_ -> decimals = {self.decimals}, text = {text}")
 
     @property
     def disableUnitChange(self) -> bool:
@@ -1715,42 +1772,45 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     def stepBy(self, steps:int):
         signalBlocker = QtCore.QSignalBlocker(self._lineEdit_)
         step = self._singleStep_ * steps
-        # print(f"{self.__class__.__name__}.stepBy({steps})")
+        print(f"{self.__class__.__name__}.stepBy({steps}) --> singleStep = {self._singleStep_}")
         # print(f"\tsingle step = {self._singleStep_}; step  = {step}")
         # print(f"\tcurrent magnitude: {self._magnitude_}")
         if isinstance(self._singleStep_, pq.Quantity):
             if self._singleStep_.size != 1:
                 raise ValueError(f"Single step must be a scalar; instead got {self._singleStep_}")
+
             stepUnits = self._singleStep_.units
+
             if isinstance(self._units_, pq.Quantity):
+                print(f"\t stepUnits = {stepUnits}, self._units_ = {self.units}")
                 if all(self._units_ != pq.dimensionless) and all(stepUnits != self._units_):
                     if not scq.unitsConvertible(stepUnits, self._units_):
                         raise ValueError(f"Step units ({stepUnits}) are incompatible with value's units ({self._units_})")
 
                     sgStep = self._singleStep_.rescale(self._units_).magnitude
+
+                else:
+                    sgStep = self._singleStep_.magnitude
             else:
                 sgStep = self._singleStep_.magnitude
 
         elif isinstance(self._singleStep_, (int, float)):
+
             sgStep = self._singleStep_
+
         else:
             raise TypeError(f"singleStep has wrong object type: {type(self._singleStep_).__name__}")
 
-        self._magnitude_ = self._magnitude_ + sgStep * steps
-        # print(f"\tnew magnitude: {self._magnitude_}")
+        δVal = sgStep * steps
+        print(f"{self.__class__.__name__}.stepBy -> changed by {δVal}, for sgStep = {sgStep}")
+        oldMagnitude = self._magnitude_
+        newMagnitude = oldMagnitude + δVal
+        self._magnitude_ = newMagnitude
         decimals = self._decimals_
         self._lineEdit_.lazy = True
+        print(f"{self.__class__.__name__}.stepBy => old magnitude = {oldMagnitude}, new magnitude = {newMagnitude}, value: {self.value()}\n")
         self._update_(forceSgStep = sgStep)
         self._lineEdit_.lazy = False
-        # restore single step & decimals
-        # self._singleStep_ = sgStep
-        # self._decimals_ = decimals
-        # value = self._magnitude_ + steps * self._singleStep_
-        # super().stepBy(steps)
-        # txt = self.lineEdit().displayText()
-        # val = self.valueFromText(txt)
-        # self._magnitude_ = float(val)
-        # print(f"\tnew magnitude again: {self._magnitude_}")
         self.sig_valueChanged.emit(self.value())
 
     def singleStep(self) -> typing.Union[pq.Quantity, float, int]:
@@ -1761,14 +1821,19 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             return ret * self.units
 
     def setSingleStep(self, value:float|pq.Quantity):
+        print(f"{self.__class__.__name__}.setSingleStep({value})")
         if isinstance(value, pq.Quantity):
             if value.size != 1:
                 raise TypeError("Scalar quantity expected")
 
             if value.units != self.units:
-                if not scq.unitsConvertible(value, self.units):
-                    raise ValueError(f"Cannot set single step with units ({value.units}) that are not scalable to the current units ({self.units})")
-                v = float(value.rescale(self.units).magnitude)
+                if isinstance(self.units, pq.Quantity):
+                    if not scq.unitsConvertible(value, self.units):
+                        raise ValueError(f"Cannot set single step with units ({value.units}) that are not scalable to the current units ({self.units})")
+                    v = float(value.rescale(self.units).magnitude)
+
+                else:
+                    v = float(value.units)
 
             else:
                 v = float(value.units)
@@ -1779,6 +1844,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             raise TypeError(f"Expecting a scalar quantity or float; instead, got a {type(value).__name__}")
 
         self._singleStep_ = v
+        self.fixSingleStep = True
 
         # super().setSingleStep(self._singleStep_)
 
@@ -1833,9 +1899,21 @@ class ComplexSpinBox(QtWidgets.QFrame):
                  rescaleWithUnitsChange:bool=False,
                  keepDimensionless:bool=False,
                  ):
-        QtWidgets.QFrame.__init__(self, parent)
+
+        units_ = None
+
         if isinstance(parent, QtWidgets.QWidget):
-            parent.addWidget(self)
+            parent_ = parent
+        else:
+            parent_ = None
+            if isinstance(parent, (pq.Quantity, float, complex, int)):
+                units_ = parent
+
+        QtWidgets.QFrame.__init__(self, parent_)
+
+        if isinstance(parent_, QtWidgets.QWidget) and hasattr(parent_, "addWidget"):
+            parent_.addWidget(self)
+
         self._layout_ = QtWidgets.QHBoxLayout(self)
         self._layout_.setSpacing(0)
         self.prefixLabel = QtWidgets.QLabel(self)
@@ -1881,19 +1959,22 @@ class ComplexSpinBox(QtWidgets.QFrame):
         self._prefix_ = ""
         self._suffix_ = ""
 
-        if isinstance(units, pq.Quantity):
-            self._units_ = units.units
-            if not isinstance(units, pq.UnitQuantity):
-                if units.size != 1:
-                    raise TypeError(f"Expecting a scalar quantity; instead, got a Quantity array with {units.size} elements")
-                self._magnitude_ = complex(units.magnitude)
+        if units_ is None:
+            units_ = units
+
+        if isinstance(units_, pq.Quantity):
+            self._units_ = units_.units
+            if not isinstance(units_, pq.UnitQuantity):
+                if units_.size != 1:
+                    raise TypeError(f"Expecting a scalar quantity; instead, got a Quantity array with {units_.size} elements")
+                self._magnitude_ = complex(units_.magnitude)
         else:
-            if isinstance(units, (float, int)):
-                self._magnitude_ = complex(units)
-            elif isinstance(units, complex):
-                self._magnitude_ = units
-            elif units is not None:
-                raise TypeError(f"Invalid 'units' argument: {units}")
+            if isinstance(units_, (float, int)):
+                self._magnitude_ = complex(units_)
+            elif isinstance(units_, complex):
+                self._magnitude_ = units_
+            elif units_ is not None:
+                raise TypeError(f"Invalid 'units' argument: {units_}")
 
             self._units_ = self._default_units_
 
@@ -2021,6 +2102,7 @@ class ComplexSpinBox(QtWidgets.QFrame):
 
             if value.dtype == np.dtype("complex"):
                 cval = complex(value.magnitude)
+
             else:
                 cval = complex(float(value.magnitude), 0.0)
 
@@ -2406,27 +2488,38 @@ class GenericInputWidget(QtWidgets.QFrame):
     # TODO: 2026-04-09 01:14:54
     # implement instantiation of objects with default (0-argument) c'tor -- maybe in a separate widget
 
-    def __init__(self, varType: typing.Union[
-                            typing.Set[type], typing.Sequence[type],
-                            typing.Sequence[numbers.Number],
-                            pq.UnitQuantity, pq.Quantity,
-                            InputSpec, dataclasses.Field,
-                            type(None),
-                            type(dataclasses.MISSING)
-                            ] = dataclasses.MISSING,
-                 default = dataclasses.MISSING,
+    def __init__(self, parent = None, varType: typing.Union[
+                typing.Set[type], typing.Sequence[type],
+                typing.Sequence[numbers.Number],
+                pq.UnitQuantity, pq.Quantity,
+                InputSpec, dataclasses.Field,
+                type(None),
+                type(dataclasses.MISSING)
+                ] = dataclasses.MISSING,
+                default = dataclasses.MISSING,
                  value = dataclasses.MISSING,
                  valueChoices: typing.Optional[
                      typing.Union[typing.Set, typing.Sequence]
                      ] = None,
-                 parent = None):
-        super().__init__(parent = parent)
+
+                 ):
         if isinstance(parent, QtWidgets.QWidget):
-            parent.addWidget(self)
+            parent_ = parent
+        else:
+            parent_ = None
+
+        super().__init__(parent = parent_)
+
+        if isinstance(parent_, QtWidgets.QWidget) and hasattr(parent_, "addWidget"):
+            parent_.addWidget(self)
 
         self._inputWidget_ = None
         self._typeCombo_ = None
         self._value_ = dataclasses.MISSING
+
+        if not isinstance(varType, type):
+            self._value_ = varType
+            self._vartype_ = type(self._value_)
 
         if varType == dataclasses.MISSING:
             # NOTE: 2026-04-06 22:13:01

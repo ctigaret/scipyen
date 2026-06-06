@@ -405,11 +405,6 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     widget.setValue(data)
                     widget.sig_valueChanged.connect(self.slot_valueChanged)
 
-            # if widget:
-            #     widget.setValue(data)
-            # if widget and not inModel:
-            #     widget.setValue(data)
-
         elif isinstance(data, (complex, np.complexfloating)):
             widget = smw.ComplexSpinBox(parent, data)
             widget.setValue(data)
@@ -584,6 +579,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         if hasattr(widget, "setFrame"):
             widget.setFrame(False)
         widget.setAutoFillBackground(True)
+        widget.setObjectName(f"{type(widget).__name__}_delegate")
 
         return widget
 
@@ -639,6 +635,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
     def createEditor(self, parent:QtWidgets.QWidget, option:int,
                      index:QtCore.QModelIndex) -> QtWidgets.QWidget | None:
+        r"""Overrides QStyledItemDelegate.createEditor"""
         self._currentModelIndex_ = index
         # NOTE: 2025-09-27 10:29:14 ATTENTION
         # editor data, although it can also be set here, it should be set through
@@ -722,7 +719,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
     def setEditorData(self, editor: QtWidgets.QWidget,
                       index: QtCore.QModelIndex):
-        r"""Sets the value of the editor widget based on the EditRole data in the QModelIndex"""
+        r"""Sets the value of the editor widget based on the EditRole data in the QModelIndex.
+    Overrides QStyledItemDelegate.setEditorData
+    """
         from gui.widgets.tableeditorwidget import TableEditorWidget
         data = index.data(ObjectDataRole) # noqa
 
@@ -810,15 +809,21 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             elif isinstance(data, float) or "float" in type(data).__name__:
                 assert isinstance(editor, QtWidgets.QDoubleSpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for floating point data"
                 # NOTE: 2025-09-27 10:31:43
-                # figure out how many decimals we've got here, see also NOTE: 2025-09-27 10:31:23
-                # if "." in disp:
-                #     decimals = len(disp[disp.index("."):])
-                # else:
-                #     decimals = 0
+                # figure out how many decimals we've got here, according to
+                # the DisplayRole, if DisplayRole is a representation of a
+                # float; when there is no decimal point, leave ``decimals``
+                # property as per default
+                # see also NOTE: 2025-09-27 10:31:23
+                if "." in disp:
+                    decimals = len(disp[disp.index("."):])
+
                 if isinstance(editor, smw.QuantitySpinBox):
                     editor.keepDimensionless = True
                     editor.forceDimensionless = True
-                # editor.setDecimals(decimals)
+
+                if "." in disp:
+                    editor.setDecimals(decimals)
+
                 editor.setValue(data)
 
             elif isinstance(data, complex) or "complex" in type(data).__name__:
@@ -849,25 +854,16 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     #     return
 
                     # NOTE: 2025-09-27 10:31:23
-                    # figure out how many decimals are shown — needed to set up the "decimals" property of the spin box
-                    # (NOTE: the actual number of decimals displayed in the spin box depends on the column width,
-                    #        but at least we avoid scientific notation which can hide the visual of the value)
-                    # below, 's0' is the string representation of the Quantity's magnitude (as a float)
-#                     units_str = data.units.dimensionality.unicode
-#
-#                     if units_str in disp:
-#                         s0 = disp.strip(units_str).strip()
-#
-#                     else:
-#                         s0 = disp.split(" ")[0].strip()
+                    if "." in disp:
+                        decimals = len(disp[disp.index("."):])
 
-                    # if "." in s0:
-                    #     decimals = len(s0[s0.index(".")-1:]) # count the dot as well
-                    # else:
-                    #     decimals = 0
+                    if isinstance(editor, (smw.QuantitySpinBox, smw.ComplexSpinBox)):
+                        editor.keepDimensionless = True
+                        editor.forceDimensionless = True
+                        editor.setSingleStep(1.0  * data.units)
 
-                    # editor.setDecimals(decimals)
-                    # editor.setSingleStep(1.0  * data.units)
+                        if "." in disp:
+                            editor.setDecimals(decimals)
 
                 editor.setValue(data)
 

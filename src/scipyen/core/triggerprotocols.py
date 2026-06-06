@@ -985,12 +985,12 @@ class TriggerProtocolList(NeoObjectList):
                 not isinstance(i, self.allowed_contents)
                 or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents)))
                 for i in items):
-                raise TypeError(f"Can only contain TriggerProtocol objects, not {type(item).__name__}")
+                raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(item).__name__}")
 
             self._items = list(items)
 
         if parent is not None and ScipyenDataclass not in inspect.getmro(type(parent)):
-            raise TypeError(f"Parent must be a ScipyenDataclass; got {type(parent).__name__} instead")
+            raise TypeError(f"Parent must be a ScipyenDataclass or None; got {type(parent).__name__} instead")
 
         self._parent = parent
 
@@ -1000,9 +1000,6 @@ class TriggerProtocolList(NeoObjectList):
 
     def __iter__(self):
         """Implement iter(self)"""
-        # if self._items is None:
-        #     yield None
-            # self._spiketrains_from_array()
         for item in self._items:
             yield item
 
@@ -1010,31 +1007,36 @@ class TriggerProtocolList(NeoObjectList):
         """x.__getitem__(y) <==> x[y]"""
         if len(self._items) == 0:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
         if i < len(self._items) and i >= -len(self._items):
             return self._items[i]
+
         else:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
     def __setitem__(self, i: int, value: TriggerProtocol):
-        if not isinstance(value, TriggerProtocol):
-            raise TypeError(f"Can only contain TriggerProtocol objects, not {type(value).__name__}")
+        if not isinstance(value, self.allowed_contents):
+            raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(value).__name__}")
+
         if len(self._items) == 0:
             raise ValueError(f"Index {i} out of range for {len(self._items)} items")
+
         if i < len(self._items) and i >= -len(self._items):
             self._items[i] = value
+
         else:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
     def __str__(self):
         """Return str(self)"""
-        return f"<{self.__class__.__name__}> with {len(self._items)} protocols"
+        return f"<{self.__class__.__name__}> with {len(self._items)} {self.allowed_contents[0].__name__} objects"
 
     def __repr__(self):
         header = f"<{self.__class__.__name__}>"
         if isinstance(self.name, str) and len(self.name.strip()):
             header += f" '{self.name}'"
 
-        s = [f"{header} with {len(self._items)} protocols",
+        s = [f"{header} with {len(self._items)} {self.allowed_contents[0].__name__} objects",
             ]
 
         if len(self._items):
@@ -1047,7 +1049,7 @@ class TriggerProtocolList(NeoObjectList):
         """Return len(self)"""
         return len(self._items)
 
-    def _add_triggerprotocols(self, other: typing.Self, in_place=False) -> typing.Self:
+    def _add_items(self, other: typing.Self, in_place=False) -> typing.Self:
         self._items = self._items + other._items
         return self
 
@@ -1055,28 +1057,35 @@ class TriggerProtocolList(NeoObjectList):
         """Return self + other"""
         ret = self.__class__(self._items, parent=self.parent)
         if isinstance(other, self.__class__):
-            return ret._add_triggerprotocols(other)
-        elif isinstance(other, TriggerProtocol):
+            return ret._add_items(other)
+
+        elif isinstance(other, self.allowed_contents):
+
             ret._items.append(other)
             return ret
+
         elif (isinstance(other, typing.Sequence)
-              and all(isinstance(o, TriggerProtocol) for o in other)):
+              and all(isinstance(o, self.allowed_contents) for o in other)):
             ret._items.extend(list(other))
             return ret
+
         else:
             return ret
 
     def __iadd__(self, other):
         """Return self"""
         if isinstance(other, self.__class__):
-            return self._add_triggerprotocols(other, in_place=True)
-        elif isinstance(other, TriggerProtocol):
+            return self._add_items(other, in_place=True)
+
+        elif isinstance(other, self.allowed_contents):
             self._items.append(other)
             return self
+
         elif (isinstance(other, typing.Sequence)
-              and all(isinstance(o, TriggerProtocol) for o in other)):
+              and all(isinstance(o, self.allowed_contents) for o in other)):
             self._items.extend(list(other))
             return self
+
         else:
             return self
 
@@ -1084,42 +1093,46 @@ class TriggerProtocolList(NeoObjectList):
         """Return other + self"""
         ret = self.__class__(self._items, parent=self.parent)
         if isinstance(other, self.__class__):
-            return other._add_spiketrainlists(ret)
-        elif isinstance(other, TriggerProtocol):
+            return other._add_items(ret)
+
+        elif isinstance(other, self.allowed_contents):
             ret._items.append(other)
             return ret
+
         elif (isinstance(other, typing.Sequence)
-              and all(isinstance(o, TriggerProtocol) for o in other)):
+              and all(isinstance(o, self.allowed_contents) for o in other)):
             ret._items.extend(list(other))
             return ret
+
         else:
             return ret
 
     def append(self, obj):
         """
-        Appends to the TriggerProtocolList a new TriggerProtocol
+        Appends a new TriggerProtocol
 
         Parameters
         ----------
         obj: TriggerProtocol
 
         """
-        if not isinstance(obj, TriggerProtocol):
-            raise TypeError("Can only append TriggerProtocol objects")
+        if not isinstance(obj, self.allowed_contents):
+            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
         self._items.append(obj)
 
     def extend(self, iterable):
-        """Extends the SpikeTrainList with additional SpikeTrain's from an iterable
+        """Extends with additional TrigerProtocol objects from an iterable
 
         Parameters
         ----------
         iterable: iterable[TriggerProtocol]
 
         """
-        if all (isinstance(o, TriggerProtocol) for o in iterable):
+        if all (isinstance(o, self.allowed_contents) for o in iterable):
             self._items.extend(iterable)
+
         else:
-            raise TypeError("Can only append TriggerProtocol objects")
+            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
 
     def protocols_by_segments(self) -> list:
         if len(self._items) == 0:
