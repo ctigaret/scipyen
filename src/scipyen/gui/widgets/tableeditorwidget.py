@@ -225,12 +225,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self.nextSliceToolButton.setEnabled(False)
             self._dataModel_.setModelData(self._data_)
 
-        delegate = self.tableView.itemDelegate()
-
-        # if isinstance(delegate, PythonItemDelegate):
-        #     delegate.immutableColumns = self._dataModel_.immutableColumns
-        #     delegate.immutableRows = self._dataModel_.immutableRows
-        #     delegate.jointImmutability = self._dataModel_.jointImmutability
+        # delegate = self.tableView.itemDelegate()
 
         # NOTE: 2025-11-23 19:53:14
         # to show bool cell data as checkboxes
@@ -239,18 +234,10 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                 index = self._dataModel_.index(row, col)
                 if isinstance(indexdata, bool):
                     self.tableView.openPersistentEditor(index)
-#                 if self._immutability_["joint"]:
-#                     immutable = col in self._immutability_["columns"] and row in self._immutability_["rows"]
-#                 else:
-#                     immutable = col in self._immutability_["columns"] or row in self._immutability_["rows"]
-#
-#                 if immutable:
-#                     continue
-#
-#                 index = self._dataModel_.index(row, col)
-#                 indexdata = self._dataModel_.data(index).value()
-#                 if isinstance(indexdata, bool):
-#                     self.tableView.openPersistentEditor(index)
+
+                if hasattr(self._dataModel_, "_modelDataHeaderSections_"):
+                    if self._dataModel_._modelDataHeaderSections_[col].lower() == "edit":
+                        self.tableView.openPersistentEditor(index)
 
     @Slot()
     def _slot_prevSlice(self):

@@ -129,9 +129,9 @@ class AuxiliaryInputWidget(Ui_AuxiliaryInputWidget, QWidgetIn):
 
         self.createObjectPushButton.setText("")
         self.createObjectPushButton.setIcon(guiutils.getIcon("list-add"))
-        self.createObjectPushButton.setToolTip("Create AuxiliaryInput")
-        self.createObjectPushButton.setWhatsThis("Create AuxiliaryInput")
-        self.createObjectPushButton.setStatusTip("Create AuxiliaryInput")
+        self.createObjectPushButton.setToolTip("Create Auxiliary Input")
+        self.createObjectPushButton.setWhatsThis("Create Auxiliary Input")
+        self.createObjectPushButton.setStatusTip("Create Auxiliary Input")
 
         self.createObjectPushButton.clicked.connect(self._slot_new)
 
@@ -267,9 +267,9 @@ class AuxiliaryOutputWidget(Ui_AuxiliaryOutputWidget, QWidgetOut):
 
         self.createObjectPushButton.setText("")
         self.createObjectPushButton.setIcon(guiutils.getIcon("list-add"))
-        self.createObjectPushButton.setToolTip("Create AuxiliaryOutput")
-        self.createObjectPushButton.setWhatsThis("Create AuxiliaryOutput")
-        self.createObjectPushButton.setStatusTip("Create AuxiliaryOutput")
+        self.createObjectPushButton.setToolTip("Create Auxiliary Output")
+        self.createObjectPushButton.setWhatsThis("Create Auxiliary Output")
+        self.createObjectPushButton.setStatusTip("Create Auxiliary Output")
 
         self.createObjectPushButton.clicked.connect(self._slot_new)
 

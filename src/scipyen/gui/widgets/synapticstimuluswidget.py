@@ -124,9 +124,9 @@ class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
 
         self.createStimulusPushButton.setText("")
         self.createStimulusPushButton.setIcon(guiutils.getIcon("list-add"))
-        self.createStimulusPushButton.setToolTip("Create stimulus")
-        self.createStimulusPushButton.setWhatsThis("Create stimulus")
-        self.createStimulusPushButton.setStatusTip("Create stimulus")
+        self.createStimulusPushButton.setToolTip("Create Stimulus")
+        self.createStimulusPushButton.setWhatsThis("Create Stimulus")
+        self.createStimulusPushButton.setStatusTip("Create Stimulus")
 
         self.createStimulusPushButton.clicked.connect(self._slot_new)
 

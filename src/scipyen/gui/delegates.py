@@ -68,42 +68,49 @@ from ephys import ephys
 class ExternalEditorDelegate(QtWidgets.QMainWindow):
     r"""For use with external editing in PythonItemDelegate.
 
-CAUTION: The underlying central widget may call another instance of this !
-
-To retrieve its update value you MUST close this window frst!
 
 NOTE: To be used with my custom itemmodels
 
 
 """
     sig_valueChanged            = Signal(object)
-    # sig_activated               = Signal(int)
-    # closeMe                     = Signal(int)
-    # signal_window_will_close    = Signal()
     sig_closing                 = Signal()
 
     def __init__(self, data: object = None,
                  parent = None,
+                 lazy: bool = False,
                  ):
+        r"""
+    CAUTION: The underlying central widget may call another instance of this !
+
+    If ``lazy`` is True, then UI changes will not update the internal data
+    representation until after the window is closed.
+"""
         QtWidgets.QMainWindow.__init__(self, parent=parent)
 
         self._pendingChange_: bool = False
+        self._lazy_ = lazy is True
 
         self._data_ = data
-        # print(f"{self.__class__.__name__}.__init__:")
-        # print(f"\tself._data_: {self._data_}")
         self._widget_ = self.chooseEditor()
-        # print(f"\tself._widget_: {self._widget_}")
-        # self._layout_ = QtWidgets.QHBoxLayout(self)
-        # self.setLayout(self._layout_)
-        # self.chooseEditor()
+
         if isinstance(self._widget_, QtWidgets.QWidget):
             self.setCentralWidget(self._widget_)
             self.resize(-1,-1)
-        # self.show()
+
+        if not self._lazy_:
+            self.show()
+
+    @property
+    def lazy(self) -> bool:
+        return self._lazy_
+
+    @lazy.setter
+    def lazy(self, val: bool):
+        self._lazy_ = val is True
 
     def closeEvent(self, evt):
-        print(f"{self.__class__.__name__}[{self.objectName()}].closeEvent:")
+        # print(f"{self.__class__.__name__}[{self.objectName()}].closeEvent:")
         self._pendingChange_ = False
         # store data from underlying central widget
         if isinstance(self._widget_, QtWidgets.QWidget) and hasattr(self._widget_, "value"):
@@ -166,7 +173,10 @@ NOTE: To be used with my custom itemmodels
     @Slot()
     def slot_Launch(self):
         if isinstance(self._widget_, QtWidgets.QWidget):
-            self._pendingChange_ = True
+            if self.lazy:
+                self._pendingChange_ = True
+            else:
+                self._pendingChange_ = False
             self.show()
 
     def setValue(self, data: object):

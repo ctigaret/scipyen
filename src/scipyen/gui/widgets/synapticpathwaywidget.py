@@ -160,9 +160,9 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
 
         self.createObjectPushButton.setText("")
         self.createObjectPushButton.setIcon(guiutils.getIcon("list-add"))
-        self.createObjectPushButton.setToolTip("Create AuxiliaryInput")
-        self.createObjectPushButton.setWhatsThis("Create AuxiliaryInput")
-        self.createObjectPushButton.setStatusTip("Create AuxiliaryInput")
+        self.createObjectPushButton.setToolTip("Create Synaptic Pathway")
+        self.createObjectPushButton.setWhatsThis("Create Synaptic Pathway")
+        self.createObjectPushButton.setStatusTip("Create Synaptic Pathway")
 
         self.createObjectPushButton.clicked.connect(self._slot_new)
 
@@ -236,9 +236,8 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
     @Slot()
     def _slot_editStimulus(self):
         from gui.delegates import ExternalEditorDelegate
-        print(f"{self.__class__.__name__}[{self.objectName()}]._slot_editStimulus: {self._stimulus_}")
+        # print(f"{self.__class__.__name__}[{self.objectName()}]._slot_editStimulus: {self._stimulus_}")
         stimEditor = ExternalEditorDelegate(self._stimulus_, self)
-        # stimEditor.sig_closing().connect(stimEditor)
         stimEditor.setObjectName("stimEditor")
         stimEditor.sig_valueChanged.connect(self._slot_stimulusChanged)
         stimEditor.slot_Launch()

@@ -59,6 +59,18 @@ class TableDataView(QtWidgets.QTableView):
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
 
+#     def openPersistentEditor(self, index):
+#         model = self.model()
+#         if model is None or model.rowCount() == 0 or model.columnCount() == 0:
+#             return
+#
+#         col = index.column()
+#
+#         if hasattr(model, "_modelDataHeaderSections_"):
+#             colHeader = model._modelDataHeaderSections_[col]
+#             if colHeader.lower() == "edit":
+
+
     def paintEvent(self, event):
         r"""Paints a placeholder text when there is no data"""
         super().paintEvent(event)

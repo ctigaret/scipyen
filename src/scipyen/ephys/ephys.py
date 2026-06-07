@@ -1315,17 +1315,6 @@ class RecordingSource():
                                     name = name, adc = self.adc,
                                     dac = self.dac,
                                     electrode = self.electrodeMode))
-            # if isinstance(syn, SynapticStimulus):
-            #     synList = SynapticStimulusList(syn, name = syn.name)
-            #     name = syn.name
-            #     pathways.append(SynapticPathway(stimulus = synList,
-            #                             name = name, adc = self.adc,
-            #                             dac = self.dac,
-            #                             electrode = self.electrodeMode))
-            # elif isinstance(syn, SynapticStimulusList):
-            #     pathway = SynapticPathway(stimulus = syn,
-            #                               adc = self.adc, dac = self.dac,
-            #                               electrode = self.electrode)
         self.pathways = pathways
         # self.pathways = tuple(pathways)
 
@@ -1944,8 +1933,7 @@ class RecordingEpisode(Episode):
         (theoretically possible, but then one may also think of this as being two
         distinct pathways)
 
-    """
-    # @with_doc(concatenate_blocks, use_header=True, header_str = "See also:")
+"""
     # FIXME: 2024-09-29 23:32:05 TODO:
     # conversion to mapping protocol ↦ sweep indices across all blocks in the episode
     # actually, strike that: an episode must contain blocks recorded WITH THE SAME EPISODE

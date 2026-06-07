@@ -17,6 +17,7 @@ from __future__ import print_function
 
 import os, inspect, warnings, traceback, datetime, typing, sys
 from functools import (singledispatch, singledispatchmethod)
+from collections import deque
 
 #### END core python modules
 
@@ -134,7 +135,10 @@ class TableEditor(ScipyenViewer):
                         # pq.Quantity: 0,
                         vigra.VigraArray: 0,
                         vigra.filters.Kernel1D: 0,
-                        vigra.filters.Kernel2D: 0}
+                        vigra.filters.Kernel2D: 0,
+                        list:0,
+                        tuple:0,
+                        deque:0}
 
     # view_action_name = "Table"
 
@@ -333,7 +337,10 @@ class TableEditor(ScipyenViewer):
                        neo.Epoch, neo.Event, neo.SpikeTrain,
                        DataSignal, IrregularlySampledDataSignal,
                        TriggerEvent, TriggerProtocol,
-                       np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D), *args, **kwargs):
+                       np.ndarray, vigra.VigraArray,
+                       vigra.filters.Kernel1D,
+                       vigra.filters.Kernel2D,
+                       list, tuple, deque), *args, **kwargs):
 
         if (type(data) not in self.viewer_for_types
             and not any(t in inspect.getmro(type(data)) for t in self.viewer_for_types)):

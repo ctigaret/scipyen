@@ -13,6 +13,7 @@ from __future__ import print_function
 
 import os, inspect, warnings, traceback, datetime, typing, numbers
 from functools import singledispatch
+from collections import deque
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -334,6 +335,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                      np.ndarray, vigra.filters.Kernel1D,
                                      vigra.filters.Kernel2D,
                                      TriggerProtocolList,
+                                     list, tuple, deque,
                                      type(None))):
                 raise TypeError("%s data is not yet supported" % type(data).__name__)
 
@@ -394,9 +396,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelData_ = data
                 self._original_data_ = data
                 self._modelDataRows_ = len(data)
-                self._is_vigra_filter_kernel_ = 0
+                # self._is_vigra_filter_kernel_ = 0
                 self._canAddRemoveRows_ = True
-                self._canAddRemoveColumns_ = True
+                self._canAddRemoveColumns_ = False
 
                 self._modelDataHeaderSections_ = dict(
                     tuple(
@@ -413,10 +415,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelData_ = data
                 self._original_data_ = data
                 self._modelDataRows_ = len(data)
-                self._is_vigra_filter_kernel_ = 0
+                # self._is_vigra_filter_kernel_ = 0
                 self._canAddRemoveRows_ = True
-                self._canAddRemoveColumns_ = True
+                self._canAddRemoveColumns_ = False
 
+                # NOTE: 2026-06-07 21:38:40 see NOTE: 2026-06-07 21:36:23
                 self._modelDataHeaderSections_ = dict(
                     tuple(
                         map(
@@ -432,15 +435,57 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelData_ = data
                 self._original_data_ = data
                 self._modelDataRows_ = len(data)
-                self._is_vigra_filter_kernel_ = 1
+                # self._is_vigra_filter_kernel_ = 0
                 self._canAddRemoveRows_ = True
-                self._canAddRemoveColumns_ = True
+                self._canAddRemoveColumns_ = False
 
+                # NOTE: 2026-06-07 21:36:23
+                # Only display (and allow editing) the relevant fields:
+                # name & adc; give option to edit the entire object via an "Edit"
+                # column
                 self._modelDataHeaderSections_ = dict(
                     tuple(
                         map(
                             lambda x: (x[0], f"{x[1]}"),
-                            enumerate(("name", "adc", "cmd"))
+                            enumerate(("name", "adc", "Edit"))
+                            )
+                        )
+                    )
+                self._modelDataColumns_ = len(self._modelDataHeaderSections_)
+
+            elif isinstance(data, ephys.AuxiliaryOutputList):
+                self._modelData_ = data
+                self._original_data_ = data
+                self._modelDataRows_ = len(data)
+                # self._is_vigra_filter_kernel_ = 0
+                self._canAddRemoveRows_ = True
+                self._canAddRemoveColumns_ = False
+
+                # NOTE: 2026-06-07 21:37:08 see NOTE: 2026-06-07 21:36:23
+                self._modelDataHeaderSections_ = dict(
+                    tuple(
+                        map(
+                            lambda x: (x[0], f"{x[1]}"),
+                            enumerate(("name", "channel", "Edit"))
+                            )
+                        )
+                    )
+                self._modelDataColumns_ = len(self._modelDataHeaderSections_)
+
+            elif isinstance(data, ephys.SynapticStimulusList):
+                self._modelData_ = data
+                self._original_data_ = data
+                self._modelDataRows_ = len(data)
+                # self._is_vigra_filter_kernel_ = 0
+                self._canAddRemoveRows_ = True
+                self._canAddRemoveColumns_ = False
+
+                # NOTE: 2026-06-07 21:38:07 see NOTE: 2026-06-07 21:36:23
+                self._modelDataHeaderSections_ = dict(
+                    tuple(
+                        map(
+                            lambda x: (x[0], f"{x[1]}"),
+                            enumerate(("name", "channel", "dig"))
                             )
                         )
                     )
@@ -614,7 +659,106 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         # else:
                         #     self._modelDataHeaderSections_ = {0: "Samples"}
 
+            elif isinstance(data, typing.Sequence):
+                if all(isinstance(d, ephys.RecordingSource) for d in data):
+                    self._modelData_ = data
+                    self._original_data_ = data
+                    self._modelDataRows_ = len(data)
+                    self._canAddRemoveRows_ = True
+                    self._canAddRemoveColumns_ = False
+                    # self._is_vigra_filter_kernel_ = 0
+                    # NOTE: 2026-06-07 21:38:07 see NOTE: 2026-06-07 21:36:23
+                    self._modelDataHeaderSections_ = dict(
+                        tuple(
+                            map(
+                                lambda x: (x[0], f"{x[1]}"),
+                                enumerate(("name", "adc", "dac", "Edit"))
+                                )
+                            )
+                        )
+                    self._modelDataColumns_ = len(self._modelDataHeaderSections_)
+
+                elif all(isinstance(d, typing.Sequence) for d in data):
+                    # NOTE: 2026-06-07 21:59:50 Row-major !!!
+                    # i.e., access is data[row][column] ≡ data[y][x]
+                    assert all(len(d) == len(data[0]) for d in data[1:]), "Sequences with non-rectangular shape are not supported"
+
+                    if any(any(isinstance(d_, typing.Sequence) for d_ in d) for d in data):
+                        raise ValueError("Only 2D nested sequences are supported")
+
+                    self._modelData_ = data
+                    self._original_data_ = data
+                    self._modelDataColumns_ = len(data[0])
+                    self._modelDataRows_ = len(data)
+
+                    self._modelDataHeaderSections_ = dict(
+                        tuple(
+                            map(
+                                lambda x: (x, f"{x}"),
+                                range(self._modelDataColumns_)
+                                )
+                            )
+                        )
+                    self._canAddRemoveRows_ = True
+                    self._canAddRemoveColumns_ = True
+
+                    if isinstance(data, tuple):
+                        self.immutableRows = range(self._modelDataRows_)
+                        self.immutableColumns = range(self._modelDataColumns_)
+                        self._canAddRemoveColumns_ = False
+
+                    else:
+                        self.immutableRows = list(
+                            map(
+                                lambda x: x[0],
+                                filter(
+                                    lambda x: isinstance(x[1], tuple),
+                                    enumerate(data)
+                                    )
+                                )
+                            )
+                        self._canAddRemoveColumns_ = False
+
+
+                else:
+                    if all(
+                        isinstance(d,
+                                      (int, float, str, bool,
+                                       np.integer, np.floating, np.complexfloating,
+                                       np.character, np.bool,
+                                       pq.Quantity)
+                                      )
+                        for d in data
+                        ):
+
+                        self._modelData_ = data
+                        self._original_data_ = data
+                        self._modelDataColumns_ = len(data[0])
+                        self._modelDataRows_ = len(data)
+
+                        self._modelDataHeaderSections_ = dict(
+                            tuple(
+                                map(
+                                    lambda x: (x, f"{x}"),
+                                    range(self._modelDataColumns_)
+                                    )
+                                )
+                            )
+                        self._canAddRemoveRows_ = True
+                        self._canAddRemoveRows_ = True
+
+                    else:
+                        scipywarn(f"Unsupported sequence element types")
+
             elif data is None:
+                self._modelData_ = data
+                self._modelDataRows_ = 0
+                self._modelDataColumns_ = 0
+                self._canAddRemoveRows_ = False
+                self._canAddRemoveColumns_ = False
+
+            else:
+                scipywarn(f"{type(data).__name__} data are not supported yet")
                 self._modelData_ = data
                 self._modelDataRows_ = 0
                 self._modelDataColumns_ = 0
@@ -977,6 +1121,39 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 else:
                     return QtCore.QVariant()
 
+            elif isinstance(self._modelData_,
+                                (
+                                    typing.Sequence,
+                                    ephys.SynapticPathwayList,
+                                    ephys.AuxiliaryInputList,
+                                    ephys.AuxiliaryOutputList,
+                                    ephys.SynapticStimulusList,
+                                )
+                            ):
+                if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
+                    # lbl = f"{section}"
+                    if orientation == QtCore.Qt.Horizontal:
+                        if (isinstance(self._modelDataHeaderSections_, dict)
+                            and len(self._modelDataHeaderSections_)):
+                            return QtCore.QVariant(self._modelDataHeaderSections_[section])
+                        # else:
+                        #     if isinstance(self._modelData_, pq.Quantity):
+                        #         lbl = f"{scq.getUnitFamily(self._modelData_.units)} ({self._modelData_.units.dimensionality})"
+                    return QtCore.QVariant(f"{section}")
+
+                elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
+                    return QtCore.QVariant(f"{section}")
+                    # if orientation == QtCore.Qt.Horizontal:
+                    #     lbl = "%s" % self._modelData_[:,section].dtype
+                    #     if isinstance(self._modelData_, pq.Quantity):
+                    #         lbl += f" ({self._modelData_.units.dimensionality})"
+                    #
+                    # else:
+                    #     return QtCore.QVariant("%s" % self._modelData_[section,:].dtype)
+
+                else:
+                    return QtCore.QVariant()
+
             else:
                 return QtCore.QVariant()
 
@@ -1041,11 +1218,37 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(self._modelData_, TriggerProtocolList):
                 protocol = self._modelData_[row]
                 val = getattr(protocol, self._modelDataHeaderSections_[col])
-                # print(f"{self.__class__.__name__}._getModelData_: val at row {row}, col {col} is {type(val).__name__}; role is {role}")
-                # if isinstance(val, neo.Event):
-                #     val = val.times
 
                 ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val.times}" if isinstance(val, neo.Event) else f"{val}" # noqa
+
+            elif isinstance(self._modelData_, (
+                                                ephys.SynapticPathwayList,
+                                                ephys.AuxiliaryInputList,
+                                                ephys.AuxiliaryOutputList,
+                                                ephys.SynapticStimulusList,
+                                               )
+                            ):
+                obj = self._modelData_[row]
+                attribute = self._modelDataHeaderSections_[col]
+                if attribute.lower() != "edit":
+                    val = getattr(obj, attribute)
+                    ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val}"
+                else:
+                    return QtCore.Qvariant()
+
+            elif isinstance(self._modelData_, typing.Sequence):
+                if all(isinstance(d, ephys.RecordingSource) for d in self._modelData_):
+                    obj = self._modelData_[row]
+                    attribute = self._modelDataHeaderSections_[col]
+                    if attribute.lower() == "edit":
+                        return QtCore.Qvariant()
+                    else:
+                        val = getattr(obj, attribute)
+                        ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val}"
+
+                else:
+                    val = self._modelData_[row][col]
+                    ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val}"
 
             elif isinstance(self._modelData_, neo.core.dataobject.DataObject):
                 if col == 0:
@@ -1214,27 +1417,68 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                 attr = self._modelDataHeaderSections_[col]
 
-                setattr(protocol, attr, value)
+                setattr(protocol, attr, pyvalue)
 
                 return True
 
-            elif isinstance(self._modelData_, ephys.AuxiliaryInputList):
+            elif isinstance(self._modelData_, (
+                                                ephys.SynapticPathwayList,
+                                                ephys.AuxiliaryInputList,
+                                                ephys.AuxiliaryOutputList,
+                                                ephys.SynapticStimulusList,
+                                              )
+                            ):
                 if row >= len(self._modelData_):
                     return False
+
                 old_obj = self._modelData_[row]
 
                 attr = self._modelDataHeaderSections_[col]
 
-                params = [
-                    old_obj.name,
-                    old_obj.adc,
-                    old_obj.cmd
-                    ]
-                params[params.index(attr)] = value
+                if isinstance(old_obj, ephys.SynapticPathway):
+                    params = {
+                        "name": old_obj.name,
+                        "adc": old_obj.adc,
+                        "dac": old_obj.dac,
+                        "stimulus": old_obj.stimulus,
+                        "electrode": old_obj.electrode,
+                        "pathType": old_obj.pathType,
+                        "schedule": old_obj.schedule,
+                        "measurements": old_obj.measurements,
+                        }
 
-                new_obj = type(old_obj)(*params)
+                elif isinstance(old_obj, ephys.AuxiliaryInput):
+                    params = {
+                        "name": old_obj.name,
+                        "adc": old_obj.adc,
+                        "cmd": old_obj.cmd
+                        }
+
+                elif isinstance(old_obj, ephys.AuxiliaryOutput):
+                    params = {
+                        "name": old_obj.name,
+                        "channel": old_obj.channel,
+                        "digttl": old_obj.digttl
+                        }
+
+                elif isinstance(old_obj, ephys.SynapticStimulus):
+                    params = {
+                        "name": old_obj.name,
+                        "channel": old_obj.channel,
+                        "dig": old_obj.dig
+                        }
+
+                else:
+                    return False
+
+                params[attr] = pyvalue
+
+                new_obj = type(old_obj)(**params)
 
                 self._modelData_[row] = new_obj
+
+            elif isinstance(self._modelData_, (list, deque)):
+                self._modelData_[row][col] = pyvalue
 
             else:
                 return False
