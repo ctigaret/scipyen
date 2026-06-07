@@ -823,7 +823,7 @@ class AuxiliaryInput(__BaseAuxInput__):
 
 AuxiliaryInput.name.__doc__ = "str: name of the auxiliary input specification; default is 'aux_in'"
 AuxiliaryInput.adc.__doc__  = "int, str, None: index or name of the ADC channel used to record the auxiliary input; default is None."
-AuxiliaryInput.cmd.__doc__  = "Tribool, None: indicates if the auxiliary ADC records a clamping command signal (True), a trigger (TTL-like) signal (False) or any other analog input (None); default is None"
+AuxiliaryInput.cmd.__doc__  = "Tribool, None: indicates if the auxiliary ADC records (is a proxy of) a clamping command signal (True), a trigger (TTL-like) signal (False) or any other analog input (None); default is None"
 
 class AuxiliaryInputList(NeoObjectList):
     allowed_contents = (AuxiliaryInput, )
@@ -999,7 +999,8 @@ class __BaseAuxOutput__(typing.NamedTuple):
     name: str = "aux_out"
     channel: int = 0
     # channel: typing.Union[int, str] = 0
-    digttl: typing.Optional[bool] = None
+    # digttl: typing.Optional[bool] = None
+    digttl: Tribool = Tribool()
 
 class AuxiliaryOutput(__BaseAuxOutput__):
     __slots__ = ()
@@ -1119,7 +1120,7 @@ class AuxiliaryOutput(__BaseAuxOutput__):
 
 AuxiliaryOutput.name.__doc__ = "str: name of this auxiliary output specification; default is 'aux_out'"
 AuxiliaryOutput.channel.__doc__ = "int, str: specifies the auxiliary output channel (index or name if a DAC channel, otherwise index only); default is 0"
-AuxiliaryOutput.digttl.__doc__ = "bool, or None: flag to indicate if the output is used to send out triggers via a DIG (True), emulated via a DAC (False) or other waveforms (None); default is None"
+AuxiliaryOutput.digttl.__doc__ = "Tribool: flag to indicate if the output is used to send out triggers via a DIG (Tribool(True)), emulated via a DAC (Tribool(False)) or other waveforms (Tribool(None)); default is Tribool(None)"
 
 class AuxiliaryOutputList(NeoObjectList):
     allowed_contents = (AuxiliaryOutput, )
@@ -1308,12 +1309,23 @@ class RecordingSource():
         # pathways = list()
         pathways = SynapticPathwayList(name=self.name)
         for syn in self.syn:
-            if isinstance(syn, SynapticStimulus):
-                pathways.append(SynapticPathway(stimulus = syn,
-                                        name = syn.name, adc = self.adc,
-                                        dac = self.dac,
-                                        electrode = self.electrodeMode))
-
+            # synList = SynapticStimulusList(syn, name = syn.name)
+            name = syn.name
+            pathways.append(SynapticPathway(stimulus = syn,
+                                    name = name, adc = self.adc,
+                                    dac = self.dac,
+                                    electrode = self.electrodeMode))
+            # if isinstance(syn, SynapticStimulus):
+            #     synList = SynapticStimulusList(syn, name = syn.name)
+            #     name = syn.name
+            #     pathways.append(SynapticPathway(stimulus = synList,
+            #                             name = name, adc = self.adc,
+            #                             dac = self.dac,
+            #                             electrode = self.electrodeMode))
+            # elif isinstance(syn, SynapticStimulusList):
+            #     pathway = SynapticPathway(stimulus = syn,
+            #                               adc = self.adc, dac = self.dac,
+            #                               electrode = self.electrode)
         self.pathways = pathways
         # self.pathways = tuple(pathways)
 
@@ -2713,6 +2725,7 @@ class SynapticPathway:
     adc: int|None = None # physical index of the ADC channel used in recording this pathway
     dac: int|None = None # physical index of the DAC channel used in recording this pathway
     stimulus: SynapticStimulus = dataclasses.field(default_factory = SynapticStimulus)
+    # stimulus: SynapticStimulusList = dataclasses.field(default_factory = SynapticStimulusList)
 
     # NOTE: 2024-10-16 11:57:17
     # 'clampMode' is not needed, in a SynapticPathway, which can be recorded in

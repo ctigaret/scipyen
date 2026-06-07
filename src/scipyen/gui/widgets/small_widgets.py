@@ -500,15 +500,23 @@ class LineEdit(QtWidgets.QLineEdit):
                  contents: typing.Optional[str] = None,
                  lazy: bool = False,
                  validator: typing.Optional[QtGui.QValidator] = None):
+        contents_ = None
         if isinstance(parent, QtWidgets.QWidget):
             parent_ = parent
         else:
+            if isinstance(parent, str):
+                contents_ = parent
             parent_ = None
+
         super().__init__(parent=parent)
         if isinstance(parent_, QtWidgets.QWidget) and hasattr(parent_, "addWidget"):
             parent_.addWidget(self)
 
-        self._variable_ = contents
+        if not isinstance(contents_, str):
+            self._variable_ = contents
+        else:
+            self._variable_ = contents_
+
         self._lazy_: bool = lazy is True
         self._custom_menu_: typing.Optional[QtWidgets.QMenu] = None
         self._validator_: typing.Optional[QtGui.QValidator] = None

@@ -12,6 +12,7 @@ import numbers
 import numpy as np
 import quantities as pq
 import neo
+from tribool import Tribool
 
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
@@ -75,11 +76,6 @@ class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
 
         QWidget.__init__(self, parent=parent)
 
-        # self._hasData_ = False
-
-        # if obj is None:
-        #     obj = SynapticStimulus()
-
         if not isinstance(obj, SynapticStimulus): # and obj is not None:
             # scipywarn(f"This widget does not support objects of type {type(obj).__name__}")
             self._data_ = None
@@ -94,7 +90,7 @@ class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
         else:
             self._name_ = None
             self._channel_ = None
-            self._digital_ = None
+            self._digital_ = Tribool()
 
         self._configureUI_()
 

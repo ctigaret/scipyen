@@ -53,6 +53,7 @@ import vigra
 import quantities as pq
 import pandas as pd
 import neo
+from tribool import Tribool
 # from core import scipyen_quantities as scq
 from core import strutils as strutils
 from gui.widgets import small_widgets as smw
@@ -61,6 +62,89 @@ from gui.widgets import inlinefiledirchooser as ifdc
 # from gui import quickdialog as qd
 # from core import typeenum
 from gui.itemmodels.roles import * # noqa
+
+from ephys import ephys
+
+class ExternalEditorDelegate(QtWidgets.QMainWindow):
+    r"""For use with external editing in PythonItemDelegate"""
+    sig_valueChanged            = Signal(object)
+    # sig_activated               = Signal(int)
+    # closeMe                     = Signal(int)
+    # signal_window_will_close    = Signal()
+    sig_closing                 = Signal()
+
+    def __init__(self, data: object = None,
+                 parent = None,
+                 ):
+        QtWidgets.QMainWindow.__init__(self, parent=parent)
+
+        self._pendingChange_: bool = False
+
+        self._data_ = data
+        self._widget_ = self.chooseEditor()
+        # self._layout_ = QtWidgets.QHBoxLayout(self)
+        # self.setLayout(self._layout_)
+        # self.chooseEditor()
+        if isinstance(self._widget_, QtWidgets.QWidget):
+            self.setCentralWidget(self._widget_)
+            self.resize(-1,-1)
+            self._widget_.sig_valueChanged.connect(self.slot_valueChanged)
+        # self.show()
+
+    def closeEvent(self, evt):
+        self._pendingChange_ = False
+        self.sig_closing.emit()
+        self.sig_valueChanged.emit(self._data_)
+
+    def chooseEditor(self) -> QtWidgets.QWidget:
+        widget = None
+        self.setWindowTitle(f"{type(self._data_).__name__} Editor")
+        if isinstance(self._data_, ephys.SynapticStimulus):
+            from gui.widgets import synapticstimuluswidget
+            widget = synapticstimuluswidget.SynapticStimulusWidget(self._data_,
+                                                                   self)
+
+        elif isinstance(self._data_, (ephys.AuxiliaryInput, ephys.AuxiliaryOutput)):
+            from gui.widgets import auxiliaryiowidget
+            if isinstance(self._data_, ephys.AuxiliaryInput):
+                widget = auxiliaryiowidget.AuxiliaryInputWidget(self._data_,
+                                                                self)
+            else:
+                widget = auxiliaryiowidget.AuxiliaryOutputWidget(self._data_,
+                                                                 self)
+
+        elif isinstance(self._data_, ephys.SynapticPathway):
+            from gui.widgets import synapticpathwaywidget
+            widget = synapticpathwaywidget.SynapticPathwayWidget(self._data_,
+                                                                 self)
+
+        return widget
+
+    @Slot(object)
+    def slot_valueChanged(self, val):
+        self._data_ = val
+        if self._pendingChange_:
+            return
+
+        self.sig_valueChanged.emit(self._data_)
+
+    @Slot()
+    def slot_Launch(self):
+        if isinstance(self._widget_, QtWidgets.QWidget):
+            self._pendingChange_ = True
+            self.show()
+
+    def setValue(self, data: object):
+        self._data_ = data
+        newWidget = self.chooseEditor()
+        if isinstance(newWidget, QtWidgets.QWidget):
+            oldWidget = self.takeCentralWidget()
+            oldWidget.sig_valueChanged.disconnect()
+            self._widget_ = newWidget
+            oldWidget.close()
+            self.setCentralWidget(self._widget_)
+            self._widget_.sig_valueChanged.connect(self.slot_valueChanged)
+
 
 class CutFileSystemItemDelegate(QtWidgets.QStyledItemDelegate):
     # WARNING: 2026-01-25 22:25:36 TODO
@@ -156,26 +240,6 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         else:
             self._columnChoices_ = dict() # always keep it as a dict, even when empty
-
-        # if isinstance(immutableColumns, typing.Sequence) and len(immutableColumns) > 0 and all(isinstance(v, int) for v in immutableColumns):
-        #     self._immutableColumns_ = immutableColumns
-        # else:
-        #     self._immutableColumns_ = list()
-        #
-        # if isinstance(immutableRows, typing.Sequence) and len(immutableRows) > 0 and all(isinstance(v, int) for v in immutableRows):
-        #     self._immutableRows_ = immutableRows
-        # else:
-        #     self._immutableRows_ = list()
-        #
-        # if isinstance(jointImmutability, bool):
-        #     self._jointImmutability_ = jointImmutability
-        # else:
-        #     self._jointImmutability_ = False
-        #
-        # self._immutability_:dict = {"columns": self._immutableColumns_,
-        #                             "rows": self._immutableRows_,
-        #                             "joint":self._jointImmutability_}
-
 
         self._currentData_:typing.Optional[typing.Any] = None
 
@@ -401,6 +465,12 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             if not inModel:
                 widget.setChecked(data is True)
             widget.toggled.connect(self.slot_dataChanged)
+
+        elif isinstance(data, Tribool):
+            widget = smw.GenericInputWidget(parent)
+            if not inModel:
+                widget.setValue(data)
+            widget.sig_valueChanged.connect(self.slot_dataChanged)
 
         elif isinstance(data, (datetime.datetime, datetime.date, datetime.time)):
             if isinstance(data, datetime.datetime):
@@ -655,33 +725,33 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     else:
                         scipywarn(f"Data ({data}) is not in the supplied choices ({choices})")
                         return
-            else:
-                if len(data) > 100:
-                    txt = data if isinstance(data, str) else data.decode()
-                    widget = QtWidgets.QPlainTextEdit(txt, parent)
-                    widget.setMaximumHeight(200)
-                    widget.setPlainText(txt)
-                    if isinstance(data, str):
-                        widget.setReadOnly(False)
-                        widget.textChanged.connect(self.slot_dataChanged)
-                    else:
-                        widget.setReadOnly(True)
-
+            # else:
+            if len(data) > 100:
+                txt = data if isinstance(data, str) else data.decode()
+                widget = QtWidgets.QPlainTextEdit(txt, parent)
+                widget.setMaximumHeight(200)
+                widget.setPlainText(txt)
+                if isinstance(data, str):
+                    widget.setReadOnly(False)
+                    widget.textChanged.connect(self.slot_dataChanged)
                 else:
-                    if isinstance(data, (str, np.character)):
-                        # widget = QtWidgets.QLineEdit(parent)
-                        widget = smw.LineEdit(data, parent=parent, lazy=True)
-                        widget.undoAvailable = True
-                        widget.redoAvailable = True
-                        widget.setClearButtonEnabled(True)
-                        # widget = smw.LazyLineEdit(parent)
-                        # widget.setText(data)
-                        # widget.setValue(data)
-                        if not inModel:
-                            widget.setValue(data)
-                        widget.sig_enterPressed.connect(self.slot_dataChanged)
-                    else:
-                        return
+                    widget.setReadOnly(True)
+
+            else:
+                if isinstance(data, (str, np.character)):
+                    # widget = QtWidgets.QLineEdit(parent)
+                    widget = smw.LineEdit(parent, data, lazy=True)
+                    widget.undoAvailable = True
+                    widget.redoAvailable = True
+                    widget.setClearButtonEnabled(True)
+                    # widget = smw.LazyLineEdit(parent)
+                    # widget.setText(data)
+                    # widget.setValue(data)
+                    if not inModel:
+                        widget.setValue(data)
+                    widget.sig_enterPressed.connect(self.slot_dataChanged)
+                else:
+                    return
 
         elif isinstance(data, (pd.DataFrame, pd.Series, pd.MultiIndex, pd.Index)):
             widget = TableEditorWidget(parent, readOnly=False)
@@ -730,6 +800,20 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         self._currentModelIndex_ = None
 
     @Slot()
+    def _slot_editDataExternally(self): # TODO 2026-06-07 11:08:52 finalize me
+        # NOTE: 2026-06-07 11:56:17
+        # external editor NEEDS a separate QMainWindow!
+        sender = self.sender()
+        if isinstance(sender, QtWidgets.QPushButton):
+            model = self._currentModelIndex_.model()
+            role = ObjectDataRole if self._useObjectDataRole_ else QtCore.Qt.EditRole
+
+            data = self._currentModelIndex_.data(role)
+
+            editor = ExternalEditorDelegate(data)
+
+
+    @Slot()
     def slot_commitAndCloseEditor(self):
         editor = self.sender()
         self.commitData.emit(editor)
@@ -743,6 +827,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         self.sig_dataChanged.emit(self.sender())
 
     @Slot(object)
+    @Slot(int)
     def slot_valueChanged(self, o:object):
         # print(f"{self.__class__.__name__}.slot_dataChanged({o})")
         # o = self.sender().getValue()
@@ -770,16 +855,6 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         # one should restrict everything to string, in the custom item model, as
         # as this cannot cover every possibility
         #
-        # col = index.column()
-        # row = index.row()
-        # if self.jointImmutability is True:
-        #     if col in self.immutableColumns and row in self.immutableRows:
-        #         print(f"\t\-> immutable")
-        #         return
-        # else:
-        #     if col in self.immutableColumns or row in self.immutableRows:
-        #         print(f"\t\-> immutable")
-        #         # return
 
         data = index.data(ObjectDataRole) # noqa
         if data is not None:
@@ -827,6 +902,16 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 elif index.row() in immutableRows:
                     # print(f"\t-> immutable row")
                     return
+
+        if hasattr(model, "_externalDataEditor_") and hasattr(model, "_modelDataHeaderSections_"):
+            if model._externalDataEditor_ is True and model._modelDataHeaderSections_[index.column()] == "Edit":
+                widget = QtWidgets.QPushButton("...")
+                if hasattr(widget, "setFrame"):
+                    widget.setFrame(False)
+                widget.setAutoFillBackground(True)
+                widget.setObjectName(f"{type(widget).__name__}_LaunchExternalEdit_delegate")
+                widget.clicked.connect(self._slot_editDataExternally)
+                return widget
 
         choices = list()
 
@@ -1045,18 +1130,6 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                                smw.QuantitySpinBox, smw.ComplexSpinBox,
                                neow.SimpleTriggerEventWidget)):
             data = editor.value()
-
-            # print(f"{self.__class__.__name__}.setModelData got editor data: {data}")
-
-            # if hasattr(editor, "_magnitude_"):
-            #     print(f"\tmagnitude: {editor._magnitude_}")
-
-
-
-        # elif isinstance(editor, ifdc.InlineFileDirChooserWidget):
-        #     if not editor._pendingChange_:
-        #         return
-        #     data = editor.value()
 
         elif isinstance(editor, QtWidgets.QLineEdit):
             data = editor.text()

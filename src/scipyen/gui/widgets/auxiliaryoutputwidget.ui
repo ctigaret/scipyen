@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>AuxiliaryInputWidget</class>
- <widget class="QWidget" name="AuxiliaryInputWidget">
+ <class>AuxiliaryOutputWidget</class>
+ <widget class="QWidget" name="AuxiliaryOutputWidget">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -43,9 +43,9 @@
       <widget class="QSpinBox" name="channelSpinBox"/>
      </item>
      <item>
-      <widget class="QCheckBox" name="isCommandCheckBox">
+      <widget class="QCheckBox" name="isDigTTLCheckBox">
        <property name="text">
-        <string>Command/TTL</string>
+        <string>TTL/DAC</string>
        </property>
        <property name="tristate">
         <bool>true</bool>

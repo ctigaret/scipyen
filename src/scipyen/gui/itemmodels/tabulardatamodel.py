@@ -169,6 +169,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._canAddRemoveRows_:bool = False
         self._canAddRemoveColumns_:bool = False
 
+        # NOTE: 2026-06-07 10:58:03
+        # needed to edit object externally
+        #
+        self._externalDataEditor_: bool = False
+
         # self._immutableColumns_:typing.Sequence[int] = list()  # of column indexes
         # self._immutableRows_:typing.Sequence[int] = list()     # of row indexes
 
@@ -389,7 +394,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelData_ = data
                 self._original_data_ = data
                 self._modelDataRows_ = len(data)
-                self._is_vigra_filter_kernel_ = 1
+                self._is_vigra_filter_kernel_ = 0
                 self._canAddRemoveRows_ = True
                 self._canAddRemoveColumns_ = True
 
@@ -404,6 +409,25 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     )
                 self._modelDataColumns_ = len(self._modelDataHeaderSections_)
 
+            elif isinstance(data, ephys.SynapticPathwayList):
+                self._modelData_ = data
+                self._original_data_ = data
+                self._modelDataRows_ = len(data)
+                self._is_vigra_filter_kernel_ = 0
+                self._canAddRemoveRows_ = True
+                self._canAddRemoveColumns_ = True
+
+                self._modelDataHeaderSections_ = dict(
+                    tuple(
+                        map(
+                            lambda x: (x[0], f"{x[1]}"),
+                            enumerate(("name", "adc", "dac",
+                                       "electrode", "pathType", "Edit")
+                            ))
+                        )
+                    )
+                self._modelDataColumns_ = len(self._modelDataHeaderSections_)
+
             elif isinstance(data, ephys.AuxiliaryInputList):
                 self._modelData_ = data
                 self._original_data_ = data
@@ -411,6 +435,16 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._is_vigra_filter_kernel_ = 1
                 self._canAddRemoveRows_ = True
                 self._canAddRemoveColumns_ = True
+
+                self._modelDataHeaderSections_ = dict(
+                    tuple(
+                        map(
+                            lambda x: (x[0], f"{x[1]}"),
+                            enumerate(("name", "adc", "cmd"))
+                            )
+                        )
+                    )
+                self._modelDataColumns_ = len(self._modelDataHeaderSections_)
 
             elif isinstance(data, np.ndarray):
                 # trying to streamline this
@@ -1175,6 +1209,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(self._modelData_, TriggerProtocolList):
                 if row >= len(self._modelData_):
                     return False
+
                 protocol = self._modelData_[row]
 
                 attr = self._modelDataHeaderSections_[col]
@@ -1182,6 +1217,24 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 setattr(protocol, attr, value)
 
                 return True
+
+            elif isinstance(self._modelData_, ephys.AuxiliaryInputList):
+                if row >= len(self._modelData_):
+                    return False
+                old_obj = self._modelData_[row]
+
+                attr = self._modelDataHeaderSections_[col]
+
+                params = [
+                    old_obj.name,
+                    old_obj.adc,
+                    old_obj.cmd
+                    ]
+                params[params.index(attr)] = value
+
+                new_obj = type(old_obj)(*params)
+
+                self._modelData_[row] = new_obj
 
             else:
                 return False
