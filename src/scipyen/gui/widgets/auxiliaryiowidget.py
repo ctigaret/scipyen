@@ -72,10 +72,10 @@ class AuxiliaryInputWidget(Ui_AuxiliaryInputWidget, QWidgetIn):
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[AuxiliaryInput] = None):
 
-        if not isinstance(parent, QtWidgets.QWidget):
-            if obj is None and isinstance(parent, AuxiliaryInput):
-                obj = parent
-            parent = None
+        # if not isinstance(parent, QtWidgets.QWidget):
+        #     if obj is None and isinstance(parent, AuxiliaryInput):
+        #         obj = parent
+        #     parent = None
 
         QWidget.__init__(self, parent=parent)
 
@@ -210,10 +210,10 @@ class AuxiliaryOutputWidget(Ui_AuxiliaryOutputWidget, QWidgetOut):
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[AuxiliaryOutput] = None):
 
-        if not isinstance(parent, QtWidgets.QWidget):
-            if obj is None and isinstance(parent, AuxiliaryOutput):
-                obj = parent
-            parent = None
+        # if not isinstance(parent, QtWidgets.QWidget):
+        #     if obj is None and isinstance(parent, AuxiliaryOutput):
+        #         obj = parent
+        #     parent = None
 
         QWidget.__init__(self, parent=parent)
 

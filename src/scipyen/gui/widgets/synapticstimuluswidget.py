@@ -60,7 +60,7 @@ Ui_SynapticStimulusWidget, QWidget = loadUiType(
     )
 
 class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
-    sig_valueChanged = Signal(SynapticStimulus, name="sig_valueChanged")
+    sig_valueChanged = Signal(object, name="sig_valueChanged")
 
     defaultName: str = "stim"
     defaultChannel: int = 0
@@ -69,18 +69,21 @@ class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[SynapticStimulus] = None):
 
-        if not isinstance(parent, QtWidgets.QWidget):
-            if obj is None and isinstance(parent, SynapticStimulus):
-                obj = parent
-            parent = None
+        # if not isinstance(parent, QtWidgets.QWidget):
+        #     if obj is None and isinstance(parent, SynapticStimulus):
+        #         obj = parent
+        #     parent = None
 
         QWidget.__init__(self, parent=parent)
+
 
         if not isinstance(obj, SynapticStimulus): # and obj is not None:
             # scipywarn(f"This widget does not support objects of type {type(obj).__name__}")
             self._data_ = None
         else:
             self._data_ = obj
+
+        # print(f"{self.__class__.__name__}.__init__: self._data_ = {self._data_}")
 
         if self._data_ is not None:
             self._name_ = self._data_.name
@@ -158,6 +161,7 @@ class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
             isinstance(self._digital_, bool)
             ):
             self._data_ = SynapticStimulus(self._name_, self._channel_, self._digital_)
+            # print(f"{self.__class__.__name__}[{self.objectName()}]._make_value() -> {self._data_}")
 
     def setValue(self, val:typing.Optional[SynapticStimulus] = None):
         if isinstance(val, SynapticStimulus):

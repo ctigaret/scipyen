@@ -66,7 +66,16 @@ from gui.itemmodels.roles import * # noqa
 from ephys import ephys
 
 class ExternalEditorDelegate(QtWidgets.QMainWindow):
-    r"""For use with external editing in PythonItemDelegate"""
+    r"""For use with external editing in PythonItemDelegate.
+
+CAUTION: The underlying central widget may call another instance of this !
+
+To retrieve its update value you MUST close this window frst!
+
+NOTE: To be used with my custom itemmodels
+
+
+"""
     sig_valueChanged            = Signal(object)
     # sig_activated               = Signal(int)
     # closeMe                     = Signal(int)
@@ -81,50 +90,76 @@ class ExternalEditorDelegate(QtWidgets.QMainWindow):
         self._pendingChange_: bool = False
 
         self._data_ = data
+        # print(f"{self.__class__.__name__}.__init__:")
+        # print(f"\tself._data_: {self._data_}")
         self._widget_ = self.chooseEditor()
+        # print(f"\tself._widget_: {self._widget_}")
         # self._layout_ = QtWidgets.QHBoxLayout(self)
         # self.setLayout(self._layout_)
         # self.chooseEditor()
         if isinstance(self._widget_, QtWidgets.QWidget):
             self.setCentralWidget(self._widget_)
             self.resize(-1,-1)
-            self._widget_.sig_valueChanged.connect(self.slot_valueChanged)
         # self.show()
 
     def closeEvent(self, evt):
+        print(f"{self.__class__.__name__}[{self.objectName()}].closeEvent:")
         self._pendingChange_ = False
+        # store data from underlying central widget
+        if isinstance(self._widget_, QtWidgets.QWidget) and hasattr(self._widget_, "value"):
+            self._data_ = self._widget_.value()
         self.sig_closing.emit()
         self.sig_valueChanged.emit(self._data_)
+        evt.accept()
 
     def chooseEditor(self) -> QtWidgets.QWidget:
+        # print(f"{self.__class__.__name__}.chooseEditor:")
+        # print(f"\tfor {self._data_}")
         widget = None
-        self.setWindowTitle(f"{type(self._data_).__name__} Editor")
+        editorName = f"{type(self._data_).__name__} Editor"
+        self.setWindowTitle(editorName)
         if isinstance(self._data_, ephys.SynapticStimulus):
             from gui.widgets import synapticstimuluswidget
-            widget = synapticstimuluswidget.SynapticStimulusWidget(self._data_,
-                                                                   self)
+            widget = synapticstimuluswidget.SynapticStimulusWidget(self,
+                                                                   self._data_,
+                                                                   )
+            widget.setObjectName(f"{editorName} Widget")
 
         elif isinstance(self._data_, (ephys.AuxiliaryInput, ephys.AuxiliaryOutput)):
             from gui.widgets import auxiliaryiowidget
             if isinstance(self._data_, ephys.AuxiliaryInput):
-                widget = auxiliaryiowidget.AuxiliaryInputWidget(self._data_,
-                                                                self)
+                widget = auxiliaryiowidget.AuxiliaryInputWidget(self,
+                                                                self._data_,
+                                                                )
             else:
-                widget = auxiliaryiowidget.AuxiliaryOutputWidget(self._data_,
-                                                                 self)
+                widget = auxiliaryiowidget.AuxiliaryOutputWidget(self,
+                                                                 self._data_,
+                                                                 )
+            widget.setObjectName(f"{editorName} Widget")
 
         elif isinstance(self._data_, ephys.SynapticPathway):
             from gui.widgets import synapticpathwaywidget
-            widget = synapticpathwaywidget.SynapticPathwayWidget(self._data_,
-                                                                 self)
+            widget = synapticpathwaywidget.SynapticPathwayWidget(self,
+                                                                 self._data_,
+                                                                 )
+            widget.setObjectName(f"{editorName} Widget")
+
+        if isinstance(widget, QtWidgets.QWidget) and hasattr(widget, "sig_valueChanged"):
+            widget.sig_valueChanged.connect(self.slot_valueChanged)
 
         return widget
 
+    @Slot()
+    def _slot_externalEditorClosing(self):
+        self._pendingChange_ = False
+
     @Slot(object)
     def slot_valueChanged(self, val):
-        self._data_ = val
+        # print(f"{self.__class__.__name__}[{self.objectName()}].slot_valueChanged({val})")
         if self._pendingChange_:
             return
+
+        self._data_ = val
 
         self.sig_valueChanged.emit(self._data_)
 

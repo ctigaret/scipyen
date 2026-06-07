@@ -65,11 +65,15 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[ephys.SynapticPathway] = None):
+        # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
 
-        if not isinstance(parent, QtWidgets.QWidget):
-            if obj is None and isinstance(parent, ephys.SynapticPathway):
-                obj = parent
-            parent = None
+        # if isinstance(parent, ephys.SynapticPathway):
+        #     obj_ = parent
+        #     if isinstance(obj, QtWidgets.QWidget):
+        #         parent = obj
+        #     elif isinstance(obj, ephys.SynapticPathway):
+        #         obj_ = obj
+        #         parent = None
 
         QWidget.__init__(self, parent=parent)
 
@@ -78,7 +82,9 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
         else:
             self._data_ = obj
 
-        if self._data_ is not None:
+        # print(f"\tself._data_: {self._data_}")
+
+        if isinstance(self._data_, ephys.SynapticPathway):
             self._name_ = self._data_.name
             self._adc_ = self._data_.adc
             self._dac_ = self._data_.dac
@@ -230,10 +236,28 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
     @Slot()
     def _slot_editStimulus(self):
         from gui.delegates import ExternalEditorDelegate
-        print(f"{self.__class__.__name__}._slot_editStimulus: {self._stimulus_}")
+        print(f"{self.__class__.__name__}[{self.objectName()}]._slot_editStimulus: {self._stimulus_}")
         stimEditor = ExternalEditorDelegate(self._stimulus_, self)
+        # stimEditor.sig_closing().connect(stimEditor)
+        stimEditor.setObjectName("stimEditor")
+        stimEditor.sig_valueChanged.connect(self._slot_stimulusChanged)
         stimEditor.slot_Launch()
 
+
+    @Slot(object)
+    def _slot_stimulusChanged(self, val):
+        # print(f"{self.__class__.__name__}[{self.objectName()}]._slot_stimulusChanged({val})")
+        if isinstance(val, ephys.SynapticStimulus):
+            self._stimulus_ = val
+            self._make_value_()
+            self.sig_valueChanged.emit(self._data_)
+
+
+    @Slot(object)
+    def slot_valueChanged(self, val):
+        # print(f"{self.__class__.__name__}[{self.objectName()}].slot_valueChanged({val})")
+        self._data_ = val
+        # print(f"\t=>{self._data_}")
 
     def setValue(self, val: typing.Optional[ephys.SynapticPathway] = None):
         if isinstance(val, ephys.SynapticPathway):
@@ -265,6 +289,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self.nameLineEdit.setText(self._name_)
             self.adcSpinBox.setValue(self._adc_)
             self.dacSpinBox.setValue(self._dac_)
+
 
             currentElectrodeModeNdx = self._electrodeModeNames_.index(self._electrode_.name)
             currentPathwayTypeNdx = self._pathwayTypeNames_.index(self._pathType_.name)
