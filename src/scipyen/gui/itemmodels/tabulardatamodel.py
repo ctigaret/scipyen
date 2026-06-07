@@ -268,7 +268,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     def setData(self: typing.Self, modelIndex: QtCore.QModelIndex,
                 value: object, role=QtCore.Qt.EditRole) -> bool:
-        r"""Set a new data with the specified role, at the specified model index in this model"""
+        r"""Set a new data with the specified role, at the specified model index in this model.
+    Overrides QtCore.QAbstractTableModel.setData
+    """
         if self._modelData_ is None:
             return False
 
@@ -438,13 +440,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                         if data.ndim > 1:
                             # include domain as the first column
-                            self._modelDataColumns_ = data.shape[1] + 1
-                            # domain = getattr(data, "times", None)
-                            # domain_name = getattr(data, "domain_name", scq.getUnitFamily(domain))
-                            # if len(domain_name) == 0:
-                            #     domain_name = f"{domain.dimensionality}"
-                            # else:
-                            #     domain_name += f" ({domain.dimensionality})"
+                            self._modelDataColumns_ = data.shape[1] + 1 # this shows data.times as column 0
 
                             channel_names = None
                             if len(data.array_annotations):
@@ -478,8 +474,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                     )
                                 )
 
-                            # self._modelDataRows_ = data.shape[0]
-
                             if isinstance(data, (neo.AnalogSignal, DataSignal)):
                                 # NOTE: 2025-09-27 11:05:05 see NOTE: 2025-09-27 10:38:00
                                 # although the signal domain is shown as a regular column
@@ -491,9 +485,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                 # be to call setItemDelegateForColumn and setItemDelegateForRow
                                 # with a custom delegate returning a null widget (i.e. None)
                                 # but that is already baked in PythonItemDelegate class
-                                self._immutableColumns_ = [0]
+                                # see NOTE: 2025-09-27 11:06:52 in gui/delegates.py
+                                self.immutableColumns = [0]
                                 # below, allow editing t_start
-                                self._immutableRows_ = range(1,self._modelDataRows_)
+                                self.immutableRows = range(1,self._modelDataRows_)
+                                self.jointImmutability = True
 
                         else: # e.g. case of spiketrains:
                             self._modelDataColumns_ = 1 if isinstance(data, neo.SpikeTrain) else 2

@@ -130,6 +130,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         # FIXME: 2025-11-23 09:58:38 next line is DEPRECATED
         self._is_vigra_filter_kernel_:bool = False # needed in future implementations of editing functionality
         self._dataModel_ = TabularDataModel(parent=self)
+        # print(f"{self.__class__.__name__}.__init__: _dataModel_ is {type(self._dataModel_).__name__}")
         # self._dataModel_.sig_rowsPopulated.connect(self._slot_rowsPopulated)
         # self._dataModel_.sig_columnsPopulated.connect(self._slot_columnsPopulated)
         self._selectedIndexes_ = list()
@@ -224,6 +225,13 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self.nextSliceToolButton.setEnabled(False)
             self._dataModel_.setModelData(self._data_)
 
+        delegate = self.tableView.itemDelegate()
+
+        # if isinstance(delegate, PythonItemDelegate):
+        #     delegate.immutableColumns = self._dataModel_.immutableColumns
+        #     delegate.immutableRows = self._dataModel_.immutableRows
+        #     delegate.jointImmutability = self._dataModel_.jointImmutability
+
         # NOTE: 2025-11-23 19:53:14
         # to show bool cell data as checkboxes
         for row in range(self._dataModel_.rowCount()):
@@ -315,16 +323,28 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self._dataModel_ = TabularDataModel(parent=self)
         self.tableView.setModel(self._dataModel_)
 
-    @property
-    def model(self):
-        return self.tableView.model()
+    # @property
+    # def model(self) -> QtCore.QAbstractTableModel:
+    #     r"""The underlying QtCore.QAbstractTableModel or type derived from it"""
+    #     self._dataModel_ = self.tableView.model()
+    #     return self._dataModel_
+    #
+    # @model.setter
+    # def model(self, md:QtCore.QAbstractTableModel|None):
+    #     self._dataModel_ = md
+    #     self.tableView.setModel(self._dataModel_)
+    #     if hasattr(self._dataModel_, "sig_modelDataChanged") and isinstance(type(self._dataModel_).sig_modelDataChanged, Signal):
+    #         self._dataModel_.sig_modelDataChanged.connect(self.sig_dataChanged) # connect signal to signal directly
 
-    @model.setter
-    def model(self, md:QtCore.QAbstractTableModel|None):
-        self._dataModel_ = md
-        self.tableView.setModel(self._dataModel_)
-        if hasattr(self._dataModel_, "sig_modelDataChanged") and isinstance(type(self._dataModel_).sig_modelDataChanged, Signal):
-            self._dataModel_.sig_modelDataChanged.connect(self.sig_dataChanged) # connect signal to signal directly
+    # @property
+    # def dataModel(self) -> QtCore.QAbstractTableModel:
+    #     r"""Same as self.model"""
+    #     return self.model
+    #
+    # @dataModel.setter
+    # def dataModel(self, val: QtCore.QAbstractTableModel):
+    #     self.model = val
+
 
     @property
     def enforceFloat(self) -> bool:
@@ -379,7 +399,11 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             # self.tableView.model.canAlterRows = True
             # self.tableVire.model.canAlterColumns = True
             self.tableView.setEditTriggers(self._defaultEditTriggers_)
+            # self._editItemDelegate_.immutableRows = self.tableView.model().immutableRows
+            # self._editItemDelegate_.immutableColumns = self.tableView.model().immutableColumns
+            # self._editItemDelegate_.jointImmutability = self.tableView.model().jointImmutability
             self.tableView.setItemDelegate(self._editItemDelegate_)
+
             self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-unlocked"))
             self.setEditableToolButton.setToolTip("Editing enabled; toggle to disable")
 
