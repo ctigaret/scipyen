@@ -76,4 +76,73 @@ class KeplerDark(Style):
         # Error:              '#a61717'
     }
 
+class KeplerLight(Style):
+    name = "KeplerLight"
+    
+    # background_color = '#232629'
+    background_color = "#ffffff"
+    # highlight_color = '#404040'
+    highlight_color = '#384f29'
+    line_number_color = '#aaaaaa'
+    
+    styles = {
+        # Token:              '#d0d0d0',
+        Token:              '#232629',
+        # Token:              '#ffff00',
+        # Whitespace:         '#666666',
+        # Whitespace:         '#232629',
+        Whitespace:         "#ffffff",
+
+        # Comment:            'italic #ababab',
+        Comment:            'italic #64644b',
+        Comment.Preproc:    'noitalic bold #a43340',
+        # Comment.Preproc:    'noitalic bold #ff3a3a',
+        # Comment.Special:    'noitalic bold #e50808 bg:#520000',
+        Comment.Special:    'noitalic bold #e50808 bg:#920000',
+
+        Keyword:            'bold #6ebf26',
+        Keyword.Pseudo:     'nobold',
+        Operator.Word:      'bold #6ebf26',
+
+        String:             '#9a640c',
+        String.Other:       '#b37759',
+
+        Number:             '#51b2fd',
+
+        Name.Builtin:       '#2fbccd',
+        Name.Variable:      '#289e9e',
+        Name.Constant:      '#207e7e',
+        Name.Class:         'underline #71adff',
+        Name.Function:      '#71adff',
+        Name.Namespace:     'underline #71adff',
+        # Name.Exception:     '#bbbbbb',
+        Name.Exception:     '#ff8800',
+        Name.Tag:           'bold #6ebf26',
+        Name.Attribute:     '#737373',
+        Name.Decorator:     '#888800',
+
+        # Generic.Heading:    'bold #ffffff',
+        Generic.Heading:    'bold #000000',
+        Generic.Subheading: 'underline #000000',
+        # Generic.Subheading: 'underline #ffffff',
+        Generic.Deleted:    '#ff3a3a',
+        Generic.Inserted:   '#589819',
+        # Generic.Error:      '#ff3a3a',
+        Generic.Error:      '#ff6200',
+        Generic.Emph:       'italic',
+        Generic.Strong:     'bold',
+        Generic.EmphStrong: 'bold italic',
+        Generic.Prompt:     '#aaaaaa',
+        # Generic.Prompt:     '#cccccc',
+        Generic.Output:     '#cccccc',
+        # Generic.Output:     '#eeeeee',
+        # Generic.Traceback:  '#ff3a3a',
+        Generic.Traceback:  '#ff6200',
+
+        # Error:              'bg:#2d1e1e #a61717',
+        Error:              'bg:#2d1e1e #a65e17',
+        # Error:              'bg:#e3d2d2 #a61717',
+        # Error:              '#a61717',
+    }
+
 # pstyles.STYLES[KeplerDark.name] = (KeplerDark.__module__, KeplerDark.__name__, ())

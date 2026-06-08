@@ -95,6 +95,7 @@ from gui import quickdialog
 import iolib.pictio as pio
 #### END pict.iolib modules
 
+from ephys import ephys
 
 # NOTE: 2022-12-25 23:08:51
 # needed for the new plugins framework
@@ -136,6 +137,10 @@ class TableEditor(ScipyenViewer):
                         vigra.VigraArray: 0,
                         vigra.filters.Kernel1D: 0,
                         vigra.filters.Kernel2D: 0,
+                        ephys.SynapticPathwayList: 0,
+                        ephys.AuxiliaryInputList: 0,
+                        ephys.AuxiliaryOutputList: 0,
+                        ephys.SynapticStimulusList: 0,
                         list:0,
                         tuple:0,
                         deque:0}

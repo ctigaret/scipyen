@@ -11,7 +11,7 @@ r"""Table Editor widget and custom table model, for tabular-like data
 #### BEGIN core python modules
 from __future__ import print_function
 
-import os, inspect, warnings, traceback, datetime, typing, numbers
+import os, inspect, warnings, traceback, datetime, typing, numbers, enum
 from functools import singledispatch
 from collections import deque
 #### END core python modules
@@ -335,6 +335,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                      np.ndarray, vigra.filters.Kernel1D,
                                      vigra.filters.Kernel2D,
                                      TriggerProtocolList,
+                                     ephys.SynapticPathwayList,
+                                     ephys.AuxiliaryInputList,
+                                     ephys.AuxiliaryOutputList,
+                                     ephys.SynapticStimulusList,
                                      list, tuple, deque,
                                      type(None))):
                 raise TypeError("%s data is not yet supported" % type(data).__name__)
@@ -1218,8 +1222,16 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(self._modelData_, TriggerProtocolList):
                 protocol = self._modelData_[row]
                 val = getattr(protocol, self._modelDataHeaderSections_[col])
+                if isinstance(val, enum.Enum):
+                    disp = f"{val.name}"
+                elif isinstance(val, neo.Event):
+                    disp = f"{val.times}"
+                else:
+                    disp = f"{val}"
 
-                ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val.times}" if isinstance(val, neo.Event) else f"{val}" # noqa
+                ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp
+
+                # ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val.times}" if isinstance(val, neo.Event) else f"{val}" # noqa
 
             elif isinstance(self._modelData_, (
                                                 ephys.SynapticPathwayList,
@@ -1232,23 +1244,37 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 attribute = self._modelDataHeaderSections_[col]
                 if attribute.lower() != "edit":
                     val = getattr(obj, attribute)
-                    ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val}"
+                    if isinstance(val, enum.Enum):
+                        disp = f"{val.name}"
+                    else:
+                        disp = f"{val}"
+                    ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp
                 else:
-                    return QtCore.Qvariant()
+                    return QtCore.QVariant()
 
             elif isinstance(self._modelData_, typing.Sequence):
                 if all(isinstance(d, ephys.RecordingSource) for d in self._modelData_):
                     obj = self._modelData_[row]
                     attribute = self._modelDataHeaderSections_[col]
                     if attribute.lower() == "edit":
-                        return QtCore.Qvariant()
+                        return QtCore.QVariant()
                     else:
                         val = getattr(obj, attribute)
-                        ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val}"
+                        if isinstance(val, enum.Enum):
+                            disp = f"{val.name}"
+                        else:
+                            disp = f"{val}"
+                        ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp
+                        # ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val}"
 
                 else:
                     val = self._modelData_[row][col]
-                    ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val}"
+                    if isinstance(val, enum.Enum):
+                        disp = f"{val.name}"
+                    else:
+                        disp = f"{val}"
+                    ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp
+                    # ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val}"
 
             elif isinstance(self._modelData_, neo.core.dataobject.DataObject):
                 if col == 0:
@@ -1315,10 +1341,16 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         try:
             if isinstance(value, QtCore.QVariant) or hasattr(value, "value"):
-                pyvalue = value.value()
+                try:
+                    pyvalue = value.value()
+                except:
+                    traceback.print_exc()
+                    pyvalue = value.value
 
             else:
                 pyvalue = value
+
+            print(f"{self.__class__.__name__}._setDataValue_({value}[{type(value).__name__}]) -> pyvalue = {pyvalue}")
 
             if isinstance(self._modelData_, pd.DataFrame):
                 if row >= self._modelData_.shape[0]:
@@ -1471,6 +1503,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 else:
                     return False
 
+                old_val = getattr(old_obj, attr)
+                if isinstance(old_val, enum.Enum):
+                    if isinstance(pyvalue, int):
+                        params[attr] = type(old_val)(pyvalue)
+                    elif isinstance(pyvalue, str):
+                        params[attr] = type(old_val)[pyvalue]
                 params[attr] = pyvalue
 
                 new_obj = type(old_obj)(**params)

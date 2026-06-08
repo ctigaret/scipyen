@@ -1,2 +1,3 @@
 [pygments.styles]
-KeplerDark = keplerdark:KeplerDark
+KeplerDark = keplerstyles:KeplerDark
+KeplerLight = keplerstyles:KeplerLight

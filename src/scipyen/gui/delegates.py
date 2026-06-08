@@ -902,6 +902,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         #
 
         data = index.data(ObjectDataRole) # noqa
+
         if data is not None:
             self._useObjectDataRole_ = True
 
@@ -909,12 +910,17 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             data = index.data(QtCore.Qt.EditRole)
             self._useObjectDataRole_ = False
 
+        print(f"{self.__class__.__name__}.createEditor -> data is {type(data).__name__}")
+
         # print(f"{self.__class__.__name__}.createEditor for {type(data).__name__} at row ({index.row()}), col {index.column()}")
 
         # disp = index.data(QtCore.Qt.DisplayRole)
         # CAUTION: Standard item model and standard items treat DisplayRole and
         # DisplayRole as being the same; in such case I need a custom role
         dataChoices = index.data(DataChoicesRole) # noqa
+        if isinstance(data, enum.Enum):
+            if dataChoices is None:
+                dataChoices = dict(map(lambda x: (x.name, x.value), type(data)))
 
         # NOTE: 2025-09-27 11:06:52
         # some models may be able to prevent editing indexes with certain rows
@@ -978,6 +984,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 return
 
             choices = self._columnChoices_[index.column()]["choices"]
+
+        # elif
 
         w = self.createWidget(data, choices, True, parent)
         # print(f"{self.__class__.__name__}.createEditor() -> {type(w).__name__}")
@@ -1171,6 +1179,14 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         r"""Sets data back into the QModelIndex"""
         originalData = index.data(ObjectDataRole) # noqa
 
+        if originalData is not None:
+            self._useObjectDataRole_ = True
+
+        else:
+            originalData = index.data(QtCore.Qt.EditRole)
+            self._useObjectDataRole_ = False
+
+
         if isinstance(editor, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox,
                                smw.QuantitySpinBox, smw.ComplexSpinBox,
                                neow.SimpleTriggerEventWidget)):
@@ -1182,6 +1198,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         elif isinstance(editor, QtWidgets.QComboBox):
             textValue = editor.currentText()
             ndxValue = editor.currentIndex()
+            print(f"{self.__class__.__name__}.setModelData from {type(editor).__name__}: textValue {textValue} -> ndxValue {ndxValue}, for originalData {originalData} ({type(originalData).__name__})")
             # originalData = index.data(ObjectDataRole)
 
             if isinstance(originalData, enum.Enum):

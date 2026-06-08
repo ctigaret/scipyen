@@ -13,9 +13,11 @@ from pygments.styles import get_style_by_name
 from qtconsole import styles as qcstyles
 from pygments.token import Token
 
-from .keplerdark import KeplerDark
+# from .keplerdark import KeplerDark
+# from .keplerlight import KeplerLight
+from .keplerstyles import KeplerDark,  KeplerLight
 
-StyleNames = ["KeplerDark"]
+StyleNames = ["KeplerDark", "KeplerLight"]
 
 def available_pygments():
     # NOTE: 2020-12-22 21:35:30

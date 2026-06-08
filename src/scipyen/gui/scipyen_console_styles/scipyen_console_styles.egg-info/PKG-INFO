@@ -2,11 +2,11 @@ Metadata-Version: 2.4
 Name: scipyen_console_styles
 Version: 0.0.1
 Summary: Styles for Scipyen Console
-Author-email: "Cezar M. Tigaret" <cezar.tigaret@gmail.com>
+Author-email: "Cezar M. Tigaret" <cezar.tigaret@proton.me>
+License-Expression: GPL-3.0-or-later
 Project-URL: Homepage, https://github.com/ctigaret/scipyen
 Project-URL: Issues, https://github.com/ctigaret/scipyen/issues
 Classifier: Programming Language : Python :: 3
-Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
