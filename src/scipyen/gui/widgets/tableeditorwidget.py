@@ -12,6 +12,7 @@ r"""Table Editor widget and custom table model, for tabular-like data
 from __future__ import print_function
 
 import os, inspect, warnings, traceback, datetime, typing
+from collections import deque
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -47,6 +48,7 @@ import quantities as pq
 #import xarray as xa
 import numpy as np
 import neo
+from neo.core.objectlist import ObjectList as NeoObjectList
 from core.vigra_patches import vigra
 
 import matplotlib as mpl
@@ -83,6 +85,7 @@ from gui import quickdialog
 from gui.delegates import PythonItemDelegate
 from gui.widgets.tabledataview import TableDataView
 from gui.itemmodels.tabulardatamodel import TabularDataModel
+from gui.itemmodels.roles import *
 # from gui import resources_rc
 # from gui import icons_rc
 #### END pict.gui modules
@@ -102,7 +105,8 @@ TabularType = typing.Union[pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
                            DataSignal, IrregularlySampledDataSignal,
                            TriggerEvent, TriggerProtocolList,
                            np.ndarray, vigra.VigraArray,
-                           vigra.filters.Kernel1D, vigra.filters.Kernel2D]
+                           vigra.filters.Kernel1D, vigra.filters.Kernel2D,
+                           NeoObjectList, list, tuple, deque]
 
 Ui_TableEditorWidget, QWidget = loadUiType(__ui_path__)
 
@@ -199,8 +203,12 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self._is_vigra_filter_kernel_ = False
 
         self._data_ = data
+        # self.tableView.reset()
+        # oldColumnCount = self.tableView.horizontalHeader().count()
 
-        if getattr(data, "shape", (0,0))[0] > 10:
+        if (getattr(data, "shape", (0,0))[0] > 10
+            or (isinstance(data, (typing.Sequence, NeoObjectList)) and len(data) > 10)
+            ):
             # avoid auto-resizing rows for data with more than 10 rows — it is
             # resource consuming
             self.resizeRowsToolButton.setEnabled(False)
@@ -227,16 +235,25 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 
         # delegate = self.tableView.itemDelegate()
 
+        # newColumnCount = self._dataModel_.columnCount()
+
+        # print(f"{self.__class__.__name__}.setData -> oldColumnCount = {oldColumnCount}, newColumnCount = {newColumnCount}")
+        # if newColumnCount != oldColumnCount:
+        #     self.tableView.columnCountChanged(oldColumnCount, newColumnCount)
+
         # NOTE: 2025-11-23 19:53:14
         # to show bool cell data as checkboxes
         for row in range(self._dataModel_.rowCount()):
             for col in range(self._dataModel_.columnCount()):
                 index = self._dataModel_.index(row, col)
-                if isinstance(indexdata, bool):
+                indexData = index.data(ObjectDataRole)
+                if indexData is None:
+                    indexData = index.data(QtCore.Qt.EditRole)
+                if isinstance(indexData, bool):
                     self.tableView.openPersistentEditor(index)
 
-                if hasattr(self._dataModel_, "_modelDataHeaderSections_"):
-                    if self._dataModel_._modelDataHeaderSections_[col].lower() == "edit":
+                if hasattr(self._dataModel_, "_modelDataColumnHeaders_"):
+                    if self._dataModel_._modelDataColumnHeaders_[col].lower() == "edit":
                         self.tableView.openPersistentEditor(index)
 
     @Slot()

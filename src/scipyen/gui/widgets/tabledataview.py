@@ -66,8 +66,8 @@ class TableDataView(QtWidgets.QTableView):
 #
 #         col = index.column()
 #
-#         if hasattr(model, "_modelDataHeaderSections_"):
-#             colHeader = model._modelDataHeaderSections_[col]
+#         if hasattr(model, "_modelDataColumnHeaders_"):
+#             colHeader = model._modelDataColumnHeaders_[col]
 #             if colHeader.lower() == "edit":
 
 

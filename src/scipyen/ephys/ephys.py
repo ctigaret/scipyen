@@ -2777,6 +2777,7 @@ class SynapticPathway:
             raise TypeError(f"Invalid synaptic pathway type {pathType}")
 
         self._pathwayType_ = pathType
+        self.pathType = self._pathwayType_
 
     @property
     def electrodeMode(self) -> ElectrodeMode:
@@ -2810,7 +2811,8 @@ class SynapticPathway:
         if not isinstance(val, SynapticPathwayType):
             raise TypeError(f"Invalid synaptic pathway type {val}")
 
-        self._pathwayType = val
+        self._pathwayType_ = val
+        self.pathType = self._pathwayType_
 
     def __repr__(self) -> str:
         import dataclasses

@@ -910,7 +910,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             data = index.data(QtCore.Qt.EditRole)
             self._useObjectDataRole_ = False
 
-        print(f"{self.__class__.__name__}.createEditor -> data is {type(data).__name__}")
+        # print(f"{self.__class__.__name__}.createEditor -> data is {type(data).__name__}")
 
         # print(f"{self.__class__.__name__}.createEditor for {type(data).__name__} at row ({index.row()}), col {index.column()}")
 
@@ -954,8 +954,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     # print(f"\t-> immutable row")
                     return
 
-        if hasattr(model, "_externalDataEditor_") and hasattr(model, "_modelDataHeaderSections_"):
-            if model._externalDataEditor_ is True and model._modelDataHeaderSections_[index.column()] == "Edit":
+        if hasattr(model, "_externalDataEditor_") and hasattr(model, "_modelDataColumnHeaders_"):
+            if model._externalDataEditor_ is True and model._modelDataColumnHeaders_[index.column()] == "Edit":
                 widget = QtWidgets.QPushButton("...")
                 if hasattr(widget, "setFrame"):
                     widget.setFrame(False)
@@ -982,6 +982,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             if not isinstance(data, str):
                 scipywarn(f"{self.__class__.__name__}.createEditor: data type ({type(data).__name__}) is not supported for combo box")
                 return
+            self.endResetModel()
+
 
             choices = self._columnChoices_[index.column()]["choices"]
 
@@ -1198,7 +1200,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         elif isinstance(editor, QtWidgets.QComboBox):
             textValue = editor.currentText()
             ndxValue = editor.currentIndex()
-            print(f"{self.__class__.__name__}.setModelData from {type(editor).__name__}: textValue {textValue} -> ndxValue {ndxValue}, for originalData {originalData} ({type(originalData).__name__})")
+            # print(f"{self.__class__.__name__}.setModelData from {type(editor).__name__}: textValue {textValue} -> ndxValue {ndxValue}, for originalData {originalData} ({type(originalData).__name__})")
             # originalData = index.data(ObjectDataRole)
 
             if isinstance(originalData, enum.Enum):

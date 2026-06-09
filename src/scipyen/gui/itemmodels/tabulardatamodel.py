@@ -49,6 +49,7 @@ import quantities as pq
 #import xarray as xa
 import numpy as np
 import neo
+from neo.core.objectlist import ObjectList as NeoObjectList
 from core.vigra_patches import vigra
 
 import matplotlib as mpl
@@ -161,7 +162,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelData_:typing.Any= None
         self._modelDataRows_:int = 0
         self._modelDataColumns_:int = 0
-        self._modelDataHeaderSections_: typing.Optional[
+        self._modelDataColumnHeaders_: typing.Optional[
             typing.Union[typingMapping, typing.Sequence]
             ] = None
         self._immutability_:dict = {"columns": list(), "rows": list(), "joint":False}
@@ -329,8 +330,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # timer.start()
         #
         # ### END   Define timer debug
+        self.beginResetModel()
         try:
-
             if not isinstance(data, (pd.Series, pd.DataFrame, pd.Index,
                                      np.ndarray, vigra.filters.Kernel1D,
                                      vigra.filters.Kernel2D,
@@ -343,7 +344,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                      type(None))):
                 raise TypeError("%s data is not yet supported" % type(data).__name__)
 
-            self.beginResetModel()
 
             # timer1 = QtCore.QElapsedTimer()
             # timer1.start()
@@ -357,7 +357,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelDataColumns_ = data.shape[1]
 
                 if isinstance(self._modelData_.columns, (pd.MultiIndex, pd.Index)):
-                    self._modelDataHeaderSections_ = dict(
+                    self._modelDataColumnHeaders_ = dict(
                         tuple(
                             map(
                                 lambda x: (x[0], f"{x[1]}"),
@@ -366,7 +366,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             )
                         )
 
-                # self._modelDataHeaderSections_ = dict(enumerate(data.columns))
+                # self._modelDataColumnHeaders_ = dict(enumerate(data.columns))
                 self._canAddRemoveColumns_ = True
                 self._canAddRemoveRows_ = True
 
@@ -374,7 +374,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelData_ = data
                 self._modelDataRows_ = data.shape[0]
                 self._modelDataColumns_ = 1
-                self._modelDataHeaderSections_ = {0: data.name}
+                self._modelDataColumnHeaders_ = {0: data.name}
                 self._canAddRemoveRows_ = True
                 self._canAddRemoveColumns_ = False
 
@@ -382,7 +382,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelData_ = data
                 self._modelDataRows_ = data.shape[0]
                 self._modelDataColumns_ = 1
-                self._modelDataHeaderSections_ = {0: "Index or Column"}
+                self._modelDataColumnHeaders_ = {0: "Index or Column"}
                 self._canAddRemoveRows_ = True
                 self._canAddRemoveColumns_ = False
 
@@ -390,7 +390,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelData_ = vigrautils.kernel2array(data)
                 self._modelDataRows_ = data.shape[0]
                 self._modelDataColumns_ = 1 if isinstance(data, vigra.filters.Kernel1D) else 2
-                self._modelDataHeaderSections_ = {0: "Sample"} if isinstance(data, vigra.filters.Kernel1D) else {0: "X", 1: "Y"}
+                self._modelDataColumnHeaders_ = {0: "Sample"} if isinstance(data, vigra.filters.Kernel1D) else {0: "X", 1: "Y"}
                 self._is_vigra_filter_kernel_  = True
                 self._original_data_ = data
                 self._canAddRemoveRows_ = False
@@ -404,7 +404,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._canAddRemoveRows_ = True
                 self._canAddRemoveColumns_ = False
 
-                self._modelDataHeaderSections_ = dict(
+                self._modelDataColumnHeaders_ = dict(
                     tuple(
                         map(
                             lambda x: (x[0], f"{x[1]}"),
@@ -413,7 +413,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             ))
                         )
                     )
-                self._modelDataColumns_ = len(self._modelDataHeaderSections_)
+                self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
 
             elif isinstance(data, ephys.SynapticPathwayList):
                 self._modelData_ = data
@@ -424,7 +424,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._canAddRemoveColumns_ = False
 
                 # NOTE: 2026-06-07 21:38:40 see NOTE: 2026-06-07 21:36:23
-                self._modelDataHeaderSections_ = dict(
+                self._modelDataColumnHeaders_ = dict(
                     tuple(
                         map(
                             lambda x: (x[0], f"{x[1]}"),
@@ -433,7 +433,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             ))
                         )
                     )
-                self._modelDataColumns_ = len(self._modelDataHeaderSections_)
+                self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
 
             elif isinstance(data, ephys.AuxiliaryInputList):
                 self._modelData_ = data
@@ -447,7 +447,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 # Only display (and allow editing) the relevant fields:
                 # name & adc; give option to edit the entire object via an "Edit"
                 # column
-                self._modelDataHeaderSections_ = dict(
+                self._modelDataColumnHeaders_ = dict(
                     tuple(
                         map(
                             lambda x: (x[0], f"{x[1]}"),
@@ -455,7 +455,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             )
                         )
                     )
-                self._modelDataColumns_ = len(self._modelDataHeaderSections_)
+                self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
 
             elif isinstance(data, ephys.AuxiliaryOutputList):
                 self._modelData_ = data
@@ -466,7 +466,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._canAddRemoveColumns_ = False
 
                 # NOTE: 2026-06-07 21:37:08 see NOTE: 2026-06-07 21:36:23
-                self._modelDataHeaderSections_ = dict(
+                self._modelDataColumnHeaders_ = dict(
                     tuple(
                         map(
                             lambda x: (x[0], f"{x[1]}"),
@@ -474,7 +474,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             )
                         )
                     )
-                self._modelDataColumns_ = len(self._modelDataHeaderSections_)
+                self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
 
             elif isinstance(data, ephys.SynapticStimulusList):
                 self._modelData_ = data
@@ -485,7 +485,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._canAddRemoveColumns_ = False
 
                 # NOTE: 2026-06-07 21:38:07 see NOTE: 2026-06-07 21:36:23
-                self._modelDataHeaderSections_ = dict(
+                self._modelDataColumnHeaders_ = dict(
                     tuple(
                         map(
                             lambda x: (x[0], f"{x[1]}"),
@@ -493,7 +493,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             )
                         )
                     )
-                self._modelDataColumns_ = len(self._modelDataHeaderSections_)
+                self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
 
             elif isinstance(data, np.ndarray):
                 # trying to streamline this
@@ -549,7 +549,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                                      range(len(channel_names))))
                             headers = [domain_name, ] + channel_names
 
-                            self._modelDataHeaderSections_ = dict(
+                            self._modelDataColumnHeaders_ = dict(
                                     (
                                         tuple(map(lambda x: (x[0]+1, x),
                                                   enumerate(headers))
@@ -601,7 +601,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                                 headers = [domain_name, ] + channel_names
 
-                            self._modelDataHeaderSections_ = dict(
+                            self._modelDataColumnHeaders_ = dict(
                                     (
                                         tuple(map(lambda x: (x[0]+1, x),
                                                   enumerate(headers))
@@ -613,7 +613,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     else:
                         self._modelDataRows_ = 1
                         self._modelDataColumns_ = 1
-                        self._modelDataHeaderSections_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
+                        self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
                         # self._canAddRemoveColumns_ = True
 
                     self._modelData_ = data
@@ -632,7 +632,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         if self._modelData_.ndim > 1:
                             self._modelDataColumns_ = self._modelData_.shape[1]
                             if isinstance(self._modelData_, pq.Quantity):
-                                self._modelDataHeaderSections_ = dict(
+                                self._modelDataColumnHeaders_ = dict(
                                         tuple(
                                             map(
                                                 lambda x: (x, f"{scq.getUnitFamily(data)} ({self._modelData_.units.dimensionality})"),
@@ -641,7 +641,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                             )
                                     )
                             # else:
-                            #     self._modelDataHeaderSections_ = dict(
+                            #     self._modelDataColumnHeaders_ = dict(
                             #         tuple(
                             #             map(
                             #                 lambda x: (x, f"Channel {x}"),
@@ -652,16 +652,16 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         else:
                             self._modelDataColumns_ = 1
                             if isinstance(self._modelData_, pq.Quantity):
-                                self._modelDataHeaderSections_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
+                                self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
                             # else:
-                            #     self._modelDataHeaderSections_ = {0: "Samples"}
+                            #     self._modelDataColumnHeaders_ = {0: "Samples"}
                     else:
                         self._modelDataRows_ = 1
                         self._modelDataColumns_ = 1
                         if isinstance(self._modelData_, pq.Quantity):
-                            self._modelDataHeaderSections_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
+                            self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
                         # else:
-                        #     self._modelDataHeaderSections_ = {0: "Samples"}
+                        #     self._modelDataColumnHeaders_ = {0: "Samples"}
 
             elif isinstance(data, typing.Sequence):
                 if all(isinstance(d, ephys.RecordingSource) for d in data):
@@ -672,7 +672,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     self._canAddRemoveColumns_ = False
                     # self._is_vigra_filter_kernel_ = 0
                     # NOTE: 2026-06-07 21:38:07 see NOTE: 2026-06-07 21:36:23
-                    self._modelDataHeaderSections_ = dict(
+                    self._modelDataColumnHeaders_ = dict(
                         tuple(
                             map(
                                 lambda x: (x[0], f"{x[1]}"),
@@ -680,7 +680,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                 )
                             )
                         )
-                    self._modelDataColumns_ = len(self._modelDataHeaderSections_)
+                    self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
 
                 elif all(isinstance(d, typing.Sequence) for d in data):
                     # NOTE: 2026-06-07 21:59:50 Row-major !!!
@@ -695,7 +695,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     self._modelDataColumns_ = len(data[0])
                     self._modelDataRows_ = len(data)
 
-                    self._modelDataHeaderSections_ = dict(
+                    self._modelDataColumnHeaders_ = dict(
                         tuple(
                             map(
                                 lambda x: (x, f"{x}"),
@@ -723,7 +723,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             )
                         self._canAddRemoveColumns_ = False
 
-
                 else:
                     if all(
                         isinstance(d,
@@ -737,10 +736,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                         self._modelData_ = data
                         self._original_data_ = data
-                        self._modelDataColumns_ = len(data[0])
+                        self._modelDataColumns_ = 1
                         self._modelDataRows_ = len(data)
 
-                        self._modelDataHeaderSections_ = dict(
+                        self._modelDataColumnHeaders_ = dict(
                             tuple(
                                 map(
                                     lambda x: (x, f"{x}"),
@@ -753,34 +752,47 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                     else:
                         scipywarn(f"Unsupported sequence element types")
+                        self._modelDataColumns_ = 0
+                        self._modelDataRows_ = 0
+                        self._modelDataColumnHeaders_ = dict()
+                        self._modelData_ = None
+                        self._original_data_ = None
 
             elif data is None:
                 self._modelData_ = data
+                self._original_data_ = data
                 self._modelDataRows_ = 0
                 self._modelDataColumns_ = 0
                 self._canAddRemoveRows_ = False
                 self._canAddRemoveColumns_ = False
-
+                self._modelDataColumnHeaders_ = dict()
             else:
                 scipywarn(f"{type(data).__name__} data are not supported yet")
                 self._modelData_ = data
+                self._original_data_ = data
                 self._modelDataRows_ = 0
                 self._modelDataColumns_ = 0
                 self._canAddRemoveRows_ = False
                 self._canAddRemoveColumns_ = False
+                self._modelDataColumnHeaders_ = dict()
 
             self._displayedRows_ = 0
-
-            self.endResetModel()
+            self._displayedColumns_ = 0
 
             if self._modelData_ is None:
                 self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, 0)
+                self.headerDataChanged.emit(QtCore.Qt.Horizontal, 0, 0)
 
             else:
+                self.headerDataChanged.emit(QtCore.Qt.Horizontal, 0, self._modelDataColumns_)
                 self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, self._modelDataRows_)
 
         except Exception as e:
             traceback.print_exc()
+
+        self.endResetModel()
+
+
 
         # ### BEGIN report timing
         #
@@ -818,8 +830,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
                             # NOTE: 2018-11-27 21:32:16
                             # TODO: chech pandas API for other possibilities
-                            if isinstance(self._modelDataHeaderSections_, dict) and len(self._modelDataHeaderSections_):
-                                return QtCore.QVariant(self._modelDataHeaderSections_[section])
+                            if isinstance(self._modelDataColumnHeaders_, dict) and len(self._modelDataColumnHeaders_):
+                                return QtCore.QVariant(self._modelDataColumnHeaders_[section])
                             else:
                                 return QtCore.QVariant(str(self._modelData_.columns[section]))
 
@@ -850,11 +862,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     elif isinstance(self._modelData_.columns, pd.Index):
                         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
                             if (
-                                isinstance(self._modelDataHeaderSections_, dict)
-                                # and len(self._modelDataHeaderSections_)
-                                and section < len(self._modelDataHeaderSections_)
+                                isinstance(self._modelDataColumnHeaders_, dict)
+                                # and len(self._modelDataColumnHeaders_)
+                                and section < len(self._modelDataColumnHeaders_)
                                 ):
-                                return QtCore.QVariant(self._modelDataHeaderSections_[section])
+                                return QtCore.QVariant(self._modelDataColumnHeaders_[section])
                             else:
                                 return QtCore.QVariant(str(self._modelData_.columns[section]))
                             # return QtCore.QVariant(str(self._modelData_.columns[section]))
@@ -916,8 +928,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                     elif isinstance(self._modelData_.index, pd.Index):
                         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            # if isinstance(self._modelDataHeaderSections_, dict) and len(self._modelDataHeaderSections_):
-                            #     return QtCore.QVariant(self._modelDataHeaderSections_[section])
+                            # if isinstance(self._modelDataColumnHeaders_, dict) and len(self._modelDataColumnHeaders_):
+                            #     return QtCore.QVariant(self._modelDataColumnHeaders_[section])
                             # else:
                             #     return QtCore.QVariant(str(self._modelData_.columns[section]))
                            return QtCore.QVariant(str(self._modelData_.index[section]))
@@ -949,8 +961,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(self._modelData_, pd.Series): # TODO pd.Index
                 if orientation == QtCore.Qt.Horizontal: # horizontal (column) headers
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                        if isinstance(self._modelDataHeaderSections_, dict) and len(self._modelDataHeaderSections_):
-                            return QtCore.QVariant(self._modelDataHeaderSections_[section])
+                        if isinstance(self._modelDataColumnHeaders_, dict) and len(self._modelDataColumnHeaders_):
+                            return QtCore.QVariant(self._modelDataColumnHeaders_[section])
                         else:
                             return QtCore.QVariant(str(self._modelData_.columns[section]))
                         # return QtCore.QVariant(str(self._modelData_.name))
@@ -979,8 +991,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 else: # vertical (row) headers
                     if isinstance(self._modelData_.index, pd.MultiIndex): # MultiIndex is subclass of Index so catch it first
                         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            # if isinstance(self._modelDataHeaderSections_, dict) and len(self._modelDataHeaderSections_):
-                            #     return QtCore.QVariant(self._modelDataHeaderSections_[section])
+                            # if isinstance(self._modelDataColumnHeaders_, dict) and len(self._modelDataColumnHeaders_):
+                            #     return QtCore.QVariant(self._modelDataColumnHeaders_[section])
                             # else:
                             #     return QtCore.QVariant(str(self._modelData_.columns[section]))
                             return QtCore.QVariant(str(self._modelData_.index[section]))
@@ -1006,8 +1018,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                     elif isinstance(self._modelData_.index, pd.Index):
                         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            # if isinstance(self._modelDataHeaderSections_, dict) and len(self._modelDataHeaderSections_):
-                            #     return QtCore.QVariant(self._modelDataHeaderSections_[section])
+                            # if isinstance(self._modelDataColumnHeaders_, dict) and len(self._modelDataColumnHeaders_):
+                            #     return QtCore.QVariant(self._modelDataColumnHeaders_[section])
                             # else:
                             #     return QtCore.QVariant(str(self._modelData_.columns[section]))
                             return QtCore.QVariant(str(self._modelData_.index[section]))
@@ -1039,10 +1051,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(self._modelData_, TriggerProtocolList):
                 if orientation == QtCore.Qt.Horizontal: # horizontal (columns) header
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                        if (isinstance(self._modelDataHeaderSections_, dict)
-                            and len(self._modelDataHeaderSections_)
+                        if (isinstance(self._modelDataColumnHeaders_, dict)
+                            and len(self._modelDataColumnHeaders_)
                             and section in range(self._modelDataColumns_)):
-                            return QtCore.QVariant(self._modelDataHeaderSections_[section])
+                            return QtCore.QVariant(self._modelDataColumnHeaders_[section])
                         else:
                             return QtCore.QVariant()
                     else:
@@ -1050,17 +1062,18 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 else:
                     return QtCore.QVariant(f"{section}")
 
-            elif isinstance(self._modelData_, neo.core.dataobject.DataObject):
+            elif isinstance(self._modelData_, NeoObjectList):
                 if orientation == QtCore.Qt.Horizontal: # horizontal (columns) header
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
                         # return QtCore.QVariant("%s (channel %d, %s)" % (self._modelData_.name, section, self._modelData_.dimensionality))
                         # for horizontal header, section number is the column number
-                        if (isinstance(self._modelDataHeaderSections_, dict)
-                            and len(self._modelDataHeaderSections_)):
+                        if (isinstance(self._modelDataColumnHeaders_, dict)
+                            and len(self._modelDataColumnHeaders_)):
                             # print(f"{self.__class__.__name__}._getHeaderData_({section} ({type(section).__name__})...)")
-                            # print(f"\theader sections: {self._modelDataHeaderSections_}")
-                            key = list(self._modelDataHeaderSections_.keys())[section]
-                            colhead = self._modelDataHeaderSections_[key][1]
+                            # print(f"\theader sections: {self._modelDataColumnHeaders_}")
+                            # key = list(self._modelDataColumnHeaders_.keys())[section]
+                            # colhead = self._modelDataColumnHeaders_[key][1]
+                            colhead = self._modelDataColumnHeaders_[section]
                             return QtCore.QVariant(colhead)
                         else:
                             if section == 0:
@@ -1087,26 +1100,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                 else: # vertical (rows) headers
                     return QtCore.QVariant(f"{section}")
-                    # if isinstance(self._modelData_, (neo.AnalogSignal, DataSignal)):
-                    #     return QtCore.QVariant(f"{section}")
-                    #     # return QtCore.QVariant(self._modelData_.times[section])
-                    # else:
-                    #     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
-                    #         return QtCore.QVariant("%s" % section)
-                    #
-                    #     elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                    #         return QtCore.QVariant("%s" % self._modelData_[section,:].dtype)
-                    #
-                    #     else:
-                    #         return QtCore.QVariant()
 
             elif isinstance(self._modelData_, np.ndarray):
                 if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
                     lbl = f"{section}"
                     if orientation == QtCore.Qt.Horizontal:
-                        if (isinstance(self._modelDataHeaderSections_, dict)
-                            and len(self._modelDataHeaderSections_)):
-                            return QtCore.QVariant(self._modelDataHeaderSections_[section])
+                        if (isinstance(self._modelDataColumnHeaders_, dict)
+                            and len(self._modelDataColumnHeaders_)):
+                            return QtCore.QVariant(self._modelDataColumnHeaders_[section])
                         else:
                             if isinstance(self._modelData_, pq.Quantity):
                                 lbl = f"{scq.getUnitFamily(self._modelData_.units)} ({self._modelData_.units.dimensionality})"
@@ -1137,31 +1138,25 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
                     # lbl = f"{section}"
                     if orientation == QtCore.Qt.Horizontal:
-                        if (isinstance(self._modelDataHeaderSections_, dict)
-                            and len(self._modelDataHeaderSections_)):
-                            return QtCore.QVariant(self._modelDataHeaderSections_[section])
-                        # else:
-                        #     if isinstance(self._modelData_, pq.Quantity):
-                        #         lbl = f"{scq.getUnitFamily(self._modelData_.units)} ({self._modelData_.units.dimensionality})"
+                        if (isinstance(self._modelDataColumnHeaders_, dict)
+                            and len(self._modelDataColumnHeaders_)):
+                            if section in self._modelDataColumnHeaders_:
+                                return QtCore.QVariant(f"{self._modelDataColumnHeaders_[section]}")
+                            else:
+                                return  QtCore.QVariant(f"{section}")
+                        else:
+                            return  QtCore.QVariant(f"{section}")
+
                     return QtCore.QVariant(f"{section}")
 
                 elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                     return QtCore.QVariant(f"{section}")
-                    # if orientation == QtCore.Qt.Horizontal:
-                    #     lbl = "%s" % self._modelData_[:,section].dtype
-                    #     if isinstance(self._modelData_, pq.Quantity):
-                    #         lbl += f" ({self._modelData_.units.dimensionality})"
-                    #
-                    # else:
-                    #     return QtCore.QVariant("%s" % self._modelData_[section,:].dtype)
 
                 else:
                     return QtCore.QVariant()
 
             else:
                 return QtCore.QVariant()
-
-            # NOTE: 2018-11-10 11:12:39 TODO nested lists !!!
 
         except (IndexError, ):
             return QtCore.QVariant()
@@ -1183,7 +1178,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         #
         # for now, new data has to be entered by hand...
         try:
-            if role not in (ObjectDataRole, QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
+            if role not in (ObjectDataRole, QtCore.Qt.DisplayRole,
+                            QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole,
+                            QtCore.Qt.AccessibleTextRole):
                 return QtCore.QVariant()
 
             if isinstance(self._modelData_, pd.DataFrame):
@@ -1221,7 +1218,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
             elif isinstance(self._modelData_, TriggerProtocolList):
                 protocol = self._modelData_[row]
-                val = getattr(protocol, self._modelDataHeaderSections_[col])
+                val = getattr(protocol, self._modelDataColumnHeaders_[col])
                 if isinstance(val, enum.Enum):
                     disp = f"{val.name}"
                 elif isinstance(val, neo.Event):
@@ -1241,7 +1238,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                                )
                             ):
                 obj = self._modelData_[row]
-                attribute = self._modelDataHeaderSections_[col]
+                attribute = self._modelDataColumnHeaders_[col]
                 if attribute.lower() != "edit":
                     val = getattr(obj, attribute)
                     if isinstance(val, enum.Enum):
@@ -1255,7 +1252,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(self._modelData_, typing.Sequence):
                 if all(isinstance(d, ephys.RecordingSource) for d in self._modelData_):
                     obj = self._modelData_[row]
-                    attribute = self._modelDataHeaderSections_[col]
+                    attribute = self._modelDataColumnHeaders_[col]
                     if attribute.lower() == "edit":
                         return QtCore.QVariant()
                     else:
@@ -1268,7 +1265,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         # ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val}"
 
                 else:
-                    val = self._modelData_[row][col]
+                    rowObj = self._modelData_[row]
+                    if isinstance(rowObj, typing.Sequence):
+                        val = rowObj[col]
+                    else:
+                        val = rowObj
+
                     if isinstance(val, enum.Enum):
                         disp = f"{val.name}"
                     else:
@@ -1344,13 +1346,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 try:
                     pyvalue = value.value()
                 except:
-                    traceback.print_exc()
-                    pyvalue = value.value
+                    # traceback.print_exc()
+                    pyvalue = value.value # for PODS this "comes out" directly !?
 
             else:
                 pyvalue = value
 
-            print(f"{self.__class__.__name__}._setDataValue_({value}[{type(value).__name__}]) -> pyvalue = {pyvalue}")
+            # print(f"{self.__class__.__name__}._setDataValue_({value}[{type(value).__name__}]) -> pyvalue = {pyvalue}")
 
             if isinstance(self._modelData_, pd.DataFrame):
                 if row >= self._modelData_.shape[0]:
@@ -1447,7 +1449,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                 protocol = self._modelData_[row]
 
-                attr = self._modelDataHeaderSections_[col]
+                attr = self._modelDataColumnHeaders_[col]
 
                 setattr(protocol, attr, pyvalue)
 
@@ -1465,7 +1467,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                 old_obj = self._modelData_[row]
 
-                attr = self._modelDataHeaderSections_[col]
+                attr = self._modelDataColumnHeaders_[col]
 
                 if isinstance(old_obj, ephys.SynapticPathway):
                     params = {
@@ -1503,13 +1505,16 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 else:
                     return False
 
+                # print(f"{self.__class__.__name__}._setDataValue_ -> params - {params}")
+
                 old_val = getattr(old_obj, attr)
                 if isinstance(old_val, enum.Enum):
                     if isinstance(pyvalue, int):
                         params[attr] = type(old_val)(pyvalue)
                     elif isinstance(pyvalue, str):
                         params[attr] = type(old_val)[pyvalue]
-                params[attr] = pyvalue
+                else:
+                    params[attr] = pyvalue
 
                 new_obj = type(old_obj)(**params)
 
