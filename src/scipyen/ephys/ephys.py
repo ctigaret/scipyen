@@ -382,22 +382,22 @@ class SynapticPathwayType(TypeEnum):
                     # • present throughout
     UserDefined = 4 # can associate any episode type, EXCEPT for Tracking (see above)
 
-class __BaseSynStim__(typing.NamedTuple):
+class __BaseSynStimChannel__(typing.NamedTuple):
     name: str = "stim"
     channel: typing.Union[int, str] = 0
     dig: bool=True
 
 class SynapticPathway: pass # noqa
 
-class SynapticStimulus(__BaseSynStim__):
+class SynapticStimulusChannel(__BaseSynStimChannel__):
     # see https://stackoverflow.com/questions/61844368/how-to-initialize-a-namedtuple-child-class-different-ways-based-on-input-argumen
     __slots__ = ()
 
-    __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseSynStim__.__annotations__.items()])
+    __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseSynStimChannel__.__annotations__.items()])
 
     __doc__ = "\n".join( ["Logical association between digital or analog outputs and synaptic stimulation.\n",
                     "Signature:\n",
-                    f"\tSynapticStimulus({__sig__})\n",
+                    f"\tSynapticStimulusChannel({__sig__})\n",
                     "where:",
                     "• name (str): the name of this synaptic simulus; default is 'stim'\n",
                     "• channel (int, str): index or name of the output channel sending TTL",
@@ -524,12 +524,12 @@ class SynapticStimulus(__BaseSynStim__):
 
         return cls(name, channel, dig)
 
-SynapticStimulus.name.__doc__ = "str: the name of this synaptic simulus; default is 'stim'"
-SynapticStimulus.channel.__doc__ = "int, str: index or name of the output channel sending TTL triggers"
-SynapticStimulus.dig.__doc__ = "bool: indicates if the triggering channel if a digital output (True) or a DAC (False)"
+SynapticStimulusChannel.name.__doc__ = "str: the name of this synaptic simulus; default is 'stim'"
+SynapticStimulusChannel.channel.__doc__ = "int, str: index or name of the output channel sending TTL triggers"
+SynapticStimulusChannel.dig.__doc__ = "bool: indicates if the triggering channel if a digital output (True) or a DAC (False)"
 
-class SynapticStimulusList(NeoObjectList):
-    allowed_contents = (SynapticStimulus, )
+class SynapticStimulusChannelList(NeoObjectList):
+    allowed_contents = (SynapticStimulusChannel, )
 
     def __init__(self, *items, name:typing.Optional[str] = None,
                  parent: object = None):
@@ -562,7 +562,7 @@ class SynapticStimulusList(NeoObjectList):
         for item in self._items:
             yield item
 
-    def __getitem__(self, i: int) -> SynapticStimulus | None:
+    def __getitem__(self, i: int) -> SynapticStimulusChannel | None:
         """x.__getitem__(y) <==> x[y]"""
         if len(self._items) == 0:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
@@ -573,7 +573,7 @@ class SynapticStimulusList(NeoObjectList):
         else:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
-    def __setitem__(self, i: int, value: SynapticStimulus):
+    def __setitem__(self, i: int, value: SynapticStimulusChannel):
         if not isinstance(value, self.allowed_contents):
             raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(value).__name__}")
 
@@ -666,11 +666,11 @@ class SynapticStimulusList(NeoObjectList):
 
     def append(self, obj):
         """
-        Appends a SynapticStimulus
+        Appends a SynapticStimulusChannel
 
         Parameters
         ----------
-        obj: SynapticStimulus
+        obj: SynapticStimulusChannel
 
         """
         if not isinstance(obj, self.allowed_contents):
@@ -678,11 +678,11 @@ class SynapticStimulusList(NeoObjectList):
         self._items.append(obj)
 
     def extend(self, iterable):
-        """Extends with additional SynapticStimulus objects from an iterable
+        """Extends with additional SynapticStimulusChannel objects from an iterable
 
         Parameters
         ----------
-        iterable: iterable[SynapticStimulus]
+        iterable: iterable[SynapticStimulusChannel]
 
         """
         if all (isinstance(o, self.allowed_contents) for o in iterable):
@@ -691,9 +691,9 @@ class SynapticStimulusList(NeoObjectList):
             raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
 
 
-def synstim(name:str, channel:typing.Optional[int]=None, dig:bool=True) -> SynapticStimulus:
-    r"""Shorthand constructor of SynapticStimulus (saves typing)"""
-    return SynapticStimulus(name, channel, dig)
+def synstim(name:str, channel:typing.Optional[int]=None, dig:bool=True) -> SynapticStimulusChannel:
+    r"""Shorthand constructor of SynapticStimulusChannel (saves typing)"""
+    return SynapticStimulusChannel(name, channel, dig)
 
 class __BaseAuxInput__(typing.NamedTuple):
     name: str = "aux_in"
@@ -1007,7 +1007,7 @@ class AuxiliaryOutput(__BaseAuxOutput__):
     __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseAuxOutput__.__annotations__.items()])
     __doc__ = "\n".join(["An auxiliary (analog — DAC — or a digital — DIG) output channel of the DAQ device.\n",
                          "This channel is used for sending waveforms other than for clamping or synaptic ",
-                         "stimulation (the latter being specified using SynapticStimulus objects).\n",
+                         "stimulation (the latter being specified using SynapticStimulusChannel objects).\n",
                          "Signature:\n",
                          f"AuxiliaryOutput({__sig__})\n",
                          "where:"
@@ -1300,7 +1300,7 @@ class RecordingSource():
     name: str = "cell"
     adc: int = 0
     dac: typing.Optional[int] = None
-    syn: typing.Optional[SynapticStimulusList]     = dataclasses.field(default_factory=SynapticStimulusList)
+    syn: typing.Optional[SynapticStimulusChannelList]     = dataclasses.field(default_factory=SynapticStimulusChannelList)
     auxin: typing.Optional[AuxiliaryInputList]     = dataclasses.field(default_factory=AuxiliaryInputList)
     auxout: typing.Optional[AuxiliaryOutputList]   = dataclasses.field(default_factory=AuxiliaryOutputList)
     electrodeMode: ElectrodeMode = dataclasses.field(default=ElectrodeMode.Null)
@@ -1309,7 +1309,7 @@ class RecordingSource():
         # pathways = list()
         pathways = SynapticPathwayList(name=self.name)
         for syn in self.syn:
-            # synList = SynapticStimulusList(syn, name = syn.name)
+            # synList = SynapticStimulusChannelList(syn, name = syn.name)
             name = syn.name
             pathways.append(SynapticPathway(stimulus = syn,
                                     name = name, adc = self.adc,
@@ -1409,10 +1409,10 @@ class RecordingSource():
         such as stimulus isolation boxes, modulators for uncaging lasers, or LEDs
         for optogenetic stimulation.
         """
-        if isinstance(self.syn, SynapticStimulus):
+        if isinstance(self.syn, SynapticStimulusChannel):
             return (self.syn.channel,) if self.syn.dig else tuple()
 
-        if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+        if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulusChannel) for s in self.syn):
             return tuple(s.channel for s in self.syn if s.dig)
 
         return tuple()
@@ -1425,10 +1425,10 @@ class RecordingSource():
         such as stimulus isolation boxes, modulators for uncaging lasers, or LEDs
         for optogenetic stimulation.
         """
-        if isinstance(self.syn, SynapticStimulus):
+        if isinstance(self.syn, SynapticStimulusChannel):
             return (self.syn.channel, ) if not self.syn.dig else tuple()
 
-        if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+        if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulusChannel) for s in self.syn):
             return tuple(s.channel for s in self.syn if not s.dig)
 
         return tuple()
@@ -1450,7 +1450,7 @@ class RecordingSource():
 #         and 'source'.
 #
 #         """
-#         if isinstance(self.syn, SynapticStimulus):
+#         if isinstance(self.syn, SynapticStimulusChannel):
 #             return (SynapticPathway(source = self, stimulus = self.syn,
 #                                     name = self.syn.name, adc = self.adc,
 #                                     dac = self.dac,
@@ -1559,13 +1559,13 @@ class RecordingSource():
 
     @property
     def syn_blocks(self) -> tuple:
-        r"""Tuple of (name, neo.Block) tuples, one for each SynapticStimulus.
+        r"""Tuple of (name, neo.Block) tuples, one for each SynapticStimulusChannel.
         May be empty.
         """
-        if isinstance(self.syn, SynapticStimulus):
+        if isinstance(self.syn, SynapticStimulusChannel):
             return ((self.syn.name, neo.Block()),)
 
-        if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulus) for s in self.syn):
+        if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulusChannel) for s in self.syn):
             return tuple((s.name, neo.Block()) for s in self.syn)
 
         return tuple()
@@ -2058,7 +2058,7 @@ class RecordingEpisode(Episode):
         # NOTE: 2023-10-15 13:27:27
         # crosstalk mapping: ATTENTION: in this context cross-talk represents an
         # overlap between synapses activated by ideally distinct axonal pathways
-        # (encapsulated by SynapticStimulus objects) in the same RecordingSource
+        # (encapsulated by SynapticStimulusChannel objects) in the same RecordingSource
         #
         # Testing the degree of pathway separation is based on short-term plasticity
         # at the synapses under study: the "facilitation" or "depletion" of the synaptic
@@ -2703,7 +2703,7 @@ class RecordingSchedule(Schedule):
 
 @dataclass
 class SynapticPathway:
-    r"""Logical association of a SynapticStimulus with a recording configuration.
+    r"""Logical association of a SynapticStimulusChannel with a recording configuration.
 
     Also specifies the "type" of the SynapticPathway, which represents the role
     of the SynapticPathway in an experiment.
@@ -2712,8 +2712,8 @@ class SynapticPathway:
     name: str = "pathway"
     adc: int|None = None # physical index of the ADC channel used in recording this pathway
     dac: int|None = None # physical index of the DAC channel used in recording this pathway
-    stimulus: SynapticStimulus = dataclasses.field(default_factory = SynapticStimulus)
-    # stimulus: SynapticStimulusList = dataclasses.field(default_factory = SynapticStimulusList)
+    stimulus: SynapticStimulusChannel = dataclasses.field(default_factory = SynapticStimulusChannel)
+    # stimulus: SynapticStimulusChannelList = dataclasses.field(default_factory = SynapticStimulusChannelList)
 
     # NOTE: 2024-10-16 11:57:17
     # 'clampMode' is not needed, in a SynapticPathway, which can be recorded in
@@ -3068,11 +3068,11 @@ class SynapticPathwayList(NeoObjectList):
 
     def append(self, obj):
         """
-        Appends a SynapticStimulus
+        Appends a SynapticStimulusChannel
 
         Parameters
         ----------
-        obj: SynapticStimulus
+        obj: SynapticStimulusChannel
 
         """
         if not isinstance(obj, self.allowed_contents):
@@ -3080,11 +3080,11 @@ class SynapticPathwayList(NeoObjectList):
         self._items.append(obj)
 
     def extend(self, iterable):
-        """Extends with additional SynapticStimulus objects from an iterable
+        """Extends with additional SynapticStimulusChannel objects from an iterable
 
         Parameters
         ----------
-        iterable: iterable[SynapticStimulus]
+        iterable: iterable[SynapticStimulusChannel]
 
         """
         if all (isinstance(o, self.allowed_contents) for o in iterable):

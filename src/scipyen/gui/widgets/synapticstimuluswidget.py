@@ -48,18 +48,18 @@ try:
 except:
     __has_qtdbus__ = False
 
-from ephys.ephys import SynapticStimulus
+from ephys.ephys import SynapticStimulusChannel
 from core.prog import scipywarn
 from gui import guiutils
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_SynapticStimulusWidget, QWidget = loadUiType(
+Ui_SynapticStimulusChannelWidget, QWidget = loadUiType(
     os.path.join(__module_path__, "synapticstimuluswidget.ui")
     )
 
-class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
+class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, QWidget):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
 
     defaultName: str = "stim"
@@ -67,17 +67,17 @@ class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
     defaultDigital: bool = True
 
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
-                 obj: typing.Optional[SynapticStimulus] = None):
+                 obj: typing.Optional[SynapticStimulusChannel] = None):
 
         # if not isinstance(parent, QtWidgets.QWidget):
-        #     if obj is None and isinstance(parent, SynapticStimulus):
+        #     if obj is None and isinstance(parent, SynapticStimulusChannel):
         #         obj = parent
         #     parent = None
 
         QWidget.__init__(self, parent=parent)
 
 
-        if not isinstance(obj, SynapticStimulus): # and obj is not None:
+        if not isinstance(obj, SynapticStimulusChannel): # and obj is not None:
             # scipywarn(f"This widget does not support objects of type {type(obj).__name__}")
             self._data_ = None
         else:
@@ -134,21 +134,21 @@ class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
     def _slot_nameChanged(self, val:str):
         self._name_ = val
         self._make_value_()
-        if isinstance(self._data_ , SynapticStimulus):
+        if isinstance(self._data_ , SynapticStimulusChannel):
             self.sig_valueChanged.emit(self.value())
 
     @Slot(bool)
     def _slot_isDigitalChanged(self, val: bool):
         self._digital_ = val is True
         self._make_value_()
-        if isinstance(self._data_ , SynapticStimulus):
+        if isinstance(self._data_ , SynapticStimulusChannel):
             self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
     def _slot_outputChannelChanged(self, val:int):
         self._channel_ = val
         self._make_value_()
-        if isinstance(self._data_ , SynapticStimulus):
+        if isinstance(self._data_ , SynapticStimulusChannel):
             self.sig_valueChanged.emit(self.value())
 
     @Slot()
@@ -160,11 +160,11 @@ class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
             isinstance(self._channel_, int) and
             isinstance(self._digital_, bool)
             ):
-            self._data_ = SynapticStimulus(self._name_, self._channel_, self._digital_)
+            self._data_ = SynapticStimulusChannel(self._name_, self._channel_, self._digital_)
             # print(f"{self.__class__.__name__}[{self.objectName()}]._make_value() -> {self._data_}")
 
-    def setValue(self, val:typing.Optional[SynapticStimulus] = None):
-        if isinstance(val, SynapticStimulus):
+    def setValue(self, val:typing.Optional[SynapticStimulusChannel] = None):
+        if isinstance(val, SynapticStimulusChannel):
             self._name_ = val.name
             self._channel_ = val.channel
             self._digital_ = val.dig is True
@@ -181,7 +181,7 @@ class SynapticStimulusWidget(Ui_SynapticStimulusWidget, QWidget):
             self.outputChannelSpinBox.setValue(self._channel_)
             self.isDigitalCheckBox.setChecked(self._digital_ is True)
 
-    def value(self) -> SynapticStimulus:
+    def value(self) -> SynapticStimulusChannel:
         return self._data_
 
 

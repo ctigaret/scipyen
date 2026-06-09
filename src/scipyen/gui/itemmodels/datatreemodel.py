@@ -404,7 +404,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         return (item0, item1, item2)
 
     # @timefunc
-    def setModelData(self, obj: object, rootTitle: str = "",
+    def populateModel(self, obj: object, rootTitle: str = "",
         predicate: typing.Optional[types.FunctionType] = None,
         showPrivate: bool = False,
         # dataTypeStr: typing.Optional[str] = None,
@@ -412,7 +412,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         readOnly: bool = False,
         # introspect: bool = False
     ):
-        # print(f"{self.__class__.__name__}.setModelData(obj: {type(obj).__name__})")
+        # print(f"{self.__class__.__name__}.populateModel(obj: {type(obj).__name__})")
         self._visited_.clear()
         self._predicate_ = predicate
         self._showPrivate_ = showPrivate is True

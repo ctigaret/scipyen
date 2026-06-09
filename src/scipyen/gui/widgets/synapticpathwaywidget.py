@@ -98,7 +98,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self._name_ = "pathway"
             self._adc_ = 0
             self._dac_ = 0
-            self._stimulus_ = ephys.SynapticStimulus()
+            self._stimulus_ = ephys.SynapticStimulusChannel()
             self._electrode_ = ephys.ElectrodeMode.Null
             self._pathType_ = ephys.SynapticPathwayType.Null
             self._schedule_ = ephys.RecordingSchedule()
@@ -246,7 +246,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
     @Slot(object)
     def _slot_stimulusChanged(self, val):
         # print(f"{self.__class__.__name__}[{self.objectName()}]._slot_stimulusChanged({val})")
-        if isinstance(val, ephys.SynapticStimulus):
+        if isinstance(val, ephys.SynapticStimulusChannel):
             self._stimulus_ = val
             self._make_value_()
             self.sig_valueChanged.emit(self._data_)

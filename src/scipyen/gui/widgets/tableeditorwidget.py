@@ -223,7 +223,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                 self._data_ = np.squeeze(data).reshape(tuple(new_shape))
 
             self._currentSlice_ = 0
-            self._dataModel_.setModelData(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
+            self._dataModel_.populateModel(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
 
             self.prevSliceToolbutton.setEnabled(True)
             self.nextSliceToolButton.setEnabled(True)
@@ -231,7 +231,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         else:
             self.prevSliceToolbutton.setEnabled(False)
             self.nextSliceToolButton.setEnabled(False)
-            self._dataModel_.setModelData(self._data_)
+            self._dataModel_.populateModel(self._data_)
 
         # delegate = self.tableView.itemDelegate()
 
@@ -321,7 +321,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                         self.prevSliceToolbutton.setEnabled(True)
                         self.nextSliceToolButton.setEnabled(True)
 
-                    self._dataModel_.setModelData(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
+                    self._dataModel_.populateModel(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
 
     def clear(self):
         self._dataModel_ = TabularDataModel(parent=self)

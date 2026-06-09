@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-# $Id: tableeditorwidget.py $
+# $Id: tabulardatamodel.py $
 # SPDX-FileCopyrightText: 2023 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-r"""Table Editor widget and custom table model, for tabular-like data
+r"""Table model, for tabular-like data
 """
 
 
@@ -98,9 +98,6 @@ from gui.itemmodels.roles import *
 import iolib.pictio as pio
 #### END pict.iolib modules
 
-__module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__, "tableeditorwidget.ui")
-
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 class TabularDataModel(QtCore.QAbstractTableModel):
@@ -184,7 +181,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._displayedColumns_:int = 0
         self._displayedRows_:int = 0
 
-        self.setModelData(data)
+        self.populateModel(data)
 
     #### BEGIN lazy (paged) display
     #
@@ -320,8 +317,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     #### END item data handling
 
     @Slot(object)
-    def setModelData(self, data):
-        #print("TabularDataModel setModelData")
+    def populateModel(self, data):
+        #print("TabularDataModel populateModel")
         from imaging import vigrautils
 
         # ### BEGIN Define timer to debug
@@ -339,7 +336,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                      ephys.SynapticPathwayList,
                                      ephys.AuxiliaryInputList,
                                      ephys.AuxiliaryOutputList,
-                                     ephys.SynapticStimulusList,
+                                     ephys.SynapticStimulusChannelList,
                                      list, tuple, deque,
                                      type(None))):
                 raise TypeError("%s data is not yet supported" % type(data).__name__)
@@ -434,6 +431,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         )
                     )
                 self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+                self._externalDataEditor_ = True
 
             elif isinstance(data, ephys.AuxiliaryInputList):
                 self._modelData_ = data
@@ -456,6 +454,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         )
                     )
                 self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+                self._externalDataEditor_ = True
 
             elif isinstance(data, ephys.AuxiliaryOutputList):
                 self._modelData_ = data
@@ -475,8 +474,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         )
                     )
                 self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+                self._externalDataEditor_ = True
 
-            elif isinstance(data, ephys.SynapticStimulusList):
+            elif isinstance(data, ephys.SynapticStimulusChannelList):
                 self._modelData_ = data
                 self._original_data_ = data
                 self._modelDataRows_ = len(data)
@@ -796,7 +796,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         # ### BEGIN report timing
         #
-        # print(f"{self.__class__.__name__}.setModelData({type(data).__name__}) took {timer.elapsed()} milliseconds")
+        # print(f"{self.__class__.__name__}.populateModel({type(data).__name__}) took {timer.elapsed()} milliseconds")
         #
         # ### END   report timing
 
@@ -1132,7 +1132,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                     ephys.SynapticPathwayList,
                                     ephys.AuxiliaryInputList,
                                     ephys.AuxiliaryOutputList,
-                                    ephys.SynapticStimulusList,
+                                    ephys.SynapticStimulusChannelList,
                                 )
                             ):
                 if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
@@ -1234,7 +1234,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                                 ephys.SynapticPathwayList,
                                                 ephys.AuxiliaryInputList,
                                                 ephys.AuxiliaryOutputList,
-                                                ephys.SynapticStimulusList,
+                                                ephys.SynapticStimulusChannelList,
                                                )
                             ):
                 obj = self._modelData_[row]
@@ -1459,7 +1459,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                                 ephys.SynapticPathwayList,
                                                 ephys.AuxiliaryInputList,
                                                 ephys.AuxiliaryOutputList,
-                                                ephys.SynapticStimulusList,
+                                                ephys.SynapticStimulusChannelList,
                                               )
                             ):
                 if row >= len(self._modelData_):
@@ -1495,7 +1495,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         "digttl": old_obj.digttl
                         }
 
-                elif isinstance(old_obj, ephys.SynapticStimulus):
+                elif isinstance(old_obj, ephys.SynapticStimulusChannel):
                     params = {
                         "name": old_obj.name,
                         "channel": old_obj.channel,

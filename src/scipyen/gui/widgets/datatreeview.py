@@ -222,7 +222,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self.sourceModel.showPrivateMembers = showPrivate
         self.sourceModel.showIntrospection = introspect
 
-        self.sourceModel.setModelData(obj, name)
+        self.sourceModel.populateModel(obj, name)
         root = self.sourceModel.invisibleRootItem()
         if root.hasChildren():
             # NOTE: 2026-02-08 15:23:06

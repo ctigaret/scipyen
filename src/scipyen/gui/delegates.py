@@ -125,9 +125,9 @@ NOTE: To be used with my custom itemmodels
         widget = None
         editorName = f"{type(self._data_).__name__} Editor"
         self.setWindowTitle(editorName)
-        if isinstance(self._data_, ephys.SynapticStimulus):
+        if isinstance(self._data_, ephys.SynapticStimulusChannel):
             from gui.widgets import synapticstimuluswidget
-            widget = synapticstimuluswidget.SynapticStimulusWidget(self,
+            widget = synapticstimuluswidget.SynapticStimulusChannelWidget(self,
                                                                    self._data_,
                                                                    )
             widget.setObjectName(f"{editorName} Widget")
@@ -502,6 +502,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
     """
         from gui.widgets.tableeditorwidget import TableEditorWidget # import here to avoid circular imports (delegates is imported by tableeditorwidget as well)
+        # from gui.itemmodels.tabulardatamodel import TabularDataModel
         widget = None
 
         if isinstance(data, (bool, np.bool)):# or "bool" in type(data).__name__:
@@ -881,7 +882,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
     def createEditor(self, parent:QtWidgets.QWidget, option:int,
                      index:QtCore.QModelIndex) -> QtWidgets.QWidget | None:
-        r"""Overrides QStyledItemDelegate.createEditor"""
+        r"""Overrides QStyledItemDelegate.createEditor
+    """
         self._currentModelIndex_ = index
         # NOTE: 2025-09-27 10:29:14 ATTENTION
         # editor data, although it can also be set here, it should be set through

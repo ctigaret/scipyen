@@ -72,6 +72,9 @@ from core.strutils import numbers2str
 from gui import quickdialog as qd
 from gui.signalviewer import SignalViewer
 from gui.delegates import PythonItemDelegate
+from gui.itemmodels.digtriggerstablemodel import DIGTriggersTableModel
+
+# TODO 2026-06-09 18:18:06 consider TabularDataModel FIXME
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -82,198 +85,199 @@ else:
     Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "widgets", "triggerdetect.ui"))
     Ui_ImportDIGTriggerWidget, _ = loadUiType(os.path.join(__module_path__, "widgets", "importDIGtrigger.ui"))
     
-class DIGTriggersTableModel(QtCore.QAbstractTableModel):
-    model_columns = ["DIG Channel", "Type", "Name", "Labels", "Sweep(s)", "Used"]
-    
-    sig_editCompleted = Signal(str, name="sig_editCompleted")
-    
-    def __init__(self, triggers:typing.Optional[typing.Sequence]=None, parent=None):
-        super().__init__(parent)
-        
-        for k, col in enumerate(self.model_columns):
-            self.setHeaderData(k, QtCore.Qt.Horizontal, QtCore.QVariant(col))
-            
-        # self.headerDataChanged.emit()
-        self.immutability = {"columns": [0, 4], "joint": False}
-        
-        self.beginResetModel()
-        self._data_ = list(triggers) if isinstance(triggers, typing.Sequence) else list()
-        self.endResetModel()
-        
-    def rowCount(self, parent:QtCore.QModelIndex = QtCore.QModelIndex()):
-        return len(self._data_)
-    
-    def columnCount(self, parent:QtCore.QModelIndex = QtCore.QModelIndex()):
-        return len(self.model_columns)
-    
-    def headerData(self, section:int, orientation:QtCore.Qt.Orientation, 
-                   role:QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole) -> QtCore.QVariant:
-        
-        if len(self._data_) == 0:
-            return QtCore.QVariant()
-        
-        if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
-            return QtCore.QVariant()
-        
-        if orientation == QtCore.Qt.Horizontal: # column header
-            return QtCore.QVariant(self.model_columns[section])
-        
-        else: # vertical (rows) header
-            return QtCore.QVariant("%d" % section)
-        
-    def data(self, index:QtCore.QModelIndex, role:QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole):
-        if self._data_ is None:
-            return QtCore.QVariant()
-            
-        if not index.isValid():
-            return QtCore.QVariant()
+# class DIGTriggersTableModel(QtCore.QAbstractTableModel):
+#     model_columns = ["DIG Channel", "Type", "Name", "Labels", "Sweep(s)", "Used"]
+#
+#     sig_editCompleted = Signal(str, name="sig_editCompleted")
+#
+#     def __init__(self, triggers:typing.Optional[typing.Sequence]=None, parent=None):
+#         super().__init__(parent)
+#
+#         for k, col in enumerate(self.model_columns):
+#             self.setHeaderData(k, QtCore.Qt.Horizontal, QtCore.QVariant(col))
+#
+#         # self.headerDataChanged.emit()
+#         self.immutability = {"columns": [0, 4], "joint": False}
+#
+#         self.beginResetModel()
+#         self._data_ = list(triggers) if isinstance(triggers, typing.Sequence) else list()
+#         self.endResetModel()
+#
+#     def rowCount(self, parent:QtCore.QModelIndex = QtCore.QModelIndex()):
+#         return len(self._data_)
+#
+#     def columnCount(self, parent:QtCore.QModelIndex = QtCore.QModelIndex()):
+#         return len(self.model_columns)
+#
+#     def headerData(self, section:int, orientation:QtCore.Qt.Orientation,
+#                    role:QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole) -> QtCore.QVariant:
+#
+#         if len(self._data_) == 0:
+#             return QtCore.QVariant()
+#
+#         if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
+#             return QtCore.QVariant()
+#
+#         if orientation == QtCore.Qt.Horizontal: # column header
+#             return QtCore.QVariant(self.model_columns[section])
+#
+#         else: # vertical (rows) header
+#             return QtCore.QVariant("%d" % section)
+#
+#     def data(self, index:QtCore.QModelIndex, role:QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole):
+#         if self._data_ is None:
+#             return QtCore.QVariant()
+#
+#         if not index.isValid():
+#             return QtCore.QVariant()
+#
+#         if len(self._data_) == 0 or not all ((isinstance(p, typing.Sequence) for p in self._data_)):
+#             return QtCore.QVariant()
+#
+#         if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole, QtCore.Qt.AccessibleDescriptionRole):
+#             return QtCore.QVariant()
+#
+#         # rows: one for each defined protocol
+#         row = index.row()
+#
+#         if row >= len(self._data_) or row < 0:
+#             return QtCore.QVariant()
+#
+#         # columns:                                  editor proxy widget
+#         # 0: int = DIG channel index                None
+#         # 1: str: trigger event type name           combo box
+#         # 2: str: trigger event name                line edit
+#         # 3: str: trigger event label               line edit
+#         # 4: tuple[int]: sweeps where it occurs     line edit
+#         # 5: bool: use this trigger event           checkbox
+#
+#         col = index.column()
+#
+#         if col < 0 or col >= len(self.model_columns):
+#             return QtCore.QVariant()
+#
+#         trigger_data = self._data_[row]
+#
+#         dig = trigger_data[0]
+#         event = trigger_data[1][0]
+#         used = trigger_data[2][0]
+#         sweeps = trigger_data[3]
+#
+#         if col == 0: # digital channel
+#             val = dig
+#             tip = QtCore.QVariant(f"DIG Channel {val}")
+#
+#         elif col == 1: # trigger event type name
+#             val = event.type.name
+#             tip = QtCore.QVariant(f"Type: {val}")
+#
+#         elif col == 2: # name
+#             val = event.name
+#             tip = QtCore.QVariant(f"Name: {val}")
+#
+#         elif col == 3: # labels
+#             val = ", ".join(list(map(lambda x: str(x), event.labels)))
+#             tip = QtCore.QVariant(f"Labels: {val}")
+#
+#         elif col == 4: # sweeps where it occurs
+#             val = ", ".join(list(map(lambda x: str(x), sweeps)))
+#             tip = QtCore.QVariant(f"Sweeps where emitted: {val}")
+#
+#         elif col == 5: # use this trigger event
+#             val = used
+#             tip = QtCore.QVariant("Used" if val else "Not used")
+#         else:
+#             val = None
+#             tip = QtCore.QVariant()
+#
+#         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.UserRole):
+#             return QtCore.QVariant() if val is None else QtCore.QVariant(val)
+#
+#         elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
+#             return tip
+#
+#         elif role in (QtCore.Qt.UserRole, ):
+#             return QtCore.QVariant(val)
+#
+#         elif role == QtCore.Qt.EditRole:
+#             return val
+#
+#     def setData(self, modelIndex, value, role = QtCore.Qt.EditRole) -> bool:
+#         row = modelIndex.row()
+#         col = modelIndex.column()
+#
+#         if col == 0: # no editing of DIG channel index
+#             return False
+#
+#         if row >= len(self._data_):
+#             return False
+#
+#         if col >= len(self.model_columns):
+#             return False
+#
+#         if role != QtCore.Qt.EditRole:
+#             return False
+#
+#         try:
+#             if isinstance(value, QtCore.QVariant) or hasattr(value, "value"):
+#                 pyvalue = value.value()
+#
+#             else:
+#                 pyvalue = value
+#
+#             te_data = list(self._data_[row])
+#
+#             # print(f"{self.__class__.__name__}.setData: te_data: {te_data}")
+#
+#             event = te_data[1][0]
+#
+#             if col == 1: # trigger event type
+#                 event.event_type = TriggerEventType[pyvalue]
+#
+#             elif col == 2: # event name
+#                 event.name = pyvalue
+#
+#             elif col == 3: # labels
+#                 event.setLabels(pyvalue)
+#
+#             elif col == 5: # in use
+#                 te_data[2] = (pyvalue,)
+#
+#             self._data_[row] = tuple(te_data)
+#
+#             # print(f"{self.__class__.__name__}.setData: _data_ = {self._data_}")
+#
+#         except:
+#             traceback.print_exc()
+#             return False
+#
+#     def flags(self, index:QtCore.QModelIndex):
+#         return QtCore.Qt.ItemIsEditable | super().flags(index)
+#
+#     @property
+#     def modelData(self) -> list:
+#         return self._data_
+#
+#     @modelData.setter
+#     def modelData(self, value:typing.Optional[typing.Sequence]):
+#         self.beginResetModel()
+#         self._data_ = list(value) if isinstance(value, typing.Sequence) else list()
+#         self.endResetModel()
+#
+#     def populateModel(self, data:list):
+#         try:
+#             self.beginResetModel()
+#             self._data_ = data
+#             self.endResetModel()
+#             self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, len(data))
+#
+#         except:
+#             traceback.print_exc()
+#
+#     def sourceData(self) -> list:
+#         return self._data_
+#
 
-        if len(self._data_) == 0 or not all ((isinstance(p, typing.Sequence) for p in self._data_)):
-            return QtCore.QVariant()
-        
-        if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole, QtCore.Qt.AccessibleDescriptionRole):
-            return QtCore.QVariant()
-        
-        # rows: one for each defined protocol
-        row = index.row()
-        
-        if row >= len(self._data_) or row < 0:
-            return QtCore.QVariant()
-        
-        # columns:                                  editor proxy widget
-        # 0: int = DIG channel index                None
-        # 1: str: trigger event type name           combo box
-        # 2: str: trigger event name                line edit
-        # 3: str: trigger event label               line edit
-        # 4: tuple[int]: sweeps where it occurs     line edit
-        # 5: bool: use this trigger event           checkbox
-        
-        col = index.column()
-    
-        if col < 0 or col >= len(self.model_columns):
-            return QtCore.QVariant()
-        
-        trigger_data = self._data_[row]
-        
-        dig = trigger_data[0]
-        event = trigger_data[1][0]
-        used = trigger_data[2][0]
-        sweeps = trigger_data[3]
-        
-        if col == 0: # digital channel
-            val = dig
-            tip = QtCore.QVariant(f"DIG Channel {val}")
-            
-        elif col == 1: # trigger event type name
-            val = event.type.name
-            tip = QtCore.QVariant(f"Type: {val}")
-            
-        elif col == 2: # name
-            val = event.name
-            tip = QtCore.QVariant(f"Name: {val}")
-            
-        elif col == 3: # labels
-            val = ", ".join(list(map(lambda x: str(x), event.labels)))
-            tip = QtCore.QVariant(f"Labels: {val}")
-            
-        elif col == 4: # sweeps where it occurs
-            val = ", ".join(list(map(lambda x: str(x), sweeps)))
-            tip = QtCore.QVariant(f"Sweeps where emitted: {val}")
-            
-        elif col == 5: # use this trigger event
-            val = used
-            tip = QtCore.QVariant("Used" if val else "Not used")
-        else:
-            val = None
-            tip = QtCore.QVariant()
-            
-        if role in (QtCore.Qt.DisplayRole, QtCore.Qt.UserRole):
-            return QtCore.QVariant() if val is None else QtCore.QVariant(val)
-        
-        elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-            return tip
-        
-        elif role in (QtCore.Qt.UserRole, ):
-            return QtCore.QVariant(val)
-            
-        elif role == QtCore.Qt.EditRole:
-            return val
-        
-    def setData(self, modelIndex, value, role = QtCore.Qt.EditRole) -> bool:
-        row = modelIndex.row()
-        col = modelIndex.column()
-        
-        if col == 0: # no editing of DIG channel index
-            return False
-        
-        if row >= len(self._data_):
-            return False
-        
-        if col >= len(self.model_columns):
-            return False
-        
-        if role != QtCore.Qt.EditRole:
-            return False
-        
-        try:
-            if isinstance(value, QtCore.QVariant) or hasattr(value, "value"):
-                pyvalue = value.value()
-                
-            else:
-                pyvalue = value
-            
-            te_data = list(self._data_[row])
-            
-            # print(f"{self.__class__.__name__}.setData: te_data: {te_data}")
-            
-            event = te_data[1][0]
-            
-            if col == 1: # trigger event type
-                event.event_type = TriggerEventType[pyvalue]
-
-            elif col == 2: # event name
-                event.name = pyvalue
-                
-            elif col == 3: # labels
-                event.setLabels(pyvalue)
-                
-            elif col == 5: # in use
-                te_data[2] = (pyvalue,)
-                
-            self._data_[row] = tuple(te_data)
-            
-            # print(f"{self.__class__.__name__}.setData: _data_ = {self._data_}")
-                
-        except:
-            traceback.print_exc()
-            return False
-        
-    def flags(self, index:QtCore.QModelIndex):
-        return QtCore.Qt.ItemIsEditable | super().flags(index)
-    
-    @property
-    def modelData(self) -> list:
-        return self._data_
-    
-    @modelData.setter
-    def modelData(self, value:typing.Optional[typing.Sequence]):
-        self.beginResetModel()
-        self._data_ = list(value) if isinstance(value, typing.Sequence) else list()
-        self.endResetModel()
-    
-    def setModelData(self, data:list):
-        try:
-            self.beginResetModel()
-            self._data_ = data
-            self.endResetModel()
-            self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, len(data))
-
-        except:
-            traceback.print_exc()
-            
-    def sourceData(self) -> list:
-        return self._data_
-    
 # class _DIGTriggersTable_(QtWidgets.QTableView):
 class DIGTriggersWidget(QtWidgets.QWidget, Ui_ImportDIGTriggerWidget):
     r"""Helper class for curating digital trigger events in a recording protocol
@@ -309,7 +313,7 @@ class DIGTriggersWidget(QtWidgets.QWidget, Ui_ImportDIGTriggerWidget):
         
     def setData(self, value:typing.Sequence):
         self._data_ = list(value) if isinstance(value, typing.Sequence) else list()
-        self._dataModel_.setModelData(self._data_)
+        self._dataModel_.populateModel(self._data_)
         for col in (1,5):
             for row in range(self._dataModel_.rowCount()):
                 self.tableView.openPersistentEditor(self._dataModel_.index(row, col))
