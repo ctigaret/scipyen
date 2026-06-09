@@ -69,10 +69,14 @@ class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, QWidget):
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[SynapticStimulusChannel] = None):
 
-        # if not isinstance(parent, QtWidgets.QWidget):
-        #     if obj is None and isinstance(parent, SynapticStimulusChannel):
-        #         obj = parent
-        #     parent = None
+        if isinstance(parent, SynapticStimulusChannel):
+            obj_ = parent
+            if isinstance(obj, QtWidgets.QWidget):
+                parent = obj
+            else:
+                parent = None
+
+            obj = obj_
 
         QWidget.__init__(self, parent=parent)
 

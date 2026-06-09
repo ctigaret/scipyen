@@ -62,7 +62,7 @@ from gui.widgets import inlinefiledirchooser as ifdc
 # from gui import quickdialog as qd
 # from core import typeenum
 from gui.itemmodels.roles import * # noqa
-
+from gui import guiutils
 from ephys import ephys
 
 class ExternalEditorDelegate(QtWidgets.QMainWindow):
@@ -94,6 +94,8 @@ NOTE: To be used with my custom itemmodels
         self._data_ = data
         self._widget_ = self.chooseEditor()
 
+        # print (f"{self.__class__.__name__}.__init__ -> widget is {type(self._widget_).__name__}")
+
         if isinstance(self._widget_, QtWidgets.QWidget):
             self.setCentralWidget(self._widget_)
             self.resize(-1,-1)
@@ -120,8 +122,7 @@ NOTE: To be used with my custom itemmodels
         evt.accept()
 
     def chooseEditor(self) -> QtWidgets.QWidget:
-        # print(f"{self.__class__.__name__}.chooseEditor:")
-        # print(f"\tfor {self._data_}")
+        # print(f"{self.__class__.__name__}.chooseEditor for {type(self._data_).__name__}")
         widget = None
         editorName = f"{type(self._data_).__name__} Editor"
         self.setWindowTitle(editorName)
@@ -229,6 +230,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 """
     sig_dataChanged = Signal(QtWidgets.QWidget, name = "sig_dataChanged")
     sig_contentsChanged = Signal(name="sig_contentsChanged")
+    sig_editExternally = Signal(QtWidgets.QWidget, QtCore.QModelIndex, name = "sig_editExternally")
 
     # TODO/FIXME: 2025-10-28 12:57:09
     # decide how to handle the case where the combo box is editable (and its
@@ -287,6 +289,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             self._columnChoices_ = dict() # always keep it as a dict, even when empty
 
         self._currentData_:typing.Optional[typing.Any] = None
+        self._externalDataEditor_: typing.Optional[QtWidgets.QWidget] = None
 
     def _checkColumnChoiceDict_(self, d:dict) -> bool:
         if not isinstance(d, dict):
@@ -849,14 +852,41 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     def _slot_editDataExternally(self): # TODO 2026-06-07 11:08:52 finalize me
         # NOTE: 2026-06-07 11:56:17
         # external editor NEEDS a separate QMainWindow!
+        # self.sig_editExternally.emit(self.sender(), index)
         sender = self.sender()
         if isinstance(sender, QtWidgets.QPushButton):
             model = self._currentModelIndex_.model()
-            role = ObjectDataRole if self._useObjectDataRole_ else QtCore.Qt.EditRole
+            modelData = getattr(model, "_modelData_", None)
 
-            data = self._currentModelIndex_.data(role)
+            # print(f"\n{self.__class__.__name__}._slot_editDataExternally: -> model = {model}\n -> modelData is {type(modelData).__name__}")
 
-            editor = ExternalEditorDelegate(data)
+            # CAUTION 2026-06-09 19:08:50
+            # this is supposed to edit the python object represented by the
+            # entire model data row!!!
+            if isinstance(modelData, typing.Iterable):
+                obj = modelData[self._currentModelIndex_.row()]
+                self._externalDataEditor_ = ExternalEditorDelegate(obj)
+                # print(f"\n\t-> editor is visible: {self._externalDataEditor_.isVisible()}")
+                self._externalDataEditor_.sig_valueChanged.connect(self._slot_dataEditedExternally)
+                self._externalDataEditor_.sig_closing.connect(self._slot_externalEditorClosing)
+                # editor.show()
+
+    @Slot()
+    def _slot_externalEditorClosing(self):
+        self._externalDataEditor_ = None
+
+    @Slot(object)
+    def _slot_dataEditedExternally(self, val):
+        # print(f"{self.__class__.__name__}._slot_dataEditedExternally -> {val}")
+        if isinstance(self._currentModelIndex_, QtCore.QModelIndex):
+            model = self._currentModelIndex_.model()
+            modelData = getattr(model, "_modelData_", None)
+            if isinstance(modelData, typing.Iterable):
+                row = self._currentModelIndex_.row()
+                modelData[row] = val
+                topLeft = model.index(row, 0)
+                bottomRight = model.index(row, model.columnCount()-1)
+                model.dataChanged.emit(topLeft, bottomRight)
 
 
     @Slot()
@@ -956,9 +986,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     # print(f"\t-> immutable row")
                     return
 
-        if hasattr(model, "_externalDataEditor_") and hasattr(model, "_modelDataColumnHeaders_"):
-            if model._externalDataEditor_ is True and model._modelDataColumnHeaders_[index.column()] == "Edit":
-                widget = QtWidgets.QPushButton("...")
+        if hasattr(model, "_useExternalDataEditor_") and hasattr(model, "_modelDataColumnHeaders_"):
+            if model._useExternalDataEditor_ is True and model._modelDataColumnHeaders_[index.column()] == "Edit":
+                widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "", parent)
+                # widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "...", parent)
                 if hasattr(widget, "setFrame"):
                     widget.setFrame(False)
                 widget.setAutoFillBackground(True)

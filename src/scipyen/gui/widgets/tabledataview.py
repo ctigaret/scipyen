@@ -88,3 +88,16 @@ class TableDataView(QtWidgets.QTableView):
         painter.restore()
 
 
+    @Slot(QtWidgets.QWidget, QtCore.QModelIndex)
+    def _slot_editDataExternally(self, sender, index): # TODO 2026-06-07 11:08:52 finalize me
+        # NOTE: 2026-06-07 11:56:17
+        # external editor NEEDS a separate QMainWindow!
+        if isinstance(sender, QtWidgets.QPushButton):
+            model = self._currentModelIndex_.model()
+            role = ObjectDataRole if self._useObjectDataRole_ else QtCore.Qt.EditRole
+
+            data = self._currentModelIndex_.data(role)
+
+            editor = ExternalEditorDelegate(data)
+
+            editor.show()

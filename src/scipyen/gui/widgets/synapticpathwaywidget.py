@@ -67,13 +67,15 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
                  obj: typing.Optional[ephys.SynapticPathway] = None):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
 
-        # if isinstance(parent, ephys.SynapticPathway):
-        #     obj_ = parent
-        #     if isinstance(obj, QtWidgets.QWidget):
-        #         parent = obj
-        #     elif isinstance(obj, ephys.SynapticPathway):
-        #         obj_ = obj
-        #         parent = None
+        if isinstance(parent, ephys.SynapticPathway):
+            obj_ = parent
+            if isinstance(obj, QtWidgets.QWidget):
+                parent = obj
+            else:
+                parent = None
+
+            obj = obj_
+
 
         QWidget.__init__(self, parent=parent)
 
@@ -90,7 +92,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self._dac_ = self._data_.dac
             self._stimulus_ = self._data_.stimulus
             self._electrode_ = self._data_.electrode
-            self._pathType_ = self._data_.pathType
+            self._pathType_ = self._data_.pathwayType
             self._schedule_ = self._data_.schedule
             self._measurements_ = self._data_.measurements
 
@@ -142,18 +144,16 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
         currentElectrodeModeNdx = self._electrodeModeNames_.index(self._electrode_.name)
         self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
 
-        self.electrodeModeComboBox.currentIndexChanged.connect(self._slot_electrodeModeChanged)
+        # self.electrodeModeComboBox.currentIndexChanged.connect(self._slot_electrodeModeChanged)
         self.electrodeModeComboBox.currentTextChanged.connect(self._slot_electrodeModeChanged)
 
         for text in self._pathwayTypeNames_:
             self.pathTypeComboBox.addItem(text)
 
         currentPathwayTypeNdx = self._pathwayTypeNames_.index(self._pathType_.name)
-        self.pathTypeComboBox.setCurrentIndex(currentPathwayTypeNdx)
-        self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
-        self.pathTypeComboBox.setCurrentIndex(currentPathwayTypeNdx)
 
-        self.pathTypeComboBox.currentIndexChanged.connect(self._slot_pathwayTypeChanged)
+        self.pathTypeComboBox.setCurrentIndex(currentPathwayTypeNdx)
+        # self.pathTypeComboBox.currentIndexChanged.connect(self._slot_pathwayTypeChanged)
         self.pathTypeComboBox.currentTextChanged.connect(self._slot_pathwayTypeChanged)
 
         self.stimulusPushButton.clicked.connect(self._slot_editStimulus)
@@ -169,23 +169,29 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
     @Slot(str)
     def _slot_nameChanged(self, val:str):
         self._name_ = val
-        self._make_value_()
-        if isinstance(self._data_ , ephys.SynapticPathway):
-            self.sig_valueChanged.emit(self.value())
+        if not isinstance(self._data_, ephys.SynapticPathway):
+            self._make_value_()
+        else:
+            self._data_.name = val
+        self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
     def _slot_adcChanged(self, val: int):
         self._adc_ = val
-        self._make_value_()
-        if isinstance(self._data_ , ephys.SynapticPathway):
-            self.sig_valueChanged.emit(self.value())
+        if not isinstance(self._data_, ephys.SynapticPathway):
+            self._make_value_()
+        else:
+            self._data_.adc = self._adc_
+        self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
     def _slot_dacChanged(self, val: int):
         self._dac_ = val
-        self._make_value_()
-        if isinstance(self._data_ , ephys.SynapticPathway):
-            self.sig_valueChanged.emit(self.value())
+        if not isinstance(self._data_, ephys.SynapticPathway):
+            self._make_value_()
+        else:
+            self._data_.dac = self._dac_
+        self.sig_valueChanged.emit(self.value())
 
     @Slot(str)
     @Slot(int)
@@ -201,9 +207,11 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
         else:
             return
 
-        self._make_value_()
-        if isinstance(self._data_ , ephys.SynapticPathway):
-            self.sig_valueChanged.emit(self.value())
+        if not isinstance(self._data_, ephys.SynapticPathway):
+            self._make_value_()
+        else:
+            self._data_.pathwayType = self._pathType_
+        self.sig_valueChanged.emit(self.value())
 
     @Slot(str)
     @Slot(int)
@@ -219,9 +227,11 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
         else:
             return
 
-        self._make_value_()
-        if isinstance(self._data_ , ephys.SynapticPathway):
-            self.sig_valueChanged.emit(self.value())
+        if not isinstance(self._data_, ephys.SynapticPathway):
+            self._make_value_()
+        else:
+            self._data_.electrodeMode = self._electrode_
+        self.sig_valueChanged.emit(self.value())
 
     @Slot()
     def _slot_new(self):
@@ -264,8 +274,8 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self._adc_ = self._data_.adc
             self._dac_ = self._data_.dac
             self._stimulus_ = self._data_.stimulus
-            self._electrode_ = self._data_.electrode
-            self._pathType_ = self._data_.pathType
+            self._electrode_ = self._data_.electrodeMode
+            self._pathType_ = self._data_.pathwayType
             self._schedule_ = self._data_.schedule
             self._measurements_ = self._data_.measurements
             self._data_ = val

@@ -14,6 +14,7 @@ from __future__ import print_function
 import os, inspect, warnings, traceback, datetime, typing, numbers, enum
 from functools import singledispatch
 from collections import deque
+import dataclasses
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -171,7 +172,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # NOTE: 2026-06-07 10:58:03
         # needed to edit object externally
         #
-        self._externalDataEditor_: bool = False
+        self._useExternalDataEditor_: bool = False
 
         # self._immutableColumns_:typing.Sequence[int] = list()  # of column indexes
         # self._immutableRows_:typing.Sequence[int] = list()     # of row indexes
@@ -319,6 +320,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @Slot(object)
     def populateModel(self, data):
         #print("TabularDataModel populateModel")
+        from core import datatypes
         from imaging import vigrautils
 
         # ### BEGIN Define timer to debug
@@ -420,18 +422,19 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._canAddRemoveRows_ = True
                 self._canAddRemoveColumns_ = False
 
+                names = list(map(lambda f: f.name, dataclasses.fields(ephys.SynapticPathway))) + ["Edit"]
+
                 # NOTE: 2026-06-07 21:38:40 see NOTE: 2026-06-07 21:36:23
                 self._modelDataColumnHeaders_ = dict(
                     tuple(
                         map(
                             lambda x: (x[0], f"{x[1]}"),
                             enumerate(("name", "adc", "dac",
-                                       "electrode", "pathType", "Edit")
+                                       "electrodeMode", "pathwayType", "Edit")
                             ))
                         )
                     )
                 self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
-                self._externalDataEditor_ = True
 
             elif isinstance(data, ephys.AuxiliaryInputList):
                 self._modelData_ = data
@@ -454,7 +457,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         )
                     )
                 self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
-                self._externalDataEditor_ = True
 
             elif isinstance(data, ephys.AuxiliaryOutputList):
                 self._modelData_ = data
@@ -474,7 +476,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         )
                     )
                 self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
-                self._externalDataEditor_ = True
+
 
             elif isinstance(data, ephys.SynapticStimulusChannelList):
                 self._modelData_ = data
@@ -640,28 +642,16 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                                 )
                                             )
                                     )
-                            # else:
-                            #     self._modelDataColumnHeaders_ = dict(
-                            #         tuple(
-                            #             map(
-                            #                 lambda x: (x, f"Channel {x}"),
-                            #                 range(self._modelData_.shape[1])
-                            #                 )
-                            #             )
-                            #         )
+
                         else:
                             self._modelDataColumns_ = 1
                             if isinstance(self._modelData_, pq.Quantity):
                                 self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
-                            # else:
-                            #     self._modelDataColumnHeaders_ = {0: "Samples"}
                     else:
                         self._modelDataRows_ = 1
                         self._modelDataColumns_ = 1
                         if isinstance(self._modelData_, pq.Quantity):
                             self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
-                        # else:
-                        #     self._modelDataColumnHeaders_ = {0: "Samples"}
 
             elif isinstance(data, typing.Sequence):
                 if all(isinstance(d, ephys.RecordingSource) for d in data):
@@ -686,6 +676,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     # NOTE: 2026-06-07 21:59:50 Row-major !!!
                     # i.e., access is data[row][column] ≡ data[y][x]
                     assert all(len(d) == len(data[0]) for d in data[1:]), "Sequences with non-rectangular shape are not supported"
+
+                    assert datatypes.is_homogeneous_sequence(data), "Only sequences homogeneous in their element types are supported"
 
                     if any(any(isinstance(d_, typing.Sequence) for d_ in d) for d in data):
                         raise ValueError("Only 2D nested sequences are supported")
@@ -792,6 +784,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         self.endResetModel()
 
+        if "Edit" in self._modelDataColumnHeaders_.values():
+            self._useExternalDataEditor_ = True
 
 
         # ### BEGIN report timing
@@ -799,6 +793,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # print(f"{self.__class__.__name__}.populateModel({type(data).__name__}) took {timer.elapsed()} milliseconds")
         #
         # ### END   report timing
+
+    @Slot()
+    def _slot_dataEditedExternally(self):
+        pass
 
     # def rowOps(self, row:object):
     #     if not self._canAddRemoveRows_:
@@ -1475,8 +1473,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         "adc": old_obj.adc,
                         "dac": old_obj.dac,
                         "stimulus": old_obj.stimulus,
-                        "electrode": old_obj.electrode,
-                        "pathType": old_obj.pathType,
+                        "electrode": old_obj.electrodeMode,
+                        "pathType": old_obj.pathwayType,
                         "schedule": old_obj.schedule,
                         "measurements": old_obj.measurements,
                         }
@@ -1507,13 +1505,19 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                 # print(f"{self.__class__.__name__}._setDataValue_ -> params - {params}")
 
-                old_val = getattr(old_obj, attr)
-                if isinstance(old_val, enum.Enum):
-                    if isinstance(pyvalue, int):
-                        params[attr] = type(old_val)(pyvalue)
-                    elif isinstance(pyvalue, str):
-                        params[attr] = type(old_val)[pyvalue]
-                else:
+                if attr.lower() != "edit":
+                    old_val = getattr(old_obj, attr)
+                    if isinstance(old_obj, ephys.SynapticPathway):
+                        if attr == "electrodeMode":
+                            attr = "electrode"
+                        elif attr == "pathwayType":
+                            attr = "pathType"
+                    elif isinstance(old_val, enum.Enum):
+                        if isinstance(pyvalue, int):
+                            params[attr] = type(old_val)(pyvalue)
+                        elif isinstance(pyvalue, str):
+                            params[attr] = type(old_val)[pyvalue]
+
                     params[attr] = pyvalue
 
                 new_obj = type(old_obj)(**params)

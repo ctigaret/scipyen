@@ -2754,8 +2754,6 @@ class SynapticPathway:
     def __post_init__(self, electrode:typing.Union[ElectrodeMode, int, str] = ElectrodeMode.Null,
                       pathType:typing.Union[SynapticPathwayType, int, str] = SynapticPathwayType.Null):
 
-        # print(f"{self.__class__.__name__}.__post_init__: electrodeMode = {electrodeMode}, pathwayType = {pathType}")
-
         if isinstance(electrode, (int, str)):
             if electrode not in ElectrodeMode:
                 raise ValueError(f"Invalid electrode mode {electrode}")
