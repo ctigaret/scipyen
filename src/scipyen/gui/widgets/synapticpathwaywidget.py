@@ -91,7 +91,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self._adc_ = self._data_.adc
             self._dac_ = self._data_.dac
             self._stimulus_ = self._data_.stimulus
-            self._electrode_ = self._data_.electrode
+            self._electrode_ = self._data_.electrodeMode
             self._pathType_ = self._data_.pathwayType
             self._schedule_ = self._data_.schedule
             self._measurements_ = self._data_.measurements
@@ -126,12 +126,14 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self.nameLineEdit.setText(self._name_)
         self.nameLineEdit.textChanged.connect(self._slot_nameChanged)
 
+        self.adcSpinBox.setValue(self._adc_)
         self.adcSpinBox.setToolTip("Input channel index")
         self.adcSpinBox.setWhatsThis("Input channel index")
         self.adcSpinBox.setStatusTip("Input channel index")
         self.adcSpinBox.setMinimum(0)
         self.adcSpinBox.valueChanged.connect(self._slot_adcChanged)
 
+        self.dacSpinBox.setValue(self._dac_)
         self.dacSpinBox.setToolTip("Input channel index")
         self.dacSpinBox.setWhatsThis("Input channel index")
         self.dacSpinBox.setStatusTip("Input channel index")

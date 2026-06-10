@@ -832,7 +832,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                                                      float, int, complex,
                                                      np.integer, np.floating,
                                                      np.complexfloating]] = None,
-                 /,
+                 # /,
                  singleStep: typing.Optional[float] = None,
                  stepType: typing.Optional[QtWidgets.QAbstractSpinBox.StepType] = None,
                  decimals: typing.Optional[int] = None,
@@ -1781,7 +1781,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     def stepBy(self, steps:int):
         signalBlocker = QtCore.QSignalBlocker(self._lineEdit_)
         step = self._singleStep_ * steps
-        print(f"{self.__class__.__name__}.stepBy({steps}) --> singleStep = {self._singleStep_}")
+        # print(f"{self.__class__.__name__}.stepBy({steps}) --> singleStep = {self._singleStep_}")
         # print(f"\tsingle step = {self._singleStep_}; step  = {step}")
         # print(f"\tcurrent magnitude: {self._magnitude_}")
         if isinstance(self._singleStep_, pq.Quantity):
@@ -1791,7 +1791,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             stepUnits = self._singleStep_.units
 
             if isinstance(self._units_, pq.Quantity):
-                print(f"\t stepUnits = {stepUnits}, self._units_ = {self.units}")
+                # print(f"\t stepUnits = {stepUnits}, self._units_ = {self.units}")
                 if all(self._units_ != pq.dimensionless) and all(stepUnits != self._units_):
                     if not scq.unitsConvertible(stepUnits, self._units_):
                         raise ValueError(f"Step units ({stepUnits}) are incompatible with value's units ({self._units_})")
@@ -1811,13 +1811,13 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             raise TypeError(f"singleStep has wrong object type: {type(self._singleStep_).__name__}")
 
         δVal = sgStep * steps
-        print(f"{self.__class__.__name__}.stepBy -> changed by {δVal}, for sgStep = {sgStep}")
+        # print(f"{self.__class__.__name__}.stepBy -> changed by {δVal}, for sgStep = {sgStep}")
         oldMagnitude = self._magnitude_
         newMagnitude = oldMagnitude + δVal
         self._magnitude_ = newMagnitude
         decimals = self._decimals_
         # self._lineEdit_.lazy = True
-        print(f"{self.__class__.__name__}.stepBy => old magnitude = {oldMagnitude}, new magnitude = {newMagnitude}, value: {self.value()}\n")
+        # print(f"{self.__class__.__name__}.stepBy => old magnitude = {oldMagnitude}, new magnitude = {newMagnitude}, value: {self.value()}\n")
         self._update_(forceSgStep = sgStep)
         # self._lineEdit_.lazy = False
         self.sig_valueChanged.emit(self.value())

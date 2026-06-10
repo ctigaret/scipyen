@@ -11,23 +11,23 @@ r"""Table model, for tabular-like data
 #### BEGIN core python modules
 from __future__ import print_function
 
-import os, inspect, warnings, traceback, datetime, typing, numbers, enum
-from functools import singledispatch
+import os, inspect, warnings, traceback, datetime, typing, types, numbers, enum # noqa
+from functools import (singledispatch, singledispatchmethod) # noqa
 from collections import deque
 import dataclasses
 #### END core python modules
 
 #### BEGIN 3rd party modules
 import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
     import PySide6
-    from PySide6 import Shiboken
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -38,7 +38,7 @@ else:
         __has_PyQt6__ = True
 
     from qtpy import sip
-    from qtpy.uic import loadUiType
+    from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -53,32 +53,32 @@ import neo
 from neo.core.objectlist import ObjectList as NeoObjectList
 from core.vigra_patches import vigra
 
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import matplotlib.pylab as plb
-import matplotlib.mlab as mlb
+import matplotlib as mpl # noqa
+import matplotlib.pyplot as plt # noqa
+import matplotlib.pylab as plb # noqa
+import matplotlib.mlab as mlb # noqa
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
 #from core.patchneo import *
 import core.datatypes
 
-import core.utilities as utilities
-import core.strutils as strutils
-from core.strutils import str2float
+import core.utilities as utilities # noqa
+import core.strutils as strutils # noqa
+from core.strutils import str2float # noqa
 
 from core.prog import (safewrapper, scipywarn)
 
-from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType)
+from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType) # noqa
 from core.marktrain import MarkTrain
-from core.triggerprotocols import (TriggerProtocol, TriggerProtocolList)
+from core.triggerprotocols import (TriggerProtocol, TriggerProtocolList) # noqa
 from core.datazone import DataZone
 
 import core.datasignal
-from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal,) # noqa
 import core.datatypes as dt
-from core.datatypes import array_slice
-from core.sysutils import adapt_ui_path
+from core.datatypes import array_slice # noqa
+from core.sysutils import adapt_ui_path # noqa
 from core import scipyen_quantities as scq
 from core import neoutils
 from ephys import ephys
@@ -88,9 +88,9 @@ from ephys import ephys
 #### BEGIN pict.gui modules
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
-from gui.delegates import PythonItemDelegate
+from gui.delegates import PythonItemDelegate # noqa
 from gui.widgets.tabledataview import TableDataView
-from gui.itemmodels.roles import *
+from gui.itemmodels.roles import * # noqa
 # from gui import resources_rc
 # from gui import icons_rc
 #### END pict.gui modules
@@ -312,9 +312,35 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     #### BEGIN resizable model
     #
-    def addRow(self):
-        pass
+    def addRow(self, data):
+        if self._modelData_ is None:
+            return
+        self._addDataRow_(self._modelData_, data)
+        # pass
     #
+    @singledispatchmethod
+    def _addDataRow_(self, mdata, obj):
+        raise NotImplementedError(f"{type(mdata).__name__}")
+
+    @_addDataRow_.register(pd.DataFrame)
+    def __addDataRow__(self, mdata: pd.DataFrame,
+                       obj: typing.Optional[pd.DataFrame] = None):
+        δndx = mdata.index[-1] - mdata.index[-2]
+
+        self.beginInsertRows(QtCore.QModelIndex(), self.rowCount(), self.rowCount()+1) # no good; should use beginResetModel/endResetModel
+
+        if obj is None:
+            obj = pd.DataFrame(dict(zip(mdata.columns, tuple((pd.NA, )) * mdata.shape[1])), index = [mdata.index[-1] + δndx])
+
+        elif isinstance(obj, typing.Sequence):
+            obj = pd.DataFrame(dict(zip(mdata.columns, obj)), index = [mdata.index[-1] + δndx])
+
+        self.insertRows(self.rowCount(), 1, QtCore.QModelIndex())
+        self._modelData_ = pd.concat((mdata, obj))
+        self.endInsertRows()
+
+
+
     #### END resizable model
 
     #### END item data handling
@@ -331,445 +357,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # timer.start()
         #
         # ### END   Define timer debug
+
         self.beginResetModel()
         try:
-            if not isinstance(data, (pd.Series, pd.DataFrame, pd.Index,
-                                     np.ndarray, vigra.filters.Kernel1D,
-                                     vigra.filters.Kernel2D,
-                                     TriggerProtocolList,
-                                     ephys.SynapticPathwayList,
-                                     ephys.AuxiliaryInputList,
-                                     ephys.AuxiliaryOutputList,
-                                     ephys.SynapticStimulusChannelList,
-                                     list, tuple, deque,
-                                     type(None))):
-                raise TypeError("%s data is not yet supported" % type(data).__name__)
-
-
-            # timer1 = QtCore.QElapsedTimer()
-            # timer1.start()
-
             self._is_vigra_filter_kernel_ = False
             self._original_data_ = data
 
-            if isinstance(data, pd.DataFrame):
-                self._modelData_ = data
-                self._modelDataRows_ = data.shape[0]
-                self._modelDataColumns_ = data.shape[1]
-
-                if isinstance(self._modelData_.columns, (pd.MultiIndex, pd.Index)):
-                    self._modelDataColumnHeaders_ = dict(
-                        tuple(
-                            map(
-                                lambda x: (x[0], f"{x[1]}"),
-                                enumerate(data.columns)
-                                )
-                            )
-                        )
-
-                # self._modelDataColumnHeaders_ = dict(enumerate(data.columns))
-                self._canAddRemoveColumns_ = True
-                self._canAddRemoveRows_ = True
-
-            elif isinstance(data, pd.Series):
-                self._modelData_ = data
-                self._modelDataRows_ = data.shape[0]
-                self._modelDataColumns_ = 1
-                self._modelDataColumnHeaders_ = {0: data.name}
-                self._canAddRemoveRows_ = True
-                self._canAddRemoveColumns_ = False
-
-            elif isinstance(data, pd.Index):
-                self._modelData_ = data
-                self._modelDataRows_ = data.shape[0]
-                self._modelDataColumns_ = 1
-                self._modelDataColumnHeaders_ = {0: "Index or Column"}
-                self._canAddRemoveRows_ = True
-                self._canAddRemoveColumns_ = False
-
-            elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
-                self._modelData_ = vigrautils.kernel2array(data)
-                self._modelDataRows_ = data.shape[0]
-                self._modelDataColumns_ = 1 if isinstance(data, vigra.filters.Kernel1D) else 2
-                self._modelDataColumnHeaders_ = {0: "Sample"} if isinstance(data, vigra.filters.Kernel1D) else {0: "X", 1: "Y"}
-                self._is_vigra_filter_kernel_  = True
-                self._original_data_ = data
-                self._canAddRemoveRows_ = False
-                self._canAddRemoveColumns_ = False
-
-            elif isinstance(data, TriggerProtocolList):
-                self._modelData_ = data
-                self._original_data_ = data
-                self._modelDataRows_ = len(data)
-                # self._is_vigra_filter_kernel_ = 0
-                self._canAddRemoveRows_ = True
-                self._canAddRemoveColumns_ = False
-
-                self._modelDataColumnHeaders_ = dict(
-                    tuple(
-                        map(
-                            lambda x: (x[0], f"{x[1]}"),
-                            enumerate(("name", "presynaptic", "postsynaptic", "photostimulation",
-                             "acquisition", "imagingDelay" ,"segments")
-                            ))
-                        )
-                    )
-                self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
-
-            elif isinstance(data, ephys.SynapticPathwayList):
-                self._modelData_ = data
-                self._original_data_ = data
-                self._modelDataRows_ = len(data)
-                # self._is_vigra_filter_kernel_ = 0
-                self._canAddRemoveRows_ = True
-                self._canAddRemoveColumns_ = False
-
-                names = list(map(lambda f: f.name, dataclasses.fields(ephys.SynapticPathway))) + ["Edit"]
-
-                # NOTE: 2026-06-07 21:38:40 see NOTE: 2026-06-07 21:36:23
-                self._modelDataColumnHeaders_ = dict(
-                    tuple(
-                        map(
-                            lambda x: (x[0], f"{x[1]}"),
-                            enumerate(("name", "adc", "dac",
-                                       "electrodeMode", "pathwayType", "Edit")
-                            ))
-                        )
-                    )
-                self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
-
-            elif isinstance(data, ephys.AuxiliaryInputList):
-                self._modelData_ = data
-                self._original_data_ = data
-                self._modelDataRows_ = len(data)
-                # self._is_vigra_filter_kernel_ = 0
-                self._canAddRemoveRows_ = True
-                self._canAddRemoveColumns_ = False
-
-                # NOTE: 2026-06-07 21:36:23
-                # Only display (and allow editing) the relevant fields:
-                # name & adc; give option to edit the entire object via an "Edit"
-                # column
-                self._modelDataColumnHeaders_ = dict(
-                    tuple(
-                        map(
-                            lambda x: (x[0], f"{x[1]}"),
-                            enumerate(("name", "adc", "Edit"))
-                            )
-                        )
-                    )
-                self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
-
-            elif isinstance(data, ephys.AuxiliaryOutputList):
-                self._modelData_ = data
-                self._original_data_ = data
-                self._modelDataRows_ = len(data)
-                # self._is_vigra_filter_kernel_ = 0
-                self._canAddRemoveRows_ = True
-                self._canAddRemoveColumns_ = False
-
-                # NOTE: 2026-06-07 21:37:08 see NOTE: 2026-06-07 21:36:23
-                self._modelDataColumnHeaders_ = dict(
-                    tuple(
-                        map(
-                            lambda x: (x[0], f"{x[1]}"),
-                            enumerate(("name", "channel", "Edit"))
-                            )
-                        )
-                    )
-                self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
-
-
-            elif isinstance(data, ephys.SynapticStimulusChannelList):
-                self._modelData_ = data
-                self._original_data_ = data
-                self._modelDataRows_ = len(data)
-                # self._is_vigra_filter_kernel_ = 0
-                self._canAddRemoveRows_ = True
-                self._canAddRemoveColumns_ = False
-
-                # NOTE: 2026-06-07 21:38:07 see NOTE: 2026-06-07 21:36:23
-                self._modelDataColumnHeaders_ = dict(
-                    tuple(
-                        map(
-                            lambda x: (x[0], f"{x[1]}"),
-                            enumerate(("name", "channel", "dig"))
-                            )
-                        )
-                    )
-                self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
-
-            elif isinstance(data, np.ndarray):
-                # trying to streamline this
-                # NOTE: 2025-11-23 09:45:45 FIXME/TODO - TOO SLOW!
-                # lazy display alleviates this to some degree (see self.fetchMore(…))
-                self._canAddRemoveRows_ = True
-                self._canAddRemoveColumns_ = True
-
-                if isinstance(data, neo.core.dataobject.DataObject):
-                    # NOTE: 2025-09-27 10:38:00
-                    # for regularly sampled signals (neo.AnalogSignal, DataSignal)
-                    # signal domain (e.g. time) is a dynamic property, calculated
-                    # from the t_start and sampling_period attributes of the signal
-                    # object; hence, individual data points in the domain cannot
-                    # be edited; however, the entire domain IS mutable (by changing
-                    # the two attributes mentioned above)
-                    #
-                    if data.ndim:
-                        self._modelDataRows_ = data.shape[0]
-
-                        domain = getattr(data, "times", None)
-                        domain_name = getattr(data, "domain_name", scq.getUnitFamily(domain))
-                        if len(domain_name) == 0:
-                            domain_name = f"{domain.dimensionality}"
-                        else:
-                            domain_name += f" ({domain.dimensionality})"
-
-                        if data.ndim > 1:
-                            # include domain as the first column
-                            self._modelDataColumns_ = data.shape[1] + 1 # this shows data.times as column 0
-
-                            channel_names = None
-                            if len(data.array_annotations):
-                                if "channel_names" in data.array_annotations:
-                                    channel_names = list(
-                                        map(
-                                            lambda n: f"{n}",
-                                            data.array_annotations["channel_names"]
-                                            )
-                                        )
-                                elif "channel_ids" in data.array_annotations:
-                                    channel_names = list(
-                                        map(
-                                            lambda i: f"{i}",
-                                            data.array_annotations["channel_ids"]
-                                            )
-                                        )
-
-                            if channel_names is None:
-                                channel_names = list(map(lambda i: f"Channel {i}", range(data.shape[1])))
-
-                            channel_names = list(map(lambda kc: f"{channel_names[kc]} ({data[:,kc].dimensionality})",
-                                                     range(len(channel_names))))
-                            headers = [domain_name, ] + channel_names
-
-                            self._modelDataColumnHeaders_ = dict(
-                                    (
-                                        tuple(map(lambda x: (x[0]+1, x),
-                                                  enumerate(headers))
-                                            )
-                                    )
-                                )
-
-                            if isinstance(data, (neo.AnalogSignal, DataSignal)):
-                                # NOTE: 2025-09-27 11:05:05 see NOTE: 2025-09-27 10:38:00
-                                # although the signal domain is shown as a regular column
-                                # (column 0),  editing data points in this column is
-                                # prevented, EXCEPT for the first data point - which is
-                                # the t_start
-                                #
-                                # This may sound contrived, but the native Qt option would
-                                # be to call setItemDelegateForColumn and setItemDelegateForRow
-                                # with a custom delegate returning a null widget (i.e. None)
-                                # but that is already baked in PythonItemDelegate class
-                                # see NOTE: 2025-09-27 11:06:52 in gui/delegates.py
-                                self.immutableColumns = [0]
-                                # below, allow editing t_start
-                                self.immutableRows = range(1,self._modelDataRows_)
-                                self.jointImmutability = True
-
-                        else: # e.g. case of spiketrains:
-                            self._modelDataColumns_ = 1 if isinstance(data, neo.SpikeTrain) else 2
-                            if isinstance(data, neo.SpikeTrain):
-                                headers = [domain_name ]
-                            else:
-                                channel_names = None
-                                if len(data.array_annotations):
-                                    if "channel_names" in data.array_annotations:
-                                        channel_names = list(
-                                            map(
-                                                lambda n: f"{n}",
-                                                data.array_annotations["channel_names"]
-                                                )
-                                            )
-                                    elif "channel_ids" in data.array_annotations:
-                                        channel_names = list(
-                                            map(
-                                                lambda i: f"{i}",
-                                                data.array_annotations["channel_ids"]
-                                                )
-                                            )
-
-                                if channel_names is None:
-                                    channel_names = [f"Channel 0 ({data.dimensionality})"]
-
-                                headers = [domain_name, ] + channel_names
-
-                            self._modelDataColumnHeaders_ = dict(
-                                    (
-                                        tuple(map(lambda x: (x[0]+1, x),
-                                                  enumerate(headers))
-                                            )
-                                    )
-                                )
-
-
-                    else:
-                        self._modelDataRows_ = 1
-                        self._modelDataColumns_ = 1
-                        self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
-                        # self._canAddRemoveColumns_ = True
-
-                    self._modelData_ = data
-
-                else: # "plain" numpy arrays and "generic" Quantity arrays
-                    if data.ndim > 2:
-                        if all (v == 1 for v in data.shape[2:]):
-                            self._modelData_ = np.squeeze(data).reshape((data.shape[0], np.prod(data.shape[1:])))
-                        else:
-                            raise ValueError("Arrays with more than two dimensions and with non-singleton dimensions higher than 2 are not supported")
-                    else:
-                        self._modelData_ = data
-
-                    if self._modelData_.ndim:
-                        self._modelDataRows_ = self._modelData_.shape[0]
-                        if self._modelData_.ndim > 1:
-                            self._modelDataColumns_ = self._modelData_.shape[1]
-                            if isinstance(self._modelData_, pq.Quantity):
-                                self._modelDataColumnHeaders_ = dict(
-                                        tuple(
-                                            map(
-                                                lambda x: (x, f"{scq.getUnitFamily(data)} ({self._modelData_.units.dimensionality})"),
-                                                range(self._modelData_.shape[1])
-                                                )
-                                            )
-                                    )
-
-                        else:
-                            self._modelDataColumns_ = 1
-                            if isinstance(self._modelData_, pq.Quantity):
-                                self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
-                    else:
-                        self._modelDataRows_ = 1
-                        self._modelDataColumns_ = 1
-                        if isinstance(self._modelData_, pq.Quantity):
-                            self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
-
-            elif isinstance(data, typing.Sequence):
-                if all(isinstance(d, ephys.RecordingSource) for d in data):
-                    self._modelData_ = data
-                    self._original_data_ = data
-                    self._modelDataRows_ = len(data)
-                    self._canAddRemoveRows_ = True
-                    self._canAddRemoveColumns_ = False
-                    # self._is_vigra_filter_kernel_ = 0
-                    # NOTE: 2026-06-07 21:38:07 see NOTE: 2026-06-07 21:36:23
-                    self._modelDataColumnHeaders_ = dict(
-                        tuple(
-                            map(
-                                lambda x: (x[0], f"{x[1]}"),
-                                enumerate(("name", "adc", "dac", "Edit"))
-                                )
-                            )
-                        )
-                    self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
-
-                elif all(isinstance(d, typing.Sequence) for d in data):
-                    # NOTE: 2026-06-07 21:59:50 Row-major !!!
-                    # i.e., access is data[row][column] ≡ data[y][x]
-                    assert all(len(d) == len(data[0]) for d in data[1:]), "Sequences with non-rectangular shape are not supported"
-
-                    assert datatypes.is_homogeneous_sequence(data), "Only sequences homogeneous in their element types are supported"
-
-                    # if any(any(isinstance(d_, typing.Sequence) for d_ in d) for d in data):
-                    #     raise ValueError("Only 2D nested sequences are supported")
-
-                    self._modelData_ = data
-                    self._original_data_ = data
-                    self._modelDataColumns_ = len(data[0])
-                    self._modelDataRows_ = len(data)
-
-                    self._modelDataColumnHeaders_ = dict(
-                        tuple(
-                            map(
-                                lambda x: (x, f"{x}"),
-                                range(self._modelDataColumns_)
-                                )
-                            )
-                        )
-                    self._canAddRemoveRows_ = True
-                    self._canAddRemoveColumns_ = True
-
-                    if isinstance(data, tuple):
-                        self.immutableRows = range(self._modelDataRows_)
-                        self.immutableColumns = range(self._modelDataColumns_)
-                        self._canAddRemoveColumns_ = False
-
-                    else:
-                        self.immutableRows = list(
-                            map(
-                                lambda x: x[0],
-                                filter(
-                                    lambda x: isinstance(x[1], tuple),
-                                    enumerate(data)
-                                    )
-                                )
-                            )
-                        self._canAddRemoveColumns_ = False
-
-                else:
-                    if all(
-                        isinstance(d,
-                                      (int, float, str, bool,
-                                       np.integer, np.floating, np.complexfloating,
-                                       np.character, np.bool,
-                                       pq.Quantity)
-                                      )
-                        for d in data
-                        ):
-
-                        self._modelData_ = data
-                        self._original_data_ = data
-                        self._modelDataColumns_ = 1
-                        self._modelDataRows_ = len(data)
-
-                        self._modelDataColumnHeaders_ = dict(
-                            tuple(
-                                map(
-                                    lambda x: (x, f"{x}"),
-                                    range(self._modelDataColumns_)
-                                    )
-                                )
-                            )
-                        self._canAddRemoveRows_ = True
-                        self._canAddRemoveRows_ = True
-
-                    else:
-                        scipywarn(f"Unsupported sequence element types")
-                        self._modelDataColumns_ = 0
-                        self._modelDataRows_ = 0
-                        self._modelDataColumnHeaders_ = dict()
-                        self._modelData_ = None
-                        self._original_data_ = None
-
-            elif data is None:
-                self._modelData_ = data
-                self._original_data_ = data
-                self._modelDataRows_ = 0
-                self._modelDataColumns_ = 0
-                self._canAddRemoveRows_ = False
-                self._canAddRemoveColumns_ = False
-                self._modelDataColumnHeaders_ = dict()
-            else:
-                scipywarn(f"{type(data).__name__} data are not supported yet")
-                self._modelData_ = data
-                self._original_data_ = data
-                self._modelDataRows_ = 0
-                self._modelDataColumns_ = 0
-                self._canAddRemoveRows_ = False
-                self._canAddRemoveColumns_ = False
-                self._modelDataColumnHeaders_ = dict()
-
+            self._makeModelData_(data)
             self._displayedRows_ = 0
             self._displayedColumns_ = 0
 
@@ -1352,197 +946,639 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             else:
                 pyvalue = value
 
-            # print(f"{self.__class__.__name__}._setDataValue_({value}[{type(value).__name__}]) -> pyvalue = {pyvalue}")
-
-            if isinstance(self._modelData_, pd.DataFrame):
-                if row >= self._modelData_.shape[0]:
-                    return False
-
-                self._modelData_.iloc[row, col] = pyvalue
-                return True
-
-            elif isinstance(self._modelData_, pd.Series):
-                if row >= self._modelData_.shape[0]:
-                    return False
-                self._modelData_.iloc[row] = pyvalue
-                return True
-
-            elif isinstance(self._modelData_, neo.dataobject.DataObject):
-                if row >= self._modelData_.shape[0]:
-                    return False
-
-                if isinstance(self._modelData_, neo.SpikeTrain) and col > 0:
-                    return False
-
-                if col >= self._modelData_.shape[1] + 1:
-                    # because the signal's domain is on column 0, what is shown
-                    # here has one extra column
-                    return False
-                if col == 0:
-                    if isinstance(self._modelData_, (neo.AnalogSignal, DataSignal)) :
-                        # for analog signals only t_start can be edited
-                        if row == 0:
-                            # allow setting t_start
-                            if isinstance(pyvalue, pq.Quantity):
-                                if pyvalue.units != self._modelData_.times.units:
-                                    raise ValueError(f"Expecting value units of {self._modelData_.times.units}; got ({pyvalue.units}) instead")
-
-                                self._modelData_.t_start = pyvalue
-                                return True
-
-                            elif isinstance(pyvalue, (float, int, complex)):
-                                self._modelData_.t_start = pyvalue * self._modelData_.units
-                                return True
-                            else:
-                                scipywarn(f"Expecting a float or a Quantity in {self._modelData_.times.units}; got {type(pyvalue).__name__} instead")
-                                return False
-                        else:
-                            return False
-
-                    else:
-                        if isinstance(pyvalue, pq.Quantity):
-                            if pyvalue.units != self._modelData_.times.units:
-                                scipywarn(f"Expecting value units of {self._modelData_.times.units}; got ({pyvalue.units}) instead")
-                                return False
-
-                            self._modelData_.times[row] = pyvalue
-                            return True
-
-                        elif isinstance(pyvalue, (float, int, complex)):
-                            self._modelData_.times[row] = pyvalue * self._modelData_.units
-                            return True
-                        else:
-                            scipywarn(f"Expecting a float or a Quantity in {self._modelData_.times.units}; got {type(pyvalue).__name__} instead")
-                            return False
-
-                else:
-                    if isinstance(pyvalue, pq.Quantity):
-                        if pyvalue.units != self._modelData_.units:
-                            scipywarn(f"Expecting value units of {self._modelData_.units}; got ({pyvalue.units}) instead")
-                            return False
-
-                        self._modelData_[row, col-1] = pyvalue
-                        return True
-
-                    elif isinstance(pyvalue, (float, int, complex)):
-                        self._modelData_[row, col-1] = pyvalue * self._modelData_.units
-                        return True
-                    else:
-                        scipywarn(f"Expecting a float or a Quantity in {self._modelData_.units}; got {type(pyvalue).__name__} instead")
-                        return False
-
-            elif isinstance(self._modelData_, np.ndarray):
-                if row >= self._modelData_.shape[0]:
-                    return False
-                if self._modelData_.ndim == 1:
-                    self._modelData_[row] = pyvalue
-                elif self._modelData_.ndim == 2:
-                    self._modelData_[row, col] = pyvalue
-                if self._is_vigra_filter_kernel_:
-                    self._original_data_ = vigrautils.kernelfromarray(self._modelData_)
-
-                return True
-
-            elif isinstance(self._modelData_, TriggerProtocolList):
-                if row >= len(self._modelData_):
-                    return False
-
-                protocol = self._modelData_[row]
-
-                attr = self._modelDataColumnHeaders_[col]
-
-                setattr(protocol, attr, pyvalue)
-
-                return True
-
-            elif isinstance(self._modelData_, (
-                                                ephys.SynapticPathwayList,
-                                                ephys.AuxiliaryInputList,
-                                                ephys.AuxiliaryOutputList,
-                                                ephys.SynapticStimulusChannelList,
-                                              )
-                            ):
-                if row >= len(self._modelData_):
-                    return False
-
-                old_obj = self._modelData_[row]
-
-                attr = self._modelDataColumnHeaders_[col]
-
-                if isinstance(old_obj, ephys.SynapticPathway):
-                    params = {
-                        "name": old_obj.name,
-                        "adc": old_obj.adc,
-                        "dac": old_obj.dac,
-                        "stimulus": old_obj.stimulus,
-                        "electrode": old_obj.electrodeMode,
-                        "pathType": old_obj.pathwayType,
-                        "schedule": old_obj.schedule,
-                        "measurements": old_obj.measurements,
-                        }
-
-                elif isinstance(old_obj, ephys.AuxiliaryInput):
-                    params = {
-                        "name": old_obj.name,
-                        "adc": old_obj.adc,
-                        "cmd": old_obj.cmd
-                        }
-
-                elif isinstance(old_obj, ephys.AuxiliaryOutput):
-                    params = {
-                        "name": old_obj.name,
-                        "channel": old_obj.channel,
-                        "digttl": old_obj.digttl
-                        }
-
-                elif isinstance(old_obj, ephys.SynapticStimulusChannel):
-                    params = {
-                        "name": old_obj.name,
-                        "channel": old_obj.channel,
-                        "dig": old_obj.dig
-                        }
-
-                else:
-                    return False
-
-                # print(f"{self.__class__.__name__}._setDataValue_ -> params - {params}")
-
-                if attr.lower() != "edit":
-                    old_val = getattr(old_obj, attr)
-                    if isinstance(old_obj, ephys.SynapticPathway):
-                        if attr == "electrodeMode":
-                            attr = "electrode"
-                        elif attr == "pathwayType":
-                            attr = "pathType"
-                    elif isinstance(old_val, enum.Enum):
-                        if isinstance(pyvalue, int):
-                            params[attr] = type(old_val)(pyvalue)
-                        elif isinstance(pyvalue, str):
-                            params[attr] = type(old_val)[pyvalue]
-
-                    params[attr] = pyvalue
-
-                new_obj = type(old_obj)(**params)
-
-                self._modelData_[row] = new_obj
-
-            elif isinstance(self._modelData_, (list, deque)):
-                self._modelData_[row][col] = pyvalue
-
-            else:
-                return False
-
-            return True
+            return self._setValueInModelData_(self._modelData_, pyvalue, row, col)
 
         except Exception as e:
             traceback.print_exc()
             return False
 
-        # NOTE: 2018-11-22 11:11:43
-        # don't delete this; contemplate using it at module/app level
-        #sip.enableautoconversion(QtCore.QVariant, old_qvariant_autoconv)
+    @singledispatchmethod
+    def _makeModelData_(self, data):
+        scipywarn(f"{type(data).__name__} data are not supported yet")
+        self._modelData_ = data
+        self._original_data_ = data
+        self._modelDataRows_ = 0
+        self._modelDataColumns_ = 0
+        self._canAddRemoveRows_ = False
+        self._canAddRemoveColumns_ = False
+        self._modelDataColumnHeaders_ = dict()
 
+    @_makeModelData_.register(types.NoneType)
+    def __makeModelData__(self, data: types.NoneType):
+        self._modelData_ = data
+        self._original_data_ = data
+        self._modelDataRows_ = 0
+        self._modelDataColumns_ = 0
+        self._canAddRemoveRows_ = False
+        self._canAddRemoveColumns_ = False
+        self._modelDataColumnHeaders_ = dict()
+
+    @_makeModelData_.register(pd.DataFrame)
+    def __makeModelData__(self, data: pd.DataFrame):
+        self._modelData_ = data
+        self._modelDataRows_ = data.shape[0]
+        self._modelDataColumns_ = data.shape[1]
+
+        if isinstance(self._modelData_.columns, (pd.MultiIndex, pd.Index)):
+            self._modelDataColumnHeaders_ = dict(
+                tuple(
+                    map(
+                        lambda x: (x[0], f"{x[1]}"),
+                        enumerate(data.columns)
+                        )
+                    )
+                )
+
+        # self._modelDataColumnHeaders_ = dict(enumerate(data.columns))
+        self._canAddRemoveColumns_ = True
+        self._canAddRemoveRows_ = True
+
+    @_makeModelData_.register(pd.Series)
+    def __makeModelData__(self, data: pd.Series):
+        self._modelData_ = data
+        self._modelDataRows_ = data.shape[0]
+        self._modelDataColumns_ = 1
+        self._modelDataColumnHeaders_ = {0: data.name}
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+    @_makeModelData_.register(pd.Index)
+    def __makeModelData__(self, data: pd.Index):
+        self._modelData_ = data
+        self._modelDataRows_ = data.shape[0]
+        self._modelDataColumns_ = 1
+        self._modelDataColumnHeaders_ = {0: "Index or Column"}
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+    @_makeModelData_.register(vigra.filters.Kernel1D)
+    @_makeModelData_.register(vigra.filters.Kernel2D)
+    def __makeModelData__(self, data: vigra.filters.Kernel1D | vigra.filters.Kernel2D):
+        self._modelData_ = vigrautils.kernel2array(data)
+        self._modelDataRows_ = data.shape[0]
+        self._modelDataColumns_ = 1 if isinstance(data, vigra.filters.Kernel1D) else 2
+        self._modelDataColumnHeaders_ = {0: "Sample"} if isinstance(data, vigra.filters.Kernel1D) else {0: "X", 1: "Y"}
+        self._is_vigra_filter_kernel_  = True
+        self._original_data_ = data
+        self._canAddRemoveRows_ = False
+        self._canAddRemoveColumns_ = False
+
+    @_makeModelData_.register(TriggerProtocolList)
+    def __makeModelData__(self, data: TriggerProtocolList):
+        self._modelData_ = data
+        self._original_data_ = data
+        self._modelDataRows_ = len(data)
+        # self._is_vigra_filter_kernel_ = 0
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        self._modelDataColumnHeaders_ = dict(
+            tuple(
+                map(
+                    lambda x: (x[0], f"{x[1]}"),
+                    enumerate(("name", "presynaptic", "postsynaptic", "photostimulation",
+                        "acquisition", "imagingDelay" ,"segments")
+                    ))
+                )
+            )
+        self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+
+    @_makeModelData_.register(ephys.SynapticPathwayList)
+    def __makeModelData__(self, data: ephys.SynapticPathwayList):
+        self._modelData_ = data
+        self._original_data_ = data
+        self._modelDataRows_ = len(data)
+        # self._is_vigra_filter_kernel_ = 0
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        names = list(map(lambda f: f.name, dataclasses.fields(ephys.SynapticPathway))) + ["Edit"]
+
+        # NOTE: 2026-06-07 21:38:40 see NOTE: 2026-06-07 21:36:23
+        self._modelDataColumnHeaders_ = dict(
+            tuple(
+                map(
+                    lambda x: (x[0], f"{x[1]}"),
+                    enumerate(("name", "adc", "dac",
+                                "electrodeMode", "pathwayType", "Edit")
+                    ))
+                )
+            )
+        self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+
+    @_makeModelData_.register(ephys.AuxiliaryInputList)
+    def __makeModelData__(self, data: ephys.AuxiliaryInputList):
+        self._modelData_ = data
+        self._original_data_ = data
+        self._modelDataRows_ = len(data)
+        # self._is_vigra_filter_kernel_ = 0
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        # NOTE: 2026-06-07 21:36:23
+        # Only display (and allow editing) the relevant fields:
+        # name & adc; give option to edit the entire object via an "Edit"
+        # column
+        self._modelDataColumnHeaders_ = dict(
+            tuple(
+                map(
+                    lambda x: (x[0], f"{x[1]}"),
+                    enumerate(("name", "adc", "Edit"))
+                    )
+                )
+            )
+        self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+
+    @_makeModelData_.register(ephys.AuxiliaryOutputList)
+    def __makeModelData__(self, data: ephys.AuxiliaryOutputList):
+        self._modelData_ = data
+        self._original_data_ = data
+        self._modelDataRows_ = len(data)
+        # self._is_vigra_filter_kernel_ = 0
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        # NOTE: 2026-06-07 21:37:08 see NOTE: 2026-06-07 21:36:23
+        self._modelDataColumnHeaders_ = dict(
+            tuple(
+                map(
+                    lambda x: (x[0], f"{x[1]}"),
+                    enumerate(("name", "channel", "Edit"))
+                    )
+                )
+            )
+        self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+
+    @_makeModelData_.register(ephys.SynapticStimulusChannelList)
+    def __makeModelData__(self, data: ephys.SynapticStimulusChannelList):
+        self._modelData_ = data
+        self._original_data_ = data
+        self._modelDataRows_ = len(data)
+        # self._is_vigra_filter_kernel_ = 0
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        # NOTE: 2026-06-07 21:38:07 see NOTE: 2026-06-07 21:36:23
+        self._modelDataColumnHeaders_ = dict(
+            tuple(
+                map(
+                    lambda x: (x[0], f"{x[1]}"),
+                    enumerate(("name", "channel", "dig"))
+                    )
+                )
+            )
+        self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+
+    @_makeModelData_.register(np.ndarray)
+    def __makeModelData__(self, data: np.ndarray):
+        # trying to streamline this
+        # NOTE: 2025-11-23 09:45:45 FIXME/TODO - TOO SLOW!
+        # lazy display alleviates this to some degree (see self.fetchMore(…))
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = True
+
+        if isinstance(data, neo.core.dataobject.DataObject):
+            # NOTE: 2025-09-27 10:38:00
+            # for regularly sampled signals (neo.AnalogSignal, DataSignal)
+            # signal domain (e.g. time) is a dynamic property, calculated
+            # from the t_start and sampling_period attributes of the signal
+            # object; hence, individual data points in the domain cannot
+            # be edited; however, the entire domain IS mutable (by changing
+            # the two attributes mentioned above)
+            #
+            if data.ndim:
+                self._modelDataRows_ = data.shape[0]
+
+                domain = getattr(data, "times", None)
+                domain_name = getattr(data, "domain_name", scq.getUnitFamily(domain))
+                if len(domain_name) == 0:
+                    domain_name = f"{domain.dimensionality}"
+                else:
+                    domain_name += f" ({domain.dimensionality})"
+
+                if data.ndim > 1:
+                    # include domain as the first column
+                    self._modelDataColumns_ = data.shape[1] + 1 # this shows data.times as column 0
+
+                    channel_names = None
+                    if len(data.array_annotations):
+                        if "channel_names" in data.array_annotations:
+                            channel_names = list(
+                                map(
+                                    lambda n: f"{n}",
+                                    data.array_annotations["channel_names"]
+                                    )
+                                )
+                        elif "channel_ids" in data.array_annotations:
+                            channel_names = list(
+                                map(
+                                    lambda i: f"{i}",
+                                    data.array_annotations["channel_ids"]
+                                    )
+                                )
+
+                    if channel_names is None:
+                        channel_names = list(map(lambda i: f"Channel {i}", range(data.shape[1])))
+
+                    channel_names = list(map(lambda kc: f"{channel_names[kc]} ({data[:,kc].dimensionality})",
+                                                range(len(channel_names))))
+                    headers = [domain_name, ] + channel_names
+
+                    self._modelDataColumnHeaders_ = dict(
+                            (
+                                tuple(map(lambda x: (x[0]+1, x),
+                                            enumerate(headers))
+                                    )
+                            )
+                        )
+
+                    if isinstance(data, (neo.AnalogSignal, DataSignal)):
+                        # NOTE: 2025-09-27 11:05:05 see NOTE: 2025-09-27 10:38:00
+                        # although the signal domain is shown as a regular column
+                        # (column 0),  editing data points in this column is
+                        # prevented, EXCEPT for the first data point - which is
+                        # the t_start
+                        #
+                        # This may sound contrived, but the native Qt option would
+                        # be to call setItemDelegateForColumn and setItemDelegateForRow
+                        # with a custom delegate returning a null widget (i.e. None)
+                        # but that is already baked in PythonItemDelegate class
+                        # see NOTE: 2025-09-27 11:06:52 in gui/delegates.py
+                        self.immutableColumns = [0]
+                        # below, allow editing t_start
+                        self.immutableRows = range(1,self._modelDataRows_)
+                        self.jointImmutability = True
+
+                else: # e.g. case of spiketrains:
+                    self._modelDataColumns_ = 1 if isinstance(data, neo.SpikeTrain) else 2
+                    if isinstance(data, neo.SpikeTrain):
+                        headers = [domain_name ]
+                    else:
+                        channel_names = None
+                        if len(data.array_annotations):
+                            if "channel_names" in data.array_annotations:
+                                channel_names = list(
+                                    map(
+                                        lambda n: f"{n}",
+                                        data.array_annotations["channel_names"]
+                                        )
+                                    )
+                            elif "channel_ids" in data.array_annotations:
+                                channel_names = list(
+                                    map(
+                                        lambda i: f"{i}",
+                                        data.array_annotations["channel_ids"]
+                                        )
+                                    )
+
+                        if channel_names is None:
+                            channel_names = [f"Channel 0 ({data.dimensionality})"]
+
+                        headers = [domain_name, ] + channel_names
+
+                    self._modelDataColumnHeaders_ = dict(
+                            (
+                                tuple(map(lambda x: (x[0]+1, x),
+                                            enumerate(headers))
+                                    )
+                            )
+                        )
+
+
+            else:
+                self._modelDataRows_ = 1
+                self._modelDataColumns_ = 1
+                self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
+                # self._canAddRemoveColumns_ = True
+
+            self._modelData_ = data
+
+        else: # "plain" numpy arrays and "generic" Quantity arrays
+            if data.ndim > 2:
+                if all (v == 1 for v in data.shape[2:]):
+                    self._modelData_ = np.squeeze(data).reshape((data.shape[0], np.prod(data.shape[1:])))
+                else:
+                    raise ValueError("Arrays with more than two dimensions and with non-singleton dimensions higher than 2 are not supported")
+            else:
+                self._modelData_ = data
+
+            if self._modelData_.ndim:
+                self._modelDataRows_ = self._modelData_.shape[0]
+                if self._modelData_.ndim > 1:
+                    self._modelDataColumns_ = self._modelData_.shape[1]
+                    if isinstance(self._modelData_, pq.Quantity):
+                        self._modelDataColumnHeaders_ = dict(
+                                tuple(
+                                    map(
+                                        lambda x: (x, f"{scq.getUnitFamily(data)} ({self._modelData_.units.dimensionality})"),
+                                        range(self._modelData_.shape[1])
+                                        )
+                                    )
+                            )
+
+                else:
+                    self._modelDataColumns_ = 1
+                    if isinstance(self._modelData_, pq.Quantity):
+                        self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
+            else:
+                self._modelDataRows_ = 1
+                self._modelDataColumns_ = 1
+                if isinstance(self._modelData_, pq.Quantity):
+                    self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
+
+    @_makeModelData_.register(list)
+    @_makeModelData_.register(tuple)
+    @_makeModelData_.register(deque)
+    def __makeModelData__(self, data: typing.Sequence):
+        if all(isinstance(d, ephys.RecordingSource) for d in data):
+            self._modelData_ = data
+            self._original_data_ = data
+            self._modelDataRows_ = len(data)
+            self._canAddRemoveRows_ = True
+            self._canAddRemoveColumns_ = False
+            # self._is_vigra_filter_kernel_ = 0
+            # NOTE: 2026-06-07 21:38:07 see NOTE: 2026-06-07 21:36:23
+            self._modelDataColumnHeaders_ = dict(
+                tuple(
+                    map(
+                        lambda x: (x[0], f"{x[1]}"),
+                        enumerate(("name", "adc", "dac", "Edit"))
+                        )
+                    )
+                )
+            self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+
+        elif all(isinstance(d, typing.Sequence) for d in data):
+            # NOTE: 2026-06-07 21:59:50 Row-major !!!
+            # i.e., access is data[row][column] ≡ data[y][x]
+            assert all(len(d) == len(data[0]) for d in data[1:]), "Sequences with non-rectangular shape are not supported"
+
+            assert datatypes.is_homogeneous_sequence(data), "Only sequences homogeneous in their element types are supported"
+
+            # if any(any(isinstance(d_, typing.Sequence) for d_ in d) for d in data):
+            #     raise ValueError("Only 2D nested sequences are supported")
+
+            self._modelData_ = data
+            self._original_data_ = data
+            self._modelDataColumns_ = len(data[0])
+            self._modelDataRows_ = len(data)
+
+            self._modelDataColumnHeaders_ = dict(
+                tuple(
+                    map(
+                        lambda x: (x, f"{x}"),
+                        range(self._modelDataColumns_)
+                        )
+                    )
+                )
+            self._canAddRemoveRows_ = True
+            self._canAddRemoveColumns_ = True
+
+            if isinstance(data, tuple):
+                self.immutableRows = range(self._modelDataRows_)
+                self.immutableColumns = range(self._modelDataColumns_)
+                self._canAddRemoveColumns_ = False
+
+            else:
+                self.immutableRows = list(
+                    map(
+                        lambda x: x[0],
+                        filter(
+                            lambda x: isinstance(x[1], tuple),
+                            enumerate(data)
+                            )
+                        )
+                    )
+                self._canAddRemoveColumns_ = False
+
+        else:
+            if all(
+                isinstance(d,
+                                (int, float, str, bool,
+                                np.integer, np.floating, np.complexfloating,
+                                np.character, np.bool,
+                                pq.Quantity)
+                                )
+                for d in data
+                ):
+
+                self._modelData_ = data
+                self._original_data_ = data
+                self._modelDataColumns_ = 1
+                self._modelDataRows_ = len(data)
+
+                self._modelDataColumnHeaders_ = dict(
+                    tuple(
+                        map(
+                            lambda x: (x, f"{x}"),
+                            range(self._modelDataColumns_)
+                            )
+                        )
+                    )
+                self._canAddRemoveRows_ = True
+                self._canAddRemoveRows_ = True
+
+            else:
+                scipywarn(f"Unsupported sequence element types")
+                self._modelDataColumns_ = 0
+                self._modelDataRows_ = 0
+                self._modelDataColumnHeaders_ = dict()
+                self._modelData_ = None
+                self._original_data_ = None
+
+    @singledispatchmethod
+    def _setValueInModelData_(self, mdata, pyvalue, row, col) -> bool:
+        scipywarn(f"Unsupported model data {type(mdata).__name__}")
         return False
+
+    @_setValueInModelData_.register(pd.DataFrame)
+    def __setValueInModelData__(self, mdata: pd.DataFrame, pyvalue, row, col) -> bool:
+        if row >= mdata.shape[0]:
+            return False
+
+        mdata.iloc[row, col] = pyvalue
+        return True
+
+    @_setValueInModelData_.register(pd.Series)
+    def __setValueInModelData__(self, mdata: pd.Series, pyvalue, row, col) -> bool:
+        if row >= mdata.shape[0]:
+            return False
+
+        mdata.iloc[row] = pyvalue
+        return True
+
+    @_setValueInModelData_.register(neo.dataobject.DataObject)
+    def __setValueInModelData__(self, mdata: neo.dataobject.DataObject, pyvalue, row, col) -> bool:
+        if row >= mdata.shape[0]:
+            return False
+
+        if isinstance(mdata, neo.SpikeTrain) and col > 0:
+            return False
+
+        if col >= mdata.shape[1] + 1:
+            # because the signal's domain is on column 0, what is shown
+            # here has one extra column
+            return False
+
+        if col == 0:
+            if isinstance(mdata, (neo.AnalogSignal, DataSignal)) :
+                # for analog signals only t_start can be edited
+                if row == 0:
+                    # allow setting t_start
+                    if isinstance(pyvalue, pq.Quantity):
+                        if pyvalue.units != mdata.times.units:
+                            raise ValueError(f"Expecting value units of {mdata.times.units}; got ({pyvalue.units}) instead")
+
+                        mdata.t_start = pyvalue
+                        return True
+
+                    elif isinstance(pyvalue, (float, int, complex)):
+                        mdata.t_start = pyvalue * mdata.units
+                        return True
+                    else:
+                        scipywarn(f"Expecting a float or a Quantity in {mdata.times.units}; got {type(pyvalue).__name__} instead")
+                        return False
+                else:
+                    return False
+
+            else:
+                if isinstance(pyvalue, pq.Quantity):
+                    if pyvalue.units != mdata.times.units:
+                        scipywarn(f"Expecting value units of {mdata.times.units}; got ({pyvalue.units}) instead")
+                        return False
+
+                    mdata.times[row] = pyvalue
+                    return True
+
+                elif isinstance(pyvalue, (float, int, complex)):
+                    mdata.times[row] = pyvalue * mdata.units
+                    return True
+                else:
+                    scipywarn(f"Expecting a float or a Quantity in {mdata.times.units}; got {type(pyvalue).__name__} instead")
+                    return False
+
+        else:
+            if isinstance(pyvalue, pq.Quantity):
+                if pyvalue.units != mdata.units:
+                    scipywarn(f"Expecting value units of {mdata.units}; got ({pyvalue.units}) instead")
+                    return False
+
+                mdata[row, col-1] = pyvalue
+                return True
+
+            elif isinstance(pyvalue, (float, int, complex)):
+                mdata[row, col-1] = pyvalue * mdata.units
+                return True
+            else:
+                scipywarn(f"Expecting a float or a Quantity in {mdata.units}; got {type(pyvalue).__name__} instead")
+                return False
+
+
+    @_setValueInModelData_.register(np.ndarray)
+    def __setValueInModelData__(self, mdata: np.ndarray, pyvalue, row, col) -> bool:
+        if row >= mdata.shape[0]:
+            return False
+        if mdata.ndim == 1:
+            mdata[row] = pyvalue
+        elif mdata.ndim == 2:
+            mdata[row, col] = pyvalue
+
+        if self._is_vigra_filter_kernel_:
+            self._original_data_ = vigrautils.kernelfromarray(mdata)
+
+        return True
+
+    @_setValueInModelData_.register(TriggerProtocolList)
+    def __setValueInModelData__(self, mdata: TriggerProtocolList, pyvalue, row, col) -> bool:
+        if row >= len(mdata):
+            return False
+        protocol = mdata[row]
+
+        attr = self._modelDataColumnHeaders_[col]
+
+        setattr(protocol, attr, pyvalue)
+
+        return True
+
+    @_setValueInModelData_.register(ephys.SynapticPathwayList)
+    @_setValueInModelData_.register(ephys.AuxiliaryInputList)
+    @_setValueInModelData_.register(ephys.AuxiliaryOutputList)
+    @_setValueInModelData_.register(ephys.SynapticStimulusChannelList)
+    def __setValueInModelData__(self, mdata: typing.Union[
+                                                ephys.SynapticPathwayList,
+                                                ephys.AuxiliaryInputList,
+                                                ephys.AuxiliaryOutputList,
+                                                ephys.SynapticStimulusChannelList,
+                                                ], pyvalue, row, col) -> bool:
+        if row >= len(mdata):
+            return False
+
+        old_obj = mdata[row]
+
+        attr = self._modelDataColumnHeaders_[col]
+
+        if isinstance(old_obj, ephys.SynapticPathway):
+            params = {
+                "name": old_obj.name,
+                "adc": old_obj.adc,
+                "dac": old_obj.dac,
+                "stimulus": old_obj.stimulus,
+                "electrode": old_obj.electrodeMode,
+                "pathType": old_obj.pathwayType,
+                "schedule": old_obj.schedule,
+                "measurements": old_obj.measurements,
+                }
+
+        elif isinstance(old_obj, ephys.AuxiliaryInput):
+            params = {
+                "name": old_obj.name,
+                "adc": old_obj.adc,
+                "cmd": old_obj.cmd
+                }
+
+        elif isinstance(old_obj, ephys.AuxiliaryOutput):
+            params = {
+                "name": old_obj.name,
+                "channel": old_obj.channel,
+                "digttl": old_obj.digttl
+                }
+
+        elif isinstance(old_obj, ephys.SynapticStimulusChannel):
+            params = {
+                "name": old_obj.name,
+                "channel": old_obj.channel,
+                "dig": old_obj.dig
+                }
+
+        else:
+            return False
+
+        if attr.lower() != "edit":
+            old_val = getattr(old_obj, attr)
+            if isinstance(old_obj, ephys.SynapticPathway):
+                if attr == "electrodeMode":
+                    attr = "electrode"
+                elif attr == "pathwayType":
+                    attr = "pathType"
+            elif isinstance(old_val, enum.Enum):
+                if isinstance(pyvalue, int):
+                    params[attr] = type(old_val)(pyvalue)
+                elif isinstance(pyvalue, str):
+                    params[attr] = type(old_val)[pyvalue]
+
+            params[attr] = pyvalue
+
+        new_obj = type(old_obj)(**params)
+
+        mdata[row] = new_obj
+
+        return True
+
+    @_setValueInModelData_.register(list)
+    @_setValueInModelData_.register(deque)
+    def __setValueInModelData__(self, mdata: list | deque, pyvalue, row, col) -> bool:
+        mdata[row][col] = pyvalue
+        return True
 
     @property
     def sourceData(self):

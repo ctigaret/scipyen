@@ -605,7 +605,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
                     elif isinstance(data, (float, np.floating)):
                         # widget = smw.QuantitySpinBox(parent, data)
-                        widget = QtWidgets.QDoubleSpinBox(parent, data)
+                        widget = QtWidgets.QDoubleSpinBox(parent)
                         widget.setMinimum(-math.inf)
                         widget.setMaximum(math.inf)
                         # widget.setSingleStep(1)
@@ -904,6 +904,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
     @Slot(object)
     @Slot(int)
+    @Slot(float)
     def slot_valueChanged(self, o:object):
         # print(f"{self.__class__.__name__}.slot_dataChanged({o})")
         # o = self.sender().getValue()
