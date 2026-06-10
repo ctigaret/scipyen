@@ -539,6 +539,8 @@ class SynapticStimulusChannelList(NeoObjectList):
         if len(items):
             if len(items) == 1 and isinstance(items[0], typing.Sequence):
                 items = items[0]
+            else:
+                raise TypeError(f"Expecting a sequence, instead, got a {type(items[0]).__name__}")
 
             if any(
                 not isinstance(i, self.allowed_contents)

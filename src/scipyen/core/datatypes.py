@@ -402,7 +402,7 @@ def is_homogeneous_sequence(x: typing.Sequence):
 
     etype = type(x[0])
 
-    return all(isinstance(e, etype), x[1:])
+    return all(isinstance(e, etype) for e in x[1:])
 
 
 def is_column_vector(x):

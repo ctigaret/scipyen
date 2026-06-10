@@ -312,6 +312,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     #### BEGIN resizable model
     #
+    def addRow(self):
+        pass
     #
     #### END resizable model
 
@@ -679,8 +681,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                     assert datatypes.is_homogeneous_sequence(data), "Only sequences homogeneous in their element types are supported"
 
-                    if any(any(isinstance(d_, typing.Sequence) for d_ in d) for d in data):
-                        raise ValueError("Only 2D nested sequences are supported")
+                    # if any(any(isinstance(d_, typing.Sequence) for d_ in d) for d in data):
+                    #     raise ValueError("Only 2D nested sequences are supported")
 
                     self._modelData_ = data
                     self._original_data_ = data
@@ -1632,7 +1634,7 @@ def _addRow_(self,
     raise NotImplementedError(f"Object of type {type (obj).__name__} are not supported")
 
 @_addRow_.register(pd.DataFrame)
-def _(obj: pd.DataFrame,
+def __addRow__(obj: pd.DataFrame,
       row: typing.Union[typing.Sequence, pd.Series],
       in_place: bool = False) -> pd.DataFrame:
     if isinstance(row, (pd.Series, np.ndarray)):
@@ -1659,7 +1661,7 @@ def _(obj: pd.DataFrame,
 
 @_addRow_.register(pd.Series)
 @_addRow_.register(pd.Index)
-def _(obj: typing.Union[pd.Series, pd.Index],
+def __addRow__(obj: typing.Union[pd.Series, pd.Index],
       row: typing.Union[dt.Number, str, pq.Quantity],
       in_place: bool = False) -> pd.Series | pd.Index:
     if isinstance(row, np.ndarray):
@@ -1687,7 +1689,7 @@ def _(obj: typing.Union[pd.Series, pd.Index],
 
 @_addRow_.register(np.ndarray)
 @_addRow_.register(pq.Quantity)
-def _(obj: typing.Union[pq.Quantity, np.ndarray],
+def __addRow__(obj: typing.Union[pq.Quantity, np.ndarray],
       row: typing.Union[typing.Sequence[pq.Quantity], pq.Quantity],
       in_place: bool = False) -> typing.Union[pq.Quantity, np.ndarray]:
 
@@ -1727,7 +1729,7 @@ def _(obj: typing.Union[pq.Quantity, np.ndarray],
 
 @_addRow_.register(neo.IrregularlySampledSignal)
 @_addRow_.register(IrregularlySampledDataSignal)
-def _(obj: typing.Union[neo.IrregularlySampledSignal,
+def __addRow__(obj: typing.Union[neo.IrregularlySampledSignal,
                         IrregularlySampledDataSignal],
       row: typing.Union[neo.IrregularlySampledSignal,
                         IrregularlySampledDataSignal],
@@ -1754,7 +1756,7 @@ def _(obj: typing.Union[neo.IrregularlySampledSignal,
 
 @_addRow_.register(neo.Epoch)
 @_addRow_.register(DataZone)
-def _(obj: typing.Union[neo.Epoch, DataZone],
+def __addRow__(obj: typing.Union[neo.Epoch, DataZone],
       row: typing.Union[neo.Epoch, DataZone],
       in_place:bool=False) -> typing.Union[neo.Epoch, DataZone]:
     if type(row) is not type(obj):
@@ -1797,7 +1799,7 @@ def _(obj: typing.Union[neo.Epoch, DataZone],
 @_addRow_.register(neo.Event)
 @_addRow_.register(DataMark)
 @_addRow_.register(TriggerEvent)
-def _(obj: typing.Union[neo.Event, DataMark, TriggerEvent],
+def __addRow__(obj: typing.Union[neo.Event, DataMark, TriggerEvent],
       row: typing.Union[neo.Event, DataMark, TriggerEvent],
       in_place:bool=False) -> typing.Union[neo.Event, DataMark, TriggerEvent]:
     if type(row) is not type(obj):
@@ -1841,7 +1843,7 @@ def _(obj: typing.Union[neo.Event, DataMark, TriggerEvent],
 
 @_addRow_.register(neo.AnalogSignal)
 @_addRow_.register(DataSignal)
-def _(obj: typing.Union[neo.AnalogSignal, DataSignal],
+def __addRow__(obj: typing.Union[neo.AnalogSignal, DataSignal],
       row: typing.Union[np.ndarray, pq.Quantity],
       in_place=False) -> neo.AnalogSignal | DataSignal:
     if not isinstance(row, [pq.Quantity, np.ndarray]):
@@ -1885,7 +1887,7 @@ def _(obj: typing.Union[neo.AnalogSignal, DataSignal],
 
 @_addRow_.register(neo.SpikeTrain)
 @_addRow_.register(MarkTrain)
-def _(obj: typing.Union[neo.SpikeTrain, MarkTrain],
+def __addRow__(obj: typing.Union[neo.SpikeTrain, MarkTrain],
       row: typing.Union[neo.SpikeTrain, MarkTrain], in_place = False) -> typing.Union[neo.SpikeTrain, MarkTrain]:
     if not isinstance(row, type(obj)):
         raise TypeError(f"Row expected to be a {type(obj).__name__}; instead got a {type(row).__name__}")
@@ -1935,7 +1937,7 @@ def _(obj: typing.Union[neo.SpikeTrain, MarkTrain],
                           **obj.annotations)
 
 @_addRow_.register(TriggerProtocolList)
-def _(obj: TriggerProtocolList, row: TriggerProtocol, in_place: bool = False):
+def __addRow__(obj: TriggerProtocolList, row: TriggerProtocol, in_place: bool = False):
     if not isinstance(row, TriggerProtocol):
         raise TypeError(f"Cannot add {type(row).__name__}")
 

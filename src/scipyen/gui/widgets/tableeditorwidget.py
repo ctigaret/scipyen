@@ -241,7 +241,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         # if newColumnCount != oldColumnCount:
         #     self.tableView.columnCountChanged(oldColumnCount, newColumnCount)
 
-        # NOTE: 2025-11-23 19:53:14
+        # NOTE: 2025-11-23 19:53:14 FIXME 2026-06-10 07:38:59
         # to show bool cell data as checkboxes
         for row in range(self._dataModel_.rowCount()):
             for col in range(self._dataModel_.columnCount()):
