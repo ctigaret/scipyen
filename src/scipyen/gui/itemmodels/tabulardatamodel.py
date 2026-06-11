@@ -312,8 +312,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     #### BEGIN resizable model
     #
-    def insertRows(self, row: int, count: int, parent: QtCore.QModelIndex) -> bool:
-        print(f"{self.__class__.__name__}.insertRows: row {row}, count {count}, parent {parent}")
+    def insertRow(self, row: int, row_value: object, parent: QtCore.QModelIndex) -> bool:
+        # print(f"{self.__class__.__name__}.insertRows: row {row}, count {count}, parent {parent}")
         # # if self._modelData_ is None:
         # #     return False
         if not datatypes.is_iterable(self._modelData_):
@@ -322,44 +322,54 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         if row < 0 or row > len(self._modelData_):
             return False
 
-        self.beginInsertRows(parent, row, count)
-        for i in range(count):
-            ret = self.__addDataRow__(self._modelData_, None)
-            # self._modelData_.insert(row, None)
-        self.endInsertRows()
+        self.beginInsertRows(parent, row, row)
+        try:
+            print(f"{self._modelData_} is {type(self._modelData_).__name__}")
+            self.__addDataRow__(self._modelData_, row_value)
+        except: # noqa
+            traceback.print_exc()
+        finally:
+            self.endInsertRows()
 
-        return ret
+        self.populateModel(self._modelData_)
+        return True
 
-    def addRow(self, data):
+    def addRow(self, data: typing.Optional[object] = None):
         if self._modelData_ is None:
             return
 
-        self.insertRows(self.rowCount(), 1, QtCore.QModelIndex())
-        # self._addDataRow_(self._modelData_, data)
-        # pass
-    #
+        self.insertRow(self.rowCount(), data, QtCore.QModelIndex())
+
+
     @singledispatchmethod
-    def _addDataRow_(self, mdata, obj):
+    def _addDataRow_(self, mdata, obj) -> bool:
         raise NotImplementedError(f"{type(mdata).__name__}")
 
     @_addDataRow_.register(pd.DataFrame)
     def __addDataRow__(self, mdata: pd.DataFrame,
-                       obj: typing.Optional[pd.DataFrame] = None):
-        δndx = mdata.index[-1] - mdata.index[-2]
+                       obj: typing.Optional[pd.DataFrame] = None) -> bool:
 
-        self.beginInsertRows(QtCore.QModelIndex(), self.rowCount(), self.rowCount()+1) # no good; should use beginResetModel/endResetModel
-        # self.beginResetModel()
+        if mdata.index.dtype.type in (float, int, complex, np.floating, np.floatingcomplex, np.integer):
+            δndx = mdata.index[-1] - mdata.index[-2]
+            newIndex = pd.Index([mdata.index[-1] + δndx], name = mdata.index.name)
+        else:
+            newIndex = pd.Index([f"row {mdata.index.size()+1}"], name = mdata.index.name)
 
         if obj is None:
-            obj = pd.DataFrame(dict(zip(mdata.columns, tuple((pd.NA, )) * mdata.shape[1])), index = [mdata.index[-1] + δndx])
+            obj = pd.DataFrame(dict(zip(mdata.columns, tuple((pd.NA, )) * mdata.shape[1])), index = newIndex)
 
         elif isinstance(obj, typing.Sequence):
-            obj = pd.DataFrame(dict(zip(mdata.columns, obj)), index = [mdata.index[-1] + δndx])
+            obj = pd.DataFrame(dict(zip(mdata.columns, obj)), index = newIndex)
 
-        if self.insertRows(self.rowCount(), 1, QtCore.QModelIndex()):
-            self._modelData_ = pd.concat((mdata, obj))
-        self.endInsertRows()
-        # self.endResetModel()
+        print(f"{self.__class__.__name__}.__addDataRow__ -> {obj}")
+
+        self._modelData_ = pd.concat((mdata, obj))
+        self._modelDataRows_ = self._modelData_.shape[0]
+        self._original_data_ = self._modelData_
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        return True
 
     @_addDataRow_.register(ephys.SynapticPathwayList)
     def __addDataRow__(self, mdata: ephys.SynapticPathwayList, # noqa
@@ -370,9 +380,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         if not isinstance(obj, ephys.SynapticPathway):
             return False
 
-        print(f"{self.__class__.__name__}.__addDataRow__: obj = {obj}")
+        # print(f"{self.__class__.__name__}.__addDataRow__: obj = {obj}")
 
         self._modelData_.append(obj)
+        self._modelDataRows_ = len(self._modelData_)
+        self._original_data_ = self._modelData_
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
 
         return True
 
@@ -1009,7 +1023,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataColumnHeaders_ = dict()
 
     @_makeModelData_.register(pd.DataFrame)
-    def __makeModelData__(self, data: pd.DataFrame):
+    def __makeModelData__(self, data: pd.DataFrame): # noqa
         self._modelData_ = data
         self._modelDataRows_ = data.shape[0]
         self._modelDataColumns_ = data.shape[1]
@@ -1029,7 +1043,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._canAddRemoveRows_ = True
 
     @_makeModelData_.register(pd.Series)
-    def __makeModelData__(self, data: pd.Series):
+    def __makeModelData__(self, data: pd.Series): # noqa
         self._modelData_ = data
         self._modelDataRows_ = data.shape[0]
         self._modelDataColumns_ = 1
@@ -1038,7 +1052,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._canAddRemoveColumns_ = False
 
     @_makeModelData_.register(pd.Index)
-    def __makeModelData__(self, data: pd.Index):
+    def __makeModelData__(self, data: pd.Index): # noqa
         self._modelData_ = data
         self._modelDataRows_ = data.shape[0]
         self._modelDataColumns_ = 1
@@ -1048,7 +1062,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     @_makeModelData_.register(vigra.filters.Kernel1D)
     @_makeModelData_.register(vigra.filters.Kernel2D)
-    def __makeModelData__(self, data: vigra.filters.Kernel1D | vigra.filters.Kernel2D):
+    def __makeModelData__(self, data: vigra.filters.Kernel1D | vigra.filters.Kernel2D): # noqa
         self._modelData_ = vigrautils.kernel2array(data)
         self._modelDataRows_ = data.shape[0]
         self._modelDataColumns_ = 1 if isinstance(data, vigra.filters.Kernel1D) else 2
@@ -1059,7 +1073,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._canAddRemoveColumns_ = False
 
     @_makeModelData_.register(TriggerProtocolList)
-    def __makeModelData__(self, data: TriggerProtocolList):
+    def __makeModelData__(self, data: TriggerProtocolList): # noqa
         self._modelData_ = data
         self._original_data_ = data
         self._modelDataRows_ = len(data)
@@ -1079,7 +1093,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
 
     @_makeModelData_.register(ephys.SynapticPathwayList)
-    def __makeModelData__(self, data: ephys.SynapticPathwayList):
+    def __makeModelData__(self, data: ephys.SynapticPathwayList): # noqa
         self._modelData_ = data
         self._original_data_ = data
         self._modelDataRows_ = len(data)
@@ -1102,7 +1116,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
 
     @_makeModelData_.register(ephys.AuxiliaryInputList)
-    def __makeModelData__(self, data: ephys.AuxiliaryInputList):
+    def __makeModelData__(self, data: ephys.AuxiliaryInputList): # noqa
         self._modelData_ = data
         self._original_data_ = data
         self._modelDataRows_ = len(data)
@@ -1125,7 +1139,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
 
     @_makeModelData_.register(ephys.AuxiliaryOutputList)
-    def __makeModelData__(self, data: ephys.AuxiliaryOutputList):
+    def __makeModelData__(self, data: ephys.AuxiliaryOutputList): # noqa
         self._modelData_ = data
         self._original_data_ = data
         self._modelDataRows_ = len(data)
@@ -1145,7 +1159,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
 
     @_makeModelData_.register(ephys.SynapticStimulusChannelList)
-    def __makeModelData__(self, data: ephys.SynapticStimulusChannelList):
+    def __makeModelData__(self, data: ephys.SynapticStimulusChannelList): # noqa
         self._modelData_ = data
         self._original_data_ = data
         self._modelDataRows_ = len(data)
@@ -1165,7 +1179,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
 
     @_makeModelData_.register(np.ndarray)
-    def __makeModelData__(self, data: np.ndarray):
+    def __makeModelData__(self, data: np.ndarray): # noqa
         # trying to streamline this
         # NOTE: 2025-11-23 09:45:45 FIXME/TODO - TOO SLOW!
         # lazy display alleviates this to some degree (see self.fetchMore(…))
@@ -1324,7 +1338,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @_makeModelData_.register(list)
     @_makeModelData_.register(tuple)
     @_makeModelData_.register(deque)
-    def __makeModelData__(self, data: typing.Sequence):
+    def __makeModelData__(self, data: typing.Sequence): # noqa
         if all(isinstance(d, ephys.RecordingSource) for d in data):
             self._modelData_ = data
             self._original_data_ = data
@@ -1435,7 +1449,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         return True
 
     @_setValueInModelData_.register(pd.Series)
-    def __setValueInModelData__(self, mdata: pd.Series, pyvalue, row, col) -> bool:
+    def __setValueInModelData__(self, mdata: pd.Series, pyvalue, row, col) -> bool: # noqa
         if row >= mdata.shape[0]:
             return False
 
@@ -1443,7 +1457,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         return True
 
     @_setValueInModelData_.register(neo.dataobject.DataObject)
-    def __setValueInModelData__(self, mdata: neo.dataobject.DataObject, pyvalue, row, col) -> bool:
+    def __setValueInModelData__(self, mdata: neo.dataobject.DataObject, pyvalue, row, col) -> bool: # noqa
         if row >= mdata.shape[0]:
             return False
 
@@ -1510,7 +1524,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
 
     @_setValueInModelData_.register(np.ndarray)
-    def __setValueInModelData__(self, mdata: np.ndarray, pyvalue, row, col) -> bool:
+    def __setValueInModelData__(self, mdata: np.ndarray, pyvalue, row, col) -> bool: # noqa
         if row >= mdata.shape[0]:
             return False
         if mdata.ndim == 1:
@@ -1524,7 +1538,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         return True
 
     @_setValueInModelData_.register(TriggerProtocolList)
-    def __setValueInModelData__(self, mdata: TriggerProtocolList, pyvalue, row, col) -> bool:
+    def __setValueInModelData__(self, mdata: TriggerProtocolList, pyvalue, row, col) -> bool: # noqa
         if row >= len(mdata):
             return False
         protocol = mdata[row]
@@ -1539,7 +1553,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @_setValueInModelData_.register(ephys.AuxiliaryInputList)
     @_setValueInModelData_.register(ephys.AuxiliaryOutputList)
     @_setValueInModelData_.register(ephys.SynapticStimulusChannelList)
-    def __setValueInModelData__(self, mdata: typing.Union[
+    def __setValueInModelData__(self, mdata: typing.Union[ # noqa
                                                 ephys.SynapticPathwayList,
                                                 ephys.AuxiliaryInputList,
                                                 ephys.AuxiliaryOutputList,
@@ -1611,7 +1625,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     @_setValueInModelData_.register(list)
     @_setValueInModelData_.register(deque)
-    def __setValueInModelData__(self, mdata: list | deque, pyvalue, row, col) -> bool:
+    def __setValueInModelData__(self, mdata: list | deque, pyvalue, row, col) -> bool: # noqa
         mdata[row][col] = pyvalue
         return True
 
