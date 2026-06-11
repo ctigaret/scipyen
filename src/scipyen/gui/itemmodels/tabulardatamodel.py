@@ -61,7 +61,7 @@ import matplotlib.mlab as mlb # noqa
 
 #### BEGIN pict.core modules
 #from core.patchneo import *
-import core.datatypes
+from core import datatypes
 
 import core.utilities as utilities # noqa
 import core.strutils as strutils # noqa
@@ -312,10 +312,30 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     #### BEGIN resizable model
     #
+    def insertRows(self, row: int, count: int, parent: QtCore.QModelIndex) -> bool:
+
+        if self._modelData_ is None:
+            return False
+        if not datatypes.is_iterable(self._modelData_):
+            return False
+
+        if row < 0 or row > len(self._modelData_):
+            return False
+
+        self.beginInsertRows(parent, row, count)
+        for i in range(count):
+            ret = self.__addDataRow__(self._modelData_, None)
+            # self._modelData_.insert(row, None)
+        self.endInsertRows()
+
+        return ret
+
     def addRow(self, data):
         if self._modelData_ is None:
             return
-        self._addDataRow_(self._modelData_, data)
+
+        self.insertRows(self.rowCount(), 1, QtCore.QModelIndex())
+        # self._addDataRow_(self._modelData_, data)
         # pass
     #
     @singledispatchmethod
@@ -328,6 +348,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         δndx = mdata.index[-1] - mdata.index[-2]
 
         self.beginInsertRows(QtCore.QModelIndex(), self.rowCount(), self.rowCount()+1) # no good; should use beginResetModel/endResetModel
+        # self.beginResetModel()
 
         if obj is None:
             obj = pd.DataFrame(dict(zip(mdata.columns, tuple((pd.NA, )) * mdata.shape[1])), index = [mdata.index[-1] + δndx])
@@ -335,11 +356,25 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         elif isinstance(obj, typing.Sequence):
             obj = pd.DataFrame(dict(zip(mdata.columns, obj)), index = [mdata.index[-1] + δndx])
 
-        self.insertRows(self.rowCount(), 1, QtCore.QModelIndex())
-        self._modelData_ = pd.concat((mdata, obj))
+        if self.insertRows(self.rowCount(), 1, QtCore.QModelIndex()):
+            self._modelData_ = pd.concat((mdata, obj))
         self.endInsertRows()
+        # self.endResetModel()
 
+    @_addDataRow_.register(ephys.SynapticPathwayList)
+    def __addDataRow__(self, mdata: ephys.SynapticPathwayList, # noqa
+                       obj: typing.Optional[ephys.SynapticPathway] = None) -> bool:
+        if obj is None:
+            obj = ephys.SynapticPathway()
 
+        if not isinstance(obj, ephys.SynapticPathway):
+            return False
+
+        print(f"{self.__class__.__name__}.__addDataRow__: obj = {obj}")
+
+        self._modelData_.append(obj)
+
+        return True
 
     #### END resizable model
 

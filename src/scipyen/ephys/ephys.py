@@ -2712,8 +2712,10 @@ class SynapticPathway:
 
     """
     name: str = "pathway"
-    adc: int|None = None # physical index of the ADC channel used in recording this pathway
-    dac: int|None = None # physical index of the DAC channel used in recording this pathway
+    adc: int = 0 # physical index of the ADC channel used in recording this pathway
+    # adc: int|None = None # physical index of the ADC channel used in recording this pathway
+    dac: int = 0 # physical index of the DAC channel used in recording this pathway
+    # dac: int|None = None # physical index of the DAC channel used in recording this pathway
     stimulus: SynapticStimulusChannel = dataclasses.field(default_factory = SynapticStimulusChannel)
     # stimulus: SynapticStimulusChannelList = dataclasses.field(default_factory = SynapticStimulusChannelList)
 
