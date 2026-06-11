@@ -322,16 +322,16 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         if row < 0 or row > len(self._modelData_):
             return False
 
-        self.beginInsertRows(parent, row, row)
+        self.beginInsertRows(parent, row, row+1)
         try:
-            print(f"{self._modelData_} is {type(self._modelData_).__name__}")
-            self.__addDataRow__(self._modelData_, row_value)
+            # print(f"{self._modelData_} is {type(self._modelData_).__name__}")
+            self._addDataRow_(self._modelData_, row_value)
         except: # noqa
             traceback.print_exc()
         finally:
             self.endInsertRows()
 
-        self.populateModel(self._modelData_)
+        self.fetchMore(parent)
         return True
 
     def addRow(self, data: typing.Optional[object] = None):
@@ -343,25 +343,29 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     @singledispatchmethod
     def _addDataRow_(self, mdata, obj) -> bool:
-        raise NotImplementedError(f"{type(mdata).__name__}")
+        scipywarn(f"Cannnot add rows to {type(mdata).__name__}")
+        return False
 
     @_addDataRow_.register(pd.DataFrame)
     def __addDataRow__(self, mdata: pd.DataFrame,
                        obj: typing.Optional[pd.DataFrame] = None) -> bool:
 
-        if mdata.index.dtype.type in (float, int, complex, np.floating, np.floatingcomplex, np.integer):
+        if issubclass(mdata.index.dtype.type, (float, int, complex, np.floating, np.complexfloating, np.integer)):
             δndx = mdata.index[-1] - mdata.index[-2]
             newIndex = pd.Index([mdata.index[-1] + δndx], name = mdata.index.name)
         else:
-            newIndex = pd.Index([f"row {mdata.index.size()+1}"], name = mdata.index.name)
+            newIndex = pd.Index([f"row {mdata.index.size+1}"], name = mdata.index.name)
 
-        if obj is None:
-            obj = pd.DataFrame(dict(zip(mdata.columns, tuple((pd.NA, )) * mdata.shape[1])), index = newIndex)
+        try:
+            if obj is None:
+                obj = pd.DataFrame(dict(zip(mdata.columns, tuple((pd.NA, )) * mdata.shape[1])), index = newIndex)
 
-        elif isinstance(obj, typing.Sequence):
-            obj = pd.DataFrame(dict(zip(mdata.columns, obj)), index = newIndex)
-
-        print(f"{self.__class__.__name__}.__addDataRow__ -> {obj}")
+            elif isinstance(obj, typing.Sequence):
+                obj = pd.DataFrame(dict(zip(mdata.columns, obj)), index = newIndex)
+        except:
+            traceback.print_exc()
+            return False
+        # print(f"{self.__class__.__name__}.__addDataRow__ -> {obj}")
 
         self._modelData_ = pd.concat((mdata, obj))
         self._modelDataRows_ = self._modelData_.shape[0]
@@ -389,6 +393,97 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._canAddRemoveColumns_ = False
 
         return True
+
+    @_addDataRow_.register(ephys.AuxiliaryInputList)
+    def __addDataRow__(self, mdata: ephys.AuxiliaryInputList, # noqa
+                       obj: typing.Optional[ephys.AuxiliaryInput] = None) -> bool:
+        if obj is None:
+            obj = ephys.AuxiliaryInput()
+
+        if not isinstance(obj, ephys.AuxiliaryInput):
+            return False
+
+        # print(f"{self.__class__.__name__}.__addDataRow__: obj = {obj}")
+
+        self._modelData_.append(obj)
+        self._modelDataRows_ = len(self._modelData_)
+        self._original_data_ = self._modelData_
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        return True
+
+    @_addDataRow_.register(ephys.AuxiliaryOutputList)
+    def __addDataRow__(self, mdata: ephys.AuxiliaryOutputList, # noqa
+                       obj: typing.Optional[ephys.AuxiliaryOutput] = None) -> bool:
+        if obj is None:
+            obj = ephys.AuxiliaryOutput()
+
+        if not isinstance(obj, ephys.AuxiliaryOutput):
+            return False
+
+        # print(f"{self.__class__.__name__}.__addDataRow__: obj = {obj}")
+
+        self._modelData_.append(obj)
+        self._modelDataRows_ = len(self._modelData_)
+        self._original_data_ = self._modelData_
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        return True
+
+    @_addDataRow_.register(ephys.SynapticStimulusChannelList)
+    def __addDataRow__(self, mdata: ephys.SynapticStimulusChannelList, # noqa
+                       obj: typing.Optional[ephys.SynapticStimulusChannel] = None) -> bool:
+        if obj is None:
+            obj = ephys.SynapticStimulusChannel()
+
+        if not isinstance(obj, ephys.SynapticStimulusChannel):
+            return False
+
+        # print(f"{self.__class__.__name__}.__addDataRow__: obj = {obj}")
+
+        self._modelData_.append(obj)
+        self._modelDataRows_ = len(self._modelData_)
+        self._original_data_ = self._modelData_
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        return True
+
+    @_addDataRow_.register(list)
+    @_addDataRow_.register(deque)
+    def __addDataRow__(self, mdata: typing.Sequence, # noqa
+                       obj: typing.Optional[object] = None) -> bool:
+        if all(isinstance(o, ephys.RecordingSource) for o in mdata):
+            if obj is None:
+                    obj = ephys.RecordingSource()
+
+            if not isinstance(obj, ephys.RecordingSource):
+                scipywarn(f"A RecordingSource object was expected; instead, got a {type(obj).__name__}")
+                return False
+
+        elif all(isinstance(o, typing.Sequence) for o in mdata):
+            if isinstance(obj, typing.Sequence):
+                if len(obj) != len(mdata[-1]):
+                    scipywarn(f"Expecting a sequence of {len(mdata[-1])} objects")
+                    return False
+
+            else:
+                scipywarn(f"Expecting a sequence of {len(mdata[-1])} objects")
+                return False
+
+        # print(f"{self.__class__.__name__}.__addDataRow__: obj = {obj}")
+
+        self._modelData_.append(obj)
+        self._modelDataRows_ = len(self._modelData_)
+        self._original_data_ = self._modelData_
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        return True
+
+    # @_addDataRow_.register()
 
     #### END resizable model
 
@@ -1351,7 +1446,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 tuple(
                     map(
                         lambda x: (x[0], f"{x[1]}"),
-                        enumerate(("name", "adc", "dac", "Edit"))
+                        enumerate(("name", "adc", "dac", "electrodeMode", "Edit"))
                         )
                     )
                 )
@@ -1609,13 +1704,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     attr = "electrode"
                 elif attr == "pathwayType":
                     attr = "pathType"
-            elif isinstance(old_val, enum.Enum):
+            if isinstance(old_val, enum.Enum):
                 if isinstance(pyvalue, int):
                     params[attr] = type(old_val)(pyvalue)
                 elif isinstance(pyvalue, str):
                     params[attr] = type(old_val)[pyvalue]
-
-            params[attr] = pyvalue
+            else:
+                params[attr] = pyvalue
 
         new_obj = type(old_obj)(**params)
 
@@ -1626,7 +1721,32 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @_setValueInModelData_.register(list)
     @_setValueInModelData_.register(deque)
     def __setValueInModelData__(self, mdata: list | deque, pyvalue, row, col) -> bool: # noqa
-        mdata[row][col] = pyvalue
+        if all(isinstance(o, ephys.RecordingSource) for o in mdata):
+            old_obj = mdata[row]
+            attr = self._modelDataColumnHeaders_[col]
+            params = {
+                "name":old_obj.name, "adc":old_obj.adc,
+                "dac":old_obj.dac, "electrodeMode":old_obj.electrodeMode
+                }
+            if attr.lower() != "edit":
+                old_val = getattr(old_obj, attr)
+                print(f"'{attr}' -> {old_val} ({type(old_val)})")
+                if isinstance(old_val, enum.Enum):
+                    if isinstance(pyvalue, int):
+                        params[attr] = type(old_val)(pyvalue)
+                    elif isinstance(pyvalue, str):
+                        params[attr] = type(old_val)[pyvalue]
+                else:
+                    params[attr] = pyvalue
+            new_obj = type(old_obj)(**params)
+            mdata[row] = new_obj
+            return True
+        else:
+            try:
+                mdata[row][col] = pyvalue
+            except:
+                traceback.print_exc()
+                return False
         return True
 
     @property

@@ -152,8 +152,23 @@ NOTE: To be used with my custom itemmodels
                                                                  )
             widget.setObjectName(f"{editorName} Widget")
 
+        elif isinstance(self._data_, ephys.RecordingSource):
+            from gui.widgets import recordingsourcewidget
+            widget = recordingsourcewidget.RecordingSourceWidget(self,
+                                                                 self._data_,
+                                                                 )
+            widget.setObjectName(f"{editorName} Widget")
+
+        elif isinstance(self._data_, typing.Sequence) or datatypes.is_iterable(self._data_):
+            from gui.widgets import tableeditorwidget
+            widget = tableeditorwidget.TableEditorWidget(self)
+            widget.setObjectName(f"{editorName} Widget")
+            widget.setData(self._data_)
+
         if isinstance(widget, QtWidgets.QWidget) and hasattr(widget, "sig_valueChanged"):
             widget.sig_valueChanged.connect(self.slot_valueChanged)
+
+
 
         return widget
 
@@ -190,6 +205,9 @@ NOTE: To be used with my custom itemmodels
             oldWidget.close()
             self.setCentralWidget(self._widget_)
             self._widget_.sig_valueChanged.connect(self.slot_valueChanged)
+
+    def value(self) -> object:
+        return self._data_
 
 
 class CutFileSystemItemDelegate(QtWidgets.QStyledItemDelegate):
@@ -240,9 +258,6 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                  columnChoices: typing.Optional[dict[int,
                                                      dict[typing.Sequence,
                                                           bool]]] = None,
-                 # immutableColumns: typing.Optional[typing.Sequence[int]] = None,
-                 # immutableRows: typing.Optional[typing.Sequence[int]] = None,
-                 # jointImmutability: bool = False,
                  enforceFloat: bool = False):
         r"""Instantiates a PythonItemDelegate.
 
@@ -883,18 +898,13 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             model = self._currentModelIndex_.model()
             modelData = getattr(model, "_modelData_", None)
 
-            # print(f"\n{self.__class__.__name__}._slot_editDataExternally: -> model = {model}\n -> modelData is {type(modelData).__name__}")
-
             # CAUTION 2026-06-09 19:08:50
             # this is supposed to edit the python object represented by the
             # entire model data row!!!
             if isinstance(modelData, typing.Iterable):
-                # obj = modelData[self._currentModelIndex_.row()]
                 self._externalDataEditor_ = ExternalEditorDelegate(modelData[self._currentModelIndex_.row()])
-                # print(f"\n\t-> editor is visible: {self._externalDataEditor_.isVisible()}")
                 self._externalDataEditor_.sig_valueChanged.connect(self._slot_dataEditedExternally)
                 self._externalDataEditor_.sig_closing.connect(self._slot_externalEditorClosing)
-                # editor.show()
 
     @Slot()
     def _slot_externalEditorClosing(self):

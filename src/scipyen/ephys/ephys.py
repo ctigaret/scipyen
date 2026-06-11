@@ -1810,9 +1810,9 @@ class RecordingSource():
         if len(self.pathways):
             ret += f" with {len(self.pathways)} synaptic pathways:\n"
             if len(self.pathways) <= 5:
-                ret += ", ".join([f"{p.name}" for p in self.pathways])
+                ret += ", ".join([f"'{p.name}'" for p in self.pathways])
             else:
-                ret += ",\n".join([f"{p.name}" for p in self.pathways])
+                ret += ",\n".join([f"'{p.name}'" for p in self.pathways])
         return "".join(ret)
 
 @with_doc(Episode, use_header=True, header_str = "Inherits from:")

@@ -3,36 +3,36 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
-# WARNING: some of the packages listed below may have already been installed, or 
+# WARNING: some of the packages listed below may have already been installed, or
 # are available from your Linux distribution. Therefore by installing them INSIDE
 # the virtual environment they will overshadow the packages in the system-wide
-# site-packages directory. This has consequences ONLY IF the virtual environment 
+# site-packages directory. This has consequences ONLY IF the virtual environment
 # was created with the --system-site-packages option .
 #
 # ATTENTION: ONLY USE THIS FILE INSIDE A VIRTUAL PYTHON ENVIRONMENT (see INSTALL
 # for details).
 #
-# You may manually check this list against the python packages installed on 
+# You may manually check this list against the python packages installed on
 # your machine (either locally as "user", see $HOME/local/lib/pythonX.Y/site-packages,
 # or system-wide, see /usr/lib64/PythonX.Y.site-packages) and comment out, below,
-# the ones already installed on your system. Otherwise, the packages installed 
+# the ones already installed on your system. Otherwise, the packages installed
 # here will take precedence over those available.
 #
 #
 # NOTE: Not all packages here are used/needed by Scipyen in its current version
 # (some are installed for experimentation, e.g. the extra jupyter kernel packages,
-# and others). 
+# and others).
 
 
 
 # NOTE as of 2021-10-12 11:59:52 might have to compile from source if using Python >= 3.9.7
-# also see nrn/docs/docs_requirements.txt, reproduced below after excluding 
+# also see nrn/docs/docs_requirements.txt, reproduced below after excluding
 # linguistics
 # packages already listed above
 #
 # ALSO NOTE that linguistics only supports python up to ~ 3.6 or so (see Pypi)
 # because one of its dependencies (slytherin); importing slytherin or any package
-# that imports slytherin will raise an error on Pyton >= 3.11 
+# that imports slytherin will raise an error on Pyton >= 3.11
 
 # CHANGELOG
 # 2024-05-02 08:45:19
@@ -49,6 +49,11 @@ pyqtdarktheme
 PyWavelets
 # QtPy # already insatlled by jupyter
 SecretStorage
+scipy #<1.16.0
+scikit-image
+scikit-learn
+scikit-guess
+scikit-bio
 airspeed
 anyio
 asttokens
@@ -152,12 +157,12 @@ neuromllite
 nibabel
 nixio
 nodejs
-nose            
+nose
 notebook
 notebook_shim
 nuitka
 numba>=0.60.0 # needed to get llvmlite and brainglobe installed un environemnts using python 3.13.3
-numpy           
+numpy
 octave_kernel
 pint
 pandas
@@ -205,18 +210,14 @@ requests-toolbelt
 researchpy
 restructuredtext_lint
 # # # rst2html5
-scikit-image
-scikit-learn
-scikit-guess
 opencv-contrib-python
-scipy<1.16.0
 seaborn
 shapely
 scscp
 smart-open
 smmap
 sniffio
-sphinx          
+sphinx
 sphinx_rtd_theme
 srsly
 stack-data
@@ -259,11 +260,10 @@ allensdk
 pynwb
 swick
 ### NOTE: thiese below will also install:
-### brainglobe-atlasapi, brainglobe-space, brainglobe-utils, 
+### brainglobe-atlasapi, brainglobe-space, brainglobe-utils,
 brainglobe-workflows
 napari[all]
 brainglobe
-brainrender 
+brainrender
 brainglobe-segmentation
-scikit-bio
 fenics

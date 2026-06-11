@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>399</width>
-    <height>46</height>
+    <width>279</width>
+    <height>122</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -15,39 +15,47 @@
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="0" column="0">
-    <layout class="QHBoxLayout" name="horizontalLayout">
+    <layout class="QVBoxLayout" name="verticalLayout">
      <item>
-      <widget class="QLabel" name="label">
-       <property name="text">
-        <string>Name:</string>
-       </property>
-       <property name="buddy">
-        <cstring>nameLineEdit</cstring>
-       </property>
-      </widget>
+      <layout class="QHBoxLayout" name="horizontalLayout_2">
+       <item>
+        <widget class="QLabel" name="label">
+         <property name="text">
+          <string>Name:</string>
+         </property>
+         <property name="buddy">
+          <cstring>nameLineEdit</cstring>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLineEdit" name="nameLineEdit"/>
+       </item>
+      </layout>
      </item>
      <item>
-      <widget class="QLineEdit" name="nameLineEdit"/>
-     </item>
-     <item>
-      <widget class="QLabel" name="label_2">
-       <property name="text">
-        <string>Channel:</string>
-       </property>
-       <property name="buddy">
-        <cstring>outputChannelSpinBox</cstring>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QSpinBox" name="outputChannelSpinBox"/>
-     </item>
-     <item>
-      <widget class="QCheckBox" name="isDigitalCheckBox">
-       <property name="text">
-        <string>Digital</string>
-       </property>
-      </widget>
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <item>
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>Channel:</string>
+         </property>
+         <property name="buddy">
+          <cstring>outputChannelSpinBox</cstring>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QSpinBox" name="outputChannelSpinBox"/>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="isDigitalCheckBox">
+         <property name="text">
+          <string>Digital</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </item>
      <item>
       <widget class="QPushButton" name="createStimulusPushButton">
