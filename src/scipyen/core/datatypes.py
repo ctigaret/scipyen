@@ -383,6 +383,9 @@ with more than one dimensions and all but one axes are singleton axes.
     else:
         return False
 
+def is_iterable(x):
+    return hasattr(x, "__iter__")
+
 def is_scalar(x):
     r"""Checks if ``x`` is a numeric scalar or a numpy array with one element"""
     import numpy as np

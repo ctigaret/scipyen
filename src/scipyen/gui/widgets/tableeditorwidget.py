@@ -157,6 +157,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 
         self._defaultItemDelegate_ = self.tableView.itemDelegate()
         self._editItemDelegate_ = PythonItemDelegate(parent=self, enforceFloat = self._enforceFloat_)
+        # self._editItemDelegate_.sig_contentsChanged.connect(self._slot_sendToExternalEditor) # BUG 2026-06-11 10:39:02 FIXME
 
         # NOTE: 2021-08-16 17:22:20
         # By default, this is defined in the .ui file as:
@@ -462,10 +463,12 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self.setEditableToolButton.setChecked(False)
             self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-locked"))
             self.setEditableToolButton.setToolTip("Editing disabled; toggle to enable")
+
         else:
             self.setEditableToolButton.setChecked(True)
             self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-unlocked"))
             self.setEditableToolButton.setToolTip("Editing enabled; toggle to disable")
+
         self.setEditableToolButton.toggled.connect(self._slot_setEditable)
 
     @Slot(bool)
@@ -636,6 +639,38 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                 ret = sep.join(ret)
 
         return ret
+
+    @Slot()
+    def _slot_sendToExternalEditor(self):
+        # NOTE: 2026-06-11 09:51:56
+        # this is to update the external editor when parts of the row have changed
+        # BUG 2026-06-11 10:39:20 FIXME
+        from core import datatypes
+        if self._readOnly_:
+            return
+
+        model = self.tableView.model()
+
+        if (
+            # hasattr(model, "_modelData_") and datatypes.is_iterable(model._modelData_)
+            hasattr(self._editItemDelegate_, "_currentModelIndex_")
+            and isinstance(self._editItemDelegate_._currentModelIndex_, QtCore.QModelIndex)
+            and hasattr(self._editItemDelegate_, "_externalDataEditor_")
+            and isinstance(self._editItemDelegate_._externalDataEditor_, QtWidgets.QWidget)
+            and hasattr(self._editItemDelegate_._externalDataEditor_, "setValue")
+            ):
+
+            # print(f"{self.__class__.__name__}._slot_sendToExternalEditor: self._currentModelIndex_ = {self._currentModelIndex_}, self._externalDataEditor_: {self._externalDataEditor_}")
+            model = self._editItemDelegate_._currentModelIndex_.model()
+            # print(f"\t-> had _modelData_: {hasattr(model, '_modelData_')}, is iterable({datatypes.is_iterable(model._modelData_)})")
+            if (
+                hasattr(model, "_modelData_")
+                and datatypes.is_iterable(model._modelData_)
+                ):
+                row = self._editItemDelegate_._currentModelIndex_.row()
+                # print(model._modelData_[row])
+                self._editItemDelegate_._externalDataEditor_.setValue(model._modelData_[row])
+
 
     @Slot(int,int,int)
     def _slot_rowsPopulated(self, start:int, fetched:int, total:int):

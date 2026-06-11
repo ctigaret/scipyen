@@ -175,6 +175,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self._make_value_()
         else:
             self._data_.name = val
+
         self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
@@ -184,6 +185,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self._make_value_()
         else:
             self._data_.adc = self._adc_
+
         self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
@@ -193,6 +195,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self._make_value_()
         else:
             self._data_.dac = self._dac_
+
         self.sig_valueChanged.emit(self.value())
 
     @Slot(str)
@@ -271,7 +274,9 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
         # print(f"\t=>{self._data_}")
 
     def setValue(self, val: typing.Optional[ephys.SynapticPathway] = None):
+        print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
         if isinstance(val, ephys.SynapticPathway):
+            self._data_ = val
             self._name_ = self._data_.name
             self._adc_ = self._data_.adc
             self._dac_ = self._data_.dac
@@ -280,7 +285,6 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self._pathType_ = self._data_.pathwayType
             self._schedule_ = self._data_.schedule
             self._measurements_ = self._data_.measurements
-            self._data_ = val
 
             sigBlock = list(map(
                                 lambda w: QtCore.QSignalBlocker(w),

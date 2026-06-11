@@ -290,6 +290,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         self._currentData_:typing.Optional[typing.Any] = None
         self._externalDataEditor_: typing.Optional[QtWidgets.QWidget] = None
+        # self.sig_contentsChanged.connect(self._slot_sendToExternalEditor)
 
     def _checkColumnChoiceDict_(self, d:dict) -> bool:
         if not isinstance(d, dict):
@@ -519,6 +520,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             widget = smw.GenericInputWidget(parent)
             if not inModel:
                 widget.setValue(data)
+
             widget.sig_valueChanged.connect(self.slot_dataChanged)
 
         elif isinstance(data, (datetime.datetime, datetime.date, datetime.time)):
@@ -530,6 +532,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 widget = QtWidgets.QDateTimeEdit(qDateTime, parent)
                 if not inModel:
                     widget.setDateTime(qDateTime)
+
                 widget.dateTimeChanged.connect(self.slot_dataChanged)
 
             elif isinstance(data, datetime.date):
@@ -537,6 +540,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 widget = QtWidgets.QDateEdit(qDate, parent)
                 if not inModel:
                     widget.setDate(qDate)
+
                 widget.dateChanged.connect(self.slot_dataChanged)
 
             else:
@@ -546,6 +550,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
                 if not inModel:
                     widget.setTime(qTime)
+
                 widget.timeChanged.connect(self.slot_dataChanged)
 
         elif isinstance(data, (int, float, np.floating, np.integer)):
@@ -591,8 +596,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     # widget.setSingleStep(1)
                     if not inModel:
                         widget.setValue(data)
+
                     widget.valueChanged.connect(self.slot_valueChanged)
-                    # widget.sig_valueChanged.connect(self.slot_valueChanged)
 
                 else:
                     if isinstance(data, (int, np.integer)):
@@ -601,6 +606,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                         widget.setMaximum(9999)
                         if not inModel:
                             widget.setValue(data)
+
                         widget.valueChanged.connect(self.slot_valueChanged)
 
                     elif isinstance(data, (float, np.floating)):
@@ -611,6 +617,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                         # widget.setSingleStep(1)
                         if not inModel:
                             widget.setValue(data)
+
                         widget.valueChanged.connect(self.slot_valueChanged)
                         # widget.sig_valueChanged.connect(self.slot_valueChanged)
 
@@ -619,6 +626,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             # widget.setValue(data)
             if not inModel:
                 widget.setValue(data)
+
             widget.sig_valueChanged.connect(self.slot_valueChanged)
             # TODO: 2026-02-03 09:31:21
             # set up other properties as well...
@@ -630,12 +638,14 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 # widget.setValue(data)
                 if not inModel:
                     widget.setValue(data)
+
                 widget.unitChanged.connect(self.slot_valueChanged)
             else:
                 if isinstance(data, neo.Event):
                     widget = neow.SimpleTriggerEventWidget(parent, data)
                     if not inModel:
                         widget.setValue(data)
+
                     widget.sig_valueChanged.connect(self.slot_valueChanged)
                 else:
                     isComplex = issubclass(data.dtype.type, np.complexfloating)
@@ -654,11 +664,13 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                             widget.setValue(data)
 
                         widget.sig_valueChanged.connect(self.slot_valueChanged)
+
                     else:
                         widget = TableEditorWidget(parent, readOnly=False)
                         # widget.setData(data)
                         if not inModel:
                             widget.setData(data)
+
                         widget.sig_dataChanged.connect(self.slot_dataChanged)
 
         elif isinstance(data, np.ndarray):
@@ -672,19 +684,23 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                         widget.disableUnitChange = True
                         if not inModel:
                             widget.setValue(data)
+
                         widget.sig_valueChanged.connect(self.slot_valueChanged)
+
                     else:
                         widget = QtWidgets.QDoubleSpinBox(parent, data)
                         widget.setMinimum(-math.inf)
                         widget.setMaximum(math.inf)
                         if not inModel:
                             widget.setValue(data)
+
                         widget.valueChanged.connect(self.slot_valueChanged)
 
                 elif issubclass(data.dtype.type, np.complexfloating):
                     widget = smw.ComplexSpinBox(parent, data)
                     if not inModel:
                         widget.setValue(data)
+
                     widget.sig_valueChanged.connect(self.slot_valueChanged)
 
                 elif issubclass(data.dtype.type, np.integer):
@@ -693,6 +709,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     widget.setMaximum(9999)
                     if not inModel:
                         widget.setValue(data)
+
                     widget.valueChanged.connect(self.slot_valueChanged)
 
                 elif issubclass(data.dtype.type, np.character):
@@ -704,6 +721,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     if not inModel:
                         widget.setValue(data)
                         # widget.setText(data)
+
                     widget.sig_enterPressed.connect(self.slot_dataChanged)
 
             else:
@@ -719,6 +737,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             widget.setData(data)
             if not inModel:
                 widget.setData(data)
+
             widget.sig_dataChanged.connect(self.slot_dataChanged)
 
         elif isinstance(data, pathlib.Path):
@@ -782,7 +801,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 widget.setPlainText(txt)
                 if isinstance(data, str):
                     widget.setReadOnly(False)
+
                     widget.textChanged.connect(self.slot_dataChanged)
+
                 else:
                     widget.setReadOnly(True)
 
@@ -798,7 +819,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     # widget.setValue(data)
                     if not inModel:
                         widget.setValue(data)
+
                     widget.sig_enterPressed.connect(self.slot_dataChanged)
+
                 else:
                     return
 
@@ -806,6 +829,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             widget = TableEditorWidget(parent, readOnly=False)
             if not inModel:
                 widget.setData(data)
+
             widget.sig_dataChanged.connect(self.slot_dataChanged)
 
         else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
@@ -815,6 +839,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             widget.setFrame(False)
         widget.setAutoFillBackground(True)
         widget.setObjectName(f"{type(widget).__name__}_delegate")
+
 
         return widget
 
@@ -864,8 +889,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             # this is supposed to edit the python object represented by the
             # entire model data row!!!
             if isinstance(modelData, typing.Iterable):
-                obj = modelData[self._currentModelIndex_.row()]
-                self._externalDataEditor_ = ExternalEditorDelegate(obj)
+                # obj = modelData[self._currentModelIndex_.row()]
+                self._externalDataEditor_ = ExternalEditorDelegate(modelData[self._currentModelIndex_.row()])
                 # print(f"\n\t-> editor is visible: {self._externalDataEditor_.isVisible()}")
                 self._externalDataEditor_.sig_valueChanged.connect(self._slot_dataEditedExternally)
                 self._externalDataEditor_.sig_closing.connect(self._slot_externalEditorClosing)
@@ -901,15 +926,23 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         # o = self.sender().getValue()
         # self._currentData_ = o
         self.sig_dataChanged.emit(self.sender())
+        self.sig_contentsChanged.emit()
 
     @Slot(object)
     @Slot(int)
     @Slot(float)
+    @Slot(complex)
+    @Slot(str)
+    @Slot(np.floating)
+    @Slot(np.complexfloating)
+    @Slot(np.character)
+    @Slot(bool)
     def slot_valueChanged(self, o:object):
         # print(f"{self.__class__.__name__}.slot_dataChanged({o})")
         # o = self.sender().getValue()
         # self._currentData_ = o
         self.sig_dataChanged.emit(self.sender())
+        self.sig_contentsChanged.emit()
 
     def createEditor(self, parent:QtWidgets.QWidget, option:int,
                      index:QtCore.QModelIndex) -> QtWidgets.QWidget | None:
@@ -965,7 +998,6 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         #
         model = index.model()
 
-        # print(f"{self.__class__.__name__}.createEditor:\n\t data type: {type(data).__name__}")
         if isinstance(getattr(model, "immutability", None), dict):
             # print(f"{self.__class__.__name__}.createEditor for column {index.column()} and row {index.row()}")
             immutableColumns = model.immutability.get("columns", list())
