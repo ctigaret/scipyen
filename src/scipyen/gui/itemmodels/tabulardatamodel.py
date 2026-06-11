@@ -313,9 +313,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     #### BEGIN resizable model
     #
     def insertRows(self, row: int, count: int, parent: QtCore.QModelIndex) -> bool:
-
-        if self._modelData_ is None:
-            return False
+        print(f"{self.__class__.__name__}.insertRows: row {row}, count {count}, parent {parent}")
+        # # if self._modelData_ is None:
+        # #     return False
         if not datatypes.is_iterable(self._modelData_):
             return False
 
