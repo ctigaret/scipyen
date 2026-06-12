@@ -117,6 +117,8 @@ class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, QWidget):
         self.outputChannelSpinBox.setWhatsThis("Output channel index")
         self.outputChannelSpinBox.setStatusTip("Output channel index")
         self.outputChannelSpinBox.setMinimum(0)
+        if isinstance(self._channel_, int) and self._channel_ >= 0:
+            self.outputChannelSpinBox.setValue(self._channel_)
         self.outputChannelSpinBox.valueChanged.connect(self._slot_outputChannelChanged)
 
         self.isDigitalCheckBox.setToolTip("Is digital channel")
@@ -126,13 +128,14 @@ class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, QWidget):
             self.isDigitalCheckBox.setChecked(self._digital_ is True)
         self.isDigitalCheckBox.toggled.connect(self._slot_isDigitalChanged)
 
-        self.createStimulusPushButton.setText("")
-        self.createStimulusPushButton.setIcon(guiutils.getIcon("list-add"))
-        self.createStimulusPushButton.setToolTip("Create Stimulus")
-        self.createStimulusPushButton.setWhatsThis("Create Stimulus")
-        self.createStimulusPushButton.setStatusTip("Create Stimulus")
+        self.createObjectPushButton.setText("")
+        self.createObjectPushButton.setIcon(guiutils.getIcon("list-add"))
+        self.createObjectPushButton.setToolTip("Create Stimulus")
+        self.createObjectPushButton.setWhatsThis("Create Stimulus")
+        self.createObjectPushButton.setStatusTip("Create Stimulus")
 
-        self.createStimulusPushButton.clicked.connect(self._slot_new)
+        self.createObjectPushButton.clicked.connect(self._slot_new)
+        self.createObjectPushButton.setEnabled(self._data_ is None)
 
     @Slot(str)
     def _slot_nameChanged(self, val:str):
@@ -166,6 +169,7 @@ class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, QWidget):
             ):
             self._data_ = SynapticStimulusChannel(self._name_, self._channel_, self._digital_)
             # print(f"{self.__class__.__name__}[{self.objectName()}]._make_value() -> {self._data_}")
+        self.createObjectPushButton.setEnabled(self._data_ is None)
 
     def setValue(self, val:typing.Optional[SynapticStimulusChannel] = None):
         if isinstance(val, SynapticStimulusChannel):

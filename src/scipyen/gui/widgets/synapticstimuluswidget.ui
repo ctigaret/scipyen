@@ -58,7 +58,7 @@
       </layout>
      </item>
      <item>
-      <widget class="QPushButton" name="createStimulusPushButton">
+      <widget class="QPushButton" name="createObjectPushButton">
        <property name="text">
         <string>New</string>
        </property>

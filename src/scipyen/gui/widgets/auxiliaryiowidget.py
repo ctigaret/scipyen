@@ -113,6 +113,8 @@ class AuxiliaryInputWidget(Ui_AuxiliaryInputWidget, QWidgetIn):
         self.channelSpinBox.setWhatsThis("Input channel index")
         self.channelSpinBox.setStatusTip("Input channel index")
         self.channelSpinBox.setMinimum(0)
+        if isinstance(self._channel_, int) and self._channel_ >= 0:
+            self.channelSpinBox.setValue(self._channel_)
         self.channelSpinBox.valueChanged.connect(self._slot_outputChannelChanged)
 
         self.isCommandCheckBox.setToolTip("Is proxy for a clamping command, TTL or any other waveform")
@@ -134,6 +136,7 @@ class AuxiliaryInputWidget(Ui_AuxiliaryInputWidget, QWidgetIn):
         self.createObjectPushButton.setStatusTip("Create Auxiliary Input")
 
         self.createObjectPushButton.clicked.connect(self._slot_new)
+        self.createObjectPushButton.setEnabled(self._data_ is None)
 
     @Slot(str)
     def _slot_nameChanged(self, val:str):
@@ -178,6 +181,7 @@ class AuxiliaryInputWidget(Ui_AuxiliaryInputWidget, QWidgetIn):
             isinstance(self._command_, Tribool)
             ):
             self._data_ = AuxiliaryInput(self._name_, self._channel_, self._command_)
+        self.createObjectPushButton.setEnabled(self._data_ is None)
 
     def setValue(self, val:typing.Optional[AuxiliaryInput] = None):
         if isinstance(val, AuxiliaryInput):
@@ -251,6 +255,8 @@ class AuxiliaryOutputWidget(Ui_AuxiliaryOutputWidget, QWidgetOut):
         self.channelSpinBox.setWhatsThis("Output channel index")
         self.channelSpinBox.setStatusTip("Output channel index")
         self.channelSpinBox.setMinimum(0)
+        if isinstance(self._channel_, int) and self._channel_ >= 0:
+            self.channelSpinBox.setValue(self._channel_)
         self.channelSpinBox.valueChanged.connect(self._slot_outputChannelChanged)
 
         self.isDigTTLCheckBox.setToolTip("Sends or emulates TTL or any other commands")
@@ -272,6 +278,7 @@ class AuxiliaryOutputWidget(Ui_AuxiliaryOutputWidget, QWidgetOut):
         self.createObjectPushButton.setStatusTip("Create Auxiliary Output")
 
         self.createObjectPushButton.clicked.connect(self._slot_new)
+        self.createObjectPushButton.setEnabled(self._data_ is None)
 
     @Slot(str)
     def _slot_nameChanged(self, val:str):
@@ -316,6 +323,7 @@ class AuxiliaryOutputWidget(Ui_AuxiliaryOutputWidget, QWidgetOut):
             isinstance(self._command_, Tribool)
             ):
             self._data_ = AuxiliaryOutput(self._name_, self._channel_, self._command_)
+        self.createObjectPushButton.setEnabled(self._data_ is None)
 
     def setValue(self, val:typing.Optional[AuxiliaryOutput] = None):
         if isinstance(val, AuxiliaryOutput):

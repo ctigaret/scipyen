@@ -126,18 +126,20 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self.nameLineEdit.setText(self._name_)
         self.nameLineEdit.textChanged.connect(self._slot_nameChanged)
 
-        self.adcSpinBox.setValue(self._adc_)
         self.adcSpinBox.setToolTip("Input channel index")
         self.adcSpinBox.setWhatsThis("Input channel index")
         self.adcSpinBox.setStatusTip("Input channel index")
         self.adcSpinBox.setMinimum(0)
+        if isinstance(self._adc_, int) and self._adc_ >= 0:
+            self.adcSpinBox.setValue(self._adc_)
         self.adcSpinBox.valueChanged.connect(self._slot_adcChanged)
 
-        self.dacSpinBox.setValue(self._dac_)
         self.dacSpinBox.setToolTip("Input channel index")
         self.dacSpinBox.setWhatsThis("Input channel index")
         self.dacSpinBox.setStatusTip("Input channel index")
         self.dacSpinBox.setMinimum(0)
+        if isinstance(self._dac_, int) and self._dac_ >= 0 :
+            self.dacSpinBox.setValue(self._dac_)
         self.dacSpinBox.valueChanged.connect(self._slot_dacChanged)
 
         for text in self._electrodeModeNames_:
@@ -167,6 +169,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
         self.createObjectPushButton.setStatusTip("Create Synaptic Pathway")
 
         self.createObjectPushButton.clicked.connect(self._slot_new)
+        self.createObjectPushButton.setEnabled(self._data_ is None)
 
     @Slot(str)
     def _slot_nameChanged(self, val:str):
@@ -247,6 +250,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
                                       self._stimulus_, self._electrode_,
                                       self._pathType_, self._schedule_,
                                       self._measurements_)
+        self.createObjectPushButton.setEnabled(self._data_ is None)
 
     @Slot()
     def _slot_editStimulus(self):
@@ -274,7 +278,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
         # print(f"\t=>{self._data_}")
 
     def setValue(self, val: typing.Optional[ephys.SynapticPathway] = None):
-        print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
+        # print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
         if isinstance(val, ephys.SynapticPathway):
             self._data_ = val
             self._name_ = self._data_.name
