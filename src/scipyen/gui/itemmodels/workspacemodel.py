@@ -164,7 +164,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         self.internalVariablesMonitor = DataBag(allow_none=True, mutable_types=True,
                                                 __parent__ = self)
         self.internalVariablesMonitor.verbose = True
-        # self.internalVariablesMonitor.observe(self.internalVariablesListenerCB)
 
         # NOTE: 2021-01-28 17:47:36 TODO to complete observables here
         # management of workspaces in external kernels
@@ -891,10 +890,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         r"""Callback for notifications from the workspace monitor (a trait notifier).
         Emits self.internalVariableChanged signal
         """
-        # self.__change_dict__ = change
-        # QtCore.QTimer.singleShot(0, self._observe_wrapper_)
-        # connected to self._slot_internalVariableChanged_, def'ed below
-        # print(f"{print_styled(f'\n{self.__class__.__name__}.internalVariablesListenerCB({change})', color='green')}")
         if change.type not in ("remove", "removed"):
             if change.name not in self.shell.user_ns:
                 change.type = "remove"
@@ -923,49 +918,24 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         if change_type == "new":
             self.__changes__[name] = WorkspaceVarChange.New
+
         elif change_type in ("remove", "removed"):
             self.__changes__[name] = WorkspaceVarChange.Removed
+
         elif change_type == "modified":
             self.__changes__[name] = WorkspaceVarChange.Modified
-        else:   # for legacy (traitlets.TraitType-style) notifications
-                # that lack 'change_type' attribute
+
+        else:
+            # for legacy (traitlets.TraitType-style) notifications
+            # that lack 'change_type' attribute
             if name not in self.shell.user_ns:
                 self.__changes__[name] = WorkspaceVarChange.New
             else:
                 self.__changes__[name] = WorkspaceVarChange.Modified
 
-        # print(f"\n{self.__class__.__name__}._slot_cacheInternalVariableChange_ self.__changes__ = {self.__changes__} and {name} is in workspace: {name in self.shell.user_ns}")
-
-#     def _updateFromMonitor_(self, name: str,
-#                             displayed_var_names: set, user_shell_var_names: set,
-#                             change_type:str):
-#
-#         if change_type in ("remove", "removed"):
-#             alteration = WorkspaceVarChange.Removed
-#         elif change_type == "new": # name in user_shell_var_names:
-#             alteration = WorkspaceVarChange.New
-#         elif change_type == "modified":
-#             alteration = WorkspaceVarChange.Modified
-#         else:   # for legacy (traitlets.TraitType-style) notifications
-#                 # lacking a 'change_type' attribute
-#             if name in user_shell_var_names:
-#                 if name not in displayed_var_names:
-#                     alteration = WorkspaceVarChange.New
-#                 else:
-#                     alteration = WorkspaceVarChange.Modified
-#             else:
-#                 if name in displayed_var_names:
-#                     alteration = WorkspaceVarChange.Removed
-#
-#                 else:
-#                     alteration = None
-#
-#         return (name, alteration)
-
     @Slot(tuple)
     def _slot_updateModelFromMonitor_(self, value):
         name, alteration = value
-        # print(f"\n{self.__class__.__name__}._slot_updateModelFromMonitor_ {name} {alteration.name}")
         if isinstance(alteration, WorkspaceVarChange):
             # calls a callback to affect the model ⇒ the viewer UI
             self._varChanges_callbacks_[alteration](name)
@@ -1158,15 +1128,14 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
     def preRunCell(self, info):
         r"""Use this function EXCLUSIVELY for debugging"""
-        # print(f"\n{self.__class__.__name__}.preRunCell info = {info}")
         pass
 
-    def postRunCell(self, result:Bunch):
-        # print(f"{print_styled(f'\n{self.__class__.__name__}.postRunCell result = {result}', color='green')}")
+    def postRunCell(self, result: Bunch):
         if hasattr(result, "result"):
             # NOTE: 2023-06-06 12:56:44
             # this is bound to the symbol "_" in the internal namespace, by IPython
             self.lastExecutionResult = result.result
+
         else:
             self.lastExecutionResult = None
 
@@ -1208,7 +1177,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         in order to be able to manage them more consistently.
 
         """
-        from core.workspacefunctions import validate_varname
+        # from core.workspacefunctions import validate_varname
 
         # NOTE: 2023-06-14 08:37:57
         # whenever  None is bound to a signal thus must always be shown

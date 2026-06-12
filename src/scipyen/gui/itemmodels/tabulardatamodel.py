@@ -244,10 +244,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         return self._getHeaderData_(section, orientation, role)
 
     def rowCount(self, parentIndex:QtCore.QModelIndex = QtCore.QModelIndex()):
-        r"""Number of rows the model currently handled.
+        r"""Number of rows the model currently handles.
         This may be less than the notional "rows" in the data
         """
-        return 0 if parentIndex.isValid() else self._displayedRows_
+        nRows = self._displayedRows_ if self._displayedRows_ <= self._modelDataRows_ else self._modelDataRows_
+        return 0 if parentIndex.isValid() else nRows
+        # return 0 if parentIndex.isValid() else self._displayedRows_
 
     def columnCount(self, parentIndex:QtCore.QModelIndex = QtCore.QModelIndex()):
         return 0 if parentIndex.isValid() else self._displayedColumns_
@@ -329,25 +331,33 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         return self.insertRow(self.rowCount(), data, QtCore.QModelIndex())
 
     def removeRow(self, row: int, parent: QtCore.QModelIndex) -> bool:
-        print(f"{self.__class__.__name__}.removeRow({row})")
+        # BUG 2026-06-12 23:32:29 FIXME
+        # when removing intermediate rows the vertical header does NOT update its sections
+        # to reflect the reduced number of rows
         if not datatypes.is_iterable(self._modelData_):
             return False
 
         if row < 0 or row > len(self._modelData_):
             return False
 
-        # self.beginRemoveRows(parent, row, row) # this will crash!
-        self.beginRemoveRows(parent, row, row+1)
+        if row < self._modelDataRows_: # -1:
+            row1 = row
+        else:
+            row1 = row+1
+
+        # print(f"{self.__class__.__name__}.removeRow({row}) -> row1 = {row1}")
+        self.beginRemoveRows(parent, row, row1)
+
         if isinstance(self._modelData_, pd.DataFrame):
             self._modelData_ = self._modelData_.drop(self._modelData_.index[row])
-            self._modelDataColumns_ = self._modelData_.shape[0]
+            self._modelDataRows_ = self._modelData_.shape[0]
         else:
             del(self._modelData_[row])
-            self._modelDataColumns_ = len(self._modelData_)
+            self._modelDataRows_ = len(self._modelData_)
 
         self.endRemoveRows()
-        self._displayedRows_ = 0
-        self.fetchMore(parent)
+        # self._displayedRows_ = 0
+        # self.fetchMore(parent)
         return True
 
     @singledispatchmethod
@@ -680,11 +690,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                     elif isinstance(self._modelData_.index, pd.Index):
                         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            # if isinstance(self._modelDataColumnHeaders_, dict) and len(self._modelDataColumnHeaders_):
-                            #     return QtCore.QVariant(self._modelDataColumnHeaders_[section])
-                            # else:
-                            #     return QtCore.QVariant(str(self._modelData_.columns[section]))
-                           return QtCore.QVariant(str(self._modelData_.index[section]))
+                            if section < self._modelData_.index.size:
+                                return QtCore.QVariant(str(self._modelData_.index[section]))
+                            else:
+                                return QtCore.QVariant()
 
                         elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                             #if isinstance(self._modelData_.iloc[:,section], pd.core.arrays.categorical.CategoricalDtype):
@@ -702,7 +711,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             else:
                                 ret = "%s" % self._modelData_.iloc[section,:].dtype # the type of the data row, not of its index !
 
-                            return QtCore.QVariant(ret)
+                            if section < self._modelData_.index.size:
+                                return QtCore.QVariant(ret)
+                            else:
+                                return QtCore.QVariant()
 
                         else:
                             return QtCore.QVariant()
@@ -710,7 +722,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     else:
                         return QtCore.QVariant()
 
-            elif isinstance(self._modelData_, pd.Series): # TODO pd.Index
+            elif isinstance(self._modelData_, pd.Series):
                 if orientation == QtCore.Qt.Horizontal: # horizontal (column) headers
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
                         if isinstance(self._modelDataColumnHeaders_, dict) and len(self._modelDataColumnHeaders_):
@@ -743,56 +755,62 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 else: # vertical (row) headers
                     if isinstance(self._modelData_.index, pd.MultiIndex): # MultiIndex is subclass of Index so catch it first
                         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            # if isinstance(self._modelDataColumnHeaders_, dict) and len(self._modelDataColumnHeaders_):
-                            #     return QtCore.QVariant(self._modelDataColumnHeaders_[section])
-                            # else:
-                            #     return QtCore.QVariant(str(self._modelData_.columns[section]))
-                            return QtCore.QVariant(str(self._modelData_.index[section]))
+                            if section < self._modelData_.index.size:
+                                return QtCore.QVariant(str(self._modelData_.index[section]))
+                            else:
+                                return QtCore.QVariant()
 
                         elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                            #if isinstance(self._modelData_.iloc[section], pd.core.arrays.categorical.CategoricalDtype):
-                            if "%s" % self._modelData_.iloc[section].dtype == "category":
-                                if len(self._modelData_.iloc[section].cat.categories) > 6:
-                                    ret = " ".join(["%s" % v for v in self._modelData_.index.names] +\
-                                                   ["%d categories:" % len(self._modelData_.iloc[section].cat.categories)] + \
-                                                   ["%s" % v for v in self._modelData_.iloc[section].cat.categories[0:3]] + \
-                                                   ["..."] + \
-                                                   ["%s" % v for v in self._modelData_.iloc[section].cat.categories[-3:]])
+                            try:
+                                if "%s" % self._modelData_.iloc[section].dtype == "category":
+                                    if len(self._modelData_.iloc[section].cat.categories) > 6:
+                                        ret = " ".join(["%s" % v for v in self._modelData_.index.names] +\
+                                                    ["%d categories:" % len(self._modelData_.iloc[section].cat.categories)] + \
+                                                    ["%s" % v for v in self._modelData_.iloc[section].cat.categories[0:3]] + \
+                                                    ["..."] + \
+                                                    ["%s" % v for v in self._modelData_.iloc[section].cat.categories[-3:]])
 
-                                else:
-                                    ret = " ".join(["categories:"] +\
-                                                ["%s" % v for v in self._modelData_.iloc[section].cat.categories])
-
+                                    else:
+                                        ret = " ".join(["categories:"] +\
+                                                    ["%s" % v for v in self._modelData_.iloc[section].cat.categories])
                                 return QtCore.QVariant(ret)
+
+                            except: # noqa
+                                return QtCore.QVariant()
+
+                            # if section < self._modelData_.index.size:
+                            #     return QtCore.QVariant(ret)
+                            # else:
+                            #     return QtCore.QVariant()
 
                         else:
                             return QtCore.QVariant()
 
                     elif isinstance(self._modelData_.index, pd.Index):
-                        if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            # if isinstance(self._modelDataColumnHeaders_, dict) and len(self._modelDataColumnHeaders_):
-                            #     return QtCore.QVariant(self._modelDataColumnHeaders_[section])
-                            # else:
-                            #     return QtCore.QVariant(str(self._modelData_.columns[section]))
-                            return QtCore.QVariant(str(self._modelData_.index[section]))
+                        if section < self._modelData_.index.size:
+                            if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
+                                return QtCore.QVariant(str(self._modelData_.index[section]))
 
-                        elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                            #if isinstance(self._modelData_.index[section], pd.core.arrays.categorical.CategoricalDtype):
-                            if "%s" % self._modelData_.iloc[section].dtype == "category":
-                                if len(self._modelData_.iloc[section].cat.categories) > 6:
-                                    ret = " ".join(["%d categories:" % len(self._modelData_[section].cat.categories)] + \
-                                                   ["%s" % v for v in self._modelData_[section].cat.categories[0:3]] + \
-                                                   ["..."] + \
-                                                   ["%s" % v for v in self._modelData_[section].cat.categories[-3:]])
+                            elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
+                                #if isinstance(self._modelData_.index[section], pd.core.arrays.categorical.CategoricalDtype):
+                                if "%s" % self._modelData_.iloc[section].dtype == "category":
+                                    if len(self._modelData_.iloc[section].cat.categories) > 6:
+                                        ret = " ".join(["%d categories:" % len(self._modelData_[section].cat.categories)] + \
+                                                    ["%s" % v for v in self._modelData_[section].cat.categories[0:3]] + \
+                                                    ["..."] + \
+                                                    ["%s" % v for v in self._modelData_[section].cat.categories[-3:]])
+
+                                    else:
+                                        ret = " ".join(["categories:"] + \
+                                                    ["%s" % v for v in self._modelData_[section].cat.categories])
+
+                                    return QtCore.QVariant(ret)
 
                                 else:
-                                    ret = " ".join(["categories:"] + \
-                                                ["%s" % v for v in self._modelData_[section].cat.categories])
-
-                                return QtCore.QVariant(ret)
+                                    return QtCore.QVariant("%s" % self._modelData_[section].dtype) # the type of data at [section]
 
                             else:
-                                return QtCore.QVariant("%s" % self._modelData_[section].dtype) # the type of data at [section]
+                                return QtCore.QVariant()
 
                         else:
                             return QtCore.QVariant()
@@ -812,7 +830,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     else:
                         return QtCore.QVariant()
                 else:
-                    return QtCore.QVariant(f"{section}")
+                    if section < len(self._modelData_):
+                        return QtCore.QVariant(f"{section}")
+                    else:
+                        return QtCore.QVariant()
 
             elif isinstance(self._modelData_, NeoObjectList):
                 if orientation == QtCore.Qt.Horizontal: # horizontal (columns) header
@@ -846,7 +867,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         return QtCore.QVariant()
 
                 else: # vertical (rows) headers
-                    return QtCore.QVariant(f"{section}")
+                    if section < len(self._modelData_):
+                        return QtCore.QVariant(f"{section}")
+                    else:
+                        return QtCore.QVariant()
+                    # return QtCore.QVariant(f"{section}")
 
             elif isinstance(self._modelData_, np.ndarray):
                 if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
@@ -858,7 +883,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         else:
                             if isinstance(self._modelData_, pq.Quantity):
                                 lbl = f"{scq.getUnitFamily(self._modelData_.units)} ({self._modelData_.units.dimensionality})"
-                    return QtCore.QVariant(lbl)
+
+                    else:
+                        if section < self._modelData_.shape[0]:
+                            return QtCore.QVariant(lbl)
+                        else:
+                            return QtCore.QVariant()
 
                 elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                     if orientation == QtCore.Qt.Horizontal:
@@ -868,7 +898,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         return QtCore.QVariant(lbl)
 
                     else:
-                        return QtCore.QVariant("%s" % self._modelData_[section,:].dtype)
+                        if section < self._modelData_.shape[0]:
+                            return QtCore.QVariant("%s" % self._modelData_[section,:].dtype)
+                        else:
+                            return QtCore.QVariant()
 
                 else:
                     return QtCore.QVariant()
@@ -893,8 +926,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                 return  QtCore.QVariant(f"{section}")
                         else:
                             return  QtCore.QVariant(f"{section}")
-
-                    return QtCore.QVariant(f"{section}")
+                    else:
+                        if section < len(self._modelData_):
+                            return QtCore.QVariant(f"{section}")
+                        else:
+                            return QtCore.QVariant()
 
                 elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                     return QtCore.QVariant(f"{section}")

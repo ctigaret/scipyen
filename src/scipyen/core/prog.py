@@ -3018,8 +3018,6 @@ def get_module_version(p:typing.Union[types.ModuleType, str]) -> str:
             return str(p.version)
 
     else:
-        # return str(p.__version__) if hasattr(p,"__version__") else ""
-        # print(f"\tversion {p.__version__}")
         return getattr(p,"__version__", "")
 
 

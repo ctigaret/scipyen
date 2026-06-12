@@ -747,17 +747,22 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 
     @Slot()
     def slot_removeRow(self):
+        # BUG 2026-06-12 23:33:37 FIXME
+        # when removing intermediate rows the vertical header does NOT update its sections
+        # to reflect the reduced number of rows
+        # see BUG 2026-06-12 23:32:29 in gui.itemmodels.tabulardatamodel.TabularDataModel
+        #
         model = self.tableView.model()
         if not isinstance(model, TabularDataModel) or not model.canAlterRows:
             return
 
         modelIndexes = self.tableView.selectedIndexes()
         if len(modelIndexes) == 0:
-            return
+            row = model._modelDataRows_ - 1
+        else:
+            row = modelIndexes[-1].row()
 
-        # remove the last row of the selection
-        row = modelIndexes[-1].row()
-        print(f"{self.__class__.__name__}.slot_removeRow -> row = {row}")
+        # print(f"{self.__class__.__name__}.slot_removeRow -> row = {row}")
         if model.removeRow(row, QtCore.QModelIndex()):
             self._data_ = model._modelData_
             self.sig_dataChanged.emit()
