@@ -310,7 +310,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         self.beginInsertRows(parent, row, row+1)
         try:
-            self._insertDataRow_(self._modelData_, row_value, row)
+            self._insertDataRow_(self._modelData_, row, row_value)
         except: # noqa
             traceback.print_exc()
         finally:
@@ -343,14 +343,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         return True
 
     @singledispatchmethod
-    def _insertDataRow_(self, mdata, obj, row: int) -> bool:
+    def _insertDataRow_(self, mdata, row: int, obj: object = None) -> bool:
         scipywarn(f"Cannnot add rows to {type(mdata).__name__}")
         return False
 
     @_insertDataRow_.register(pd.DataFrame)
     def __insertDataRow__(self, mdata: pd.DataFrame,
-                       obj: typing.Optional[pd.DataFrame] = None,
-                       row: int) -> bool: # noqa
+                       row: int,
+                       obj: typing.Optional[pd.DataFrame] = None) -> bool: # noqa
 
         if row == self.rowCount():
             if issubclass(mdata.index.dtype.type, (float, int, complex, np.floating, np.complexfloating, np.integer)):
@@ -417,8 +417,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         ephys.SynapticStimulusChannelList,
         ephys.SynapticStimulusChannelList,
         ], # noqa
-        obj: typing.Optional[ephys.SynapticPathway] = None,
-        row: int) -> bool:
+        row: int,
+        obj: typing.Optional[ephys.SynapticPathway] = None) -> bool:
         if obj is None:
             if isinstance(mdata, ephys.SynapticPathwayList):
                 obj = ephys.SynapticPathway()
@@ -457,8 +457,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @_insertDataRow_.register(list)
     @_insertDataRow_.register(deque)
     def __insertDataRow__(self, mdata: typing.Sequence, # noqa
-                       obj: typing.Optional[object] = None,
-                       row: int) -> bool:
+                       row: int, # noqa
+                       obj: typing.Optional[object] = None) -> bool:
         if all(isinstance(o, ephys.RecordingSource) for o in mdata):
             if obj is None:
                     obj = ephys.RecordingSource()
