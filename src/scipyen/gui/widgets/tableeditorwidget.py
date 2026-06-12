@@ -80,12 +80,12 @@ from core import scipyen_quantities as scq
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
-from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
-from gui import quickdialog
+# from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
+from gui import (quickdialog, guiutils) # noqa
 from gui.delegates import PythonItemDelegate
-from gui.widgets.tabledataview import TableDataView
+# from gui.widgets.tabledataview import TableDataView
 from gui.itemmodels.tabulardatamodel import TabularDataModel
-from gui.itemmodels.roles import *
+from gui.itemmodels.roles import * # noqa
 # from gui import resources_rc
 # from gui import icons_rc
 #### END pict.gui modules
@@ -133,14 +133,10 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         super().__init__(parent=parent)
         # FIXME: 2025-11-23 09:58:38 next line is DEPRECATED
         self._is_vigra_filter_kernel_:bool = False # needed in future implementations of editing functionality
-        self._dataModel_ = TabularDataModel(parent=self)
-        # print(f"{self.__class__.__name__}.__init__: _dataModel_ is {type(self._dataModel_).__name__}")
-        # self._dataModel_.sig_rowsPopulated.connect(self._slot_rowsPopulated)
-        # self._dataModel_.sig_columnsPopulated.connect(self._slot_columnsPopulated)
         self._selectedIndexes_ = list()
-        self._readOnly_:bool = readOnly == True
-        self._enforceFloat_:bool = enforceFloat == True
-        self._enforceReadOnly_:bool=False
+        self._readOnly_:bool = readOnly is True
+        self._enforceFloat_:bool = enforceFloat is True
+        self._enforceReadOnly_:bool = False
 
         # NOTE: 2021-10-18 09:32:45
         # ### BEGIN keep this  - you may re-enable the possibility to use other custom tabular
@@ -153,7 +149,11 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             #self._dataModel_ = model
         # ### END keep this ...
 
+        self._dataModel_ = TabularDataModel(parent=self)
+
         self._configureUI_()
+
+        self._dataModel_.sig_modelPopulated.connect(self._slot_modelPopulated)
 
         self._defaultItemDelegate_ = self.tableView.itemDelegate()
         self._editItemDelegate_ = PythonItemDelegate(parent=self, enforceFloat = self._enforceFloat_)
@@ -189,6 +189,17 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 
     def value(self):
         return self._data_
+
+    def _slot_modelPopulated(self):
+        # print(f"{self.__class__.__name__}._slot_modelPopulated")
+        if isinstance(self._dataModel_, TabularDataModel):
+            if (isinstance(self._dataModel_._modelDataRowIndexName_, str) and
+                len(self._dataModel_._modelDataRowIndexName_.strip())
+                ):
+                self.tableView.setCornerButtonEnabled(True)
+                # print(f"{self.__class__.__name__}.setData: corner label -> {self._dataModel_._modelDataRowIndexName_}")
+                self.tableView.setCornerLabel(self._dataModel_._modelDataRowIndexName_)
+
 
     def setData(self, data: TabularType, *args, **kwargs):
         r"""Called when this widget is part of TableEditor
@@ -232,14 +243,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self.prevSliceToolbutton.setEnabled(False)
             self.nextSliceToolButton.setEnabled(False)
             self._dataModel_.populateModel(self._data_)
-
-        # delegate = self.tableView.itemDelegate()
-
-        # newColumnCount = self._dataModel_.columnCount()
-
-        # print(f"{self.__class__.__name__}.setData -> oldColumnCount = {oldColumnCount}, newColumnCount = {newColumnCount}")
-        # if newColumnCount != oldColumnCount:
-        #     self.tableView.columnCountChanged(oldColumnCount, newColumnCount)
 
         # NOTE: 2025-11-23 19:53:14 FIXME 2026-06-10 07:38:59
         # to show bool cell data as checkboxes
@@ -722,6 +725,44 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self.tableView.horizontalHeader().resizeSection(self.selectedColumnIndex, sizeHint)
 
     @Slot()
+    def slot_insertRow(self):
+        model = self.tableView.model()
+        if not isinstance(model, TabularDataModel) or not model.canAlterRows:
+            return
+
+        modelIndexes = self.tableView.selectedIndexes()
+        if len(modelIndexes) == 0:
+            row = model.rowCount()
+        else:
+            # insert a row just below the selection
+            row = modelIndexes[-1].row()
+
+        if row < (model.rowCount()-1):
+            row = row+1
+
+        if model.insertRow(row, None, QtCore.QModelIndex()):
+            self._data_ = model._modelData_
+            self.sig_dataChanged.emit()
+
+
+    @Slot()
+    def slot_removeRow(self):
+        model = self.tableView.model()
+        if not isinstance(model, TabularDataModel) or not model.canAlterRows:
+            return
+
+        modelIndexes = self.tableView.selectedIndexes()
+        if len(modelIndexes) == 0:
+            return
+
+        # remove the last row of the selection
+        row = modelIndexes[-1].row()
+        print(f"{self.__class__.__name__}.slot_removeRow -> row = {row}")
+        if model.removeRow(row, QtCore.QModelIndex()):
+            self._data_ = model._modelData_
+            self.sig_dataChanged.emit()
+
+    @Slot()
     @safewrapper
     def slot_copySelection(self):
         # TODO: 2025-05-24 22:56:56
@@ -834,7 +875,17 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 
         cm = QtWidgets.QMenu("Cell menu", self.tableView)
         copySelectedAction = cm.addAction("Copy")
-
+        copySelectedAction.setIcon(guiutils.getIcon("edit-copy"))
         copySelectedAction.triggered.connect(self.slot_copySelection)
+
+        model = self.tableView.model()
+        if isinstance(model, TabularDataModel) and model.canAlterRows:
+            insertRowAction = cm.addAction("Insert row")
+            insertRowAction.setIcon(guiutils.getIcon("insert-table-row"))
+            insertRowAction.triggered.connect(self.slot_insertRow)
+
+            removeRowAction = cm.addAction("Remove row")
+            removeRowAction.setIcon(guiutils.getIcon("delete-table-row"))
+            removeRowAction.triggered.connect(self.slot_removeRow)
 
         cm.popup(self.tableView.mapToGlobal(pos), copySelectedAction)

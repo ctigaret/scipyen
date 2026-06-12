@@ -55,7 +55,13 @@ else:
 
 class TableDataView(QtWidgets.QTableView):
     r"""Custom table view, with placeholder text
-    """
+
+For code painting the NW corner label see
+// Source - https://stackoverflow.com/a/24163288
+// Posted by aknuds1, modified by community. See post 'Timeline' for change history
+// Retrieved 2026-06-12, License - CC BY-SA 3.0
+
+"""
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent)
 
@@ -70,12 +76,28 @@ class TableDataView(QtWidgets.QTableView):
 #             colHeader = model._modelDataColumnHeaders_[col]
 #             if colHeader.lower() == "edit":
 
+    def setCornerLabel(self, text:str = ""):
+        btn = self.findChild(QtWidgets.QAbstractButton)
+        btn.setText(text)
+        btn.setToolTip('Toggle selecting all table cells')
+        btn.installEventFilter(self)
+
+        opt = QtWidgets.QStyleOptionHeader()
+        opt.text = btn.text()
+        s = QtCore.QSize(btn.style().sizeFromContents(
+            QtWidgets.QStyle.CT_HeaderSection, opt, QtCore.QSize(), btn)#.
+            # expandedTo(QtWidgets.QApplication.globalStrut())
+            )
+
+        if s.isValid():
+            self.verticalHeader().setMinimumWidth(s.width())
 
     def paintEvent(self, event):
         r"""Paints a placeholder text when there is no data"""
         super().paintEvent(event)
         if self.model() is not None and self.model().rowCount() > 0:
             return
+
         painter = QtGui.QPainter(self.viewport())
         painter.save()
         col = self.palette().placeholderText().color()
@@ -87,6 +109,30 @@ class TableDataView(QtWidgets.QTableView):
         painter.drawText(self.viewport().rect(), QtCore.Qt.AlignCenter, elided_text)
         painter.restore()
 
+    def eventFilter(self, obj, event):
+        if event.type() != QtCore.QEvent.Paint or not isinstance(
+                obj, QtWidgets.QAbstractButton):
+            return False
+
+        # Paint by hand (borrowed from QTableCornerButton)
+        opt = QtWidgets.QStyleOptionHeader()
+        opt.initFrom(obj)
+        styleState = QtWidgets.QStyle.State_None
+        if obj.isEnabled():
+            styleState |= QtWidgets.QStyle.State_Enabled
+        if obj.isActiveWindow():
+            styleState |= QtWidgets.QStyle.State_Active
+        if obj.isDown():
+            styleState |= QtWidgets.QStyle.State_Sunken
+        opt.state = styleState
+        opt.rect = obj.rect()
+        # This line is the only difference to QTableCornerButton
+        opt.text = obj.text()
+        opt.position = QtWidgets.QStyleOptionHeader.OnlyOneSection
+        painter = QtWidgets.QStylePainter(obj)
+        painter.drawControl(QtWidgets.QStyle.CE_Header, opt)
+
+        return True
 
     @Slot(QtWidgets.QWidget, QtCore.QModelIndex)
     def _slot_editDataExternally(self, sender, index): # TODO 2026-06-07 11:08:52 finalize me

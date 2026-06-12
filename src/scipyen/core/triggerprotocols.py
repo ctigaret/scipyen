@@ -972,6 +972,7 @@ stimulation, etc).
 class TriggerProtocolList(NeoObjectList):
     r"""Inspired by neo.ObjectList"""
     allowed_contents = (TriggerProtocol, )
+
     def __init__(self, *items, name:typing.Optional[str] = None,
                  parent: object = None):
         self.name = "" if not isinstance(name, str) else name

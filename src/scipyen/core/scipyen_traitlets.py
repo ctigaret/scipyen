@@ -503,12 +503,10 @@ class ListTrait(List, ScipyenTraitTypeMixin):
                 self.hashed = gethash(old_value)
             silent=False
             
-        # print(f"\n{self.__class__.__name__}.set for {self.name}: old_value = {old_value}, new_value = {new_value}")
-        
         try:
             klass = getattr(self, "klass", None)
             # print(f"{print_styled(f'{self.__class__.__name__}.set: klass = {klass};\n\tnew_value: {new_value}\n\told_value: {old_value}', color='yellow')}")
-            check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False
+            check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False # noqa
             if any(not check_klass(v) for v in (new_value, old_value)):
                 if not self.name or self.name not in obj._trait_values or self.name not in obj.traits():
                     change_type = "new"
@@ -1546,10 +1544,12 @@ class NeoSpikeTrainTrait(NeoDataObjectTrait):
     def make_dynamic_default(self):
         return self.klass([0.]*pq.s, 0.)
     
+# class NeoObjectListTrait(ListTrait):
 class NeoObjectListTrait(NeoBaseNeoTrait):
     klass = NeoObjectList
     info_text = f"Traitlet for {klass}"
     default_value = Undefined
+    # default_value = NeoObjectList()
     _cast_types = tuple()
     _valid_defaults = (klass,)
            

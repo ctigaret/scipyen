@@ -142,6 +142,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     # NOTE: 2025-11-23 14:03:48 sig_rowsPopulated(startRow, count, total)
     sig_rowsPopulated = Signal(int, int, int, name="sig_rowsPopulated")
     sig_columnsPopulated = Signal(int, int, int, name="sig_columnsPopulated")
+    sig_modelPopulated = Signal(name="sig_modelPopulated")
 
     def __init__(self, data=None, parent=None):
         super(TabularDataModel, self).__init__(parent=parent)
@@ -150,6 +151,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._original_data_:typing.Any = None
         self._modelData_:typing.Any= None
         self._modelDataRows_:int = 0
+        self._modelDataRowIndexName_: str | None = None
+        # self._modelDataRowIndexName_: str = "Index"
         self._modelDataColumns_:int = 0
         self._modelDataColumnHeaders_: typing.Optional[
             typing.Union[typing.Mapping, typing.Sequence]
@@ -319,26 +322,31 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self.fetchMore(parent)
         return True
 
-    def appendRow(self, data: typing.Optional[object] = None):
+    def appendRow(self, data: typing.Optional[object] = None) -> bool:
         if self._modelData_ is None:
             return
 
-        self.insertRow(self.rowCount(), data, QtCore.QModelIndex())
+        return self.insertRow(self.rowCount(), data, QtCore.QModelIndex())
 
     def removeRow(self, row: int, parent: QtCore.QModelIndex) -> bool:
+        print(f"{self.__class__.__name__}.removeRow({row})")
         if not datatypes.is_iterable(self._modelData_):
             return False
 
         if row < 0 or row > len(self._modelData_):
             return False
 
+        # self.beginRemoveRows(parent, row, row) # this will crash!
         self.beginRemoveRows(parent, row, row+1)
         if isinstance(self._modelData_, pd.DataFrame):
             self._modelData_ = self._modelData_.drop(self._modelData_.index[row])
+            self._modelDataColumns_ = self._modelData_.shape[0]
         else:
             del(self._modelData_[row])
+            self._modelDataColumns_ = len(self._modelData_)
 
         self.endRemoveRows()
+        self._displayedRows_ = 0
         self.fetchMore(parent)
         return True
 
@@ -530,6 +538,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         if "Edit" in self._modelDataColumnHeaders_.values():
             self._useExternalDataEditor_ = True
+
+        self.sig_modelPopulated.emit()
 
 
         # ### BEGIN report timing
@@ -1089,6 +1099,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._canAddRemoveRows_ = False
         self._canAddRemoveColumns_ = False
         self._modelDataColumnHeaders_ = dict()
+        # self._modelDataRowIndexName_ = "Index"
 
     @_makeModelData_.register(types.NoneType)
     def __makeModelData__(self, data: types.NoneType):
@@ -1119,6 +1130,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # self._modelDataColumnHeaders_ = dict(enumerate(data.columns))
         self._canAddRemoveColumns_ = True
         self._canAddRemoveRows_ = True
+        self._modelDataRowIndexName_ = self._modelData_.index.name or "Index"
 
     @_makeModelData_.register(pd.Series)
     def __makeModelData__(self, data: pd.Series): # noqa
@@ -1128,6 +1140,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataColumnHeaders_ = {0: data.name}
         self._canAddRemoveRows_ = True
         self._canAddRemoveColumns_ = False
+        self._modelDataRowIndexName_ = "Index"
 
     @_makeModelData_.register(pd.Index)
     def __makeModelData__(self, data: pd.Index): # noqa
@@ -1137,6 +1150,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataColumnHeaders_ = {0: "Index or Column"}
         self._canAddRemoveRows_ = True
         self._canAddRemoveColumns_ = False
+        self._modelDataRowIndexName_ = "Index"
 
     @_makeModelData_.register(vigra.filters.Kernel1D)
     @_makeModelData_.register(vigra.filters.Kernel2D)
@@ -1149,6 +1163,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._original_data_ = data
         self._canAddRemoveRows_ = False
         self._canAddRemoveColumns_ = False
+        self._modelDataRowIndexName_ = "Index"
 
     @_makeModelData_.register(TriggerProtocolList)
     def __makeModelData__(self, data: TriggerProtocolList): # noqa
@@ -1169,6 +1184,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 )
             )
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+        self._modelDataRowIndexName_ = "Index"
 
     @_makeModelData_.register(ephys.SynapticPathwayList)
     def __makeModelData__(self, data: ephys.SynapticPathwayList): # noqa
@@ -1192,6 +1208,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 )
             )
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+        self._modelDataRowIndexName_ = "Index"
 
     @_makeModelData_.register(ephys.AuxiliaryInputList)
     def __makeModelData__(self, data: ephys.AuxiliaryInputList): # noqa
@@ -1215,6 +1232,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 )
             )
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+        self._modelDataRowIndexName_ = "Index"
 
     @_makeModelData_.register(ephys.AuxiliaryOutputList)
     def __makeModelData__(self, data: ephys.AuxiliaryOutputList): # noqa
@@ -1235,6 +1253,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 )
             )
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+        self._modelDataRowIndexName_ = "Index"
 
     @_makeModelData_.register(ephys.SynapticStimulusChannelList)
     def __makeModelData__(self, data: ephys.SynapticStimulusChannelList): # noqa
@@ -1255,6 +1274,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 )
             )
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+        self._modelDataRowIndexName_ = "Index"
 
     @_makeModelData_.register(np.ndarray)
     def __makeModelData__(self, data: np.ndarray): # noqa
@@ -1279,9 +1299,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 domain = getattr(data, "times", None)
                 domain_name = getattr(data, "domain_name", scq.getUnitFamily(domain))
                 if len(domain_name) == 0:
-                    domain_name = f"{domain.dimensionality}"
+                    # domain_name = f"{domain.dimensionality}"
+                    domain_name = f"{scq.unitsSymbol(domain)}"
                 else:
-                    domain_name += f" ({domain.dimensionality})"
+                    # domain_name += f" ({domain.dimensionality})"
+                    domain_name += f" ({scq.unitsSymbol(domain)})"
 
                 if data.ndim > 1:
                     # include domain as the first column
@@ -1319,6 +1341,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             )
                         )
 
+                    self._modelDataRowIndexName_ = domain_name
+
                     if isinstance(data, (neo.AnalogSignal, DataSignal)):
                         # NOTE: 2025-09-27 11:05:05 see NOTE: 2025-09-27 10:38:00
                         # although the signal domain is shown as a regular column
@@ -1335,6 +1359,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         # below, allow editing t_start
                         self.immutableRows = range(1,self._modelDataRows_)
                         self.jointImmutability = True
+                        # self._modelDataRowIndexName_ = f"{scq.unitFamilyName(data.times)} ({scq.unitSymbol(data.times)})"
 
                 else: # e.g. case of spiketrains:
                     self._modelDataColumns_ = 1 if isinstance(data, neo.SpikeTrain) else 2
@@ -1371,11 +1396,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             )
                         )
 
+                    self._modelDataRowIndexName_ = domain_name
 
             else:
                 self._modelDataRows_ = 1
                 self._modelDataColumns_ = 1
                 self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
+                self._modelDataRowIndexName_ = "Index"
+
                 # self._canAddRemoveColumns_ = True
 
             self._modelData_ = data
@@ -1388,6 +1416,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     raise ValueError("Arrays with more than two dimensions and with non-singleton dimensions higher than 2 are not supported")
             else:
                 self._modelData_ = data
+
+            self._modelDataRowIndexName_ = "Index"
 
             if self._modelData_.ndim:
                 self._modelDataRows_ = self._modelData_.shape[0]
@@ -1412,6 +1442,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._modelDataColumns_ = 1
                 if isinstance(self._modelData_, pq.Quantity):
                     self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
+
 
     @_makeModelData_.register(list)
     @_makeModelData_.register(tuple)
@@ -1506,12 +1537,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self._canAddRemoveRows_ = True
 
             else:
-                scipywarn(f"Unsupported sequence element types")
+                scipywarn("Unsupported sequence element types")
                 self._modelDataColumns_ = 0
                 self._modelDataRows_ = 0
                 self._modelDataColumnHeaders_ = dict()
                 self._modelData_ = None
                 self._original_data_ = None
+
+        self._modelDataRowIndexName_ = "Index"
 
     @singledispatchmethod
     def _setValueInModelData_(self, mdata, pyvalue, row, col) -> bool:

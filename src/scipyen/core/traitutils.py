@@ -124,6 +124,67 @@ def traitlet_delete(self_instance, owner_instance):
             owner_instance._notify_trait(self_instance.name, old_value, Undefined,
                                          change_type="removed")
    
+def traitlet_set_scipyen_object_lists(instance, obj, value):
+    from core import datatypes # noqa
+    new_value = instance._validate(obj, value)
+    # new_hash = gethash(new_value)
+    silent = True
+    change_type = "modified"
+
+    if instance.name and instance.name in obj._trait_values and instance.name in obj.traits():
+        old_value = obj._trait_values[instance.name]
+        if not instance.hashed:
+            instance.hashed = gethash(old_value)
+            silent = False
+    else:
+        change_type="new"
+        old_value = instance.default_value
+        if not instance.hashed:
+            instance.hashed = gethash(old_value)
+        silent=False
+
+    try:
+        klass = getattr(instance, "klass", None)
+        # print(f"{print_styled(f'{instance.__class__.__name__}.set: klass = {klass};\n\tnew_value: {new_value}\n\told_value: {old_value}', color='yellow')}")
+        check_klass = lambda v: (  # noqa
+            isinstance(v, klass) if (
+                isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))
+                ) else False
+            )
+        if any(not check_klass(v) for v in (new_value, old_value)):
+            if not instance.name or instance.name not in obj._trait_values or instance.name not in obj.traits():
+                change_type = "new"
+                instance.hashed = gethash(new_value)
+                obj._trait_values[instance.name] = new_value
+                obj._notify_trait(instance.name, old_value, new_value,
+                                change_type = change_type)
+                return
+            else:
+                change_type = "modified"
+
+        # NOTE: 2021-08-19 16:17:23
+        # check for change in contents
+        if silent:
+            silent = bool(old_value == new_value)
+            # if isinstance(old_value, typing.Sequence) and any(isinstance(v, np.ndarray) for v in old_value) or \
+            #     isinstance(new_value, typing.Sequence) and any(isinstance(v, np.ndarray) for v in new_value):
+            #         silent = safe_identity_test(old_value, new_value)
+            # else:
+            #     silent = bool(old_value == new_value)
+
+        # if silent:
+        #     new_hash = gethash(new_value)
+        #     silent = (new_hash == instance.hashed)
+
+    except:
+        traceback.print_exc()
+        silent = False
+
+    if not silent:
+        instance.hashed = gethash(new_value)
+        obj._trait_values[instance.name] = new_value
+        obj._notify_trait(instance.name, old_value, new_value,
+                            change_type=change_type)
 
 #@timefunc
 def traitlet_set(instance, obj, value):
@@ -133,36 +194,52 @@ def traitlet_set(instance, obj, value):
     """
     # NOTE: 2025-06-14 13:39:57 in PySide6 I need to deal with
     # Shiboken.ObjectType and with Ui_* types created by loadUiType
-    # also, QObject instances shoudl be left alone
-    
-    new_value = value # skip validation
-            
-    silent = True
-    change_type="modified"
-    
-    check_Qt_object = lambda v: (isinstance(v, QtCore.QObject)
+    # also, QObject instances should be left alone
+
+    from core import datatypes
+    klass = getattr(instance, "klass", None)
+    check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False # noqa
+    check_Qt_object = lambda v: (isinstance(v, QtCore.QObject) # noqa
                                  or (__has_PySide6__ and isinstance(v, type) and
                                      (hasattr(v, "setupUi") or
                                       issubclass(v, Shiboken.Object)
                                       )
                                      )
-                                 )
+                                 ) # noqa
     
-    if instance.name and instance.name in obj._trait_values and instance.name in obj.traits():
-        old_value = obj._trait_values[instance.name]
-        if not(check_Qt_object(old_value)) or not instance.hashed:
-            instance.hashed = gethash(old_value)
-    else:
-        change_type = "new"
+    new_value = value # skip validation
+    if hasattr(instance, "default_value"):
         old_value = instance.default_value
-        if check_Qt_object(new_value):
-            obj._trait_values[instance.name] = new_value
-            obj._notify_trait(instance.name, old_value, new_value, 
-                            change_type = change_type)
-            return
 
-        if not(check_Qt_object(old_value)) or not instance.hashed:
-            instance.hashed = gethash(old_value)
+    silent = True
+
+    change_type="modified"
+    if any(not check_klass(v) for v in (new_value, old_value)):
+        if not instance.name or instance.name not in obj._trait_values or instance.name not in obj.traits():
+            change_type = "new"
+            old_value = instance.default_value
+            if check_Qt_object(new_value):
+                obj._trait_values[instance.name] = new_value
+                obj._notify_trait(instance.name, old_value, new_value,
+                                change_type = change_type)
+                return
+
+        else:
+            change_type = "modified"
+
+    # if instance.name and instance.name in obj._trait_values and instance.name in obj.traits():
+    #     old_value = obj._trait_values[instance.name]
+    # else:
+    #     change_type = "new"
+    #     old_value = instance.default_value
+    #     if check_Qt_object(new_value):
+    #         obj._trait_values[instance.name] = new_value
+    #         obj._notify_trait(instance.name, old_value, new_value,
+    #                         change_type = change_type)
+    #         return
+    #
+    #     if not(check_Qt_object(old_value)) or not instance.hashed:
+    #         instance.hashed = gethash(old_value)
 
         silent = False
         
@@ -175,38 +252,39 @@ def traitlet_set(instance, obj, value):
     
     if check_Qt_object(new_value):
         return
-    
-    new_hash = gethash(new_value)
-    
+
+    # new_hash = gethash(new_value)
+
     # NOTE: 2023-06-14 08:49:55
     # always notify here - this is relevant, because:
     # a) notifies when an existing trait is set to None
-    # b) notifies when a new trait with underlying value of None is set 
+    # b) notifies when a new trait with underlying value of None is set
     # therefore this will enable e.g., showing up symbols bound to None, in
     # any monitored mappings (such as the workspace)
-    
-    if (klass is not type(None) and (new_value is None or old_value is None)) or any(not check_klass(v) for v in (new_value, old_value)):
-        if not instance.name or instance.name not in obj._trait_values or instance.name not in obj.traits():
-            change_type = "new"
-            instance.hashed = new_hash
-            obj._trait_values[instance.name] = new_value
-            obj._notify_trait(instance.name, old_value, new_value, 
-                            change_type = change_type)
-            return
-        else:
-            change_type = "modified"
-    
+
+    # if (klass is not type(None) and (new_value is None or old_value is None)) or any(not check_klass(v) for v in (new_value, old_value)):
+    #     if not instance.name or instance.name not in obj._trait_values or instance.name not in obj.traits():
+    #         change_type = "new"
+    #         instance.hashed = gethash(new_value)
+    #         obj._trait_values[instance.name] = new_value
+    #         obj._notify_trait(instance.name, old_value, new_value,
+    #                         change_type = change_type)
+    #         return
+    #     else:
+    #
+    #         change_type = "modified"
+
     try:
-        #silent = new_value is old_value
+        # print(f"{instance.__class__.__name__} set: -> old_value = {old_value}, new_value = {new_value}")
+        if datatypes.is_iterable(new_value):
+            if datatypes.is_iterable(old_value) and len(old_value) != len(new_value):
+                silent = False
+                change_type = "modified"
+
         if silent:
             new_hash = gethash(new_value)
             old_hash = gethash(old_value)
-            #print("\told %s (hash %s)\n\tnew %s (hash %s)" % (old_value, instance.hashed, new_value, new_hash))
-            #print(instance.name, "old hashed", instance.hashed, "new_hash", new_hash)
             silent = bool(new_hash == instance.hashed)
-            # print(f"{print_styled(f'{instance.__class__.__name__}.set: new_hash == instance.hashed -> {silent}', color='yellow')}")
-            # if not silent:
-            #     print(f"{print_styled(f'\n\tinstance.hashed: {instance.hashed}\n\tnew_hash: {new_hash}', color='yellow')}")
            
     except:
         traceback.print_exc()
@@ -215,19 +293,26 @@ def traitlet_set(instance, obj, value):
         
     
     if not silent:
-        instance.hashed = new_hash
+        instance.hashed = gethash(new_value)
         obj._trait_values[instance.name] = new_value
         obj._notify_trait(instance.name, old_value, new_value, 
                           change_type = change_type)
 
-def _dynatrtyp_exec_body_(ns, klass, setfn = traitlet_set, delfn=traitlet_delete):
-    #print("ns:", ns)
+def _dynatrtyp_exec_body_(ns, klass,
+                          setfn = traitlet_set,
+                          delfn = traitlet_delete,
+                          **kwargs):
+    # NOTE: 2026-06-12 16:02:56
+    # ns is supplied by types.new_class() function!!!!
+    # and must be the ONLY parameter to exec_body in new_class
+    # therefore this function must ALWAYS be used as a partial
     ns["info_text"]="Trait that is sensitive to changes in data contents"
     ns["klass"] = klass
     ns["hashed"] = None
-    # ns["hashed"] = -1
     ns["set"] = setfn
     ns["__delete__"] = delfn
+    for key, val in kwargs.items():
+        ns[key] = val
     
 #@safewrapper
 def adapt_args_kw(x, args, kw, allow_none): # where is this used ?!?
@@ -477,34 +562,49 @@ def dynamic_trait(x, *args, **kwargs):
     # avoid confusion of NeoObjectList with List, for older neo versions 😦
     if myclass == NeoObjectList:
         if issubclass(myclass, list):
-            traitlet_class_name = "ListTrait"
+            traitlet_class_name = "ListTrait" # give the pssibility to co-inherit from list, also
         else:
             traitlet_class_name = "NeoObjectListTrait"
-            # traitlet_class_name = "NeoDataObjectTrait"
+
+    # elif issubclass(myclass, NeoObjectList): # BUG 2026-06-12 16:44:38 FIXME
+    #     # covers the recenty added ephys.*List types and triggerprotocols
+    #     traitlet_class_name = myclass.__name__ + "Trait"
+    #     base_classes = (sct.NeoObjectListTrait, )
+    #     # base_classes = (sct.ListTrait, )
+    #     exec_body_fn = partial(_dynatrtyp_exec_body_, klass=myclass,
+    #                            setfn=traitlet_set_scipyen_object_lists,
+    #                            allowed_contents = myclass.allowed_contents)
+    #
+    #     traitlet_class = new_class(traitlet_class_name,
+    #                                    bases = base_classes,
+    #                                    exec_body = exec_body_fn)
+    #     traitlet_class.default_value = Undefined
+    #     # traitlet_class.default_value = myclass()
+    #
+    #     return traitlet_class
+
     else:
         traitlet_class_name = f"{traitlet_class_name}Trait"
-    
-    traitlet_class = sct.__dict__.get(traitlet_class_name, None)
+        traitlet_class = sct.__dict__.get(traitlet_class_name, None)
+
     
     if traitlet_class is None:
         if any("neo" in c.__module__ for c in getmro(myclass)):
             traitlet_class_name = f"Neo{myclass.__name__}Trait"
             traitlet_class = sct.__dict__.get(traitlet_class_name, None)
             
-    if traitlet_class is not None and (not isinstance(traitlet_class, type) and TraitType not in getmro(traitlet_class)):
+    if (
+        traitlet_class is not None and
+        (
+            not isinstance(traitlet_class, type)
+            and TraitType not in getmro(traitlet_class)
+         )
+        ):
         traitlet_class = None
     
     
     if traitlet_class is None:
         traitlet_classes = [None]
-        
-        # NOTE: 2025-07-06 10:35:43
-        # se what happes if we adapt ALL stock traitlet classes
-#         if issubclass(myclass, tuple):
-#             return Tuple(x)
-#         
-#         elif issubclass(myclass, dict):
-#             return Dict(x)
         
         if isclass(force_trait) and issubclass(force_trait, traitlets.TraitType):
             traitlet_classes = sct.TRAITSMAP.get(myclass, (force_trait, ))
