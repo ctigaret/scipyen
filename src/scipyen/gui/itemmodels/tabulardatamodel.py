@@ -52,6 +52,7 @@ import numpy as np
 import neo
 from neo.core.objectlist import ObjectList as NeoObjectList
 from core.vigra_patches import vigra
+from imaging import vigrautils
 
 import matplotlib as mpl # noqa
 import matplotlib.pyplot as plt # noqa
@@ -74,29 +75,24 @@ from core.marktrain import MarkTrain
 from core.triggerprotocols import (TriggerProtocol, TriggerProtocolList) # noqa
 from core.datazone import DataZone
 
-import core.datasignal
+import core.datasignal # noqa
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,) # noqa
 import core.datatypes as dt
 from core.datatypes import array_slice # noqa
 from core.sysutils import adapt_ui_path # noqa
 from core import scipyen_quantities as scq
-from core import neoutils
+from core import neoutils # noqa
 from ephys import ephys
 
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
-from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
-from gui import quickdialog
 from gui.delegates import PythonItemDelegate # noqa
-from gui.widgets.tabledataview import TableDataView
 from gui.itemmodels.roles import * # noqa
-# from gui import resources_rc
-# from gui import icons_rc
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules
-import iolib.pictio as pio
+# import iolib.pictio as pio
 #### END pict.iolib modules
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -150,18 +146,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     def __init__(self, data=None, parent=None):
         super(TabularDataModel, self).__init__(parent=parent)
 
-        #if not isinstance(data, (pd.Series, pd.DataFrame, np.ndarray, type(None))):
-            #raise TypeError("%s data is not yet supported" % type(data).name)
-
-        #if isinstance(data, np.ndarray) and data.ndim > 2:
-            #raise TypeError("cannot support numpy array data with more than two dimensions")
         self._is_vigra_filter_kernel_:bool = False
         self._original_data_:typing.Any = None
         self._modelData_:typing.Any= None
         self._modelDataRows_:int = 0
         self._modelDataColumns_:int = 0
         self._modelDataColumnHeaders_: typing.Optional[
-            typing.Union[typingMapping, typing.Sequence]
+            typing.Union[typing.Mapping, typing.Sequence]
             ] = None
         self._immutability_:dict = {"columns": list(), "rows": list(), "joint":False}
         self._rowBatchSize_:int = 10
@@ -170,12 +161,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._canAddRemoveColumns_:bool = False
 
         # NOTE: 2026-06-07 10:58:03
-        # needed to edit object externally
+        # flag showing if editing an object externally is allowed
         #
         self._useExternalDataEditor_: bool = False
-
-        # self._immutableColumns_:typing.Sequence[int] = list()  # of column indexes
-        # self._immutableRows_:typing.Sequence[int] = list()     # of row indexes
 
         # NOTE: 2018-11-10 10:58:09
         # how many columns & rows are actually displayed
@@ -191,7 +179,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     def fetchMore(self, parentIndex:QtCore.QModelIndex):
         if parentIndex.isValid():
-            # print(f"{self.__class__.__name__}.fetchMore: parent is valid, nothing to fetch")
             return
 
         startRow:int = self._displayedRows_
@@ -202,7 +189,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         rowsToFetch = min(self._rowBatchSize_, remainingRows)
         columnsToFetch = min(self._columnBatchSize_, remainingColumns)
-        # print(f"{self.__class__.__name__}.fetchMore: {rowsToFetch} rows and {columnsToFetch} columns to fetch")
 
         if rowsToFetch <= 0 and columnsToFetch <= 0:
             return
@@ -245,7 +231,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
             return self._getModelData_(row, col, role)
 
-        except Exception as e:
+        except Exception as e: # noqa
             traceback.print_exc()
 
     def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
@@ -255,7 +241,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         return self._getHeaderData_(section, orientation, role)
 
     def rowCount(self, parentIndex:QtCore.QModelIndex = QtCore.QModelIndex()):
-        r"""Number of rows the model currently handles.
+        r"""Number of rows the model currently handled.
         This may be less than the notional "rows" in the data
         """
         return 0 if parentIndex.isValid() else self._displayedRows_
@@ -324,8 +310,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         self.beginInsertRows(parent, row, row+1)
         try:
-            # print(f"{self._modelData_} is {type(self._modelData_).__name__}")
-            self._addDataRow_(self._modelData_, row_value)
+            self._insertDataRow_(self._modelData_, row_value, row)
         except: # noqa
             traceback.print_exc()
         finally:
@@ -334,40 +319,85 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self.fetchMore(parent)
         return True
 
-    def addRow(self, data: typing.Optional[object] = None):
+    def appendRow(self, data: typing.Optional[object] = None):
         if self._modelData_ is None:
             return
 
         self.insertRow(self.rowCount(), data, QtCore.QModelIndex())
 
+    def removeRow(self, row: int, parent: QtCore.QModelIndex) -> bool:
+        if not datatypes.is_iterable(self._modelData_):
+            return False
+
+        if row < 0 or row > len(self._modelData_):
+            return False
+
+        self.beginRemoveRows(parent, row, row+1)
+        if isinstance(self._modelData_, pd.DataFrame):
+            self._modelData_ = self._modelData_.drop(self._modelData_.index[row])
+        else:
+            del(self._modelData_[row])
+
+        self.endRemoveRows()
+        self.fetchMore(parent)
+        return True
 
     @singledispatchmethod
-    def _addDataRow_(self, mdata, obj) -> bool:
+    def _insertDataRow_(self, mdata, obj, row: int) -> bool:
         scipywarn(f"Cannnot add rows to {type(mdata).__name__}")
         return False
 
-    @_addDataRow_.register(pd.DataFrame)
-    def __addDataRow__(self, mdata: pd.DataFrame,
-                       obj: typing.Optional[pd.DataFrame] = None) -> bool:
+    @_insertDataRow_.register(pd.DataFrame)
+    def __insertDataRow__(self, mdata: pd.DataFrame,
+                       obj: typing.Optional[pd.DataFrame] = None,
+                       row: int) -> bool: # noqa
 
-        if issubclass(mdata.index.dtype.type, (float, int, complex, np.floating, np.complexfloating, np.integer)):
-            δndx = mdata.index[-1] - mdata.index[-2]
-            newIndex = pd.Index([mdata.index[-1] + δndx], name = mdata.index.name)
+        if row == self.rowCount():
+            if issubclass(mdata.index.dtype.type, (float, int, complex, np.floating, np.complexfloating, np.integer)):
+                δndx = mdata.index[-1] - mdata.index[-2]
+                newIndex = pd.Index([mdata.index[-1] + δndx], name = mdata.index.name)
+            else:
+                newIndex = pd.Index([f"row {mdata.index.size+1}"], name = mdata.index.name)
+
+            try:
+                if obj is None:
+                    obj = pd.DataFrame(dict(zip(mdata.columns, tuple((pd.NA, )) * mdata.shape[1])), index = newIndex)
+
+                elif isinstance(obj, typing.Sequence):
+                    obj = pd.DataFrame(dict(zip(mdata.columns, obj)), index = newIndex)
+                else:
+                    return False
+
+                self._modelData_ = pd.concat((mdata, obj))
+
+            except:
+                traceback.print_exc()
+                return False
+
         else:
-            newIndex = pd.Index([f"row {mdata.index.size+1}"], name = mdata.index.name)
+            if issubclass(mdata.index.dtype.type, (float, int, complex, np.floating, np.complexfloating, np.integer)):
+                δndx = mdata.index[row] - mdata.index[row-1]
+                newIndex = pd.Index([mdata.index[row] + δndx], name = mdata.index.name)
+            else:
+                newIndex = pd.Index([f"row {row+1}"], name = mdata.index.name)
+            try:
+                if obj is None:
+                    obj = pd.DataFrame(dict(zip(mdata.columns, tuple((pd.NA, )) * mdata.shape[1])), index = newIndex).T
 
-        try:
-            if obj is None:
-                obj = pd.DataFrame(dict(zip(mdata.columns, tuple((pd.NA, )) * mdata.shape[1])), index = newIndex)
+                elif isinstance(obj, typing.Sequence):
+                    obj = pd.DataFrame(dict(zip(mdata.columns, obj)), index = newIndex).T
 
-            elif isinstance(obj, typing.Sequence):
-                obj = pd.DataFrame(dict(zip(mdata.columns, obj)), index = newIndex)
-        except:
-            traceback.print_exc()
-            return False
-        # print(f"{self.__class__.__name__}.__addDataRow__ -> {obj}")
+                else:
+                    return False
 
-        self._modelData_ = pd.concat((mdata, obj))
+                temp = mdata.T
+                temp.insert(row, obj.columns[0], obj, allow_duplicates = True)
+                self._modelData_ = temp.T
+
+            except:
+                traceback.print_exc()
+                return False
+
         self._modelDataRows_ = self._modelData_.shape[0]
         self._original_data_ = self._modelData_
         self._canAddRemoveRows_ = True
@@ -375,18 +405,48 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         return True
 
-    @_addDataRow_.register(ephys.SynapticPathwayList)
-    def __addDataRow__(self, mdata: ephys.SynapticPathwayList, # noqa
-                       obj: typing.Optional[ephys.SynapticPathway] = None) -> bool:
+    @_insertDataRow_.register(ephys.SynapticPathwayList)
+    @_insertDataRow_.register(ephys.AuxiliaryInputList)
+    @_insertDataRow_.register(ephys.AuxiliaryOutputList)
+    @_insertDataRow_.register(ephys.SynapticStimulusChannelList)
+    @_insertDataRow_.register(TriggerProtocolList)
+    def __insertDataRow__(self, mdata: typing.Union[
+        ephys.SynapticPathwayList,
+        ephys.AuxiliaryInputList,
+        ephys.AuxiliaryOutputList,
+        ephys.SynapticStimulusChannelList,
+        ephys.SynapticStimulusChannelList,
+        ], # noqa
+        obj: typing.Optional[ephys.SynapticPathway] = None,
+        row: int) -> bool:
         if obj is None:
-            obj = ephys.SynapticPathway()
+            if isinstance(mdata, ephys.SynapticPathwayList):
+                obj = ephys.SynapticPathway()
+            elif isinstance(mdata, ephys.AuxiliaryInputList):
+                obj = ephys.AuxiliaryInput()
+            elif isinstance(mdata, ephys.AuxiliaryOutputList):
+                obj = ephys.AuxiliaryOutput()
+            elif isinstance(mdata, ephys.SynapticStimulusChannelList):
+                obj = ephys.SynapticStimulusChannel()
+            elif isinstance(mdata, TriggerProtocolList):
+                obj = TriggerProtocol()
 
-        if not isinstance(obj, ephys.SynapticPathway):
+        if not isinstance(obj, (ephys.SynapticPathway,
+                                ephys.AuxiliaryInput,
+                                ephys.AuxiliaryOutput,
+                                ephys.SynapticStimulusChannel,
+                                TriggerProtocol
+                                )
+                        ):
             return False
 
-        # print(f"{self.__class__.__name__}.__addDataRow__: obj = {obj}")
+        if row == self.rowCount():
+            self._modelData_.append(obj)
+        else:
+            temp = list(self._modelData_)
+            temp.insert(row, obj)
+            self._modelData_ = type(self._modelData_)(temp)
 
-        self._modelData_.append(obj)
         self._modelDataRows_ = len(self._modelData_)
         self._original_data_ = self._modelData_
         self._canAddRemoveRows_ = True
@@ -394,67 +454,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         return True
 
-    @_addDataRow_.register(ephys.AuxiliaryInputList)
-    def __addDataRow__(self, mdata: ephys.AuxiliaryInputList, # noqa
-                       obj: typing.Optional[ephys.AuxiliaryInput] = None) -> bool:
-        if obj is None:
-            obj = ephys.AuxiliaryInput()
-
-        if not isinstance(obj, ephys.AuxiliaryInput):
-            return False
-
-        # print(f"{self.__class__.__name__}.__addDataRow__: obj = {obj}")
-
-        self._modelData_.append(obj)
-        self._modelDataRows_ = len(self._modelData_)
-        self._original_data_ = self._modelData_
-        self._canAddRemoveRows_ = True
-        self._canAddRemoveColumns_ = False
-
-        return True
-
-    @_addDataRow_.register(ephys.AuxiliaryOutputList)
-    def __addDataRow__(self, mdata: ephys.AuxiliaryOutputList, # noqa
-                       obj: typing.Optional[ephys.AuxiliaryOutput] = None) -> bool:
-        if obj is None:
-            obj = ephys.AuxiliaryOutput()
-
-        if not isinstance(obj, ephys.AuxiliaryOutput):
-            return False
-
-        # print(f"{self.__class__.__name__}.__addDataRow__: obj = {obj}")
-
-        self._modelData_.append(obj)
-        self._modelDataRows_ = len(self._modelData_)
-        self._original_data_ = self._modelData_
-        self._canAddRemoveRows_ = True
-        self._canAddRemoveColumns_ = False
-
-        return True
-
-    @_addDataRow_.register(ephys.SynapticStimulusChannelList)
-    def __addDataRow__(self, mdata: ephys.SynapticStimulusChannelList, # noqa
-                       obj: typing.Optional[ephys.SynapticStimulusChannel] = None) -> bool:
-        if obj is None:
-            obj = ephys.SynapticStimulusChannel()
-
-        if not isinstance(obj, ephys.SynapticStimulusChannel):
-            return False
-
-        # print(f"{self.__class__.__name__}.__addDataRow__: obj = {obj}")
-
-        self._modelData_.append(obj)
-        self._modelDataRows_ = len(self._modelData_)
-        self._original_data_ = self._modelData_
-        self._canAddRemoveRows_ = True
-        self._canAddRemoveColumns_ = False
-
-        return True
-
-    @_addDataRow_.register(list)
-    @_addDataRow_.register(deque)
-    def __addDataRow__(self, mdata: typing.Sequence, # noqa
-                       obj: typing.Optional[object] = None) -> bool:
+    @_insertDataRow_.register(list)
+    @_insertDataRow_.register(deque)
+    def __insertDataRow__(self, mdata: typing.Sequence, # noqa
+                       obj: typing.Optional[object] = None,
+                       row: int) -> bool:
         if all(isinstance(o, ephys.RecordingSource) for o in mdata):
             if obj is None:
                     obj = ephys.RecordingSource()
@@ -473,17 +477,17 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 scipywarn(f"Expecting a sequence of {len(mdata[-1])} objects")
                 return False
 
-        # print(f"{self.__class__.__name__}.__addDataRow__: obj = {obj}")
+        if row == self.rowCount():
+            self._modelData_.append(obj)
+        else:
+            self._modelData_.insert(row, obj)
 
-        self._modelData_.append(obj)
         self._modelDataRows_ = len(self._modelData_)
         self._original_data_ = self._modelData_
         self._canAddRemoveRows_ = True
         self._canAddRemoveColumns_ = False
 
         return True
-
-    # @_addDataRow_.register()
 
     #### END resizable model
 
@@ -803,14 +807,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(self._modelData_, NeoObjectList):
                 if orientation == QtCore.Qt.Horizontal: # horizontal (columns) header
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                        # return QtCore.QVariant("%s (channel %d, %s)" % (self._modelData_.name, section, self._modelData_.dimensionality))
                         # for horizontal header, section number is the column number
                         if (isinstance(self._modelDataColumnHeaders_, dict)
                             and len(self._modelDataColumnHeaders_)):
-                            # print(f"{self.__class__.__name__}._getHeaderData_({section} ({type(section).__name__})...)")
-                            # print(f"\theader sections: {self._modelDataColumnHeaders_}")
-                            # key = list(self._modelDataColumnHeaders_.keys())[section]
-                            # colhead = self._modelDataColumnHeaders_[key][1]
                             colhead = self._modelDataColumnHeaders_[section]
                             return QtCore.QVariant(colhead)
                         else:
@@ -905,18 +904,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         r"""Retrieves tabular data associated with row & column, given the item role.
 
     """
-        # TODO: 2026-03-17 13:20:49
-        # if data is None but the owner of accest attibuting values to the data
-        # _AND_ it advertises what types of data are acceptale, then allow creating
-        # a new instance of the acceptable class, via a GUI, before setting a new
-        # value to it
-        #
-        # Must work in concert with PythonItemDelegate and with the various model
-        # data types supported by this item model.
-        #
-        # for now, new data has to be entered by hand...
         try:
-            if role not in (ObjectDataRole, QtCore.Qt.DisplayRole,
+            if role not in (ObjectDataRole, QtCore.Qt.DisplayRole, # noqa
                             QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole,
                             QtCore.Qt.AccessibleTextRole):
                 return QtCore.QVariant()
@@ -964,9 +953,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 else:
                     disp = f"{val}"
 
-                ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp
-
-                # ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val.times}" if isinstance(val, neo.Event) else f"{val}" # noqa
+                ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
 
             elif isinstance(self._modelData_, (
                                                 ephys.SynapticPathwayList,
@@ -999,8 +986,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             disp = f"{val.name}"
                         else:
                             disp = f"{val}"
-                        ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp
-                        # ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val}"
+                        ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
 
                 else:
                     rowObj = self._modelData_[row]
@@ -1013,8 +999,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         disp = f"{val.name}"
                     else:
                         disp = f"{val}"
-                    ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp
-                    # ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val}"
+                    ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
 
             elif isinstance(self._modelData_, neo.core.dataobject.DataObject):
                 if col == 0:
@@ -1048,7 +1033,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                 else: # allow for python Quantity arrays, here
                     ret = val if role == QtCore.Qt.EditRole else f"{val.magnitude}" if isinstance(self._modelData_, pq.Quantity) else f"{val}"
-                    # ret = val if role == QtCore.Qt.EditRole else f"{val}" #" f"{val.magnitude}" if isinstance(self._modelData_, pq.Quantity) else f"{val}"
 
             else:
                 return QtCore.QVariant()
@@ -1066,7 +1050,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
             elif role in (QtCore.Qt.UserRole, ):
                 return QtCore.QVariant(val)
-                # return val
 
             else:
                 return QtCore.QVariant()
@@ -1083,7 +1066,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             if isinstance(value, QtCore.QVariant) or hasattr(value, "value"):
                 try:
                     pyvalue = value.value()
-                except:
+                except: # noqa
                     # traceback.print_exc()
                     pyvalue = value.value # for PODS this "comes out" directly !?
 
@@ -1092,7 +1075,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
             return self._setValueInModelData_(self._modelData_, pyvalue, row, col)
 
-        except Exception as e:
+        except Exception as e: # noqa
             traceback.print_exc()
             return False
 
@@ -1833,13 +1816,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._canAddRemoveColumns_ = val is True
 
 @singledispatch
-def _addRow_(self,
+def _appendRow_(self,
              obj: object, row: object, in_place: bool = False) -> object:
     r"""Appends a row of data to the object"""
     raise NotImplementedError(f"Object of type {type (obj).__name__} are not supported")
 
-@_addRow_.register(pd.DataFrame)
-def __addRow__(obj: pd.DataFrame,
+@_appendRow_.register(pd.DataFrame)
+def __appendRow__(obj: pd.DataFrame,
       row: typing.Union[typing.Sequence, pd.Series],
       in_place: bool = False) -> pd.DataFrame:
     if isinstance(row, (pd.Series, np.ndarray)):
@@ -1864,9 +1847,9 @@ def __addRow__(obj: pd.DataFrame,
 
     return ret
 
-@_addRow_.register(pd.Series)
-@_addRow_.register(pd.Index)
-def __addRow__(obj: typing.Union[pd.Series, pd.Index],
+@_appendRow_.register(pd.Series)
+@_appendRow_.register(pd.Index)
+def __appendRow__(obj: typing.Union[pd.Series, pd.Index],
       row: typing.Union[dt.Number, str, pq.Quantity],
       in_place: bool = False) -> pd.Series | pd.Index:
     if isinstance(row, np.ndarray):
@@ -1892,9 +1875,9 @@ def __addRow__(obj: typing.Union[pd.Series, pd.Index],
 
     return ret
 
-@_addRow_.register(np.ndarray)
-@_addRow_.register(pq.Quantity)
-def __addRow__(obj: typing.Union[pq.Quantity, np.ndarray],
+@_appendRow_.register(np.ndarray)
+@_appendRow_.register(pq.Quantity)
+def __appendRow__(obj: typing.Union[pq.Quantity, np.ndarray],
       row: typing.Union[typing.Sequence[pq.Quantity], pq.Quantity],
       in_place: bool = False) -> typing.Union[pq.Quantity, np.ndarray]:
 
@@ -1932,9 +1915,9 @@ def __addRow__(obj: typing.Union[pq.Quantity, np.ndarray],
         # traceback.print_exc()
         raise
 
-@_addRow_.register(neo.IrregularlySampledSignal)
-@_addRow_.register(IrregularlySampledDataSignal)
-def __addRow__(obj: typing.Union[neo.IrregularlySampledSignal,
+@_appendRow_.register(neo.IrregularlySampledSignal)
+@_appendRow_.register(IrregularlySampledDataSignal)
+def __appendRow__(obj: typing.Union[neo.IrregularlySampledSignal,
                         IrregularlySampledDataSignal],
       row: typing.Union[neo.IrregularlySampledSignal,
                         IrregularlySampledDataSignal],
@@ -1959,9 +1942,9 @@ def __addRow__(obj: typing.Union[neo.IrregularlySampledSignal,
 
     return ret
 
-@_addRow_.register(neo.Epoch)
-@_addRow_.register(DataZone)
-def __addRow__(obj: typing.Union[neo.Epoch, DataZone],
+@_appendRow_.register(neo.Epoch)
+@_appendRow_.register(DataZone)
+def __appendRow__(obj: typing.Union[neo.Epoch, DataZone],
       row: typing.Union[neo.Epoch, DataZone],
       in_place:bool=False) -> typing.Union[neo.Epoch, DataZone]:
     if type(row) is not type(obj):
@@ -2001,10 +1984,10 @@ def __addRow__(obj: typing.Union[neo.Epoch, DataZone],
                      array_annotations = obj.array_annotations,
                      **obj.annotations)
 
-@_addRow_.register(neo.Event)
-@_addRow_.register(DataMark)
-@_addRow_.register(TriggerEvent)
-def __addRow__(obj: typing.Union[neo.Event, DataMark, TriggerEvent],
+@_appendRow_.register(neo.Event)
+@_appendRow_.register(DataMark)
+@_appendRow_.register(TriggerEvent)
+def __appendRow__(obj: typing.Union[neo.Event, DataMark, TriggerEvent],
       row: typing.Union[neo.Event, DataMark, TriggerEvent],
       in_place:bool=False) -> typing.Union[neo.Event, DataMark, TriggerEvent]:
     if type(row) is not type(obj):
@@ -2046,9 +2029,9 @@ def __addRow__(obj: typing.Union[neo.Event, DataMark, TriggerEvent],
 
     return ret
 
-@_addRow_.register(neo.AnalogSignal)
-@_addRow_.register(DataSignal)
-def __addRow__(obj: typing.Union[neo.AnalogSignal, DataSignal],
+@_appendRow_.register(neo.AnalogSignal)
+@_appendRow_.register(DataSignal)
+def __appendRow__(obj: typing.Union[neo.AnalogSignal, DataSignal],
       row: typing.Union[np.ndarray, pq.Quantity],
       in_place=False) -> neo.AnalogSignal | DataSignal:
     if not isinstance(row, [pq.Quantity, np.ndarray]):
@@ -2090,9 +2073,9 @@ def __addRow__(obj: typing.Union[neo.AnalogSignal, DataSignal],
 
     return ret
 
-@_addRow_.register(neo.SpikeTrain)
-@_addRow_.register(MarkTrain)
-def __addRow__(obj: typing.Union[neo.SpikeTrain, MarkTrain],
+@_appendRow_.register(neo.SpikeTrain)
+@_appendRow_.register(MarkTrain)
+def __appendRow__(obj: typing.Union[neo.SpikeTrain, MarkTrain],
       row: typing.Union[neo.SpikeTrain, MarkTrain], in_place = False) -> typing.Union[neo.SpikeTrain, MarkTrain]:
     if not isinstance(row, type(obj)):
         raise TypeError(f"Row expected to be a {type(obj).__name__}; instead got a {type(row).__name__}")
@@ -2141,8 +2124,8 @@ def __addRow__(obj: typing.Union[neo.SpikeTrain, MarkTrain],
                           array_annotations = obj.array_annotations,
                           **obj.annotations)
 
-@_addRow_.register(TriggerProtocolList)
-def __addRow__(obj: TriggerProtocolList, row: TriggerProtocol, in_place: bool = False):
+@_appendRow_.register(TriggerProtocolList)
+def __appendRow__(obj: TriggerProtocolList, row: TriggerProtocol, in_place: bool = False):
     if not isinstance(row, TriggerProtocol):
         raise TypeError(f"Cannot add {type(row).__name__}")
 

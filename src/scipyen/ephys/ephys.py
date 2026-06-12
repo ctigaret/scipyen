@@ -564,6 +564,15 @@ class SynapticStimulusChannelList(NeoObjectList):
         for item in self._items:
             yield item
 
+    def __delitem__(self, i: int) -> None:
+        if len(self._items) == 0:
+            return
+
+        if i < len(self._items) and i >= -len(self._items):
+            del(self._items[i])
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
     def __getitem__(self, i: int) -> SynapticStimulusChannel | None:
         """x.__getitem__(y) <==> x[y]"""
         if len(self._items) == 0:
@@ -861,6 +870,15 @@ class AuxiliaryInputList(NeoObjectList):
         for item in self._items:
             yield item
 
+    def __delitem__(self, i: int) -> None:
+        if len(self._items) == 0:
+            return
+
+        if i < len(self._items) and i >= -len(self._items):
+            del(self._items[i])
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
     def __getitem__(self, i: int) -> AuxiliaryInput | None:
         """x.__getitem__(y) <==> x[y]"""
         if len(self._items) == 0:
@@ -1157,6 +1175,15 @@ class AuxiliaryOutputList(NeoObjectList):
         """Implement iter(self)"""
         for item in self._items:
             yield item
+
+    def __delitem__(self, i: int) -> None:
+        if len(self._items) == 0:
+            return
+
+        if i < len(self._items) and i >= -len(self._items):
+            del(self._items[i])
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
     def __getitem__(self, i: int) -> AuxiliaryOutput | None:
         """x.__getitem__(y) <==> x[y]"""
@@ -2965,6 +2992,15 @@ class SynapticPathwayList(NeoObjectList):
         """Implement iter(self)"""
         for item in self._items:
             yield item
+
+    def __delitem__(self, i: int) -> None:
+        if len(self._items) == 0:
+            return
+
+        if i < len(self._items) and i >= -len(self._items):
+            del(self._items[i])
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
     def __getitem__(self, i: int) -> SynapticPathway | None:
         """x.__getitem__(y) <==> x[y]"""

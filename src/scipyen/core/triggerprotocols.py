@@ -1003,6 +1003,15 @@ class TriggerProtocolList(NeoObjectList):
         for item in self._items:
             yield item
 
+    def __delitem__(self, i: int) -> None:
+        if len(self._items) == 0:
+            return
+
+        if i < len(self._items) and i >= -len(self._items):
+            del(self._items[i])
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
     def __getitem__(self, i: int) -> TriggerProtocol | None:
         """x.__getitem__(y) <==> x[y]"""
         if len(self._items) == 0:
