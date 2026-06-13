@@ -214,8 +214,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self._is_vigra_filter_kernel_ = False
 
         self._data_ = data
-        # self.tableView.reset()
-        # oldColumnCount = self.tableView.horizontalHeader().count()
 
         if (getattr(data, "shape", (0,0))[0] > 10
             or (isinstance(data, (typing.Sequence, NeoObjectList)) and len(data) > 10)
@@ -224,20 +222,22 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             # resource consuming
             self.resizeRowsToolButton.setEnabled(False)
 
-        if isinstance(data, np.ndarray) and data.ndim > 2:
-            self._slicingAxis_ = kwargs.get("sliceaxis", None)
-            if not isinstance(self._slicingAxis_, int) or self._slicingAxis_ < 0 or self._slicingAxis_ >= data.ndim:
-                self._slicingAxis_ = 2
+        if isinstance(data, np.ndarray):
+            if data.ndim > 2:
+                self._slicingAxis_ = kwargs.get("sliceaxis", None)
+                if not isinstance(self._slicingAxis_, int) or self._slicingAxis_ < 0 or self._slicingAxis_ >= data.ndim:
+                    self._slicingAxis_ = 2
 
-            if data.ndim > 3:
-                new_shape = list(data.shape[0:self._slicingAxis_]) + [np.prod(data.shape[self._slicingAxis_:])]
-                self._data_ = np.squeeze(data).reshape(tuple(new_shape))
+                if data.ndim > 3:
+                    new_shape = list(data.shape[0:self._slicingAxis_]) + [np.prod(data.shape[self._slicingAxis_:])]
+                    self._data_ = np.squeeze(data).reshape(tuple(new_shape))
+
+            self.prevSliceToolbutton.setEnabled(True)
+            self.nextSliceToolButton.setEnabled(True)
 
             self._currentSlice_ = 0
             self._dataModel_.populateModel(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
 
-            self.prevSliceToolbutton.setEnabled(True)
-            self.nextSliceToolButton.setEnabled(True)
 
         else:
             self.prevSliceToolbutton.setEnabled(False)
@@ -252,6 +252,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                 indexData = index.data(ObjectDataRole)
                 if indexData is None:
                     indexData = index.data(QtCore.Qt.EditRole)
+
                 if isinstance(indexData, bool):
                     self.tableView.openPersistentEditor(index)
 
@@ -383,7 +384,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     @property
     def readOnly(self):
         return self._readOnly_
-        # return self.tableView.editTriggers() == QtWidgets.QAbstractItemView.NoEditTriggers
 
     @readOnly.setter
     def readOnly(self, val:bool):
@@ -406,9 +406,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             # self.tableView.model.canAlterRows = True
             # self.tableVire.model.canAlterColumns = True
             self.tableView.setEditTriggers(self._defaultEditTriggers_)
-            # self._editItemDelegate_.immutableRows = self.tableView.model().immutableRows
-            # self._editItemDelegate_.immutableColumns = self.tableView.model().immutableColumns
-            # self._editItemDelegate_.jointImmutability = self.tableView.model().jointImmutability
             self.tableView.setItemDelegate(self._editItemDelegate_)
 
             self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-unlocked"))
@@ -882,15 +879,15 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         copySelectedAction = cm.addAction("Copy")
         copySelectedAction.setIcon(guiutils.getIcon("edit-copy"))
         copySelectedAction.triggered.connect(self.slot_copySelection)
+        if not self.readOnly:
+            model = self.tableView.model()
+            if isinstance(model, TabularDataModel) and model.canAlterRows:
+                insertRowAction = cm.addAction("Insert row")
+                insertRowAction.setIcon(guiutils.getIcon("insert-table-row"))
+                insertRowAction.triggered.connect(self.slot_insertRow)
 
-        model = self.tableView.model()
-        if isinstance(model, TabularDataModel) and model.canAlterRows:
-            insertRowAction = cm.addAction("Insert row")
-            insertRowAction.setIcon(guiutils.getIcon("insert-table-row"))
-            insertRowAction.triggered.connect(self.slot_insertRow)
-
-            removeRowAction = cm.addAction("Remove row")
-            removeRowAction.setIcon(guiutils.getIcon("delete-table-row"))
-            removeRowAction.triggered.connect(self.slot_removeRow)
+                removeRowAction = cm.addAction("Remove row")
+                removeRowAction.setIcon(guiutils.getIcon("delete-table-row"))
+                removeRowAction.triggered.connect(self.slot_removeRow)
 
         cm.popup(self.tableView.mapToGlobal(pos), copySelectedAction)

@@ -6513,12 +6513,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
 
         self.newViewersMenu = QtWidgets.QMenu("New", self)
-        # self.newViewersMenu.setIcon(QtGui.QIcon.fromTheme("window-new"))
         self.newViewersMenu.setIcon(guiutils.getIcon("window-new"))
         self.newViewersMenu.setTearOffEnabled(True)
         self.newViewersMenu.setToolTipsVisible(True)
         self.newViewersMenu.addAction(guiutils.getIcon("window"),"Figure", lambda: self.newViewer(mpl.figure.Figure))
-        # self.newViewersMenu.addAction(QtGui.QIcon.fromTheme("window"),"Figure", lambda: self.newViewer(mpl.figure.Figure))
         self.menuViewers.addMenu(self.newViewersMenu)
         #
         self.menuView.setIcon(guiutils.getIcon("quickview", "view-preview"))
@@ -6532,32 +6530,26 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         #
 
         # add new viewers menu as toolbar action, too
-        # self.newViewersAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("window-new"), "New Viewer")
         self.newViewersAction = self.toolBar.addAction(guiutils.getIcon("window-new"), "New Viewer")
         self.newViewersAction.setMenu(self.newViewersMenu)
-        # self.consolesAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("akonadiconsole"), "Consoles")
         self.consolesAction = self.toolBar.addAction(guiutils.getIcon("akonadiconsole"), "Consoles")
         # this one is defined in the ui file mainwindow.ui
         self.consolesAction.setMenu(self.menuConsoles)
-        # self.scriptsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("dialog-scripts"), "Scripts")
         self.scriptsAction = self.toolBar.addAction(guiutils.getIcon("dialog-scripts"), "Scripts")
         self.scriptsAction.setMenu(self.menuScripts)
         self.applicationsAction = self.toolBar.addAction(guiutils.getIcon("homerun", "window-list"), "Applications")
-        # self.applicationsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("homerun"), "Applications")
         self.applicationsAction.setMenu(self.menuApplications)
         self.refreshViewAction = self.toolBar.addAction(guiutils.getIcon("view-refresh"), "Refresh Active View")
-        # self.refreshViewAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("view-refresh"), "Refresh Active View")
         self.refreshViewAction.triggered.connect(self.slot_refreshView)
         self.actionHide_Filtered_out_File_Names.setChecked(self._fileNamesFiltersHides_)
         self.actionHide_Filtered_out_File_Names.toggled.connect(self._slot_hideFilteredFileNames)
         self.hideFilteredOutnamesToolButton.setChecked(self._fileNamesFiltersHides_)
         self.hideFilteredOutnamesToolButton.toggled.connect(self._slot_hideFilteredFileNames)
         self.helpTbAction = self.toolBar.addAction(guiutils.getIcon("help-contents"), "Help")
-        # self.helpTbAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("help-contents"), "Help")
         self.helpTbAction.setMenu(self.menuHelp)
         self.settingsAction = self.toolBar.addAction(guiutils.getIcon("settings-configure", "configure"), "Settings")
-        # self.settingsAction = self.toolBar.addAction(QtGui.QIcon.fromTheme("settings-configure"), "Settings")
         self.settingsAction.setMenu(self.menuSettings)
+
         # NOTE: 2024-06-01 18:08:54
         # 'whats this' action should be the last action added to the toolbar
         # self.toolBar.addAction(self.whatsThisAction)
@@ -10300,6 +10292,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             viewers = [spec[0]
                        for spec in handler_specs if spec[1] == actionName]
 
+            # print(f"{self.__class__.__name__}.slot_autoSelectViewer -> viewers = {viewers}")
+
             if len(viewers) == 0:
                 self.console.execute(varname)
 
@@ -10448,12 +10442,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         r"""Displays a variable in the workspace.
         The variable is selected by its name
         """
-        # print("ScipyenWindow.viewVar, newWindow:", newWindow)
+        # print(f"{self.__class__.__name__}.viewVar({varname}, newWindow={newWindow})")
         if varname in self.workspace.keys():
             if varname is None:
                 return False
 
             obj = self.workspace[varname]
+            # print(f"-> obj is a {type(obj).__name__}")
 
             # NOTE: 2022-12-22 09:59:02
             # The following three checks are here to avoid launching a viewer for a
@@ -10466,9 +10461,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if isinstance(obj, numbers.Number):
                 return False
 
-            if isinstance(obj, (tuple, list, collections.deque)) or hasattr(obj, "__iter__") or hasattr(obj, "__len__"):
-                if len(obj) < 1:
-                    return False
+            # NOTE: 2026-06-13 22:12:57
+            # see NOTE: 2026-06-13 22:12:18
+            #
+
+            # if isinstance(obj, (tuple, list, collections.deque)) or hasattr(obj, "__iter__") or hasattr(obj, "__len__"):
+            #     if not isinstance(obj, NeoObjectList):
+            #         if len(obj) < 1:
+            #             return False
 
             return self.viewObject(obj, varname,
                                    winType=winType,
@@ -10631,10 +10631,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     def viewObject(self, obj, objname, winType=None,
                    newWindow=False, askForParams=False):
-        r"""Actually displays a python object in user's workspace.
-        Delegates to appropriate viewer according to object type, creates a new
-        viewer if necessary.
-        Call this function when the intention is to display variables that are
+        r"""Displays a python object using a built-in viewer.
+
+        Delegates to an appropriate viewer type selected according to the object
+        type; creates a new viewer instance if necessary.
+
+        Call this method directly when the intention is to display variables that are
         NOT in user's workspace.
 
         Parameters:
@@ -10669,12 +10671,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if isinstance(obj, numbers.Number):
             return False
 
-        if isinstance(obj, (tuple, list, collections.deque)) or hasattr(obj, "__iter__") or hasattr(obj, "__len__"):
-            try:
-                if len(obj) < 1:
-                    return False
-            except:
-                return False
+        # NOTE: 2026-06-13 22:12:18
+        # allow creating viewers for empty sequences too
+        #
+        # see also NOTE: 2026-06-13 22:12:57
+
+        # if isinstance(obj, (tuple, list, collections.deque)) or hasattr(obj, "__iter__") or hasattr(obj, "__len__"):
+        #     try:
+        #         if len(obj) < 1:
+        #             return False
+        #     except:
+        #         return False
 
         if isinstance(winType, str) and winType in [v.__name__ for v in self.viewers.keys()]:
             if winType not in self.viewers.keys():
@@ -10703,8 +10710,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         if len(self.viewers[winType]) == 0 or newWindow:
             # print(f"{self.__class__.__name__}.viewObject make new")
-
             win = self.newViewer(winType)
+
         else:
             win = self.currentViewers[winType]
 
@@ -10978,8 +10985,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     for v in sortedViewers:
                         self.newViewersMenu.addAction(guiutils.getIcon("window"),
                             v[0], self.slot_newViewerMenuAction)
-                        # self.newViewersMenu.addAction(QtGui.QIcon.fromTheme("window"),
-                        #     v[0], self.slot_newViewerMenuAction)
+
                 else:
                     actions = self.newViewersMenu.actions()
                     labels = sorted(list(action.text() for action in actions))
@@ -11003,8 +11009,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                             else:
                                 self.newViewersMenu.addAction(guiutils.getIcon("window"),
                                     v[0], self.slot_newViewerMenuAction)
-                                # self.newViewersMenu.addAction(QtGui.QIcon.fromTheme("window"),
-                                #     v[0], self.slot_newViewerMenuAction)
 
         # NOTE: 2016-04-03 00:25:00 - do NOT delete - keep for future reference
         # (i.e., don't make this mistake again...)

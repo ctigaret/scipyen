@@ -1035,6 +1035,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 # widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "...", parent)
                 if hasattr(widget, "setFrame"):
                     widget.setFrame(False)
+                    widget.setToolTip("Click to edit the object represented in this row")
                 widget.setAutoFillBackground(True)
                 widget.setObjectName(f"{type(widget).__name__}_LaunchExternalEdit_delegate")
                 widget.clicked.connect(self._slot_editDataExternally)

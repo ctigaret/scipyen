@@ -477,23 +477,43 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     def __insertDataRow__(self, mdata: typing.Sequence, # noqa
                        row: int, # noqa
                        obj: typing.Optional[object] = None) -> bool:
-        if all(isinstance(o, ephys.RecordingSource) for o in mdata):
-            if obj is None:
+        if len(mdata):
+            if all(isinstance(o, ephys.RecordingSource) for o in mdata):
+                if obj is None:
                     obj = ephys.RecordingSource()
 
-            if not isinstance(obj, ephys.RecordingSource):
-                scipywarn(f"A RecordingSource object was expected; instead, got a {type(obj).__name__}")
-                return False
+                if not isinstance(obj, ephys.RecordingSource):
+                    scipywarn(f"A RecordingSource object was expected; instead, got a {type(obj).__name__}")
+                    return False
 
-        elif all(isinstance(o, typing.Sequence) for o in mdata):
-            if isinstance(obj, typing.Sequence):
-                if len(obj) != len(mdata[-1]):
+            elif all(isinstance(o, typing.Sequence) for o in mdata):
+                if isinstance(obj, typing.Sequence):
+                    if len(obj) != len(mdata[-1]):
+                        scipywarn(f"Expecting a sequence of {len(mdata[-1])} objects")
+                        return False
+
+                else:
                     scipywarn(f"Expecting a sequence of {len(mdata[-1])} objects")
                     return False
 
             else:
-                scipywarn(f"Expecting a sequence of {len(mdata[-1])} objects")
-                return False
+                if all(
+                    isinstance(d,
+                                    (int, float, str, bool,
+                                    np.integer, np.floating, np.complexfloating,
+                                    np.character, np.bool,
+                                    pq.Quantity)
+                                )
+                    for d in mdata
+                    ):
+                    if not isinstance(obj, ((int, float, str, bool,
+                                    np.integer, np.floating, np.complexfloating,
+                                    np.character, np.bool,
+                                    pq.Quantity, types.NoneType))):
+                        return False
+
+        else:
+            return False
 
         if row == self.rowCount():
             self._modelData_.append(obj)
@@ -513,10 +533,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     @Slot(object)
     def populateModel(self, data):
-        #print("TabularDataModel populateModel")
         from core import datatypes
         from imaging import vigrautils
 
+        # print(f"{self.__class__.__name__}.populateModel({type(data).__name__})")
         # ### BEGIN Define timer to debug
         # #
         # timer = QtCore.QElapsedTimer()
@@ -861,7 +881,18 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                 return QtCore.QVariant("%s (channel %d, %s)" % (self._modelData_.name, section-1, self._modelData_.dimensionality))
 
                     elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                        return QtCore.QVariant("%s" % self._modelData_[:,section].dtype)
+                        try:
+                            if len(self._modelData_):
+                                if self._modelDataColumnHeaders_[section].lower() == "edit":
+                                    tip = "Double-click in the desired row to edit the object represented in the row"
+                                else:
+                                    tip = type(getattr(self._modelData_[0], self._modelDataColumnHeaders_[section])).__name__
+                                return QtCore.QVariant(f"{tip}")
+                            else:
+                                return QtCore.QVariant()
+                        except:
+                            traceback.print_exc()
+                            return QtCore.QVariant()
 
                     else:
                         return QtCore.QVariant()
@@ -1484,81 +1515,38 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @_makeModelData_.register(tuple)
     @_makeModelData_.register(deque)
     def __makeModelData__(self, data: typing.Sequence): # noqa
-        if all(isinstance(d, ephys.RecordingSource) for d in data):
-            self._modelData_ = data
-            self._original_data_ = data
-            self._modelDataRows_ = len(data)
-            self._canAddRemoveRows_ = True
-            self._canAddRemoveColumns_ = False
-            # self._is_vigra_filter_kernel_ = 0
-            # NOTE: 2026-06-07 21:38:07 see NOTE: 2026-06-07 21:36:23
-            self._modelDataColumnHeaders_ = dict(
-                tuple(
-                    map(
-                        lambda x: (x[0], f"{x[1]}"),
-                        enumerate(("name", "adc", "dac", "electrodeMode", "Edit"))
-                        )
-                    )
-                )
-            self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
-
-        elif all(isinstance(d, typing.Sequence) for d in data):
-            # NOTE: 2026-06-07 21:59:50 Row-major !!!
-            # i.e., access is data[row][column] ≡ data[y][x]
-            assert all(len(d) == len(data[0]) for d in data[1:]), "Sequences with non-rectangular shape are not supported"
-
-            assert datatypes.is_homogeneous_sequence(data), "Only sequences homogeneous in their element types are supported"
-
-            # if any(any(isinstance(d_, typing.Sequence) for d_ in d) for d in data):
-            #     raise ValueError("Only 2D nested sequences are supported")
-
-            self._modelData_ = data
-            self._original_data_ = data
-            self._modelDataColumns_ = len(data[0])
-            self._modelDataRows_ = len(data)
-
-            self._modelDataColumnHeaders_ = dict(
-                tuple(
-                    map(
-                        lambda x: (x, f"{x}"),
-                        range(self._modelDataColumns_)
-                        )
-                    )
-                )
-            self._canAddRemoveRows_ = True
-            self._canAddRemoveColumns_ = True
-
-            if isinstance(data, tuple):
-                self.immutableRows = range(self._modelDataRows_)
-                self.immutableColumns = range(self._modelDataColumns_)
+        if len(data):
+            if all(isinstance(d, ephys.RecordingSource) for d in data):
+                self._modelData_ = data
+                self._original_data_ = data
+                self._modelDataRows_ = len(data)
+                self._canAddRemoveRows_ = True
                 self._canAddRemoveColumns_ = False
-
-            else:
-                self.immutableRows = list(
-                    map(
-                        lambda x: x[0],
-                        filter(
-                            lambda x: isinstance(x[1], tuple),
-                            enumerate(data)
+                # self._is_vigra_filter_kernel_ = 0
+                # NOTE: 2026-06-07 21:38:07 see NOTE: 2026-06-07 21:36:23
+                self._modelDataColumnHeaders_ = dict(
+                    tuple(
+                        map(
+                            lambda x: (x[0], f"{x[1]}"),
+                            enumerate(("name", "adc", "dac", "electrodeMode", "Edit"))
                             )
                         )
                     )
-                self._canAddRemoveColumns_ = False
+                self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
 
-        else:
-            if all(
-                isinstance(d,
-                                (int, float, str, bool,
-                                np.integer, np.floating, np.complexfloating,
-                                np.character, np.bool,
-                                pq.Quantity)
-                                )
-                for d in data
-                ):
+            elif all(isinstance(d, typing.Sequence) for d in data):
+                # NOTE: 2026-06-07 21:59:50 Row-major !!!
+                # i.e., access is data[row][column] ≡ data[y][x]
+                assert all(len(d) == len(data[0]) for d in data[1:]), "Sequences with non-rectangular shape are not supported"
+
+                assert datatypes.is_homogeneous_sequence(data), "Only sequences homogeneous in their element types are supported"
+
+                # if any(any(isinstance(d_, typing.Sequence) for d_ in d) for d in data):
+                #     raise ValueError("Only 2D nested sequences are supported")
 
                 self._modelData_ = data
                 self._original_data_ = data
-                self._modelDataColumns_ = 1
+                self._modelDataColumns_ = len(data[0])
                 self._modelDataRows_ = len(data)
 
                 self._modelDataColumnHeaders_ = dict(
@@ -1570,15 +1558,68 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         )
                     )
                 self._canAddRemoveRows_ = True
-                self._canAddRemoveRows_ = True
+                self._canAddRemoveColumns_ = True
+
+                if isinstance(data, tuple):
+                    self.immutableRows = range(self._modelDataRows_)
+                    self.immutableColumns = range(self._modelDataColumns_)
+                    self._canAddRemoveColumns_ = False
+
+                else:
+                    self.immutableRows = list(
+                        map(
+                            lambda x: x[0],
+                            filter(
+                                lambda x: isinstance(x[1], tuple),
+                                enumerate(data)
+                                )
+                            )
+                        )
+                    self._canAddRemoveColumns_ = False
 
             else:
-                scipywarn("Unsupported sequence element types")
-                self._modelDataColumns_ = 0
-                self._modelDataRows_ = 0
-                self._modelDataColumnHeaders_ = dict()
-                self._modelData_ = None
-                self._original_data_ = None
+                if all(
+                    isinstance(d,
+                                    (int, float, str, bool,
+                                    np.integer, np.floating, np.complexfloating,
+                                    np.character, np.bool,
+                                    pq.Quantity)
+                                    )
+                    for d in data
+                    ):
+
+                    self._modelData_ = data
+                    self._original_data_ = data
+                    self._modelDataColumns_ = 1
+                    self._modelDataRows_ = len(data)
+
+                    self._modelDataColumnHeaders_ = dict(
+                        tuple(
+                            map(
+                                lambda x: (x, f"{x}"),
+                                range(self._modelDataColumns_)
+                                )
+                            )
+                        )
+                    self._canAddRemoveRows_ = True
+                    self._canAddRemoveRows_ = True
+
+                else:
+                    scipywarn("Unsupported sequence element types")
+                    self._modelDataColumns_ = 0
+                    self._modelDataRows_ = 0
+                    self._modelDataColumnHeaders_ = dict()
+                    self._modelData_ = None
+                    self._original_data_ = None
+
+        else:
+            self._modelDataColumns_ = 0
+            self._modelDataRows_ = 0
+            self._modelDataColumnHeaders_ = dict()
+            self._modelData_ = data
+            self._original_data_ = data
+            self._canAddRemoveRows_ = True
+            self._canAddRemoveRows_ = True
 
         self._modelDataRowIndexName_ = "Index"
 

@@ -3131,7 +3131,7 @@ class SynapticPathwayList(NeoObjectList):
             raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
 
 
-class DataListener(QtCore.QObject):
+class EphysDataListener(QtCore.QObject): # FIXME 2026-06-13 22:05:16 Not used ?!?
     r"""
     Dynamically constructs and augments neo.Block data as
     axon files are created in the current working directory
