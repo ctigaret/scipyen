@@ -213,7 +213,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         else:
             self._is_vigra_filter_kernel_ = False
 
-        self._data_ = data
 
         if (getattr(data, "shape", (0,0))[0] > 10
             or (isinstance(data, (typing.Sequence, NeoObjectList)) and len(data) > 10)
@@ -223,6 +222,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self.resizeRowsToolButton.setEnabled(False)
 
         if isinstance(data, np.ndarray):
+            self._currentSlice_ = 0
             if data.ndim > 2:
                 self._slicingAxis_ = kwargs.get("sliceaxis", None)
                 if not isinstance(self._slicingAxis_, int) or self._slicingAxis_ < 0 or self._slicingAxis_ >= data.ndim:
@@ -232,14 +232,20 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                     new_shape = list(data.shape[0:self._slicingAxis_]) + [np.prod(data.shape[self._slicingAxis_:])]
                     self._data_ = np.squeeze(data).reshape(tuple(new_shape))
 
-            self.prevSliceToolbutton.setEnabled(True)
-            self.nextSliceToolButton.setEnabled(True)
+                else:
+                    self._data_ = data
 
-            self._currentSlice_ = 0
-            self._dataModel_.populateModel(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
+                self.prevSliceToolbutton.setEnabled(True)
+                self.nextSliceToolButton.setEnabled(True)
 
+                self._dataModel_.populateModel(self._data_[array_slice(self._data_, {self._slicingAxis_:self._currentSlice_})])
+
+            else:
+                self._data_ = data
+                self._dataModel_.populateModel(self._data_)
 
         else:
+            self._data_ = data
             self.prevSliceToolbutton.setEnabled(False)
             self.nextSliceToolButton.setEnabled(False)
             self._dataModel_.populateModel(self._data_)

@@ -480,6 +480,7 @@ device such as an image acquisition workstation - e.g. linescan TTLs or frame TT
 """
 import typing, struct, inspect, itertools, functools, warnings, pathlib
 from functools import singledispatch, singledispatchmethod, partial
+import enum
 import traceback
 import numpy as np
 import pandas as pd
@@ -735,6 +736,12 @@ class ABFEpochType(TypeEnum):
     Triangular = 4
     Cosine = 5
     Biphasic = 7
+
+class ABFEpochRole(enum.IntEnum):
+    UnspecifiedRole = 0
+    BaselineRole = 1 # for measuring the direct component (i.e. "baseline" of the entire sweep)
+    MembraneTestRole = 2 # for measuring passive membrane properies: capacitance, Rs, Rin
+    StimulusRole = 3 # for evoking synaptic response via DIG-emitted or DAC-emulated TTLs
 
 class ABFEpoch:
     r"""Encapsulates an ABF Epoch - a building part of the DAC (command) waveform.
@@ -1084,7 +1091,6 @@ class ABFProtocol(ElectrophysiologyProtocol):
     # TODO 2024-07-19 13:19:40 FIXME URGENTLY
     # implement code related to pyabf stimulusFilefolder & stimulusWaveformFromFile
     #
-    from ephys.ephys import SynapticPathway
     from ephys.ephys import ClampMode
     from core.neoutils import getAcquisitionInfo
 
