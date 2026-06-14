@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# $Id: recordingsourcewidget.py $
+# $Id: recordingepisodewidget.py $
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@proton.me>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -57,19 +57,19 @@ from gui import guiutils
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_RecordingSourceWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "recordingsourcewidget.ui")
+Ui_RecordingEpisodeWidget, QWidget = loadUiType(
+    os.path.join(__module_path__, "recordingepisodewidget.ui")
     )
 
 
-class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget):
+class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
-                 obj: typing.Optional[pathways.RecordingSource] = None):
+                 obj: typing.Optional[pathways.RecordingEpisode] = None):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
 
-        if isinstance(parent, pathways.RecordingSource):
+        if isinstance(parent, pathways.RecordingEpisode):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
                 parent = obj
@@ -81,14 +81,14 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget):
 
         QWidget.__init__(self, parent=parent)
 
-        if not isinstance(obj, pathways.RecordingSource):
+        if not isinstance(obj, pathways.RecordingEpisode):
             self._data_ = None
         else:
             self._data_ = obj
 
         # print(f"\tself._data_: {self._data_}")
 
-        if isinstance(self._data_, pathways.RecordingSource):
+        if isinstance(self._data_, pathways.RecordingEpisode):
             self._name_ = self._data_.name
             self._adc_ = self._data_.adc
             self._dac_ = self._data_.dac

@@ -290,59 +290,10 @@ class RecordingEpisode(Episode):
         protocol: ElectrophysiologyProtocol — the protocol used in common througout
             the episode
 
-        pathActivationBySweep: dict — indicates which pathways are stimulated in
+        stimulusLayout: PathwaysStimulationLayout — indicates which pathways are stimulated in
             which sweep; also useful for testing pathway cross-talk, or independence
 
-            This is a key ↦ value mapping, where:
-
-            • the keys are either:
-                ∘ an int: the index of the segment¹ where the cross-stimulation
-                    of the pathways indicated in the corresponsing tuple,
-                    has occurred.
-
-                ∘ a tuple of two int (x,y) where `x` is the index of the
-                    first segment where cross-stimulation is applied, and
-                    `y` is the number of segments skipped.
-
-            • values are tuples of SynapticPathway objects, and their ORDER
-                indicates the order in which the pathways are cross-stimulated
-                in a given sweep;
-
-                In theory, there can be any number of pathways, but in practice
-                only first two pathways are tested for cross-talk.
-
-                A tuple that contains only one pathway indicates no crosstalk in
-                the sweep(s) specified by the key.
-
-            Examples:
-            A dictionary with the following structure:
-
-            0 ↦ (path0, path1)
-            1 ↦ (path1, path0)
-
-            indicates a cross-stimulation of two pathwyas ('path0' & 'path1') in
-            the order 'path0' → 'path1' in the 1ˢᵗ segment (sweep 0), and in
-            the order 'path1' → 'path0' in the 2ⁿᵈ segment (sweep 1)
-
-
-            A dictionary with the following structure:
-
-            (0,2) ↦ (path0, path1)
-            (1,2) ↦ (path1, path0)
-
-            indicates cross-stimulation of two pathways ('path0' & 'path1') in
-            the order 'path0' → 'path1' in every other segment starting with the
-            1ˢᵗ  (segment index 0) , 𝑖.𝑒, on `even-numbered` segments,
-            and in the order 'path1' → 'path0' in every other segment, starting
-            with the 2ⁿᵈ (segment index 1) , 𝑖.𝑒,, on `odd-numbered` segments.
-
-            By default the `pathActivationBySweep` attribute of a recording
-            episode is an empty dict.
-
-            ¹ Here a `segment` has the same meaning as a `sweep`; we use `segment`
-            to also indicate that this refers to a neo.Segment object.
-
-            Optional, default is an empty dictionary.
+            Optional, default is None.
 
         Var-keyword parameters (kwargs)
         -------------------------------
@@ -3485,10 +3436,10 @@ def parseEpochs(pathway: SynapticPathway, protocol: pab.ABFProtocol,
                                  and protocol.getEpochLevel(epoch, dac, sweep) == 0
                                  and epoch.deltaLevel == 0) # and epoch.deltaDuration == 0
 
-    classifyEpoch = lambda epoch: (ABFEpochRole.MembraneTestRole if isMTEpoch(epoch) else
-                                   ABFEpochRole.BaselineRole if isFlatEpoch(epoch) else
-                                   ABFEpochRole.StimulusRole if epoch.number in digTriggerEpochs
-                                   else ABFEpochRole.UnspecifiedRole)
+    classifyEpoch = lambda epoch: (pab.ABFEpochRole.MembraneTestRole if isMTEpoch(epoch) else
+                                   pab.ABFEpochRole.BaselineRole if isFlatEpoch(epoch) else
+                                   pab.ABFEpochRole.StimulusRole if epoch.number in digTriggerEpochs
+                                   else pab.ABFEpochRole.UnspecifiedRole)
 
     # NOTE: 2026-05-01 21:57:34
     # use a list instead of tuple so that Role can be changed in GUI
@@ -3549,9 +3500,8 @@ def parseEpochs(pathway: SynapticPathway, protocol: pab.ABFProtocol,
                     dcEpoch = maybeSuitable[ndx]
 
                 for eNumber, (epoch, epochRole) in epochsDict.items():
-                    if epochRole == ABFEpochRole.BaselineRole and epoch is not dcEpoch:
-                        epochsDict[eNumber][1] = ABFEpochRole.UnspecifiedRole
-                        # epochsDict[eNumber] = (epoch, ABFEpochRole.UnspecifiedRole)
+                    if epochRole == pab.ABFEpochRole.BaselineRole and epoch is not dcEpoch:
+                        epochsDict[eNumber][1] = pab.ABFEpochRole.UnspecifiedRole
 
     return epochsDict
 
