@@ -908,7 +908,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     lbl = f"{section}"
                     if orientation == QtCore.Qt.Horizontal:
                         if (isinstance(self._modelDataColumnHeaders_, dict)
-                            and len(self._modelDataColumnHeaders_)):
+                            and len(self._modelDataColumnHeaders_)
+                            and section in self._modelDataColumnHeaders_
+                            ):
                             return QtCore.QVariant(self._modelDataColumnHeaders_[section])
                         else:
                             if isinstance(self._modelData_, pq.Quantity):
@@ -1366,10 +1368,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 domain_name = getattr(data, "domain_name", scq.getUnitFamily(domain))
                 if len(domain_name) == 0:
                     # domain_name = f"{domain.dimensionality}"
-                    domain_name = f"{scq.unitsSymbol(domain)}"
+                    domain_name = f"{scq.unitSymbol(domain)}"
                 else:
                     # domain_name += f" ({domain.dimensionality})"
-                    domain_name += f" ({scq.unitsSymbol(domain)})"
+                    domain_name += f" ({scq.unitSymbol(domain)})"
 
                 if data.ndim > 1:
                     # include domain as the first column

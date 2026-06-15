@@ -7,9 +7,16 @@
 r"""
 """
 
-import sys, os, typing, types, warnings, math, cmath
+import sys
+import os
+import typing
+import types
+import warnings
+import math
+import cmath
 import numbers
 import datetime
+import traceback
 import numpy as np
 import quantities as pq
 import neo
@@ -26,8 +33,8 @@ __has_qtdbus__ = False
 
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -37,7 +44,7 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
+    from qtpy import sip # noqa
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
@@ -45,16 +52,17 @@ else:
     __has_sip__ = True
 
 try:
-    from qtpy import QtDBus
+    from qtpy import QtDBus # noqa
     __has_qtdbus__ = True
 except:
     __has_qtdbus__ = False
 
 from ephys import ephys
 from ephys import pathways
-from core import datatypes
+from core import datatypes # noqa
 from core.prog import scipywarn
 from core import qtutils
+from iolib import pictio as pio
 from gui import (guiutils, interact)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -152,6 +160,14 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
 
         self.episodeBeginDateTimeEdit.dateTimeChanged.connect(self._slot_beginDateTimeChanged)
 
+        self.episodeEndDateTimeEdit.setToolTip("Date/time for the end of episode (inclusive)")
+        self.episodeEndDateTimeEdit.setWhatsThis("Date/time for the end of episode (inclusive)")
+        self.episodeEndDateTimeEdit.setStatusTip("Date/time for the end of episode (inclusive)")
+        if isinstance(self._end_, datetime.datetime):
+            self.episodeEndDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._begin_))
+
+        self.episodeEndDateTimeEdit.dateTimeChanged.connect(self._slot_endDateTimeChanged)
+
         self.firstFrameSpinBox.setToolTip("Index of the first frame (sweep) in data")
         self.firstFrameSpinBox.setWhatsThis("Index of the first frame (sweep) in data")
         self.firstFrameSpinBox.setStatusTip("Index of the first frame (sweep) in data")
@@ -224,7 +240,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
-    def _slot_endFrameChanged(self, val: int):
+    def _slot_lastFrameChanged(self, val: int):
         self._endFrame_ = val
         if not isinstance(self._data_, pathways.RecordingEpisode):
             self._make_value_()
@@ -271,19 +287,203 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
     def _slot_importTrials(self):
         self._importTrials()
 
-
     @Slot()
     def _slot_loadTrials(self):
         self._loadTrials()
 
     def _importTrials(self):
+        ret = list()
         if isinstance(self._name_, str) and len(self._name_.strip()):
-            ret = interact.selectWSData(f"{self._name_}_*", title = f"Select Trial Blocks for {self._name_}", single=False, var_type = neo.Block) # noqa
+            ret = interact.selectWSData(f"{self._name_}_*",
+                                        title = f"Select Trial Blocks for {
+                                            self._name_
+                                            }",
+                                        single=False,
+                                        var_type = neo.Block,
+                                        retrieve_all = True,
+                                        ) # noqa
         else:
-            ret = interact.selectWSData(title = f"Select Trial Blocks for {drug}", single=False, var_type = neo.Block) # noqa
+            ret = interact.selectWSData(title = "Select Trial Blocks",
+                                        single=False,
+                                        var_type = neo.Block,
+                                        retrieve_all = True,
+                                        ) # noqa
 
         if len(ret):
-            return ret
+            ret = sorted(ret, key = lambda x: x.rec_datetime)
+
+            if self.protocol is None:
+                self.protocol = ephys.getProtocol(ret[0])
+                if isinstance(self.protocol , ephys.ElectrophysiologyProtocol):
+                    if not all(ephys.getProtocol(x) == self.protocol for x in ret[1:]):
+                        scipywarn("All trials in an episode must have been recorded with the same protocol")
+
+            else:
+                protocol = ephys.getProtocol(ret[0])
+                # allow chaning the protocol even when it was previously set
+                if isinstance(self.protocol , ephys.ElectrophysiologyProtocol):
+                    if not all(ephys.getProtocol(x) == self.protocol for x in ret[1:]):
+                        scipywarn("All trials in an episode must have been recorded with the same protocol")
+                    else:
+                        self.protocol = protocol
+
+            self._begin_ = ret[0].rec_datetime
+            self._beginFrame_ = 0
+            self._end_ = ret[-1].rec_datetime
+            self._endFrame_ = len(ret)-1
+
+        self._blocks_ = ret
+
+    def _loadTrials(self):
+        from gui.workspacegui import FileIOGui
+        if isinstance(self._name_, str) and len(self._name_.strip()):
+            fileNameFilter = f"{self._name_}*.abf;{self._name_}*.pkl"
+        else:
+            fileNameFilter = "*.abf;*.pkl"
+        files = FileIOGui.chooseFile_static(caption="Open trials",
+                                            fileFilter = fileNameFilter,
+                                            single=False)
+
+        ret = list()
+        try:
+            if len(files):
+                for f in files:
+                    obj = pio.loadFile(f)
+                    if isinstance(obj, neo.Block):
+                        ret.append(obj)
+        except: # noqa
+            traceback.print_exc()
+
+        if len(ret):
+            ret = sorted(ret, key = lambda x: x.rec_datetime)
+
+            if self.protocol is None:
+                self.protocol = ephys.getProtocol(ret[0])
+                if isinstance(self.protocol , ephys.ElectrophysiologyProtocol):
+                    if not all(ephys.getProtocol(x) == self.protocol for x in ret[1:]):
+                        scipywarn("All trials in an episode must have been recorded with the same protocol")
+
+            else:
+                protocol = ephys.getProtocol(ret[0])
+                # allow chaning the protocol even when it was previously set
+                if isinstance(self.protocol , ephys.ElectrophysiologyProtocol):
+                    if not all(ephys.getProtocol(x) == self.protocol for x in ret[1:]):
+                        scipywarn("All trials in an episode must have been recorded with the same protocol")
+                    else:
+                        self.protocol = protocol
+
+            self._begin_ = ret[0].rec_datetime
+            self._beginFrame_ = 0
+            self._end_ = ret[-1].rec_datetime
+            self._endFrame_ = len(ret)-1
+
+        self._blocks_ = ret
+
+    @property
+    def protocol(self) -> ephys.ElectrophysiologyProtocol | None:
+        return self._protocol_
+
+    @protocol.setter
+    def protocol(self, val: typing.Optional[ephys.ElectrophysiologyProtocol] = None):
+        if not isinstance(val, ephys.ElectrophysiologyProtocol) and val is not None:
+            raise TypeError(f"Expecting an ElectrophysiologyProtocol or None; instead got a {type(val).__name__}")
+
+        self._protocol_ = val
+
+        if not isinstance(self._data_, pathways.RecordingEpisode):
+            self._make_value_()
+        else:
+            self._data_.protocol = self._protocol_
+
+        sigBlock = QtCore.QSignalBlocker(self.protocolNameLabel)
+        if isinstance(self._protocol_, ephys.ElectrophysiologyProtocol):
+            self.protocolNameLabel.setText(self._protocol_.name)
+        else:
+            self.protocolNameLabel.setText("")
+
+    @property
+    def begin(self) -> datetime.datetime:
+        return self._begin_
+
+    @begin.setter
+    def begin(self, val: datetime.datetime | None = None):
+        if not isinstance(val, datetime.datetime) and val is not None:
+            raise TypeError(f"Expecting a datetime object or None; instead, got a {type(val).__name__}")
+
+        if val is None:
+            val = datetime.datetime.now()
+
+        self._begin_ = val
+
+        if not isinstance(self._data_, pathways.RecordingEpisode):
+            self._make_value_()
+        else:
+            self._data_.begin = self._begin_
+
+        sigBlock = QtCore.QSignalBlocker(self.episodeBeginDateTimeEdit)
+        self.episodeBeginDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._begin_))
+
+    @property
+    def end(self) -> datetime.datetime:
+        return self._end_
+
+    @end.setter
+    def end(self, val: datetime.datetime | None):
+        if not isinstance(val, datetime.datetime) and val is not None:
+            raise TypeError(f"Expecting a datetime object or None; instead, got a {type(val).__name__}")
+
+        if val is None:
+            val = datetime.datetime.now()
+
+        self._end_ = val
+
+        if not isinstance(self._data_, pathways.RecordingEpisode):
+            self._make_value_()
+        else:
+            self._data_.end = self._end_
+
+        sigBlock = QtCore.QSignalBlocker(self.episodeEndDateTimeEdit)
+        self.episodeEndDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._begin_))
+
+    @property
+    def firstFrame(self) -> int:
+        return self._beginFrame_
+
+    @firstFrame.setter
+    def firstFrame(self, val: int):
+        if not isinstance(val, int):
+            raise TypeError(f"Expecting an int,; instead got a {type(val).__name__}")
+        if val < 0:
+            raise ValueError(f"Expecting a positive value; got {val} instead")
+
+        self._beginFrame_ = val
+        if not isinstance(self._data_, pathways.RecordingEpisode):
+            self._make_value_()
+        else:
+            self._data_.beginFrame = self._beginFrame_
+
+        sigBlock = QtCore.QSignalBlocker(self.firstFrameSpinBox)
+        self.firstFrameSpinBox.setValue(self._beginFrame_)
+
+    @property
+    def lastFrame(self) -> int:
+        return self._endFrame_
+
+    @lastFrame.setter
+    def lastFrame(self, val: int):
+        if not isinstance(val, int):
+            raise TypeError(f"Expecting an int,; instead got a {type(val).__name__}")
+        if val < 0:
+            raise ValueError(f"Expecting a positive value; got {val} instead")
+
+        self._endFrame_ = val
+        if not isinstance(self._data_, pathways.RecordingEpisode):
+            self._make_value_()
+        else:
+            self._data_.endFrame = self._endFrame_
+
+        sigBlock = QtCore.QSignalBlocker(self.lastFrameSpinBox)
+        self.lastFrameSpinBox.setValue(self._endFrame_)
 
 
     # @Slot()
@@ -319,9 +519,9 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
     #         self._make_value_()
     #         self.sig_valueChanged.emit(self._data_)
 
-    @Slot(object)
-    def slot_valueChanged(self, val):
-        self._data_ = val
+    # @Slot(object)
+    # def slot_valueChanged(self, val):
+    #     self._data_ = val
 
     def setValue(self, val: typing.Optional[pathways.SynapticPathway] = None):
         print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
