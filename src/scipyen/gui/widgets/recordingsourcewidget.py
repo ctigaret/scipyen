@@ -49,7 +49,7 @@ except:
     __has_qtdbus__ = False
 
 from ephys import ephys
-from ephys import pathways
+from ephys import ephys_pathways
 from core import datatypes
 from core.prog import scipywarn
 from gui import guiutils
@@ -66,10 +66,10 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
-                 obj: typing.Optional[pathways.RecordingSource] = None):
+                 obj: typing.Optional[ephys_pathways.RecordingSource] = None):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
 
-        if isinstance(parent, pathways.RecordingSource):
+        if isinstance(parent, ephys_pathways.RecordingSource):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
                 parent = obj
@@ -81,14 +81,14 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget):
 
         QWidget.__init__(self, parent=parent)
 
-        if not isinstance(obj, pathways.RecordingSource):
+        if not isinstance(obj, ephys_pathways.RecordingSource):
             self._data_ = None
         else:
             self._data_ = obj
 
         # print(f"\tself._data_: {self._data_}")
 
-        if isinstance(self._data_, pathways.RecordingSource):
+        if isinstance(self._data_, ephys_pathways.RecordingSource):
             self._name_ = self._data_.name
             self._adc_ = self._data_.adc
             self._dac_ = self._data_.dac
@@ -102,11 +102,11 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget):
             self._name_ = "source"
             self._adc_ = 0
             self._dac_ = 0
-            self._syn_ = pathways.SynapticStimulusChannelList()
+            self._syn_ = ephys_pathways.SynapticStimulusChannelList()
             self._auxin_ = 0
             self._auxout_ = 0
             self._electrode_ = ephys.ElectrodeMode.Null
-            # self._pathways_ = ephys.SynapticPathwayList(name=self._name_)
+            # self._ephys_pathways_ = ephys.SynapticPathwayList(name=self._name_)
 
         self._electrodeModeNames_ = list(ephys.ElectrodeMode.names())
 
@@ -170,7 +170,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget):
     @Slot(str)
     def _slot_nameChanged(self, val:str):
         self._name_ = val
-        if not isinstance(self._data_, pathways.RecordingSource):
+        if not isinstance(self._data_, ephys_pathways.RecordingSource):
             self._make_value_()
         else:
             self._data_.name = val
@@ -180,7 +180,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget):
     @Slot(int)
     def _slot_adcChanged(self, val: int):
         self._adc_ = val
-        if not isinstance(self._data_, pathways.RecordingSource):
+        if not isinstance(self._data_, ephys_pathways.RecordingSource):
             self._make_value_()
         else:
             self._data_.adc = self._adc_
@@ -190,7 +190,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget):
     @Slot(int)
     def _slot_dacChanged(self, val: int):
         self._dac_ = val
-        if not isinstance(self._data_, pathways.RecordingSource):
+        if not isinstance(self._data_, ephys_pathways.RecordingSource):
             self._make_value_()
         else:
             self._data_.dac = self._dac_
@@ -211,7 +211,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget):
         else:
             return
 
-        if not isinstance(self._data_, pathways.RecordingSource):
+        if not isinstance(self._data_, ephys_pathways.RecordingSource):
             self._make_value_()
         else:
             self._data_.electrodeMode = self._electrode_
@@ -223,7 +223,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget):
         self._make_value_()
 
     def _make_value_(self):
-        self._data_ = pathways.RecordingSource(name=self._name_, adc=self._adc_,
+        self._data_ = ephys_pathways.RecordingSource(name=self._name_, adc=self._adc_,
                                             dac=self._dac_, syn=self._syn_,
                                             auxin=self._auxin_,
                                             auxout=self._auxout_,
@@ -258,7 +258,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget):
     @Slot(object)
     def _slot_stimulusChanged(self, val):
         # print(f"{self.__class__.__name__}[{self.objectName()}]._slot_stimulusChanged({val})")
-        if isinstance(val, pathways.SynapticStimulusChannel):
+        if isinstance(val, ephys_pathways.SynapticStimulusChannel):
             self._syn_ = val
             self._make_value_()
             self.sig_valueChanged.emit(self._data_)
@@ -267,9 +267,9 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget):
     def slot_valueChanged(self, val):
         self._data_ = val
 
-    def setValue(self, val: typing.Optional[pathways.SynapticPathway] = None):
+    def setValue(self, val: typing.Optional[ephys_pathways.SynapticPathway] = None):
         print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
-        if isinstance(val, pathways.SynapticPathway):
+        if isinstance(val, ephys_pathways.SynapticPathway):
             self._data_ = val
             self._name_ = self._data_.name
             self._adc_ = self._data_.adc
@@ -304,6 +304,6 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget):
 
             self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
 
-    def value(self) -> pathways.RecordingSource:
+    def value(self) -> ephys_pathways.RecordingSource:
         return self._data_
 

@@ -58,7 +58,7 @@ except:
     __has_qtdbus__ = False
 
 from ephys import ephys
-from ephys import pathways
+from ephys import ephys_pathways
 from core import datatypes # noqa
 from core.prog import scipywarn
 from core import qtutils
@@ -77,10 +77,10 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
-                 obj: typing.Optional[pathways.RecordingEpisode] = None):
+                 obj: typing.Optional[ephys_pathways.RecordingEpisode] = None):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
 
-        if isinstance(parent, pathways.RecordingEpisode):
+        if isinstance(parent, ephys_pathways.RecordingEpisode):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
                 parent = obj
@@ -92,14 +92,14 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
 
         QWidget.__init__(self, parent=parent)
 
-        if not isinstance(obj, pathways.RecordingEpisode):
+        if not isinstance(obj, ephys_pathways.RecordingEpisode):
             self._data_ = None
         else:
             self._data_ = obj
 
-        self._recordingEpisodeNames_ = list(pathways.RecordingEpisodeType.names())
+        self._recordingEpisodeNames_ = list(ephys_pathways.RecordingEpisodeType.names())
 
-        if isinstance(self._data_, pathways.RecordingEpisode):
+        if isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._name_ = self._data_.name
             self._blocks_ = self._data_.blocks
             self._episodeType_ = self._data_.type
@@ -113,7 +113,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         else:
             self._name_ = "Episode"
             self._blocks_ = list()
-            self._episodeType_ = pathways.RecordingEpisodeType.Tracking
+            self._episodeType_ = ephys_pathways.RecordingEpisodeType.Tracking
             self._begin_ = datetime.datetime.now()
             self._end_ = datetime.datetime.now()
             self._beginFrame_ = 0
@@ -202,7 +202,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         if isinstance(val, QtCore.QDateTime):
             self._begin_ = qtutils.datetimeFromQt(val)
 
-        if not isinstance(self._data_, pathways.RecordingEpisode):
+        if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._make_value_()
         else:
             self._data_.begin = self._begin_
@@ -212,7 +212,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         if isinstance(val, QtCore.QDateTime):
             self._end_ = qtutils.datetimeFromQt(val)
 
-        if not isinstance(self._data_, pathways.RecordingEpisode):
+        if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._make_value_()
         else:
             self._data_.end = self._end_
@@ -222,7 +222,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         if not isinstance(val, str) or len(val.strip()) == 0:
             val = "Episode"
         self._name_ = val
-        if not isinstance(self._data_, pathways.RecordingEpisode):
+        if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._make_value_()
         else:
             self._data_.name = self._name_
@@ -232,7 +232,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
     @Slot(int)
     def _slot_firstFrameChanged(self, val: int):
         self._beginFrame_ = val
-        if not isinstance(self._data_, pathways.RecordingEpisode):
+        if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._make_value_()
         else:
             self._data_.beginFrame = self._beginFrame_
@@ -242,7 +242,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
     @Slot(int)
     def _slot_lastFrameChanged(self, val: int):
         self._endFrame_ = val
-        if not isinstance(self._data_, pathways.RecordingEpisode):
+        if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._make_value_()
         else:
             self._data_.endFrame = self._endFrame_
@@ -257,13 +257,13 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
 
         if isinstance(val, str):
             if val in self._recordingEpisodeNames_:
-                self._episodeType_ = pathways.RecordingEpisodeType[val]
+                self._episodeType_ = ephys_pathways.RecordingEpisodeType[val]
             else:
                 return
         else:
             return
 
-        if not isinstance(self._data_, pathways.RecordingEpisode):
+        if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._make_value_()
         else:
             self._data_.type = self._episodeType_
@@ -275,7 +275,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         self._make_value_()
 
     def _make_value_(self):
-        self._data_ = pathways.RecordingEpisode(blocks = self._blocks_,
+        self._data_ = ephys_pathways.RecordingEpisode(blocks = self._blocks_,
                                                 protocol = self._protocol_,
                                                 name=self._name_,
                                                 episodeType = self._episodeType_,
@@ -390,7 +390,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
 
         self._protocol_ = val
 
-        if not isinstance(self._data_, pathways.RecordingEpisode):
+        if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._make_value_()
         else:
             self._data_.protocol = self._protocol_
@@ -415,7 +415,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
 
         self._begin_ = val
 
-        if not isinstance(self._data_, pathways.RecordingEpisode):
+        if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._make_value_()
         else:
             self._data_.begin = self._begin_
@@ -437,7 +437,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
 
         self._end_ = val
 
-        if not isinstance(self._data_, pathways.RecordingEpisode):
+        if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._make_value_()
         else:
             self._data_.end = self._end_
@@ -457,7 +457,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
             raise ValueError(f"Expecting a positive value; got {val} instead")
 
         self._beginFrame_ = val
-        if not isinstance(self._data_, pathways.RecordingEpisode):
+        if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._make_value_()
         else:
             self._data_.beginFrame = self._beginFrame_
@@ -477,7 +477,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
             raise ValueError(f"Expecting a positive value; got {val} instead")
 
         self._endFrame_ = val
-        if not isinstance(self._data_, pathways.RecordingEpisode):
+        if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._make_value_()
         else:
             self._data_.endFrame = self._endFrame_
@@ -514,7 +514,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
     # @Slot(object)
     # def _slot_stimulusChanged(self, val):
     #     # print(f"{self.__class__.__name__}[{self.objectName()}]._slot_stimulusChanged({val})")
-    #     if isinstance(val, pathways.SynapticStimulusChannel):
+    #     if isinstance(val, ephys_pathways.SynapticStimulusChannel):
     #         self._syn_ = val
     #         self._make_value_()
     #         self.sig_valueChanged.emit(self._data_)
@@ -523,9 +523,9 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
     # def slot_valueChanged(self, val):
     #     self._data_ = val
 
-    def setValue(self, val: typing.Optional[pathways.SynapticPathway] = None):
+    def setValue(self, val: typing.Optional[ephys_pathways.SynapticPathway] = None):
         print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
-        if isinstance(val, pathways.SynapticPathway):
+        if isinstance(val, ephys_pathways.SynapticPathway):
             self._data_ = val
             self._name_ = self._data_.name
             self._adc_ = self._data_.adc
@@ -560,6 +560,6 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
 
             self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
 
-    def value(self) -> pathways.RecordingEpisode:
+    def value(self) -> ephys_pathways.RecordingEpisode:
         return self._data_
 

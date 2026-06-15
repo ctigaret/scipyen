@@ -48,7 +48,7 @@ try:
 except:
     __has_qtdbus__ = False
 
-from ephys.pathways import AuxiliaryInput, AuxiliaryOutput
+from ephys.ephys_pathways import AuxiliaryInput, AuxiliaryOutput
 from core.prog import scipywarn
 from gui import guiutils
 

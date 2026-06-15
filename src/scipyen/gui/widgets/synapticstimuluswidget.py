@@ -48,8 +48,8 @@ try:
 except:
     __has_qtdbus__ = False
 
-from ephys import pathways
-from ephys.pathways import SynapticStimulusChannel
+from ephys import ephys_pathways
+from ephys.ephys_pathways import SynapticStimulusChannel
 from core.prog import scipywarn
 from gui import guiutils
 

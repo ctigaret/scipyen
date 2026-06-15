@@ -313,7 +313,7 @@ from imaging.axiscalibration import (AxesCalibration, # noqa
                                      AxisCalibrationData, # noqa
                                      ChannelCalibrationData, # noqa
                                      CalibrationData) # noqa
-from ephys import (ephys, membrane, pathways) # noqa
+from ephys import (ephys, membrane, ephys_pathways) # noqa
 from systems import * # noqa
 
 from gui.guiutils import (get_font_style, get_font_weight, treeWidgetItems) # noqa

@@ -82,7 +82,7 @@ from core.datatypes import array_slice # noqa
 from core.sysutils import adapt_ui_path # noqa
 from core import scipyen_quantities as scq
 from core import neoutils # noqa
-from ephys import (ephys, pathways)
+from ephys import (ephys, ephys_pathways)
 
 #### END pict.core modules
 
@@ -423,35 +423,35 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         return True
 
-    @_insertDataRow_.register(pathways.SynapticPathwayList)
-    @_insertDataRow_.register(pathways.AuxiliaryInputList)
-    @_insertDataRow_.register(pathways.AuxiliaryOutputList)
-    @_insertDataRow_.register(pathways.SynapticStimulusChannelList)
+    @_insertDataRow_.register(ephys_pathways.SynapticPathwayList)
+    @_insertDataRow_.register(ephys_pathways.AuxiliaryInputList)
+    @_insertDataRow_.register(ephys_pathways.AuxiliaryOutputList)
+    @_insertDataRow_.register(ephys_pathways.SynapticStimulusChannelList)
     @_insertDataRow_.register(TriggerProtocolList)
     def __insertDataRow__(self, mdata: typing.Union[
-        pathways.SynapticPathwayList,
-        pathways.AuxiliaryInputList,
-        pathways.AuxiliaryOutputList,
-        pathways.SynapticStimulusChannelList,
+        ephys_pathways.SynapticPathwayList,
+        ephys_pathways.AuxiliaryInputList,
+        ephys_pathways.AuxiliaryOutputList,
+        ephys_pathways.SynapticStimulusChannelList,
         ], # noqa
         row: int,
-        obj: typing.Optional[pathways.SynapticPathway] = None) -> bool:
+        obj: typing.Optional[ephys_pathways.SynapticPathway] = None) -> bool:
         if obj is None:
-            if isinstance(mdata, pathways.SynapticPathwayList):
-                obj = pathways.SynapticPathway()
-            elif isinstance(mdata, pathways.AuxiliaryInputList):
-                obj = pathways.AuxiliaryInput()
-            elif isinstance(mdata, pathways.AuxiliaryOutputList):
-                obj = pathways.AuxiliaryOutput()
-            elif isinstance(mdata, pathways.SynapticStimulusChannelList):
-                obj = pathways.SynapticStimulusChannel()
+            if isinstance(mdata, ephys_pathways.SynapticPathwayList):
+                obj = ephys_pathways.SynapticPathway()
+            elif isinstance(mdata, ephys_pathways.AuxiliaryInputList):
+                obj = ephys_pathways.AuxiliaryInput()
+            elif isinstance(mdata, ephys_pathways.AuxiliaryOutputList):
+                obj = ephys_pathways.AuxiliaryOutput()
+            elif isinstance(mdata, ephys_pathways.SynapticStimulusChannelList):
+                obj = ephys_pathways.SynapticStimulusChannel()
             elif isinstance(mdata, TriggerProtocolList):
                 obj = TriggerProtocol()
 
-        if not isinstance(obj, (pathways.SynapticPathway,
-                                pathways.AuxiliaryInput,
-                                pathways.AuxiliaryOutput,
-                                pathways.SynapticStimulusChannel,
+        if not isinstance(obj, (ephys_pathways.SynapticPathway,
+                                ephys_pathways.AuxiliaryInput,
+                                ephys_pathways.AuxiliaryOutput,
+                                ephys_pathways.SynapticStimulusChannel,
                                 TriggerProtocol
                                 )
                         ):
@@ -477,11 +477,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                        row: int, # noqa
                        obj: typing.Optional[object] = None) -> bool:
         if len(mdata):
-            if all(isinstance(o, pathways.RecordingSource) for o in mdata):
+            if all(isinstance(o, ephys_pathways.RecordingSource) for o in mdata):
                 if obj is None:
-                    obj = pathways.RecordingSource()
+                    obj = ephys_pathways.RecordingSource()
 
-                if not isinstance(obj, pathways.RecordingSource):
+                if not isinstance(obj, ephys_pathways.RecordingSource):
                     scipywarn(f"A RecordingSource object was expected; instead, got a {type(obj).__name__}")
                     return False
 
@@ -941,10 +941,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(self._modelData_,
                                 (
                                     typing.Sequence,
-                                    pathways.SynapticPathwayList,
-                                    pathways.AuxiliaryInputList,
-                                    pathways.AuxiliaryOutputList,
-                                    pathways.SynapticStimulusChannelList,
+                                    ephys_pathways.SynapticPathwayList,
+                                    ephys_pathways.AuxiliaryInputList,
+                                    ephys_pathways.AuxiliaryOutputList,
+                                    ephys_pathways.SynapticStimulusChannelList,
                                 )
                             ):
                 if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
@@ -1034,10 +1034,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
 
             elif isinstance(self._modelData_, (
-                                                pathways.SynapticPathwayList,
-                                                pathways.AuxiliaryInputList,
-                                                pathways.AuxiliaryOutputList,
-                                                pathways.SynapticStimulusChannelList,
+                                                ephys_pathways.SynapticPathwayList,
+                                                ephys_pathways.AuxiliaryInputList,
+                                                ephys_pathways.AuxiliaryOutputList,
+                                                ephys_pathways.SynapticStimulusChannelList,
                                                )
                             ):
                 obj = self._modelData_[row]
@@ -1053,7 +1053,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     return QtCore.QVariant()
 
             elif isinstance(self._modelData_, typing.Sequence):
-                if all(isinstance(d, pathways.RecordingSource) for d in self._modelData_):
+                if all(isinstance(d, ephys_pathways.RecordingSource) for d in self._modelData_):
                     obj = self._modelData_[row]
                     attribute = self._modelDataColumnHeaders_[col]
                     if attribute.lower() == "edit":
@@ -1254,8 +1254,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
         self._modelDataRowIndexName_ = "Index"
 
-    @_makeModelData_.register(pathways.SynapticPathwayList)
-    def __makeModelData__(self, data: pathways.SynapticPathwayList): # noqa
+    @_makeModelData_.register(ephys_pathways.SynapticPathwayList)
+    def __makeModelData__(self, data: ephys_pathways.SynapticPathwayList): # noqa
         self._modelData_ = data
         self._original_data_ = data
         self._modelDataRows_ = len(data)
@@ -1263,7 +1263,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._canAddRemoveRows_ = True
         self._canAddRemoveColumns_ = False
 
-        names = list(map(lambda f: f.name, dataclasses.fields(pathways.SynapticPathway))) + ["Edit"]
+        names = list(map(lambda f: f.name, dataclasses.fields(ephys_pathways.SynapticPathway))) + ["Edit"]
 
         # NOTE: 2026-06-07 21:38:40 see NOTE: 2026-06-07 21:36:23
         self._modelDataColumnHeaders_ = dict(
@@ -1278,8 +1278,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
         self._modelDataRowIndexName_ = "Index"
 
-    @_makeModelData_.register(pathways.AuxiliaryInputList)
-    def __makeModelData__(self, data: pathways.AuxiliaryInputList): # noqa
+    @_makeModelData_.register(ephys_pathways.AuxiliaryInputList)
+    def __makeModelData__(self, data: ephys_pathways.AuxiliaryInputList): # noqa
         self._modelData_ = data
         self._original_data_ = data
         self._modelDataRows_ = len(data)
@@ -1302,8 +1302,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
         self._modelDataRowIndexName_ = "Index"
 
-    @_makeModelData_.register(pathways.AuxiliaryOutputList)
-    def __makeModelData__(self, data: pathways.AuxiliaryOutputList): # noqa
+    @_makeModelData_.register(ephys_pathways.AuxiliaryOutputList)
+    def __makeModelData__(self, data: ephys_pathways.AuxiliaryOutputList): # noqa
         self._modelData_ = data
         self._original_data_ = data
         self._modelDataRows_ = len(data)
@@ -1323,8 +1323,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
         self._modelDataRowIndexName_ = "Index"
 
-    @_makeModelData_.register(pathways.SynapticStimulusChannelList)
-    def __makeModelData__(self, data: pathways.SynapticStimulusChannelList): # noqa
+    @_makeModelData_.register(ephys_pathways.SynapticStimulusChannelList)
+    def __makeModelData__(self, data: ephys_pathways.SynapticStimulusChannelList): # noqa
         self._modelData_ = data
         self._original_data_ = data
         self._modelDataRows_ = len(data)
@@ -1517,7 +1517,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @_makeModelData_.register(deque)
     def __makeModelData__(self, data: typing.Sequence): # noqa
         if len(data):
-            if all(isinstance(d, pathways.RecordingSource) for d in data):
+            if all(isinstance(d, ephys_pathways.RecordingSource) for d in data):
                 self._modelData_ = data
                 self._original_data_ = data
                 self._modelDataRows_ = len(data)
@@ -1738,15 +1738,15 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         return True
 
-    @_setValueInModelData_.register(pathways.SynapticPathwayList)
-    @_setValueInModelData_.register(pathways.AuxiliaryInputList)
-    @_setValueInModelData_.register(pathways.AuxiliaryOutputList)
-    @_setValueInModelData_.register(pathways.SynapticStimulusChannelList)
+    @_setValueInModelData_.register(ephys_pathways.SynapticPathwayList)
+    @_setValueInModelData_.register(ephys_pathways.AuxiliaryInputList)
+    @_setValueInModelData_.register(ephys_pathways.AuxiliaryOutputList)
+    @_setValueInModelData_.register(ephys_pathways.SynapticStimulusChannelList)
     def __setValueInModelData__(self, mdata: typing.Union[ # noqa
-                                                pathways.SynapticPathwayList,
-                                                pathways.AuxiliaryInputList,
-                                                pathways.AuxiliaryOutputList,
-                                                pathways.SynapticStimulusChannelList,
+                                                ephys_pathways.SynapticPathwayList,
+                                                ephys_pathways.AuxiliaryInputList,
+                                                ephys_pathways.AuxiliaryOutputList,
+                                                ephys_pathways.SynapticStimulusChannelList,
                                                 ], pyvalue, row, col) -> bool:
         if row >= len(mdata):
             return False
@@ -1755,7 +1755,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         attr = self._modelDataColumnHeaders_[col]
 
-        if isinstance(old_obj, pathways.SynapticPathway):
+        if isinstance(old_obj, ephys_pathways.SynapticPathway):
             params = {
                 "name": old_obj.name,
                 "adc": old_obj.adc,
@@ -1767,21 +1767,21 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 "measurements": old_obj.measurements,
                 }
 
-        elif isinstance(old_obj, pathways.AuxiliaryInput):
+        elif isinstance(old_obj, ephys_pathways.AuxiliaryInput):
             params = {
                 "name": old_obj.name,
                 "adc": old_obj.adc,
                 "cmd": old_obj.cmd
                 }
 
-        elif isinstance(old_obj, pathways.AuxiliaryOutput):
+        elif isinstance(old_obj, ephys_pathways.AuxiliaryOutput):
             params = {
                 "name": old_obj.name,
                 "channel": old_obj.channel,
                 "digttl": old_obj.digttl
                 }
 
-        elif isinstance(old_obj, pathways.SynapticStimulusChannel):
+        elif isinstance(old_obj, ephys_pathways.SynapticStimulusChannel):
             params = {
                 "name": old_obj.name,
                 "channel": old_obj.channel,
@@ -1793,7 +1793,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         if attr.lower() != "edit":
             old_val = getattr(old_obj, attr)
-            if isinstance(old_obj, pathways.SynapticPathway):
+            if isinstance(old_obj, ephys_pathways.SynapticPathway):
                 if attr == "electrodeMode":
                     attr = "electrode"
                 elif attr == "pathwayType":
@@ -1815,7 +1815,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @_setValueInModelData_.register(list)
     @_setValueInModelData_.register(deque)
     def __setValueInModelData__(self, mdata: list | deque, pyvalue, row, col) -> bool: # noqa
-        if all(isinstance(o, pathways.RecordingSource) for o in mdata):
+        if all(isinstance(o, ephys_pathways.RecordingSource) for o in mdata):
             old_obj = mdata[row]
             attr = self._modelDataColumnHeaders_[col]
             params = {
