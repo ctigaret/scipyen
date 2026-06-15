@@ -115,9 +115,28 @@
       <widget class="QComboBox" name="episodeTypeComboBox"/>
      </item>
      <item>
-      <widget class="QPushButton" name="selectTrialsPushButton">
+      <widget class="QToolButton" name="importTrialsToolButton">
        <property name="text">
-        <string>Trials...</string>
+        <string>Import Trials...</string>
+       </property>
+       <property name="icon">
+        <iconset theme="document-import"/>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="openTrialsToolButton">
+       <property name="text">
+        <string>Open Trials...</string>
+       </property>
+       <property name="icon">
+        <iconset theme="document-open"/>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
        </property>
       </widget>
      </item>

@@ -378,6 +378,7 @@ class RecordingEpisode(Episode):
 
         if isinstance(begin, datetime.datetime):
             self.begin = begin
+
         if isinstance(end, datetime.datetime):
             self.end = end
 
@@ -508,7 +509,7 @@ class RecordingEpisode(Episode):
 
         blocks = h5io.fromHDF5(entity["blocks"], cache=cache)
         protocol = h5io.fromHDF5(entity["protocol"], cache=cache)
-        stimulationLayout = h5io.fromHDF5(entity["stimulationLayout"], cache=cache)
+        stimulusLayout = h5io.fromHDF5(entity["stimulusLayout"], cache=cache)
 
         name=attrs["name"]
         begin=attrs["begin"]
@@ -523,26 +524,26 @@ class RecordingEpisode(Episode):
                 beginframe=beginFrame,endFrame=endFrame,
                 protocol=protocol,
                 blocks = blocks,
-                stimulationLayout=stimulationLayout,
+                stimulusLayout=stimulusLayout,
                 clampMode = clampMode,
                 electrodeMode = electrodeMode)
 
 
     @property
-    def stimulationLayout(self) -> dict:
+    def stimulusLayout(self) -> dict:
         r"""Maps a correspondence between the sweep(s) that stimulate pathways and the stimulated pathways
         """
         return self._pAxS
 
-    @stimulationLayout.setter
-    def stimulationLayout(self, layout: typing.Optional[PathwaysStimulationLayout] = None) -> None:
+    @stimulusLayout.setter
+    def stimulusLayout(self, layout: typing.Optional[PathwaysStimulationLayout] = None) -> None:
         if not isinstance(layout, PathwaysStimulationLayout):
             scipywarn(f"Expecting a PathwaysStimulationLayout or None; instead, got a {type(layout).__name__} ")
         self._pAxS = layout
 
     @property
     def isXTalk(self) -> bool:
-        return isinstance(self.stimulationLayout, PathwaysStimulationLayout) and PathwaysStimulationLayout.isXTalkLayout(self.stimulationLayout)
+        return isinstance(self.stimulusLayout, PathwaysStimulationLayout) and PathwaysStimulationLayout.isXTalkLayout(self.stimulusLayout)
 
     @property
     def blocks(self) -> list:
@@ -2626,7 +2627,7 @@ class PathwaysStimulationLayout():
         # self._layout_ = self._parseLayout_(pathways, protocol, temporalOrder)
 
     def _parseLayout_(self, temporalOrder: bool = True) -> dict:
-        stimulationLayout = dict()
+        stimulusLayout = dict()
 
         stimByPaths = tuple(map(lambda p: (p, getPathwayStimulationSequence(p, self._protocol_)), self._pathways_))
 
@@ -2638,20 +2639,20 @@ class PathwaysStimulationLayout():
 
                     sPC = SweepPathCommands(path, epochsDict, triggers)
 
-                    if sweep in stimulationLayout:
-                        stimulationLayout[sweep].append(sPC)
+                    if sweep in stimulusLayout:
+                        stimulusLayout[sweep].append(sPC)
 
                     else:
-                        stimulationLayout[sweep] = [sPC]
+                        stimulusLayout[sweep] = [sPC]
 
         if temporalOrder:
-            for sweep in stimulationLayout:
-                pps = sorted(stimulationLayout[sweep],
+            for sweep in stimulusLayout:
+                pps = sorted(stimulusLayout[sweep],
                             key = lambda sPC: min(list(map(lambda tr: tr.times[0], sPC.triggers))))
 
-                stimulationLayout[sweep] = pps
+                stimulusLayout[sweep] = pps
 
-        return stimulationLayout
+        return stimulusLayout
 
     @property
     def protocol(self):

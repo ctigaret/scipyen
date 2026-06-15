@@ -9,10 +9,12 @@ r"""
 
 import sys, os, typing, types, warnings, math, cmath
 import numbers
+import datetime
 import numpy as np
 import quantities as pq
 import neo
 from tribool import Tribool
+
 
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
@@ -52,6 +54,7 @@ from ephys import ephys
 from ephys import pathways
 from core import datatypes
 from core.prog import scipywarn
+from core import qtutils
 from gui import guiutils
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -91,23 +94,24 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         if isinstance(self._data_, pathways.RecordingEpisode):
             self._name_ = self._data_.name
             self._blocks_ = self._data_.blocks
-            self._type_ = self._data_._type_
-            self._begin_ = self._data_._begin_
-            self._end_ = self._data_._end_
-            self._beginFrame_ = self._data_._beginFrame_
-            self._endFrame_ = self._data_._endFrame_
-            self._protocol_ = self._data_._protocol_
+            self._episodeType_ = self._data_.type
+            self._begin_ = self._data_.begin
+            self._end_ = self._data_.end
+            self._beginFrame_ = self._data_.beginFrame
+            self._endFrame_ = self._data_.endFrame
+            self._protocol_ = self._data_.protocol
+            self._stimulusLayout_ = self._data_.stimulusLayout
 
         else:
             self._name_ = "Episode"
             self._blocks_ = list()
-            self._type_ = pathways.RecordingEpisodeType.Tracking
+            self._episodeType_ = pathways.RecordingEpisodeType.Tracking
             self._begin_ = datetime.datetime.now()
             self._end_ = datetime.datetime.now()
             self._beginFrame_ = 0
             self._endFrame_ = 0
             self._protocol_ = None
-
+            self._stimulusLayout_ = None
 
         self._configureUI_()
 
@@ -133,92 +137,117 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         else:
             self.protocolNameLabel.setText("")
 
-        self.adcSpinBox.setToolTip("Index of ADC (input) channel used for recording")
-        self.adcSpinBox.setWhatsThis("Index of ADC (input) channel used for recording")
-        self.adcSpinBox.setStatusTip("Index of ADC (input) channel used for recording")
-        self.adcSpinBox.setMinimum(0)
-        if isinstance(self._adc_, int) and self._adc_ >= 0:
-            self.adcSpinBox.setValue(self._adc_)
-        self.adcSpinBox.valueChanged.connect(self._slot_adcChanged)
-
-        self.dacSpinBox.setToolTip("Input channel index")
-        self.dacSpinBox.setWhatsThis("Input channel index")
-        self.dacSpinBox.setStatusTip("Input channel index")
-        self.dacSpinBox.setMinimum(0)
-        if isinstance(self._dac_, int) and self._dac_ >= 0:
-            self.dacSpinBox.setValue(self._dac_)
-        self.dacSpinBox.valueChanged.connect(self._slot_dacChanged)
-
         for text in self._recordingEpisodeNames_:
-            self.electrodeModeComboBox.addItem(text)
+            self.episodeTypeComboBox.addItem(text)
 
-        currentElectrodeModeNdx = self._recordingEpisodeNames_.index(self._electrode_.name)
-        self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
+        currentEpisodeTypeNdx = self._recordingEpisodeNames_.index(self._episodeType_.name)
+        self.episodeTypeComboBox.setCurrentIndex(currentEpisodeTypeNdx)
+        self.episodeTypeComboBox.currentTextChanged.connect(self._slot_episodeTypeChanged)
 
-        # self.electrodeModeComboBox.currentIndexChanged.connect(self._slot_electrodeModeChanged)
-        self.electrodeModeComboBox.currentTextChanged.connect(self._slot_electrodeModeChanged)
+        self.episodeBeginDateTimeEdit.setToolTip("Date/time for the start of episode")
+        self.episodeBeginDateTimeEdit.setWhatsThis("Date/time for the start of episode")
+        self.episodeBeginDateTimeEdit.setStatusTip("Date/time for the start of episode")
+        if isinstance(self._begin_, datetime.datetime):
+            self.episodeBeginDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._begin_))
 
-        self.stimulusPushButton.clicked.connect(self._slot_editStimulus)
-        self.auxInPushButton.clicked.connect(self._slot_editAuxIn)
-        self.auxOutPushButton.clicked.connect(self._slot_editAuxOut)
+        self.episodeBeginDateTimeEdit.dateTimeChanged.connect(self._slot_beginDateTimeChanged)
+
+        self.firstFrameSpinBox.setToolTip("Index of the first frame (sweep) in data")
+        self.firstFrameSpinBox.setWhatsThis("Index of the first frame (sweep) in data")
+        self.firstFrameSpinBox.setStatusTip("Index of the first frame (sweep) in data")
+        self.firstFrameSpinBox.setMinimum(0)
+        if isinstance(self._beginFrame_, int) and self._beginFrame_ >= 0:
+            self.firstFrameSpinBox.setValue(self._beginFrame_)
+
+        self.firstFrameSpinBox.valueChanged.connect(self._slot_firstFrameChanged)
+
+        self.lastFrameSpinBox.setToolTip("Input channel index")
+        self.lastFrameSpinBox.setWhatsThis("Input channel index")
+        self.lastFrameSpinBox.setStatusTip("Input channel index")
+        self.lastFrameSpinBox.setMinimum(0)
+        if isinstance(self._endFrame_, int) and self._endFrame_ >= 0:
+            self.lastFrameSpinBox.setValue(self._endFrame_)
+        self.lastFrameSpinBox.valueChanged.connect(self._slot_lastFrameChanged)
 
         self.createObjectPushButton.setText("")
         self.createObjectPushButton.setIcon(guiutils.getIcon("list-add"))
-        self.createObjectPushButton.setToolTip("Create Recording Source")
-        self.createObjectPushButton.setWhatsThis("Create Recording Source")
-        self.createObjectPushButton.setStatusTip("Create Recording Source")
+        self.createObjectPushButton.setToolTip("Create Recording Episode")
+        self.createObjectPushButton.setWhatsThis("Create Recording Episode")
+        self.createObjectPushButton.setStatusTip("Create Recording Episode")
 
         self.createObjectPushButton.clicked.connect(self._slot_new)
         self.createObjectPushButton.setEnabled(self._data_ is None)
 
+    @Slot(QtCore.QDateTime)
+    def _slot_beginDateTimeChanged(self, val: QtCore.QDateTime):
+        if isinstance(val, QtCore.QDateTime):
+            self._begin_ = qtutils.datetimeFromQt(val)
+
+        if not isinstance(self._data_, pathways.RecordingEpisode):
+            self._make_value_()
+        else:
+            self._data_.begin = self._begin_
+
+    @Slot(QtCore.QDateTime)
+    def _slot_endDateTimeChanged(self, val: QtCore.QDateTime):
+        if isinstance(val, QtCore.QDateTime):
+            self._end_ = qtutils.datetimeFromQt(val)
+
+        if not isinstance(self._data_, pathways.RecordingEpisode):
+            self._make_value_()
+        else:
+            self._data_.end = self._end_
+
     @Slot(str)
     def _slot_nameChanged(self, val:str):
+        if not isinstance(val, str) or len(val.strip()) == 0:
+            val = "Episode"
         self._name_ = val
-        if not isinstance(self._data_, pathways.RecordingSource):
+        if not isinstance(self._data_, pathways.RecordingEpisode):
             self._make_value_()
         else:
-            self._data_.name = val
+            self._data_.name = self._name_
 
         self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
-    def _slot_adcChanged(self, val: int):
-        self._adc_ = val
-        if not isinstance(self._data_, pathways.RecordingSource):
+    def _slot_firstFrameChanged(self, val: int):
+        self._beginFrame_ = val
+        if not isinstance(self._data_, pathways.RecordingEpisode):
             self._make_value_()
         else:
-            self._data_.adc = self._adc_
+            self._data_.beginFrame = self._beginFrame_
 
         self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
-    def _slot_dacChanged(self, val: int):
-        self._dac_ = val
-        if not isinstance(self._data_, pathways.RecordingSource):
+    def _slot_endFrameChanged(self, val: int):
+        self._endFrame_ = val
+        if not isinstance(self._data_, pathways.RecordingEpisode):
             self._make_value_()
         else:
-            self._data_.dac = self._dac_
+            self._data_.endFrame = self._endFrame_
 
         self.sig_valueChanged.emit(self.value())
 
     @Slot(str)
     @Slot(int)
-    def _slot_electrodeModeChanged(self, val: int | str):
+    def _slot_episodeTypeChanged(self, val: int | str):
         if isinstance(val, int) and val >=0 and val < len(self._recordingEpisodeNames_):
             val = self._recordingEpisodeNames_[val]
 
         if isinstance(val, str):
             if val in self._recordingEpisodeNames_:
-                self._electrode_ = ephys.ElectrodeMode[val]
+                self._episodeType_ = pathways.RecordingEpisodeType[val]
             else:
                 return
         else:
             return
 
-        if not isinstance(self._data_, pathways.RecordingSource):
+        if not isinstance(self._data_, pathways.RecordingEpisode):
             self._make_value_()
         else:
-            self._data_.electrodeMode = self._electrode_
+            self._data_.type = self._episodeType_
 
         self.sig_valueChanged.emit(self.value())
 
@@ -227,45 +256,46 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         self._make_value_()
 
     def _make_value_(self):
-        self._data_ = pathways.RecordingSource(name=self._name_, adc=self._adc_,
-                                            dac=self._dac_, syn=self._syn_,
-                                            auxin=self._auxin_,
-                                            auxout=self._auxout_,
-                                            electrodeMode = self._electrode_)
+        self._data_ = pathways.RecordingEpisode(blocks = self._blocks_,
+                                                protocol = self._protocol_,
+                                                name=self._name_,
+                                                episodeType = self._episodeType_,
+                                                stimulusLayout = self._stimulusLayout_,
+                                                )
         self.createObjectPushButton.setEnabled(self._data_ is None)
 
-    @Slot()
-    def _slot_editStimulus(self):
-        from gui.delegates import ExternalEditorDelegate
-        # print(f"{self.__class__.__name__}[{self.objectName()}]._slot_editStimulus: {self._syn_}")
-        stimEditor = ExternalEditorDelegate(self._syn_, self)
-        stimEditor.setObjectName("stimEditor")
-        stimEditor.sig_valueChanged.connect(self._slot_stimulusChanged)
-        stimEditor.slot_Launch()
+    # @Slot()
+    # def _slot_editStimulus(self):
+    #     from gui.delegates import ExternalEditorDelegate
+    #     # print(f"{self.__class__.__name__}[{self.objectName()}]._slot_editStimulus: {self._syn_}")
+    #     stimEditor = ExternalEditorDelegate(self._syn_, self)
+    #     stimEditor.setObjectName("stimEditor")
+    #     stimEditor.sig_valueChanged.connect(self._slot_stimulusChanged)
+    #     stimEditor.slot_Launch()
 
-    @Slot()
-    def _slot_editAuxIn(self):
-        from gui.delegates import ExternalEditorDelegate
-        editor = ExternalEditorDelegate(self._auxin_, self)
-        editor.setObjectName("auxInEditor")
-        editor.sig_valueChanged.connect(self._slot_stimulusChanged)
-        editor.slot_Launch()
-
-    @Slot()
-    def _slot_editAuxOut(self):
-        from gui.delegates import ExternalEditorDelegate
-        editor = ExternalEditorDelegate(self._auxou_, self)
-        editor.setObjectName("auxOutEditor")
-        editor.sig_valueChanged.connect(self._slot_stimulusChanged)
-        editor.slot_Launch()
-
-    @Slot(object)
-    def _slot_stimulusChanged(self, val):
-        # print(f"{self.__class__.__name__}[{self.objectName()}]._slot_stimulusChanged({val})")
-        if isinstance(val, pathways.SynapticStimulusChannel):
-            self._syn_ = val
-            self._make_value_()
-            self.sig_valueChanged.emit(self._data_)
+    # @Slot()
+    # def _slot_editAuxIn(self):
+    #     from gui.delegates import ExternalEditorDelegate
+    #     editor = ExternalEditorDelegate(self._auxin_, self)
+    #     editor.setObjectName("auxInEditor")
+    #     editor.sig_valueChanged.connect(self._slot_stimulusChanged)
+    #     editor.slot_Launch()
+    #
+    # @Slot()
+    # def _slot_editAuxOut(self):
+    #     from gui.delegates import ExternalEditorDelegate
+    #     editor = ExternalEditorDelegate(self._auxou_, self)
+    #     editor.setObjectName("auxOutEditor")
+    #     editor.sig_valueChanged.connect(self._slot_stimulusChanged)
+    #     editor.slot_Launch()
+    #
+    # @Slot(object)
+    # def _slot_stimulusChanged(self, val):
+    #     # print(f"{self.__class__.__name__}[{self.objectName()}]._slot_stimulusChanged({val})")
+    #     if isinstance(val, pathways.SynapticStimulusChannel):
+    #         self._syn_ = val
+    #         self._make_value_()
+    #         self.sig_valueChanged.emit(self._data_)
 
     @Slot(object)
     def slot_valueChanged(self, val):
@@ -277,7 +307,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
             self._data_ = val
             self._name_ = self._data_.name
             self._adc_ = self._data_.adc
-            self._dac_ = self._data_.dac
+            self._endFrame_ = self._data_.dac
             self._syn_ = self._data_.syn
             self._auxin_ = self._data_.auxin
             self._auxout_ = self._data_.auxout
@@ -288,8 +318,8 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
                                 lambda w: QtCore.QSignalBlocker(w),
                                 (
                                     self.nameLineEdit,
-                                    self.adcSpinBox,
-                                    self.dacSpinBox,
+                                    self.episodeBeginDateTimeEdit,
+                                    self.lastFrameSpinBox,
                                     self.electrodeModeComboBox,
                                     self.pathTypeComboBox,
                                     self.stimulusPushButton,
@@ -299,8 +329,8 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
                             )
 
             self.nameLineEdit.setText(self._name_)
-            self.adcSpinBox.setValue(self._adc_)
-            self.dacSpinBox.setValue(self._dac_)
+            self.episodeBeginDateTimeEdit.setValue(self._adc_)
+            self.lastFrameSpinBox.setValue(self._endFrame_)
 
 
             currentElectrodeModeNdx = self._recordingEpisodeNames_.index(self._electrode_.name)
@@ -308,6 +338,6 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
 
             self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
 
-    def value(self) -> pathways.RecordingSource:
+    def value(self) -> pathways.RecordingEpisode:
         return self._data_
 
