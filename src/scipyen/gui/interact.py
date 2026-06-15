@@ -43,9 +43,73 @@ from gui.widgets import small_widgets as smw
 
 def selectWSData(*args, title="", single=True, asDict=False,
                  **kwargs) -> tuple | dict:
-    r"""Selection of workspace variables from a list
+    r"""Selection of workspace variables from a list.
+
+    Var-positional parameters:
+    ==========================
+
+    When given, it should be a string or sequence of strings with variable name
+        patterns (regular expressions or "glob" expressions)
+
+        For regular expressions see the standard Python library model 're'.
+
+        A "glob" expressions is a string matching part of the name and containing
+        one of the special characters '*' '+' as a place holder for:
+            zero or more characters ('*') e.g., 'abc_*' will match variable
+                names starting with 'abc_'
+
+            one or more characters ('+') e.g., 'abc_+' will match variable names
+                starting with 'abc_' and containing a SINGLE  extra character
+
+    NOTE: These can be omitted, and a selection by name can be made in the dialog.
+
+    Named (keyword) parameters:
+    ===========================
+    title: the title of the dialog; when missing, the dialog will have a suitable
+        descriptive title
+
+    single: bool flag indicating whether the selection is restricted to a single item
+        (default, True) or not (False)
+
+    asDict: bool flag; when True, variables are to be returned "packed"
+        in a dict (mapping variable name as key ↦ variable). This is useful to
+        also capture the symbols (i.e., names) the variables are bound to, in the
+        workspace where they are being looked up.
+
+        Default is False.
+
+    Var-keyword parameters:
+    =======================
+
+    :glob: bool flag, which indicates how the var-positional parameters are to
+        be used; default is True i.e., expecting the "glob" expressions
+
+    :ws: a dictionary corresponding to the namespace where variables are to be
+        looked up by name; defaults to the user's workspace (i.e. the workspace
+        of the current Scipyen session)
+
+    :retrieve_all: a bool flag indicating whether to show all available variables
+        in the case none of the regular or glob expressions in ``*args`` found
+        a match; default is False
+
+    Var-keyword parameters passed to code.workspacefunctions.lsvars(…) function
+    ===========================================================================
+
+    :var_type: type or sequence of type objects to further restrict the list of
+        variables
+
+    NOTE for other keyword parameters please see the documentation for lsvars(…)
+
+    Returns:
+    ========
+
+    A (possibly empty) tuple containing the selected variables (when ``asDict``
+    is False) or a dict.
+
     """
     from core.workspacefunctions import (lsvars, getvarsbytype, user_workspace)
+
+    retrieve_all = kwargs.pop("retrieve_all", False)
 
     glob = kwargs.pop("glob", True)
 
@@ -54,6 +118,10 @@ def selectWSData(*args, title="", single=True, asDict=False,
     user_ns_visible = dict([(k,v) for k,v in ws.items() if not k.startswith("_") and k not in ws["mainWindow"].workspaceModel.user_ns_hidden])
 
     name_vars = lsvars(*args, glob=glob, ws=user_ns_visible, **kwargs)
+
+    if len(name_vars) == 0:
+        if retrieve_all is True:
+            name_vars = lsvars(glob=glob, ws = user_ns_visible, **kwargs)
 
     if len(name_vars) == 0:
         return tuple()
@@ -69,8 +137,6 @@ def selectWSData(*args, title="", single=True, asDict=False,
 
     dialog = ItemsListDialog(title=dtitle, itemsList = name_list,
                             selectmode = selectionMode)
-
-    # dialog.adjustSize()
 
     ans = dialog.exec()
 

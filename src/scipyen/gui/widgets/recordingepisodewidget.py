@@ -55,7 +55,7 @@ from ephys import pathways
 from core import datatypes
 from core.prog import scipywarn
 from core import qtutils
-from gui import guiutils
+from gui import (guiutils, interact)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -178,6 +178,9 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         self.createObjectPushButton.clicked.connect(self._slot_new)
         self.createObjectPushButton.setEnabled(self._data_ is None)
 
+        self.importTrialsToolButton.triggered.connect(self._slot_importTrials)
+        self.openTrialsToolButton.triggered.connect(self._slot_loadTrials)
+
     @Slot(QtCore.QDateTime)
     def _slot_beginDateTimeChanged(self, val: QtCore.QDateTime):
         if isinstance(val, QtCore.QDateTime):
@@ -263,6 +266,25 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
                                                 stimulusLayout = self._stimulusLayout_,
                                                 )
         self.createObjectPushButton.setEnabled(self._data_ is None)
+
+    @Slot()
+    def _slot_importTrials(self):
+        self._importTrials()
+
+
+    @Slot()
+    def _slot_loadTrials(self):
+        self._loadTrials()
+
+    def _importTrials(self):
+        if isinstance(self._name_, str) and len(self._name_.strip()):
+            ret = interact.selectWSData(f"{self._name_}_*", title = f"Select Trial Blocks for {self._name_}", single=False, var_type = neo.Block) # noqa
+        else:
+            ret = interact.selectWSData(title = f"Select Trial Blocks for {drug}", single=False, var_type = neo.Block) # noqa
+
+        if len(ret):
+            return ret
+
 
     # @Slot()
     # def _slot_editStimulus(self):

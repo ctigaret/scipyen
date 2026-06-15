@@ -178,6 +178,16 @@ ws: dict (default None) = the search namespace
 var_type: a type, a sequence of types, or None (default)
     When a type, only select the variables of the indicated type
 
+sort: default False; when True, the variables will be sorted in ascending order
+    of their names, unless a sort key is specified
+
+sortkey: specific key to use when sorting; this can be a lambda function,
+    see documentation for the standard library function ``sorted(…)`` and the
+    ``sort`` method for mutable sequences (e.g., ``list.sort(…)``)
+
+reverse: bool flag, default is False; when True, any sorting specified as above
+    will be carried out in descending order
+
 predicate: callable, for further selection
 
 Returns:
@@ -194,7 +204,15 @@ A (possibly sorted) list of variable names if found, or an empty list.
         raise ValueError("No valid workspace has been specified or found")
 
     if len(args) == 0: # no selector arguments: get all variables names in ws
-        return ws.keys()
+        vlist = ws.keys()
+
+        if isinstance(var_type, type) or (isinstance(var_type, (tuple, list)) and all([isinstance(v, type) for v in var_type])):
+            ret = [s for s in vlist if isinstance(ws[s], var_type)]
+
+        else:
+            ret =  vlist # return a list of variable names
+
+        return ret
 
     elif len(args) == 1: # one selector argument
         sel = args[0]

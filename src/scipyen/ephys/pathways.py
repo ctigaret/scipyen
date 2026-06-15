@@ -2867,7 +2867,7 @@ class PathwaysStimulationLayout():
                 Membrane test epochs should be unique in any given sweep
 
         """
-        return self.getEpochsWithRole(pathway, ABFEpochRole.MembraneTestRole,
+        return self.getEpochsWithRole(pathway, pab.ABFEpochRole.MembraneTestRole,
                                      True, sweep, asNeoEpoch)
 
 
@@ -2894,7 +2894,7 @@ class PathwaysStimulationLayout():
         stimulation, etc).
 
         """
-        return self.getEpochsWithRole(pathway, ABFEpochRole.BaselineRole,
+        return self.getEpochsWithRole(pathway, pab.ABFEpochRole.BaselineRole,
                                      True, sweep, asNeoEpoch)
 
     def getStimulationEpochs(self, pathway: SynapticPathway,
@@ -2920,7 +2920,7 @@ class PathwaysStimulationLayout():
             Unlike for self.getMembraneTestEpoch or self.getBaselineEpoch, there can be more than one stimulation epoch in any given sweep.
 
         """
-        return self.getEpochsWithRole(pathway, ABFEpochRole.StimulusRole,
+        return self.getEpochsWithRole(pathway, pab.ABFEpochRole.StimulusRole,
                                       False, sweep, asNeoEpoch)
 
     def getCrossTalkLayout(self) -> dict:
