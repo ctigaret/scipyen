@@ -388,7 +388,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                 self._modelData_ = pd.concat((mdata, obj))
 
-            except:
+            except: # noqa
                 traceback.print_exc()
                 return False
 
@@ -412,7 +412,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 temp.insert(row, obj.columns[0], obj, allow_duplicates = True)
                 self._modelData_ = temp.T
 
-            except:
+            except: # noqa
                 traceback.print_exc()
                 return False
 

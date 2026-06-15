@@ -347,27 +347,32 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
             self._blocks_ = list()
 
         else:
-            ret = list(sorted(val, key = lambda x: x.rec_datetime))
+            if len(val)  > 1:
+                val = list(sorted(val, key = lambda x: x.rec_datetime))
 
             if self.protocol is None:
-                self.protocol = ephys.getProtocol(ret[0])
-                if isinstance(self.protocol , ephys.ElectrophysiologyProtocol):
-                    if not all(ephys.getProtocol(x) == self.protocol for x in ret[1:]):
-                        scipywarn("All trials in an episode must have been recorded with the same protocol")
+                self.protocol = ephys.getProtocol(val[0])
+                if len(val) > 1:
+                    if isinstance(self.protocol , ephys.ElectrophysiologyProtocol):
+                        if not all(ephys.getProtocol(x) == self.protocol for x in val[1:]):
+                            scipywarn("All trials in an episode must have been recorded with the same protocol, or be synthetic trial blocks")
 
             else:
-                protocol = ephys.getProtocol(ret[0])
-                # allow chaning the protocol even when it was previously set
+                protocol = ephys.getProtocol(val[0])
+                # allow changing the protocol even when it was previously set
                 if isinstance(self.protocol , ephys.ElectrophysiologyProtocol):
-                    if not all(ephys.getProtocol(x) == self.protocol for x in ret[1:]):
-                        scipywarn("All trials in an episode must have been recorded with the same protocol")
+                    if not all(ephys.getProtocol(x) == self.protocol for x in val[1:]):
+                        scipywarn("All trials in an episode must have been recorded with the same protocol, or be synthetic trial blocks")
                     else:
                         self.protocol = protocol
 
-            self._begin_ = ret[0].rec_datetime
-            self._beginFrame_ = 0
-            self._end_ = ret[-1].rec_datetime
-            self._endFrame_ = len(ret)-1
+            self.begin = val[0].segments[0].rec_datetime
+            self.beginFrame = 0
+            self.end = val[-1].segments[-1].rec_datetime
+            if len(val) > 1:
+                self.lastFrame = sum(map(lambda x: len(x.segments), val))-1
+            else:
+                self.lastFrame = len(val[0].segments)-1
 
         self.trialsInfoLabel.setText(f"{len(self._blocks_)} Trials")
 
@@ -469,6 +474,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
             raise ValueError(f"Expecting a positive value; got {val} instead")
 
         self._endFrame_ = val
+
         if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._make_value_()
         else:
@@ -477,56 +483,17 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         sigBlock = QtCore.QSignalBlocker(self.lastFrameSpinBox)
         self.lastFrameSpinBox.setValue(self._endFrame_)
 
-
-    # @Slot()
-    # def _slot_editStimulus(self):
-    #     from gui.delegates import ExternalEditorDelegate
-    #     # print(f"{self.__class__.__name__}[{self.objectName()}]._slot_editStimulus: {self._syn_}")
-    #     stimEditor = ExternalEditorDelegate(self._syn_, self)
-    #     stimEditor.setObjectName("stimEditor")
-    #     stimEditor.sig_valueChanged.connect(self._slot_stimulusChanged)
-    #     stimEditor.slot_Launch()
-
-    # @Slot()
-    # def _slot_editAuxIn(self):
-    #     from gui.delegates import ExternalEditorDelegate
-    #     editor = ExternalEditorDelegate(self._auxin_, self)
-    #     editor.setObjectName("auxInEditor")
-    #     editor.sig_valueChanged.connect(self._slot_stimulusChanged)
-    #     editor.slot_Launch()
-    #
-    # @Slot()
-    # def _slot_editAuxOut(self):
-    #     from gui.delegates import ExternalEditorDelegate
-    #     editor = ExternalEditorDelegate(self._auxou_, self)
-    #     editor.setObjectName("auxOutEditor")
-    #     editor.sig_valueChanged.connect(self._slot_stimulusChanged)
-    #     editor.slot_Launch()
-    #
-    # @Slot(object)
-    # def _slot_stimulusChanged(self, val):
-    #     # print(f"{self.__class__.__name__}[{self.objectName()}]._slot_stimulusChanged({val})")
-    #     if isinstance(val, ephys_pathways.SynapticStimulusChannel):
-    #         self._syn_ = val
-    #         self._make_value_()
-    #         self.sig_valueChanged.emit(self._data_)
-
-    # @Slot(object)
-    # def slot_valueChanged(self, val):
-    #     self._data_ = val
-
-    def setValue(self, val: typing.Optional[ephys_pathways.SynapticPathway] = None):
-        print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
-        if isinstance(val, ephys_pathways.SynapticPathway):
+    def setValue(self, val: typing.Optional[ephys_pathways.RecordingEpisode] = None):
+        # print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
+        if isinstance(val, ephys_pathways.RecordingEpisode):
             self._data_ = val
             self._name_ = self._data_.name
-            self._adc_ = self._data_.adc
-            self._endFrame_ = self._data_.dac
-            self._syn_ = self._data_.syn
-            self._auxin_ = self._data_.auxin
-            self._auxout_ = self._data_.auxout
-            self._electrode_ = self._data_.electrodeMode
-            self._pathways_ = self._data_.pathways
+            self._beginFrame_ = self._data_.beginFrame
+            self._endFrame_ = self._data_.endFrame
+            self._begin_ = self._data_.begin
+            self._end_ = self._data_.end
+            self._episodeType_ = self._data_.type
+            self._protocol_ = self._data_.protocol
 
             sigBlock = list(map(
                                 lambda w: QtCore.QSignalBlocker(w),
@@ -543,14 +510,14 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
                             )
 
             self.nameLineEdit.setText(self._name_)
-            self.episodeBeginDateTimeEdit.setValue(self._adc_)
+            self.episodeBeginDateTimeEdit.setValue(self._begin_)
+            self.firstFrameSpinBox.setValue(self._beginFrame_)
+            self.episodeEndDateTimeEdit.setValue(self._end_)
             self.lastFrameSpinBox.setValue(self._endFrame_)
 
+            currentEpisodeTypeNdx = self._recordingEpisodeNames_.index(self._electrode_.name)
 
-            currentElectrodeModeNdx = self._recordingEpisodeNames_.index(self._electrode_.name)
-            currentPathwayTypeNdx = self._pathwayTypeNames_.index(self._pathType_.name)
-
-            self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
+            self.episodeTypeComboBox.setCurrentIndex(currentEpisodeTypeNdx)
 
     def value(self) -> ephys_pathways.RecordingEpisode:
         return self._data_

@@ -572,42 +572,63 @@ class RecordingEpisode(Episode):
         if len(self._blocks_) == 0:
             return
 
-        self.begin = self._blocks_[0].rec_datetime
-        self.end = self._blocks_[-1].rec_datetime + datetime.timedelta(seconds = float(neoutils.block_duration(self._blocks_[-1])))
+        if len(self._blocks_) > 1:
+            self.begin = self._blocks_[0].rec_datetime
+            self.end = self._blocks_[-1].rec_datetime + datetime.timedelta(seconds = float(neoutils.block_duration(self._blocks_[-1])))
 
-        self.beginFrame = 0
-        self.endFrame = sum([len(b.segments) for b in self._blocks_]) - 1
+            self.beginFrame = 0
+            self.endFrame = sum([len(b.segments) for b in self._blocks_]) - 1
 
-        block_protocols = list()
+            protocol = ephys.getProtocol(self._blocks_[0])
 
-        try:
-            block_protocols = unique(list(filter(lambda x: isinstance(x, ElectrophysiologyProtocol), map(lambda x: getProtocol(x), self._blocks_))), idcheck=False)
-        except:
-            scipywarn("Cannot parse protocols from the Block objects")
-            traceback.print_exc()
+            if isinstance(protocol, ephys.ElectrophysiologyProtocol):
+                if not all(ephys.getProtocol(x) == protocol for x in self._blocks_):
+                    scipywarn("All trials in an episode must have been recorded with the same protocol, or be synthetic trial blocks")
 
-        if len(block_protocols) != 1:
-            raise RuntimeError("An episode can have exactly one protocol")
+            self._protocol_ = protocol
 
-        self._protocol_ = block_protocols[0]
+        else:
+            self.begin = self._blocks_[0].segments[0].rec_datetime
+            self.end = self._blocks_[0].segments[-1].rec_datetime
+            self.beginFrame = 0
+            self.endFrame = len(self._blocks_[0].segments) - 1
+            self._protocol_ = ephys.getProtocol(self._blocks_[0])
+
+        #
+        # block_protocols = list()
+        #
+        # try:
+        #     block_protocols = unique(list(filter(lambda x: isinstance(x, ElectrophysiologyProtocol), map(lambda x: ephys.getProtocol(x), self._blocks_))), idcheck=False)
+        # except:
+        #     scipywarn("Cannot parse protocols from the Block objects")
+        #     traceback.print_exc()
+        #
+        # if len(block_protocols) != 1:
+        #     raise RuntimeError("An episode can have exactly one protocol")
+        #
+        # self._protocol_ = block_protocols[0]
 
     def addBlock(self, x:neo.Block):
         r"""Adds a new block; blocks will be reordered by rec_datetime if necessary"""
         if not isinstance(x, neo.Block):
             raise TypeError(f"Expecting a neo.Block; instead, got {type().__name__}")
 
-        protocol = getProtocol(x)
-        if isinstance(self._protocol_, ElectrophysiologyProtocol):
-            # make sure they use the same protocol
-            protocols = unique([protocol, self._protocol_], idcheck=False)
-            if len(protocols) != 1:
-                raise RuntimeError("Cannot add new block because is using a different protocol")
+        protocol = ephys.getProtocol(x)
+
+        if len(self._blocks_):
+            if ((self._protocol_ is None and isinstance(protocol, ephys.ElectrophysiologyProtocol))
+            or (isinstance(self._protocol_, ephys.ElectrophysiologyProtocol) and protocol is None)):
+                    scipywarn("Cannot apped a trial with a different protocol")
+                    return
+
+            blocks = self._blocks_ + [x]
+            self.blocks = blocks
 
         else:
             self._protocol_ = protocol
+            self.blocks = [x]
 
-        blocks = self._blocks_ + [x]
-        self.blocks = blocks
+        self._setup_from_blocks_() # will also update the protocols,
 
     def removeBlock(self, index:typing.Union[int, str]):
         r"""Removes a block by name or by its index in the episode blocks"""
@@ -628,12 +649,6 @@ class RecordingEpisode(Episode):
         block = self._blocks_[index]
 
         del self._blocks_[index]
-
-        protocol = getProtocol(block)
-        if isinstance(protocol, ElectrophysiologyProtocol):
-            if protocol in self._protocols_:
-                ndx = self._protocols_.index(protocol)
-                del self._protocols_[ndx]
 
         self._setup_from_blocks_() # will also update the protocols,
 
@@ -754,6 +769,7 @@ class RecordingEpisode(Episode):
 
 @with_doc(Schedule, use_header=True, header_str = "Inherits from:")
 class RecordingSchedule(Schedule):
+    r"""Sequence of RecordingEpisode objects"""
     def __init__(self, name: typing.Optional[str] = None, **kwargs):
         super().__init__(name, **kwargs)
 
@@ -919,8 +935,6 @@ class RecordingSchedule(Schedule):
         episodes = h5io.fromHDF5(entity["episodes"], cache)
 
         return cls(name, episodes=episodes)
-
-
 
 class SynapticPathwayType(TypeEnum):
     r"""

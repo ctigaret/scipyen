@@ -476,9 +476,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
         if objDict["objDataAsChild"] and self._inlineTables_:
             dataItem = QtGui.QStandardItem("")
             dataItem.setData(QtCore.QVariant(True), StandaloneEditorWidgetRole) # noqa
-            # if not self._inlineTables_:
-            #     dataItem.setData(QtCore.QVariant("Double-click to edit..."), QtCore.Qt.DisplayRole) # noqa
-            #     dataItem.setData(QtCore.QVariant(obj), ObjectDataRole) # noqa
             objItem.insertRow(0, [dataItem])
         else:
             dataItem = rowItems[-1]
@@ -501,7 +498,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 and objId not in self._visited_):
                 itemPath = f"{self._rootTitle_}{self.getPathForLeaf(objItem)}"
                 self._memoize_(obj, itemPath, objDict)
-                # self._memoize_(obj, itemPath, objDict["objType"], objId)
 
         return objItem
 
@@ -529,8 +525,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
         k = 0
 
         if objDict["objDataAsChild"]:
-            # NOTE: 2026-02-08 09:53:31 TODO
-            # see NOTE: 2026-02-08 09:52:28 TODO
             dataItem = QtGui.QStandardItem("")
             pItem.insertRow(0, [dataItem])
             k += 1
@@ -553,16 +547,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         if len(visited):
             return pItem
 
-        # print(f"{self.__class__.__name__}._buildBranch_")
-
-        # if self._sortedRows_:
-        #     keyvals = sorted(obj.items(), key = lambda i: f"'{i[0]}'" if isinstance(i[0], str) else f"{i[0]}")
-        # else:
-        #     keyvals = list(obj.items())
-
-        # for (key, value) in keyvals:
         for key, value in obj.items():
-            # print(f"\tkey  {key} ->  {type(value)}")
             if isinstance(key, str):
                 keyName = key
             else:
@@ -594,16 +579,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
             k += 1
 
-
         return pItem
-
-    # @property
-    # def sortedRows(self) -> bool:
-    #     return self._sortedRows_
-    #
-    # @sortedRows.setter
-    # def sortedRows(self, val: bool):
-    #     self._sortedRows_ = val is True
 
     @property
     def showMethods(self) -> bool:
