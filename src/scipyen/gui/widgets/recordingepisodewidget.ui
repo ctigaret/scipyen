@@ -22,12 +22,12 @@
         <string>Name:</string>
        </property>
        <property name="buddy">
-        <cstring>episodeNameLineEdit</cstring>
+        <cstring>nameLineEdit</cstring>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QLineEdit" name="episodeNameLineEdit"/>
+      <widget class="QLineEdit" name="nameLineEdit"/>
      </item>
      <item>
       <widget class="QToolButton" name="descriptionToolButton">

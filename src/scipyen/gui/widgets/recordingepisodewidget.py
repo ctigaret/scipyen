@@ -86,29 +86,28 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         else:
             self._data_ = obj
 
-        # print(f"\tself._data_: {self._data_}")
+        self._recordingEpisodeNames_ = list(pathways.RecordingEpisodeType.names())
 
         if isinstance(self._data_, pathways.RecordingEpisode):
             self._name_ = self._data_.name
-            self._adc_ = self._data_.adc
-            self._dac_ = self._data_.dac
-            self._syn_ = self._data_.syn
-            self._auxin_ = self._data_.auxin
-            self._auxout_ = self._data_.auxout
-            self._electrode_ = self._data_.electrodeMode
-            # self._pathways_ = self._data_.pathways
+            self._blocks_ = self._data_.blocks
+            self._type_ = self._data_._type_
+            self._begin_ = self._data_._begin_
+            self._end_ = self._data_._end_
+            self._beginFrame_ = self._data_._beginFrame_
+            self._endFrame_ = self._data_._endFrame_
+            self._protocol_ = self._data_._protocol_
 
         else:
-            self._name_ = "source"
-            self._adc_ = 0
-            self._dac_ = 0
-            self._syn_ = pathways.SynapticStimulusChannelList()
-            self._auxin_ = 0
-            self._auxout_ = 0
-            self._electrode_ = ephys.ElectrodeMode.Null
-            # self._pathways_ = ephys.SynapticPathwayList(name=self._name_)
+            self._name_ = "Episode"
+            self._blocks_ = list()
+            self._type_ = pathways.RecordingEpisodeType.Tracking
+            self._begin_ = datetime.datetime.now()
+            self._end_ = datetime.datetime.now()
+            self._beginFrame_ = 0
+            self._endFrame_ = 0
+            self._protocol_ = None
 
-        self._electrodeModeNames_ = list(ephys.ElectrodeMode.names())
 
         self._configureUI_()
 
@@ -129,6 +128,11 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
             self.nameLineEdit.setText(self._name_)
         self.nameLineEdit.textChanged.connect(self._slot_nameChanged)
 
+        if isinstance(self._protocol_, ephys.ElectrophysiologyProtocol):
+            self.protocolNameLabel.setText(self._protocol_.name)
+        else:
+            self.protocolNameLabel.setText("")
+
         self.adcSpinBox.setToolTip("Index of ADC (input) channel used for recording")
         self.adcSpinBox.setWhatsThis("Index of ADC (input) channel used for recording")
         self.adcSpinBox.setStatusTip("Index of ADC (input) channel used for recording")
@@ -145,10 +149,10 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
             self.dacSpinBox.setValue(self._dac_)
         self.dacSpinBox.valueChanged.connect(self._slot_dacChanged)
 
-        for text in self._electrodeModeNames_:
+        for text in self._recordingEpisodeNames_:
             self.electrodeModeComboBox.addItem(text)
 
-        currentElectrodeModeNdx = self._electrodeModeNames_.index(self._electrode_.name)
+        currentElectrodeModeNdx = self._recordingEpisodeNames_.index(self._electrode_.name)
         self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
 
         # self.electrodeModeComboBox.currentIndexChanged.connect(self._slot_electrodeModeChanged)
@@ -200,11 +204,11 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
     @Slot(str)
     @Slot(int)
     def _slot_electrodeModeChanged(self, val: int | str):
-        if isinstance(val, int) and val >=0 and val < len(self._electrodeModeNames_):
-            val = self._electrodeModeNames_[val]
+        if isinstance(val, int) and val >=0 and val < len(self._recordingEpisodeNames_):
+            val = self._recordingEpisodeNames_[val]
 
         if isinstance(val, str):
-            if val in self._electrodeModeNames_:
+            if val in self._recordingEpisodeNames_:
                 self._electrode_ = ephys.ElectrodeMode[val]
             else:
                 return
@@ -299,7 +303,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
             self.dacSpinBox.setValue(self._dac_)
 
 
-            currentElectrodeModeNdx = self._electrodeModeNames_.index(self._electrode_.name)
+            currentElectrodeModeNdx = self._recordingEpisodeNames_.index(self._electrode_.name)
             currentPathwayTypeNdx = self._pathwayTypeNames_.index(self._pathType_.name)
 
             self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
