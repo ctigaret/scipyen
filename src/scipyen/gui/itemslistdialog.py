@@ -33,12 +33,11 @@ else:
     __has_sip__ = True
 
 
-
-
 # NOTE: 2023-07-14 16:32:06
 # necessary to adapt to the situation where Scipyen is bundled
 from core.sysutils import adapt_ui_path
 from gui import guiutils
+from core.prog import scipywarn
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -75,7 +74,7 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
             elif selectmode.lower == "multi":
                 selectmode = QtWidgets.QAbstractItemView.MultiSelection
             else:
-                warnings.warn(f"I don't know what '{selectmode}' selection means...")
+                scipywarn(f"I don't know what '{selectmode}' selection means...")
                 selectmode = QtWidgets.QAbstractItemView.SingleSelection
 
 
@@ -83,6 +82,7 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
             selectmode = QtWidgets.QAbstractItemView.SingleSelection
 
         self.listWidget.setSelectionMode(selectmode)
+        self.listWidget.selectionModel().selectionChanged.connect(self._slot_selectionChanged)
 
         if title is not None:
             self.setWindowTitle(title)
@@ -103,6 +103,12 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
 
             self.setItems(itemsList)
 
+    @Slot(QtCore.QItemSelection, QtCore.QItemSelection)
+    def _slot_selectionChanged(self, selected: QtCore.QItemSelection,
+                               deselected: QtCore.QItemSelection):
+
+        self.infoLabel.setText(f"{len(selected.indexes())} selected out of {self.listWidget.count()} items")
+
     @Slot(str)
     def slot_locateSelectName(self, txt):
         found_items = self.listWidget.findItems(txt, QtCore.Qt.MatchContains | QtCore.Qt.MatchCaseSensitive)
@@ -118,6 +124,7 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
 
             if len(sel_indexes):
                 self.listWidget.scrollTo(sel_indexes[0])
+                self.infoLabel.setText(f"{len(sel_indexes)} selected out of {self.listWidget.count()} items")
                 if len(sel_indexes) == 1:
                     self.itemSelected.emit(str(found_items[0].text()))
                 #self.itemSelected.emit()
@@ -192,6 +199,14 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
                 w += self.listWidget.verticalScrollBar().sizeHint().width()
 
             self.listWidget.setMinimumWidth(int(w))
+
+            if self.listWidget.count() == 0:
+                self.infoLabel.setText("No items")
+            else:
+                if len(self.preSelected):
+                    self.infoLabel.setText(f"{len(self.preSelected)} selected out of {self.listWidget.count()} items")
+                else:
+                    self.infoLabel.setText(f"{self.listWidget.count()} items")
 
     @Slot(QtWidgets.QListWidgetItem)
     def selectItem(self, item):
