@@ -196,6 +196,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
 
         self.importTrialsToolButton.triggered.connect(self._slot_importTrials)
         self.openTrialsToolButton.triggered.connect(self._slot_loadTrials)
+        self.trialsInfoLabel.setText(f"{len(self._blocks_)} Trials")
 
     @Slot(QtCore.QDateTime)
     def _slot_beginDateTimeChanged(self, val: QtCore.QDateTime):
@@ -308,31 +309,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
                                         var_type = neo.Block,
                                         retrieve_all = True,
                                         ) # noqa
-
-        if len(ret):
-            ret = sorted(ret, key = lambda x: x.rec_datetime)
-
-            if self.protocol is None:
-                self.protocol = ephys.getProtocol(ret[0])
-                if isinstance(self.protocol , ephys.ElectrophysiologyProtocol):
-                    if not all(ephys.getProtocol(x) == self.protocol for x in ret[1:]):
-                        scipywarn("All trials in an episode must have been recorded with the same protocol")
-
-            else:
-                protocol = ephys.getProtocol(ret[0])
-                # allow chaning the protocol even when it was previously set
-                if isinstance(self.protocol , ephys.ElectrophysiologyProtocol):
-                    if not all(ephys.getProtocol(x) == self.protocol for x in ret[1:]):
-                        scipywarn("All trials in an episode must have been recorded with the same protocol")
-                    else:
-                        self.protocol = protocol
-
-            self._begin_ = ret[0].rec_datetime
-            self._beginFrame_ = 0
-            self._end_ = ret[-1].rec_datetime
-            self._endFrame_ = len(ret)-1
-
-        self._blocks_ = ret
+        self.trials = ret
 
     def _loadTrials(self):
         from gui.workspacegui import FileIOGui
@@ -354,8 +331,23 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         except: # noqa
             traceback.print_exc()
 
-        if len(ret):
-            ret = sorted(ret, key = lambda x: x.rec_datetime)
+        self.trials = ret
+
+    @property
+    def trials(self) -> list:
+        return self._blocks_
+
+    @trials.setter
+    def trials(self, val: list[neo.Block] | None):
+        if (val is not None and not isinstance(val, typing.Sequence) and
+            (len(val) > 0 and not all(isinstance(v, neo.Block) for v in val))):
+            raise TypeError(f"Expecting a sequence of neo.Block trials or None; instead got a {type(val).__name__}")
+
+        if val is None or (isinstance(val, typing.Sequence) and len(val) == 0):
+            self._blocks_ = list()
+
+        else:
+            ret = list(sorted(val, key = lambda x: x.rec_datetime))
 
             if self.protocol is None:
                 self.protocol = ephys.getProtocol(ret[0])
@@ -377,7 +369,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
             self._end_ = ret[-1].rec_datetime
             self._endFrame_ = len(ret)-1
 
-        self._blocks_ = ret
+        self.trialsInfoLabel.setText(f"{len(self._blocks_)} Trials")
 
     @property
     def protocol(self) -> ephys.ElectrophysiologyProtocol | None:

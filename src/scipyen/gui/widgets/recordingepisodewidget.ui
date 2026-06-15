@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>345</width>
-    <height>245</height>
+    <width>306</width>
+    <height>267</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -56,26 +56,6 @@
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_3">
      <item>
-      <widget class="QLabel" name="label_3">
-       <property name="text">
-        <string>Protocol:</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="protocolNameLabel">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string/>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QToolButton" name="previewProtocolToolButton">
        <property name="toolTip">
         <string>View protocol</string>
@@ -97,10 +77,30 @@
        </property>
       </widget>
      </item>
+     <item>
+      <widget class="QLabel" name="label_3">
+       <property name="text">
+        <string>Protocol:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="protocolNameLabel">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
     </layout>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout_2">
+    <layout class="QHBoxLayout" name="horizontalLayout_5">
      <item>
       <widget class="QLabel" name="label_2">
        <property name="text">
@@ -114,6 +114,10 @@
      <item>
       <widget class="QComboBox" name="episodeTypeComboBox"/>
      </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout_2">
      <item>
       <widget class="QToolButton" name="importTrialsToolButton">
        <property name="text">
@@ -137,6 +141,20 @@
        </property>
        <property name="autoRaise">
         <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="label_9">
+       <property name="text">
+        <string>Trials:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="trialsInfoLabel">
+       <property name="text">
+        <string/>
        </property>
       </widget>
      </item>
