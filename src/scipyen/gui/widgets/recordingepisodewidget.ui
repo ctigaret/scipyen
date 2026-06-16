@@ -56,6 +56,13 @@
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_3">
      <item>
+      <widget class="QLabel" name="label_3">
+       <property name="text">
+        <string>Protocol:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QToolButton" name="previewProtocolToolButton">
        <property name="toolTip">
         <string>View protocol</string>
@@ -74,13 +81,6 @@
        </property>
        <property name="autoRaise">
         <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="label_3">
-       <property name="text">
-        <string>Protocol:</string>
        </property>
       </widget>
      </item>
@@ -112,12 +112,26 @@
       </widget>
      </item>
      <item>
-      <widget class="QComboBox" name="episodeTypeComboBox"/>
+      <widget class="QComboBox" name="episodeTypeComboBox">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+      </widget>
      </item>
     </layout>
    </item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <item>
+      <widget class="QLabel" name="label_9">
+       <property name="text">
+        <string>Trials:</string>
+       </property>
+      </widget>
+     </item>
      <item>
       <widget class="QToolButton" name="importTrialsToolButton">
        <property name="text">
@@ -141,13 +155,6 @@
        </property>
        <property name="autoRaise">
         <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="label_9">
-       <property name="text">
-        <string>Trials:</string>
        </property>
       </widget>
      </item>
@@ -267,7 +274,7 @@
       </spacer>
      </item>
      <item>
-      <widget class="QPushButton" name="createEpisodePushButton">
+      <widget class="QPushButton" name="createObjectPushButton">
        <property name="toolTip">
         <string>Create a new recording episode</string>
        </property>

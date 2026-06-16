@@ -56,6 +56,7 @@ import neo
 from tribool import Tribool
 # from core import scipyen_quantities as scq
 from core import strutils as strutils
+from core import datatypes
 from gui.widgets import small_widgets as smw
 from gui.widgets import neo_widgets as neow
 from gui.widgets import inlinefiledirchooser as ifdc
@@ -63,7 +64,7 @@ from gui.widgets import inlinefiledirchooser as ifdc
 # from core import typeenum
 from gui.itemmodels.roles import * # noqa
 from gui import guiutils
-from ephys import ephys
+from ephys import (ephys, ephys_pathways)
 
 class ExternalEditorDelegate(QtWidgets.QMainWindow):
     r"""For use with external editing in PythonItemDelegate.
@@ -123,19 +124,23 @@ NOTE: To be used with my custom itemmodels
 
     def chooseEditor(self) -> QtWidgets.QWidget:
         # print(f"{self.__class__.__name__}.chooseEditor for {type(self._data_).__name__}")
+        from gui.widgets import (synapticstimuluswidget,
+                                 synapticpathwaywidget,
+                                 auxiliaryiowidget,
+                                 recordingsourcewidget,
+                                 tableeditorwidget,
+                                 )
         widget = None
         editorName = f"{type(self._data_).__name__} Editor"
         self.setWindowTitle(editorName)
-        if isinstance(self._data_, ephys.SynapticStimulusChannel):
-            from gui.widgets import synapticstimuluswidget
+        if isinstance(self._data_, ephys_pathways.SynapticStimulusChannel):
             widget = synapticstimuluswidget.SynapticStimulusChannelWidget(self,
                                                                    self._data_,
                                                                    )
             widget.setObjectName(f"{editorName} Widget")
 
-        elif isinstance(self._data_, (ephys.AuxiliaryInput, ephys.AuxiliaryOutput)):
-            from gui.widgets import auxiliaryiowidget
-            if isinstance(self._data_, ephys.AuxiliaryInput):
+        elif isinstance(self._data_, (ephys_pathways.AuxiliaryInput, ephys_pathways.AuxiliaryOutput)):
+            if isinstance(self._data_, ephys_pathways.AuxiliaryInput):
                 widget = auxiliaryiowidget.AuxiliaryInputWidget(self,
                                                                 self._data_,
                                                                 )
@@ -145,36 +150,43 @@ NOTE: To be used with my custom itemmodels
                                                                  )
             widget.setObjectName(f"{editorName} Widget")
 
-        elif isinstance(self._data_, ephys.SynapticPathway):
-            from gui.widgets import synapticpathwaywidget
+        elif isinstance(self._data_, ephys_pathways.SynapticPathway):
             widget = synapticpathwaywidget.SynapticPathwayWidget(self,
                                                                  self._data_,
                                                                  )
             widget.setObjectName(f"{editorName} Widget")
 
-        elif isinstance(self._data_, ephys.RecordingSource):
-            from gui.widgets import recordingsourcewidget
+        elif isinstance(self._data_, ephys_pathways.RecordingSource):
             widget = recordingsourcewidget.RecordingSourceWidget(self,
                                                                  self._data_,
                                                                  )
             widget.setObjectName(f"{editorName} Widget")
 
         elif isinstance(self._data_, typing.Sequence) or datatypes.is_iterable(self._data_):
-            from gui.widgets import tableeditorwidget
             widget = tableeditorwidget.TableEditorWidget(self)
             widget.setObjectName(f"{editorName} Widget")
             widget.setData(self._data_)
 
         if isinstance(widget, QtWidgets.QWidget) and hasattr(widget, "sig_valueChanged"):
-            widget.sig_valueChanged.connect(self.slot_valueChanged)
-
-
+            # print(f"{self.__class__.__name__}.chooseEditor -> widget is a {type(widget).__name__}:")
+            if isinstance(widget, tableeditorwidget.TableEditorWidget):
+                widget.sig_valueChanged.connect(self.slot_dataChanged)
+            else:
+                widget.sig_valueChanged.connect(self.slot_valueChanged)
 
         return widget
 
     @Slot()
     def _slot_externalEditorClosing(self):
         self._pendingChange_ = False
+
+    @Slot()
+    def slot_dataChanged(self):
+        obj = self.sender().value()
+        if self._pendingChange_:
+            return
+        self._data_ = obj
+        self.sig_valueChanged.emit(self._data_)
 
     @Slot(object)
     def slot_valueChanged(self, val):
@@ -249,7 +261,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     sig_dataChanged = Signal(QtWidgets.QWidget, name = "sig_dataChanged")
     sig_contentsChanged = Signal(name="sig_contentsChanged")
     sig_editExternally = Signal(QtWidgets.QWidget, QtCore.QModelIndex, name = "sig_editExternally")
-
+    sig_indexChanged = Signal(int, int, name="sig_indexChanged")
     # TODO/FIXME: 2025-10-28 12:57:09
     # decide how to handle the case where the combo box is editable (and its
     # currentText() is not among the combo box items)
@@ -662,6 +674,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                         widget.setValue(data)
 
                     widget.sig_valueChanged.connect(self.slot_valueChanged)
+
                 else:
                     isComplex = issubclass(data.dtype.type, np.complexfloating)
                     if data.ndim == 0 or (data.ndim == 1 and data.size == 1):
@@ -669,6 +682,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                             widget = smw.ComplexSpinBox(parent, data, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
                         else:
                             widget = smw.QuantitySpinBox(parent, data, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
+
                         widget.setMinimum(-math.inf * data.units)
                         widget.setMaximum(math.inf * data.units)
                         widget.setSingleStep(1.0  * data.units)
@@ -682,11 +696,12 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
                     else:
                         widget = TableEditorWidget(parent, readOnly=False)
-                        # widget.setData(data)
                         if not inModel:
                             widget.setData(data)
 
                         widget.sig_dataChanged.connect(self.slot_dataChanged)
+                        widget.sig_indexChanged.connect(self.sig_indexChanged) # connect signal 2 signal directly
+                        # widget.sig_indexChanged
 
         elif isinstance(data, np.ndarray):
             if data.ndim == 0 or (data.ndim ==1 and data.size == 1):
@@ -746,6 +761,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     widget.setData(data)
 
                 widget.sig_dataChanged.connect(self.slot_dataChanged)
+                widget.sig_indexChanged.connect(self.sig_indexChanged)
 
         elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
             widget = TableEditorWidget(parent, readOnly=False)
@@ -754,6 +770,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 widget.setData(data)
 
             widget.sig_dataChanged.connect(self.slot_dataChanged)
+            widget.sig_indexChanged.connect(self.sig_indexChanged)
 
         elif isinstance(data, pathlib.Path):
             if data.is_dir():
@@ -846,6 +863,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 widget.setData(data)
 
             widget.sig_dataChanged.connect(self.slot_dataChanged)
+            widget.sig_indexChanged.connect(self.sig_indexChanged)
 
         else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
             return
@@ -912,17 +930,19 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
     @Slot(object)
     def _slot_dataEditedExternally(self, val):
+        from gui.itemmodels.tabulardatamodel import TabularDataModel
         # print(f"{self.__class__.__name__}._slot_dataEditedExternally -> {val}")
         if isinstance(self._currentModelIndex_, QtCore.QModelIndex):
             model = self._currentModelIndex_.model()
             modelData = getattr(model, "_modelData_", None)
-            if isinstance(modelData, typing.Iterable):
+            if isinstance(model, TabularDataModel) and isinstance(modelData, typing.Iterable):
                 row = self._currentModelIndex_.row()
                 modelData[row] = val
                 topLeft = model.index(row, 0)
                 bottomRight = model.index(row, model.columnCount()-1)
                 model.dataChanged.emit(topLeft, bottomRight)
 
+        self.sig_indexChanged.emit(self._currentModelIndex_.row(), self._currentModelIndex_.column())
 
     @Slot()
     def slot_commitAndCloseEditor(self):
@@ -1063,8 +1083,6 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
 
             choices = self._columnChoices_[index.column()]["choices"]
-
-        # elif
 
         w = self.createWidget(data, choices, True, parent)
         # print(f"{self.__class__.__name__}.createEditor() -> {type(w).__name__}")

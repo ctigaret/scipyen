@@ -403,19 +403,19 @@ class RecordingEpisode(Episode):
     def __repr__(self) -> str:
         ret = list()
         ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}), with:")
-        ret.append(f"\tBlocks: {self.nBlocks}")
-        ret.append(f"\tFrames: {self.nFrames}")
+        ret.append(f"\t{len.self.blocks} trials")
+        ret.append(f"\t{self.nFrames} frames")
         ret.append(f"\tbegin={self.begin}, end={self.end}")
         ret.append(f"\tbeginFrame={self.beginFrame}, endFrame={self.endFrame}")
 
-        ret.append(f"\tPathway Stimulation by Sweep: {self.pathActivationBySweep}")
+        ret.append(f"\tStimulus Layout: {self.stimulusLayout}")
 
         ret.append(f"\tProtocol name: {self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else None}")
 
         return "\n".join(ret)
 
     def _repr_pretty_(self, p, cycle):
-        supertxt = super().__repr__() + " with :"
+        supertxt = super().__repr__()
 
         if cycle:
             p.text(supertxt)
@@ -426,7 +426,7 @@ class RecordingEpisode(Episode):
 
             p.text("Protocol name:")
             # attr_repr.append("Protocol:")
-            attr_repr.append(f"\t{self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else None}")
+            attr_repr.append(f"\t{self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else ''}")
             # attr_repr += [f"\t{s}" for s in repr(self.protocol).split("\n")]
 
             # with p.group(q4 ,"(",")"):
@@ -438,13 +438,20 @@ class RecordingEpisode(Episode):
 
             p.text("Pathways:")
             p.breakable()
+            for k, v in enumerate(self.pathways):
+                p.text(f"{k} ↦ {v}")
 
-            if isinstance(self.pathActivationBySweep, dict) and len(self.pathActivationBySweep):
+            if isinstance(self.stimulusLayout, PathwaysStimulationLayout):
                 link = " \u2192 "
-                txt = ["Pathway Stimulation by Sweep:"]
+                txt = ["Stimulus Layout:"]
 
-                for k,v in self.pathActivationBySweep.items():
-                    txt.append(f"Sweeps {k} ↦ {v}")
+                for k,v in enumerate(self.stimulusLayout.pathways):
+                    txt.append(f"Synaptic Pathway {k} ↦ {v}")
+                xTalk = self.stimulusLayout.getCrossTalkLayout()
+                if len(xTalk):
+                    txt.append("Cross-talk:")
+                    for k, v in xTalk.items():
+                        txt.append(f"{k} ↦ {v}")
 
                 p.text("\n".join(txt))
                 p.breakable()
@@ -760,12 +767,10 @@ class RecordingEpisode(Episode):
 
     @property
     def pathways(self) -> typing.List[SynapticPathway]:
-        ret = list()
-        for v in self.pathActivationBySweep.values():
-            p = [v_ for v_ in v if v_ not in ret]
-            ret += p
-
-        return ret
+        if isinstance(self.stimulusLayout, PathwaysStimulationLayout):
+            return self.stimulusLayout.pathways
+        else:
+            return list()
 
 @with_doc(Schedule, use_header=True, header_str = "Inherits from:")
 class RecordingSchedule(Schedule):
@@ -3229,16 +3234,19 @@ class SynapticPathwayList(NeoObjectList):
         else:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
-    def __getitem__(self, i: int) -> SynapticPathway | None:
+    def __getitem__(self, i: int | slice) -> SynapticPathway | None:
         """x.__getitem__(y) <==> x[y]"""
         if len(self._items) == 0:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
-        if i < len(self._items) and i >= -len(self._items):
-            return self._items[i]
+        if isinstance(i, int):
+            if i < len(self._items) and i >= -len(self._items):
+                return self._items[i]
 
-        else:
-            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+            else:
+                raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+        elif isinstance(i, slice):
+            return self._items[i]
 
     def __setitem__(self, i: int, value: SynapticPathway):
         if not isinstance(value, self.allowed_contents):

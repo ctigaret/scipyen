@@ -57,6 +57,7 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         self.setupUi(self)
         self.setModal(modal)
         self.preSelected = list()
+        self._currentlySelected_ = list()
 
         self.searchLineEdit.undoAvailable=True
         self.searchLineEdit.redoAvailable=True
@@ -67,12 +68,16 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         if isinstance(selectmode, str):
             if selectmode.lower == "single":
                 selectmode = QtWidgets.QAbstractItemView.SingleSelection
+
             elif selectmode.lower == "contiguous":
                 selectmode = QtWidgets.QAbstractItemView.ContiguousSelection
+
             elif selectmode.lower == "extended":
                 selectmode = QtWidgets.QAbstractItemView.ExtendedSelection
+
             elif selectmode.lower == "multi":
                 selectmode = QtWidgets.QAbstractItemView.MultiSelection
+
             else:
                 scipywarn(f"I don't know what '{selectmode}' selection means...")
                 selectmode = QtWidgets.QAbstractItemView.SingleSelection
@@ -106,8 +111,14 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
     @Slot(QtCore.QItemSelection, QtCore.QItemSelection)
     def _slot_selectionChanged(self, selected: QtCore.QItemSelection,
                                deselected: QtCore.QItemSelection):
-
-        self.infoLabel.setText(f"{len(selected.indexes())} selected out of {self.listWidget.count()} items")
+        # print(f"{self.__class__.__name__}._slot_selectionChanged: {selected.indexes()}")
+        for index in deselected.indexes():
+            if index in self._currentlySelected_:
+                ndx = self._currentlySelected_.index(index)
+                del self._currentlySelected_[ndx]
+        for index in selected.indexes():
+            self._currentlySelected_.append(index)
+        self.infoLabel.setText(f"{len(self._currentlySelected_)} selected out of {self.listWidget.count()} items")
 
     @Slot(str)
     def slot_locateSelectName(self, txt):

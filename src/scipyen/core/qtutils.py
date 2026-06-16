@@ -113,7 +113,7 @@ def isQObjectAlive(obj:QtCore.QObject):
 def datetime2Qt(d:datetime.datetime)->QtCore.QDateTime:
     from core import utilities
     
-    timeStamp = utilities.posixUTC(d)
+    timeStamp = int(utilities.posixUTC(d))
     return QtCore.QDateTime.fromSecsSinceEpoch(timeStamp) # converts to local time,
 
 def datetimeFromQt(d:QtCore.QDateTime)->datetime.datetime:

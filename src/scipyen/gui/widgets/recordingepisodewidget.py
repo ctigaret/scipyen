@@ -60,10 +60,12 @@ except:
 from ephys import ephys
 from ephys import ephys_pathways
 from core import datatypes # noqa
+from core import strutils
 from core.prog import scipywarn
 from core import qtutils
 from iolib import pictio as pio
 from gui import (guiutils, interact)
+from gui.workspacegui import WorkspaceGuiMixin
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -73,14 +75,15 @@ Ui_RecordingEpisodeWidget, QWidget = loadUiType(
     )
 
 
-class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
+class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMixin):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[ephys_pathways.RecordingEpisode] = None):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
 
-        if isinstance(parent, ephys_pathways.RecordingEpisode):
+        if isinstance(parent, (ephys_pathways.RecordingEpisode,
+                               neo.Block, typing.Sequence)):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
                 parent = obj
@@ -92,10 +95,19 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
 
         QWidget.__init__(self, parent=parent)
 
-        if not isinstance(obj, ephys_pathways.RecordingEpisode):
-            self._data_ = None
-        else:
+        self._descriptionViewer_: typing.Optional[QtWidgets.QWidget] = None
+
+        if isinstance(obj, ephys_pathways.RecordingEpisode):
             self._data_ = obj
+
+        elif isinstance(obj, typing.Sequence) and all(isinstance(x, neo.Block) for x in obj):
+            self._data_ = ephys_pathways.RecordingEpisode(obj)
+
+        elif isinstance(obj, neo.Block):
+            self._data_ = ephys_pathways.RecordingEpisode([obj])
+
+        else:
+            self._data_ = None
 
         self._recordingEpisodeNames_ = list(ephys_pathways.RecordingEpisodeType.names())
 
@@ -109,6 +121,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
             self._endFrame_ = self._data_.endFrame
             self._protocol_ = self._data_.protocol
             self._stimulusLayout_ = self._data_.stimulusLayout
+            self._description_ = self._data_.description
 
         else:
             self._name_ = "Episode"
@@ -120,6 +133,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
             self._endFrame_ = 0
             self._protocol_ = None
             self._stimulusLayout_ = None
+            self._description_ = ""
 
         self._configureUI_()
 
@@ -136,6 +150,8 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         self.nameLineEdit.setWhatsThis("Name of the recording source")
         self.nameLineEdit.setStatusTip("Name of the recording source")
 
+        self.descriptionToolButton.clicked.connect(self._slot_editDescription)
+
         if isinstance(self._name_, str) and len(self._name_.strip()):
             self.nameLineEdit.setText(self._name_)
         self.nameLineEdit.textChanged.connect(self._slot_nameChanged)
@@ -150,6 +166,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
 
         currentEpisodeTypeNdx = self._recordingEpisodeNames_.index(self._episodeType_.name)
         self.episodeTypeComboBox.setCurrentIndex(currentEpisodeTypeNdx)
+
         self.episodeTypeComboBox.currentTextChanged.connect(self._slot_episodeTypeChanged)
 
         self.episodeBeginDateTimeEdit.setToolTip("Date/time for the start of episode")
@@ -164,7 +181,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         self.episodeEndDateTimeEdit.setWhatsThis("Date/time for the end of episode (inclusive)")
         self.episodeEndDateTimeEdit.setStatusTip("Date/time for the end of episode (inclusive)")
         if isinstance(self._end_, datetime.datetime):
-            self.episodeEndDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._begin_))
+            self.episodeEndDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._end_))
 
         self.episodeEndDateTimeEdit.dateTimeChanged.connect(self._slot_endDateTimeChanged)
 
@@ -194,9 +211,9 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         self.createObjectPushButton.clicked.connect(self._slot_new)
         self.createObjectPushButton.setEnabled(self._data_ is None)
 
-        self.importTrialsToolButton.triggered.connect(self._slot_importTrials)
-        self.openTrialsToolButton.triggered.connect(self._slot_loadTrials)
-        self.trialsInfoLabel.setText(f"{len(self._blocks_)} Trials")
+        self.importTrialsToolButton.clicked.connect(self._slot_importTrials)
+        self.openTrialsToolButton.clicked.connect(self._slot_loadTrials)
+        self.trialsInfoLabel.setText(f"{len(self._blocks_)} {strutils.pluralize('Trial', len(self._blocks_))}")
 
     @Slot(QtCore.QDateTime)
     def _slot_beginDateTimeChanged(self, val: QtCore.QDateTime):
@@ -275,24 +292,49 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
     def _slot_new(self):
         self._make_value_()
 
+    @Slot()
+    def _slot_editDescription(self):
+        from gui import textviewer as tv
+        if isinstance(self._descriptionViewer_, tv.TextViewer):
+            self._descriptionViewer_.setText(self._description_)
+        else:
+            self._descriptionViewer_ = tv.TextViewer(data = self._description_, parent=self, edit=True,
+                               win_title = "Description Editor", doc_title = "Description")
+
+            self._descriptionViewer_.sig_textChanged.connect(self._slot_descriptionChanged)
+            self._descriptionViewer_.show()
+
+    @Slot()
+    def _slot_descriptionChanged(self):
+        from gui import textviewer as tv
+        if isinstance(self._descriptionViewer_, tv.TextViewer):
+            self._description_ = self._descriptionViewer_.text(plain = True)
+            if isinstance(self._data_, ephys_pathways.RecordingEpisode):
+                self._data_.description = self._description_
+
+            else:
+                self._make_value_()
+
     def _make_value_(self):
         self._data_ = ephys_pathways.RecordingEpisode(blocks = self._blocks_,
                                                 protocol = self._protocol_,
                                                 name=self._name_,
                                                 episodeType = self._episodeType_,
                                                 stimulusLayout = self._stimulusLayout_,
+                                                description = self._description_
                                                 )
         self.createObjectPushButton.setEnabled(self._data_ is None)
 
     @Slot()
     def _slot_importTrials(self):
-        self._importTrials()
+        self._uiImportTrials_()
 
     @Slot()
     def _slot_loadTrials(self):
-        self._loadTrials()
+        # print(f"{self.__class__.__name__}._slot_loadTrials")
+        self._uiLoadTrials_()
 
-    def _importTrials(self):
+    def _uiImportTrials_(self):
         ret = list()
         if isinstance(self._name_, str) and len(self._name_.strip()):
             ret = interact.selectWSData(f"{self._name_}_*",
@@ -302,16 +344,18 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
                                         single=False,
                                         var_type = neo.Block,
                                         retrieve_all = True,
+                                        ws = self.appWindow.workspace,
                                         ) # noqa
         else:
             ret = interact.selectWSData(title = "Select Trial Blocks",
                                         single=False,
                                         var_type = neo.Block,
                                         retrieve_all = True,
+                                        ws = self.appWindow.workspace,
                                         ) # noqa
         self.trials = ret
 
-    def _loadTrials(self):
+    def _uiLoadTrials_(self):
         from gui.workspacegui import FileIOGui
         if isinstance(self._name_, str) and len(self._name_.strip()):
             fileNameFilter = f"{self._name_}*.abf;{self._name_}*.pkl"
@@ -338,7 +382,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
         return self._blocks_
 
     @trials.setter
-    def trials(self, val: list[neo.Block] | None):
+    def trials(self, val: typing.Optional[typing.Sequence[neo.Block]] = None):
         if (val is not None and not isinstance(val, typing.Sequence) and
             (len(val) > 0 and not all(isinstance(v, neo.Block) for v in val))):
             raise TypeError(f"Expecting a sequence of neo.Block trials or None; instead got a {type(val).__name__}")
@@ -366,13 +410,27 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
                     else:
                         self.protocol = protocol
 
-            self.begin = val[0].segments[0].rec_datetime
+            begin = val[0].segments[0].rec_datetime
+
+            if not isinstance(begin, datetime.datetime):
+                begin = val[0].rec_datetime
+
+            self.begin = begin
+
+            end = val[-1].segments[-1].rec_datetime
+            if not isinstance(end, datetime.datetime):
+                end = val[-1].rec_datetime
+
+            self.end = end
+
             self.beginFrame = 0
-            self.end = val[-1].segments[-1].rec_datetime
+
             if len(val) > 1:
                 self.lastFrame = sum(map(lambda x: len(x.segments), val))-1
             else:
                 self.lastFrame = len(val[0].segments)-1
+
+            self._blocks_ = val
 
         self.trialsInfoLabel.setText(f"{len(self._blocks_)} Trials")
 
@@ -440,7 +498,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
             self._data_.end = self._end_
 
         sigBlock = QtCore.QSignalBlocker(self.episodeEndDateTimeEdit)
-        self.episodeEndDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._begin_))
+        self.episodeEndDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._end_))
 
     @property
     def firstFrame(self) -> int:
@@ -495,29 +553,46 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget):
             self._episodeType_ = self._data_.type
             self._protocol_ = self._data_.protocol
 
-            sigBlock = list(map(
-                                lambda w: QtCore.QSignalBlocker(w),
-                                (
-                                    self.nameLineEdit,
-                                    self.episodeBeginDateTimeEdit,
-                                    self.lastFrameSpinBox,
-                                    self.electrodeModeComboBox,
-                                    self.pathTypeComboBox,
-                                    self.stimulusPushButton,
-                                    self.auxOutPushButton,
-                                 )
+        elif val is None:
+            self._name_ = "Episode"
+            self._blocks_ = list()
+            self._episodeType_ = ephys_pathways.RecordingEpisodeType.Tracking
+            self._begin_ = datetime.datetime.now()
+            self._end_ = datetime.datetime.now()
+            self._beginFrame_ = 0
+            self._endFrame_ = 0
+            self._protocol_ = None
+            self._stimulusLayout_ = None
+
+        else:
+            raise TypeError(f"Expecting a RecordingEpisode or None; instead got a {type(val).__name__}")
+
+        sigBlock = list(map(
+                            lambda w: QtCore.QSignalBlocker(w),
+                            (
+                                self.nameLineEdit,
+                                self.episodeBeginDateTimeEdit,
+                                self.episodeEndDateTimeEdit,
+                                self.firstFrameSpinBox,
+                                self.lastFrameSpinBox,
+                                self.episodeTypeComboBox,
                                 )
                             )
+                        )
 
-            self.nameLineEdit.setText(self._name_)
-            self.episodeBeginDateTimeEdit.setValue(self._begin_)
-            self.firstFrameSpinBox.setValue(self._beginFrame_)
-            self.episodeEndDateTimeEdit.setValue(self._end_)
-            self.lastFrameSpinBox.setValue(self._endFrame_)
+        self.nameLineEdit.setText(self._name_)
+        self.episodeBeginDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._begin_))
+        self.episodeEndDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._end_))
+        self.firstFrameSpinBox.setValue(self._beginFrame_)
+        self.lastFrameSpinBox.setValue(self._endFrame_)
+        self.protocolNameLabel.setText(self._protocol_.name if isinstance(self._protocol_, ephys.ElectrophysiologyProtocol) else "")
+        self.trialsInfoLabel.setText(f"{len(self._blocks_)} {strutils.pluralize('Trial', len(self._blocks_))}")
 
-            currentEpisodeTypeNdx = self._recordingEpisodeNames_.index(self._electrode_.name)
 
-            self.episodeTypeComboBox.setCurrentIndex(currentEpisodeTypeNdx)
+        currentEpisodeTypeNdx = self._recordingEpisodeNames_.index(self._episodeType_.name)
+
+        self.episodeTypeComboBox.setCurrentIndex(currentEpisodeTypeNdx)
+
 
     def value(self) -> ephys_pathways.RecordingEpisode:
         return self._data_

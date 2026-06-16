@@ -70,12 +70,9 @@ class TextViewer(ScipyenViewer):
     • no drag'n drop
     """
     sig_activated = Signal(int)
-    # closeMe  = Signal(int)
-    # signal_window_will_close = Signal()
     sig_textChanged = Signal(name = "sig_textChanged")
     
     viewer_for_types = {str: 99, QtGui.QTextDocument: 99, strutils.is_html:99}
-    # view_action_name = "Text"
     
     # FIXME/TODO: 2019-11-10 13:16:56
     # highlighter_types = ("plain", "xml", "html")
@@ -85,16 +82,14 @@ class TextViewer(ScipyenViewer):
                  ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, 
                  doc_title: (str, type(None)) = None, 
-                 edit:bool=False,
+                 edit: bool = False,
                  markdown:bool=False, *args, **kwargs):
-        self._readOnly = edit!=True
-        self._markdown = markdown==True
+        self._readOnly = edit is not True
+        self._markdown = markdown is True
         self._wrapMode_ = kwargs.pop("wrap", None)
         if not isinstance(self._wrapMode_, QtWidgets.QTextEdit.LineWrapMode):
             self._wrapMode_ = QtWidgets.QTextEdit.NoWrap
         super().__init__(data=data, parent=parent, ID = ID, win_title=win_title, doc_title=doc_title, *args, **kwargs)
-        # super(QMainWindow, self).__init__(parent)
-        # self._wm_id_ = int(self.winId())
             
     def _configureUI_(self):
         self.fileMenu = self.menuBar().addMenu("&File")
@@ -123,11 +118,13 @@ class TextViewer(ScipyenViewer):
         
         self.setCentralWidget(self._docViewer_)
         
-        #self._defaultCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
-        
         self._docViewer_.setDocument(QtGui.QTextDocument())
         
     def _set_data_(self, data, *args, **kwargs):
+
+        if data is None:
+            data = ""
+
         if isinstance(data, QtGui.QTextDocument):
             self._docViewer_.setDocument(data)
             
@@ -155,7 +152,6 @@ class TextViewer(ScipyenViewer):
                     self._highlighter_ = xmlutils.XmlSyntaxHighlighter(self._docViewer_.document())
                 else:
                     self._highlighter_ = None
-                
         else:
             raise TypeError("Expecting a QTextDdocument or a str; got %s instead" % type(data).__name__)
         

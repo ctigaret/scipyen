@@ -11,12 +11,12 @@ r"""Table Editor widget and custom table model, for tabular-like data
 #### BEGIN core python modules
 from __future__ import print_function
 
-import os, inspect, warnings, traceback, datetime, typing
+import os, inspect, warnings, traceback, datetime, typing # noqa
 from collections import deque
 #### END core python modules
 
 #### BEGIN 3rd party modules
-import qtpy
+import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
@@ -35,7 +35,7 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
+    from qtpy import sip # noqa
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
@@ -44,17 +44,17 @@ else:
 
 
 import pandas as pd
-import quantities as pq
+import quantities as pq # noqa
 #import xarray as xa
 import numpy as np
 import neo
 from neo.core.objectlist import ObjectList as NeoObjectList
 from core.vigra_patches import vigra
 
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import matplotlib.pylab as plb
-import matplotlib.mlab as mlb
+import matplotlib as mpl # noqa
+import matplotlib.pyplot as plt # noqa
+import matplotlib.pylab as plb # noqa
+import matplotlib.mlab as mlb # noqa
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
@@ -62,16 +62,16 @@ import matplotlib.mlab as mlb
 import core.datatypes
 
 import core.utilities as utilities
-import core.strutils as strutils
-from core.strutils import str2float
+import core.strutils as strutils # noqa
+from core.strutils import str2float # noqa
 
-from core.prog import (safewrapper, scipywarn)
+from core.prog import (safewrapper, scipywarn) # noqa
 
-from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType)
+from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType) # noqa
 from core.triggerprotocols import TriggerProtocolList
 from core.datazone import DataZone
 
-import core.datasignal
+import core.datasignal # noqa
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.datatypes import array_slice
 from core.sysutils import adapt_ui_path
@@ -91,7 +91,7 @@ from gui.itemmodels.roles import * # noqa
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules
-import iolib.pictio as pio
+import iolib.pictio as pio # noqa
 #### END pict.iolib modules
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -126,6 +126,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     sig_selectionChanged = Signal(name="sig_selectionChanged")
     sig_dataChanged = Signal(name="sig_dataChanged")
     sig_valueChanged = sig_dataChanged
+    sig_indexChanged = Signal(int, int, name="sig_indexChanged")
+    sig_indexesChanged = Signal(QtCore.QModelIndex, QtCore.QModelIndex, list, name="sig_indexesChanged")
 
     def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None,
                  readOnly:bool=True, enforceFloat:bool=False,
@@ -182,7 +184,10 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         if hasattr(self._dataModel_, "sig_modelDataChanged") and isinstance(type(self._dataModel_).sig_modelDataChanged, Signal):
             self._dataModel_.sig_modelDataChanged.connect(self.sig_dataChanged) # connect signal to signal directly
 
-        # self.setData(None)
+        if hasattr(self._dataModel_, "sig_indexChanged") and isinstance(type(self._dataModel_).sig_indexChanged, Signal):
+            self._dataModel_.sig_indexChanged.connect(self.sig_indexChanged) # connect signal to signal directly
+
+        self._dataModel_.dataChanged.connect(self._slot_modelDataChanged_)
 
     def setValue(self: typing.Self, value: TabularType, *args, **kwargs):
         self.setData(value, *args, **kwargs)
@@ -190,6 +195,17 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     def value(self):
         return self._data_
 
+    @Slot(QtCore.QModelIndex, QtCore.QModelIndex, "QList<int>")
+    def _slot_modelDataChanged_(self, topLeft: QtCore.QModelIndex,
+                                bottomRight: QtCore.QModelIndex,
+                                roles: list):
+        if topLeft == bottomRight:
+            self.sig_indexChanged.emit(topLeft.row(), topLeft.column())
+
+        else:
+            selg.sig_indexesChanged.emit(topLeft, bottomRight, roles)
+
+    @Slot()
     def _slot_modelPopulated(self):
         # print(f"{self.__class__.__name__}._slot_modelPopulated")
         if isinstance(self._dataModel_, TabularDataModel):
@@ -336,29 +352,6 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     def clear(self):
         self._dataModel_ = TabularDataModel(parent=self)
         self.tableView.setModel(self._dataModel_)
-
-    # @property
-    # def model(self) -> QtCore.QAbstractTableModel:
-    #     r"""The underlying QtCore.QAbstractTableModel or type derived from it"""
-    #     self._dataModel_ = self.tableView.model()
-    #     return self._dataModel_
-    #
-    # @model.setter
-    # def model(self, md:QtCore.QAbstractTableModel|None):
-    #     self._dataModel_ = md
-    #     self.tableView.setModel(self._dataModel_)
-    #     if hasattr(self._dataModel_, "sig_modelDataChanged") and isinstance(type(self._dataModel_).sig_modelDataChanged, Signal):
-    #         self._dataModel_.sig_modelDataChanged.connect(self.sig_dataChanged) # connect signal to signal directly
-
-    # @property
-    # def dataModel(self) -> QtCore.QAbstractTableModel:
-    #     r"""Same as self.model"""
-    #     return self.model
-    #
-    # @dataModel.setter
-    # def dataModel(self, val: QtCore.QAbstractTableModel):
-    #     self.model = val
-
 
     @property
     def enforceFloat(self) -> bool:

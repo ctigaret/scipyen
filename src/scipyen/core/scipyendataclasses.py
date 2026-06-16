@@ -1234,7 +1234,7 @@ class Episode(ScipyenDataclass):
     end:datetime.datetime = datetime.datetime.now()
     beginFrame:int = 0
     endFrame:int = 0
-    # description:str = ""
+    description:str = ""
     procedure:typing.Optional[Procedure] = field(default = None)
 
     def __eq__(self, other) -> bool:
