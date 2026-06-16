@@ -3,14 +3,14 @@
 import os
 # import sys
 import collections
-import traceback
+import traceback # noqa
 import datetime
-import numbers
+import numbers # noqa
 import inspect
 import itertools
-import functools
-from functools import singledispatch
-import warnings
+import functools # noqa
+from functools import singledispatch # noqa
+import warnings # noqa
 import typing
 import types
 # import difflib
@@ -39,17 +39,17 @@ from tribool import Tribool
 from scipy import optimize
 
 # import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
     import PySide6
-    from PySide6 import Shiboken
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    from PySide6.QtUiTools import loadUiType # -- A-HA! # noqa
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -72,21 +72,21 @@ import matplotlib as mpl
 #### BEGIN pict.core modules
 from core.basescipyen import BaseScipyenData
 # from core.traitcontainers import DataBag
-from core.prog import (safewrapper, with_doc, get_func_param_types, scipywarn)
-from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
-from core.datazone import (DataZone, Interval)
-from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, )
-from core.triggerprotocols import TriggerProtocol, TriggerProtocolList
+from core.prog import (safewrapper, with_doc, get_func_param_types, scipywarn) # noqa
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal) # noqa
+from core.datazone import (DataZone, Interval) # noqa
+from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, ) # noqa
+from core.triggerprotocols import TriggerProtocol, TriggerProtocolList # noqa
 from core.typeenum import TypeEnum
 from core.scipyendataclasses import (Episode, Schedule, ScipyenDataclass)
 from core import datatypes
-from core.datatypes import (check_type, type2str)
-from core import workspacefunctions
-from core import signalprocessing as sigp
-from core import utilities
+from core.datatypes import (check_type, type2str) # noqa
+from core import workspacefunctions # noqa
+from core import signalprocessing as sigp # noqa
+from core import utilities # noqa
 from core import neoutils
 from core import strutils
-from core import curvefitting as crvf
+from core import curvefitting as crvf # noqa
 from core import models as models
 
 from core.utilities import (reverse_mapping_lookup,
@@ -94,14 +94,14 @@ from core.utilities import (reverse_mapping_lookup,
                             sp_set_loc,
                             normalized_index,
                             unique,
-                            GeneralIndexType)
+                            GeneralIndexType) # noqa
 
-from core.neoutils import (get_index_of_named_signal, concatenate_blocks)
-from core import scipyen_quantities as scq
+from core.neoutils import (get_index_of_named_signal, concatenate_blocks) # noqa
+from core import scipyen_quantities as scq # noqa
 from core.scipyen_quantities import (unitsConvertible, checkTimeUnits,
                              checkElectricalCurrentUnits,
                              checkElectricalPotentialUnits,
-                             checkRescale)
+                             checkRescale) # noqa
 
 import core.pyabfbridge as pab
 

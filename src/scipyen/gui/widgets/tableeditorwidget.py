@@ -159,7 +159,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 
         self._defaultItemDelegate_ = self.tableView.itemDelegate()
         self._editItemDelegate_ = PythonItemDelegate(parent=self, enforceFloat = self._enforceFloat_)
-
+        self._editItemDelegate_.sig_indexChanged.connect(self.sig_indexChanged)
         # NOTE: 2021-08-16 17:22:20
         # By default, this is defined in the .ui file as:
         # QtWidgets.QAbstractItemView.DoubleClicked |
@@ -203,7 +203,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self.sig_indexChanged.emit(topLeft.row(), topLeft.column())
 
         else:
-            selg.sig_indexesChanged.emit(topLeft, bottomRight, roles)
+            self.sig_indexesChanged.emit(topLeft, bottomRight, roles)
 
     @Slot()
     def _slot_modelPopulated(self):

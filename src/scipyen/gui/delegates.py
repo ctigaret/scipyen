@@ -76,6 +76,7 @@ NOTE: To be used with my custom itemmodels
 """
     sig_valueChanged            = Signal(object)
     sig_closing                 = Signal()
+    sig_indexChanged            = Signal(int, int, name="sig_indexChanged")
 
     def __init__(self, data: object = None,
                  parent = None,
@@ -171,6 +172,7 @@ NOTE: To be used with my custom itemmodels
             # print(f"{self.__class__.__name__}.chooseEditor -> widget is a {type(widget).__name__}:")
             if isinstance(widget, tableeditorwidget.TableEditorWidget):
                 widget.sig_valueChanged.connect(self.slot_dataChanged)
+                widget.sig_indexChanged.connect(self.sig_indexChanged)
             else:
                 widget.sig_valueChanged.connect(self.slot_valueChanged)
 
