@@ -74,7 +74,6 @@ Ui_RecordingEpisodeWidget, QWidget = loadUiType(
     os.path.join(__module_path__, "recordingepisodewidget.ui")
     )
 
-
 class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMixin):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
 
@@ -361,14 +360,14 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
             fileNameFilter = f"{self._name_}*.abf;{self._name_}*.pkl"
         else:
             fileNameFilter = "*.abf;*.pkl"
-        files = FileIOGui.chooseFile_static(caption="Open trials",
+        fn, fl = FileIOGui.chooseFile_static(caption="Open trials",
                                             fileFilter = fileNameFilter,
                                             single=False)
 
         ret = list()
         try:
-            if len(files):
-                for f in files:
+            if len(fn):
+                for f in fn:
                     obj = pio.loadFile(f)
                     if isinstance(obj, neo.Block):
                         ret.append(obj)

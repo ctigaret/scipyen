@@ -1896,7 +1896,8 @@ def saveHDF5(data, fileName:typing.Union[str, pathlib.Path]):
         h5io.toHDF5(data, h5file, name=fileName.stem)
 
 @safewrapper
-def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None, ws:typing.Optional[dict]=None, mode:str="pkl", **kwargs):
+def save(*args:typing.Optional[typing.Any], name:typing.Optional[str]=None,
+         ws:typing.Optional[dict]=None, mode:str="pkl", **kwargs):
     r"""Saves variable(s) in the current working directory.
     WARNING Do not confuse with IPython %save line magic
     TODO adapt to other modes

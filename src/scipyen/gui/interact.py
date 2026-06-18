@@ -92,6 +92,8 @@ def selectWSData(*args, title="", single=True, asDict=False,
         in the case none of the regular or glob expressions in ``*args`` found
         a match; default is False
 
+    :preselected: name pre-selected variable (default is None)
+
     Var-keyword parameters passed to code.workspacefunctions.lsvars(…) function
     ===========================================================================
 
@@ -115,6 +117,8 @@ def selectWSData(*args, title="", single=True, asDict=False,
 
     ws = kwargs.pop("ws", user_workspace())
 
+    preselected = kwargs.pop("preselected", None)
+
     user_ns_visible = dict([(k,v) for k,v in ws.items() if not k.startswith("_") and k not in ws["mainWindow"].workspaceModel.user_ns_hidden])
 
     name_vars = lsvars(*args, glob=glob, ws=user_ns_visible, **kwargs)
@@ -128,15 +132,23 @@ def selectWSData(*args, title="", single=True, asDict=False,
 
     name_list = sorted([name for name in name_vars])
 
-    selectionMode = QtWidgets.QAbstractItemView.SingleSelection if single else QtWidgets.QAbstractItemView.ExtendedSelection
+    selectionMode = (QtWidgets.QAbstractItemView.SingleSelection if single
+                     else QtWidgets.QAbstractItemView.ExtendedSelection)
 
     if len(title.strip()):
         dtitle = f"{title}"
     else:
         dtitle = "Select Workspace Variable(s)"
 
-    dialog = ItemsListDialog(title=dtitle, itemsList = name_list,
-                            selectmode = selectionMode)
+    # dialog = ItemsListDialog(title=dtitle, itemsList = name_list,
+    #                         selectmode = selectionMode)
+
+    if isinstance(preSelected, str) and len(preSelected.strip()) and preSelected in name_list:
+        dialog = ItemsListDialog(parent=self, title=title, itemsList = name_list,
+                                selectmode = selectionMode, preSelected=preSelected)
+    else:
+        dialog = ItemsListDialog(parent=self, title=title, itemsList = name_list,
+                                selectmode = selectionMode)
 
     ans = dialog.exec()
 

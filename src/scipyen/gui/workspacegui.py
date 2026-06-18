@@ -1400,6 +1400,26 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
         return list()
 
+    def importFromWorkSpace(self, dataTypes: typing.Union[typing.Type[typing.Any],
+                                                         typing.Sequence[typing.Type[typing.Any]]
+                                                         ],
+                            title: str="Import from workspace",
+                            single: bool=True,
+                            preSelected: typing.Optional[str]=None,
+                            with_varName: bool=False,
+                            predicate = None) -> typing.Optional[list | dict]:
+        r"""Version of importWorkspaceData using interact module"""
+        from gui import interact
+
+        user_ns_visible = dict([(k,v) for k,v in scipyenWindow.workspace.items() if k not in scipyenWindow.workspaceModel.user_ns_hidden])
+
+        ret = interact.selectWSData(title = title, single = single,
+                                    asDict = with_varName,
+                                    retrieve_all = True, var_type = dataTypes,
+                                    ws = user_ns_visible)
+
+        return ret
+
     @safewrapper
     def exportDataToWorkspace(self, data:typing.Any, var_name:str,
                               title:str="Export data to workspace",
@@ -1417,7 +1437,10 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         if not isinstance(title, str) or len(title.strip()) == 0:
             title = "Export data to workspace"
 
-        newVarName = validate_varname(newVarName, ws = scipyenWindow.workspace)
+        newVarName = validate_varname(newVarName, ws = scipyenWindow.workspace,
+                                      returns_counter = False)
+
+        # print(f"{self.__class__.__name__}.exportDataToWorkspace: -> newVarName = {newVarName}")
 
         if dialog:
             dlg = qd.QuickDialog(self, title)
@@ -1444,7 +1467,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                 if hasattr(data, "modified") and isinstance(data.modified, bool):
                     data.modified=False
 
-                self.statusBar().showMessage("Done!")
+                if hasattr(self, "statusBar"):
+                    self.statusBar().showMessage("Done!")
         else:
             scipyenWindow.assignToWorkspace(newVarName, data)
 

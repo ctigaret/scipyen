@@ -247,12 +247,15 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         r"""Number of rows the model currently handles.
         This may be less than the notional "rows" in the data
         """
-        nRows = self._displayedRows_ if self._displayedRows_ <= self._modelDataRows_ else self._modelDataRows_
+        nRows = (self._displayedRows_ if self._displayedRows_ <= self._modelDataRows_
+                 else self._modelDataRows_)
         return 0 if parentIndex.isValid() else nRows
         # return 0 if parentIndex.isValid() else self._displayedRows_
 
     def columnCount(self, parentIndex:QtCore.QModelIndex = QtCore.QModelIndex()):
-        return 0 if parentIndex.isValid() else self._displayedColumns_
+        nCols = (self._displayedColumns_ if self._displayedColumns_ <= self._modelDataRows_
+                 else self._modelDataColumns_)
+        return 0 if parentIndex.isValid() else nCols
 
     #### BEGIN editable items
     #
@@ -304,25 +307,30 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     #### BEGIN resizable model
     #
     def insertRow(self, row: int, row_value: object, parent: QtCore.QModelIndex) -> bool:
-        # print(f"{self.__class__.__name__}.insertRows: row {row}, count {count}, parent {parent}")
+        # print(f"{self.__class__.__name__}.insertRows: row {row}, value {row_value}, parent {parent}")
         # # if self._modelData_ is None:
         # #     return False
         if not datatypes.is_iterable(self._modelData_):
             return False
 
+        # print(f"\n\tmodel data has {len(self._modelData_)} row(s)")
         if row < 0 or row > len(self._modelData_):
             return False
 
+        ret = False
+
         self.beginInsertRows(parent, row, row+1)
         try:
-            self._insertDataRow_(self._modelData_, row, row_value)
+            ret = self._insertDataRow_(self._modelData_, row, row_value)
         except: # noqa
             traceback.print_exc()
+
         finally:
             self.endInsertRows()
 
-        self.fetchMore(parent)
-        return True
+        if ret and self._displayedRows_ < self._modelDataRows_:
+            self.fetchMore(parent)
+        return ret
 
     def appendRow(self, data: typing.Optional[object] = None) -> bool:
         if self._modelData_ is None:
@@ -436,15 +444,20 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         ], # noqa
         row: int,
         obj: typing.Optional[ephys_pathways.SynapticPathway] = None) -> bool:
+
         if obj is None:
             if isinstance(mdata, ephys_pathways.SynapticPathwayList):
                 obj = ephys_pathways.SynapticPathway()
+
             elif isinstance(mdata, ephys_pathways.AuxiliaryInputList):
                 obj = ephys_pathways.AuxiliaryInput()
+
             elif isinstance(mdata, ephys_pathways.AuxiliaryOutputList):
                 obj = ephys_pathways.AuxiliaryOutput()
+
             elif isinstance(mdata, ephys_pathways.SynapticStimulusChannelList):
                 obj = ephys_pathways.SynapticStimulusChannel()
+
             elif isinstance(mdata, TriggerProtocolList):
                 obj = TriggerProtocol()
 
@@ -457,7 +470,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         ):
             return False
 
-        if row == self.rowCount():
+        # if row == self.rowCount():
+        if row == len(self._modelData_):
             self._modelData_.append(obj)
         else:
             temp = list(self._modelData_)
