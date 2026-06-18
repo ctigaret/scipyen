@@ -6,14 +6,14 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>322</width>
-    <height>340</height>
+    <width>269</width>
+    <height>323</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <layout class="QGridLayout" name="gridLayout_2">
+  <layout class="QGridLayout" name="gridLayout_4">
    <item row="0" column="0">
     <layout class="QHBoxLayout" name="horizontalLayout_4">
      <item>
@@ -44,8 +44,8 @@
       <attribute name="title">
        <string>Configuration</string>
       </attribute>
-      <layout class="QVBoxLayout" name="verticalLayout">
-       <item>
+      <layout class="QGridLayout" name="gridLayout_2">
+       <item row="0" column="0">
         <layout class="QHBoxLayout" name="horizontalLayout">
          <item>
           <widget class="QLabel" name="label_2">
@@ -67,38 +67,9 @@
          <item>
           <widget class="QSpinBox" name="dacSpinBox"/>
          </item>
-         <item>
-          <widget class="QLabel" name="label_4">
-           <property name="toolTip">
-            <string>Recording Electrode Mode</string>
-           </property>
-           <property name="statusTip">
-            <string>Recording Electrode Mode</string>
-           </property>
-           <property name="whatsThis">
-            <string>Recording Electrode Mode</string>
-           </property>
-           <property name="text">
-            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Electrode&lt;br/&gt;Mode:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QComboBox" name="electrodeModeComboBox">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="frame">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
         </layout>
        </item>
-       <item>
+       <item row="1" column="0">
         <widget class="QGroupBox" name="groupBox">
          <property name="title">
           <string>Auxiliary</string>
@@ -127,21 +98,51 @@
          </layout>
         </widget>
        </item>
-       <item>
+       <item row="2" column="0">
+        <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <item>
+          <widget class="QLabel" name="label_4">
+           <property name="toolTip">
+            <string>Recording Electrode Mode</string>
+           </property>
+           <property name="statusTip">
+            <string>Recording Electrode Mode</string>
+           </property>
+           <property name="whatsThis">
+            <string>Recording Electrode Mode</string>
+           </property>
+           <property name="text">
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Electrode&lt;br/&gt;Mode:&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="electrodeModeComboBox">
+           <property name="frame">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="stimulusPushButton">
+           <property name="text">
+            <string>Stimulus...</string>
+           </property>
+           <property name="flat">
+            <bool>false</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item row="3" column="0">
         <widget class="QGroupBox" name="groupBox_2">
          <property name="title">
           <string>Stimulus</string>
          </property>
          <layout class="QGridLayout" name="gridLayout">
           <item row="0" column="0">
-           <widget class="TableEditorWidget" name="stimulusListTable" native="true">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-           </widget>
+           <widget class="TableEditorWidget" name="stimulusListTable" native="true"/>
           </item>
          </layout>
         </widget>
