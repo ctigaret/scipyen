@@ -1765,66 +1765,106 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         if row >= len(mdata):
             return False
 
-        old_obj = mdata[row]
+        obj = mdata[row]
 
         attr = self._modelDataColumnHeaders_[col]
 
-        if isinstance(old_obj, ephys_pathways.SynapticPathway):
-            params = {
-                "name": old_obj.name,
-                "adc": old_obj.adc,
-                "dac": old_obj.dac,
-                "stimulus": old_obj.stimulus,
-                "electrode": old_obj.electrodeMode,
-                "pathType": old_obj.pathwayType,
-                "schedule": old_obj.schedule,
-                "measurements": old_obj.measurements,
-                }
+        if isinstance(obj, ephys_pathways.SynapticPathway):
+            if attr == "electrodeMode":
+                attr = "electrode"
 
-        elif isinstance(old_obj, ephys_pathways.AuxiliaryInput):
-            params = {
-                "name": old_obj.name,
-                "adc": old_obj.adc,
-                "cmd": old_obj.cmd
-                }
-
-        elif isinstance(old_obj, ephys_pathways.AuxiliaryOutput):
-            params = {
-                "name": old_obj.name,
-                "channel": old_obj.channel,
-                "digttl": old_obj.digttl
-                }
-
-        elif isinstance(old_obj, ephys_pathways.SynapticStimulusChannel):
-            params = {
-                "name": old_obj.name,
-                "channel": old_obj.channel,
-                "dig": old_obj.dig
-                }
-
-        else:
-            return False
+            elif attr == "pathwayType":
+                attr = "pathType"
 
         if attr.lower() != "edit":
-            old_val = getattr(old_obj, attr)
-            if isinstance(old_obj, ephys_pathways.SynapticPathway):
-                if attr == "electrodeMode":
-                    attr = "electrode"
-                elif attr == "pathwayType":
-                    attr = "pathType"
+            old_val = getattr(obj, attr)
             if isinstance(old_val, enum.Enum):
                 if isinstance(pyvalue, int):
-                    params[attr] = type(old_val)(pyvalue)
+                    new_val = type(old_val)(pyvalue)
+
                 elif isinstance(pyvalue, str):
-                    params[attr] = type(old_val)[pyvalue]
+                    new_val = type(old_val)[pyvalue]
+
             else:
-                params[attr] = pyvalue
+                new_val = pyvalue
 
-        new_obj = type(old_obj)(**params)
+            setattr(obj, attr, new_val)
 
-        mdata[row] = new_obj
+        elif hasattr(obj, attr):
+            old_val = getattr(obj, attr)
+            if isinstance(old_val, enum.Enum):
+                if isinstance(pyvalue, int):
+                    new_val = type(old_val)(pyvalue)
+
+                elif isinstance(pyvalue, str):
+                    new_val = type(old_val)[pyvalue]
+
+            else:
+                new_val = pyvalue
+
+            setattr(obj, attr, new_val)
+
+        mdata[row] = obj
 
         return True
+
+#         if isinstance(old_obj, ephys_pathways.SynapticPathway):
+#             params = {
+#                 "name": old_obj.name,
+#                 "adc": old_obj.adc,
+#                 "dac": old_obj.dac,
+#                 "stimulus": old_obj.stimulus,
+#                 "electrode": old_obj.electrodeMode,
+#                 "pathType": old_obj.pathwayType,
+#                 "schedule": old_obj.schedule,
+#                 "measurements": old_obj.measurements,
+#                 }
+#
+#         elif isinstance(old_obj, ephys_pathways.AuxiliaryInput):
+#             params = {
+#                 "name": old_obj.name,
+#                 "adc": old_obj.adc,
+#                 "cmd": old_obj.cmd
+#                 }
+#
+#         elif isinstance(old_obj, ephys_pathways.AuxiliaryOutput):
+#             params = {
+#                 "name": old_obj.name,
+#                 "channel": old_obj.channel,
+#                 "digttl": old_obj.digttl
+#                 }
+#
+#         elif isinstance(old_obj, ephys_pathways.SynapticStimulusChannel):
+#             params = {
+#                 "name": old_obj.name,
+#                 "channel": old_obj.channel,
+#                 "dig": old_obj.dig
+#                 }
+#
+#         else:
+#             return False
+#
+#         if attr.lower() != "edit":
+#             old_val = getattr(old_obj, attr)
+#             if isinstance(old_obj, ephys_pathways.SynapticPathway):
+#                 if attr == "electrodeMode":
+#                     attr = "electrode"
+#                 elif attr == "pathwayType":
+#                     attr = "pathType"
+#
+#             if isinstance(old_val, enum.Enum):
+#                 if isinstance(pyvalue, int):
+#                     params[attr] = type(old_val)(pyvalue)
+#                 elif isinstance(pyvalue, str):
+#                     params[attr] = type(old_val)[pyvalue]
+#             else:
+#                 params[attr] = pyvalue
+#
+#         new_obj = type(old_obj)(**params)
+#
+#         mdata[row] = new_obj
+#
+#         return True
 
     @_setValueInModelData_.register(list)
     @_setValueInModelData_.register(deque)
@@ -1940,328 +1980,328 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     def canAlterColumns(self, val: bool):
         self._canAddRemoveColumns_ = val is True
 
-@singledispatch
-def _appendRow_(self,
-             obj: object, row: object, in_place: bool = False) -> object:
-    r"""Appends a row of data to the object"""
-    raise NotImplementedError(f"Object of type {type (obj).__name__} are not supported")
-
-@_appendRow_.register(pd.DataFrame)
-def __appendRow__(obj: pd.DataFrame,
-      row: typing.Union[typing.Sequence, pd.Series],
-      in_place: bool = False) -> pd.DataFrame:
-    if isinstance(row, (pd.Series, np.ndarray)):
-        assert(row.size == len(obj.columns)), f"Mismatch between the number of row elements ({row.size}) and target columns ({len(obj.columns)})"
-        assert row.ndim==1, f"Wrong row dimensionality ({row.ndim}); should be 1"
-        row = tuple(row)
-
-    if isinstance(row, typing.Sequence):
-        assert len(row) == len(obj.columns), f"Mismatch between the number of row elements ({len(row)}) and target columns ({len(obj.columns)})"
-
-        for k, col in enumerate(obj.columns):
-            dtype = obj[col].dtype
-            rtype = type(row[k])
-            if np.dtype(rtype) is not dtype:
-                raise TypeError(f"Row element {k} expected to resolve to {dtype}; got {rtype.__name__} instead")
-
-    else:
-        raise TypeError(f"Row expected a pd.Series or a sequence of objects; got {type(row).__name__} instead")
-
-    ret = obj if in_place else obj.copy()
-    ret.loc[len(obj)] = row
-
-    return ret
-
-@_appendRow_.register(pd.Series)
-@_appendRow_.register(pd.Index)
-def __appendRow__(obj: typing.Union[pd.Series, pd.Index],
-      row: typing.Union[dt.Number, str, pq.Quantity],
-      in_place: bool = False) -> pd.Series | pd.Index:
-    if isinstance(row, np.ndarray):
-        if row.size > 1:
-            raise ValueError("Can only add a scalar object")
-        row = tuple(row)
-
-    elif isinstance(row, typing.Sequence):
-        if len(row) > 1:
-            raise ValueError("Can only add a scalar object")
-
-    else:
-        row = (row,)
-
-    dtype = obj.dtype
-    rtype = type(row[0])
-    # print(f"{rtype} -> {np.dtype(rtype)}")
-    if np.dtype(rtype) is not dtype:
-        raise TypeError(f"Row data expected to resolve to {dtype}; got {rtype.__name__} instead")
-
-    ret = obj if in_place else obj.copy()
-    ret.loc[len(obj)] = row[0]
-
-    return ret
-
-@_appendRow_.register(np.ndarray)
-@_appendRow_.register(pq.Quantity)
-def __appendRow__(obj: typing.Union[pq.Quantity, np.ndarray],
-      row: typing.Union[typing.Sequence[pq.Quantity], pq.Quantity],
-      in_place: bool = False) -> typing.Union[pq.Quantity, np.ndarray]:
-
-    if isinstance(obj, pd.Quantity):
-        units = obj.units
-        obj = obj.magnitude
-
-        if isinstance(row, pq.Quantity):
-            if row.units != units:
-                if scq.unitsConvertible(row, units):
-                    row = row.rescale(units)
-                else:
-                    raise TypeError(f"Row units ({row.units}) are incompatible with target's units ({units})")
-
-        row = row.magnitude
-
-    assert row.ndim == obj.ndim, f"Mismatch between dimensions: for row ({row.ndim}) vs target ({obj.ndim})"
-
-    try:
-        if obj.ndim == 0:
-            # NOTE: 2026-03-08 10:24:58
-            # in_place does not make sense here , as concatenation of dimensionless
-            # arrays is non-sensical; hence both obj and row MUST be converted
-            # to 1D arrays
-            ret = np.concat((np.atleast_1d(obj.magnitude), np.atleast_1d(row.magnitude)))
-
-        else:
-            ret = np.concat((obj.magnitude, row.magnitude), axis=0)
-
-        if isinstance(obj, pq.Quantity):
-            return ret * obj.units
-
-        return ret
-    except:
-        # traceback.print_exc()
-        raise
-
-@_appendRow_.register(neo.IrregularlySampledSignal)
-@_appendRow_.register(IrregularlySampledDataSignal)
-def __appendRow__(obj: typing.Union[neo.IrregularlySampledSignal,
-                        IrregularlySampledDataSignal],
-      row: typing.Union[neo.IrregularlySampledSignal,
-                        IrregularlySampledDataSignal],
-      in_place: bool = False) -> typing.Union[neo.IrregularlySampledSignal,
-                                              IrregularlySampledDataSignal]:
-    r"""Concnatenates irregular signals on their domain axis"""
-    if type(row) is not type(obj):
-        raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
-
-    assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
-
-    domainUnits = obj.times.units
-    rowDomainUnits = row.times.units
-
-    if rowDomainUnits != domainUnits:
-        if not scq.unitsConvertible(rowDomainUnits, domainUnits):
-            raise TypeError(f"Incompatible domain units between row ({rowDomainUnits}) and target ({domainUnits})")
-        row.times = row.times.rescale(domainUnits)
-
-    ret = obj.concatenate(row, allow_overlap=True)
-    ret.file_origin = ""
-
-    return ret
-
-@_appendRow_.register(neo.Epoch)
-@_appendRow_.register(DataZone)
-def __appendRow__(obj: typing.Union[neo.Epoch, DataZone],
-      row: typing.Union[neo.Epoch, DataZone],
-      in_place:bool=False) -> typing.Union[neo.Epoch, DataZone]:
-    if type(row) is not type(obj):
-        raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
-
-    assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
-
-    objTimes = obj.times
-    rowTimes = row.times
-
-    objDurations = obj.durations
-    rowDurations = row.durations
-
-    domainUnits = objTimes.units
-    rowDomainUnits = rowTimes.units
-
-    if rowDomainUnits != domainUnits:
-        if not scq.unitsConvertible(rowDomainUnits, domainUnits):
-            raise TypeError(f"Incompatible domain units between row ({rowDomainUnits}) and target ({domainUnits})")
-        rowTimes = rowTimes.rescale(domainUnits)
-
-    if rowDurations.units != objDurations.units:
-        if not scq.unitsConvertible(rowDuration.units, objDurations.units):
-            raise TypeError(f"Incompatible domain units between row ({rowDurations.units}) and target ({objDurations.units})")
-
-        rowDurations = rowDurations.rescale(objDurations.units)
-
-    times = np.concatenate((objTimes, rowTimes), axis=0) * objTimes.units
-
-    durations = np.concatenate((objDurations, rowDurations), axis=0) * objDurations.units
-
-    labels = np.concatenate((obj.labels, row.labels), axis=0)
-
-    return type(obj)(times = times, durations = durations, labels = labels,
-                     name = obj.name, description = obj.description,
-                     file_origin = "",
-                     array_annotations = obj.array_annotations,
-                     **obj.annotations)
-
-@_appendRow_.register(neo.Event)
-@_appendRow_.register(DataMark)
-@_appendRow_.register(TriggerEvent)
-def __appendRow__(obj: typing.Union[neo.Event, DataMark, TriggerEvent],
-      row: typing.Union[neo.Event, DataMark, TriggerEvent],
-      in_place:bool=False) -> typing.Union[neo.Event, DataMark, TriggerEvent]:
-    if type(row) is not type(obj):
-        raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
-
-    assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
-
-    # NOTE: 2026-03-08 22:19:12
-    # using neo.Event.merge is enticing, but the code below ensures the row is
-    # appended
-    # return obj.merge(row)
-
-    objTimes = obj.times
-    rowTimes = row.times
-
-    if isinstance(obj, (TriggerEvent, DataMark)):
-        assert (row.type == obj.type), "Incompatible trigger event type"
-
-    domainUnits = objTimes.units
-    rowDomainUnits = rowTimes.units
-
-    if rowDomainUnits != domainUnits:
-        if not scq.unitsConvertible(rowDomainUnits, domainUnits):
-            raise TypeError(f"Incompatible domain units between row ({rowDomainUnits}) and target ({domainUnits})")
-        rowTimes = rowTimes.rescale(domainUnits)
-
-    times = np.concatenate((objTimes, rowTimes), axis=0) * objTimes.units
-
-    labels = np.concatenate((obj.labels, row.labels), axis=0)
-
-    ret = type(obj)(times = times, labels = labels,
-                     name = obj.name, description = obj.description,
-                     file_origin = "",
-                     array_annotations = obj.array_annotations,
-                     **obj.annotations)
-
-    if isinstance(obj, (DataMark, TriggerEvent)):
-        ret.type = obj.type
-
-    return ret
-
-@_appendRow_.register(neo.AnalogSignal)
-@_appendRow_.register(DataSignal)
-def __appendRow__(obj: typing.Union[neo.AnalogSignal, DataSignal],
-      row: typing.Union[np.ndarray, pq.Quantity],
-      in_place=False) -> neo.AnalogSignal | DataSignal:
-    if not isinstance(row, [pq.Quantity, np.ndarray]):
-        raise TypeError(f"Row expected to be a Quantity or a numpy array; got {type(row).__name__} instead")
-
-    if row.ndim == 0:
-        if obj.shape[1] > 1:
-            raise ValueError(f"Not enough data points; expected {obj.shape[1]}")
-
-    elif row.ndim == 1:
-        if row.size != obj.shape[1]:
-            raise ValueError(f"Mismatch in data points; expected {obj.shape[1]}, got {row.size} instead")
-
-    elif row.ndim > 2:
-        raise ValueError(f"Unexpected row shape ({row.shape})")
-
-    if isinstance(row, pq.Quantity) and row.units != obj.units:
-        if not scq.unitsConvertible(row, obj):
-            raise TypeError(f"Incompatible units: expecting {obj.units}; got {row.units} instead")
-
-        row = row.rescale(obj.units)
-
-    sampling_rate = obj.sampling_rate
-
-    objData = obj.magnitude
-    rowData = row.magnitude if isinstance(row, pq.Quantity) else row
-
-    if rowData.ndim < 2:
-        rowData = np.atleast_2d(rowData)
-
-    newData = np.concatenate((objData, rowData), axis=0) * obj.units
-
-    ret = type(obj)(newData, units = newData.units, t_start = obj.t_start,
-                    sampling_rate = obj.sampling_rate,
-                    name = obj.name, description = obj.description,
-                    file_origin = "",
-                    array_annotations = obj.array_annotations,
-                    **obj.annotations)
-
-    return ret
-
-@_appendRow_.register(neo.SpikeTrain)
-@_appendRow_.register(MarkTrain)
-def __appendRow__(obj: typing.Union[neo.SpikeTrain, MarkTrain],
-      row: typing.Union[neo.SpikeTrain, MarkTrain], in_place = False) -> typing.Union[neo.SpikeTrain, MarkTrain]:
-    if not isinstance(row, type(obj)):
-        raise TypeError(f"Row expected to be a {type(obj).__name__}; instead got a {type(row).__name__}")
-
-    assert(row.size == 1), "Expecting exactly one timestamp"
-    assert(row.left_sweep == obj.left_sweep), "Both argument must have the same 'left_sweep'"
-
-    # NOTE: 2026-03-08 22:21:00 see NOTE: 2026-03-08 22:19:12
-    # return obj.merge(row)
-
-    times = obj.times
-    waveforms = obj.waveforms
-
-    time = row.times
-    waves = row.waveforms
-
-    if time.units != times.units:
-        if not scq.unitsConvertible(time, times):
-            raise TypeError(f"Incompatible domain units: row ({time.units}) vs target ({times.units})")
-
-        time = time.rescale(times.units)
-
-    newTimes = np.concatenate(
-        (np.atleast_1d(times.magnitude),
-         np.atleast_1d(time.magnitude)), axis=0) * times.units
-
-    if waveforms is None:
-        if isinstance(wave, np.ndarray):
-            shape = (obj.size, ) + wave.shape[0:2]
-            full_waveforms = np.concatenate((np.full(shape, np.nan), wave), axis=0)
-        else:
-            full_waveforms = None
-
-    else:
-        full_waveforms = np.concatenate((waveforms, wave), axis=0)
-
-    t_stop = np.max(obj.t_stop, row.t_stop)
-    t_start = np.min(obj.t_start, row.t_start)
-
-    return neo.SpikeTrain(newTimes, t_stop, units = newTimes.units,
-                          sampling_rate = obj.sampling_rate,
-                          t_start = t_start,
-                          waveforms = full_waveforms,
-                          left_sweep = obj.left_sweep,
-                          file_origin = "",
-                          array_annotations = obj.array_annotations,
-                          **obj.annotations)
-
-@_appendRow_.register(TriggerProtocolList)
-def __appendRow__(obj: TriggerProtocolList, row: TriggerProtocol, in_place: bool = False):
-    if not isinstance(row, TriggerProtocol):
-        raise TypeError(f"Cannot add {type(row).__name__}")
-
-    if in_place:
-        obj += row
-        return obj
-
-    else:
-        ret = TriggerProtocolList(obj._items)
-        ret += row
-        return ret
+# @singledispatch
+# def _appendRow_(self,
+#              obj: object, row: object, in_place: bool = False) -> object:
+#     r"""Appends a row of data to the object"""
+#     raise NotImplementedError(f"Object of type {type (obj).__name__} are not supported")
+#
+# @_appendRow_.register(pd.DataFrame)
+# def __appendRow__(obj: pd.DataFrame,
+#       row: typing.Union[typing.Sequence, pd.Series],
+#       in_place: bool = False) -> pd.DataFrame:
+#     if isinstance(row, (pd.Series, np.ndarray)):
+#         assert(row.size == len(obj.columns)), f"Mismatch between the number of row elements ({row.size}) and target columns ({len(obj.columns)})"
+#         assert row.ndim==1, f"Wrong row dimensionality ({row.ndim}); should be 1"
+#         row = tuple(row)
+#
+#     if isinstance(row, typing.Sequence):
+#         assert len(row) == len(obj.columns), f"Mismatch between the number of row elements ({len(row)}) and target columns ({len(obj.columns)})"
+#
+#         for k, col in enumerate(obj.columns):
+#             dtype = obj[col].dtype
+#             rtype = type(row[k])
+#             if np.dtype(rtype) is not dtype:
+#                 raise TypeError(f"Row element {k} expected to resolve to {dtype}; got {rtype.__name__} instead")
+#
+#     else:
+#         raise TypeError(f"Row expected a pd.Series or a sequence of objects; got {type(row).__name__} instead")
+#
+#     ret = obj if in_place else obj.copy()
+#     ret.loc[len(obj)] = row
+#
+#     return ret
+#
+# @_appendRow_.register(pd.Series)
+# @_appendRow_.register(pd.Index)
+# def __appendRow__(obj: typing.Union[pd.Series, pd.Index],
+#       row: typing.Union[dt.Number, str, pq.Quantity],
+#       in_place: bool = False) -> pd.Series | pd.Index:
+#     if isinstance(row, np.ndarray):
+#         if row.size > 1:
+#             raise ValueError("Can only add a scalar object")
+#         row = tuple(row)
+#
+#     elif isinstance(row, typing.Sequence):
+#         if len(row) > 1:
+#             raise ValueError("Can only add a scalar object")
+#
+#     else:
+#         row = (row,)
+#
+#     dtype = obj.dtype
+#     rtype = type(row[0])
+#     # print(f"{rtype} -> {np.dtype(rtype)}")
+#     if np.dtype(rtype) is not dtype:
+#         raise TypeError(f"Row data expected to resolve to {dtype}; got {rtype.__name__} instead")
+#
+#     ret = obj if in_place else obj.copy()
+#     ret.loc[len(obj)] = row[0]
+#
+#     return ret
+#
+# @_appendRow_.register(np.ndarray)
+# @_appendRow_.register(pq.Quantity)
+# def __appendRow__(obj: typing.Union[pq.Quantity, np.ndarray],
+#       row: typing.Union[typing.Sequence[pq.Quantity], pq.Quantity],
+#       in_place: bool = False) -> typing.Union[pq.Quantity, np.ndarray]:
+#
+#     if isinstance(obj, pd.Quantity):
+#         units = obj.units
+#         obj = obj.magnitude
+#
+#         if isinstance(row, pq.Quantity):
+#             if row.units != units:
+#                 if scq.unitsConvertible(row, units):
+#                     row = row.rescale(units)
+#                 else:
+#                     raise TypeError(f"Row units ({row.units}) are incompatible with target's units ({units})")
+#
+#         row = row.magnitude
+#
+#     assert row.ndim == obj.ndim, f"Mismatch between dimensions: for row ({row.ndim}) vs target ({obj.ndim})"
+#
+#     try:
+#         if obj.ndim == 0:
+#             # NOTE: 2026-03-08 10:24:58
+#             # in_place does not make sense here , as concatenation of dimensionless
+#             # arrays is non-sensical; hence both obj and row MUST be converted
+#             # to 1D arrays
+#             ret = np.concat((np.atleast_1d(obj.magnitude), np.atleast_1d(row.magnitude)))
+#
+#         else:
+#             ret = np.concat((obj.magnitude, row.magnitude), axis=0)
+#
+#         if isinstance(obj, pq.Quantity):
+#             return ret * obj.units
+#
+#         return ret
+#     except:
+#         # traceback.print_exc()
+#         raise
+#
+# @_appendRow_.register(neo.IrregularlySampledSignal)
+# @_appendRow_.register(IrregularlySampledDataSignal)
+# def __appendRow__(obj: typing.Union[neo.IrregularlySampledSignal,
+#                         IrregularlySampledDataSignal],
+#       row: typing.Union[neo.IrregularlySampledSignal,
+#                         IrregularlySampledDataSignal],
+#       in_place: bool = False) -> typing.Union[neo.IrregularlySampledSignal,
+#                                               IrregularlySampledDataSignal]:
+#     r"""Concnatenates irregular signals on their domain axis"""
+#     if type(row) is not type(obj):
+#         raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
+#
+#     assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
+#
+#     domainUnits = obj.times.units
+#     rowDomainUnits = row.times.units
+#
+#     if rowDomainUnits != domainUnits:
+#         if not scq.unitsConvertible(rowDomainUnits, domainUnits):
+#             raise TypeError(f"Incompatible domain units between row ({rowDomainUnits}) and target ({domainUnits})")
+#         row.times = row.times.rescale(domainUnits)
+#
+#     ret = obj.concatenate(row, allow_overlap=True)
+#     ret.file_origin = ""
+#
+#     return ret
+#
+# @_appendRow_.register(neo.Epoch)
+# @_appendRow_.register(DataZone)
+# def __appendRow__(obj: typing.Union[neo.Epoch, DataZone],
+#       row: typing.Union[neo.Epoch, DataZone],
+#       in_place:bool=False) -> typing.Union[neo.Epoch, DataZone]:
+#     if type(row) is not type(obj):
+#         raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
+#
+#     assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
+#
+#     objTimes = obj.times
+#     rowTimes = row.times
+#
+#     objDurations = obj.durations
+#     rowDurations = row.durations
+#
+#     domainUnits = objTimes.units
+#     rowDomainUnits = rowTimes.units
+#
+#     if rowDomainUnits != domainUnits:
+#         if not scq.unitsConvertible(rowDomainUnits, domainUnits):
+#             raise TypeError(f"Incompatible domain units between row ({rowDomainUnits}) and target ({domainUnits})")
+#         rowTimes = rowTimes.rescale(domainUnits)
+#
+#     if rowDurations.units != objDurations.units:
+#         if not scq.unitsConvertible(rowDuration.units, objDurations.units):
+#             raise TypeError(f"Incompatible domain units between row ({rowDurations.units}) and target ({objDurations.units})")
+#
+#         rowDurations = rowDurations.rescale(objDurations.units)
+#
+#     times = np.concatenate((objTimes, rowTimes), axis=0) * objTimes.units
+#
+#     durations = np.concatenate((objDurations, rowDurations), axis=0) * objDurations.units
+#
+#     labels = np.concatenate((obj.labels, row.labels), axis=0)
+#
+#     return type(obj)(times = times, durations = durations, labels = labels,
+#                      name = obj.name, description = obj.description,
+#                      file_origin = "",
+#                      array_annotations = obj.array_annotations,
+#                      **obj.annotations)
+#
+# @_appendRow_.register(neo.Event)
+# @_appendRow_.register(DataMark)
+# @_appendRow_.register(TriggerEvent)
+# def __appendRow__(obj: typing.Union[neo.Event, DataMark, TriggerEvent],
+#       row: typing.Union[neo.Event, DataMark, TriggerEvent],
+#       in_place:bool=False) -> typing.Union[neo.Event, DataMark, TriggerEvent]:
+#     if type(row) is not type(obj):
+#         raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
+#
+#     assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
+#
+#     # NOTE: 2026-03-08 22:19:12
+#     # using neo.Event.merge is enticing, but the code below ensures the row is
+#     # appended
+#     # return obj.merge(row)
+#
+#     objTimes = obj.times
+#     rowTimes = row.times
+#
+#     if isinstance(obj, (TriggerEvent, DataMark)):
+#         assert (row.type == obj.type), "Incompatible trigger event type"
+#
+#     domainUnits = objTimes.units
+#     rowDomainUnits = rowTimes.units
+#
+#     if rowDomainUnits != domainUnits:
+#         if not scq.unitsConvertible(rowDomainUnits, domainUnits):
+#             raise TypeError(f"Incompatible domain units between row ({rowDomainUnits}) and target ({domainUnits})")
+#         rowTimes = rowTimes.rescale(domainUnits)
+#
+#     times = np.concatenate((objTimes, rowTimes), axis=0) * objTimes.units
+#
+#     labels = np.concatenate((obj.labels, row.labels), axis=0)
+#
+#     ret = type(obj)(times = times, labels = labels,
+#                      name = obj.name, description = obj.description,
+#                      file_origin = "",
+#                      array_annotations = obj.array_annotations,
+#                      **obj.annotations)
+#
+#     if isinstance(obj, (DataMark, TriggerEvent)):
+#         ret.type = obj.type
+#
+#     return ret
+#
+# @_appendRow_.register(neo.AnalogSignal)
+# @_appendRow_.register(DataSignal)
+# def __appendRow__(obj: typing.Union[neo.AnalogSignal, DataSignal],
+#       row: typing.Union[np.ndarray, pq.Quantity],
+#       in_place=False) -> neo.AnalogSignal | DataSignal:
+#     if not isinstance(row, [pq.Quantity, np.ndarray]):
+#         raise TypeError(f"Row expected to be a Quantity or a numpy array; got {type(row).__name__} instead")
+#
+#     if row.ndim == 0:
+#         if obj.shape[1] > 1:
+#             raise ValueError(f"Not enough data points; expected {obj.shape[1]}")
+#
+#     elif row.ndim == 1:
+#         if row.size != obj.shape[1]:
+#             raise ValueError(f"Mismatch in data points; expected {obj.shape[1]}, got {row.size} instead")
+#
+#     elif row.ndim > 2:
+#         raise ValueError(f"Unexpected row shape ({row.shape})")
+#
+#     if isinstance(row, pq.Quantity) and row.units != obj.units:
+#         if not scq.unitsConvertible(row, obj):
+#             raise TypeError(f"Incompatible units: expecting {obj.units}; got {row.units} instead")
+#
+#         row = row.rescale(obj.units)
+#
+#     sampling_rate = obj.sampling_rate
+#
+#     objData = obj.magnitude
+#     rowData = row.magnitude if isinstance(row, pq.Quantity) else row
+#
+#     if rowData.ndim < 2:
+#         rowData = np.atleast_2d(rowData)
+#
+#     newData = np.concatenate((objData, rowData), axis=0) * obj.units
+#
+#     ret = type(obj)(newData, units = newData.units, t_start = obj.t_start,
+#                     sampling_rate = obj.sampling_rate,
+#                     name = obj.name, description = obj.description,
+#                     file_origin = "",
+#                     array_annotations = obj.array_annotations,
+#                     **obj.annotations)
+#
+#     return ret
+#
+# @_appendRow_.register(neo.SpikeTrain)
+# @_appendRow_.register(MarkTrain)
+# def __appendRow__(obj: typing.Union[neo.SpikeTrain, MarkTrain],
+#       row: typing.Union[neo.SpikeTrain, MarkTrain], in_place = False) -> typing.Union[neo.SpikeTrain, MarkTrain]:
+#     if not isinstance(row, type(obj)):
+#         raise TypeError(f"Row expected to be a {type(obj).__name__}; instead got a {type(row).__name__}")
+#
+#     assert(row.size == 1), "Expecting exactly one timestamp"
+#     assert(row.left_sweep == obj.left_sweep), "Both argument must have the same 'left_sweep'"
+#
+#     # NOTE: 2026-03-08 22:21:00 see NOTE: 2026-03-08 22:19:12
+#     # return obj.merge(row)
+#
+#     times = obj.times
+#     waveforms = obj.waveforms
+#
+#     time = row.times
+#     waves = row.waveforms
+#
+#     if time.units != times.units:
+#         if not scq.unitsConvertible(time, times):
+#             raise TypeError(f"Incompatible domain units: row ({time.units}) vs target ({times.units})")
+#
+#         time = time.rescale(times.units)
+#
+#     newTimes = np.concatenate(
+#         (np.atleast_1d(times.magnitude),
+#          np.atleast_1d(time.magnitude)), axis=0) * times.units
+#
+#     if waveforms is None:
+#         if isinstance(wave, np.ndarray):
+#             shape = (obj.size, ) + wave.shape[0:2]
+#             full_waveforms = np.concatenate((np.full(shape, np.nan), wave), axis=0)
+#         else:
+#             full_waveforms = None
+#
+#     else:
+#         full_waveforms = np.concatenate((waveforms, wave), axis=0)
+#
+#     t_stop = np.max(obj.t_stop, row.t_stop)
+#     t_start = np.min(obj.t_start, row.t_start)
+#
+#     return neo.SpikeTrain(newTimes, t_stop, units = newTimes.units,
+#                           sampling_rate = obj.sampling_rate,
+#                           t_start = t_start,
+#                           waveforms = full_waveforms,
+#                           left_sweep = obj.left_sweep,
+#                           file_origin = "",
+#                           array_annotations = obj.array_annotations,
+#                           **obj.annotations)
+#
+# @_appendRow_.register(TriggerProtocolList)
+# def __appendRow__(obj: TriggerProtocolList, row: TriggerProtocol, in_place: bool = False):
+#     if not isinstance(row, TriggerProtocol):
+#         raise TypeError(f"Cannot add {type(row).__name__}")
+#
+#     if in_place:
+#         obj += row
+#         return obj
+#
+#     else:
+#         ret = TriggerProtocolList(obj._items)
+#         ret += row
+#         return ret
 
 
 

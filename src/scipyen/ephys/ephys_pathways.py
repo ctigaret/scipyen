@@ -988,95 +988,96 @@ class SynapticPathwayType(TypeEnum):
                     # • present throughout
     UserDefined = 4 # can associate any episode type, EXCEPT for Tracking (see above)
 
-class __BaseSynStimChannel__(typing.NamedTuple):
+# class __BaseSynStimChannel__(typing.NamedTuple):
+#     name: str = "stim"
+#     channel: typing.Union[int, str] = 0
+#     dig: bool=True
+
+@dataclass
+class SynapticStimulusChannel():
+    r"""Logical association between digital or analog outputs and synaptic stimulation.
+
+    Attributes:
+
+    :name: the name of this synaptic simulus; default is 'stim'
+
+    :channel: index or name of the output channel sending TTL triggers for a
+        synaptic stimulation device e.g. stimulus isolation box, uncaging laser m
+        odulator, LED device, 𝑒𝑡𝑐,
+        Optional; default is 0
+
+    :dig: indicates the type of the triggering channel
+       (used when the 'channel' field is an int):
+       when True, the channel is a digital output,
+       when False, the channel is a DAC that emulates TTL triggers
+       Optional; default is True
+
+    Channel indices are expected to be >= 0 and correspond to the
+        logical channel indices in the acquisition protocol.
+    Channel names are as assigned in the acquisition protocol (if available).
+
+    NOTE: The order of parameters matters, unless they are given as name↦value pairs.
+
+    Since only DAC channels can be named in a protocol, specifying a str as 'channel'
+       implied the stimulus is a DAC channel and not a DIG output channel.
+"""
     name: str = "stim"
     channel: typing.Union[int, str] = 0
     dig: bool=True
 
-class SynapticStimulusChannel(__BaseSynStimChannel__):
-    # see https://stackoverflow.com/questions/61844368/how-to-initialize-a-namedtuple-child-class-different-ways-based-on-input-argumen
-    __slots__ = ()
-
-    __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseSynStimChannel__.__annotations__.items()])
-
-    __doc__ = "\n".join( ["Logical association between digital or analog outputs and synaptic stimulation.\n",
-                    "Signature:\n",
-                    f"\tSynapticStimulusChannel({__sig__})\n",
-                    "where:",
-                    "• name (str): the name of this synaptic simulus; default is 'stim'\n",
-                    "• channel (int, str): index or name of the output channel sending TTL",
-                    "   triggers to a synaptic stimulation device e.g. stimulus isolation box,",
-                    "   uncaging laser modulator, LED device, 𝑒𝑡𝑐.",
-                    "   Optional; default is 0\n",
-                    "• dig (bool): indicates the type of the triggering channel",
-                    "   (used when the 'channel' field is an int):",
-                    "   when True, the channel is a digital output",
-                    "   when False, the channel is a DAC that emulates TTL triggers",
-                    "   Optional; default is True\n"
-                    "",
-                    "Channel indices are expected to be >= 0 and correspond to the",
-                    "    logical channel indices in the acquisition protocol.\n",
-                    "Channel names are as assigned in the acquisition protocol (if available).",
-                    "",
-                    "NOTE: The order of parameters matters, unless they are given as name↦value pairs.",
-                    "",
-                    "Since only DAC channels can be named in a protocol, specifying a str as 'channel'",
-                    "   implied the stimulus is a DAC channel and not a DIG output channel."
-                    ""])
-
-    @classmethod
-    def __new__(cls, *args, **kwargs):
-        super_anns = super().__annotations__
-        fields = list(super_anns.keys())
-        super_defaults = super()._field_defaults
-
-        args = args[1:] # drop cls
-
-        if len(args) > len(super_anns):
-            raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
-
-        new_args = dict()
-        for k, arg in enumerate(args):
-            # if not isinstance(arg, super_anns[fields[k]]):
-            if not datatypes.check_type(type(arg), super_anns[fields[k]]).value:
-                raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
-            new_args[fields[k]] = arg
-
-        if len(new_args) == len(super_anns):
-            if len(kwargs):
-                dups = [k for k in kwargs if k in fields]
-                if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-                else:
-                    raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
-
-        else:
-            if len(kwargs):
-                dups = [k for k in kwargs if k in new_args]
-                if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-
-                spurious = [k for k in kwargs if k not in fields]
-                if len(spurious):
-                    raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
-
-                new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
-
-                new_args.update(new_kwargs)
-
-            # finally, add the default unspecified args
-            for (k,v) in super_defaults.items():
-                if k not in new_args:
-                    new_args[k] = v
-
-        return super().__new__(cls, **new_args)
+    # @classmethod
+    # def __new__(cls, *args, **kwargs):
+    #     super_anns = super().__annotations__
+    #     fields = list(super_anns.keys())
+    #     super_defaults = super()._field_defaults
+    #
+    #     args = args[1:] # drop cls
+    #
+    #     if len(args) > len(super_anns):
+    #         raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
+    #
+    #     new_args = dict()
+    #     for k, arg in enumerate(args):
+    #         # if not isinstance(arg, super_anns[fields[k]]):
+    #         if not datatypes.check_type(type(arg), super_anns[fields[k]]).value:
+    #             raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
+    #         new_args[fields[k]] = arg
+    #
+    #     if len(new_args) == len(super_anns):
+    #         if len(kwargs):
+    #             dups = [k for k in kwargs if k in fields]
+    #             if len(dups):
+    #                 raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+    #             else:
+    #                 raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
+    #
+    #     else:
+    #         if len(kwargs):
+    #             dups = [k for k in kwargs if k in new_args]
+    #             if len(dups):
+    #                 raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+    #
+    #             spurious = [k for k in kwargs if k not in fields]
+    #             if len(spurious):
+    #                 raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
+    #
+    #             new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
+    #
+    #             new_args.update(new_kwargs)
+    #
+    #         # finally, add the default unspecified args
+    #         for (k,v) in super_defaults.items():
+    #             if k not in new_args:
+    #                 new_args[k] = v
+    #
+    #     return super().__new__(cls, **new_args)
 
     def __eq__(self, other) -> bool:
         ret = type(self) == type(other)
         if not ret:
             return ret
 
-        ret &= all(getattr(self, f) == getattr(other, f) for f in self._fields)
+        ret &= all(getattr(self, f) == getattr(other, f) for f in map(lambda f: f.name, dataclasses.fields(self)))
 
         return ret
 
@@ -1128,9 +1129,9 @@ class SynapticStimulusChannel(__BaseSynStimChannel__):
 
         return cls(name, channel, dig)
 
-SynapticStimulusChannel.name.__doc__ = "str: the name of this synaptic simulus; default is 'stim'"
-SynapticStimulusChannel.channel.__doc__ = "int, str: index or name of the output channel sending TTL triggers"
-SynapticStimulusChannel.dig.__doc__ = "bool: indicates if the triggering channel if a digital output (True) or a DAC (False)"
+# SynapticStimulusChannel.name.__doc__ = "str: the name of this synaptic simulus; default is 'stim'"
+# SynapticStimulusChannel.channel.__doc__ = "int, str: index or name of the output channel sending TTL triggers"
+# SynapticStimulusChannel.dig.__doc__ = "bool: indicates if the triggering channel if a digital output (True) or a DAC (False)"
 
 class SynapticStimulusChannelList(NeoObjectList):
     allowed_contents = (SynapticStimulusChannel, )
@@ -1311,89 +1312,103 @@ def synstim(name:str, channel:typing.Optional[int]=None, dig:bool=True) -> Synap
     r"""Shorthand constructor of SynapticStimulusChannel (saves typing)"""
     return SynapticStimulusChannel(name, channel, dig)
 
-class __BaseAuxInput__(typing.NamedTuple):
+# class __BaseAuxInput__(typing.NamedTuple):
+#     name: str = "aux_in"
+#     adc: int = 0
+#     # adc: typing.Union[int, str] = 0
+#     cmd: Tribool = Tribool() # reflects an input that "copies" a command signal
+
+@dataclass
+class AuxiliaryInput():
+    r""" ADC for recording a signal other than the primary amplifier output.
+
+    This can be, for example, a secondary amplifier output, 'copies' (or signal proxies)
+    of digital TTLs or DAQ command output signals sent to the amplifier,
+    output from auxiliary measurement device, 𝑒𝑡𝑐.).
+
+    Attributes:
+    ===========
+    • name (str): name of this auxiliary input specification; default is 'aux_in'.
+    • adc (int, str): index or name of the ADC channel used to record the auxiliary input.
+    Optional; default is 0.
+    • cmd (bool, None): default is None;
+    when True, this is a 'copy' of a command signal, or of an appropriately chosen
+        secondary amplifier output, as a 'proxy' of the command signal (e.g.
+        membrane potential in voltage clamp, or membrane current in current clamp)¹;
+    when False, this indicates that this auxiliary input is a copy or a trigger (TTL-like)
+        signal (either from a digital output or from a DAC);
+    when None, this auxiliary input carries any other signal NOT mentioned above.
+
+    Channel indices are expected to be >= 0 and correspond to the logical channel ,
+        indices in the acquisition protocol.\n ,
+    Channel names are as assigned in the acquisition protocol (if available).
+
+    NOTE: The order of parameters matters, unless they are given as name↦value pairs.
+
+    ¹ In modern amplifiers the recording electrode switches between voltage measurement and current injection, ,
+    with a high cycle rate; therefore, both membrane potential and current are theoretically available
+
+"""
     name: str = "aux_in"
     adc: int = 0
     # adc: typing.Union[int, str] = 0
     cmd: Tribool = Tribool() # reflects an input that "copies" a command signal
-
-class AuxiliaryInput(__BaseAuxInput__):
     __slots__ = ()
-    __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseAuxInput__.__annotations__.items()])
-    __doc__ = "\n".join(["An auxiliary input identifies an ADC for recording a signal other than",
-                "the primary amplifier output (e.g. a secondary amplifier output, 'copies' ",
-                "of digital TTLs or DAQ command output signals sent to the amplifier, ",
-                "output from auxiliary measurement device, 𝑒𝑡𝑐.)\n",
-                "Signature:\n"
-                f"\tAuxiliaryInput({__sig__})\n",
-                "where:",
-                "• name (str): name of this auxiliary input specification; default is 'aux_in'.\n",
-                "• adc (int, str): index or name of the ADC channel used to record the auxiliary input.",
-                "   Optional; default is 0.\n",
-                "• cmd (bool, None): default is None; ",
-                "   when True, this is a 'copy' of a command signal, or of an appropriately chosen",
-                "       secondary amplifier output, as a 'proxy' of the command signal (e.g.",
-                "       membrane potential in voltage clamp, or membrane current in current clamp)¹;",
-                "   when False, this indicates that this auxiliary input is a copy or a trigger (TTL-like)",
-                "       signal (either from a digital output or from a DAC);",
-                "   when None, this auxiliary input carries any other signal NOT mentioned above.\n"
-                "",
-                "Channel indices are expected to be >= 0 and correspond to the logical channel",
-                "    indices in the acquisition protocol.\n",
-                "Channel names are as assigned in the acquisition protocol (if available).",
-                "",
-                "NOTE: The order of parameters matters, unless they are given as name↦value pairs.",
-                "",
-                "¹ In modern amplifiers the recording electrode switches between voltage measurement and current injection,",
-                "   with a high cycle rate; therefore, both membrane potential and current are theoretically available "
-                ""])
 
-    @classmethod
-    def __new__(cls, *args, **kwargs):
-        super_anns = super().__annotations__
-        fields = list(super_anns.keys())
-        super_defaults = super()._field_defaults
+    # @classmethod
+    # def __new__(cls, *args, **kwargs):
+    #     super_anns = super().__annotations__
+    #     fields = list(super_anns.keys())
+    #     super_defaults = super()._field_defaults
+    #
+    #     args = args[1:] # drop cls
+    #
+    #     if len(args) > len(super_anns):
+    #         raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
+    #
+    #     new_args = dict()
+    #     for k, arg in enumerate(args):
+    #         if not datatypes.check_type(type(arg), super_anns[fields[k]]).value:
+    #             raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
+    #         new_args[fields[k]] = arg
+    #
+    #     if len(new_args) == len(super_anns):
+    #         if len(kwargs):
+    #             dups = [k for k in kwargs if k in fields]
+    #             if len(dups):
+    #                 raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+    #             else:
+    #                 raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
+    #
+    #     else:
+    #         if len(kwargs):
+    #             dups = [k for k in kwargs if k in new_args]
+    #             if len(dups):
+    #                 raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+    #
+    #             spurious = [k for k in kwargs if k not in fields]
+    #             if len(spurious):
+    #                 raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
+    #
+    #             new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
+    #
+    #             new_args.update(new_kwargs)
+    #
+    #         # finally, add the default unspecified args
+    #         for (k,v) in super_defaults.items():
+    #             if k not in new_args:
+    #                 new_args[k] = v
+    #
+    #     return super().__new__(cls, **new_args)
 
-        args = args[1:] # drop cls
+    def __eq__(self, other) -> bool:
+        ret = type(self) == type(other)
+        if not ret:
+            return ret
 
-        if len(args) > len(super_anns):
-            raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
+        ret &= all(getattr(self, f) == getattr(other, f) for f in map(lambda f: f.name, datalasses.fields(self)))
 
-        new_args = dict()
-        for k, arg in enumerate(args):
-            if not datatypes.check_type(type(arg), super_anns[fields[k]]).value:
-                raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
-            new_args[fields[k]] = arg
-
-        if len(new_args) == len(super_anns):
-            if len(kwargs):
-                dups = [k for k in kwargs if k in fields]
-                if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-                else:
-                    raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
-
-        else:
-            if len(kwargs):
-                dups = [k for k in kwargs if k in new_args]
-                if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-
-                spurious = [k for k in kwargs if k not in fields]
-                if len(spurious):
-                    raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
-
-                new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
-
-                new_args.update(new_kwargs)
-
-            # finally, add the default unspecified args
-            for (k,v) in super_defaults.items():
-                if k not in new_args:
-                    new_args[k] = v
-
-        return super().__new__(cls, **new_args)
-
+        return ret
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Dataset:
         from iolib import h5io
@@ -1437,9 +1452,9 @@ class AuxiliaryInput(__BaseAuxInput__):
         return cls(name, adc, cmd)
 
 
-AuxiliaryInput.name.__doc__ = "str: name of the auxiliary input specification; default is 'aux_in'"
-AuxiliaryInput.adc.__doc__  = "int, str, None: index or name of the ADC channel used to record the auxiliary input; default is None."
-AuxiliaryInput.cmd.__doc__  = "Tribool, None: indicates if the auxiliary ADC records (is a proxy of) a clamping command signal (True), a trigger (TTL-like) signal (False) or any other analog input (None); default is None"
+# AuxiliaryInput.name.__doc__ = "str: name of the auxiliary input specification; default is 'aux_in'"
+# AuxiliaryInput.adc.__doc__  = "int, str, None: index or name of the ADC channel used to record the auxiliary input; default is None."
+# AuxiliaryInput.cmd.__doc__  = "Tribool, None: indicates if the auxiliary ADC records (is a proxy of) a clamping command signal (True), a trigger (TTL-like) signal (False) or any other analog input (None); default is None"
 
 class AuxiliaryInputList(NeoObjectList):
     allowed_contents = (AuxiliaryInput, )
@@ -1620,86 +1635,98 @@ def auxinput(name:str, adc:typing.Optional[int]=None, cmd:typing.Optional[bool]=
         raise TypeError(f"'adc' expected an int; instead, got {type(adc).__name__}")
     return AuxiliaryInput(name, adc, cmd)
 
-class __BaseAuxOutput__(typing.NamedTuple):
+# class __BaseAuxOutput__(typing.NamedTuple):
+#     name: str = "aux_out"
+#     channel: int = 0
+#     # channel: typing.Union[int, str] = 0
+#     # digttl: typing.Optional[bool] = None
+#     digttl: Tribool = Tribool()
+
+@dataclass
+class AuxiliaryOutput():
+    r""" An auxiliary (analog — DAC — or a digital — DIG) output channel of the DAQ device.
+
+    This channel is used for sending waveforms other than for clamping or synaptic
+    stimulation (the latter being specified using SynapticStimulusChannel objects).
+
+    Attributes:
+    ===========
+    • name (str): name of this auxiliary output specification; default is 'aux_out'.
+    • channel (int, str): specifies the auxiliary output channel (index or name if a DAC channel, otherwise index only)
+    Optional; default is 0.
+    • digttl (bool or None): flag to indicate if the output is used to send out triggers, with:
+    True ⇒ the auxiliary output is a DIG channel (hence sending out exclusively TTL-like waveforms)
+    False ⇒ the auxiliary output is a DAC channel used to emulaate TTLs
+    None ⇒ the auxiliary outoyut is a DAC channel used to send arbitrary¹ waveforms
+    Optional, default is None.
+
+    Channel indices are expected to be >= 0 and correspond to the logical channel
+        indices in the acquisition protocol.
+    Channel names are as assigned in the acquisition protocol (if available).
+
+    NOTE: The order of parameters matters, unless they are given as name↦value pairs.
+
+    ¹ From the range of waveforms available in the acquisition software.
+
+"""
     name: str = "aux_out"
     channel: int = 0
-    # channel: typing.Union[int, str] = 0
-    # digttl: typing.Optional[bool] = None
     digttl: Tribool = Tribool()
 
-class AuxiliaryOutput(__BaseAuxOutput__):
-    __slots__ = ()
-    __sig__ = ", ".join([f"{k}: {type2str(v)}" for (k,v) in __BaseAuxOutput__.__annotations__.items()])
-    __doc__ = "\n".join(["An auxiliary (analog — DAC — or a digital — DIG) output channel of the DAQ device.\n",
-                         "This channel is used for sending waveforms other than for clamping or synaptic ",
-                         "stimulation (the latter being specified using SynapticStimulusChannel objects).\n",
-                         "Signature:\n",
-                         f"AuxiliaryOutput({__sig__})\n",
-                         "where:"
-                         "• name (str): name of this auxiliary output specification; default is 'aux_out'.\n",
-                         "• channel (int, str): specifies the auxiliary output channel (index or name if a DAC channel, otherwise index only)\n",
-                         "  Optional; default is 0.\n",
-                         "• digttl (bool or None): flag to indicate if the output is used to send out triggers, with:",
-                         "  True ⇒ the auxiliary output is a DIG channel (hence sending out exclusively TTL-like waveforms)",
-                         "  False ⇒ the auxiliary output is a DAC channel used to emulaate TTLs",
-                         "  None ⇒ the auxiliary outoyut is a DAC channel used to send arbitrary¹ waveforms",
-                         "  Optional, default is None.\n",
-                         "",
-                         "Channel indices are expected to be >= 0 and correspond to the logical channel",
-                         "    indices in the acquisition protocol.\n",
-                         "Channel names are as assigned in the acquisition protocol (if available).",
-                         "",
-                         "NOTE: The order of parameters matters, unless they are given as name↦value pairs.",
-                         "",
-                         "¹ From the range of waveforms available in the acquisition software."
-                         ])
+#     @classmethod
+#     def __new__(cls, *args, **kwargs):
+#         super_anns = super().__annotations__
+#         fields = list(super_anns.keys())
+#         super_defaults = super()._field_defaults
+#
+#         args = args[1:] # drop cls
+#
+#         if len(args) > len(super_anns):
+#             raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
+#
+#         new_args = dict()
+#         for k, arg in enumerate(args):
+#             if not datatypes.check_type(type(arg), super_anns[fields[k]]).value:
+#                 raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
+#             new_args[fields[k]] = arg
+#
+#         if len(new_args) == len(super_anns):
+#             if len(kwargs):
+#                 dups = [k for k in kwargs if k in fields]
+#                 if len(dups):
+#                     raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+#                 else:
+#                     raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
+#
+#         else:
+#             if len(kwargs):
+#                 dups = [k for k in kwargs if k in new_args]
+#                 if len(dups):
+#                     raise SyntaxError(f"Duplicate specification of parameters: {dups}")
+#
+#                 spurious = [k for k in kwargs if k not in fields]
+#                 if len(spurious):
+#                     raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
+#
+#                 new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
+#
+#                 new_args.update(new_kwargs)
+#
+#             # finally, add the default unspecified args
+#             for (k,v) in super_defaults.items():
+#                 if k not in new_args:
+#                     new_args[k] = v
+#
+#         return super().__new__(cls, **new_args)
 
-    @classmethod
-    def __new__(cls, *args, **kwargs):
-        super_anns = super().__annotations__
-        fields = list(super_anns.keys())
-        super_defaults = super()._field_defaults
+    def __eq__(self, other) -> bool:
+        ret = type(self) == type(other)
+        if not ret:
+            return ret
 
-        args = args[1:] # drop cls
+        ret &= all(getattr(self, f) == getattr(other, f) for f in map(lambda f: f.name, datalasses.fields(self)))
 
-        if len(args) > len(super_anns):
-            raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
-
-        new_args = dict()
-        for k, arg in enumerate(args):
-            if not datatypes.check_type(type(arg), super_anns[fields[k]]).value:
-                raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
-            new_args[fields[k]] = arg
-
-        if len(new_args) == len(super_anns):
-            if len(kwargs):
-                dups = [k for k in kwargs if k in fields]
-                if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-                else:
-                    raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
-
-        else:
-            if len(kwargs):
-                dups = [k for k in kwargs if k in new_args]
-                if len(dups):
-                    raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-
-                spurious = [k for k in kwargs if k not in fields]
-                if len(spurious):
-                    raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
-
-                new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
-
-                new_args.update(new_kwargs)
-
-            # finally, add the default unspecified args
-            for (k,v) in super_defaults.items():
-                if k not in new_args:
-                    new_args[k] = v
-
-        return super().__new__(cls, **new_args)
-
+        return ret
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Dataset:
 
@@ -1743,9 +1770,9 @@ class AuxiliaryOutput(__BaseAuxOutput__):
 
         return cls(name, channel, digttl)
 
-AuxiliaryOutput.name.__doc__ = "str: name of this auxiliary output specification; default is 'aux_out'"
-AuxiliaryOutput.channel.__doc__ = "int, str: specifies the auxiliary output channel (index or name if a DAC channel, otherwise index only); default is 0"
-AuxiliaryOutput.digttl.__doc__ = "Tribool: flag to indicate if the output is used to send out triggers via a DIG (Tribool(True)), emulated via a DAC (Tribool(False)) or other waveforms (Tribool(None)); default is Tribool(None)"
+# AuxiliaryOutput.name.__doc__ = "str: name of this auxiliary output specification; default is 'aux_out'"
+# AuxiliaryOutput.channel.__doc__ = "int, str: specifies the auxiliary output channel (index or name if a DAC channel, otherwise index only); default is 0"
+# AuxiliaryOutput.digttl.__doc__ = "Tribool: flag to indicate if the output is used to send out triggers via a DIG (Tribool(True)), emulated via a DAC (Tribool(False)) or other waveforms (Tribool(None)); default is Tribool(None)"
 
 class AuxiliaryOutputList(NeoObjectList):
     allowed_contents = (AuxiliaryOutput, )
@@ -2447,14 +2474,15 @@ class RecordingSource():
                 ret += ",\n".join([f"'{p.name}'" for p in self.pathways])
         return "".join(ret)
 
-class PathwaysCrossTalk(typing.NamedTuple):
+@dataclass
+class PathwaysCrossTalk:
     r"""Encapsulates an ordered pair of synaptic pathways tested for crosstalk.
 
 """
     path0: typing.Union[SynapticPathway, str, int]
     path1: typing.Union[SynapticPathway, str, int]
 
-@dataclasses.dataclass
+@dataclass
 class SweepPathCommands:
     r"""Encapsulates the DAC and DIG commands sent to the pathway during a given sweep.
     """

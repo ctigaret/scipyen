@@ -219,6 +219,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self._make_value_()
         else:
             self._data_.pathwayType = self._pathType_
+
         self.sig_valueChanged.emit(self.value())
 
     @Slot(str)
@@ -239,6 +240,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self._make_value_()
         else:
             self._data_.electrodeMode = self._electrode_
+
         self.sig_valueChanged.emit(self.value())
 
     @Slot()

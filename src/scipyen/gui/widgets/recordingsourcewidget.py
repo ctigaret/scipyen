@@ -474,23 +474,13 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
                 return
 
             if not isinstance(self._data_, ephys_pathways.RecordingSource):
-                self._syn_ = syn
                 # print("\n\twill create new RecordingSource")
+                self._syn_ = syn
                 self._make_value_()
 
             else:
+                # self._data_.syn = self._syn_
                 # print(f"\n\tpending: {self._pendingStimulusChange_}")
-                if len(syn) < len(self._data_.syn):
-                    # print("\n\tdeleting excess syn")
-                    for k in range(len(syn), len(self._data_.syn)):
-                        pp = list(filter(lambda p: p.stimulus == self._data_.syn[k], self._data_.pathways))
-                        if len(pp):
-                            for p in pp:
-                                pndx = self._data_.pathways.index(p)
-                                del self._data_.pathways[pndx]
-                        del self._data_.syn[k]
-                        self._pathways_ = self._data_.pathways
-
                 if len(self._data_.pathways) == 0:
                     self._data_.syn = syn
                     for stim in self._data_.syn:
@@ -502,44 +492,45 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
                                                                 )
                         self._data_.pathways.append(pathway)
 
-                elif len(syn) == len(self._data_.syn):
-                    if isinstance(self._pendingStimulusChange_, tuple) and len(self._pendingStimulusChange_) == 2:
-                        stimNdx = self._pendingStimulusChange_[0]
-                        # print(f"\n\tstimulus at {stimNdx} changed")
-                        if stimNdx < len(self._data_.syn):
-                            editedStim = syn[stimNdx]
-                            # col = self._pendingStimulusChange_[1]
-                            currentStim = self._data_.syn[stimNdx]
-                            pp = list(filter(lambda p: p.stimulus == currentStim, self._data_.pathways))
-                            if len(pp):
-                                for p in pp:
-                                    p.stimulus = editedStim
-                            self._data_.syn[stimNdx] = editedStim
-                        self._pendingStimulusChange_ = None
-                        self._syn_ = self._data_.syn
-
                 else:
-                    # print(f"\n\tenumerating {len(syn)} stimuli")
-                    for kstim, stim in enumerate(syn):
-                        # print(f"\n\t{kstim} -> {stim}")
-                        if kstim < len(self._data_.pathways):
-                            # print(f"\n\tchanging stim for pathway {kstim}")
-                            self._data_.syn[kstim] = stim
-                            self._data_.pathways[kstim].stimulus = self._data_.syn[kstim]
+                    # if len(syn) == len(self._data_.pathways):
+                    #     if isinstance(self._pendingStimulusChange_, tuple) and len(self._pendingStimulusChange_) == 2:
+                    #         stimNdx = self._pendingStimulusChange_[0]
+                    #         editedStim = syn[stimNdx]
 
-                        else:
-                            # print(f"\n\tadding new pathway using {stim}")
-                            pathway = ephys_pathways.SynapticPathway(stimulus = stim,
-                                                                name = stim.name,
-                                                                adc= self._data_.adc,
-                                                                dac = self._data_.dac,
-                                                                electrode = self._data_.electrodeMode
-                                                            )
+                    if len(syn) < len(self._data_.pathways):
+                        retainedPathways = list(filter(lambda p: p.stimulus in syn, self._data_.pathways))
+                        self._data_.pathways = retainedPathways
+                        self._data_.syn = syn
+
+
+                    elif len(syn) == len(self._data_.pathways):
+                        if isinstance(self._pendingStimulusChange_, tuple) and len(self._pendingStimulusChange_) == 2:
+                            stimNdx = self._pendingStimulusChange_[0]
+                            # print(f"\n\tstimulus at {stimNdx} changed")
+                            if stimNdx < len(self._data_.syn):
+                                editedStim = syn[stimNdx]
+                                # col = self._pendingStimulusChange_[1]
+                                currentStim = self._data_.syn[stimNdx]
+                                pp = list(filter(lambda p: p.stimulus == currentStim, self._data_.pathways))
+                                if len(pp):
+                                    for p in pp:
+                                        p.stimulus = editedStim
+                                self._data_.syn[stimNdx] = editedStim
+                            self._pendingStimulusChange_ = None
+
+                    elif len(syn) > len(self._data_.pathways):
+                        for k in range(len(self._data_.pathways), len(syn)):
+                            pathway = ephys_pathways.SynapticPathway(stimulus = syn[k],
+                                                                    name = syn[k].name,
+                                                                    adc= self._data_.adc,
+                                                                    dac = self._data_.dac,
+                                                                    electrode = self._data_.electrodeMode
+                                                                    )
                             self._data_.pathways.append(pathway)
-                            self._data_.syn.append(stim)
+                            self._data_.syn.append(syn[k])
 
-                    self._syn_ = syn
-
+                self._syn_ = self._data_.syn
                 self._pathways_ = self._data_.pathways
 
             sigBlock = QtCore.QSignalBlocker(self.synapticPathwaysTable)

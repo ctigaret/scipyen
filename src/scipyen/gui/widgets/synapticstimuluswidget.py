@@ -141,21 +141,35 @@ class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, QWidget):
     @Slot(str)
     def _slot_nameChanged(self, val:str):
         self._name_ = val
-        self._make_value_()
+        if not isinstance(self._data_, SynapticStimulusChannel):
+            self._make_value_()
+        else:
+            self._data_.name = self._name_
+
         if isinstance(self._data_ , SynapticStimulusChannel):
             self.sig_valueChanged.emit(self.value())
 
     @Slot(bool)
     def _slot_isDigitalChanged(self, val: bool):
         self._digital_ = val is True
-        self._make_value_()
+        if not isinstance(self._data_ , SynapticStimulusChannel):
+            self._make_value_()
+        else:
+            self._data_.dig = self._digital_
+
         if isinstance(self._data_ , SynapticStimulusChannel):
             self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
     def _slot_outputChannelChanged(self, val:int):
         self._channel_ = val
-        self._make_value_()
+
+        if not isinstance(self._data_ , SynapticStimulusChannel):
+            self._make_value_()
+
+        else:
+            self._data_.channel = self._channel_
+
         if isinstance(self._data_ , SynapticStimulusChannel):
             self.sig_valueChanged.emit(self.value())
 

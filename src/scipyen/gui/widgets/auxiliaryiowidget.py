@@ -122,11 +122,14 @@ class AuxiliaryInputWidget(Ui_AuxiliaryInputWidget, QWidgetIn):
         self.isCommandCheckBox.setStatusTip("Is proxy for a clamping command, TTL or any other waveform")
         if isinstance(self._command_, Tribool):
             if self._command_.value is True:
-                self.isCommandCheckBox.setCheckedState(Qt.Checked)
+                self.isCommandCheckBox.setCheckedState(QtCore.Qt.Checked)
+
             elif self._command_.value is False:
-                self.isCommandCheckBox.setCheckedState(Qt.Unchecked)
+                self.isCommandCheckBox.setCheckedState(QtCore.Qt.Unchecked)
+
             else:
-                self.isCommandCheckBox.setCheckedState(Qt.PartiallyChecked)
+                self.isCommandCheckBox.setCheckedState(QtCore.Qt.PartiallyChecked)
+
         self.isCommandCheckBox.toggled.connect(self._slot_isCommandChanged)
 
         self.createObjectPushButton.setText("")
@@ -141,7 +144,12 @@ class AuxiliaryInputWidget(Ui_AuxiliaryInputWidget, QWidgetIn):
     @Slot(str)
     def _slot_nameChanged(self, val:str):
         self._name_ = val
-        self._make_value_()
+        if not isinstance(self._data_ , AuxiliaryInput):
+            self._make_value_()
+
+        else:
+            self._data_.name = self._name
+
         if isinstance(self._data_ , AuxiliaryInput):
             self.sig_valueChanged.emit(self.value())
 
@@ -152,22 +160,32 @@ class AuxiliaryInputWidget(Ui_AuxiliaryInputWidget, QWidgetIn):
             val = Tribool(val)
 
         else:
-            if val == QtCore.Checked:
+            if val == QtCore.Qt.Checked:
                 val = Tribool(True)
-            elif val == QtCore.Unchecked:
+
+            elif val == QtCore.Qt.Unchecked:
                 val = Tribool(False)
+
             else:
                 val = Tribool()
 
         self._command_ = val
-        self._make_value_()
+        if not isinstance(self._data_ , AuxiliaryInput):
+            self._make_value_()
+        else:
+            self._data_.cmd = self._command_
+
         if isinstance(self._data_ , AuxiliaryInput):
             self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
     def _slot_outputChannelChanged(self, val:int):
         self._channel_ = val
-        self._make_value_()
+        if not isinstance(self._data_ , AuxiliaryInput):
+            self._make_value_()
+        else:
+            self._data_.adc = self._channel_
+
         if isinstance(self._data_ , AuxiliaryInput):
             self.sig_valueChanged.emit(self.value())
 
@@ -264,11 +282,14 @@ class AuxiliaryOutputWidget(Ui_AuxiliaryOutputWidget, QWidgetOut):
         self.isDigTTLCheckBox.setStatusTip("Sends or emulates TTL or any other commands")
         if isinstance(self._command_, Tribool):
             if self._command_.value is True:
-                self.isDigTTLCheckBox.setCheckedState(Qt.Checked)
+                self.isDigTTLCheckBox.setCheckedState(QtCore.Qt.Checked)
+
             elif self._command_.value is False:
-                self.isDigTTLCheckBox.setCheckedState(Qt.Unchecked)
+                self.isDigTTLCheckBox.setCheckedState(QtCore.Qt.Unchecked)
+
             else:
-                self.isDigTTLCheckBox.setCheckedState(Qt.PartiallyChecked)
+                self.isDigTTLCheckBox.setCheckedState(QtCore.Qt.PartiallyChecked)
+
         self.isDigTTLCheckBox.toggled.connect(self._slot_isTTLChanged)
 
         self.createObjectPushButton.setText("")
@@ -283,7 +304,12 @@ class AuxiliaryOutputWidget(Ui_AuxiliaryOutputWidget, QWidgetOut):
     @Slot(str)
     def _slot_nameChanged(self, val:str):
         self._name_ = val
-        self._make_value_()
+
+        if not isinstance(self._data_ , AuxiliaryOutput):
+            self._make_value_()
+        else:
+            self._data_.name = self._name_
+
         if isinstance(self._data_ , AuxiliaryOutput):
             self.sig_valueChanged.emit(self.value())
 
@@ -294,22 +320,34 @@ class AuxiliaryOutputWidget(Ui_AuxiliaryOutputWidget, QWidgetOut):
             val = Tribool(val)
 
         else:
-            if val == QtCore.Checked:
+            if val == QtCore.Qt.Checked:
                 val = Tribool(True)
-            elif val == QtCore.Unchecked:
+
+            elif val == QtCore.Qt.Unchecked:
                 val = Tribool(False)
+
             else:
                 val = Tribool()
 
         self._command_ = val
-        self._make_value_()
+
+        if not isinstance(self._data_ , AuxiliaryOutput):
+            self._make_value_()
+        else:
+            self._data_.digttl = self._command_
+
         if isinstance(self._data_ , AuxiliaryOutput):
             self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
     def _slot_outputChannelChanged(self, val:int):
         self._channel_ = val
-        self._make_value_()
+
+        if not isinstance(self._data_ , AuxiliaryOutput):
+            self._make_value_()
+        else:
+            self._data_.channel = self._channel_
+
         if isinstance(self._data_ , AuxiliaryOutput):
             self.sig_valueChanged.emit(self.value())
 
@@ -330,6 +368,7 @@ class AuxiliaryOutputWidget(Ui_AuxiliaryOutputWidget, QWidgetOut):
             self._name_ = val.name
             self._channel_ = val.channel
             self._command_ = val.digttl
+            self._data_ = self._name_
 
             sigBlock = list(map(
                                 lambda w: QtCore.QSignalBlocker(w),
