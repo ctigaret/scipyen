@@ -320,7 +320,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
     @Slot()
     def _slot_editStimulus(self):
         from gui.delegates import ExternalEditorDelegate
-        # print(f"{self.__class__.__name__}[{self.objectName()}]._slot_editStimulus: {self._syn_}")
+        print(f"{self.__class__.__name__}[{self.objectName()}]._slot_editStimulus: {self._syn_}")
         stimEditor = ExternalEditorDelegate(self._syn_, self)
         stimEditor.setObjectName("stimEditor")
         stimEditor.sig_valueChanged.connect(self._slot_stimulusChanged)
@@ -465,7 +465,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
 
     @Slot()
     def _slot_stimulusListChanged(self):
-        # print(f"{self.__class__.__name__}._slot_stimulusListChanged()")
+        print(f"{self.__class__.__name__}._slot_stimulusListChanged()")
         widget = self.sender()
         if widget == self.stimulusListTable:
             syn = widget.value()
@@ -474,7 +474,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
                 return
 
             if not isinstance(self._data_, ephys_pathways.RecordingSource):
-                # print("\n\twill create new RecordingSource")
+                print("\n\twill create new RecordingSource")
                 self._syn_ = syn
                 self._make_value_()
 
@@ -482,6 +482,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
                 # self._data_.syn = self._syn_
                 # print(f"\n\tpending: {self._pendingStimulusChange_}")
                 if len(self._data_.pathways) == 0:
+                    print("\n\tadding new pathways")
                     self._data_.syn = syn
                     for stim in self._data_.syn:
                         pathway = ephys_pathways.SynapticPathway(stimulus = stim,
@@ -493,11 +494,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
                         self._data_.pathways.append(pathway)
 
                 else:
-                    # if len(syn) == len(self._data_.pathways):
-                    #     if isinstance(self._pendingStimulusChange_, tuple) and len(self._pendingStimulusChange_) == 2:
-                    #         stimNdx = self._pendingStimulusChange_[0]
-                    #         editedStim = syn[stimNdx]
-
+                    print(f"syn has {len(syn)}; data.pathways has {len(self._data_.pathways)}")
                     if len(syn) < len(self._data_.pathways):
                         retainedPathways = list(filter(lambda p: p.stimulus in syn, self._data_.pathways))
                         self._data_.pathways = retainedPathways
