@@ -143,6 +143,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     sig_rowsPopulated = Signal(int, int, int, name="sig_rowsPopulated")
     sig_columnsPopulated = Signal(int, int, int, name="sig_columnsPopulated")
     sig_modelPopulated = Signal(name="sig_modelPopulated")
+    sig_indexChanged = Signal([int, int], [QtCore.QModelIndex], name="sig_indexChanged")
 
     def __init__(self, data=None, parent=None):
         super(TabularDataModel, self).__init__(parent=parent)
@@ -298,6 +299,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             # 'atomic' data changes in arrays, etc)
             # CAUTION/WARNING this only works for my own custom item models!
             self.sig_modelDataChanged.emit()
+            self.sig_indexChanged[QtCore.QModelIndex].emit(modelIndex)
             return True
 
         return False
@@ -594,14 +596,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @Slot()
     def _slot_dataEditedExternally(self):
         pass
-
-    # def rowOps(self, row:object):
-    #     if not self._canAddRemoveRows_:
-    #         return
-
-        # if isinstance()
-
-    # def colOps()
 
     @safewrapper
     def _getHeaderData_(self, section, orientation, role = QtCore.Qt.DisplayRole):
@@ -1620,7 +1614,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     self._canAddRemoveRows_ = True
 
                 else:
-                    scipywarn("Unsupported sequence element types")
+                    scipywarn(f"{self.__class__.__name__} <with parent: {self.parent().objectName() if isinstance(self.parent(), QtWidgets.QWidget) else None}>: Unsupported sequence element types")
                     self._modelDataColumns_ = 0
                     self._modelDataRows_ = 0
                     self._modelDataColumnHeaders_ = dict()
@@ -1769,13 +1763,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         attr = self._modelDataColumnHeaders_[col]
 
-        if isinstance(obj, ephys_pathways.SynapticPathway):
-            if attr == "electrodeMode":
-                attr = "electrode"
-
-            elif attr == "pathwayType":
-                attr = "pathType"
-
         if attr.lower() != "edit":
             old_val = getattr(obj, attr)
             if isinstance(old_val, enum.Enum):
@@ -1808,64 +1795,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         return True
 
-#         if isinstance(old_obj, ephys_pathways.SynapticPathway):
-#             params = {
-#                 "name": old_obj.name,
-#                 "adc": old_obj.adc,
-#                 "dac": old_obj.dac,
-#                 "stimulus": old_obj.stimulus,
-#                 "electrode": old_obj.electrodeMode,
-#                 "pathType": old_obj.pathwayType,
-#                 "schedule": old_obj.schedule,
-#                 "measurements": old_obj.measurements,
-#                 }
-#
-#         elif isinstance(old_obj, ephys_pathways.AuxiliaryInput):
-#             params = {
-#                 "name": old_obj.name,
-#                 "adc": old_obj.adc,
-#                 "cmd": old_obj.cmd
-#                 }
-#
-#         elif isinstance(old_obj, ephys_pathways.AuxiliaryOutput):
-#             params = {
-#                 "name": old_obj.name,
-#                 "channel": old_obj.channel,
-#                 "digttl": old_obj.digttl
-#                 }
-#
-#         elif isinstance(old_obj, ephys_pathways.SynapticStimulusChannel):
-#             params = {
-#                 "name": old_obj.name,
-#                 "channel": old_obj.channel,
-#                 "dig": old_obj.dig
-#                 }
-#
-#         else:
-#             return False
-#
-#         if attr.lower() != "edit":
-#             old_val = getattr(old_obj, attr)
-#             if isinstance(old_obj, ephys_pathways.SynapticPathway):
-#                 if attr == "electrodeMode":
-#                     attr = "electrode"
-#                 elif attr == "pathwayType":
-#                     attr = "pathType"
-#
-#             if isinstance(old_val, enum.Enum):
-#                 if isinstance(pyvalue, int):
-#                     params[attr] = type(old_val)(pyvalue)
-#                 elif isinstance(pyvalue, str):
-#                     params[attr] = type(old_val)[pyvalue]
-#             else:
-#                 params[attr] = pyvalue
-#
-#         new_obj = type(old_obj)(**params)
-#
-#         mdata[row] = new_obj
-#
-#         return True
-
     @_setValueInModelData_.register(list)
     @_setValueInModelData_.register(deque)
     def __setValueInModelData__(self, mdata: list | deque, pyvalue, row, col) -> bool: # noqa
@@ -1878,7 +1807,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 }
             if attr.lower() != "edit":
                 old_val = getattr(old_obj, attr)
-                print(f"'{attr}' -> {old_val} ({type(old_val)})")
+                # print(f"'{attr}' -> {old_val} ({type(old_val)})")
                 if isinstance(old_val, enum.Enum):
                     if isinstance(pyvalue, int):
                         params[attr] = type(old_val)(pyvalue)

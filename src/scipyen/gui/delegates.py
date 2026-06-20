@@ -8,6 +8,7 @@ r"""
 """
 import os, sys, typing, types, math, pathlib, enum, datetime # noqa
 from functools import partial
+import dataclasses
 import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,) # noqa
@@ -76,7 +77,7 @@ NOTE: To be used with my custom itemmodels
 """
     sig_valueChanged            = Signal(object)
     sig_closing                 = Signal()
-    sig_indexChanged            = Signal(int, int, name="sig_indexChanged")
+    sig_indexChanged            = Signal([int, int], [QtCore.QModelIndex], name="sig_indexChanged")
 
     def __init__(self, data: object = None,
                  parent = None,
@@ -173,6 +174,7 @@ NOTE: To be used with my custom itemmodels
             if isinstance(widget, tableeditorwidget.TableEditorWidget):
                 widget.sig_valueChanged.connect(self.slot_dataChanged)
                 widget.sig_indexChanged.connect(self.sig_indexChanged)
+                widget.sig_indexChanged[QtCore.QModelIndex].connect(self.sig_indexChanged[QtCore.QModelIndex])
             else:
                 widget.sig_valueChanged.connect(self.slot_valueChanged)
 
@@ -263,7 +265,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     sig_dataChanged = Signal(QtWidgets.QWidget, name = "sig_dataChanged")
     sig_contentsChanged = Signal(name="sig_contentsChanged")
     sig_editExternally = Signal(QtWidgets.QWidget, QtCore.QModelIndex, name = "sig_editExternally")
-    sig_indexChanged = Signal(int, int, name="sig_indexChanged")
+    sig_indexChanged = Signal([int, int], [QtCore.QModelIndex], name="sig_indexChanged")
     # TODO/FIXME: 2025-10-28 12:57:09
     # decide how to handle the case where the combo box is editable (and its
     # currentText() is not among the combo box items)
@@ -611,6 +613,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
                     widget.setAutoFillBackground(True)
 
+                    widget.currentIndexChanged.connect(self.slot_valueChanged)
+
                     return widget
 
                 else:
@@ -703,6 +707,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
                         widget.sig_dataChanged.connect(self.slot_dataChanged)
                         widget.sig_indexChanged.connect(self.sig_indexChanged) # connect signal 2 signal directly
+                        widget.sig_indexChanged[Qt].connect(self.sig_indexChanged) # connect signal 2 signal directly
                         # widget.sig_indexChanged
 
         elif isinstance(data, np.ndarray):
@@ -944,7 +949,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 bottomRight = model.index(row, model.columnCount()-1)
                 model.dataChanged.emit(topLeft, bottomRight)
 
-        self.sig_indexChanged.emit(self._currentModelIndex_.row(), self._currentModelIndex_.column())
+            self.sig_indexChanged[QtCore.QModelIndex].emit(self._currentModelIndex_)
+            # self.sig_indexChanged.emit(self._currentModelIndex_.row(), self._currentModelIndex_.column())
 
     @Slot()
     def slot_commitAndCloseEditor(self):
@@ -955,8 +961,35 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     @Slot()
     def slot_dataChanged(self):#, o:typing.Any):
         # print(f"{self.__class__.__name__}.slot_dataChanged({o})")
-        # o = self.sender().getValue()
-        # self._currentData_ = o
+        if hasattr(self.sender(), "getValue"):
+            obj = self.sender().getValue()
+
+        elif hasattr(self.sender(), "value"):
+            obj = self.sender().value()
+
+        else:
+            obj = dataclasses.MISSING
+
+        if (
+            (
+                isinstance(obj, (bool, np.bool, Tribool,
+                            datetime.datetime, datetime.date, datetime.time,
+                            int, float, np.floating, np.integer,
+                            complex, np.complexfloating,
+                            vigra.filters.Kernel1D, vigra.filters.Kernel2D,
+                            str, np.character,
+                            # bytes, bytearray,
+                            ))
+                or (
+                    isinstance(obj, (pq.Quantity, np.ndarray))
+                    and (obj.ndim==0 or (obj.ndim==1 and obj.size==1))
+                    )
+            )
+            and isinstance(self._currentModelIndex_, QtCore.QModelIndex)
+            ):
+            self.sig_indexChanged[QtCore.QModelIndex].emit(self._currentModelIndex_)
+            # self.sig_indexChanged.emit(self._currentModelIndex_.row(), self._currentModelIndex_.column())
+
         self.sig_dataChanged.emit(self.sender())
         self.sig_contentsChanged.emit()
 
@@ -970,9 +1003,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     @Slot(np.character)
     @Slot(bool)
     def slot_valueChanged(self, o:object):
-        # print(f"{self.__class__.__name__}.slot_dataChanged({o})")
-        # o = self.sender().getValue()
-        # self._currentData_ = o
+        # print(f"{self.__class__.__name__}.slot_valueChanged({o})")
         self.sig_dataChanged.emit(self.sender())
         self.sig_contentsChanged.emit()
 

@@ -230,7 +230,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
 
         if isinstance(val, str):
             if val in self._electrodeModeNames_:
-                self._electrode_ = ephys_pathways.ElectrodeMode[val]
+                self._electrode_ = ephys.ElectrodeMode[val]
             else:
                 return
         else:

@@ -126,7 +126,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     sig_selectionChanged = Signal(name="sig_selectionChanged")
     sig_dataChanged = Signal(name="sig_dataChanged")
     sig_valueChanged = sig_dataChanged
-    sig_indexChanged = Signal(int, int, name="sig_indexChanged")
+    sig_indexChanged = Signal([int, int], [QtCore.QModelIndex], name="sig_indexChanged")
     sig_indexesChanged = Signal(QtCore.QModelIndex, QtCore.QModelIndex, list, name="sig_indexesChanged")
 
     def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None,
@@ -160,16 +160,17 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self._defaultItemDelegate_ = self.tableView.itemDelegate()
         self._editItemDelegate_ = PythonItemDelegate(parent=self, enforceFloat = self._enforceFloat_)
         self._editItemDelegate_.sig_indexChanged.connect(self.sig_indexChanged)
+        self._editItemDelegate_.sig_indexChanged[QtCore.QModelIndex].connect(self.sig_indexChanged[QtCore.QModelIndex])
         # NOTE: 2021-08-16 17:22:20
         # By default, this is defined in the .ui file as:
         # QtWidgets.QAbstractItemView.DoubleClicked |
         # QtWidgets.QAbstractItemView.EditKeyPressed |
         # QtWidgets.QAbstractItemView.AnyKeyPressed
         self._defaultEditTriggers_ = self.tableView.editTriggers()
+
         if self._readOnly_:
             self.tableView.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         else:
-            # FIXME: 2025-11-23 10:23:31 is this too time-consuming?
             self.tableView.setItemDelegate(self._editItemDelegate_)
 
         self._data_ = None
@@ -186,6 +187,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 
         if hasattr(self._dataModel_, "sig_indexChanged") and isinstance(type(self._dataModel_).sig_indexChanged, Signal):
             self._dataModel_.sig_indexChanged.connect(self.sig_indexChanged) # connect signal to signal directly
+            self._dataModel_.sig_indexChanged[QtCore.QModelIndex].connect(self.sig_indexChanged[QtCore.QModelIndex]) # connect signal to signal directly
 
         self._dataModel_.dataChanged.connect(self._slot_modelDataChanged_)
 
@@ -200,7 +202,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                                 bottomRight: QtCore.QModelIndex,
                                 roles: list):
         if topLeft == bottomRight:
-            self.sig_indexChanged.emit(topLeft.row(), topLeft.column())
+            self.sig_indexChanged[QtCore.QModelIndex].emit(topLeft)
+            # self.sig_indexChanged.emit(topLeft.row(), topLeft.column())
 
         else:
             self.sig_indexesChanged.emit(topLeft, bottomRight, roles)
@@ -880,12 +883,20 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         copySelectedAction.triggered.connect(self.slot_copySelection)
         if not self.readOnly:
             model = self.tableView.model()
+            rowEntity = "row"
             if isinstance(model, TabularDataModel) and model.canAlterRows:
-                insertRowAction = cm.addAction("Insert row")
+                if hasattr(model._modelData_, "allowed_contents"):
+                    if isinstance(model._modelData_.allowed_contents, typing.Sequence):
+                        if len(model._modelData_.allowed_contents) == 1:
+                            rowEntity = f"{model._modelData_.allowed_contents[0].__name__ if isinstance (model._modelData_.allowed_contents[0], type) else type(model._modelData_.allowed_contents[0]).__name__} object"
+                        elif len(model._modelData_.allowed_contents) > 1:
+                            rowEntity = f"object ({', '.join(list(map(lambda c: c.__name__ if isinstance(c, type) else type(c).__name__)))})"
+
+                insertRowAction = cm.addAction(f"Insert {rowEntity}")
                 insertRowAction.setIcon(guiutils.getIcon("insert-table-row"))
                 insertRowAction.triggered.connect(self.slot_insertRow)
 
-                removeRowAction = cm.addAction("Remove row")
+                removeRowAction = cm.addAction(f"Remove {rowEntity}")
                 removeRowAction.setIcon(guiutils.getIcon("delete-table-row"))
                 removeRowAction.triggered.connect(self.slot_removeRow)
 

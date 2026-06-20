@@ -210,6 +210,9 @@ class ScipyenDataclass:
 
         return len(self.diff(other)) == 0
 
+    def __hash__(self) -> int:
+        return hash((self.name, self.description))
+
     def __contains__(self, val:str) -> bool:
         r"""Test the existence of a field name in this instance
     Parameters:
@@ -1156,6 +1159,9 @@ class Procedure(ScipyenDataclass):
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
 
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.procedureType))
+
 @dataclass
 class SubstanceDosage(ScipyenDataclass):
     r"""Logical mapping between a compund (or substance) and a dose, in a Treatment.
@@ -1246,6 +1252,9 @@ class Episode(ScipyenDataclass):
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.begin, self.end, self.beginFrame, self.endFrame, self.procedure))
+
 @dataclass
 class Schedule(ScipyenDataclass):
     r"""Logical grouping of a sequence of episodes.
@@ -1266,16 +1275,6 @@ class Schedule(ScipyenDataclass):
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
-
-#         if not isinstance(other, self.__class__):
-#             return False
-#
-#         ret = len(self.episodes) == len(other.episodes)
-#
-#         if ret:
-#             return all(e==e1 for (e,e1) in zip(self.episodes, other.episodes))
-#
-#         return ret
 
     def __len__(self)->int:
         return len(self.episodes)

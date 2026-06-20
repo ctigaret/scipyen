@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>321</width>
-    <height>354</height>
+    <width>436</width>
+    <height>388</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -218,6 +218,15 @@
     <layout class="QHBoxLayout" name="horizontalLayout_7">
      <item>
       <widget class="QPushButton" name="createObjectPushButton">
+       <property name="toolTip">
+        <string>Create a new RecordingSource from current data</string>
+       </property>
+       <property name="statusTip">
+        <string>Create a new RecordingSource from current data</string>
+       </property>
+       <property name="whatsThis">
+        <string>Create a new RecordingSource from current data</string>
+       </property>
        <property name="text">
         <string>New</string>
        </property>

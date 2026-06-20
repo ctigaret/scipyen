@@ -306,6 +306,7 @@ class RecordingEpisode(Episode):
         if not isinstance(name, str):
             name = self._type_.name
 
+        self.__hash__ = None # enforce non-hashable
 
         self._begin_ = datetime.datetime.now()
         self._end_ = datetime.datetime.now()
@@ -1025,53 +1026,6 @@ class SynapticStimulusChannel():
     channel: typing.Union[int, str] = 0
     dig: bool=True
 
-    # @classmethod
-    # def __new__(cls, *args, **kwargs):
-    #     super_anns = super().__annotations__
-    #     fields = list(super_anns.keys())
-    #     super_defaults = super()._field_defaults
-    #
-    #     args = args[1:] # drop cls
-    #
-    #     if len(args) > len(super_anns):
-    #         raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
-    #
-    #     new_args = dict()
-    #     for k, arg in enumerate(args):
-    #         # if not isinstance(arg, super_anns[fields[k]]):
-    #         if not datatypes.check_type(type(arg), super_anns[fields[k]]).value:
-    #             raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
-    #         new_args[fields[k]] = arg
-    #
-    #     if len(new_args) == len(super_anns):
-    #         if len(kwargs):
-    #             dups = [k for k in kwargs if k in fields]
-    #             if len(dups):
-    #                 raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-    #             else:
-    #                 raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
-    #
-    #     else:
-    #         if len(kwargs):
-    #             dups = [k for k in kwargs if k in new_args]
-    #             if len(dups):
-    #                 raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-    #
-    #             spurious = [k for k in kwargs if k not in fields]
-    #             if len(spurious):
-    #                 raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
-    #
-    #             new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
-    #
-    #             new_args.update(new_kwargs)
-    #
-    #         # finally, add the default unspecified args
-    #         for (k,v) in super_defaults.items():
-    #             if k not in new_args:
-    #                 new_args[k] = v
-    #
-    #     return super().__new__(cls, **new_args)
-
     def __eq__(self, other) -> bool:
         ret = type(self) == type(other)
         if not ret:
@@ -1080,6 +1034,9 @@ class SynapticStimulusChannel():
         ret &= all(getattr(self, f) == getattr(other, f) for f in map(lambda f: f.name, dataclasses.fields(self)))
 
         return ret
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.channel, self.dig))
 
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Dataset:
@@ -1312,12 +1269,6 @@ def synstim(name:str, channel:typing.Optional[int]=None, dig:bool=True) -> Synap
     r"""Shorthand constructor of SynapticStimulusChannel (saves typing)"""
     return SynapticStimulusChannel(name, channel, dig)
 
-# class __BaseAuxInput__(typing.NamedTuple):
-#     name: str = "aux_in"
-#     adc: int = 0
-#     # adc: typing.Union[int, str] = 0
-#     cmd: Tribool = Tribool() # reflects an input that "copies" a command signal
-
 @dataclass
 class AuxiliaryInput():
     r""" ADC for recording a signal other than the primary amplifier output.
@@ -1353,53 +1304,6 @@ class AuxiliaryInput():
     adc: int = 0
     # adc: typing.Union[int, str] = 0
     cmd: Tribool = Tribool() # reflects an input that "copies" a command signal
-    __slots__ = ()
-
-    # @classmethod
-    # def __new__(cls, *args, **kwargs):
-    #     super_anns = super().__annotations__
-    #     fields = list(super_anns.keys())
-    #     super_defaults = super()._field_defaults
-    #
-    #     args = args[1:] # drop cls
-    #
-    #     if len(args) > len(super_anns):
-    #         raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
-    #
-    #     new_args = dict()
-    #     for k, arg in enumerate(args):
-    #         if not datatypes.check_type(type(arg), super_anns[fields[k]]).value:
-    #             raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
-    #         new_args[fields[k]] = arg
-    #
-    #     if len(new_args) == len(super_anns):
-    #         if len(kwargs):
-    #             dups = [k for k in kwargs if k in fields]
-    #             if len(dups):
-    #                 raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-    #             else:
-    #                 raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
-    #
-    #     else:
-    #         if len(kwargs):
-    #             dups = [k for k in kwargs if k in new_args]
-    #             if len(dups):
-    #                 raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-    #
-    #             spurious = [k for k in kwargs if k not in fields]
-    #             if len(spurious):
-    #                 raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
-    #
-    #             new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
-    #
-    #             new_args.update(new_kwargs)
-    #
-    #         # finally, add the default unspecified args
-    #         for (k,v) in super_defaults.items():
-    #             if k not in new_args:
-    #                 new_args[k] = v
-    #
-    #     return super().__new__(cls, **new_args)
 
     def __eq__(self, other) -> bool:
         ret = type(self) == type(other)
@@ -1409,6 +1313,10 @@ class AuxiliaryInput():
         ret &= all(getattr(self, f) == getattr(other, f) for f in map(lambda f: f.name, datalasses.fields(self)))
 
         return ret
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.adc, self.cmd))
+
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Dataset:
         from iolib import h5io
@@ -1635,13 +1543,6 @@ def auxinput(name:str, adc:typing.Optional[int]=None, cmd:typing.Optional[bool]=
         raise TypeError(f"'adc' expected an int; instead, got {type(adc).__name__}")
     return AuxiliaryInput(name, adc, cmd)
 
-# class __BaseAuxOutput__(typing.NamedTuple):
-#     name: str = "aux_out"
-#     channel: int = 0
-#     # channel: typing.Union[int, str] = 0
-#     # digttl: typing.Optional[bool] = None
-#     digttl: Tribool = Tribool()
-
 @dataclass
 class AuxiliaryOutput():
     r""" An auxiliary (analog — DAC — or a digital — DIG) output channel of the DAQ device.
@@ -1673,52 +1574,6 @@ class AuxiliaryOutput():
     channel: int = 0
     digttl: Tribool = Tribool()
 
-#     @classmethod
-#     def __new__(cls, *args, **kwargs):
-#         super_anns = super().__annotations__
-#         fields = list(super_anns.keys())
-#         super_defaults = super()._field_defaults
-#
-#         args = args[1:] # drop cls
-#
-#         if len(args) > len(super_anns):
-#             raise SyntaxError(f"Too many positional parameters ({len(args)}); expecting {len(fields)}")
-#
-#         new_args = dict()
-#         for k, arg in enumerate(args):
-#             if not datatypes.check_type(type(arg), super_anns[fields[k]]).value:
-#                 raise TypeError(f"Expecting a {super_anns[fields[k]]}; instead, got a {type(arg)}")
-#             new_args[fields[k]] = arg
-#
-#         if len(new_args) == len(super_anns):
-#             if len(kwargs):
-#                 dups = [k for k in kwargs if k in fields]
-#                 if len(dups):
-#                     raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-#                 else:
-#                     raise SyntaxError(f"Spurious additional keyword parameters: {kwargs}")
-#
-#         else:
-#             if len(kwargs):
-#                 dups = [k for k in kwargs if k in new_args]
-#                 if len(dups):
-#                     raise SyntaxError(f"Duplicate specification of parameters: {dups}")
-#
-#                 spurious = [k for k in kwargs if k not in fields]
-#                 if len(spurious):
-#                     raise SyntaxError(f"Unknown/unsupported keyword parameters specified: {spurious}")
-#
-#                 new_kwargs = dict((k,v) for k, v in kwargs.items() if k in fields and k not in new_args)
-#
-#                 new_args.update(new_kwargs)
-#
-#             # finally, add the default unspecified args
-#             for (k,v) in super_defaults.items():
-#                 if k not in new_args:
-#                     new_args[k] = v
-#
-#         return super().__new__(cls, **new_args)
-
     def __eq__(self, other) -> bool:
         ret = type(self) == type(other)
         if not ret:
@@ -1727,6 +1582,10 @@ class AuxiliaryOutput():
         ret &= all(getattr(self, f) == getattr(other, f) for f in map(lambda f: f.name, datalasses.fields(self)))
 
         return ret
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.channel, self.digttl))
+
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Dataset:
 
@@ -1969,9 +1828,9 @@ class RecordingSource():
     def __post_init__(self):
         # pathways = list()
         pathways = SynapticPathwayList(name=self.name)
-        for syn in self.syn:
+        for ksyn, syn in enumerate(self.syn):
             # synList = SynapticStimulusChannelList(syn, name = syn.name)
-            name = syn.name
+            name = f"{syn.name}_pathway"
             pathways.append(SynapticPathway(stimulus = syn,
                                     name = name, adc = self.adc,
                                     dac = self.dac,
@@ -3055,6 +2914,7 @@ class SynapticPathway:
             raise TypeError(f"Invalid electrode mode {electrode}")
 
         self._electrodeMode_ = electrode
+        self.electrode = self._electrodeMode_
 
         if isinstance(pathType, (int, str)):
             if pathType not in SynapticPathwayType:
@@ -3067,6 +2927,9 @@ class SynapticPathway:
 
         self._pathwayType_ = pathType
         self.pathType = self._pathwayType_
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.adc, self.dac, self.stimulus, self.electrodeMode, self.pathwayType, self.schedule, tuple(self.measuremments)))
 
     @property
     def electrodeMode(self) -> ephys.ElectrodeMode:
@@ -3084,6 +2947,7 @@ class SynapticPathway:
             raise TypeError(f"Invalid electrode mode {val}")
 
         self._electrodeMode_ = val
+        self.electrode = self._electrodeMode_
 
     @property
     def pathwayType(self) -> SynapticPathwayType:
