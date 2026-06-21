@@ -248,7 +248,6 @@ dialog.
     from core import strutils as strutils
     dlg_title = kwargs.pop("dlg_title", "Input Values")
     dlg_widget_orientation = kwargs.pop("dlg_widget_orientation", None)
-    print(dlg_widget_orientation)
 
     dlg = qd.QuickDialog(title=dlg_title)
     if len(prompts) == 0 or not isinstance(prompts[0], dict):
@@ -261,8 +260,6 @@ dialog.
 
     nVars = len(prompts)
 
-    # print(nVars)
-
     if nVars == 0:
         return
 
@@ -271,11 +268,8 @@ dialog.
     else:
         dlgGroupFactory = qd.VDialogGroup
 
-    # print(dlgGroupFactory)
-
     if nVars > 1:
         group = dlgGroupFactory(dlg)
-        # print(group.layout())
         widget_parent = group
     else:
         group = None
@@ -299,7 +293,6 @@ dialog.
             w.setValue(def_val)
             w.setToolTip("Tri-state checkbox: click to set the desired state: □ (False), ✓ (True) or ⋯ (Undetermined)")
             labels[k] = None
-            # w.setCheckState(QtCore.Qt.Checked if def_val is True else QtCore.Qt.Unchecked)
 
         elif issubclass(v_type, typing.Sequence):
             if not dt.is_homogeneous_sequence(def_val):
@@ -396,9 +389,6 @@ dialog.
 
         prompt_widgets[k] = w
 
-        # label = QtWidgets.QLabel(f"{k}:", widget_parent)
-        # labels[k] = label
-
     for k in prompt_widgets:
         if isinstance(group, qd.DialogGroup):
             if isinstance(labels[k], QtWidgets.QWidget):
@@ -414,10 +404,7 @@ dialog.
     if isinstance(group, qd.DialogGroup):
         group.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Preferred)
         dlg.addWidget(group, stretch=1)
-    # else:
-    #     dlg.addWidget(w, stretch=1)
 
-    # dlg.resize(-1, -1)
     dlg.adjustSize()
 
     dlgret = dlg.exec()
@@ -428,7 +415,7 @@ dialog.
             return dict(zip(prompts.keys(), ret))
         return ret
 
-def newObject(t: type):
+def newObject(t: type): # TODO 2026-06-21 23:28:27  finalize me
     # PODS:
     if t is bool:
         pass
