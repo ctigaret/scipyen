@@ -914,22 +914,23 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         self._currentModelIndex_ = None
 
     @Slot()
-    def _slot_editDataExternally(self): # TODO 2026-06-07 11:08:52 finalize me
+    def _slot_editDataExternally(self):
         # NOTE: 2026-06-07 11:56:17
         # external editor NEEDS a separate QMainWindow!
         # self.sig_editExternally.emit(self.sender(), index)
         sender = self.sender()
         if isinstance(sender, QtWidgets.QPushButton):
-            model = self._currentModelIndex_.model()
-            modelData = getattr(model, "_modelData_", None)
+            if isinstance(self._currentModelIndex_, QtCore.QModelIndex) and self._currentModelIndex_.isValid():
+                model = self._currentModelIndex_.model()
+                modelData = getattr(model, "_modelData_", None)
 
-            # CAUTION 2026-06-09 19:08:50
-            # this is supposed to edit the python object represented by the
-            # entire model data row!!!
-            if isinstance(modelData, typing.Iterable):
-                self._externalDataEditor_ = ExternalEditorDelegate(modelData[self._currentModelIndex_.row()])
-                self._externalDataEditor_.sig_valueChanged.connect(self._slot_dataEditedExternally)
-                self._externalDataEditor_.sig_closing.connect(self._slot_externalEditorClosing)
+                # CAUTION 2026-06-09 19:08:50
+                # this is supposed to edit the python object represented by the
+                # entire model data row!!!
+                if isinstance(modelData, typing.Iterable):
+                    self._externalDataEditor_ = ExternalEditorDelegate(modelData[self._currentModelIndex_.row()])
+                    self._externalDataEditor_.sig_valueChanged.connect(self._slot_dataEditedExternally)
+                    self._externalDataEditor_.sig_closing.connect(self._slot_externalEditorClosing)
 
     @Slot()
     def _slot_externalEditorClosing(self):
