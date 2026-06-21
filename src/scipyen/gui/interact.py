@@ -5,19 +5,19 @@
 
 r"""A collection of functions to prompt user input using GUI
 """
-import typing, collections, dataclasses, os, types
+import typing, collections, dataclasses, os, types # noqa
 import numpy as np
 from tribool import Tribool
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
+import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -28,13 +28,14 @@ else:
         __has_PyQt6__ = True
 
     from qtpy import sip
-    from qtpy.uic import loadUiType
+    from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
 from core import prog
+from core.prog import scipywarn
 from core.inputspec import InputSpec
 from . import quickdialog as qd
 from .itemslistdialog import ItemsListDialog
@@ -94,6 +95,8 @@ def selectWSData(*args, title="", single=True, asDict=False,
 
     :preselected: name pre-selected variable (default is None)
 
+    :parent: optional QtWidget object (default is None)
+
     Var-keyword parameters passed to code.workspacefunctions.lsvars(…) function
     ===========================================================================
 
@@ -113,11 +116,17 @@ def selectWSData(*args, title="", single=True, asDict=False,
 
     retrieve_all = kwargs.pop("retrieve_all", False)
 
+    parent = kwargs.pop("parent", None)
+
     glob = kwargs.pop("glob", True)
 
     ws = kwargs.pop("ws", user_workspace())
 
     preselected = kwargs.pop("preselected", None)
+
+    if "mainWindow" not in ws:
+        scipywarn("In interact.selectWSData(): The supplied namespace is not the Scipyen's workspace")
+        return
 
     user_ns_visible = dict([(k,v) for k,v in ws.items() if not k.startswith("_") and k not in ws["mainWindow"].workspaceModel.user_ns_hidden])
 
@@ -143,11 +152,11 @@ def selectWSData(*args, title="", single=True, asDict=False,
     # dialog = ItemsListDialog(title=dtitle, itemsList = name_list,
     #                         selectmode = selectionMode)
 
-    if isinstance(preSelected, str) and len(preSelected.strip()) and preSelected in name_list:
-        dialog = ItemsListDialog(parent=self, title=title, itemsList = name_list,
-                                selectmode = selectionMode, preSelected=preSelected)
+    if isinstance(preselected, str) and len(preselected.strip()) and preselected in name_list:
+        dialog = ItemsListDialog(parent=parent, title=title, itemsList = name_list,
+                                selectmode = selectionMode, preSelected=preselected)
     else:
-        dialog = ItemsListDialog(parent=self, title=title, itemsList = name_list,
+        dialog = ItemsListDialog(parent=parent, title=title, itemsList = name_list,
                                 selectmode = selectionMode)
 
     ans = dialog.exec()
@@ -170,8 +179,12 @@ Typical use:
     a, b, c = getInputs(a=1, b=2, c=3)
 
 """
+    dlg_title = kwargs.pop("dlg_title", "Input Values")
+    dlg_widget_orientation = kwargs.pop("dlg_widget_orientation", None)
+    kw = {"dlg_title": dlg_title,
+          "dlg_widget_orientation": dlg_widget_orientation}
 
-    return getInput(kwargs, mapping=False)
+    return getInput(kwargs, mapping=False, **kw)
 
 def packInputs(**kwargs):
     r"""Version of getInputs that returns a dict
@@ -188,7 +201,7 @@ Typical use:
 
     return getInput(kwargs, mapping=True)
 
-def getInput(*prompts, mapping:bool=False):
+def getInput(*prompts, mapping:bool=False, **kwargs):
     r"""Opens a quick dialog to prompt user input for values.
 
 .. |nbsp| unicode:: 0xA0
@@ -211,6 +224,10 @@ or a comma-separated list of _NamedInputSpec objects
 :mapping: bool, optional default is False; when True, parameter names are mapped |nbsp|
 to their new values (see below)
 
+Kwargs:
+=======
+:dlg_title: ustom dialog title (default is "Input values")
+
 Returns:
 --------
 
@@ -229,9 +246,15 @@ dialog.
     from gui.widgets.tableeditorwidget import TableEditorWidget
     from core import datatypes as dt
     from core import strutils as strutils
-    dlg = qd.QuickDialog(title="Input values")
-    if not isinstance(prompts, dict):
-        raise TypeError(f"'prompts' expected to be a dict; got {type(prompts).__name__} instead")
+    dlg_title = kwargs.pop("dlg_title", "Input Values")
+    dlg_widget_orientation = kwargs.pop("dlg_widget_orientation", None)
+    print(dlg_widget_orientation)
+
+    dlg = qd.QuickDialog(title=dlg_title)
+    if len(prompts) == 0 or not isinstance(prompts[0], dict):
+        raise TypeError(f"'prompts' expected to be contain dict; got {prompts} instead")
+
+    prompts = prompts[0]
 
     prompt_widgets = dict()
     labels = dict()
@@ -243,15 +266,22 @@ dialog.
     if nVars == 0:
         return
 
+    if isinstance(dlg_widget_orientation, QtCore.Qt.Orientation):
+        dlgGroupFactory = qd.VDialogGroup if dlg_widget_orientation == QtCore.Qt.Vertical else qd.HDialogGroup
+    else:
+        dlgGroupFactory = qd.VDialogGroup
+
+    # print(dlgGroupFactory)
+
     if nVars > 1:
-        group = qd.VDialogGroup(dlg)
+        group = dlgGroupFactory(dlg)
+        # print(group.layout())
         widget_parent = group
     else:
         group = None
         widget_parent = dlg
 
     for k,v in prompts.items():
-        # label = None
         if isinstance(v, InputSpec):
             def_val  = v.default
             v_type = v.type
@@ -268,45 +298,44 @@ dialog.
             w = qd.CheckBox(widget_parent, f"{k}", tristate = True)
             w.setValue(def_val)
             w.setToolTip("Tri-state checkbox: click to set the desired state: □ (False), ✓ (True) or ⋯ (Undetermined)")
+            labels[k] = None
             # w.setCheckState(QtCore.Qt.Checked if def_val is True else QtCore.Qt.Unchecked)
 
         elif issubclass(v_type, typing.Sequence):
             if not dt.is_homogeneous_sequence(def_val):
                 raise TypeError("Only sequences homogeneous in their element types are supported")
             v_type = type(def_val)
+            labels[k] = QtWidgets.QLabel(f"{k}")#, widget_parent)
 
         elif v_type is bool:
             w = qd.CheckBox(widget_parent, f"{k}")
             w.setCheckState(QtCore.Qt.Checked if def_val is True else QtCore.Qt.Unchecked)
             w.setToolTip("Click to set to □ (False) or ✓ (True)")
-            # labels[k] = None
+            labels[k] = None
 
         elif issubclass(v_type, (int, np.integer)):
             w = qd.HSpinBox(widget_parent,f"{k}:", widget_type = "i")
             w.setValue(def_val)
             w.setToolTip("Click to edit, scroll or use arrows to change the value")
-            # w = qd.IntegerInput(widget_parent,f"{k}:")
-            # w.setValue(def_text)
-            # labels[k] = None
+            labels[k] = None
 
         elif issubclass(v_type, (float, np.floating)):
             w = qd.HSpinBox(widget_parent,f"{k}:", widget_type = "q")
             w.setToolTip("Click to edit, scroll or use arrows to change the value")
             w.setValue(def_val)
-            # w = qd.FloatInput(widget_parent, f"{k}:")
-            # w.setValue(def_text)
-            # labels[k] = None
+            labels[k] = None
 
         elif issubclass(v_type, complex):
             w = qd.HSpinBox(widget_parent,f"{k}:", widget_type = "c")
             w.setValue(def_val)
             w.setToolTip("Click to edit, scroll or use arrows to change the value")
+            labels[k] = None
 
         elif issubclass(v_type, str):
             w = qd.StringInput(widget_parent, f"{k}:")
             w.setText(def_val)
             w.setToolTip("Click to edit text")
-            # labels[k] = None
+            labels[k] = None
 
         elif issubclass(v_type, np.ndarray):
             if dt.is_scalar(def_val):
@@ -315,6 +344,7 @@ dialog.
                     # w.setText(", ".join(list(def_val)))
                     w.setText(str(def_val[0]))
                     w.setToolTip("Click to edit text")
+                    labels[k] = None
 
                 elif issubclass(def_val.dtype.type, np.number):
                     if issubclass(def_val.dtype.type, complex):
@@ -322,6 +352,7 @@ dialog.
 
                     else:
                         w = qd.HSpinBox(widget_parent, f"{k}:", "q")
+                    labels[k] = None
 
                     w.setValue(def_val)
                     if isinstance(def_val, pq.Quantity):
@@ -338,6 +369,7 @@ dialog.
                 if def_val.size <= 5:
                     w = qd.StringInput(widget_parent, f"{k}:")
                     w.setToolTip("Click to edit text")
+                    labels[k] = None
 
                     if def_val.dtype.type is np.str_:
                         w.setText(", ".join(list(def_val)))
@@ -352,8 +384,7 @@ dialog.
                 w = TableEditorWidget(widget_parent)
                 w.setValue(def_val)
                 w.setToolTip("Double click in cells to edit contents")
-                label = QtWidgets.QLabel(f"{k}:", widget_parent)
-                labels[k] = label
+                labels[k] = QtWidgets.QLabel(f"{k}")#, widget_parent)
 
         else:
             raise TypeError(f"{v_type.__name__} types are not yet supported")
@@ -368,21 +399,23 @@ dialog.
         # label = QtWidgets.QLabel(f"{k}:", widget_parent)
         # labels[k] = label
 
-
-        if isinstance(group, qd.VDialogGroup):
-            group.addWidget(w, stretch=1)
-            if k in labels:
-                group.addWidget(label)
-            group.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Preferred)
+    for k in prompt_widgets:
+        if isinstance(group, qd.DialogGroup):
+            if isinstance(labels[k], QtWidgets.QWidget):
+                group.addWidget(labels[k])
+            group.addWidget(prompt_widgets[k], stretch=1)
 
         else:
-            if k in labels:
-                dlg.addWidget(label)
+            if isinstance(labels[k], QtWidgets.QWidget):
+                dlg.addWidget(labels[k])
+            dlg.addWidget(prompt_widgets[k])
 
-    if isinstance(group, qd.VDialogGroup):
+
+    if isinstance(group, qd.DialogGroup):
+        group.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Preferred)
         dlg.addWidget(group, stretch=1)
-    else:
-        dlg.addWidget(w, stretch=1)
+    # else:
+    #     dlg.addWidget(w, stretch=1)
 
     # dlg.resize(-1, -1)
     dlg.adjustSize()

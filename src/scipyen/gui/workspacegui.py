@@ -1359,6 +1359,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
         See also core.workspacefunctions.getvarsbytype
         """
+
+        # TODO: 2026-06-21 15:45:41 harmonize with self.importWorkspaceData and interact.selectWSData
+
         from core.workspacefunctions import getvarsbytype
         #print("dataTypes", dataTypes)
         if self.isTopLevel and self.appWindow:
@@ -1407,16 +1410,31 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                             single: bool=True,
                             preSelected: typing.Optional[str]=None,
                             with_varName: bool=False,
-                            predicate = None) -> typing.Optional[list | dict]:
+                            predicate = None,
+                            retrieve_all: bool = True,
+                            ) -> typing.Optional[list | dict]:
         r"""Version of importWorkspaceData using interact module"""
+        # TODO: 2026-06-21 15:46:19 harmonize with self.importWorkspaceData
         from gui import interact
 
-        user_ns_visible = dict([(k,v) for k,v in scipyenWindow.workspace.items() if k not in scipyenWindow.workspaceModel.user_ns_hidden])
+        # if self.isTopLevel and self.appWindow:
+        #     scipyenWindow = self.appWindow
+        # else:
+        #     parent = self.parent()
+        #     if getattr(parent, "isTopLevel", None) is True:
+        #         scipyenWindow = parent.appWindow
+        #     else:
+        #         return
+
+        # user_ns_visible = dict([(k,v) for k,v in self.scipyenWindow.workspace.items() if k not in self.scipyenWindow.workspaceModel.user_ns_hidden])
 
         ret = interact.selectWSData(title = title, single = single,
                                     asDict = with_varName,
-                                    retrieve_all = True, var_type = dataTypes,
-                                    ws = user_ns_visible)
+                                    var_type = dataTypes,
+                                    retrieve_all = retrieve_all,
+                                    preselected = preSelected,
+                                    ws = self.scipyenWindow.workspace,
+                                    parent=self)
 
         return ret
 

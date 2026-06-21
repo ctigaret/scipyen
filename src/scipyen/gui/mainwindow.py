@@ -11073,6 +11073,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 of the parnet menu
 
         '''
+        # print(f"{self.__class__.__name__}._installPluginFunction_(f = {f}, menuItemLabel = {menuItemLabel})")
         argSpec = inspect.getfullargspec(f)
 
         arg_names = argSpec.args
@@ -11161,7 +11162,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         return newAction
 
     def installPluginMenuPySide6(self, pname, v):
-        '''Installs a GUI menu for the  plugin named pname.
+        '''Installs a GUI menu for the plugin named pname.
 
         Parameters:
         ===========

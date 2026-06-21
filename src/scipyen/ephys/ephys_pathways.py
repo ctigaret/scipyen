@@ -1027,7 +1027,7 @@ class SynapticStimulusChannel():
     dig: bool=True
 
     def __eq__(self, other) -> bool:
-        ret = type(self) == type(other)
+        ret = type(self) is type(other)
         if not ret:
             return ret
 
@@ -3045,27 +3045,29 @@ class SynapticPathway:
         ret = [f"{self.__class__.__name__}"]
         ret += ["("]
 
-        ret += ", ".join([f"{a}={getattr(self,a).name if a in ('electrodeMode', 'pathwayType') else getattr(self, a)}" for a in all_attr_names])
+        ret += ", ".join([f"{a}={getattr(self,a).name if a in ('electrodeMode', 'pathwayType') else f"'{getattr(self, a)}'" if a == "name" else getattr(self, a)}" for a in all_attr_names])
         ret += [")"]
 
         return "".join(ret)
 
     def __eq__(self, other) -> bool:
         from dataclasses import fields
-        ret = type(self) == type(other)
+        ret = type(self) is type(other)
 
         if not ret:
             return ret
 
-        ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in fields(type(self)) if f.name != "source")
+        return hash(self) == hash(other)
 
-        if ret:
-            ret &= self.pathwayType == other.pathwayType
-
-        if ret:
-            ret &= self.electrodeMode == other.electrodeMode
-
-        return ret
+        # ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in fields(type(self)) if f.name != "source")
+        #
+        # if ret:
+        #     ret &= self.pathwayType == other.pathwayType
+        #
+        # if ret:
+        #     ret &= self.electrodeMode == other.electrodeMode
+        #
+        # return ret
 
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:

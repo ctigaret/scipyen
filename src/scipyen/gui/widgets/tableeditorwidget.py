@@ -139,6 +139,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         self._readOnly_:bool = readOnly is True
         self._enforceFloat_:bool = enforceFloat is True
         self._enforceReadOnly_:bool = False
+        self._autoResizeColumns_: bool = False
+        self._autoResizeRows_: bool = False
 
         # NOTE: 2021-10-18 09:32:45
         # ### BEGIN keep this  - you may re-enable the possibility to use other custom tabular
@@ -285,6 +287,15 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                     if self._dataModel_._modelDataColumnHeaders_[col].lower() == "edit":
                         self.tableView.openPersistentEditor(index)
 
+
+        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), (self.tableView.horizontalHeader(), self.tableView.verticalHeader())))
+        if self.isAutoResizeColumns:
+            self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
+
+        if self.isAutoResizeRows:
+            self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
+
+
     @Slot()
     def _slot_prevSlice(self):
         if isinstance(self._data_, np.ndarray) and self._data_.ndim > 2:
@@ -327,6 +338,34 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     @property
     def selectedIndexes(self):
         return self.tableView.selectedIndexes()
+
+    @property
+    def isAutoResizeRows(self) -> bool:
+        return self._autoResizeRows_
+
+    @isAutoResizeRows.setter
+    def isAutoResizeRows(self, val : bool):
+        self._autoResizeRows_ = val is True
+        if self._autoResizeRows_:
+            self.autoResizeRows()
+
+    def autoResizeRows(self):
+        signalBlocker = QtCore.QSignalBlocker(self.tableView.verticalHeader()) # noqa
+        self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
+
+    @property
+    def isAutoResizeColumns(self) -> bool:
+        return self._autoResizeColumns_
+
+    @isAutoResizeColumns.setter
+    def isAutoResizeColumns(self, val: bool):
+        self._autoResizeColumns_ = val is True
+        if self._autoResizeColumns_:
+            self.autoResizeColumns()
+
+    def autoResizeColumns(self):
+        signalBlocker = QtCore.QSignalBlocker(self.tableView.horizontalHeader()) # noqa
+        self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
     @property
     def currentSlice(self):
