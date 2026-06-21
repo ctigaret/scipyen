@@ -1144,6 +1144,30 @@ class TriggerProtocolList(NeoObjectList):
         else:
             raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
 
+    def insert(self, index:int, obj: object):
+        if isinstance(obj, self.allowed_contents):
+            self._items.insert(index, obj)
+        else:
+            raise TypeError(f"Can only insert {self.allowed_contents[0].__name__} objects")
+
+    def clear(self):
+        self._items.clear()
+
+    def pop(self, index: int = -1, /,) -> object:
+        return self._items.pop(index)
+
+    def remove(self, obj:object):
+        self._items.remove(obj)
+
+    def reverse(self):
+        return self.__class__(reversed(self._items))
+
+    def count(self, obj) -> int:
+        return self._items.count(obj)
+
+    def index(self, *args):
+        return self._index(*args)
+
     def protocols_by_segments(self) -> list:
         if len(self._items) == 0:
             return list()

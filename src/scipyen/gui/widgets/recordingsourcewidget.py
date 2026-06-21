@@ -375,9 +375,19 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
 
     @Slot()
     def _slot_synapticPathwaysListChanged(self):
+        blockers = list(
+            map(
+                    lambda w: QtCore.QSignalBlocker(w),
+                    (
+                        self.stimulusListTable,
+                        self.synapticPathwaysTable,
+                        self.electrodeModeComboBox
+                    )
+                )
+            )
         # print(f"\n***\n\n{self.__class__.__name__}._slot_synapticPathwaysListChanged()")
         # print(f"\n\tdata.syn -> {len(self._data_.syn)};\n\tdata.pathways -> {len(self._data_.pathways)}")
-       # from gui.widgets import tableeditorwidget
+        # from gui.widgets import tableeditorwidget
         widget = self.sender()
         # if isinstance(widget, tableeditorwidget.TableEditorWidget):
         if widget == self.synapticPathwaysTable:
@@ -410,20 +420,13 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
                                     p.electrodeMode = eMode
                             self._electrode_ = eMode
                             self._data_.electrodeMode = self._electrode_
-                            blockers = list(map(lambda w: QtCore.QSignalBlocker(w), (self.synapticPathwaysTable, self.electrodeModeComboBox)))
+                            # blockers = list(map(lambda w: QtCore.QSignalBlocker(w), (self.synapticPathwaysTable, self.electrodeModeComboBox)))
                             currentElectrodeModeNdx = self._electrodeModeNames_.index(eMode.name)
                             self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
                             self.synapticPathwaysTable.setValue(pathways) # to reflect ALL pathway changes
 
-
-
-                        # deal with pathway stimulus change
-                        pStim = pathways[lastChangedPathwayNdx].stimulus
-                        if lastChangedPathwayNdx < len(self._data_.syn):
-                            if pStim != self._data_.syn[lastChangedPathwayNdx]:
-                                self._data_.syn[lastChangedPathwayNdx] = pStim
-                                blocker = QtCore.QSignalBlocker(self.stimulusListTable)
-                                self.stimulusListTable.setValue(self._data_.syn)
+                        blocker = QtCore.QSignalBlocker(self.stimulusListTable)
+                        self.stimulusListTable.setValue(self._data_.syn)
 
                 else:
                     # synchronise the stimulus list
@@ -435,17 +438,12 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
                     self._syn_ = newSyn
                     self._pathways_ = pathways
                     self._data_.pathways = pathways
-                    blockers = list(map(lambda w: QtCore.QSignalBlocker(w), (self.stimulusListTable, self.synapticPathwaysTable)))
+                    # blockers = list(map(lambda w: QtCore.QSignalBlocker(w), (self.stimulusListTable, self.synapticPathwaysTable)))
                     # to reflect changes in electrodeMode:
                     self.synapticPathwaysTable.setValue(pathways)
                     # to reflect changes in stimulus (when edited)
                     self.stimulusListTable.setValue(self._data_.syn)
 
-            # sigBlock = QtCore.QSignalBlocker(self.electrodeModeComboBox)
-            # self.electrodeModeComboBox.setCurrentIndex(
-            #     self._electrodeModeNames_.index(self._electrode_.name)
-            #     )
-            #
             self.sig_valueChanged.emit(self._data_)
 
     @Slot(int, int)

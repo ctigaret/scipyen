@@ -1264,6 +1264,29 @@ class SynapticStimulusChannelList(NeoObjectList):
         else:
             raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
 
+    def insert(self, index:int, obj: object):
+        if isinstance(obj, self.allowed_contents):
+            self._items.insert(index, obj)
+        else:
+            raise TypeError(f"Can only insert {self.allowed_contents[0].__name__} objects")
+
+    def clear(self):
+        self._items.clear()
+
+    def pop(self, index: int = -1, /,) -> object:
+        return self._items.pop(index)
+
+    def remove(self, obj:object):
+        self._items.remove(obj)
+
+    def reverse(self):
+        return self.__class__(reversed(self._items))
+
+    def count(self, obj) -> int:
+        return self._items.count(obj)
+
+    def index(self, *args):
+        return self._index(*args)
 
 def synstim(name:str, channel:typing.Optional[int]=None, dig:bool=True) -> SynapticStimulusChannel:
     r"""Shorthand constructor of SynapticStimulusChannel (saves typing)"""
@@ -1522,6 +1545,15 @@ class AuxiliaryInputList(NeoObjectList):
             raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
         self._items.append(obj)
 
+    def insert(self, index:int, obj: object):
+        if isinstance(obj, self.allowed_contents):
+            self._items.insert(index, obj)
+        else:
+            raise TypeError(f"Can only insert {self.allowed_contents[0].__name__} objects")
+
+    def clear(self):
+        self._items.clear()
+
     def extend(self, iterable):
         """Extends with additional AuxiliaryInput objects from an iterable
 
@@ -1534,6 +1566,21 @@ class AuxiliaryInputList(NeoObjectList):
             self._items.extend(iterable)
         else:
             raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
+
+    def pop(self, index: int = -1, /,) -> object:
+        return self._items.pop(index)
+
+    def remove(self, obj:object):
+        self._items.remove(obj)
+
+    def reverse(self):
+        return self.__class__(reversed(self._items))
+
+    def count(self, obj) -> int:
+        return self._items.count(obj)
+
+    def index(self, *args):
+        return self._index(*args)
 
 def auxinput(name:str, adc:typing.Optional[int]=None, cmd:typing.Optional[bool]=None) -> AuxiliaryInput:
     r"""Constructs a run-of-the-mill AuxiliaryInput"""
@@ -1791,6 +1838,15 @@ class AuxiliaryOutputList(NeoObjectList):
             raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
         self._items.append(obj)
 
+    def insert(self, index:int, obj: object):
+        if isinstance(obj, self.allowed_contents):
+            self._items.insert(index, obj)
+        else:
+            raise TypeError(f"Can only insert {self.allowed_contents[0].__name__} objects")
+
+    def clear(self):
+        self._items.clear()
+
     def extend(self, iterable):
         """Extends with additional AuxiliaryOutput objects from an iterable
 
@@ -1803,6 +1859,22 @@ class AuxiliaryOutputList(NeoObjectList):
             self._items.extend(iterable)
         else:
             raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
+
+    def pop(self, index: int = -1, /,) -> object:
+        return self._items.pop(index)
+
+    def remove(self, obj:object):
+        self._items.remove(obj)
+
+    def reverse(self):
+        return self.__class__(reversed(self._items))
+
+    def count(self, obj) -> int:
+        return self._items.count(obj)
+
+    def index(self, *args):
+        return self._index(*args)
+
 
 
 def auxoutput(name:str, channel:typing.Optional[int]=None, digttl:typing.Optional[bool]=None) -> AuxiliaryOutput:
@@ -3256,6 +3328,31 @@ class SynapticPathwayList(NeoObjectList):
             self._items.extend(iterable)
         else:
             raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
+
+    def insert(self, index:int, obj: object):
+        if isinstance(obj, self.allowed_contents):
+            self._items.insert(index, obj)
+        else:
+            raise TypeError(f"Can only insert {self.allowed_contents[0].__name__} objects")
+
+    def clear(self):
+        self._items.clear()
+
+    def pop(self, index: int = -1, /,) -> object:
+        return self._items.pop(index)
+
+    def remove(self, obj:object):
+        self._items.remove(obj)
+
+    def reverse(self):
+        return self.__class__(reversed(self._items))
+
+    def count(self, obj) -> int:
+        return self._items.count(obj)
+
+    def index(self, *args):
+        return self._index(*args)
+
 
 def infer_schedule(*args, name:typing.Optional[str] = None) -> RecordingSchedule:
     r"""WARNING: Based on the naming of the trials (neo.Block objects).

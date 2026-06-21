@@ -724,22 +724,45 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self.tableView.horizontalHeader().resizeSection(self.selectedColumnIndex, sizeHint)
 
     @Slot()
+    def slot_insertRowAbove(self):
+        model = self.tableView.model()
+        if not isinstance(model, TabularDataModel) or not model.canAlterRows:
+            return
+
+        modelIndexes = self.tableView.selectedIndexes()
+        index = modelIndexes[0]
+        row = index.row()
+        if model.insertModelRow(row, None, QtCore.QModelIndex()):
+            self._data_ = model._modelData_
+            self.sig_dataChanged.emit()
+
+    @Slot()
+    def slot_insertRowBelow(self):
+        model = self.tableView.model()
+        if not isinstance(model, TabularDataModel) or not model.canAlterRows:
+            return
+
+        modelIndexes = self.tableView.selectedIndexes()
+        index = modelIndexes[-1]
+        row = index.row()+1
+        if model.insertModelRow(row, None, QtCore.QModelIndex()):
+            self._data_ = model._modelData_
+            self.sig_dataChanged.emit()
+
+
+    @Slot()
     def slot_insertRow(self):
         model = self.tableView.model()
         if not isinstance(model, TabularDataModel) or not model.canAlterRows:
             return
 
         modelIndexes = self.tableView.selectedIndexes()
-        if len(modelIndexes) == 0:
-            row = model.rowCount()
-        else:
-            # insert a row just below the selection
-            row = modelIndexes[-1].row()
+        row = model.rowCount()
 
-        if row < (model.rowCount()-1):
+        if row < model.rowCount():
             row = row+1
 
-        if model.insertRow(row, None, QtCore.QModelIndex()):
+        if model.insertModelRow(row, None, QtCore.QModelIndex()):
             self._data_ = model._modelData_
             self.sig_dataChanged.emit()
 
@@ -891,13 +914,29 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                             rowEntity = f"{model._modelData_.allowed_contents[0].__name__ if isinstance (model._modelData_.allowed_contents[0], type) else type(model._modelData_.allowed_contents[0]).__name__} object"
                         elif len(model._modelData_.allowed_contents) > 1:
                             rowEntity = f"object ({', '.join(list(map(lambda c: c.__name__ if isinstance(c, type) else type(c).__name__)))})"
+                selectedIndexes = self.tableView.selectedIndexes()
 
-                insertRowAction = cm.addAction(f"Insert {rowEntity}")
+                if len(model._modelData_) == 0:
+                    insertActionName = "Add"
+                else:
+                    insertActionName = "Append"
+
+                insertRowAction = cm.addAction(f"{insertActionName} {rowEntity}")
                 insertRowAction.setIcon(guiutils.getIcon("insert-table-row"))
                 insertRowAction.triggered.connect(self.slot_insertRow)
 
-                removeRowAction = cm.addAction(f"Remove {rowEntity}")
-                removeRowAction.setIcon(guiutils.getIcon("delete-table-row"))
-                removeRowAction.triggered.connect(self.slot_removeRow)
+                if len(selectedIndexes) >0: # implies len(modelData) == 0
+                    insertActionName = "Insert"
+                    insertRowAboveSelectedAction = cm.addAction(f"{insertActionName} {rowEntity} Above")
+                    insertRowAboveSelectedAction.setIcon(guiutils.getIcon("insert-table-row"))
+                    insertRowAboveSelectedAction.triggered.connect(self.slot_insertRowAbove)
+                    insertRowBelowSelectedAction = cm.addAction(f"{insertActionName} {rowEntity} Below")
+                    insertRowBelowSelectedAction.setIcon(guiutils.getIcon("insert-table-row"))
+                    insertRowBelowSelectedAction.triggered.connect(self.slot_insertRowBelow)
+
+                if len(selectedIndexes):
+                    removeRowAction = cm.addAction(f"Remove {rowEntity}")
+                    removeRowAction.setIcon(guiutils.getIcon("delete-table-row"))
+                    removeRowAction.triggered.connect(self.slot_removeRow)
 
         cm.popup(self.tableView.mapToGlobal(pos), copySelectedAction)

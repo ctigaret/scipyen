@@ -960,6 +960,30 @@ def is_pathname_valid(pathname: str) -> bool:
     #
     # Did we mention this should be shipped with Python already?
 
+def guess_sfx_sep(s, suppress_warnings:bool=False) -> str:
+    nosepPattern = _re.compile(r"(.*?)??(\d*)$")
+    try_match = nosepPattern.match(s)
+    # print(f"try_match -> {try_match}")
+    if try_match is not None and len(try_match.groups()) > 1:
+        try:
+            base, sfx = try_match.group(1,2)
+            if base.endswith("_"):
+                sep = "_"
+            elif base.endswith(" "):
+                sep = " "
+            else:
+                sep = ""
+        except:
+            if not suppress_warnings:
+                scipywarn("Cannot guess whether separator is '_', ' ', or ''; assuming ''.")
+            sep = ""
+
+    else:
+        if not suppress_warnings:
+            scipywarn("Cannot guess whether separator is '_', ' ', or ''; assuming ''.")
+        sep = ""
+
+    return sep
 
 def get_int_sfx(s: str, sep: str = "_",
                 use_re: bool = False, bracketed:bool=False) -> typing.Tuple[str, int]:
@@ -1001,6 +1025,12 @@ Examples:
 
     get_int_sfx("some_name_1", sep="_") -> ("some_name", 1)
 
+    # also:
+
+    get_int_sfx("name0", sep="") -> ("name", 0)
+
+    get_int_sfx("name(0)", sep="", bracketed=True) -> ("name", 0)
+
 """
     if not isinstance(s, str) or len(s.strip()) == 0:
         return ("", None)
@@ -1019,12 +1049,14 @@ Examples:
             return (ss, val)
 
     elif not isinstance(sep, str) or len(sep) == 0 or use_re:
+        # print("using regexp")
         # pattern = _re.compile(r"(.*?)??(\(\d+\))$")
         pattern = _re.compile(r"(.*?)??(\d*)$")
         re_match = pattern.match(s)
         if re_match is not None and len(re_match.groups()) > 1:
             try:
                 base, sfx = re_match.group(1, 2)
+                sfx = int(sfx)
             except:
                 # base, sfx = s, 0
                 base, sfx = s, None
@@ -1035,8 +1067,8 @@ Examples:
 
     else:
         parts = s.split(sep)
+        # print(f"parts -> {parts}")
 
-        # if len(parts) <= 1:
         if len(parts) < 2:
             # return s, 0
             sfx = None
@@ -1060,12 +1092,6 @@ Examples:
                 sfx = None
                 base = sep.join(parts)
 
-    # try:
-    #     sfx = int(sfx)
-    # except:
-    #     sfx = None
-    #     # sfx = 0
-
     return base, sfx
 
 def counter_suffix(x:str, strings:typing.List[str], sep:str="_",
@@ -1081,7 +1107,9 @@ Parameters:
 
 :strings: sequence of str to check for existence of x
 
-:sep: default is "_"; suffix separator
+:sep: default is "_"; suffix separator; valid values are "_", " " (single space),
+    "" (the empty string), or "guess". When sep is "guess", the function will try
+    to determine which separator is used in "x", i.e., either "_", " ", or "".
 
 :use_re: When True, use regular expressions to detect integral suffixes in ``strings``
 
@@ -1117,9 +1145,12 @@ Parameters:
     if start < 0:
         raise ValueError(f"'start' expected to be a positive int (>= 0); instead, got {start}")
 
-    if len(strings):
 
-        make_suffix = lambda c: f" ({c})" if bracketed else sep + f"{c}" if isinstance(sep, str) and len(sep) else f"{c}"
+    if isinstance(sep, str) and sep.lower() == "guess":
+        sep = guess_sfx_sep(x)
+
+    if len(strings):
+        make_suffix = lambda c: f" ({c})" if bracketed else sep + f"{c}" if (isinstance(sep, str) and len(sep)) else f"{c}"
 
         base, cc = get_int_sfx(x, sep=sep, use_re=use_re, bracketed=bracketed)
 
@@ -1132,7 +1163,7 @@ Parameters:
         if len(clashes) == 0:
             return None if returns_counter==True else x if returns_counter==False else (x, None)
 
-        candidate_counters = list(filter(lambda t: isinstance(t, int), map(lambda s: get_int_sfx(s, sep=sep, bracketed=bracketed)[1], clashes)))
+        candidate_counters = list(filter(lambda t: isinstance(t, int), map(lambda s: get_int_sfx(s, sep=sep, use_re=use_re, bracketed=bracketed)[1], clashes)))
 
         # print(f"counter_suffix: candidate_counters = {candidate_counters}")
 

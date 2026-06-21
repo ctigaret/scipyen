@@ -163,6 +163,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._columnBatchSize_:int = 10
         self._canAddRemoveRows_:bool = False
         self._canAddRemoveColumns_:bool = False
+        self._rowValueToInsert_: typing.Any = None
 
         # NOTE: 2026-06-07 10:58:03
         # flag showing if editing an object externally is allowed
@@ -198,12 +199,21 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             return
 
         if rowsToFetch > 0:
-            self.beginInsertRows(QtCore.QModelIndex(), startRow, startRow + rowsToFetch -1)
+            endRow = startRow + rowsToFetch - 1
+            if endRow < 0:
+                endRow = startRow
+            # print(f"{self.__class__.__name__}.fetchMore(startRow={startRow}, endRow={endRow})")
+            # self.beginInsertRows(QtCore.QModelIndex(), startRow, startRow + rowsToFetch -1)
+            self.beginInsertRows(QtCore.QModelIndex(), startRow, endRow)
             self._displayedRows_ += rowsToFetch
             self.endInsertRows()
 
         if columnsToFetch > 0:
-            self.beginInsertColumns(QtCore.QModelIndex(), startColumn, startColumn + columnsToFetch -1)
+            endColumn = startColumn + columnsToFetch -1
+            if endColumn < 0:
+                endColumn = startColumn
+            # self.beginInsertColumns(QtCore.QModelIndex(), startColumn, startColumn + columnsToFetch -1)
+            self.beginInsertColumns(QtCore.QModelIndex(), startColumn, endColumn)
             self._displayedColumns_ += columnsToFetch
             self.endInsertColumns()
 
@@ -250,7 +260,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         """
         nRows = (self._displayedRows_ if self._displayedRows_ <= self._modelDataRows_
                  else self._modelDataRows_)
-        return 0 if parentIndex.isValid() else nRows
+        # return 0 if parentIndex.isValid() else nRows
+        return nRows
         # return 0 if parentIndex.isValid() else self._displayedRows_
 
     def columnCount(self, parentIndex:QtCore.QModelIndex = QtCore.QModelIndex()):
@@ -308,10 +319,34 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     #### BEGIN resizable model
     #
-    def insertRow(self, row: int, row_value: object, parent: QtCore.QModelIndex) -> bool:
-        # print(f"{self.__class__.__name__}.insertRows: row {row}, value {row_value}, parent {parent}")
-        # # if self._modelData_ is None:
-        # #     return False
+
+    def insertRow(self, row: int, index: QtCore.QModelIndex = QtCore.QModelIndex()) -> bool:
+        r"""Overrrides QAbstractItemModel.insertRow"""
+        # print(f"{self.__class__.__name__}.insertRow(row={row}, index={(index.row(), index.column())})")
+        last = row+1
+        # if row == self._modelDataRows_:
+        #     first = row-1
+        # else:
+        #     first = row
+        first = row
+        # print(f"\n\t calling beginInsertRows({first}, {last})")
+
+        self.beginInsertRows(index, first, last)
+        ret = False
+        try:
+            ret = self._insertDataRow_(self._modelData_, row, self._rowValueToInsert_)
+        except: # noqa
+            traceback.print_exc()
+
+        finally:
+            self.endInsertRows()
+
+        return ret
+
+
+    def insertModelRow(self, row: int, row_value: object, parent: QtCore.QModelIndex = QtCore.QModelIndex()) -> bool:
+        # print(f"{self.__class__.__name__}.insertModelRow: row {row}, value {row_value}, parent {parent}")
+
         if not datatypes.is_iterable(self._modelData_):
             return False
 
@@ -321,24 +356,19 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         ret = False
 
-        self.beginInsertRows(parent, row, row+1)
-        try:
-            ret = self._insertDataRow_(self._modelData_, row, row_value)
-        except: # noqa
-            traceback.print_exc()
-
-        finally:
-            self.endInsertRows()
+        self._rowValueToInsert_ = row_value
+        ret = self.insertRow(row, parent)
 
         if ret and self._displayedRows_ < self._modelDataRows_:
             self.fetchMore(parent)
+
         return ret
 
     def appendRow(self, data: typing.Optional[object] = None) -> bool:
         if self._modelData_ is None:
             return
 
-        return self.insertRow(self.rowCount(), data, QtCore.QModelIndex())
+        return self.insertModelRow(self.rowCount(), data, QtCore.QModelIndex())
 
     def removeRow(self, row: int, parent: QtCore.QModelIndex) -> bool:
         # BUG 2026-06-12 23:32:29 FIXME
@@ -366,8 +396,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             self._modelDataRows_ = len(self._modelData_)
 
         self.endRemoveRows()
-        # self._displayedRows_ = 0
-        # self.fetchMore(parent)
         return True
 
     @singledispatchmethod
@@ -438,7 +466,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @_insertDataRow_.register(ephys_pathways.AuxiliaryOutputList)
     @_insertDataRow_.register(ephys_pathways.SynapticStimulusChannelList)
     @_insertDataRow_.register(TriggerProtocolList)
-    def __insertDataRow__(self, mdata: typing.Union[
+    def __insertDataRow__(self, mdata: typing.Union[ # noqa
         ephys_pathways.SynapticPathwayList,
         ephys_pathways.AuxiliaryInputList,
         ephys_pathways.AuxiliaryOutputList,
@@ -463,6 +491,19 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             elif isinstance(mdata, TriggerProtocolList):
                 obj = TriggerProtocol()
 
+        if len(self._modelData_) and all(hasattr(o, "name") for o in self._modelData_) and hasattr(obj, "name"):
+            names = list(map(lambda o: o.name, self._modelData_))
+
+            seps = list(map(lambda s: strutils.guess_sfx_sep(s), names))
+            seplen = list(map(lambda s: len(s), seps))
+            longest_sep_ndx = seplen.index(max(seplen))
+            sep = seps[longest_sep_ndx]
+
+            objNameAttr = strutils.counter_suffix(obj.name, names, sep = sep,
+                                                  returns_counter=False)
+
+            obj.name = objNameAttr
+
         if not isinstance(obj, (ephys_pathways.SynapticPathway,
                                 ephys_pathways.AuxiliaryInput,
                                 ephys_pathways.AuxiliaryOutput,
@@ -472,13 +513,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         ):
             return False
 
-        # if row == self.rowCount():
+        # print(f"{self.__class__.__name__}._insertDataRow_(row={row})")
+
         if row == len(self._modelData_):
             self._modelData_.append(obj)
         else:
-            temp = list(self._modelData_)
-            temp.insert(row, obj)
-            self._modelData_ = type(self._modelData_)(temp)
+            self._modelData_.insert(row, obj)
 
         self._modelDataRows_ = len(self._modelData_)
         self._original_data_ = self._modelData_
