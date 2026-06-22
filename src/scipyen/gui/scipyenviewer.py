@@ -320,7 +320,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         else:
             self._ID_  = int(self.winId()) # this is the wm ID of the window
 
-        self.update()
+        # self.update() # why is this needed !?
         # NOTE: 2021-09-16 12:26:09
         # This SHOULD be implemented in the derived class
         self._configureUI_()
@@ -896,7 +896,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             old_v = QtCore.QVariant(self._wm_id_)
 
             if old_v.convert(QtCore.QVariant.UInt):
-                reply = dbusinterface.call("UnregisterWindow", old_v)
+                reply = dbusinterface.call("UnregisterWindow", old_v) # noqa
 
     def _restore_menuBar_(self):
         r"""Hack to restore the window's menubar in the desktop's global menu.

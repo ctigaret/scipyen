@@ -1892,7 +1892,7 @@ class RecordingSource():
     name: str = "cell"
     adc: int = 0
     dac: typing.Optional[int] = None
-    syn: typing.Optional[SynapticStimulusChannelList]     = dataclasses.field(default_factory=SynapticStimulusChannelList)
+    syn: typing.Optional[SynapticStimulusChannelList]  = dataclasses.field(default_factory=SynapticStimulusChannelList)
     auxin: typing.Optional[AuxiliaryInputList]     = dataclasses.field(default_factory=AuxiliaryInputList)
     auxout: typing.Optional[AuxiliaryOutputList]   = dataclasses.field(default_factory=AuxiliaryOutputList)
     electrodeMode: ephys.ElectrodeMode = dataclasses.field(default=ephys.ElectrodeMode.Null)

@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>BaseScipyenDataWidget</class>
- <widget class="QWidget" name="BaseScipyenDataWidget">
+ <class>MetaDataWidget</class>
+ <widget class="QWidget" name="MetaDataWidget">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>480</width>
-    <height>262</height>
+    <width>530</width>
+    <height>266</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -362,7 +362,7 @@
         <string>Procedure</string>
        </property>
        <property name="icon">
-        <iconset theme="configure"/>
+        <iconset theme="view-task"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
@@ -384,7 +384,7 @@
         <string>Triggers</string>
        </property>
        <property name="icon">
-        <iconset theme="network-connect"/>
+        <iconset theme="mark-location"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
@@ -428,7 +428,7 @@
         <string>Annotations</string>
        </property>
        <property name="icon">
-        <iconset theme="settings-configure"/>
+        <iconset theme="database-index"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
@@ -568,7 +568,7 @@
      <property name="sizeHint" stdset="0">
       <size>
        <width>20</width>
-       <height>40</height>
+       <height>11</height>
       </size>
      </property>
     </spacer>

@@ -60,8 +60,8 @@ from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
 from gui.textviewer import TextViewer
 from gui.widgets.datatreeview import DataTreeView
 
-# Ui_MetaDataWidget, QWidget = loadUiType(os.path.join(__module_path__, "metadatawidget.ui"))
-Ui_MetaDataWidget, QWidget = loadUiType(os.path.join(__module_path__, "metadatawidget_new_26b13.ui"))
+Ui_MetaDataWidget, QWidget = loadUiType(os.path.join(__module_path__, "metadatawidget.ui"))
+# Ui_MetaDataWidget, QWidget = loadUiType(os.path.join(__module_path__, "metadatawidget_new_26b13.ui"))
 
 class MetaDataWidget(Ui_MetaDataWidget, QWidget):
     r"""Widget for displaying the most commonly used data attributes in Scipyen.

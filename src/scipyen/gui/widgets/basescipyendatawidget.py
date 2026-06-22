@@ -338,7 +338,7 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
         from gui import quickdialog as qd
 
         qde = QtWidgets.QDateTimeEdit(self._dateTime)
-        dfmt = qde.displayFormat()
+        dfmt = qde.displayFormat() # noqa
         dlg = qd.QuickDialog(parent=self, title = "Set analysis date and time")
         dlg.addWidget(qde)
         dlg.adjustSize()
@@ -487,7 +487,7 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
         # WARNING: 2022-11-09 16:07:02
         # do NOT use this setter from within the slot connected to the
         # dataNameLineEdit!
-        signalBlocker = QtCore.QSignalBlocker(self.dataNameLineEdit)
+        signalBlocker = QtCore.QSignalBlocker(self.dataNameLineEdit) # noqa
         if isinstance(value, str) and len(value.strip()):
             self._dataName = strutils.str2symbol(value)
         else:
@@ -503,7 +503,7 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
 
     @sourceID.setter
     def sourceID(self, value:typing.Union[str, type(pd.NA)]):
-        signalBlocker = QtCore.QSignalBlocker(self.sourceIDLineEdit)
+        signalBlocker = QtCore.QSignalBlocker(self.sourceIDLineEdit) # noqa
         if isinstance(value, str) and len(value.strip()):
             self._sourceID = value
             if self._sourceID in ("NA", "<NA>"):
@@ -521,7 +521,7 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
 
     @cell.setter
     def cell(self, value:typing.Union[str, type(pd.NA)]):
-        signalBlocker = QtCore.QSignalBlocker(self.cellIDLineEdit)
+        signalBlocker = QtCore.QSignalBlocker(self.cellIDLineEdit) # noqa
         if isinstance(value, str) and len(value.strip()):
             self._cell = value
             if self._cell in ("NA", "<NA>"):
@@ -550,7 +550,7 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
 
     @field.setter
     def field(self, value:typing.Union[str, type(pd.NA)]):
-        signalBlocker = QtCore.QSignalBlocker(self.fieldIDLineEdit)
+        signalBlocker = QtCore.QSignalBlocker(self.fieldIDLineEdit) # noqa
         if isinstance(value, str) and len(value.strip()):
             self._field = value
             if self._field in ("NA", "<NA>"):

@@ -47,7 +47,7 @@ from gui.painting_shared import (FontStyleType, standardQtFontStyles,
 
 from gui import quickdialog as qd
 from gui.guiutils import (DisplayHint,
-    InftyDoubleValidator, ComplexValidator, validatorString, NumericStringValidator,
+    InftyDoubleValidator, ComplexValidator, validatorString, NumericStringValidator, # noqa
     get_elided_text, get_text_width)
 
 from core import scipyen_quantities as scq
