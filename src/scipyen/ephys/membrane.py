@@ -6418,7 +6418,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
     age: python Quantity (one of days, months, years), "NA" or None
         Default is None; either None or "NA" result in the string "NA" for age
 
-    stage: core.scipyendataclasses.OrganismStage
+    stage: core.scipyendataclasses.DevelopmentalStage
 
     name: str
         name of the results (string), or None;
@@ -6534,7 +6534,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
 
     treatment = kwargs.pop("treatment", "veh")
 
-    stage = kwargs.pop("stage", sdc.OrganismStage.undefined)
+    stage = kwargs.pop("stage", sdc.DevelopmentalStage.undefined)
 
     # if sex.lower() not in ("m", "f", "na"):
     #     raise ValueError("Allowed values for sex are 'm' or 'f'; got %s instead" % sex)

@@ -1,26 +1,26 @@
 # -*- coding: utf-8 -*-
 r"""Common widget for meta-information in results
 """
-import os, math, typing, datetime, dataclasses
+import os, math, typing, datetime, dataclasses # noqa
 from dataclasses import MISSING
 import numpy as np
 import quantities as pq
 from core import scipyen_quantities as scq
 from core import strutils
-from core.datatypes import UnitTypes, GENOTYPES, NoData
+from core.datatypes import UnitTypes, GENOTYPES, NoData # noqa
 from core.basescipyen import BaseScipyenData
 import pandas as pd
 
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
     import PySide6
-    from PySide6 import Shiboken
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -39,7 +39,7 @@ else:
 
 
 
-from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
+from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget # noqa
 from gui.textviewer import TextViewer
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -56,7 +56,7 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
     sig_valueChanged = Signal(name="sig_valueChanged")
 
     def __init__(self, parent=None, **kwargs):
-        QWidget.__init__(self, parent=parent)
+        # super().__init__(self, parent=parent)
 
         self._dataVarName = kwargs.pop("varname", "")
         self._dataName = kwargs.pop("name", "")
@@ -109,6 +109,8 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
 
         self._data_description_ = kwargs.pop("description", "")
 
+        QWidget.__init__(self, parent=parent)
+        self._descriptionEditor = None
         self._configureUI_()
 
     def _configureUI_(self):
@@ -189,13 +191,7 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
         self.importToolButton.triggered.connect(self._slot_importMetaData)
         self.loadToolButton.triggered.connect(self._slot_loadMetaData)
 
-        self._descriptionEditor = TextViewer(self._data_description_,
-                                             parent=self, edit=True,
-                                             win_title="Edit description",
-                                             doc_title="Edit description",
-                                             title="mPSC Detect")
-        self._descriptionEditor.setVisible(False)
-        self._descriptionEditor.sig_textChanged.connect(self._slot_descriptionChanged)
+
 
     def value(self):
         r"""Returns a dict with field values takes from individual children
@@ -358,6 +354,14 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
 
     @Slot()
     def _slot_editDescription(self):
+        if not isinstance(self._descriptionEditor, QtWidgets.QWidget):
+            self._descriptionEditor = TextViewer(self._data_description_,
+                                                parent=self, edit=True,
+                                                win_title="Edit description",
+                                                doc_title="Edit description",
+                                                title="mPSC Detect")
+            # self._descriptionEditor.setVisible(False)
+            self._descriptionEditor.sig_textChanged.connect(self._slot_descriptionChanged)
         self._descriptionEditor.setData(self._data_description_)
         self._descriptionEditor.show()
 

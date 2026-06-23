@@ -26,7 +26,7 @@ import types
 import warnings
 import weakref
 import h5py
-import treelib
+import treelib # noqa
 import pathlib
 from copy import (deepcopy, copy,)
 
@@ -672,7 +672,7 @@ class ProcedureType(TypeEnum):
     cull = auto()
     other = auto()
 
-class OrganismStage(TypeEnum):
+class DevelopmentalStage(TypeEnum):
     undefined   = 0
     zygote      = auto()
     morula      = auto()
@@ -754,7 +754,7 @@ class Biometrics(ScipyenDataclass):
     geneticSex: GeneticSex = GeneticSex.undefined
     # ID of source sex (where appropriate); one of "f", "m", "na" (case-insensitive)
     #
-    stage: OrganismStage = OrganismStage.postnatal
+    stage: DevelopmentalStage = DevelopmentalStage.postnatal
 
     age: typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
@@ -839,12 +839,12 @@ class Organism(ScipyenDataclass):
             return self.biometrics.stage
 
     @stage.setter
-    def stage(self, val: typing.Optional[OrganismStage]):
+    def stage(self, val: typing.Optional[DevelopmentalStage]):
         if isinstance(self.biometrics, Biometrics):
-            if isinstance(val, OrganismStage):
+            if isinstance(val, DevelopmentalStage):
                 self.biometrics.stage = val
             else:
-                self.biometrics.stage = OrganismStage.undefined
+                self.biometrics.stage = DevelopmentalStage.undefined
 
 
     @property
@@ -1780,6 +1780,6 @@ of 'args'.
 
 # __all__ = ("AdministrationRoute", "BiologicalSource", "Biometrics",
 #            "BioSourceType", "Cell", "CellCompartment","CellCompartmentType", "Episode",
-#            "Organ", "Organism", "OrganismStage", "Procedure", "ProcedureType",
+#            "Organ", "Organism", "DevelopmentalStage", "Procedure", "ProcedureType",
 #            "Schedule", "SubstanceDosage", "Tissue", "Treatment",
 #            "isDataclass", "mergeDataclasses", "ScipyenDataclass")

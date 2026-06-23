@@ -25,7 +25,7 @@ __has_qtdbus__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
     import PySide6
-    from PySide6 import Shiboken
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -35,7 +35,7 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
+    from qtpy import sip # noqa
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
@@ -43,13 +43,13 @@ else:
     __has_sip__ = True
 
 try:
-    from qtpy import QtDBus
+    from qtpy import QtDBus # noqa
     __has_qtdbus__ = True
 except:
     __has_qtdbus__ = False
 
 from ephys import (ephys, ephys_pathways)
-from core.prog import scipywarn
+from core.prog import scipywarn # noqa
 from gui import guiutils
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))

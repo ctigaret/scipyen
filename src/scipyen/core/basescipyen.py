@@ -22,9 +22,9 @@ from core import scipyen_quantities as cq
 from core.scipyen_quantities import unitsConvertible
 
 # from core.datatypes import * # clashes with datetime class imported from datetime module !!!
-from core.typeenum import TypeEnum
-from core.scipyendataclasses import (Episode, Schedule, ProcedureType, AdministrationRoute,
-                            Procedure, BioSourceType, TaxonDescriptor, Taxon,
+from core.typeenum import TypeEnum # noqa
+from core.scipyendataclasses import (Episode, Schedule, ProcedureType, AdministrationRoute, # noqa
+                            Procedure, BioSourceType, TaxonDescriptor, Taxon, # noqa
                             BiologicalSource, CellCompartment, CellCompartmentType,
                             Organism, Biometrics, ScipyenDataclass,
                             FileOriginDescriptor
@@ -35,6 +35,8 @@ from iolib.navigation.filesystems import getFileCreationDateTime
 @dataclass
 class BaseScipyenData(ScipyenDataclass):
     r"""Encapsulates 'metadata' associated with recorded data or analysis results"""
+
+    # ### BEGIN
     # NOTE: 2024-11-16 10:07:21
     # The fields below, from 'name' to 'rec_datetime' are meant to align this
     # data model to the one used in NeuralEnsemble's neo library.
@@ -46,6 +48,7 @@ class BaseScipyenData(ScipyenDataclass):
     # file_origin: typing.Union[
     #     str, pathlib.Path
     #     ] = dataclasses.field(default="")
+    # ### END
 
 
     # NOTE: 2026-03-05 23:34:21
