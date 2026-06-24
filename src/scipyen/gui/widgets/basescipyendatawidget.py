@@ -349,8 +349,9 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
 
     @Slot()
     def _slot_descriptionChanged(self):
-        self._data_description_ = self._descriptionEditor.text(True)
-        self.sig_valueChanged.emit()
+        if isinstance(self._descriptionEditor, textviewer.TextViewer):
+            self._data_.description = self._descriptionEditor.text(plain=True)
+            self.sig_valueChanged.emit()
 
     @Slot()
     def _slot_editDescription(self):
@@ -362,7 +363,7 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
                                                 title="mPSC Detect")
             # self._descriptionEditor.setVisible(False)
             self._descriptionEditor.sig_textChanged.connect(self._slot_descriptionChanged)
-        self._descriptionEditor.setData(self._data_description_)
+        self._descriptionEditor.setData(self._data_.description)
         self._descriptionEditor.show()
 
     @Slot()

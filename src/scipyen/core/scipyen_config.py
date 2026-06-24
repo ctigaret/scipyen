@@ -1171,7 +1171,8 @@ class ScipyenConfigurable(object):
 
     def __init__(self, configTag:typing.Optional[str]=None):
         self.configurable_traits = DataBag(__parent__ = self)
-        self.configurable_traits.observe(self._observe_configurables_)
+        if hasattr(self, "_observe_configurables_"):
+            self.configurable_traits.observe(self._observe_configurables_)
         self._tag = configTag
 
     def _get_parent_(self):

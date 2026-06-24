@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>NeuronWidget</class>
+ <widget class="QWidget" name="NeuronWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>426</width>
+    <height>237</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <widget class="DataExchangeWidget" name="dataExchangeWidget" native="true">
+   <property name="geometry">
+    <rect>
+     <x>7</x>
+     <y>31</y>
+     <width>149</width>
+     <height>16</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="DataSymbolWidget" name="objectSymbolWidget" native="true">
+   <property name="geometry">
+    <rect>
+     <x>6</x>
+     <y>6</y>
+     <width>151</width>
+     <height>16</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QWidget" name="">
+   <property name="geometry">
+    <rect>
+     <x>8</x>
+     <y>48</y>
+     <width>149</width>
+     <height>34</height>
+    </rect>
+   </property>
+   <layout class="QHBoxLayout" name="horizontalLayout">
+    <item>
+     <widget class="QLabel" name="label_2">
+      <property name="text">
+       <string>Subtype:</string>
+      </property>
+      <property name="buddy">
+       <cstring>cellSubTypeComboBox</cstring>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QComboBox" name="cellSubTypeComboBox"/>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QWidget" name="">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>80</y>
+     <width>183</width>
+     <height>34</height>
+    </rect>
+   </property>
+   <layout class="QHBoxLayout" name="horizontalLayout_2">
+    <item>
+     <widget class="QLabel" name="label">
+      <property name="text">
+       <string>Compartment:</string>
+      </property>
+      <property name="buddy">
+       <cstring>neuronCompartmentTypeComboBox</cstring>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QComboBox" name="neuronCompartmentTypeComboBox"/>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>DataExchangeWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">gui.widgets.dataexchangewidget</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>DataSymbolWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">gui.widgets.datasymbolwidget</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

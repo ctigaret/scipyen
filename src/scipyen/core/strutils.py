@@ -26,7 +26,7 @@ from PIL.Image import Image as PILImage
 import drawsvg as dw
 from tribool import Tribool
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from IPython.core.latex_symbols import (latex_symbols, reverse_latex_symbol)
 from IPython.display import Image as IPImage
 from IPython.core.interactiveshell import is_integer_string

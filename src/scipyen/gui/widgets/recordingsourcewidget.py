@@ -63,14 +63,16 @@ Ui_RecordingSourceWidget, QWidget = loadUiType(
     os.path.join(__module_path__, "recordingsourcewidget.ui")
     )
 
+T = ephys_pathways.RecordingSource
 class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
+    _objectType_ = ephys_pathways.RecordingSource
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
-                 obj: typing.Optional[ephys_pathways.RecordingSource] = None):
+                 obj: typing.Optional[T] = None):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
 
-        if isinstance(parent, ephys_pathways.RecordingSource):
+        if isinstance(parent, self._objectType_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
                 parent = obj
@@ -87,12 +89,12 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
         self._pendingPathwayChange_ = None
         self._pendingStimulusChange_ = None
 
-        if not isinstance(obj, ephys_pathways.RecordingSource):
+        if not isinstance(obj, self._objectType_):
             self._data_ = None
         else:
             self._data_ = obj
 
-        if isinstance(self._data_, ephys_pathways.RecordingSource):
+        if isinstance(self._data_, self._objectType_):
             self._name_ = self._data_.name
             self._adc_ = self._data_.adc
             self._dac_ = self._data_.dac
@@ -114,10 +116,10 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
 
         self._configureUI_()
 
-        if not isinstance(self._data_, ephys_pathways.RecordingSource):
+        if not isinstance(self._data_, self._objectType_):
             self._make_value_()
 
-    def default(self) -> ephys_pathways.RecordingSource:
+    def default(self) -> T:
         self._name_ = "source"
         self._adc_ = 0
         self._dac_ = 0
@@ -204,27 +206,27 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
         self.synapticPathwaysTable.sig_dataChanged.connect(self._slot_synapticPathwaysListChanged)
         # self.synapticPathwaysTable.sig_indexesChanged.connect(self._slot_pathwaysListIndexesChanged)
 
-        self.importRecordingSourceToolbutton.clicked.connect(self._slot_importRecordingSource)
-        self.loadRecordingSourceToolButton.clicked.connect(self._slot_loadRecordingSource)
-        self.exportToWorkspaceToolButton.clicked.connect(self._slot_exportRecordingSource)
-        self.saveToPickleToolButton.clicked.connect(self._slot_saveRecordingSource)
+        self.importRecordingSourceToolbutton.clicked.connect(self._slot_importData)
+        self.loadRecordingSourceToolButton.clicked.connect(self._slot_loadData)
+        self.exportToWorkspaceToolButton.clicked.connect(self._slot_exportData)
+        self.saveToPickleToolButton.clicked.connect(self._slot_saveData)
 
     @Slot()
-    def _slot_importRecordingSource(self):
-        ret = self.importFromWorkSpace(dataTypes = ephys_pathways.RecordingSource,
+    def _slot_importData(self):
+        ret = self.importFromWorkSpace(dataTypes = self._objectType_,
                                     title="Select RecordingSource Object in Workspace",
                                     single=True,
                                     retrieve_all = True)
-        # print(f"{self.__class__.__name__}._slot_importRecordingSource -> ret = {ret}\n\t({type(ret).__name__})")
-        if isinstance(ret, typing.Sequence) and len(ret) and isinstance(ret[0], ephys_pathways.RecordingSource):
+        # print(f"{self.__class__.__name__}._slot_importData -> ret = {ret}\n\t({type(ret).__name__})")
+        if isinstance(ret, typing.Sequence) and len(ret) and isinstance(ret[0], self._objectType_):
             self.setValue(ret[0])
 
         self.sig_valueChanged.emit(self.value())
 
     @Slot()
-    def _slot_exportRecordingSource(self):
+    def _slot_exportData(self):
         obj = self.value()
-        if isinstance(obj, ephys_pathways.RecordingSource):
+        if isinstance(obj, self._objectType_):
             name = obj.name
             if not isinstance(name, str) or len(name.strip()) == 0:
                 name = "source"
@@ -232,7 +234,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
             self.exportDataToWorkspace(obj, name)
 
     @Slot()
-    def _slot_loadRecordingSource(self):
+    def _slot_loadData(self):
         fileNameFilter = "*.pkl"
         fn, fl = self.chooseFile(caption = "Open Recording Source Pickle File",
                                 fileFilter = fileNameFilter,
@@ -240,7 +242,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
 
         if len(fn.strip()):
             obj = pio.loadFile(fn)
-            if isinstance(obj, ephys_pathways.RecordingSource):
+            if isinstance(obj, self._objectType_):
                 self.setValue(obj)
             else:
                 self.errorMessage(title = "Open Recording Source Pickle File",
@@ -248,10 +250,10 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
         self.sig_valueChanged.emit(self.value())
 
     @Slot()
-    def _slot_saveRecordingSource(self):
+    def _slot_saveData(self):
         obj = self.value()
 
-        if not isinstance(obj, ephys_pathways.RecordingSource):
+        if not isinstance(obj, self._objectType_):
             return
 
         fileNameFilter = "*.pkl"
@@ -266,7 +268,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
     @Slot(str)
     def _slot_nameChanged(self, val:str):
         self._name_ = val
-        if not isinstance(self._data_, ephys_pathways.RecordingSource):
+        if not isinstance(self._data_, self._objectType_):
             self._make_value_()
         else:
             self._data_.name = val
@@ -278,7 +280,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
     @Slot(int)
     def _slot_adcChanged(self, val: int):
         self._adc_ = val
-        if not isinstance(self._data_, ephys_pathways.RecordingSource):
+        if not isinstance(self._data_, self._objectType_):
             self._make_value_()
         else:
             self._data_.adc = self._adc_
@@ -290,7 +292,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
     @Slot(int)
     def _slot_dacChanged(self, val: int):
         self._dac_ = val
-        if not isinstance(self._data_, ephys_pathways.RecordingSource):
+        if not isinstance(self._data_, self._objectType_):
             self._make_value_()
         else:
             self._data_.dac = self._dac_
@@ -308,7 +310,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
         if isinstance(val, str):
             if val in self._electrodeModeNames_:
                 self._electrode_ = ephys.ElectrodeMode[val]
-                if not isinstance(self._data_, ephys_pathways.RecordingSource):
+                if not isinstance(self._data_, self._objectType_):
                     self._make_value_()
                 else:
                     self._data_.electrodeMode = self._electrode_
@@ -323,9 +325,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
         else:
             return
 
-
-
-        if not isinstance(self._data_, ephys_pathways.RecordingSource):
+        if not isinstance(self._data_, self._objectType_):
             for pathway in self._pathways_:
                 p.electrodeMode = self._data_.electrodeMode
             self._make_value_()
@@ -347,13 +347,11 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
         self.sig_valueChanged.emit(self.value())
 
     def _make_value_(self):
-        self._data_ = ephys_pathways.RecordingSource(name=self._name_, adc=self._adc_,
+        self._data_ = self._objectType_(name=self._name_, adc=self._adc_,
                                             dac=self._dac_, syn=self._syn_,
                                             auxin=self._auxin_,
                                             auxout=self._auxout_,
                                             electrodeMode = self._electrode_)
-
-
 
         self.createObjectPushButton.setEnabled(self._data_ is None)
 
@@ -535,7 +533,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
             if not isinstance(syn, ephys_pathways.SynapticStimulusChannelList):
                 return
 
-            if not isinstance(self._data_, ephys_pathways.RecordingSource):
+            if not isinstance(self._data_, self._objectType_):
                 # print("\n\twill create new RecordingSource")
                 self._syn_ = syn
                 self._make_value_()
@@ -606,7 +604,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
         else:
             self._auxin_ = ephys_pathways.AuxiliaryInputList()
 
-        if not isinstance(self._data_, ephys_pathways.RecordingSource):
+        if not isinstance(self._data_, self._objectType_):
             self._make_value_()
         else:
             self._data_.auxin = self._auxin_
@@ -620,7 +618,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
         else:
             self._auxout_ = ephys_pathways.AuxiliaryOutputList()
 
-        if not isinstance(self._data_, ephys_pathways.RecordingSource):
+        if not isinstance(self._data_, self._objectType_):
             self._make_value_()
         else:
             self._data_.auxout = self._auxout_
@@ -631,9 +629,9 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
     def slot_valueChanged(self, val):
         self._data_ = val
 
-    def setValue(self, val: typing.Optional[ephys_pathways.RecordingSource] = None):
+    def setValue(self, val: typing.Optional[T] = None):
         # print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
-        if isinstance(val, ephys_pathways.RecordingSource):
+        if isinstance(val, self._objectType_):
             self._data_ = val
             self._name_ = self._data_.name
             self._adc_ = self._data_.adc
@@ -682,6 +680,6 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
         self.synapticPathwaysTable.setValue(self._data_.pathways)
         self.synapticPathwaysTable.autoResizeColumns()
 
-    def value(self) -> ephys_pathways.RecordingSource:
+    def value(self) -> T:
         return self._data_
 

@@ -396,6 +396,7 @@ class CellCompartmentType(TypeEnum):
     microvillus = auto()
     filopodium = auto()
     lamellipodium = auto()
+    body = auto()
 
 class NeuronCompartmentType(TypeEnum):
     undefined = 0
@@ -768,7 +769,10 @@ class Biometrics(ScipyenDataclass):
 
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t") # noqa
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
+        repr_attr = lambda x: (f": {type(x).__name__} → '{x}'" if isinstance(x, str)
+                               else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x))
+                               else f": {type(x).__name__} → {x.name} ({x})" if isinstance(x, Enum)
+                               else f": {type(x).__name__} → {x}") # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -973,7 +977,6 @@ class CellCompartment(ScipyenDataclass):
         if isinstance(self.parent, Cell):
             self.parent.setOrganism(o)
 
-
 @dataclass
 class NeuronCompartment(CellCompartment):
     compartmentType: NeuronCompartmentType = NeuronCompartmentType.undefined
@@ -1018,8 +1021,8 @@ class ChemicalSynapse(ScipyenDataclass):
     morphologicalType : ChemicalSynapseMorphologicalType = ChemicalSynapseMorphologicalType.undefined
     functionalType: ChemicalSynapseFunctionalType = ChemicalSynapseFunctionalType.undefined
     postsynapticEntityType: PostsynapticEntityType = PostsynapticEntityType.undefined
-    preSynapticParent: Neuron = dataclasses.field(default_factory = Neuron)
-    postSynapticParent: Neuron = dataclasses.field(default_factory = Neuron)
+    preSynapticParent: typing.Union[Neuron, Cell] = dataclasses.field(default_factory = Neuron)
+    postSynapticParent: typing.Union[Neuron, Cell] = dataclasses.field(default_factory = Neuron)
 
     def __post_init__(self: typing.Self):
         assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"

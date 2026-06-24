@@ -1126,6 +1126,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     _defaultUseNativeMenuBar:bool = True
 
+    _defaultFileSystemViewMode_:str  = "Tree"
+
     # _instance = None # NOTE: Singleton design pattern
 
     @classmethod
@@ -1595,6 +1597,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._useLastHistoryCommandSearch_: bool = False
 
         self._useNativeMenuBar: bool = self._defaultUseNativeMenuBar
+
+        self._fileSystemViewMode_: str = self._defaultFileSystemViewMode_
 
         # ### END configurables, but see NOTE:2022-01-28 23:16:57 below
 
@@ -2744,6 +2748,78 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         #     self._showScriptsManagerWindow()
         # else:
             self._scriptManager_.close()
+
+    @property
+    def fileSystemViewMode(self) -> str:
+        return self._fileSystemViewMode_
+
+    @markConfigurable("FileSystemViewMode", "Qt", default="Tree")
+    @fileSystemViewMode.setter
+    def fileSystemViewMode(self, val:str):
+        if val not in ("Tree", "Icon", "List", "Column"):
+            val = "Tree"
+
+        self._fileSystemViewMode_ = val
+
+        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+                                  (self.actionTreeView, self.actionListView,
+                                   self.actionIconView, self.actionColumnView,
+                                   self.fileSystemViewToolButton,
+                                   self.fileSystemViewStackedWidget)))
+
+        if self._fileSystemViewMode_ == "Tree":
+            self.fileSystemViewToolButton.setIcon(guiutils.getIcon("view-list-tree"))
+            self.actionTreeView.setChecked(True)
+            for a in (self.actionListView,self.actionIconView, self.actionColumnView):
+                a.setChecked(False)
+            ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemTreeViewPage)
+            self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
+
+        elif self._fileSystemViewMode_ == "List":
+            self.fileSystemViewToolButton.setIcon(guiutils.getIcon("view-list-details"))
+            self.actionListView.setChecked(True)
+            for a in (self.actionTreeView,self.actionIconView, self.actionColumnView):
+                a.setChecked(False)
+            self.fileSystemListView.setViewMode(QtWidgets.QListView.ListMode)
+            ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemListViewPage)
+            self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
+
+        elif self._fileSystemViewMode_ == "Icon":
+            self.fileSystemViewToolButton.setIcon(guiutils.getIcon("view-list-icons"))
+            self.actionIconView.setChecked(True)
+            for a in (self.actionTreeView,self.actionListView, self.actionColumnView):
+                a.setChecked(False)
+            self.fileSystemListView.setViewMode(QtWidgets.QListView.IconMode)
+            ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemListViewPage)
+            self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
+
+        elif self._fileSystemViewMode_ == "Column":
+            self.fileSystemViewToolButton.setIcon(guiutils.getIcon("object-columns"))
+            self.actionColumnView.setChecked(True)
+            for a in (self.actionTreeView,self.actionListView, self.actionIconView):
+                a.setChecked(False)
+            ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemColumnViewPage)
+            self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
+
+    @Slot(bool)
+    def _slot_fileViewTreeMode(self, val:bool):
+        if val is True:
+            self.fileSystemViewMode = "Tree"
+
+    @Slot(bool)
+    def _slot_fileViewListMode(self, val:bool):
+        if val is True:
+            self.fileSystemViewMode = "List"
+
+    @Slot(bool)
+    def _slot_fileViewIconMode(self, val:bool):
+        if val is True:
+            self.fileSystemViewMode = "Icon"
+
+    @Slot(bool)
+    def _slot_fileViewColumnMode(self, val:bool):
+        if val is True:
+            self.fileSystemViewMode = "Column"
 
 
     @property
@@ -6743,9 +6819,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # ### BEGIN file system view, navigation widgets & actions
         #
 
-        # self.fileSystemTreeView.setUniformRowHeights(True) # set in the ui file
-        # self._defaultFileSystemTreeViewItemDelegate_ = self.fileSystemTreeView.itemDelegate()
-        # self._cutFileSystemItemTreeViewDelegate_ = delegates.CutFileSystemItemDelegate(parent = self)
         self.fileSystemTreeView.setModel(self.fileSystemModel)
         self.fileSystemTreeView.setAlternatingRowColors(True)
         self.fileSystemTreeView.activated[QtCore.QModelIndex].connect(
@@ -6761,6 +6834,62 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.fileSystemTreeView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
         # self.fileSystemTreeView.setHorizontalScrollBarPolicy(
         #     QtCore.Qt.ScrollBarAlwaysOn)
+
+        self.fileSystemListView.setModel(self.fileSystemModel)
+        self.fileSystemListView.activated[QtCore.QModelIndex].connect(
+            self.slot_fileSystemItemActivated)
+
+#         self.fileSystemColumnViewPreviewWidget = QtWidgets.QWidget(self)
+#         self.fileSystemColumnViewPreviewWidget.setLayout(QtWidgets.QVBoxLayout(self.fileSystemColumnViewPreviewWidget))
+#
+#         self.fileSystemColumnViewPreviewWidgetTextEdit = QtWidgets.QPlainTextEdit(self)
+#         self.fileInfoDocument = QtGui.QTextDocument(parent=self.fileSystemColumnViewPreviewWidgetTextEdit)
+#         self.fileInfoDocumentLayout = QtWidgets.QPlainTextDocumentLayout(self.fileInfoDocument)
+#         self.fileInfoDocument.setDocumentLayout(self.fileInfoDocumentLayout)
+#         self.fileSystemColumnViewPreviewWidgetTextEdit.setDocument(self.fileInfoDocument)
+#         self.fileSystemColumnViewPreviewWidgetTextEdit.setReadOnly(True)
+#         self.fileSystemColumnViewPreviewWidget.layout().addWidget(self.fileSystemColumnViewPreviewWidgetTextEdit)
+#         self.fileSystemColumnViewPreviewWidgetTextEdit.setAutoFillBackground(True)
+#         self.fileSystemColumnViewPreviewWidgetTextEdit.setSizePolicy(
+#             QtWidgets.QSizePolicy(
+#                 QtWidgets.QSizePolicy.Expanding,
+#                 QtWidgets.QSizePolicy.Expanding,
+#                 )
+#             )
+#         self.fileSystemColumnViewPreviewWidget.setSizePolicy(
+#             QtWidgets.QSizePolicy(
+#                 QtWidgets.QSizePolicy.Expanding,
+#                 QtWidgets.QSizePolicy.Expanding,
+#                 )
+#             )
+#
+#         self.fileSystemColumnView.setPreviewWidget(self.fileSystemColumnViewPreviewWidget)
+
+        self.fileSystemColumnViewPreviewWidget = QtWidgets.QLabel(self)
+        self.fileSystemColumnView.setPreviewWidget(self.fileSystemColumnViewPreviewWidget)
+        self.fileSystemColumnViewPreviewWidget.setSizePolicy(
+            QtWidgets.QSizePolicy(
+                QtWidgets.QSizePolicy.Expanding,
+                QtWidgets.QSizePolicy.Expanding,
+                )
+            )
+        self.fileSystemColumnViewPreviewWidget.setSizePolicy(
+            QtWidgets.QSizePolicy(
+                QtWidgets.QSizePolicy.Expanding,
+                QtWidgets.QSizePolicy.Expanding,
+                )
+            )
+
+        self.fileSystemColumnView.setModel(self.fileSystemModel)
+
+        self.fileSystemColumnView.activated[QtCore.QModelIndex].connect(
+            self.slot_fileSystemItemActivated)
+
+        self.fileSystemColumnView.selectionModel().currentChanged.connect(
+            self.slot_fileSystemColumnViewCurrentChanged)
+
+        # self.fileSystemColumnView.pressed[QtCore.QModelIndex].connect(
+        #     self.slot_fileSystemItemPressedInColumnView)
 
         self.fileSystemModel.directoryLoaded[str].connect(
             self.slot_resizeFileTreeColumnForPath)
@@ -6819,6 +6948,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.selDirBtn.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.selDirBtn.setMenu(self.recentDirectoriesMenu)
         self.selDirBtn.setIcon(guiutils.getIcon("document-open-folder"))
+
+        self.fileSystemViewToolButton.setMenu(self.menuFileSystemView)
+        self.actionTreeView.toggled.connect(self._slot_fileViewTreeMode)
+        self.actionListView.toggled.connect(self._slot_fileViewListMode)
+        self.actionIconView.toggled.connect(self._slot_fileViewIconMode)
+        self.actionColumnView.toggled.connect(self._slot_fileViewColumnMode)
 
         # NOTE: 2023-09-28 12:13:22
         self.openTermBtn.released.connect(self.slot_openCurrentDirInSystemTerminal)
@@ -8101,6 +8236,53 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.loadFiles([self.fileSystemModel.filePath(ndx)],
                            self._openSelectedFileItemsThreaded)
 
+    @Slot(QtCore.QModelIndex)
+    def slot_fileSystemItemPressedInColumnView(self, index:QtCore.QModelIndex):
+        self.fileSystemColumnViewPreviewWidget.setText(self._getFileInfoText_(index))
+        # self.fileSystemColumnViewPreviewWidgetTextEdit.document().setPlainText(self._getFileInfoText_(index))
+        # self.fileSystemColumnViewPreviewWidgetTextEdit.document().adjustSize()
+
+    @Slot(QtCore.QModelIndex, QtCore.QModelIndex)
+    def slot_fileSystemColumnViewCurrentChanged(self, current: QtCore.QModelIndex, prev: QtCore.QModelIndex):
+        self.fileSystemColumnViewPreviewWidget.setText(self._getFileInfoText_(current))
+        # self.fileSystemColumnViewPreviewWidgetTextEdit.document().setPlainText(self._getFileInfoText_(current))
+        # self.fileSystemColumnViewPreviewWidgetTextEdit.document().adjustSize()
+
+    def _getFileInfoText_(self, index: QtCore.QModelIndex):
+        if not self.fileSystemModel.isDir(index):
+            fileInfo = index.data(QtGui.QFileSystemModel.FileInfoRole)
+            infoData = list()
+            infoData.append(fileInfo.fileName())
+            infoData.append(f"Path: {fileInfo.absolutePath()}")
+            if fileInfo.isSymbolicLink():
+                infoData.append(f"Linked to: {fileInfo.symLinkTarget()}")
+
+            bTime = fileInfo.birthTime()
+            lastMod = fileInfo.lastModified()
+            if isinstance(self.fileSystemModel.timeFormat, QtCore.QLocale.FormatType):
+                infoData.append(f"Created: {guiutils.formatRelativeDateTime(bTime, self.fileSystemModel.timeFormat)}")
+                infoData.append(f"Modified: {guiutils.formatRelativeDateTime(lastMod, self.fileSystemModel.timeFormat)}")
+            elif isinstance(self.fileSystemModel.timeFormat, str) and self.fileSystemModel.timeFormat in ("Fancy Short", "Fancy Narrow"):
+                tFormat = QtCore.QLocale.ShortFormat if self.timeFormat == "Fancy Short" else QtCore.QLocale.NarrowFormat
+                infoData.append(f"Created: {guiutils.formatRelativeDateTime(bTime, tFormat, fancy=True)}")
+                infoData.append(f"Modified: {guiutils.formatRelativeDateTime(lastMod, tFormat, fancy=True)}")
+
+
+            group = fileInfo.group()
+            if len(group):
+                infoData.append(f"Group: {group}")
+
+            owner = fileInfo.owner()
+            if len(owner):
+                infoData.append(f"Owner: {owner}")
+
+            infoData.append(f"Readable: {fileInfo.isReadable()}")
+            infoData.append(f"Writable: {fileInfo.isWritable()}")
+            infoData.append(f"Executable: {fileInfo.isExecutable()}")
+            return "\n".join(infoData)
+
+        return ""
+
     @Slot(QtCore.QUrl)
     @safewrapper
     def slot_chDirUrl(self, val:QtCore.QUrl):
@@ -8254,13 +8436,20 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if self.fileSystemModel.rootPath() == targetDir:
             return
         self.fileSystemModel.setRootPath(targetDir)
+        targetIndex = self.fileSystemModel.index(self.fileSystemModel.rootPath())
         self.fileSystemTreeView.scrollTo(self.fileSystemModel.index(targetDir))
+        targetIndex = self.fileSystemModel.index(self.fileSystemModel.rootPath())
         if cd:
-            self.fileSystemTreeView.setRootIndex(
-                self.fileSystemModel.index(targetDir))
+            self.fileSystemTreeView.setRootIndex(targetIndex)
+            self.fileSystemListView.setRootIndex(targetIndex)
+            self.fileSystemColumnView.setRootIndex(targetIndex)
+
         else:
             self.fileSystemTreeView.setCurrentIndex(
                 self.fileSystemModel.index(targetDir))
+            self.fileSystemListView.setCurrentIndex(targetIndex)
+            self.fileSystemColumnView.setCurrentIndex(targetIndex)
+
         self.fileSystemTreeView.sortByColumn(0, QtCore.Qt.AscendingOrder)
         # NOTE 2017-07-04 15:59:38
         # for this to work one has to set horizontalScrollBarPolicy

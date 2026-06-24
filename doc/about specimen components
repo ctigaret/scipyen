@@ -1,0 +1,33 @@
+about specimen components
+
+Organism <- Organ <- Tissue <- Cell     <- CellCompartment <- UltrastructureElement
+                               Neuron   <- NeuronCompartment/AxonalCompartment/DendriticCompartment <- UltrastructureElement
+                                        <- ChemicalSynapse <- ChemicalSynapseUltrastructureElement
+
+==============================================================================================================================
+
+    Cell:                           <->                 Neuron:
+        cellType:str                                        cellType = "neuron"
+        cellSubType:str                                     cellSubType -> NeuronType enum
+
+    CellCompartment:                <->                 NeuronCompartment:
+        compartmentType: Enum                               compartmentType: NeuronCompartmentType enum
+
+                                                        <->     AxonalCompartment:
+                                                                    compartmentType: AxonalCompartmentType enum
+
+                                                        <->     DendriticCompartment:
+                                                                    compartmentType: DendriticCompartmentType enum
+
+                                                        ChemicalSynapse:
+                                                            morphologicalType : ChemicalSynapseMorphologicalType enum
+                                                            functionalType: ChemicalSynapseFunctionalType
+                                                            postsynapticEntityType: PostsynapticEntityType
+                                                            preSynapticParent
+                                                            postSynapticParent
+
+
+==============================================================================================================================
+
+    UltrastructureElement:                              ChemicalSynapseUltrastructureElement:
+        elementType: UltrastructureElementType enum         elementType: ChemicalSynapseUltrastructureElementType
