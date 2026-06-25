@@ -1015,6 +1015,9 @@ class DendriticCompartment(NeuronCompartment):
         assert isinstance(self.compartmentType, DendriticCompartmentType), f"Wrong compartment type: {self.compartmentType}"
         assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
 
+class UltrastructureElement:
+    pass
+
 @dataclass
 class ChemicalSynapse(ScipyenDataclass):
     morphologicalType : ChemicalSynapseMorphologicalType = ChemicalSynapseMorphologicalType.undefined

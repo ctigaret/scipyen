@@ -84,14 +84,15 @@ class BiometricsWidget(Ui_BiometricsWidget, QWidget, WorkspaceGuiMixin):
 
             obj = obj_
 
-        QWidget.__init__(self, parent=parent)
-        title = kwargs.pop("title", f"{self._objectTypes_.__name__} Widget")
-        WorkspaceGuiMixin.__init__(self, parent=parent, title=title, **kwargs)
-
         if not isinstance(obj, self._objectTypes_):
             self._data_ =  self._objectTypes_()
         else:
             self._data_ = obj
+
+        QWidget.__init__(self, parent=parent)
+        title = kwargs.pop("title", f"{type(self._data_).__name__} Widget")
+        self._boundSymbol_: str = kwargs.pop("symbol", "")
+        WorkspaceGuiMixin.__init__(self, parent=parent, title=title, **kwargs)
 
         self._geneticSexNames_ = list(sdc.GeneticSex.names())
         self._devStageNames_ = list(sdc.DevelopmentalStage.names())
@@ -102,7 +103,8 @@ class BiometricsWidget(Ui_BiometricsWidget, QWidget, WorkspaceGuiMixin):
     def _configureUI_(self):
         self.setupUi(self)
 
-        self.dataExchangeWidget.dataType = self._objectTypes_
+        self.dataExchangeWidget.dataType = type(self._data_)
+        self.objectSymbolWidget.setValue(self._boundSymbol_)
 
         self.nameLineEdit.setClearButtonEnabled(True)
         self.nameLineEdit.redoAvailable = True

@@ -30,7 +30,7 @@
        </sizepolicy>
       </property>
      </widget>
-     <widget class="QWidget" name="">
+     <widget class="QWidget" name="layoutWidget">
       <layout class="QVBoxLayout" name="verticalLayout_4">
        <item>
         <widget class="DataExchangeWidget" name="dataExchangeWidget" native="true">
@@ -274,6 +274,18 @@
  </widget>
  <customwidgets>
   <customwidget>
+   <class>DataExchangeWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">gui.widgets.dataclasswidgets.dataexchangewidget</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>DataSymbolWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">gui.widgets.dataclasswidgets.datasymbolwidget</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
    <class>QuantitySpinBox</class>
    <extends>QDoubleSpinBox</extends>
    <header location="global">gui.widgets.small_widgets</header>
@@ -282,18 +294,6 @@
    <class>LineEdit</class>
    <extends>QLineEdit</extends>
    <header location="global">gui.widgets.small_widgets</header>
-  </customwidget>
-  <customwidget>
-   <class>DataExchangeWidget</class>
-   <extends>QWidget</extends>
-   <header location="global">gui.widgets.dataexchangewidget</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>DataSymbolWidget</class>
-   <extends>QWidget</extends>
-   <header location="global">gui.widgets.datasymbolwidget</header>
-   <container>1</container>
   </customwidget>
  </customwidgets>
  <resources/>

@@ -78,7 +78,7 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, QtWidgets.QWidget,
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
-         if isinstance(parent, self._objectTypes_):
+        if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
                 parent = obj
@@ -87,17 +87,17 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, QtWidgets.QWidget,
 
             obj = obj_
 
-       QtWidgets.QWidget.__init__(self, parent=parent)
-       title = kwargs.pop("title", f"{type(obj).__name__} Widget")
-       self._boundSymbol_: str = kwargs.pop("symbol", "")
-       WorkspaceGuiMixin.__init__(self, parent=parent, title=title, **kwargs)
+        QtWidgets.QWidget.__init__(self, parent=parent)
+        title = kwargs.pop("title", f"{type(obj).__name__} Widget")
+        self._boundSymbol_: str = kwargs.pop("symbol", "")
+        WorkspaceGuiMixin.__init__(self, parent=parent, title=title, **kwargs)
 
-       if not isinstance(obj, self._objectTypes_):
+        if not isinstance(obj, self._objectTypes_):
             self._data_ =  sdc.CellCompartment()
         else:
             self._data_ = obj
 
-        if isinstance(data, sdc.NeuronCompartment):
+        if isinstance(self._data_, sdc.NeuronCompartment):
             self._compartmentTypeNames_ = list(sdc.NeuronCompartmentType.names())
         else:
             self._compartmentTypeNames_ = list(sdc.CellCompartmentType.names())
@@ -106,7 +106,9 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, QtWidgets.QWidget,
 
     def _configureUI_(self):
         self.setupUi(self)
+        self.dataExchangeWidget.dataType = type(self._data_)
         self.objectSymbolWidget.setValue(self._boundSymbol_)
+
         self.editParentToolButton.clicked.connect(self._slot_editParent)
         for s in self._compartmentTypeNames_:
             self.typeComboBox.addItem(s)
@@ -114,12 +116,43 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, QtWidgets.QWidget,
         self.typeComboBox.setCurrentIndex(ndx)
         self.typeComboBox.currentIndexChanged.connect(self._slot_compartmentTypeChanged)
 
+    def value(self) -> sdc.CellCompartment:
+        return self._data_
+
+    def setValue(self, val: sdc.CellCompartment):
+        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+                               (
+                                   self.dataExchangeWidget,
+                                   self.objectSymbolWidget,
+                                   self.editParentToolButton,
+                                   self.typeComboBox,
+                                   self,dataTreeViewToolButton,
+
+                                )
+                            )
+                        )
+
+
+        self.dataExchangeWidget.dataType = type(self._data_)
+
+        if isinstance(self._data_, sdc.NeuronCompartment):
+            self._compartmentTypeNames_ = list(sdc.NeuronCompartmentType.names())
+        else:
+            self._compartmentTypeNames_ = list(sdc.CellCompartmentType.names())
+        self.typeComboBox.clear()
+        for s in self._compartmentTypeNames_:
+            self.typeComboBox.addItem(s)
+        ndx = self._compartmentTypeNames_.index(self._data_.compartmentType.name)
+        self.typeComboBox.setCurrentIndex(ndx)
+
+
+
 
     @Slot(int)
     def _slot_compartmentTypeChanged(self, val:int):
         cTypes = sdc.CellCompartmentType if isinstance(self._data_, sdc.CellCompartment) else sdc.NeuronCompartmentType
         self._data_.compartmentType = cTypes[self._compartmentTypeNames_[val]]
-        sig_valueChanged.emit(self._data_)
+        self.sig_valueChanged.emit(self._data_)
 
     @Slot()
     def _slot_editParent(self):
