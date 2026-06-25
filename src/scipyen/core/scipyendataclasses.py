@@ -1020,11 +1020,11 @@ class ChemicalSynapse(ScipyenDataclass):
     morphologicalType : ChemicalSynapseMorphologicalType = ChemicalSynapseMorphologicalType.undefined
     functionalType: ChemicalSynapseFunctionalType = ChemicalSynapseFunctionalType.undefined
     # postsynapticEntityType: PostsynapticEntityType = PostsynapticEntityType.undefined
-    postsynaptic: typing.Union[CellCompartment, NeuronCompartment] = datalasses.field(default_factory = NeuronCompartment)
-    presynaptic: typing.Union[CellCompartment, NeuronCompartment] = datalasses.field(default_factory = NeuronCompartment)
+    postsynaptic: typing.Union[CellCompartment, UltrastructureElement] = dataclasses.field(default_factory = NeuronCompartment)
+    presynaptic: typing.Union[CellCompartment, UltrastructureElement] = dataclasses.field(default_factory = NeuronCompartment)
 
-    def __post_init__(self: typing.Self):
-        assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
+    # def __post_init__(self: typing.Self):
+    #     assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
 
     def getOrganism(self):
         if all(isinstance(p, (CellCompartment, NeuronCompartment)) for p in (self.postsynaptic, self.presynaptic)):

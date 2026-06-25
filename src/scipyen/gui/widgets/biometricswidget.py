@@ -67,15 +67,15 @@ Ui_BiometricsWidget, QWidget = loadUiType(
 
 T = sdc.Biometrics
 
-class BiometricsWidget(Ui_BiometricsWidget, QWidget):
+class BiometricsWidget(Ui_BiometricsWidget, QWidget, WorkspaceGuiMixin):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
-    _objectType_ = sdc.Biometrics
+    _objectTypes_ = (sdc.Biometrics,)
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.Biometrics] = None,
                  **kwargs):
 
-        if isinstance(parent, self._objectType_):
+        if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
                 parent = obj
@@ -85,11 +85,11 @@ class BiometricsWidget(Ui_BiometricsWidget, QWidget):
             obj = obj_
 
         QWidget.__init__(self, parent=parent)
-        title = kwargs.pop("title", f"{self._objectType_.__name__} Widget")
+        title = kwargs.pop("title", f"{self._objectTypes_.__name__} Widget")
         WorkspaceGuiMixin.__init__(self, parent=parent, title=title, **kwargs)
 
-        if not isinstance(obj, self._objectType_):
-            self._data_ =  self._objectType_()
+        if not isinstance(obj, self._objectTypes_):
+            self._data_ =  self._objectTypes_()
         else:
             self._data_ = obj
 
@@ -102,7 +102,7 @@ class BiometricsWidget(Ui_BiometricsWidget, QWidget):
     def _configureUI_(self):
         self.setupUi(self)
 
-        self.dataExchangeWidget.dataType = self._objectType_
+        self.dataExchangeWidget.dataType = self._objectTypes_
 
         self.nameLineEdit.setClearButtonEnabled(True)
         self.nameLineEdit.redoAvailable = True
@@ -206,8 +206,8 @@ class BiometricsWidget(Ui_BiometricsWidget, QWidget):
         self.sig_valueChanged.emit(self._data_)
 
     def setValue(self, val: typing.Optional[T] = None):
-        if not isinstance(val, self._objectType_):
-            val =  self._objectType_()
+        if not isinstance(val, self._objectTypes_):
+            val =  self._objectTypes_()
 
         self._data_ = val
 
