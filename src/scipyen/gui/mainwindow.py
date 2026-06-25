@@ -6839,46 +6839,30 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.fileSystemListView.activated[QtCore.QModelIndex].connect(
             self.slot_fileSystemItemActivated)
 
-#         self.fileSystemColumnViewPreviewWidget = QtWidgets.QWidget(self)
-#         self.fileSystemColumnViewPreviewWidget.setLayout(QtWidgets.QVBoxLayout(self.fileSystemColumnViewPreviewWidget))
-#
-#         self.fileSystemColumnViewPreviewWidgetTextEdit = QtWidgets.QPlainTextEdit(self)
-#         self.fileInfoDocument = QtGui.QTextDocument(parent=self.fileSystemColumnViewPreviewWidgetTextEdit)
-#         self.fileInfoDocumentLayout = QtWidgets.QPlainTextDocumentLayout(self.fileInfoDocument)
-#         self.fileInfoDocument.setDocumentLayout(self.fileInfoDocumentLayout)
-#         self.fileSystemColumnViewPreviewWidgetTextEdit.setDocument(self.fileInfoDocument)
-#         self.fileSystemColumnViewPreviewWidgetTextEdit.setReadOnly(True)
-#         self.fileSystemColumnViewPreviewWidget.layout().addWidget(self.fileSystemColumnViewPreviewWidgetTextEdit)
-#         self.fileSystemColumnViewPreviewWidgetTextEdit.setAutoFillBackground(True)
-#         self.fileSystemColumnViewPreviewWidgetTextEdit.setSizePolicy(
-#             QtWidgets.QSizePolicy(
-#                 QtWidgets.QSizePolicy.Expanding,
-#                 QtWidgets.QSizePolicy.Expanding,
-#                 )
-#             )
-#         self.fileSystemColumnViewPreviewWidget.setSizePolicy(
-#             QtWidgets.QSizePolicy(
-#                 QtWidgets.QSizePolicy.Expanding,
-#                 QtWidgets.QSizePolicy.Expanding,
-#                 )
-#             )
-#
-#         self.fileSystemColumnView.setPreviewWidget(self.fileSystemColumnViewPreviewWidget)
+        self.fileSystemColumnViewPreviewWidget = QtWidgets.QTextEdit(self)
+        self.fileSystemColumnViewPreviewWidget.setReadOnly(True)
+        self.fileSystemColumnViewPreviewWidget.setLineWrapMode(QtWidgets.QTextEdit.WidgetWidth)
+        self.fileSystemColumnViewPreviewWidget.setWordWrapMode(QtGui.QTextOption.WordWrap)
+        self.fileInfoDocument = QtGui.QTextDocument(self.fileSystemColumnViewPreviewWidget)
+        self.fileSystemColumnViewPreviewWidget.setDocument(self.fileInfoDocument)
+        self.fileSystemColumnViewPreviewWidget.setSizePolicy(
+            QtWidgets.QSizePolicy(
+                QtWidgets.QSizePolicy.Expanding,
+                QtWidgets.QSizePolicy.Expanding,
+                )
+            )
+        self.fileSystemColumnViewPreviewWidget.setSizePolicy(
+            QtWidgets.QSizePolicy(
+                QtWidgets.QSizePolicy.Expanding,
+                QtWidgets.QSizePolicy.Expanding,
+                )
+            )
 
-        self.fileSystemColumnViewPreviewWidget = QtWidgets.QLabel(self)
         self.fileSystemColumnView.setPreviewWidget(self.fileSystemColumnViewPreviewWidget)
-        self.fileSystemColumnViewPreviewWidget.setSizePolicy(
-            QtWidgets.QSizePolicy(
-                QtWidgets.QSizePolicy.Expanding,
-                QtWidgets.QSizePolicy.Expanding,
-                )
-            )
-        self.fileSystemColumnViewPreviewWidget.setSizePolicy(
-            QtWidgets.QSizePolicy(
-                QtWidgets.QSizePolicy.Expanding,
-                QtWidgets.QSizePolicy.Expanding,
-                )
-            )
+        previewParent = self.fileSystemColumnView.previewWidget().parent()
+        if previewParent.layout() is None:
+            previewParentLayout = QtWidgets.QVBoxLayout(previewParent)
+            previewParentLayout.addWidget(self.fileSystemColumnViewPreviewWidget)
 
         self.fileSystemColumnView.setModel(self.fileSystemModel)
 
@@ -6887,9 +6871,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.fileSystemColumnView.selectionModel().currentChanged.connect(
             self.slot_fileSystemColumnViewCurrentChanged)
-
-        # self.fileSystemColumnView.pressed[QtCore.QModelIndex].connect(
-        #     self.slot_fileSystemItemPressedInColumnView)
 
         self.fileSystemModel.directoryLoaded[str].connect(
             self.slot_resizeFileTreeColumnForPath)
@@ -8238,50 +8219,22 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @Slot(QtCore.QModelIndex)
     def slot_fileSystemItemPressedInColumnView(self, index:QtCore.QModelIndex):
-        self.fileSystemColumnViewPreviewWidget.setText(self._getFileInfoText_(index))
+        self.fileSystemColumnViewPreviewWidget.document().setPlainText(self.fileSystemModel.getFileInfoText(index))
+        # self.fileSystemColumnViewPreviewWidget.setText(self._getFileInfoText_(index))
+        # self.fileSystemColumnViewPreviewWidget.document().setPlainText(self.fileSystemModel.getFileInfoText(index))
         # self.fileSystemColumnViewPreviewWidgetTextEdit.document().setPlainText(self._getFileInfoText_(index))
         # self.fileSystemColumnViewPreviewWidgetTextEdit.document().adjustSize()
 
     @Slot(QtCore.QModelIndex, QtCore.QModelIndex)
     def slot_fileSystemColumnViewCurrentChanged(self, current: QtCore.QModelIndex, prev: QtCore.QModelIndex):
-        self.fileSystemColumnViewPreviewWidget.setText(self._getFileInfoText_(current))
-        # self.fileSystemColumnViewPreviewWidgetTextEdit.document().setPlainText(self._getFileInfoText_(current))
-        # self.fileSystemColumnViewPreviewWidgetTextEdit.document().adjustSize()
-
-    def _getFileInfoText_(self, index: QtCore.QModelIndex):
-        if not self.fileSystemModel.isDir(index):
-            fileInfo = index.data(QtGui.QFileSystemModel.FileInfoRole)
-            infoData = list()
-            infoData.append(fileInfo.fileName())
-            infoData.append(f"Path: {fileInfo.absolutePath()}")
-            if fileInfo.isSymbolicLink():
-                infoData.append(f"Linked to: {fileInfo.symLinkTarget()}")
-
-            bTime = fileInfo.birthTime()
-            lastMod = fileInfo.lastModified()
-            if isinstance(self.fileSystemModel.timeFormat, QtCore.QLocale.FormatType):
-                infoData.append(f"Created: {guiutils.formatRelativeDateTime(bTime, self.fileSystemModel.timeFormat)}")
-                infoData.append(f"Modified: {guiutils.formatRelativeDateTime(lastMod, self.fileSystemModel.timeFormat)}")
-            elif isinstance(self.fileSystemModel.timeFormat, str) and self.fileSystemModel.timeFormat in ("Fancy Short", "Fancy Narrow"):
-                tFormat = QtCore.QLocale.ShortFormat if self.timeFormat == "Fancy Short" else QtCore.QLocale.NarrowFormat
-                infoData.append(f"Created: {guiutils.formatRelativeDateTime(bTime, tFormat, fancy=True)}")
-                infoData.append(f"Modified: {guiutils.formatRelativeDateTime(lastMod, tFormat, fancy=True)}")
-
-
-            group = fileInfo.group()
-            if len(group):
-                infoData.append(f"Group: {group}")
-
-            owner = fileInfo.owner()
-            if len(owner):
-                infoData.append(f"Owner: {owner}")
-
-            infoData.append(f"Readable: {fileInfo.isReadable()}")
-            infoData.append(f"Writable: {fileInfo.isWritable()}")
-            infoData.append(f"Executable: {fileInfo.isExecutable()}")
-            return "\n".join(infoData)
-
-        return ""
+        self.fileSystemColumnViewPreviewWidget.document().clear()
+        icon = self.fileSystemModel.getFileIcon(current).toImage()
+        text = self.fileSystemModel.getFileInfoText(current)
+        docCursor = QtGui.QTextCursor(self.fileSystemColumnViewPreviewWidget.document())
+        docCursor.insertImage(icon)
+        docCursor.insertText("\n")
+        docCursor.insertHtml(text)
+        # self.fileSystemColumnViewPreviewWidget.document().setPlainText(text)
 
     @Slot(QtCore.QUrl)
     @safewrapper

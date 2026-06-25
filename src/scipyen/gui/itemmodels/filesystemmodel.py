@@ -36,6 +36,8 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
+from gui import guiutils
+
 class FileSystemModel(QtGui.QFileSystemModel):
     CutItemRole = QtCore.Qt.UserRole=1
     def __init__(self, parent:typing.Optional[QtCore.QObject] = None):
@@ -106,3 +108,92 @@ class FileSystemModel(QtGui.QFileSystemModel):
             return
 
         self._cutIndexes_ = value
+
+    def getFileIcon(self, index: QtCore.QModelIndex,
+                    size: QtCore.QSize = QtCore.QSize(48, 48)) -> QtGui.QPixmap:
+        icon = index.data(QtGui.QFileSystemModel.FileIconRole)
+        return icon.pixmap(size)
+
+    def getFileInfoText(self, index: QtCore.QModelIndex):
+        mimeDb = QtCore.QMimeDatabase()
+        fileInfo = index.data(QtGui.QFileSystemModel.FileInfoRole)
+        infoData = ["<html>"]
+        infoData.append(fileInfo.fileName())
+        mimeType = mimeDb.mimeTypeForFile(fileInfo)
+        mimeName = mimeType.name()
+        mimeAliases = mimeType.aliases()
+        mimeComment = mimeType.comment()
+        infoData.append(f"<p><b>Mime Type:</b> {mimeName}<br>")
+        if len(mimeAliases):
+            infoData.append(f"<b>Mime Aliases:</b> {', '.join(mimeAliases)}<br>")
+        infoData.append(f"<b>Mime Comment:</b> {mimeComment}</p>")
+        infoData.append(f"<p><b>Path:</b> {fileInfo.absolutePath()}</p>")
+        if fileInfo.isSymbolicLink():
+            infoData.append(f"<p><b>Linked To:</b> {fileInfo.symLinkTarget()}</p>")
+
+        bTime = fileInfo.birthTime()
+        lastMod = fileInfo.lastModified()
+        if isinstance(self.timeFormat, QtCore.QLocale.FormatType):
+            infoData.append(f"<p><b>Created:</b> {guiutils.formatRelativeDateTime(bTime, self.timeFormat)}<br>")
+            infoData.append(f"<b>Modified:</b> {guiutils.formatRelativeDateTime(lastMod, self.timeFormat)}</p>")
+        elif isinstance(self.timeFormat, str) and self.timeFormat in ("Fancy Short", "Fancy Narrow"):
+            tFormat = QtCore.QLocale.ShortFormat if self.timeFormat == "Fancy Short" else QtCore.QLocale.NarrowFormat
+            infoData.append(f"<p><b>Created:</b> {guiutils.formatRelativeDateTime(bTime, tFormat, fancy=True)}<br>")
+            infoData.append(f"<b>Modified:</b> {guiutils.formatRelativeDateTime(lastMod, tFormat, fancy=True)}</p>")
+
+        size = fileInfo.size()
+        infoData.append(f"<p><b>Size (bytes):</b> {size}</p>")
+
+        owner = fileInfo.owner()
+        if len(owner):
+            infoData.append(f"<p><b>Owner:</b> {owner}")
+
+        group = fileInfo.group()
+        if len(group):
+            if len(owner):
+                infoData.append(f"<br><b>Group:</b> {group}<p>")
+            else:
+                infoData.append(f"<p><b>Group:</b> {group}<p>")
+        else:
+            infoData.append("<p>")
+
+        infoData.append(f"<p><b>Readable:</b> {fileInfo.isReadable()}<br>")
+        infoData.append(f"<b>Writable:</b> {fileInfo.isWritable()}<br>")
+        infoData.append(f"<b>Executable:</b> {fileInfo.isExecutable()}</p>")
+        infoData.append("</html>")
+        return "\n".join(infoData)
+
+        # if not self.isDir(index):
+        #     fileInfo = index.data(QtGui.QFileSystemModel.FileInfoRole)
+        #     infoData = list()
+        #     infoData.append(fileInfo.fileName())
+        #     infoData.append(f"Path: {fileInfo.absolutePath()}")
+        #     if fileInfo.isSymbolicLink():
+        #         infoData.append(f"Linked to: {fileInfo.symLinkTarget()}")
+        #
+        #     bTime = fileInfo.birthTime()
+        #     lastMod = fileInfo.lastModified()
+        #     if isinstance(self.timeFormat, QtCore.QLocale.FormatType):
+        #         infoData.append(f"Created: {guiutils.formatRelativeDateTime(bTime, self.timeFormat)}")
+        #         infoData.append(f"Modified: {guiutils.formatRelativeDateTime(lastMod, self.timeFormat)}")
+        #     elif isinstance(self.timeFormat, str) and self.timeFormat in ("Fancy Short", "Fancy Narrow"):
+        #         tFormat = QtCore.QLocale.ShortFormat if self.timeFormat == "Fancy Short" else QtCore.QLocale.NarrowFormat
+        #         infoData.append(f"Created: {guiutils.formatRelativeDateTime(bTime, tFormat, fancy=True)}")
+        #         infoData.append(f"Modified: {guiutils.formatRelativeDateTime(lastMod, tFormat, fancy=True)}")
+        #
+        #
+        #     group = fileInfo.group()
+        #     if len(group):
+        #         infoData.append(f"Group: {group}")
+        #
+        #     owner = fileInfo.owner()
+        #     if len(owner):
+        #         infoData.append(f"Owner: {owner}")
+        #
+        #     infoData.append(f"Readable: {fileInfo.isReadable()}")
+        #     infoData.append(f"Writable: {fileInfo.isWritable()}")
+        #     infoData.append(f"Executable: {fileInfo.isExecutable()}")
+        #     return "\n".join(infoData)
+
+        # return ""
+
