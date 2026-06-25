@@ -627,9 +627,8 @@ class BioSourceType(TypeEnum):
     invitro     = auto()    # culture system, homogenate
     invivo      = auto()    # e.g. in vivo imaging, electrophysiology, etc
     organism    = auto()    # for behaviour and systemic measurements (temperature, mass, motor function, etc)
-    organ       = auto()    # e.g. isolated hear, aorta, ileum, 33
+    organ       = auto()    # e.g. isolated heart, aorta, ileum, 33
     tissue      = auto()    # e.g. aortic strip, teania caeci/coli, etc
-    # marrow      = auto() # this is an organ!
     cell        = auto()
     thrombocyte = auto()
     platelet    = thrombocyte
@@ -1020,30 +1019,30 @@ class DendriticCompartment(NeuronCompartment):
 class ChemicalSynapse(ScipyenDataclass):
     morphologicalType : ChemicalSynapseMorphologicalType = ChemicalSynapseMorphologicalType.undefined
     functionalType: ChemicalSynapseFunctionalType = ChemicalSynapseFunctionalType.undefined
-    postsynapticEntityType: PostsynapticEntityType = PostsynapticEntityType.undefined
-    preSynapticParent: typing.Union[Neuron, Cell] = dataclasses.field(default_factory = Neuron)
-    postSynapticParent: typing.Union[Neuron, Cell] = dataclasses.field(default_factory = Neuron)
+    # postsynapticEntityType: PostsynapticEntityType = PostsynapticEntityType.undefined
+    postsynaptic: typing.Union[CellCompartment, NeuronCompartment] = datalasses.field(default_factory = NeuronCompartment)
+    presynaptic: typing.Union[CellCompartment, NeuronCompartment] = datalasses.field(default_factory = NeuronCompartment)
 
     def __post_init__(self: typing.Self):
         assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
 
     def getOrganism(self):
-        parents = (self.preSynapticParent, self.postSynapticParent)
-        if all(isinstance(p, Neuron) and all(p.parent == self.preSynapticParent.parent) for p in parents):
-            return self.preSynapticParent.getOrganism()
+        if all(isinstance(p, (CellCompartment, NeuronCompartment)) for p in (self.postsynaptic, self.presynaptic)):
+            organisms = tuple(map(lambda p: p.getOrganism(), (self.postsynaptic, self.presynaptic)))
+            if organisms[0] == organisms[1]:
+                return organisms[0]
 
-    def setOrganism(self, o:Organism):
-        parents = (self.preSynapticParent, self.postSynapticParent)
-        if all(isinstance(p, Neuron) for p in parents):
-            p.setOrganism(o)
+    def setOrganism(self, organism: Organism):
+        for parent in (self.preSynapticParent, self.postSynapticParent):
+            parent.setOrganism(organism)
 
 @dataclass
 class UltrastructureElement(ScipyenDataclass):
     elementType: UltrastructureElementType = UltrastructureElementType.undefined
-    parent: Cell = dataclasses.field(default_factory = Cell)
+    parent: typing.Union[Cell, CellCompartment, ChemicalSynapse, Tissue, Organ] = dataclasses.field(default_factory = Cell)
 
     def getOrganism(self):
-        if isinstance(self.parent, (Cell, ChemicalSynapse)):
+        if isinstance(self.parent, (Cell, ChemicalSynapse, CellCompartment)):
             return self.parent.getOrganism()
 
     def setOrganism(self, o:Organism):
