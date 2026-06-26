@@ -767,11 +767,11 @@ class Biometrics(ScipyenDataclass):
     height:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t") # noqa
-        repr_attr = lambda x: (f": {type(x).__name__} → '{x}'" if isinstance(x, str)
-                               else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x))
-                               else f": {type(x).__name__} → {x.name} ({x})" if isinstance(x, Enum)
-                               else f": {type(x).__name__} → {x}") # noqa
+        # indent = lambda x: x.replace("\n", "\n\t") # noqa
+        # repr_attr = lambda x: (f": {type(x).__name__} → '{x}'" if isinstance(x, str)
+        #                        else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x))
+        #                        else f": {type(x).__name__} → {x.name} ({x})" if isinstance(x, Enum)
+        #                        else f": {type(x).__name__} → {x}") # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -788,8 +788,8 @@ class Organism(ScipyenDataclass):
     ID: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t") # noqa
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x.name}" if isinstance(x, Enum) else f": {type(x).__name__} → {x}" # noqa
+        # indent = lambda x: x.replace("\n", "\n\t") # noqa
+        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x.name}" if isinstance(x, Enum) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -960,8 +960,8 @@ class CellCompartment(ScipyenDataclass):
     parent: Cell = dataclasses.field(default_factory = Cell)
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t") # noqa
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
+        # indent = lambda x: x.replace("\n", "\n\t") # noqa
+        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f"{x.name} -> {x}" if isinstance(x, Enum) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -989,8 +989,8 @@ class NeuronCompartment(CellCompartment):
         #                  parent = self.parent)
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t") # noqa
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
+        # indent = lambda x: x.replace("\n", "\n\t") # noqa
+        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -1098,8 +1098,8 @@ class BiologicalSource(ScipyenDataclass):
             )
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t") # noqa
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
+        # indent = lambda x: x.replace("\n", "\n\t") # noqa
+        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -1156,8 +1156,8 @@ class Procedure(ScipyenDataclass):
     # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("type", ) )) # "name" and "description" inherited from ScipyenDataclass
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        # indent = lambda x: x.replace("\n", "\n\t")
+        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -1188,8 +1188,8 @@ class SubstanceDosage(ScipyenDataclass):
     __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("dose", )))
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        # indent = lambda x: x.replace("\n", "\n\t")
+        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -1252,8 +1252,8 @@ class Episode(ScipyenDataclass):
         return super().__eq__(other)
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        # indent = lambda x: x.replace("\n", "\n\t")
+        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -1273,8 +1273,8 @@ class Schedule(ScipyenDataclass):
     # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("episodes",)))
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        # indent = lambda x: x.replace("\n", "\n\t")
+        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -1781,7 +1781,16 @@ of 'args'.
     # #                            module=None)
 
 
-
+def repr_attr(x):
+    indent = lambda x: x.replace("\n", "\n\t") # noqa
+    if isinstance(x, str):
+        return f": {type(x).__name__} → '{x}'"
+    elif dataclasses.is_dataclass(type(x)):
+        return f": {type(x).__name__} → {indent(x.__repr__())}"
+    elif isinstance(x, Enum):
+        return f": {type(x).__name__} →  '{x.name}' ({x})"
+    else:
+        return f": {type(x).__name__} → {x}"
 
 # __all__ = ("AdministrationRoute", "BiologicalSource", "Biometrics",
 #            "BioSourceType", "Cell", "CellCompartment","CellCompartmentType", "Episode",

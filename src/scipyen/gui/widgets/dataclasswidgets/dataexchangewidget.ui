@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>290</width>
-    <height>72</height>
+    <width>281</width>
+    <height>76</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -22,138 +22,6 @@
   <layout class="QGridLayout" name="gridLayout">
    <item row="0" column="0">
     <layout class="QVBoxLayout" name="verticalLayout">
-     <item>
-      <layout class="QHBoxLayout" name="horizontalLayout_3">
-       <property name="sizeConstraint">
-        <enum>QLayout::SizeConstraint::SetMinimumSize</enum>
-       </property>
-       <item>
-        <widget class="QToolButton" name="loadToolButton">
-         <property name="minimumSize">
-          <size>
-           <width>16</width>
-           <height>16</height>
-          </size>
-         </property>
-         <property name="toolTip">
-          <string>Load meta-data from file</string>
-         </property>
-         <property name="statusTip">
-          <string>Load meta-data from file</string>
-         </property>
-         <property name="whatsThis">
-          <string>Load meta-data from file</string>
-         </property>
-         <property name="text">
-          <string>Load from file</string>
-         </property>
-         <property name="icon">
-          <iconset theme="document-open"/>
-         </property>
-         <property name="autoRaise">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="importToolButton">
-         <property name="minimumSize">
-          <size>
-           <width>16</width>
-           <height>16</height>
-          </size>
-         </property>
-         <property name="toolTip">
-          <string>Import metadata from workspace object</string>
-         </property>
-         <property name="statusTip">
-          <string>Import metadata from workspace object</string>
-         </property>
-         <property name="whatsThis">
-          <string>Import metadata from workspace object</string>
-         </property>
-         <property name="text">
-          <string>Import</string>
-         </property>
-         <property name="icon">
-          <iconset theme="document-import"/>
-         </property>
-         <property name="autoRaise">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="saveToolButton">
-         <property name="minimumSize">
-          <size>
-           <width>16</width>
-           <height>16</height>
-          </size>
-         </property>
-         <property name="toolTip">
-          <string>Save metadata to file</string>
-         </property>
-         <property name="statusTip">
-          <string>Save metadata to file</string>
-         </property>
-         <property name="whatsThis">
-          <string>Save metadata to file</string>
-         </property>
-         <property name="text">
-          <string>Save</string>
-         </property>
-         <property name="icon">
-          <iconset theme="document-save"/>
-         </property>
-         <property name="autoRaise">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="exportToolButton">
-         <property name="minimumSize">
-          <size>
-           <width>16</width>
-           <height>16</height>
-          </size>
-         </property>
-         <property name="toolTip">
-          <string>Export metadata to workspace object</string>
-         </property>
-         <property name="statusTip">
-          <string>Export metadata to workspace object</string>
-         </property>
-         <property name="whatsThis">
-          <string>Export metadata to workspace object</string>
-         </property>
-         <property name="text">
-          <string>Export</string>
-         </property>
-         <property name="icon">
-          <iconset theme="document-export"/>
-         </property>
-         <property name="autoRaise">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <spacer name="horizontalSpacer_2">
-         <property name="orientation">
-          <enum>Qt::Orientation::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>40</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-      </layout>
-     </item>
      <item>
       <layout class="QHBoxLayout" name="objectSymbolLayout">
        <item>
@@ -180,6 +48,188 @@
        </item>
        <item>
         <spacer name="objectSymbolSpacer">
+         <property name="orientation">
+          <enum>Qt::Orientation::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_3">
+       <property name="sizeConstraint">
+        <enum>QLayout::SizeConstraint::SetMinimumSize</enum>
+       </property>
+       <item>
+        <widget class="QToolButton" name="newObjectToolButton">
+         <property name="toolTip">
+          <string>Create new object with default values</string>
+         </property>
+         <property name="statusTip">
+          <string>Create new object with default values</string>
+         </property>
+         <property name="whatsThis">
+          <string>Create new object with default values</string>
+         </property>
+         <property name="text">
+          <string>New</string>
+         </property>
+         <property name="icon">
+          <iconset theme="document-new"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="loadToolButton">
+         <property name="minimumSize">
+          <size>
+           <width>16</width>
+           <height>16</height>
+          </size>
+         </property>
+         <property name="toolTip">
+          <string>Load data from file</string>
+         </property>
+         <property name="statusTip">
+          <string>Load data from file</string>
+         </property>
+         <property name="whatsThis">
+          <string>Load data from file</string>
+         </property>
+         <property name="text">
+          <string>Load from file</string>
+         </property>
+         <property name="icon">
+          <iconset theme="document-open"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="saveToolButton">
+         <property name="minimumSize">
+          <size>
+           <width>16</width>
+           <height>16</height>
+          </size>
+         </property>
+         <property name="toolTip">
+          <string>Save as pickle</string>
+         </property>
+         <property name="statusTip">
+          <string>Save as pickle</string>
+         </property>
+         <property name="whatsThis">
+          <string>Save as pickle</string>
+         </property>
+         <property name="text">
+          <string>Save</string>
+         </property>
+         <property name="icon">
+          <iconset theme="document-save"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="importToolButton">
+         <property name="minimumSize">
+          <size>
+           <width>16</width>
+           <height>16</height>
+          </size>
+         </property>
+         <property name="toolTip">
+          <string>Import from workspace</string>
+         </property>
+         <property name="statusTip">
+          <string>Import from workspace</string>
+         </property>
+         <property name="whatsThis">
+          <string>Import from workspace</string>
+         </property>
+         <property name="text">
+          <string>Import</string>
+         </property>
+         <property name="icon">
+          <iconset theme="document-import"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="exportToolButton">
+         <property name="minimumSize">
+          <size>
+           <width>16</width>
+           <height>16</height>
+          </size>
+         </property>
+         <property name="toolTip">
+          <string>Export to workspace.
+This will bind the object to a new symbol in the workspace. 
+If the object is already bound to another symbol, both symbols will point to the same object.</string>
+         </property>
+         <property name="statusTip">
+          <string>Export to workspace.</string>
+         </property>
+         <property name="whatsThis">
+          <string>Export to workspace.
+This will bind the object to a new symbol in the workspace. 
+If the object is already bound to another symbol, both symbols will point to the same object.</string>
+         </property>
+         <property name="text">
+          <string>Export</string>
+         </property>
+         <property name="icon">
+          <iconset theme="document-export"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="copyToolButton">
+         <property name="toolTip">
+          <string>Export a deep copy to the workspace.
+You will still work on the original object.</string>
+         </property>
+         <property name="statusTip">
+          <string>Export a deep copy to the workspace. You will still work on the original object.</string>
+         </property>
+         <property name="whatsThis">
+          <string>Export a deep copy to the workspace.
+You will still work on the original object.</string>
+         </property>
+         <property name="text">
+          <string>Copy</string>
+         </property>
+         <property name="icon">
+          <iconset theme="edit-copy"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="horizontalSpacer_2">
          <property name="orientation">
           <enum>Qt::Orientation::Horizontal</enum>
          </property>

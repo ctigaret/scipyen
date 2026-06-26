@@ -525,7 +525,7 @@ def get_symbol_in_namespace(x:typing.Any, ws:typing.Optional[dict] = None):
         ws = user_workspace()
 
     elif not isinstance(ws, dict):
-        raise TypeError("'ws' expected ot be a dict; got %s instead" % type(ws).__name__)
+        raise TypeError("'ws' expected to be a dict; got %s instead" % type(ws).__name__)
 
     return [k for k in ws if ws[k] is x and not k.startswith("_")]
 
@@ -545,33 +545,6 @@ Returns None if the SciyenWindow instance is not found
     """
     from gui import guiutils
     return guiutils.getScipyenMainWindow()
-# #     # NOTE: 2026-01-04 22:34:17
-# #     # redundant: see gui.guiutils.getScipyenMainWindow
-# #     ret = None
-# #     ws = user_workspace()
-# #     if ws is not None:
-# #         ret = ws["mainWindow"]
-# #     else:
-# #         frame_records = inspect.getouterframes(inspect.currentframe())
-# #         for (n,f) in enumerate(frame_records):
-# #             if "ScipyenWindow" in f[0].f_globals:
-# #                 if __has_PyQt6__:
-# #                     ret = f[0].f_globals["ScipyenWindow"]
-# #                 else:
-# #                     ret = f[0].f_globals["ScipyenWindow"].instance()
-# #                 break
-# #
-# #     if ret is None:
-# #         try:
-# #             app = QtWidgets.QApplication.instance()
-# #             if app is not None:
-# #                 ww = list(filter(lambda x: "ScipyenWindow" in x.__class__.__name__, app.topLevelWidgets()))
-# #                 if len(ww):
-# #                     ret = ww[0]
-# #         except:
-# #             traceback.print_exc()
-# #
-# #     return ret
 
 def getCallSource() -> object:
     # FIXME

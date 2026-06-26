@@ -7,6 +7,7 @@
 
 import sys, os, typing, types, warnings, math, cmath # noqa
 import numbers # noqa
+import dataclasses
 import numpy as np # noqa
 import quantities as pq # noqa
 import neo
@@ -48,6 +49,7 @@ except:
 
 from core import datatypes # noqa
 from core.prog import scipywarn # noqa
+from core import utilities
 from gui import (guiutils, interact) # noqa
 from gui.workspacegui import WorkspaceGuiMixin
 from iolib import pictio as pio
@@ -64,7 +66,39 @@ class DataExchangeWidget(Ui_DataExchangeWidget, QWidget, WorkspaceGuiMixin):
 Contains a set of tool buttons for loading/saving data to/from piclkle files and
 for importing/exporting data to the user workspace.
 
+For information purposes, the widget also contains a label with the workspace
+symbol bound to the data (if any).
+
+The widget is meant to be used as a child widget of more complex widgets in Scipyen,
+to offset data input/output operations here (loading from/saving to pickle files,
+importing from/exporting to the user's workspace).
+
+These operations communicate with the parent widget via Qt signal/slots.
+
+The only prerequisites for the parent widget are:
+
+1. On the "output side": the parent widget shoulwd sends the data object via one
+of two signals: sig_dataSaving and sig_dataExporting to trigger respectively,
+saving and exporting logic. These two signals (in the parent widget) MUST be
+connected to the public Qt slots of this widget: ``slot_saveData`` and ``slot_exportData``.
+
+2. On the "input side": the parent widget should have at least one Qt slot connected to this
+widget's Qt signals ``sig_dataLoaded`` and ``sig_dataImported`` to receive the incoming
+data object after loading from file or importing from the workspace.
+
+NOTE: This widget does NOT hold any reference to the data; hence it lacks a
+`value()` method. On the other hand, the method `setValue(obj)` updates the internal
+attributes of the widget to reflect the data type of `obj` and possibly the symbol
+that `obj` is bound to, in the user space.
+
 """
+    sig_dataLoaded = Signal(object, name="sig_dataLoaded")
+    sig_dataImported = Signal(object, name="sig_dataImported")
+    sig_requestDataExport = Signal(name="sig_requestDataExport")
+    sig_requestDataSave = Signal(name="sig_requestDataSave")
+    sig_requestDataCopy = Signal(name="sig_requestDataCopy")
+    sig_requestNewObject = Signal(name="sig_requestNewObject")
+
     def __init__(self, objType: typing.Optional[type]=None,
                  parent: typing.Optional[QtWidgets.QWidget] = None, **kwargs):
 
@@ -82,9 +116,6 @@ for importing/exporting data to the user workspace.
         QtCore.QObject.__init__(self, parent=parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
 
-        # if not isinstance(objType, type):
-        #     raise TypeError(f"First parameter must be a type; instead, got a {type(objType).__name__}")
-
         self._objectType_ = objType
 
         self._configureUI_()
@@ -94,8 +125,20 @@ for importing/exporting data to the user workspace.
 
         self.loadToolButton.clicked.connect(self._slot_loadData)
         self.importToolButton.clicked.connect(self._slot_importData)
-        self.saveToolButton.clicked.connect(self._slot_saveData)
-        self.exportToolButton.clicked.connect(self._slot_exportData)
+        self.saveToolButton.clicked.connect(self.sig_requestDataSave)
+        self.copyToolButton.clicked.connect(self.sig_requestDataCopy)
+        # self.saveToolButton.clicked.connect(self._slot_saveData)
+        self.exportToolButton.clicked.connect(self.sig_requestDataExport)
+        self.newObjectToolButton.clicked.connect(self.sig_requestNewObject)
+        # self.exportToolButton.clicked.connect(self._slot_exportData)
+
+    @property
+    def varName(self) -> str:
+        ret = self.objectSymbolLabel.text()
+        if not isinstance(ret, str):
+            return ""
+        else:
+            return ret
 
     @property
     def dataType(self) -> type:
@@ -112,61 +155,99 @@ for importing/exporting data to the user workspace.
 
     @Slot()
     def _slot_loadData(self):
-        if hasattr(self.parent(), "setValue"):
-            fileNameFilter = "*.pkl"
-            fn, fl = self.chooseFile(caption = f"Open {self._objectType_.__name__} Pickle File",
-                                    fileFilter = fileNameFilter,
-                                    single=True)
+        fileNameFilter = "*.pkl"
+        fn, fl = self.chooseFile(caption = f"Open {self._objectType_.__name__} Pickle File",
+                                fileFilter = fileNameFilter,
+                                single=True)
 
-            if len(fn.strip()):
-                obj = pio.loadFile(fn)
-                if isinstance(obj, self._objectType_):
-                    self.parent().setValue(obj)
+        if len(fn.strip()):
+            obj = pio.loadFile(fn)
+            if isinstance(obj, self._objectType_):
+                if self.receivers(self.sig_dataLoaded) > 0:
+                    self.sig_dataLoaded.emit(obj)
+                    # varName = os.path.basename(fn)
+                    # self.objectSymbolLabel.setText(varName)
+                    # self.objectSymbolLabel.setToolTip(f"'{varName}' is a {type(obj).__name__} object")
                 else:
-                    self.errorMessage(title = f"Open {self._objectType_.__name__} Pickle File",
-                                    text = f"Expecting a {self._objectType_.__name__}; intead got a {type(obj).__name__}")
+                    self.setValue(obj)
 
-            if hasattr(self.parent(), "sig_valueChanged"):
-                self.parent().sig_valueChanged.emit(self.value())
+            else:
+                self.errorMessage(title = f"Open {self._objectType_.__name__} Pickle File",
+                                text = f"Expecting a {self._objectType_.__name__}; intead got a {type(obj).__name__}")
 
-    @Slot()
-    def _slot_saveData(self):
-        if hasattr(self.parent(), "value"):
-            obj = self.parent().value()
+    @Slot(object)
+    def slot_saveData(self, obj):
+        if not isinstance(obj, self._objectType_):
+            return
 
-            if not isinstance(obj, self._objectType_):
-                return
+        fileNameFilter = "*.pkl"
 
-            fileNameFilter = "*.pkl"
+        fn, fl = self.chooseFile(caption = f"Save {self._objectType_.__name__} as Pickle File",
+                                fileFilter = fileNameFilter,
+                                single=True, save=True)
 
-            fn, fl = self.chooseFile(caption = f"Save {self._objectType_.__name__} as Pickle File",
-                                    fileFilter = fileNameFilter,
-                                    single=True, save=True)
+        if len(fn.strip()):
+            pio.savePickle(obj, fn)
 
-            if len(fn.strip()):
-                pio.savePickle(obj, fn)
 
     @Slot()
     def _slot_importData(self):
-        if hasattr(self.parent(), "setValue"):
-            ret = self.importFromWorkSpace(dataTypes = self._objectType_,
-                                        title=f"Select {self._objectType_.__name__} Object in Workspace",
-                                        single=True,
-                                        retrieve_all = True)
-            # print(f"{self.__class__.__name__}._slot_importData -> ret = {ret}\n\t({type(ret).__name__})")
-            if isinstance(ret, typing.Sequence) and len(ret) and isinstance(ret[0], self._objectType_):
-                self.parent().setValue(ret[0])
-
-            if hasattr(self.parent(), "sig_valueChanged"):
-                self.parent().sig_valueChanged.emit(self.value())
-
-    @Slot()
-    def _slot_exportData(self):
-        if hasattr(self.parent, "value"):
-            obj = self.parent().value()
+        ret = self.importFromWorkSpace(dataTypes = self._objectType_,
+                                    title=f"Select {self._objectType_.__name__} Object in Workspace",
+                                    single=True,
+                                    with_varName=True,
+                                    retrieve_all = True)
+        if isinstance(ret, dict) and len(ret) == 1:
+            varName = list(ret.keys())[0]
+            obj = ret[varName]
             if isinstance(obj, self._objectType_):
-                name = obj.name
-                if not isinstance(name, str) or len(name.strip()) == 0:
-                    name = self._objectType_.__name__.lower()
+                if self.receivers(self.sig_dataImported) > 0:
+                    self.sig_dataImported.emit(obj)
+                    # self.objectSymbolLabel.setText(varName)
+                    # self.objectSymbolLabel.setToolTip(f"'{varName}' is bound to a {type(obj).__name__} object in the workspace")
 
-                self.exportDataToWorkspace(obj, name)
+    @Slot(object)
+    def slot_exportData(self, obj):
+        if isinstance(obj, self._objectType_):
+            name = obj.name
+            if not isinstance(name, str) or len(name.strip()) == 0:
+                name = self._objectType_.__name__.lower()
+
+            varName = self.exportDataToWorkspace(obj, name)
+
+            if isinstance(varName, str):
+                self.objectSymbolLabel.setText(varName)
+                self.objectSymbolLabel.setToolTip(f"'{varName}' is bound to a {type(obj).__name__} object in the workspace")
+
+    @Slot(object)
+    def slot_copyData(self, obj):
+        from copy import deepcopy
+        if isinstance(obj, self._objectType_):
+            obj1 = deepcopy(obj)
+            name = obj1.name
+            if not isinstance(name, str) or len(name.strip()) == 0:
+                name = self._objectType_.__name__.lower()
+
+            self.exportDataToWorkspace(obj1, name)
+
+    def setValue(self, obj: typing.Any):
+        self.dataType = type(obj)
+
+        candidateSymbols = self.getDataSymbolInWorkspace(obj)
+        if isinstance(candidateSymbols, str):
+            varName = candidateSymbols
+
+        elif (isinstance(candidateSymbols, typing.Sequence) and
+              len(candidateSymbols) and
+              all(isinstance(s, str) for s in candidateSymbols)):
+            varName = candidateSymbols[0]
+        else:
+            varName = None
+
+        if isinstance(varName, str) and len(varName.strip()):
+            self.objectSymbolLabel.setText(varName)
+            self.objectSymbolLabel.setToolTip(f"'{varName}' is bound to a {type(obj).__name__} object in the workspace")
+        else:
+            self.objectSymbolLabel.clear()
+            self.objectSymbolLabel.setToolTip("")
+

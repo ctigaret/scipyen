@@ -493,9 +493,12 @@ class LineEdit(QtWidgets.QLineEdit):
     r"""Line editor widget with custom context menu and, optional lazy notifications of text changes.
 
     To constrain for numeric values/arrays, including Quantity arrays, use it with guiutils.NumericStringValidator.
+
+    The inherited Qt signal "textChanged" is still available!
 """
     sig_enterPressed = Signal(str, name="sig_enterPressed")
     sig_lazy = Signal(bool, name="sig_lazy")
+
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  contents: typing.Optional[str] = None,
                  lazy: bool = False,

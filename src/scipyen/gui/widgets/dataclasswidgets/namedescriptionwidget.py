@@ -63,3 +63,76 @@ from gui.textviewer import TextViewer
 from gui.widgets import small_widgets as smw
 from gui.workspacegui import WorkspaceGuiMixin
 from iolib import pictio as pio
+
+
+__module_path__ = os.path.abspath(os.path.dirname(__file__))
+__module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
+
+Ui_NameDescriptionWidget, QWidget = loadUiType(
+    os.path.join(__module_path__, "namedescriptionwidget.ui")
+    )
+
+class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiMixin):
+    sig_valueChanged = Signal(object, name="sig_valueChanged")
+    sig_nameChanged = Signal(str, name="sig_nameChanged")
+    sig_descriptionChanged = Signal(str, name="sig_descriptionChanged")
+
+    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None):
+        QtCore.QObject.__init__(self, parent=parent)
+
+        self._dataName_ = ""
+        self._dataDescription_ = ""
+
+        self._configureUI_()
+
+    def _configureUI_(self):
+        self.setupUi(self)
+        self._descriptionEditor = None
+        self.nameLineEdit.setText(self._dataName_)
+        self.nameLineEdit.textChanged.connect(self._slot_nameChanged)
+        self.descriptionToolButton.clicked.connect(self._slot_editDescription)
+
+    @Slot(str)
+    def _slot_nameChanged(self, val:str):
+        self._dataName_ = val
+        self.sig_nameChanged.emit(self._dataName_)
+
+    @Slot()
+    def _slot_editDescription(self):
+        if not isinstance(self._descriptionEditor, textviewer.TextViewer):
+            self._descriptionEditor = textviewer.TextViewer(self._dataDescription_,
+                                                parent=self, edit=True,
+                                                win_title="Edit description",
+                                                doc_title="Edit description",
+                                                title="Description")
+            # self._descriptionEditor.setVisible(False)
+            self._descriptionEditor.sig_textChanged.connect(self._slot_descriptionChanged)
+
+        self._descriptionEditor.setData(self._dataDescription_)
+        self._descriptionEditor.show()
+
+    @Slot()
+    def _slot_descriptionChanged(self):
+        if isinstance(self._descriptionEditor, textviewer.TextViewer):
+            self._dataDescription_ = self._descriptionEditor.text(plain=True)
+            self.sig_descriptionChanged.emit(self._dataDescription_)
+
+    @property
+    def dataName(self) -> str:
+        return self._dataName_
+
+    @dataName.setter
+    def dataName(self, val:str):
+        self._dataName_ = val
+        sigBlock = QtCore.QSignalBlocker(self.nameLineEdit)
+        self.nameLineEdit.setText(self._dataName_)
+        self.sig_nameChanged.emit(self._dataName_)
+
+    @property
+    def dataDescription(self) -> str:
+        return self._dataDescription_
+
+    @dataDescription.setter
+    def dataDescription(self, val:str):
+        self._dataDescription_ = val
+        self.sig_descriptionChanged.emit(self._dataDescription_)

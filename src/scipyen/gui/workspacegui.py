@@ -1329,13 +1329,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
         """
         return self._appWindow_
-#         if isinstance(self._scipyenWindow_, QtWidgets.QMainWindow) and type(self._scipyenWindow_).__name__ == "ScipyenWindow":
-#             return self._scipyenWindow_
-#
-#         p = self.parent()
-#
-#         if isinstance(p, QtWidgets.QMainWindow):
-#             return p
 
     @safewrapper
     def importWorkspaceData(self, dataTypes: typing.Union[typing.Type[typing.Any],
@@ -1345,7 +1338,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                             single: bool=True,
                             preSelected: typing.Optional[str]=None,
                             with_varName: bool=False,
-                            predicate = None):
+                            predicate = None) -> list:
         r"""Launches ItemsListDialog to import on or several workspace variables.
 
         Parameters:
@@ -1441,7 +1434,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     @safewrapper
     def exportDataToWorkspace(self, data:typing.Any, var_name:str,
                               title:str="Export data to workspace",
-                              dialog:bool=True):
+                              dialog:bool=True) -> str | None:
+        r"""Returns the new variable symbol (name) bound to the object in the workspace"""
         newVarName = strutils.str2symbol(var_name)
         if self.isTopLevel and self.appWindow:
             scipyenWindow = self.appWindow
@@ -1487,13 +1481,16 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
                 if hasattr(self, "statusBar"):
                     self.statusBar().showMessage("Done!")
+
         else:
             scipyenWindow.assignToWorkspace(newVarName, data)
 
             if hasattr(data, "modified") and isinstance(data.modified, bool):
                 data.modified=False
 
-    def getDataSymbolInWorkspace_(self, data=None):
+        return newVarName
+
+    def getDataSymbolInWorkspace(self, data=None):
         r"""Calls workspacefunctions.get_symbol_in_namespace for the data.
         """
         if self.isTopLevel and self.appWindow:
