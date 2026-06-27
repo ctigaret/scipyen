@@ -473,16 +473,6 @@ class ChemicalSynapseUltrastructureElementType(TypeEnum):
     extrasynaptic = auto()
     cleft = auto()
 
-class ChemicalSynapseMorphologicalType(TypeEnum):
-    undefined = 0
-    symmetrical = auto()
-    asymmetrical = auto()
-    glomerulus = auto() # cerebellar glomerulus
-    mossy = auto() # hippocampal mossy fibre synapse
-    calyx = auto() # calyx of Held
-    nmj = auto() # neuromuscular junction
-    other = auto()
-
 class PostsynapticEntityType(TypeEnum):
     undefined = 0
     soma = auto()
@@ -494,6 +484,41 @@ class ChemicalSynapseFunctionalType(TypeEnum):
     undefined = 0
     excitatory = auto()
     inhibitory = auto()
+
+class ChemicalSynapseMorphologicalType(TypeEnum):
+    undefined = 0
+    symmetrical = auto()
+    asymmetrical = auto()
+    glomerulus = auto() # cerebellar glomerulus
+    mossy = auto() # hippocampal mossy fibre synapse
+    calyx = auto() # calyx of Held
+    nmj = auto() # neuromuscular junction
+    volume = auto()
+    other = auto()
+
+class Neurotransmitter(TypeEnum):
+    undefined = 0
+    Glutamate = auto()
+    Glycine = auto()
+    GABA = auto()
+    Acetylcholine = auto()
+    Adrenaline = auto()
+    Epinephrine = Adrenaline
+    Noradrenaline = auto()
+    Norepinephrine = Noradrenaline
+    Dopamine = auto()
+    Histamine = auto()
+    Serotonin = auto()
+    Tyramine = auto()
+    Octopamine = auto()
+    Endorphins = auto()
+    Endocannabinoids = auto()
+    Neuropeptide = auto()
+    SubstanceP = Neuropeptide
+    ATP = auto()
+    Purines = ATP
+    NO = auto()
+    EDRF = NO
 
 class PlasmaMembraneSpecializationType(TypeEnum):
     undefined = 0
@@ -917,6 +942,10 @@ class Organ(ScipyenDataclass):
         else:
             self.organism = Organism()
 
+    def __hash__(self) -> int:
+        return hash((self.atlasName))
+
+
 @dataclass
 class Tissue(ScipyenDataclass):
     r"""Tissue"""
@@ -1025,6 +1054,8 @@ class ChemicalSynapse(ScipyenDataclass):
     # postsynapticEntityType: PostsynapticEntityType = PostsynapticEntityType.undefined
     postsynaptic: typing.Union[CellCompartment, UltrastructureElement] = dataclasses.field(default_factory = NeuronCompartment)
     presynaptic: typing.Union[CellCompartment, UltrastructureElement] = dataclasses.field(default_factory = NeuronCompartment)
+    transmitter: Neurotransmitter = Neurotransmitter.undefined
+    retrograde: bool = False
 
     # def __post_init__(self: typing.Self):
     #     assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"

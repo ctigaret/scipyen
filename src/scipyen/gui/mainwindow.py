@@ -10943,6 +10943,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         else:
             # , varname=objname)
             win.setData(obj, doc_title=objname, uiParamsPrompt=askForParams)
+            win.docTitle = objname
             win.activateWindow()
 
         return True

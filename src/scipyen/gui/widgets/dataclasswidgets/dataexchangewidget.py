@@ -98,6 +98,7 @@ that `obj` is bound to, in the user space.
     sig_requestDataSave = Signal(name="sig_requestDataSave")
     sig_requestDataCopy = Signal(name="sig_requestDataCopy")
     sig_requestNewObject = Signal(name="sig_requestNewObject")
+    sig_symbolChanged = Signal(str, name="sig_symbolChanged")
 
     def __init__(self, objType: typing.Optional[type]=None,
                  parent: typing.Optional[QtWidgets.QWidget] = None, **kwargs):
@@ -202,6 +203,7 @@ that `obj` is bound to, in the user space.
             obj = ret[varName]
             if isinstance(obj, self._objectType_):
                 if self.receivers(self.sig_dataImported) > 0:
+                    self.sig_symbolChanged.emit(varName)
                     self.sig_dataImported.emit(obj)
                     # self.objectSymbolLabel.setText(varName)
                     # self.objectSymbolLabel.setToolTip(f"'{varName}' is bound to a {type(obj).__name__} object in the workspace")
@@ -218,6 +220,7 @@ that `obj` is bound to, in the user space.
             if isinstance(varName, str):
                 self.objectSymbolLabel.setText(varName)
                 self.objectSymbolLabel.setToolTip(f"'{varName}' is bound to a {type(obj).__name__} object in the workspace")
+                self.sig_symbolChanged.emit(varName)
 
     @Slot(object)
     def slot_copyData(self, obj):
@@ -230,24 +233,29 @@ that `obj` is bound to, in the user space.
 
             self.exportDataToWorkspace(obj1, name)
 
-    def setValue(self, obj: typing.Any):
+    def setValue(self, obj: typing.Any, objSymbol:typing.Optional[str]=None):
         self.dataType = type(obj)
-
-        candidateSymbols = self.getDataSymbolInWorkspace(obj)
-        if isinstance(candidateSymbols, str):
-            varName = candidateSymbols
-
-        elif (isinstance(candidateSymbols, typing.Sequence) and
-              len(candidateSymbols) and
-              all(isinstance(s, str) for s in candidateSymbols)):
-            varName = candidateSymbols[0]
+        if isinstance(objSymbol, str) and len(objSymbol.strip()):
+            varName = objSymbol
         else:
-            varName = None
+            candidateSymbols = self.getDataSymbolInWorkspace(obj)
+            if isinstance(candidateSymbols, str):
+                varName = candidateSymbols
+
+            elif (isinstance(candidateSymbols, typing.Sequence) and
+                len(candidateSymbols) and
+                all(isinstance(s, str) for s in candidateSymbols)):
+                varName = candidateSymbols[0]
+            else:
+                varName = None
 
         if isinstance(varName, str) and len(varName.strip()):
             self.objectSymbolLabel.setText(varName)
             self.objectSymbolLabel.setToolTip(f"'{varName}' is bound to a {type(obj).__name__} object in the workspace")
+            self.sig_symbolChanged.emit(varName)
         else:
             self.objectSymbolLabel.clear()
             self.objectSymbolLabel.setToolTip("")
+            self.sig_symbolChanged.emit("")
+
 

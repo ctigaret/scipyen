@@ -1118,6 +1118,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
             choices = self._columnChoices_[index.column()]["choices"]
 
+        # print(f"{self.__class__.__name__}.createEditor -> choices = {choices}")
         w = self.createWidget(data, choices, True, parent)
         # print(f"{self.__class__.__name__}.createEditor() -> {type(w).__name__}")
         return w

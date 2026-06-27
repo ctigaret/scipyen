@@ -114,7 +114,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self.setItemDelegate(self._delegate_)
 
     def setModel(self: typing.Self, model: QtCore.QAbstractItemModel):
-        # disallow changing the model
+        r"""Overrides QtCore.QAbstractItemModel.setModel() to disallow changing the model"""
         pass
 
     def paintEvent(self, event):
@@ -222,7 +222,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self.sourceModel.showPrivateMembers = showPrivate
         self.sourceModel.showIntrospection = introspect
 
-        self.sourceModel.populateModel(obj, name)
+        self.sourceModel.populateModel(obj, rootTitle=name)
         root = self.sourceModel.invisibleRootItem()
         if root.hasChildren():
             # NOTE: 2026-02-08 15:23:06

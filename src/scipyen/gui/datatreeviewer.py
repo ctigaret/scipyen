@@ -269,6 +269,7 @@ A lot of things copied from there, EXCEPT that it now uses
                                      # readOnly = self._readOnly_)
 
         self.model = self.treeView.sourceModel
+        self.model.sig_modelDataChanged.connect(self.sig_dataChanged)
 
         self.treeView.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
@@ -825,6 +826,7 @@ A lot of things copied from there, EXCEPT that it now uses
         r"""
         Displays new data
         """
+        print(f"{self.__class__.__name__}._set_data_({data})")
         self._readOnly_ = kwargs.get("readOnly", False)
         self.update()
         if inspect.isfunction(predicate):
@@ -858,12 +860,15 @@ A lot of things copied from there, EXCEPT that it now uses
 
     def _populateTreeView_(self):
         self.treeView.clear()
+        print(f"{self.__class__.__name__}._populateTreeView_: object cache = {self._obj_cache_}")
         if len(self._obj_cache_):
             if self._cache_index_ >= len(self._obj_cache_):
                 self._cache_index_ = len(self._obj_cache_) - 1
             obj, name = self._obj_cache_[self._cache_index_]
+            # print(f"{self.__class__.__name__}._populateTreeView_: name = {name}")
             self.update_title(doc_title = name, win_title=self._winTitle_)
-            what = {"data": obj, "predicate": self.predicate,
+            what = {"data": obj,
+                    "predicate": self.predicate,
                     "root_title": name,
                     "readOnly": self.readOnly,
                     "showPrivate": self.showPrivateMembers,

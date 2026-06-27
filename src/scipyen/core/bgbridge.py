@@ -1905,6 +1905,13 @@ a valid atlas ``metadata.json`` file.
     pattern = r'"species":\s*"(.*?)"'
     with open(atlas_metadata_json_file_name, "rt", encoding="utf-8") as json_file:
         return re.findall(pattern, json_file.read())
+
+
+
+def get_hash(s: typing.Union[Structure, StructuresDict]) -> int:
+    items = tuple(map(lambda i: (i[0], tuple(i[1]) if isinstance(i[1], list) else get_hash(i[1]) if isinstance(i[1], Structure) else i[1])))
+    return hash(items)
+
 # ### END ---- module-level functions
 
 # manager = BrainAtlasManager()

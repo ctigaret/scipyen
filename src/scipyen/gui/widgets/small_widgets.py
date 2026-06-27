@@ -78,7 +78,8 @@ class ElidedPushButton(UrlNavigatorButtonBase):
         self.setElideTextAction.setCheckable(True)
         self.setElideTextAction.setChecked(self._elideText_ is True)
         self.setElideTextAction.toggled.connect(self._slot_setElideText)
-        if self._text_ is None and isinstance(text, str) and len(text.strip()):
+        # if self._text_ is None and isinstance(text, str) and len(text.strip()):
+        if isinstance(text, str) and len(text.strip()):
             txt_ = text
         else:
             txt_ = ""

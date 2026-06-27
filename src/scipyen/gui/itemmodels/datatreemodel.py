@@ -412,7 +412,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         readOnly: bool = False,
         # introspect: bool = False
     ):
-        # print(f"{self.__class__.__name__}.populateModel(obj: {type(obj).__name__})")
+        # print(f"{self.__class__.__name__}.populateModel({type(obj)}, rootTitle: {rootTitle})")
         self._visited_.clear()
         self._predicate_ = predicate
         self._showPrivate_ = showPrivate is True
@@ -504,10 +504,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_buildBranch_.register(dict)
     @_buildBranch_.register(UserDict)
     @_buildBranch_.register(types.MappingProxyType)
-    def __buildBranch_(self: typing.Self, obj: typing.Union[dict, types.MappingProxyType, UserDict],
+    @_buildBranch_.register(OrderedDict)
+    def __buildBranch_(self: typing.Self, obj: typing.Union[dict, types.MappingProxyType, UserDict, OrderedDict],
           objDict: dict, objKey: object, objKeyType: type,
           parentItem: QtGui.QStandardItem, row: int) -> QtGui.QStandardItem:
-
+        # print(f"{self.__class__.__name__}._buildBranch_<{type(obj)}>")
         visited = tuple()
 
         objId = objDict["objId"]
@@ -1027,51 +1028,52 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "objId": objId
             }
 
-    @_parseObject_.register(bgbridge.Structure)
-    def __parseObject_(self: typing.Self, obj: bgbridge.Structure,
-                choices: dict = dict(),
-                includePrivateMembers: bool = False) -> tuple:
-        objType = type(obj)
-        objId = id(obj)
-        if not isinstance(choices, dict):
-            if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
-                choices = dict()
-        ndx = [
-            i[1]
-            for i in sorted(
-                (str(k[0]), k[1])
-                for k in zip(obj.keys(), range(len(obj)))
-            )
-        ]
-
-        items = [i for i in obj.items()]
-        pData = dict([items[k] for k in ndx])
-        indirect = True
-        info = f"{obj}"
-        if not includePrivateMembers:
-            pData = dict(
-                list(
-                    filter(
-                        self._check_public_member_,
-                        pData.items()
-                    )
-                    )
-                )
-
-        tip = type(obj).__name__
-        return pData, {
-            "indirect": indirect,
-            "objDataAsChild": False,
-            "objInfo": info,
-            "objType": objType,
-            "objTip": tip,
-            "memberAccess": (".",),
-            "accessType": "attribute",
-            "choices": choices,
-            "readOnly": True,
-            "readOnlyChildren": True,
-            "objId": objId
-            }
+    # @_parseObject_.register(bgbridge.Structure)
+    # def __parseObject_(self: typing.Self, obj: bgbridge.Structure,
+    #             choices: dict = dict(),
+    #             includePrivateMembers: bool = False) -> tuple:
+    #     objType = type(obj)
+    #     objId = id(obj)
+    #     if not isinstance(choices, dict):
+    #         if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
+    #             choices = dict()
+    #     ndx = [
+    #         i[1]
+    #         for i in sorted(
+    #             (str(k[0]), k[1])
+    #             for k in zip(obj.keys(), range(len(obj)))
+    #         )
+    #     ]
+    #
+    #     items = [i for i in obj.items()]
+    #     pData = dict([items[k] for k in ndx])
+    #     indirect = True
+    #     info = f"{obj}"
+    #     if not includePrivateMembers:
+    #         pData = dict(
+    #             list(
+    #                 filter(
+    #                     self._check_public_member_,
+    #                     pData.items()
+    #                 )
+    #                 )
+    #             )
+    #
+    #     tip = type(obj).__name__
+    #     return pData, {
+    #         "indirect": indirect,
+    #         "objDataAsChild": False,
+    #         "objInfo": info,
+    #         "objType": objType,
+    #         "objTip": tip,
+    #         # "memberAccess": (".",),
+    #         "memberAccess": ("[", "]"),
+    #         "accessType": "attribute",
+    #         "choices": choices,
+    #         "readOnly": True,
+    #         "readOnlyChildren": True,
+    #         "objId": objId
+    #         }
 
     @_parseObject_.register(taxonbridge.Taxon)
     def __parseObject_(self: typing.Self, obj: taxonbridge.Taxon,
@@ -1128,9 +1130,13 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # CAUTION: 2026-02-13 21:54:18
         # this might be the private data, NOT the original model data!
 
+        # print(f"{self.__class__.__name__}._parseObject_({type(obj)})")
+
         objId = id(obj)
+
         if obj is self._privateData_:
             objType = type(self._modelData_)
+
         else:
             objType = type(obj)
 
@@ -1153,6 +1159,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             # print(f"{self.__class__.__name__}._parseObject_({type(obj)})")
             pData = obj
             indirect = False
+        # elif isinstance(obj, bgbridge.Structure)
         else:
             items = [i for i in obj.items()]
             pData = dict([items[k] for k in ndx])
