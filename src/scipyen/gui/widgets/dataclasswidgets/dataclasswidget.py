@@ -76,18 +76,29 @@ class DataClassWidget(QtWidgets.QWidget):
     sig_dataCopy = Signal(object, name="sig_dataCopy")
     sig_detailedView = Signal(object, str, name="sig_detailedView")
 
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None):
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None, **kwargs):
+        isAttribute = kwargs.pop("isAttribute", False)
         QtWidgets.QWidget.__init__(self, parent=parent)
+        self._isAttribute_: bool = isAttribute
+        # self._customSymbol_: typing.Optional[str] = None
 
     def value(self) -> None:
         r"""Must override in subclasses"""
         pass
 
-    def setValue(self):
+    def setValue(self, *args, **kwargs):
         r"""Must override in subclasses.
         Implementations must make sure it emits sig_valueChanged Qt signal.
     """
         pass
+
+    @property
+    def isAttribute(self) -> bool:
+        return self._isAttribute_
+
+    @isAttribute.setter
+    def isAttribute(self, val: bool):
+        self._isAttribute_ = val is True
 
     @Slot()
     def _slot_dataExportRequested(self):
@@ -140,6 +151,14 @@ class DataClassWidget(QtWidgets.QWidget):
             and isinstance(self._data_, self._objectTypes_)):
             self._data_.description = val
             self.sig_valueChanged.emit(self._data_)
+
+    @Slot(str)
+    def _slot_symbolChanged(self, val:str):
+        # from gui.widgets.dataclasswidgets import namedescriptionwidget
+        # if (hasattr(self, "nameDescriptionWidget")
+        #     and isinstance(self.nameDescriptionWidget, namedescriptionwidget.NameDescriptionWidget)):
+        #     self.nameDescriptionWidget._slot_symbolChanged("")
+        pass
 
     @Slot()
     def _slot_viewDetails(self):

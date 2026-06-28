@@ -70,19 +70,19 @@ from iolib import pictio as pio
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_ChemicalSynapseWidget, QWidget - loadUiType(
+Ui_ChemicalSynapseWidget, QWidget = loadUiType(
     os.path.join(__module_path__, "chemicalsynapsewidget.ui")
     )
 
 class ChemicalSynapseWidget(Ui_ChemicalSynapseWidget, DataClassWidget):
-    sig_valueChanged = Signal(object, name="sig_valueChanged")
-    sig_dataSaving = Signal(object, name="sig_dataSaving")
-    sig_dataExporting = Signal(object, name="sig_dataExporting")
-    sig_dataCopy = Signal(object, name="sig_dataCopy")
+    # sig_valueChanged = Signal(object, name="sig_valueChanged")
+    # sig_dataSaving = Signal(object, name="sig_dataSaving")
+    # sig_dataExporting = Signal(object, name="sig_dataExporting")
+    # sig_dataCopy = Signal(object, name="sig_dataCopy")
 
     _objectTypes_ = (sdc.ChemicalSynapse, )
 
-    def __init__(self, , parent: typing.Optional[QtWidgets.QWidget] = None,
+    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
 
@@ -106,7 +106,7 @@ class ChemicalSynapseWidget(Ui_ChemicalSynapseWidget, DataClassWidget):
 
         self._functionalTypes_ = list(sdc.ChemicalSynapseFunctionalType.names())
 
-        self._transmitters_ = list(sdc.Neurotrasmitters.names())
+        self._transmitters_ = list(sdc.Neurotransmitter.names())
 
         self._configureUI_()
 
@@ -146,14 +146,19 @@ class ChemicalSynapseWidget(Ui_ChemicalSynapseWidget, DataClassWidget):
 
         for t in self._transmitters_:
             self.neurotransmitterComboBox.addItem(t)
-        ndx = self._transmitters_.index(self._data_.transmitter)
+        ndx = self._transmitters_.index(self._data_.transmitter.name)
         self.neurotransmitterComboBox.setCurrentIndex(ndx)
         self.neurotransmitterComboBox.currentIndexChanged.connect(self._slot_transmitterChanged)
 
         self.retrogradeCheckBox.setChecked(self._data_.retrograde is True)
         self.retrogradeCheckBox.toggled.connect(self._slot_retrogradeChanged)
 
+        self.presynapticCompartmentWidget.setValue(self._data_.presynaptic, isAttribute=True)
+        self.presynapticCompartmentWidget.nameDescriptionWidget.symbol = f"{self.dataExchangeWidget.objectSymbolLabel.text()}.presynaptic"
         self.presynapticCompartmentWidget.sig_valueChanged.connect(self._slot_presynaptiChanged)
+
+        self.postsynapticCompartmentWidget.setValue(self._data_.postsynaptic, isAttribute=True)
+        self.postsynapticCompartmentWidget.nameDescriptionWidget.symbol = f"{self.dataExchangeWidget.objectSymbolLabel.text()}.postynaptic"
         self.postsynapticCompartmentWidget.sig_valueChanged.connect(self._slot_postsynapticChanged)
 
     @Slot(int)
@@ -186,14 +191,52 @@ class ChemicalSynapseWidget(Ui_ChemicalSynapseWidget, DataClassWidget):
         self._data_.postsynaptic = val
         self.sig_valueChanged.emit(self._data_)
 
-    # @Slot()
-    # def _slot_viewDetails(self):
-    #     if not isinstance(self._data_, self._objectTypes_):
-    #         return
-    #     varName = self.dataExchangeWidget.varName
-    #     self.sig_detailedView.emit(self._data_, varName)
+    def value(self) -> sdc.ChemicalSynapse:
+        return self._data_
 
+    def setValue(self, val: sdc.ChemicalSynapse, *args, **kwargs):
+        if not isinstance(val, self._objectTypes_):
+            raise TypeError(f"Expecting one of  {self._objectTypes_}; instead, got a {type(val).__name__}")
 
+        self._data_ = val
+        self._isAttribute_ = kwargs.get("isAttribute", False)
 
+        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+                               (
+                                   self.dataExchangeWidget,
+                                   self.nameDescriptionWidget,
+                                   self.editParentToolButton,
+                                   self.synapseMorhpologicalTypeComboBox,
+                                   self.synapseFunctionalTypeComboBox,
+                                   self.retrogradeCheckBox,
+                                   self.presynapticCompartmentWidget,
+                                   self.postsynapticCompartmentWidget
+                                )
+                               ))
+
+        self.dataExchangeWidget.setValue(self._data_)
+
+        self.nameDescriptionWidget.dataName = self._data_.name
+        self.nameDescriptionWidget.dataDescription = self._data_.description
+
+        for t in self._functionalTypes_:
+            self.synapseFunctionalTypeComboBox.addItem(t)
+        ndx = self._functionalTypes_.index(self._data_.functionalType.name)
+        self.synapseFunctionalTypeComboBox.setCurrentIndex(ndx)
+
+        for t in self._transmitters_:
+            self.neurotransmitterComboBox.addItem(t)
+        ndx = self._transmitters_.index(self._data_.transmitter.name)
+        self.neurotransmitterComboBox.setCurrentIndex(ndx)
+
+        self.retrogradeCheckBox.setChecked(self._data_.retrograde is True)
+
+        self.presynapticCompartmentWidget.setValue(self._data_.presynaptic, isAttribute=True)
+        self.presynapticCompartmentWidget.nameDescriptionWidget.symbol = f"{self.dataExchangeWidget.objectSymbolLabel.text()}.presynaptic"
+
+        self.postsynapticCompartmentWidget.setValue(self._data_.postsynaptic, isAttribute=True)
+        self.postsynapticCompartmentWidget.nameDescriptionWidget.symbol = f"{self.dataExchangeWidget.objectSymbolLabel.text()}.postynaptic"
+
+        self.sig_valueChanged.emit(self._data_)
 
 
