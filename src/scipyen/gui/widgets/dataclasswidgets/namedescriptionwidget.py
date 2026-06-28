@@ -107,8 +107,8 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
                               (self.nameLineEdit,
                                )))
 
-        if isinstance(self._detailsViewer_, datatreeviewer.DataTreeViewer):
-            sigBlockers.append(QtCore.QSignalBlocker(self._detailsViewer_))
+        # if isinstance(self._detailsViewer_, datatreeviewer.DataTreeViewer):
+        #     sigBlockers.append(QtCore.QSignalBlocker(self._detailsViewer_))
 
         if isinstance(self._descriptionEditor_, textviewer.TextViewer):
             sigBlockers.append(QtCore.QSignalBlocker(self._descriptionEditor_))
@@ -116,18 +116,15 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         if hasattr(val, "description") and isinstance(val.description, str):
             self._dataDescription_ = val.description
             if isinstance(self._descriptionEditor_, textviewer.TextViewer):
-                self._decsriptionEditor_.setText(self._dataDescription_)
+                self._descriptionEditor_.setText(self._dataDescription_)
 
         if hasattr(val, "name") and isinstance(val.name, str):
             self._dataName_ = val.name
             self.nameLineEdit.setText(self._dataName_)
 
-        if isinstance(self._detailsViewer_, datatreeviewer.DataTreeViewer) and self._detailsViewer_.isVisible():
-            self._detailsViewer_.view(val, doc_title=self.symbol)
-            # if len(self.symbol.strip()):
-            # else:
-            #     self._detailsViewer_.view(val, doc_title=None)
-
+        if isinstance(self._detailsViewer_, datatreeviewer.DataTreeViewer):# and self._detailsViewer_.isVisible():
+            # print(f"\n\t-> call self._detailsViewer_.view({val},\n{self.symbol})")
+            self._detailsViewer_.view(val, doc_title=self.symbol, autoRaise=False)
             self._detailsViewer_.slot_refreshDataDisplay()
 
 
@@ -174,6 +171,8 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
                 title="Detailed view"
                 )
 
+            self._detailsViewer_.autoRaise = False
+
             self._detailsViewer_.view(obj, doc_title = doc_title)
             self._detailsViewer_.sig_dataChanged.connect(self._slot_dataChangedInDetailsViewer)
         else:
@@ -215,4 +214,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
     @dataDescription.setter
     def dataDescription(self, val:str):
         self._dataDescription_ = val
+        if isinstance(self._descriptionEditor_, textviewer.TextViewer):
+            sigBlock = QtCore.QSignalBlocker(self._descriptionEditor_)
+            self._descriptionEditor_.setText(self._dataDescription_)
         self.sig_descriptionChanged.emit(self._dataDescription_)

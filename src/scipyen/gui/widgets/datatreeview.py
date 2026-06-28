@@ -76,6 +76,7 @@ from gui.itemmodels.datatreemodel import DataTreeModel
 class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     sig_itemDoubleClicked = Signal(QtGui.QStandardItem, name="sig_itemDoubleClicked")
     def __init__(self: typing.Self, *args, **kwargs):
+        # print(f"{self.__class__.__name__}.__init__")
         parent = kwargs.pop("parent", None)
         initialExpandDepth = kwargs.pop("initialExpandDepth", 1)
         self._showCallables_: bool = kwargs.get("showCallables", False)
@@ -96,7 +97,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
         # NOTE: 2026-04-01 10:41:46
         self.setExpandsOnDoubleClick(False)
-
+        # print(f"\n\t-> initialising sourceModel")
         self.sourceModel = DataTreeModel(showMethods = self._showCallables_,
                                        valuesOnly = self._showValuesOnly_,
                                        parent=self)
@@ -213,16 +214,26 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                 valuesOnly: bool = True,
                 inlineTables: bool = False,
                 introspect: bool = False):
-        signalBlocker = QtCore.QSignalBlocker(self.model()) #noqa
+        # print(f"{self.__class__.__name__}.setData({type(obj)})")
+        # signalBlocker = QtCore.QSignalBlocker(self.model()) #noqa
         # model = self.model()
-        self.sourceModel.clear()
-        # self.proxyModel.clear()
-        self.sourceModel.inlineTables = inlineTables
-        self.sourceModel.showValuesOnly = valuesOnly
-        self.sourceModel.showPrivateMembers = showPrivate
-        self.sourceModel.showIntrospection = introspect
 
-        self.sourceModel.populateModel(obj, rootTitle=name)
+        # print(f"\n\tcall self.sourceModel.beginResetModel()")
+        # NOTE: 2026-06-28 11:51:12
+        # I think I need these here to notify the viewer.
+        self.sourceModel.beginResetModel()
+        # print(f"\n\tcall self.sourceModel.endResetModel()")
+        self.sourceModel.endResetModel()
+        self.sourceModel.populateModel(obj, rootTitle=name,
+                                       showPrivate=showPrivate,
+                                       introspect=introspect,
+                                       inlineTables=inlineTables,
+                                       valuesOnly=valuesOnly)
+        # WARNING: 2026-06-28 11:45:39
+        # DO NOT call begin/endResetMdoel on the proxyModel here
+        # see also WARNING: 2026-06-28 11:43:14 in itemmodels.datatreemodeo.DataTreeModel
+        self.proxyModel.setSourceModel(self.sourceModel)
+
         root = self.sourceModel.invisibleRootItem()
         if root.hasChildren():
             # NOTE: 2026-02-08 15:23:06
@@ -253,19 +264,6 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     def data(self) -> object:
         return self.sourceModel._modelData_
         # return self.model()._modelData_
-
-    # @property
-    # def alwaysSortRows(self) -> bool:
-    #     return self._alwaysSortRows_
-    #
-    # @alwaysSortRows.setter
-    # def alwaysSortRows(self, val: bool):
-    #     self._alwaysSortRows_ = val is True
-    #     needsRefresh = self.model().sortedRows != self._alwaysSortRows_
-    #     self.model().sortedRows = self._alwaysSortRows_
-    #     if needsRefresh:
-    #         data = self.data
-    #         self.model().setData(data)
 
     @property
     def readOnly(self: typing.Self) -> bool:
@@ -408,7 +406,9 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self.setData(data, root_title, showPrivate, valuesOnly, inlineTables, introspect)
 
     def clear(self: typing.Self):
+        # self.sourceModel.beginResetModel()
         self.sourceModel.clear()
+        # self.sourceModel.endResetModel()
 
     def mouseDoubleClickEvent(self: typing.Self, evt: QtGui.QMouseEvent):
         pos = evt.position().toPoint()

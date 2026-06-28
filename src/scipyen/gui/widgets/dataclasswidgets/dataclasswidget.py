@@ -134,6 +134,7 @@ class DataClassWidget(QtWidgets.QWidget):
 
     @Slot(str)
     def _slot_dataDescriptionChanged(self, val:str):
+        # print(f"{self.__class__.__name__}._slot_dataDescriptionChanged({val})")
         if (hasattr(self, "_data_")
             and hasattr(self, "_objectTypes_")
             and isinstance(self._data_, self._objectTypes_)):

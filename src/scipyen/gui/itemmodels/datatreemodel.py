@@ -209,15 +209,14 @@ class DataTreeModel(QtGui.QStandardItemModel):
         return (not isinstance(x[0], str)
                 or not x[0].startswith("_"))
 
-    # @staticmethod
-    # def _check_private_member_2_(x: object, y: object):
-    #     return self._check_public_member_(x)
-
     def __init__(self: typing.Self, data: typing.Optional[typing.Any] = None,
                  dataName: str = None,
                  parent: typing.Optional[QtCore.QObject] = None,
                  **kwargs):
         super(DataTreeModel, self).__init__(0, 3, parent=parent)
+        # print(f"{self.__class__.__name__}.__init__")
+        # print(f"\n\tcall self.beginResetModel()")
+        self.beginResetModel()
         self._modelData_: typing.Optional[object] = None
         self._dataTypeStr_: str = ""
         self._visited_: dict = dict()
@@ -248,6 +247,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
         self._showValueAttributesOnly_ = kwargs.pop("valuesOnly", True)
 
         self.setHorizontalHeaderLabels(["Object", "Type", "Value / Information"])
+        # print(f"\n\tcall self.endResetModel()")
+        self.endResetModel()
 
     @property
     def topObjectItem(self: typing.Self) -> QtGui.QStandardItem | None:
@@ -410,21 +411,34 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # dataTypeStr: typing.Optional[str] = None,
         hideRoot: bool = False,
         readOnly: bool = False,
-        # introspect: bool = False
+        valuesOnly: bool = True,
+        introspect: bool = False,
+        inlineTables: bool = False
     ):
         # print(f"{self.__class__.__name__}.populateModel({type(obj)}, rootTitle: {rootTitle})")
+        # print(f"\n\t-> call self.clear()")
+        # ### BEGIN WARNING: 2026-06-28 11:43:14
+        # this calls beginResetModel() ... endResetModel() already,
+        # therefore it MUST NOT follow an isolated call to beginResetModel
+        self.clear()
+        # ### END   WARNING: 2026-06-28 11:43:14
+        # print(f"\n\t-> call self.beginResetModel()")
+        self.beginResetModel()
         self._visited_.clear()
         self._predicate_ = predicate
         self._showPrivate_ = showPrivate is True
         self._hideRoot_ = hideRoot is True
         self._readOnly_ = readOnly is True
-        # self._introspect_ = introspect is True
+        self._inlineTables_ = inlineTables is True
+        self._introspect_ = introspect is True
+        self._showValueAttributesOnly_ = valuesOnly is True
 
         self._rootTitle_ = rootTitle if (
             isinstance(rootTitle, str)
             and len(rootTitle.strip())
             ) else "/"
 
+        # print(f"\n\t-> assign to self._modelData_")
         self._modelData_ = obj
 
         self.setHorizontalHeaderLabels(["Object", "Type", "Information or Value"])
@@ -435,6 +449,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
         self._privateData_ = pData
 
         self._buildTree_(self._privateData_, objDict, self._rootTitle_)
+
+        # print(f"\n\t-> call self.endResetModel()")
+        self.endResetModel()
 
     def _buildTree_(self: typing.Self,
                     obj: object,

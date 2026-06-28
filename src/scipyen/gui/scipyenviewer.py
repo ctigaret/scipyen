@@ -241,6 +241,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
         self._ready_:bool = False
         self._grab_focus_:bool = False
+        self._alwaysShow_: bool = True
 
         super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
@@ -520,12 +521,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         elif len(self._winTitle_.strip()) == 0:
             self._winTitle_ = self.scipyenWindow.applicationName
 
-#         if isinstance(self._docTitle_, str) and len(self._docTitle_.strip()):
-#             self.setWindowTitle("%s - %s" % (self._docTitle_, self._winTitle_))
-#
-#         else:
-#             self.setWindowTitle(self._winTitle_)
-
     @abstractmethod
     def setDataDisplayEnabled(self, value):
         r"""Enable/disable the central data display widget.
@@ -578,20 +573,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         else:
             return __check_val_type_is_supported__(value)
 
-    # @Slot(object, tuple, dict)
-    # def _slot_beginSetData(self, obj: object, args = tuple(), kwargs = dict()):
-    #     if obj is None:
-    #         return
-    #
-    #     if not isinstance(args, tuple):
-    #         args = (args, )
-    #
-    #     if not isinstance(kwargs, dict):
-    #         kwargs = dict()
-    #
-    #     self.setData(obj, *args, **kwargs)
-
-
     def setData(self, *args, **kwargs):
         r"""Generic function to set the data to be displayed by this viewer.
 
@@ -624,7 +605,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         uiParamsPrompt:bool, default False;l when True, a dialog asking for
             further parameters is shown (if the viewer supports it)
         """
-
+        # print(f"ScipyenViewer[{self.__class__.__name__}].setData(...)")
         # NOTE: 2020-09-25 10:35:34
         #
         # This function does the following:
@@ -645,6 +626,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #
 
         uiParamsPrompt = kwargs.pop("uiParamsPrompt", False)
+        self._alwaysShow_ = kwargs.get("autoRaise", True)
 
         if uiParamsPrompt:
             # TODO 2023-01-18 08:48:13
@@ -675,25 +657,17 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         worker = WorkerThread(self, self._set_data_, *args, **kwargs)
         worker.signals.signal_Finished.connect(self._slot_set_data_finished)
         worker.run()
-        # self._set_data_(*args, **kwargs)
-
-        #print(f"In ScipyenViewer<{self.__class__.__name__}>.setData(): is visible: {self.isVisible()}")
-
-#         if not self.isVisible():
-#             self.setVisible(True)
-#
-#         if get_focus:
-#             self.activateWindow()
 
     @Slot()
     def _slot_set_data_finished(self):
         self._slot_update_title()
         self._ready_ = True
-        if not self.isVisible():
-            self.setVisible(True)
+        if self._alwaysShow_:
+            if not self.isVisible():
+                self.setVisible(True)
 
-        if self._grab_focus_:
-            self.activateWindow()
+            if self._grab_focus_:
+                self.activateWindow()
 
     @Slot()
     def _slot_update_title(self):
@@ -702,7 +676,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
         else:
             self.setWindowTitle(self._winTitle_)
-
 
     def paintEvent(self, event:QtGui.QPaintEvent):
         super().paintEvent(event)
@@ -730,6 +703,24 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         r"""Should implement/override in the subclass if self._data_ has specific structure
         """
         return self._data_
+
+    @property
+    def autoRaise(self) -> bool:
+        r"""When True, the window will be made visible every time data is set.
+        By default this property is always True.
+    """
+        return self._alwaysShow_
+
+    @autoRaise.setter
+    def autoRaise(self, val:bool):
+        self._alwaysShow_ = val is True
+
+        if self._alwaysShow_:
+            if not self.isVisible():
+                self.setVisible(True)
+
+            if self._grab_focus_:
+                self.activateWindow()
 
     @property
     def ID(self):

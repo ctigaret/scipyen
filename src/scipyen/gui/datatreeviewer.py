@@ -265,8 +265,6 @@ A lot of things copied from there, EXCEPT that it now uses
                                      supported_data_types = tuple(self.viewer_for_types),
                                      initialExpandDepth = self._initialExpandDepth_,
                                      autoResizeColumns = self._autoResizeColumns_)
-                                     # ,
-                                     # readOnly = self._readOnly_)
 
         self.model = self.treeView.sourceModel
         self.model.sig_modelDataChanged.connect(self.sig_dataChanged)
@@ -567,25 +565,15 @@ A lot of things copied from there, EXCEPT that it now uses
     @Slot(bool)
     def slot_showPrivateMembers(self, value: bool):
         self.showPrivateMembers = value is True
-        # self.model.showPrivateMembers = value is True
-        # self.slot_refreshDataDisplay()
 
     @Slot(bool)
     def slot_showIntrospect(self, value: bool):
         self.showIntrospection = value is True
-        # self.model.showIntrospection = value is True
-        # self.slot_refreshDataDisplay()
 
     @Slot(bool)
     @safewrapper
     def slot_setInlineTables(self, value: bool):
         self.showInlineTables = value is True
-        # self.model.inlineTables = value is True
-        # self.slot_refreshDataDisplay()
-
-    # @Slot(bool)
-    # def slot_alwaysSortRows(self, val: bool):
-    #     self.alwaysSortRows = val is True
 
     @Slot()
     @safewrapper
@@ -826,9 +814,9 @@ A lot of things copied from there, EXCEPT that it now uses
         r"""
         Displays new data
         """
-        print(f"{self.__class__.__name__}._set_data_({data})")
+        # print(f"{self.__class__.__name__}._set_data_({type(data)})")
         self._readOnly_ = kwargs.get("readOnly", False)
-        self.update()
+        # self.update()
         if inspect.isfunction(predicate):
             self.predicate=predicate
 
@@ -855,12 +843,13 @@ A lot of things copied from there, EXCEPT that it now uses
             worker.signals.signal_Finished.connect(self._slot_treeViewPopulated)
             worker.run()
 
-        if kwargs.get("show", True):
-            self.activateWindow()
+        # if kwargs.get("show", True):
+        #     self.activateWindow()
 
     def _populateTreeView_(self):
-        self.treeView.clear()
-        print(f"{self.__class__.__name__}._populateTreeView_: object cache = {self._obj_cache_}")
+        # self.treeView.clear()
+        # print(f"{self.__class__.__name__}._populateTreeView_: object cache = {self._obj_cache_}")
+        # print(f"{self.__class__.__name__}._populateTreeView_")
         if len(self._obj_cache_):
             if self._cache_index_ >= len(self._obj_cache_):
                 self._cache_index_ = len(self._obj_cache_) - 1
@@ -877,6 +866,7 @@ A lot of things copied from there, EXCEPT that it now uses
                     "introspect": self.showIntrospection,
                     # "dataTypeStr": type(obj).__name__,
                     }
+            # print(f"\n\temit self._sig_setTreeViewData_")
             self._sig_setTreeViewData_.emit(what)
 
     @Slot()
@@ -917,7 +907,7 @@ A lot of things copied from there, EXCEPT that it now uses
 
     @Slot()
     def _slot_treeViewPopulated(self):
-        self._slot_update_title()
+        self._slot_update_title() # inherited from ScipyenViewer
 
     @Slot()
     @safewrapper
@@ -950,7 +940,7 @@ A lot of things copied from there, EXCEPT that it now uses
             return
 
         if item.column() == 0:
-            readOnly = item.data(ReadOnlyRole) is True
+            readOnly = item.data(ReadOnlyRole) is True # noqa
             obj = self.treeView.sourceModel.getDataObjectForLeaf(item)
             if obj is None:
                 return
