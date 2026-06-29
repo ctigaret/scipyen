@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>412</width>
-    <height>245</height>
+    <width>226</width>
+    <height>210</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,70 +16,33 @@
   <layout class="QGridLayout" name="gridLayout">
    <item row="0" column="0">
     <widget class="QSplitter" name="splitter">
+     <property name="toolTip">
+      <string>Drag to resize</string>
+     </property>
+     <property name="statusTip">
+      <string>Drag to resize</string>
+     </property>
+     <property name="whatsThis">
+      <string>Drag to resize</string>
+     </property>
      <property name="orientation">
       <enum>Qt::Orientation::Vertical</enum>
      </property>
      <property name="handleWidth">
       <number>3</number>
      </property>
-     <widget class="DataSymbolWidget" name="objectSymbolWidget" native="true">
+     <widget class="DataExchangeWidget" name="dataExchangeWidget" native="true">
       <property name="sizePolicy">
        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
         <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
+        <verstretch>1</verstretch>
        </sizepolicy>
       </property>
      </widget>
-     <widget class="QWidget" name="layoutWidget">
+     <widget class="QWidget" name="">
       <layout class="QVBoxLayout" name="verticalLayout_4">
        <item>
-        <widget class="DataExchangeWidget" name="dataExchangeWidget" native="true">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>1</verstretch>
-          </sizepolicy>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_5">
-         <item>
-          <widget class="QLabel" name="label_6">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="text">
-            <string>Name:</string>
-           </property>
-           <property name="buddy">
-            <cstring>nameLineEdit</cstring>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="LineEdit" name="nameLineEdit">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="toolTip">
-            <string>Name</string>
-           </property>
-           <property name="statusTip">
-            <string>Name</string>
-           </property>
-           <property name="whatsThis">
-            <string>Name of this Biometrics object</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
+        <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true"/>
        </item>
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_6">
@@ -121,8 +84,17 @@
              <verstretch>0</verstretch>
             </sizepolicy>
            </property>
+           <property name="toolTip">
+            <string>Developmental stage</string>
+           </property>
+           <property name="statusTip">
+            <string>Developmental stage</string>
+           </property>
+           <property name="whatsThis">
+            <string>Developmental stage</string>
+           </property>
            <property name="text">
-            <string>Developmental Stage:</string>
+            <string>Stage:</string>
            </property>
            <property name="buddy">
             <cstring>devStageComboBox</cstring>
@@ -136,6 +108,15 @@
              <horstretch>0</horstretch>
              <verstretch>0</verstretch>
             </sizepolicy>
+           </property>
+           <property name="toolTip">
+            <string>Developmental stage</string>
+           </property>
+           <property name="statusTip">
+            <string>Developmental stage</string>
+           </property>
+           <property name="whatsThis">
+            <string>Developmental stage</string>
            </property>
           </widget>
          </item>
@@ -151,8 +132,17 @@
              <verstretch>0</verstretch>
             </sizepolicy>
            </property>
+           <property name="toolTip">
+            <string>Genetic sex</string>
+           </property>
+           <property name="statusTip">
+            <string>Genetic sex</string>
+           </property>
+           <property name="whatsThis">
+            <string>Genetic sex</string>
+           </property>
            <property name="text">
-            <string>Genetic Sex:</string>
+            <string>Sex:</string>
            </property>
            <property name="buddy">
             <cstring>geneticSexComboBox</cstring>
@@ -167,27 +157,14 @@
              <verstretch>0</verstretch>
             </sizepolicy>
            </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QToolButton" name="descriptionToolButton">
            <property name="toolTip">
-            <string>Edit description</string>
+            <string>Genetic sex</string>
            </property>
            <property name="statusTip">
-            <string>Edit description</string>
+            <string>Genetic sex</string>
            </property>
            <property name="whatsThis">
-            <string>Edit description</string>
-           </property>
-           <property name="text">
-            <string>Description</string>
-           </property>
-           <property name="icon">
-            <iconset theme="description"/>
-           </property>
-           <property name="autoRaise">
-            <bool>true</bool>
+            <string>Genetic sex</string>
            </property>
           </widget>
          </item>
@@ -266,6 +243,19 @@
          </item>
         </layout>
        </item>
+       <item>
+        <spacer name="verticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
       </layout>
      </widget>
     </widget>
@@ -280,19 +270,19 @@
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>DataSymbolWidget</class>
+   <class>NameDescriptionWidget</class>
    <extends>QWidget</extends>
-   <header location="global">gui.widgets.dataclasswidgets.datasymbolwidget</header>
+   <header location="global">gui.widgets.dataclasswidgets.namedescriptionwidget</header>
    <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>QuantitySpinBox</class>
-   <extends>QDoubleSpinBox</extends>
-   <header location="global">gui.widgets.small_widgets</header>
   </customwidget>
   <customwidget>
    <class>LineEdit</class>
    <extends>QLineEdit</extends>
+   <header location="global">gui.widgets.small_widgets</header>
+  </customwidget>
+  <customwidget>
+   <class>QuantitySpinBox</class>
+   <extends>QDoubleSpinBox</extends>
    <header location="global">gui.widgets.small_widgets</header>
   </customwidget>
  </customwidgets>
