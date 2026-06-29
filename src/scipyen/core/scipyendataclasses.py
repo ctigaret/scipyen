@@ -904,6 +904,10 @@ class Organism(ScipyenDataclass):
 
 @dataclass
 class Organ(ScipyenDataclass):
+    parent: Organism = dataclasses.field(default_factory = Organism)
+
+@dataclass
+class Brain(Organ):
     from core.bgbridge import BGStructureDescriptor
     # Specific organ structure, if relevant.
     #
@@ -932,6 +936,15 @@ class Organ(ScipyenDataclass):
     structure: BGStructureDescriptor = BGStructureDescriptor()
     parent: Organism = dataclasses.field(default_factory = Organism)
 
+    @property
+    def name(self) -> str:
+        return "Brain"
+
+    @name.setter
+    def name(self, val:str):
+        return
+
+
     def getOrganism(self):
         if isinstance(self.parent, Organism):
             return self.parent
@@ -944,7 +957,6 @@ class Organ(ScipyenDataclass):
 
     def __hash__(self) -> int:
         return hash((self.atlasName))
-
 
 @dataclass
 class Tissue(ScipyenDataclass):
@@ -979,9 +991,17 @@ class Cell(ScipyenDataclass):
 class Neuron(Cell):
     cellSubType: NeuronType = NeuronType.undefined
 
-    def __post_init__(self: typing.Self):
-        assert isinstance (self.cellSubType, NeuronType), f"Wrong subtype {self.cellSubType} for Neuron"
-        self.cellType = "neuron"
+    @property
+    def cellType(self) -> str:
+        return "Neuron"
+
+    @cellType.setter
+    def cellType(self, val:str):
+        return
+
+    # def __post_init__(self: typing.Self):
+    #     assert isinstance (self.cellSubType, NeuronType), f"Wrong subtype {self.cellSubType} for Neuron"
+    #     self.cellType = "neuron"
 
 @dataclass
 class CellCompartment(ScipyenDataclass):
@@ -1824,7 +1844,7 @@ def repr_attr(x):
         return f": {type(x).__name__} → {x}"
 
 # __all__ = ("AdministrationRoute", "BiologicalSource", "Biometrics",
-#            "BioSourceType", "Cell", "CellCompartment","CellCompartmentType", "Episode",
+#            "BioSourceType", "Cell", "Neuron", "Brain", "CellCompartment","CellCompartmentType", "Episode",
 #            "Organ", "Organism", "DevelopmentalStage", "Procedure", "ProcedureType",
 #            "Schedule", "SubstanceDosage", "Tissue", "Treatment",
 #            "isDataclass", "mergeDataclasses", "ScipyenDataclass")

@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""
-Wrapper around BrainGlobe API, with shims
+Wrapper around taxoniq, with shims
 """
 class Taxon:
     r"""Shim class that will be overwritten below if taxoniq package is installed.
