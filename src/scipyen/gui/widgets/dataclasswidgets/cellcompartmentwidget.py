@@ -60,11 +60,11 @@ from gui.widgets.datatreeview import DataTreeView
 from core.prog import scipywarn # noqa
 from core import scipyendataclasses as sdc
 from core import scipyen_quantities as scq
-from gui import guiutils, textviewer, datatreeviewer
-from gui.widgets import small_widgets as smw
+# from gui import guiutils, textviewer, datatreeviewer
+# from gui.widgets import small_widgets as smw
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
-from gui.workspacegui import WorkspaceGuiMixin
-from iolib import pictio as pio
+# from gui.workspacegui import WorkspaceGuiMixin
+# from iolib import pictio as pio
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -79,6 +79,7 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
+
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -91,7 +92,7 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
         DataClassWidget.__init__(self, parent=parent)
 
         if not isinstance(obj, self._objectTypes_):
-            self._data_ =  sdc.CellCompartment()
+            self._data_ =  self._objectTypes_[0]()
         else:
             self._data_ = obj
 
@@ -131,11 +132,10 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
         self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
         self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
         self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
-
         self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
-
         self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
         self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
+        self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
 
         self.nameDescriptionWidget.dataName = self._data_.name
         self.nameDescriptionWidget.dataDescription = self._data_.description
@@ -145,7 +145,6 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
         self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
         self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
         self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
-        self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
 
         self.editParentToolButton.clicked.connect(self._slot_editParent)
 
