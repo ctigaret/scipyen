@@ -52,15 +52,10 @@ from core import strutils
 from core.datatypes import UnitTypes, GENOTYPES
 
 from core import workspacefunctions as wsf
-from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
-from gui.widgets.datatreeview import DataTreeView
+# from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
 
 from core.prog import scipywarn # noqa
-from core import scipyendataclasses as sdc
-from core import scipyen_quantities as scq
-from gui import guiutils, textviewer, datatreeviewer
-from gui.widgets import small_widgets as smw
-from gui.workspacegui import WorkspaceGuiMixin
+from gui import textviewer, datatreeviewer
 from iolib import pictio as pio
 
 
@@ -106,9 +101,6 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
                               (self.nameLineEdit,
                                )))
-
-        # if isinstance(self._detailsViewer_, datatreeviewer.DataTreeViewer):
-        #     sigBlockers.append(QtCore.QSignalBlocker(self._detailsViewer_))
 
         if isinstance(self._descriptionEditor_, textviewer.TextViewer):
             sigBlockers.append(QtCore.QSignalBlocker(self._descriptionEditor_))

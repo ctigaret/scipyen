@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>253</width>
-    <height>213</height>
+    <width>273</width>
+    <height>190</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,15 +16,6 @@
   <layout class="QGridLayout" name="gridLayout">
    <item row="0" column="0">
     <widget class="QSplitter" name="splitter">
-     <property name="toolTip">
-      <string>Drag to resize</string>
-     </property>
-     <property name="statusTip">
-      <string>Drag to resize</string>
-     </property>
-     <property name="whatsThis">
-      <string>Drag to resize</string>
-     </property>
      <property name="orientation">
       <enum>Qt::Orientation::Vertical</enum>
      </property>
@@ -39,7 +30,7 @@
        </sizepolicy>
       </property>
      </widget>
-     <widget class="QWidget" name="layoutWidget">
+     <widget class="QWidget" name="">
       <layout class="QVBoxLayout" name="verticalLayout_4">
        <item>
         <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true"/>
@@ -76,54 +67,6 @@
        </item>
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout">
-         <item>
-          <widget class="QLabel" name="label_3">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="toolTip">
-            <string>Developmental stage</string>
-           </property>
-           <property name="statusTip">
-            <string>Developmental stage</string>
-           </property>
-           <property name="whatsThis">
-            <string>Developmental stage</string>
-           </property>
-           <property name="text">
-            <string>Stage:</string>
-           </property>
-           <property name="buddy">
-            <cstring>devStageComboBox</cstring>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QComboBox" name="devStageComboBox">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="toolTip">
-            <string>Developmental stage</string>
-           </property>
-           <property name="statusTip">
-            <string>Developmental stage</string>
-           </property>
-           <property name="whatsThis">
-            <string>Developmental stage</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </item>
-       <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_2">
          <item>
           <widget class="QLabel" name="label_2">
            <property name="sizePolicy">
@@ -165,6 +108,50 @@
            </property>
            <property name="whatsThis">
             <string>Genetic sex</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_3">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Minimum" vsizetype="Minimum">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="toolTip">
+            <string>Developmental stage</string>
+           </property>
+           <property name="statusTip">
+            <string>Developmental stage</string>
+           </property>
+           <property name="whatsThis">
+            <string>Developmental stage</string>
+           </property>
+           <property name="text">
+            <string>Stage:</string>
+           </property>
+           <property name="buddy">
+            <cstring>devStageComboBox</cstring>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="devStageComboBox">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="toolTip">
+            <string>Developmental stage</string>
+           </property>
+           <property name="statusTip">
+            <string>Developmental stage</string>
+           </property>
+           <property name="whatsThis">
+            <string>Developmental stage</string>
            </property>
           </widget>
          </item>
