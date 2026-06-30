@@ -69,7 +69,6 @@ Ui_BiometricsWidget, QWidget = loadUiType(
 T = sdc.Biometrics
 
 class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
-    sig_valueChanged = Signal(object, name="sig_valueChanged")
     _objectTypes_ = (sdc.Biometrics,)
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,

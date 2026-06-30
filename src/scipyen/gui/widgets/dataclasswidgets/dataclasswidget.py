@@ -75,6 +75,7 @@ class DataClassWidget(QtWidgets.QWidget):
     sig_dataExporting = Signal(object, name="sig_dataExporting")
     sig_dataCopy = Signal(object, name="sig_dataCopy")
     sig_detailedView = Signal(object, str, name="sig_detailedView")
+    _objectTypes_ = tuple()
 
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None, **kwargs):
         isAttribute = kwargs.pop("isAttribute", False)

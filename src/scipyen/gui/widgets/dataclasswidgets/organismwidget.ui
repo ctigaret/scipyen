@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>364</width>
-    <height>275</height>
+    <width>318</width>
+    <height>278</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -65,30 +65,55 @@
         </layout>
        </item>
        <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_3">
-         <item>
+        <layout class="QFormLayout" name="formLayout">
+         <item row="0" column="0">
           <widget class="QLabel" name="label_2">
            <property name="text">
             <string>Subspecies:</string>
            </property>
           </widget>
          </item>
-         <item>
+         <item row="0" column="1">
           <widget class="LineEdit" name="subSpeciesLineEdit"/>
          </item>
-        </layout>
-       </item>
-       <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_2">
-         <item>
+         <item row="1" column="0">
           <widget class="QLabel" name="label_3">
            <property name="text">
             <string>Strain:</string>
            </property>
           </widget>
          </item>
-         <item>
+         <item row="1" column="1">
           <widget class="LineEdit" name="strainLineEdit"/>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="label_4">
+           <property name="toolTip">
+            <string>Facility ID</string>
+           </property>
+           <property name="statusTip">
+            <string>Facility ID</string>
+           </property>
+           <property name="whatsThis">
+            <string>Facility ID</string>
+           </property>
+           <property name="text">
+            <string>ID:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="LineEdit" name="facilityIDLineEdit">
+           <property name="toolTip">
+            <string>Facility ID</string>
+           </property>
+           <property name="statusTip">
+            <string>Facility ID</string>
+           </property>
+           <property name="whatsThis">
+            <string>Facility ID</string>
+           </property>
+          </widget>
          </item>
         </layout>
        </item>
@@ -111,8 +136,8 @@
          </property>
          <property name="sizeHint" stdset="0">
           <size>
-           <width>20</width>
-           <height>40</height>
+           <width>238</width>
+           <height>13</height>
           </size>
          </property>
         </spacer>
