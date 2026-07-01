@@ -8,12 +8,12 @@ r"""
 """
 
 import sys, os, typing, types, warnings, math, cmath # noqa
-import numbers
-import numpy as np
-import quantities as pq
+# import numbers
+# import numpy as np
+# import quantities as pq
 import pandas as pd
-import neo
-from tribool import Tribool
+# import neo
+# from tribool import Tribool
 
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
@@ -141,17 +141,82 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
             self.taxonDetailsToolButton.setEnabled(False)
 
         self.subSpeciesLineEdit.setText(f"{self._data_.subspecies}")
+        self.subSpeciesLineEdit.sig_enterPressed.connect(self._slot_setSubSpecies)
         self.strainLineEdit.setText(f"{self._data_.strain}")
+        self.strainLineEdit.sig_enterPressed.connect(self._slot_setStrain)
         self.facilityIDLineEdit.setText(f"{self._data_.ID}")
+        self.facilityIDLineEdit.sig_enterPressed.connect(self._slot_setFacilityID)
 
         self.biometricsWidget.setValue(self._data_.biometrics)
 
+    def setTaxon(self, value):
+        if isinstance(val, taxonbridge.Taxon):
+            self._data_.taxon = value
 
-    @Slot(str)
-    def _slot_selectTaxon(self, string: str):
-        self._data_.taxon = string
+        elif isinstance(value, str) or value in (None, datalasses.MISSING, pd.NA):
+            if taxonbridge.hasTaxoniq and isinstance(value, str):
+                if value in taxonbridge.supported_species:
+                    value = taxonbridge.Taxon(scientific_name=value)
+                else:
+                    value = taxonbridge.get_taxon(value)
+
+            self._data_.taxon = value
+        else:
+            # scipywarn(f"Expecting a str, a Taxon, None, or MISSING; instead, got {type(value).__name__}")
+            self._data_.taxon = pd.NA
+
+        sigBlocker = QtCore.QSignalBlocker(self.taxonSpeciesLineEdit)
+
+        if taxonbridge.hasTaxoniq and isinstance(self._data_.taxon, taxonbridge.Taxon):
+            taxon_name = self._data_.taxon.scientific_name
+            common_name = f"{self._data_.taxon.common_name}, (species: {taxon_name})"
+
+        elif isinstance(self._data_.taxon,str):
+            taxon_name = self._data_.taxon
+            common_name = self._data_.taxon
+
+        else:
+            taxon_name = f"{pd.NA}"
+            common_name = f"{pd.NA}"
+
+        self.taxonSpeciesLineEdit.setText(taxon_name)
+        self.taxonSpeciesLineEdit.setToolTip(common_name)
 
         self.sig_valueChanged.emit(self._data_)
+
+
+    @Slot(str)
+    def _slot_selectTaxon(self, value: str):
+        self.setTaxon(value)
+
+    @Slot(str)
+    def _slot_setSubSpecies(self, value:str):
+        if isinstance(value, str):
+            self._data_.subspecies = value
+        else:
+            self._data_.subspecies = ""
+
+        self.sig_valueChanged.emit(self._data_)
+
+    @Slot(str)
+    def _slot_setStrain(self, value: str):
+        if isinstance(value, str):
+            self._data_.strain = value
+        else:
+            self._data_.strain = ""
+
+        self.sig_valueChanged.emit(self._data_)
+
+    @Slot(str)
+    def _slot_setFacilityID(self, value: str):
+        if isinstance(value, str):
+            self._data_.ID = value
+        else:
+            self._data_.ID = ""
+
+        self.sig_valueChanged.emit(self._data_)
+
+
 
     @Slot()
     def _slot_showTaxonDetails(self):

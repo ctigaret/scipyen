@@ -23,10 +23,17 @@
       <number>3</number>
      </property>
      <widget class="DataExchangeWidget" name="dataExchangeWidget" native="true"/>
-     <widget class="QWidget" name="">
+     <widget class="QWidget" name="layoutWidget">
       <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
-        <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true"/>
+        <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+        </widget>
        </item>
        <item>
         <widget class="QTabWidget" name="tabWidget">
@@ -35,7 +42,7 @@
          </property>
          <widget class="QWidget" name="idSpeciesTab">
           <attribute name="title">
-           <string>ID &amp; Species</string>
+           <string>Organism</string>
           </attribute>
           <layout class="QGridLayout" name="gridLayout_2">
            <item row="0" column="0">
