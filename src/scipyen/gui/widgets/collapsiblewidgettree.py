@@ -141,52 +141,61 @@ class CollapsibleWidgetTree(QtWidgets.QWidget):
 
         self.sections = dict() # section name ↦ tuple(qtreewidgetitem, widget)
 
-    def add_section(self, title: str, widget: QtWidgets.QWidget):
+    def removeSection(self, title:str) -> tuple:
+        if title not in self.sections:
+            return tuple()
+
+        ndx = list(self.sections.keys()).index(title)
+        qtwi = self.tree.takeTopLevelItem(ndx)
+        qtwi_, widget = self.sections.pop(title)
+        print(qtwi == qtwi_)
+        return qtwi, widget
+
+
+    def replaceSection(self, title:str, widget: QtWidgets.QWidget) -> tuple:
+        r"""Returns the replaced section """
+        if title not in self.sections:
+            scipywarn(f"There is no section entitled {title}")
+            return tuple()
+
+        ndx = list(self.sections.keys()).index(title)
+        qtwi_, w_ = self.sections[title]
+        qtwi = self.tree.takeTopLevelItem(ndx)
+        item = self.addButton(title, ndx)
+        child = self.addWidget(item, widget)
+        self.sections[title] = (item, widget)
+        return qtwi, w_
+
+    def addSection(self, title: str, widget: QtWidgets.QWidget):
         if title in self.sections:
-            qtwi, wid = self.sections.pop(title)
-            self.tree.removeItemWidget(qtwi)
-            wid.close()
-            del wid
-        item = self.add_button(title)
-        child = self.add_widget(item, widget)
+            scipywarn(f"A section entitled {title} already exist; please remove it first")
+            return
+            # qtwi, wid = self.sections.pop(title)
+            # self.tree.removeItemWidget(qtwi, 0)
+            # wid.close()
+            # del wid
+        item = self.addButton(title)
+        child = self.addWidget(item, widget)
         item.addChild(child)
         self.sections[title] = (item, widget)
 
-
-    # def add_sections(self):
-    #     """adds a collapsible sections for every
-    #     (title, widget) tuple in self.sections
-    #     """
-    #     for (title, widget) in self.sections:
-    #         button1 = self.add_button(title)
-    #         section1 = self.add_widget(button1, widget)
-    #         button1.addChild(section1)
-
-    # def define_sections(self):
-    #     """reimplement this to define all your sections
-    #     and add them as (title, widget) tuples to self.sections
-    #     """
-    #     widget = QtWidgets.QFrame(self.tree)
-    #     layout = QtWidgets.QHBoxLayout(widget)
-    #     layout.addWidget(QtWidgets.QLabel("Bla"))
-    #     layout.addWidget(QtWidgets.QLabel("Blubb"))
-    #     title = "Section 1"
-    #     self.sections.append((title, widget))
-
-    def add_button(self, title: str) -> QtWidgets.QTreeWidgetItem:
+    def addButton(self, title: str, ndx: typing.Optional[int] = None) -> QtWidgets.QTreeWidgetItem:
         """creates a QTreeWidgetItem containing a button
         to expand or collapse its section
         """
         if not isinstance(title, str) or len(title.strip()) == 0:
             title = strutils.counter_suffix("Section", list(self.sections.keys()), returns_counter=False)
         item = QtWidgets.QTreeWidgetItem()
-        self.tree.addTopLevelItem(item)
+        if isinstance(ndx, int):
+            self.tree.insertTopLevelItem(ndx, item)
+        else:
+            self.tree.addTopLevelItem(item)
         self.tree.setItemWidget(item, 0, SectionExpandButton(item, text = title))
         # self.items.append(item)
         return item
 
-    def add_widget(self, button: QtWidgets.QTreeWidgetItem, widget: QtWidgets.QWidget) -> QtWidgets.QTreeWidgetItem:
-        """creates a QWidgetItem containing the widget,
+    def addWidget(self, button: QtWidgets.QTreeWidgetItem, widget: QtWidgets.QWidget) -> QtWidgets.QTreeWidgetItem:
+        """creates a QTreeWidgetItem containing the widget,
         as child of the button-QWidgetItem
         """
         section = QtWidgets.QTreeWidgetItem(button)
