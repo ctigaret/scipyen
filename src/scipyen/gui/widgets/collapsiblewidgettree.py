@@ -63,21 +63,60 @@ from gui.widgets import dataclasswidgets as dcw
 # from gui.workspacegui import WorkspaceGuiMixin
 # from gui.widgets.datawidgetmixin import DataWidgetMixin
 
-class SectionExpandButton(QtWidgets.QPushButton):
-    """a QPushbutton that can expand or collapse its section
+# class SectionExpandButton(QtWidgets.QPushButton):
+# class SectionExpandButton(QtWidgets.QToolButton):
+class SectionExpandButton(QtWidgets.QWidget):
+    """Toolbutton-like widget that can expand or collapse its section
     """
-    def __init__(self, item, text = "", parent = None):
-        super().__init__(text, parent)
+    def __init__(self, item: QtWidgets.QTreeWidgetItem, text: str = "",
+                 parent: typing.Optional[QtWidgets.QWidget] = None):
+        super().__init__(parent)
+        self.toolButton = QtWidgets.QToolButton(self)
+        self.toolButton.setAutoRaise(True)
+        self.toolButton.setArrowType(QtCore.Qt.RightArrow)
+        self.toolButton.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+        self.toolButton.setText(text)
+        self.headerLine = QtWidgets.QFrame(self)
+        self.headerLine.setFrameShape(QtWidgets.QFrame.HLine)
+        self.headerLine.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.headerLine.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                      QtWidgets.QSizePolicy.Minimum)
+
+
+        self.innerLayout = QtWidgets.QHBoxLayout(self)
+        self.innerLayout.setSpacing(0)
+        self.innerLayout.setContentsMargins(0,0,0,0)
+        self.innerLayout.addWidget(self.toolButton)
+        self.innerLayout.addWidget(self.headerLine)
+
+        # self.mainLayout = QtWidgets.QGridLayout(self)
+        # self.mainLayout.setVerticalSpacing(0)
+        # self.mainLayout.setHorizontalSpacing(0)
+        # self.mainLayout.setContentsMargins(0,0,0,0)
+        # self.mainLayout.addLayout(self.innerLayout)
+        # self.setLayout(self.mainLayout)
+
         self.section = item
-        self.clicked.connect(self.on_clicked)
+        self.toolButton.clicked.connect(self.on_clicked)
+
+
+        # super().__init__(text, parent)
+        # self.setAutoRaise(True)
+        # self.setArrowType(QtCore.Qt.RightArrow)
+        # self.setToolButtonStyle(QtCore.Qt.ToolButtonTextBesideIcon)
+        # self.setText(text)
+        # self.section = item
+        # self.clicked.connect(self.on_clicked)
 
     def on_clicked(self):
         """toggle expand/collapse of section by clicking
         """
         if self.section.isExpanded():
             self.section.setExpanded(False)
+            self.toolButton.setArrowType(QtCore.Qt.RightArrow)
         else:
             self.section.setExpanded(True)
+            self.toolButton.setArrowType(QtCore.Qt.DownArrow)
 
 
 # class CollapsibleDialog(QDialog):
@@ -86,7 +125,7 @@ class CollapsibleWidgetTree(QtWidgets.QWidget):
     subclass and reimplement define_sections() to define sections and
         add them as (title, widget) tuples to self.sections
     """
-    def __init__(self, parent=None):
+    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
         self.tree = QtWidgets.QTreeWidget()
         self.tree.setHeaderHidden(True)
