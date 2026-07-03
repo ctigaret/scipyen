@@ -189,6 +189,7 @@ pyneuroml[combined]       # optional
 pyparsing
 pypng
 pyqtgraph
+# pyqt-drawer
 pyserial
 pyudev ; sys_platform == 'linux'
 pyusb

@@ -662,6 +662,7 @@ class BioSourceType(TypeEnum):
     serum       = auto()
     plasma      = auto()
     homogenate  = auto()
+    cell_fraction = auto()
     monolayer   = invitro | cell # dissociated cells, cultured, possibly confluent
     culture     = monolayer
     acute_slice = exvivo | tissue # e.g. acute brain slice = exvivo | tissue = 17
@@ -682,6 +683,16 @@ class BioSourceType(TypeEnum):
     excretion   = (urine + faeces)
     exudate     = auto()
     pus         = auto()
+
+#
+# class BioProductType(TypeEnum):
+#     undefined = 0
+#
+#
+# @dataclass
+# class BiologicalProduct(ScipyenDataClass):
+#     r"""Biological product (not cell, tissue, organ or organism)"""
+
 
 class ProcedureType(TypeEnum):
     null = 0
@@ -1143,7 +1154,8 @@ class BiologicalSource(ScipyenDataclass):
         CellCompartment,
         ChemicalSynapse,
         UltrastructureElement,
-        ChemicalSynapseUltrastructureElement
+        ChemicalSynapseUltrastructureElement,
+        # BiologicalProduct,
         ] = dataclasses.field(
                 default_factory = Cell
             )
