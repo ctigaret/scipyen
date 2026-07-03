@@ -62,11 +62,21 @@ from iolib import pictio as pio
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-
 class DrawerWidget(QtWidgets.QWidget):
-    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None):
-        super().__init__(parent=parent)
+    def __init__(self, drawnWidget: QtWidgets.QWidget,
+                 drawerOrientation: QtCore.Qt.Orientation = QtCore.Qt.Horizontal,
+                 drawerVerticalAlignment: QtCore.Qt.AlignmentFlag = QtCore.Qt.AlignTop,
+                 drawerHorizontalAlignment: QtCore.Qt.AlignmentFlag = QtCore.Qt.AlignLeft,
+                 parent: typing.Optional[QtWidgets.QWidget] = None,
+                 ):
 
+        super().__init__(parent=parent)
+        self._drawnWidget_ = drawnWidget
+        self._drawerOrientation_ = drawerOrientation
+        self._drawerVerticalAlignment_ = drawerVerticalAlignment
+        self._drawerHorizontalAlignment_ = drawerHorizontalAlignment
+
+        self._configureUI_()
 
     def _configureUI_(self):
         self._toggleButton_ = QtWidgets.QToolButton(self)
@@ -74,6 +84,108 @@ class DrawerWidget(QtWidgets.QWidget):
         self._toggleButton_.setCheckable(True)
         self._toggleButton_.setAutoRaise(True)
         self._toggleButton_.setToolButtonStyle(QtCore.Qt.ToolButtonIconOnly)
+        self._toggleButton_.toggled.connect(self._slot_drawerToggled)
 
-        # self._sizeAnimation_ =
+        if self._drawerOrientation_ == QtCore.Qt.Horizontal:
+            self._drawnWidget_.setFixedWidth(0)
+            self._sizeAnimation_ = QtCore.QPropertyAnimation(self._drawnWidget_, b'width', self)
+            self._sizeAnimation_.valueChanged.connect(self._drawnWidget_.setFixedWidth)
+        else:
+            self._drawnWidget_.setFixedHeight(0)
+            self._sizeAnimation_ = QtCore.QPropertyAnimation(self._drawnWidget_, b'height', self)
+            self._sizeAnimation_.valueChanged.connect(self._drawnWidget_.setFixedHeight)
+
+        self._sizeAnimation_.setStartValue(0)
+        self._sizeAnimation_.setDuration(200)
+        self._sizeAnimation_.setEndValue(200)
+
+        self._opacityEffect_ = QtWidgets.QGraphicsOpacityEffect(self)
+        self._opacityEffect_.setOpacity(0.0)
+
+        self._opacityAnimation_ = QtCore.QPropertyAnimation(self._opacityEffect_, b'opacity', self)
+        self._opacityAnimation_.setStartValue(0.0)
+        self._opacityAnimation_.setDuration(200)
+        self._opacityAnimation_.setEndValue(1.0)
+        self._opacityAnimation_.valueChanged.connect(self._slot_setOpacity)
+
+        self._drawnWidget_.setGraphicsEffect(self._opacityEffect_)
+
+        # self._parentOpacityAnimation_ = QtCore.QPropertyAnimation(self, b'parentopacity')
+        # self._parentOpacityAnimation_.setStartValue(255)
+        # self._parentOpacityAnimation_.setDuration(200)
+        # self._parentOpacityAnimation_.setEndValue(127)
+        #
+        # self._parentOpacityAnimation_.valueChanged.connect(self._slot_setParentOpacity)
+
         self._animationGroup_ = QtCore.QParallelAnimationGroup()
+        self._animationGroup_.addAnimation(self._sizeAnimation_)
+        self._animationGroup_.addAnimation(self._opacityAnimation_)
+        # self._animationGroup_.addAnimation(self._parentOpacityAnimation_)
+        self._animationGroup_.stateChanged.connect(self._slot_animationStateChanged)
+
+        layout = QtWidgets.QGridLayout(self)
+        layout.addWidget(self._toggleButton_, 0, 0, 1, 1, QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
+        layout.addWidget(self._drawnWidget_, 0, 0, 1, 2, self._drawerVerticalAlignment_ | self._drawerHorizontalAlignment_)
+        layout.setSpacing(0)
+        layout.setContentsMargins(0,0,0,0)
+
+    def setIon(self, icon: QtGui.QIcon):
+        self._toggleButton_.setIcon(icon)
+
+    def setEndValue(self, val: int):
+        self._sizeAnimation_.setEndValue(val)
+
+    def setDuration(self, val: int):
+        self._sizeAnimation_.setDuration(val)
+        self._opacityAnimation_.setDuration(val)
+        # self._parentOpacityAnimation_.setDuration(val)
+
+    def setOrientation(self, val: QtCore.Qt.Orientation):
+        self._drawerOrientation_ = val
+        if self._drawerOrientation_ == QtCore.Qt.Horizontal:
+            self._drawnWidget_.setFixedWidth(0)
+            self._sizeAnimation_.setPropertyName(b'width')
+            self._sizeAnimation_.valueChanged.disconnect()
+            self._sizeAnimation_.valueChanged.connect(self._drawnWidget_.setFixedWidth)
+        else:
+            self._drawnWidget_.setFixedHeight(0)
+            self._sizeAnimation_.setPropertyName(b'height')
+            self._sizeAnimation_.valueChanged.disconnect()
+            self._sizeAnimation_.valueChanged.connect(self._drawnWidget_.setFixedHeight)
+
+    def setWidget(self, obj: QtWidgets.QWidget):
+        self._drawnWidget_ = obj
+
+
+    @Slot(QtCore.QVariant)
+    def _slot_setOpacity(self, val: QtCore.QVariant):
+        self._opacityEffect_.setOpacity(val.value())
+
+    # @Slot(QtCore.QVariant)
+    # def _slot_setParentOpacity(self, val: QtCore.QVariant):
+    #     return # no-op for now
+    #     parent = self.parent()
+    #     if not isinstance(parent, QtWidgets.QWidget):
+    #         return
+    #     palette = parent.palette()
+    #     palette.setColor(QtGui.QPalette.Window, QtGui.Qolor(255,255,255, val.value()))
+    #     parent.setPalette(palette)
+
+    @Slot(QtCore.QAbstractAnimation.State, QtCore.QAbstractAnimation.State)
+    def _slot_animationStateChanged(self, newState: QtCore.QAbstractAnimation.State,
+                                    oldState: QtCore.QAbstractAnimation.State):
+        if newState == QtCore.QAbstractAnimation.Running:
+            self._drawnWidget_.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
+            # self._parentOpacityAnimation_.start()
+        elif newState == QtCore.QAbstractAnimation.Stopped:
+            self._drawnWidget_.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
+
+    @Slot(bool)
+    def _slot_drawerToggled(self, val: bool):
+        if val is True:
+            self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Forward)
+            self._toggleButton_.hide()
+
+        else:
+            self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
+            self._toggleButton_.show()
