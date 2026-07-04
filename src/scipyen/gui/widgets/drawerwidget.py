@@ -88,12 +88,12 @@ class DrawerWidget(QtWidgets.QWidget):
 
         if self._drawerOrientation_ == QtCore.Qt.Horizontal:
             self._drawnWidget_.setFixedWidth(0)
-            self._sizeAnimation_ = QtCore.QPropertyAnimation(self._drawnWidget_, b'width', self)
-            self._sizeAnimation_.valueChanged.connect(self._drawnWidget_.setFixedWidth)
+            self._sizeAnimation_ = QtCore.QPropertyAnimation(self, b'drawerWidgetWidth', self)
+            self._sizeAnimation_.valueChanged.connect(self._slot_setDrawnWidgetWidth)
         else:
             self._drawnWidget_.setFixedHeight(0)
-            self._sizeAnimation_ = QtCore.QPropertyAnimation(self._drawnWidget_, b'height', self)
-            self._sizeAnimation_.valueChanged.connect(self._drawnWidget_.setFixedHeight)
+            self._sizeAnimation_ = QtCore.QPropertyAnimation(self, b'drawerWidgetHeight', self)
+            self._sizeAnimation_.valueChanged.connect(self._slot_setDrawnWidgetHeight)
 
         self._sizeAnimation_.setStartValue(0)
         self._sizeAnimation_.setDuration(200)
@@ -129,7 +129,34 @@ class DrawerWidget(QtWidgets.QWidget):
         layout.setSpacing(0)
         layout.setContentsMargins(0,0,0,0)
 
-    def setIon(self, icon: QtGui.QIcon):
+        parent = self.parent()
+        if isinstance(parent, QtWidgets.QWidget):
+            parent.installEventFilter(self)
+
+    @QtCore.Property(int)
+    def drawerWidgetWidth(self) -> int:
+        return self._drawnWidget_.width()
+
+    @drawerWidgetWidth.setter
+    def drawerWidgetWidth(self, val:int):
+        print(f"{self.__class__.__name__}.drawerWidgetWidth.setter({val})")
+        self._drawnWidget_.setFixedWidth(val)
+        # h = self._drawnWidget_.height()
+        # self._drawnWidget_.resize(QtCore.QSize(val, h))
+
+    @QtCore.Property(int)
+    def drawerWidgetHeight(self) -> int:
+        return self._drawnWidget_.height()
+
+    @drawerWidgetHeight.setter
+    def drawerWidgetHeight(self, val: int):
+        print(f"{self.__class__.__name__}.drawerWidgetHeight.setter({val})")
+        self._drawnWidget_.setFixedHeight(val)
+        # w = self._drawnWidget_.width()
+        # self._drawnWidget_.resize(QtCore.QSize(w,val))
+
+
+    def setIcon(self, icon: QtGui.QIcon):
         self._toggleButton_.setIcon(icon)
 
     def setEndValue(self, val: int):
@@ -156,10 +183,35 @@ class DrawerWidget(QtWidgets.QWidget):
     def setWidget(self, obj: QtWidgets.QWidget):
         self._drawnWidget_ = obj
 
+    def eventFilter(self, obj: QtCore.QObject, evt: QtCore.QEvent):
+        parent = self.parent()
+        if isinstance(parent, QtWidgets.QWidget):
+            if isinstance(obj, type(self.__parent)):
+                if evt.type() == QtCore.QEvent.MouseButtonRelease:
+                    if self._sizeAnimation_.currentValue() == self._sizeAnimation_.endValue():
+                        self._toggleButton_.toggle()
+        return super().eventFilter(obj, e)
+
+    @Slot(QtCore.QVariant)
+    def _slot_setDrawnWidgetWidth(self, val: QtCore.QVariant):
+        if not isinstance(val, int):
+            val = val.value()
+        print(f"{self.__class__.__name__}._slot_setDrawnWidgetWidth({val})")
+        self._drawnWidget_.setFixedWidth(val)
+
+    @Slot(QtCore.QVariant)
+    def _slot_setDrawnWidgetHeight(self, val: QtCore.QVariant):
+        if not isinstance(val, int):
+            val = val.value()
+        print(f"{self.__class__.__name__}._slot_setDrawnWidgetHeight({val})")
+        self._drawnWidget_.setFixedHeight(val)
 
     @Slot(QtCore.QVariant)
     def _slot_setOpacity(self, val: QtCore.QVariant):
-        self._opacityEffect_.setOpacity(val.value())
+        if not isinstance(val, float):
+            val = val.value()
+        print(f"{self.__class__.__name__}._slot_setOpacity({val})")
+        self._opacityEffect_.setOpacity(val)
 
     # @Slot(QtCore.QVariant)
     # def _slot_setParentOpacity(self, val: QtCore.QVariant):
@@ -174,6 +226,7 @@ class DrawerWidget(QtWidgets.QWidget):
     @Slot(QtCore.QAbstractAnimation.State, QtCore.QAbstractAnimation.State)
     def _slot_animationStateChanged(self, newState: QtCore.QAbstractAnimation.State,
                                     oldState: QtCore.QAbstractAnimation.State):
+        print(f"{self.__class__.__name__}._slot_animationStateChanged(newState = {newState}, oldState={oldState})")
         if newState == QtCore.QAbstractAnimation.Running:
             self._drawnWidget_.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
             # self._parentOpacityAnimation_.start()
@@ -182,10 +235,13 @@ class DrawerWidget(QtWidgets.QWidget):
 
     @Slot(bool)
     def _slot_drawerToggled(self, val: bool):
+        print(f"{self.__class__.__name__}._slot_drawerToggled({val})")
         if val is True:
             self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Forward)
-            self._toggleButton_.hide()
+            # self._toggleButton_.hide()
 
         else:
             self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
-            self._toggleButton_.show()
+            # self._toggleButton_.show()
+
+        self._animationGroup_.start()
