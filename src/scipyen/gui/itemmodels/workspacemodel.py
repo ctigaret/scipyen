@@ -972,14 +972,17 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # NOTE: 2023-06-07 08:39:15
         # at this stage there may be variables not cached but still monitored
         # we need to remove then from the monitor, but withhold notifications
-        with self.internalVariablesMonitor.observer.hold_trait_notifications():
-            observed_set = set(self.internalVariablesMonitor.keys())
-            cached_set = set(self.cached_vars)
+        try:
+            with self.internalVariablesMonitor.observer.hold_trait_notifications():
+                observed_set = set(self.internalVariablesMonitor.keys())
+                cached_set = set(self.cached_vars)
 
-            observed_not_cached = observed_set - cached_set
-            # print(f"{print_styled('\t{len(observed_not_cached)} observed_not_cached', color='magenta')}")
-            for var in observed_not_cached:
-                self.internalVariablesMonitor.pop(var, None)
+                observed_not_cached = observed_set - cached_set
+                # print(f"{print_styled('\t{len(observed_not_cached)} observed_not_cached', color='magenta')}")
+                for var in observed_not_cached:
+                    self.internalVariablesMonitor.pop(var, None)
+        except:
+            traceback.print_exc()
 
     # @timefunc
     # def post_execute(self):

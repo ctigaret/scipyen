@@ -14,6 +14,7 @@ import quantities as pq
 import pandas as pd
 import neo
 from tribool import Tribool
+from functools import singledispatchmethod
 
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
@@ -67,7 +68,7 @@ Ui_BiologicalSourceWidget, QWidget = loadUiType(
     )
 
 class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
-    _objectTypes_ = (sdc.BiologicalSource)
+    _objectTypes_ = (sdc.BiologicalSource, )
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.BiologicalSource] = None,
@@ -91,24 +92,21 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         self._bioSourceTypeNames_ = list(sdc.BioSourceType.names())
 
         self._specimenTypes_ = [
-            Organism,
-            Organ,
-            Tissue,
-            Cell,
-            CellCompartment,
-            ChemicalSynapse,
-            UltrastructureElement,
-            ChemicalSynapseUltrastructureElement,
-            BiologicalProduct,
+            sdc.Organism,
+            sdc.Organ,
+            sdc.Tissue,
+            sdc.Cell,
+            sdc.CellCompartment,
+            sdc.ChemicalSynapse,
+            sdc.UltrastructureElement,
+            sdc.ChemicalSynapseUltrastructureElement,
+            sdc.BiologicalProduct,
         ]
-
-        # self._drawer_ = None
 
         self._configureUI_()
 
     def _configureUI_(self):
         self.setupUi(self)
-
 
         self.dataExchangeWidget.dataType = type(self._data_)
         self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
@@ -133,10 +131,13 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         for text in self._bioSourceTypeNames_:
             self.bioSourceTypeComboBox.addItem(text)
+
         ndx = self._bioSourceTypeNames_.index(self._data_.sourceType.name)
         self.bioSourceTypeComboBox.setCurrentIndex(ndx)
 
         self.bioSourceTypeComboBox.currentIndexChanged.connect(self._slot_sourceTypeChanged)
+
+        self.specimenWidget = None
 
         self.showSpecimenToolButton.clicked.connect(self._slot_showSpecimen)
 
@@ -150,6 +151,31 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
     @Slot()
     def _slot_showSpecimen(self):
+        if isinstance(self._data_.specimen, self._specimenTypes_):
+            self._specimenWidget_ = self._createWidget_(self._data_.specimen)
+            self._specimenWidget_.show()
 
-        pass
+    @singledispatchmethod
+    def _createWidget_(self, obj):
+        raise NotImplementedError(f"Objects of type {type(obj)} are not supported")
+
+    @_createWidget_.register(sdc.Organism)
+    def __createWidget__(self, obj: sdc.Organism):
+        from gui.widgets.dataclasswidgets.organismwidget import OrganismWidget
+        return OrganismWidget(obj)
+
+    @_createWidget_.register(sdc.Organ)
+    @_createWidget_.register(sdc.Tissue)
+    def __createWidget__(self, obj: sdc.Organ):
+        from gui.widgets.dataclasswidgets.organwidget import OrganWidget
+        return OrganWidget(obj)
+
+    @_createWidget_.register(sdc.Tissue)
+    def __createWidget__(self, obj: sdc.Tissue):
+        from gui.widgets.dataclasswidgets.tissuewidget import OrganWidget
+        return OrganWidget(obj)
+
+
+
+
 

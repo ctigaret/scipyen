@@ -60,6 +60,7 @@ from gui.widgets.datatreeview import DataTreeView
 from core.prog import scipywarn # noqa
 from core import scipyendataclasses as sdc
 from core import scipyen_quantities as scq
+from core import qtutils
 from gui import guiutils, textviewer, datatreeviewer
 from gui.textviewer import TextViewer
 from gui.widgets import small_widgets as smw
@@ -81,6 +82,7 @@ class DataClassWidget(QtWidgets.QWidget):
         isAttribute = kwargs.pop("isAttribute", False)
         QtWidgets.QWidget.__init__(self, parent=parent)
         self._isAttribute_: bool = isAttribute
+        self._parentEditor_ = None
         # self._customSymbol_: typing.Optional[str] = None
 
     def value(self) -> None:
@@ -185,8 +187,65 @@ class DataClassWidget(QtWidgets.QWidget):
             and isinstance(self._data_, self._objectTypes_) and hasattr(self._data_, "parent") and dataclasses.is_dataclass(self._data_.parent)):
             parent = self._data_.parent
 
-        print(f"{self.__class__.__name__}._slot_editParent -> {parent}")
+        # print(f"{self.__class__.__name__}._slot_editParent -> {parent}")
+
+        if isinstance(self._parentEditor_, QtWidgets.QWidget) and qtutils.isQObjectAlive(self._parentEditor_):
+            editor = self._createParentEditor_(parent)
+            if type(editor) != type(self._parentEditor_):
+                self._parentEditor_.close()
+                self._parentEditor_.deleteLater()
+                self._parentEditor_ = editor
+
+        else:
+            self._parentEditor_ = self._createParentEditor_(parent)
+
+        self._parentEditor_.show()
+        self._parentEditor_.setWindowTitle("Edit parent")
+
 
         # TODO: 2026-06-25 16:47:07 finalize me
         # what are the possible parents of the CellCompartment/NeuronCompartment
         # propose creating a new one (add create new button to these widgets)
+
+    @singledispatchmethod
+    def _createParentEditor_(self, obj):
+        raise NotImplementedError(f"{type(obj)} objects are not supported")
+
+    @_createParentEditor_.register(sdc.Neuron)
+    def __createParentEditor(self, obj: sdc.Neuron):
+        from gui.widgets.dataclasswidgets.cellwidget import NeuronWidget
+        return NeuronWidget(obj)
+
+    @_createParentEditor_.register(sdc.Cell)
+    def __createParentEditor(self, obj: sdc.Cell):
+        from gui.widgets.dataclasswidgets.cellwidget import CellWidget
+        return CellWidget(obj)
+
+    @_createParentEditor_.register(sdc.CellCompartment)
+    def __createParentEditor(self, obj: sdc.CellCompartment):
+        from gui.widgets.dataclasswidgets.cellcompartmentwidget import CellCompartmentWidget
+        return CellCompartmentWidget(obj)
+
+    @_createParentEditor_.register(sdc.Organism)
+    def __createParentEditor(self, obj: sdc.Organism):
+        from gui.widgets.dataclasswidgets.organismwidget import OrganismWidget
+        return OrganismWidget(obj)
+
+    @_createParentEditor_.register(sdc.Brain)
+    def __createParentEditor(self, obj: sdc.Brain):
+        from gui.widgets.dataclasswidgets.organtissuewidgets import BrainWidget
+        return BrainWidget(obj)
+
+    @_createParentEditor_.register(sdc.Organ)
+    def __createParentEditor(self, obj: sdc.Organ):
+        from gui.widgets.dataclasswidgets.organtissuewidgets import OrganWidget
+        return OrganWidget(obj)
+
+    @_createParentEditor_.register(sdc.Tissue)
+    def __createParentEditor(self, obj: sdc.Tissue):
+        from gui.widgets.dataclasswidgets.organtissuewidgets import TissueWidget
+        return TissueWidget(obj)
+
+
+
+

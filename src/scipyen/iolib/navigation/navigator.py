@@ -1877,6 +1877,7 @@ class PlacesMenu(QtWidgets.QMenu):
         else:
             assert(isinstance(parent, (QtWidgets.QWidget, type(None))))
             super().__init__(parent=parent)
+
         self._initialMousePosition = QtGui.QCursor.pos()
         self._mouseMoved_ = False
         self.setAcceptDrops(True)
@@ -1995,7 +1996,7 @@ class PlacesButton(UrlNavigatorButtonBase):
         navigator = self.parent()
         assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
         menu.mouseButtonClicked.connect(self.slot_menuActionClicked) # mouse activation of menu entry
-        menu.triggered.connect(self.slot_menuActionTriggered) # keybard activation of menu entry
+        menu.triggered.connect(self.slot_menuActionTriggered) # keyboard activation of menu entry
         menu.setLayoutDirection(QtCore.Qt.LeftToRight)
 
         maxIndex = startIndex + nItems # (max 10 places shown in the menu)
