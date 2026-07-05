@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# $Id: brainwidget.py $
+# $Id: nervoussystemwidgets.py $
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@proton.me>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -67,52 +67,7 @@ Ui_NervousSystemWidget, _ = loadUiType(
     os.path.join(__module_path__, "nervoussystemwidget.ui")
     )
 
-Ui_BGAtlasStructureLookupWidget, _ = loadUiType(
-    os.path.join(__module_path__, "brainglobeatlasstructurelookup.ui")
-    )
 
-class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QWidget):
-    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
-                 atlas: typing.Optional[bgbridge.BrainbGlobeAtlas] = None,
-                 structure: typing.Optional[bgbridge.Structure] = None,
-                 **kwargs):
-        super().__init__(parent=parent)
-
-        self._atlas_ = atlas
-        self._structure_ = structure
-        self._structureIdentityText_ = ""
-
-    def _configureUI_(self):
-        self.setupUi(self)
-        self.structureIDAcroNameLabel.setText("")
-
-
-    def _parseStructureAncestorsAndDescendants(self):
-        self._ancestors_ = dict()
-        self._descendants_ = dict()
-        if (
-            bgbridge.hasBrainGlobe and bgbridge.hasBrainGlobeAtlasAPI
-            ):
-            if isinstance(self._structure_, bgbridge.Structure) and "brainglobe_atlasapi" in type(self._structure_).__module__:
-                self._structureIdentityText_ =
-                    f"{self._structure_['id']} ({self._structure_['acronym]']}: {self._structure_['name']})"
-
-                if isinstance(self._atlas_, bgbridge.BrainGlobeAtlas) and "brainglobe_atlasapi" in type(self._atlas_).__module__:
-                    self._ancestors_ = dict(
-                        map(
-                            lambda a: (self._atlas_.structures[a]["acronym"],
-                                       self._atlas_.structures[a]["name"]),
-                            self._atlas_.get_structure_ancestors(self._structure_["id"])
-                            )
-                        )
-
-                    self._descendants_ = dict(
-                        map(
-                            lambda a: (self._atlas_.structures[a]["acronym"],
-                                       self._atlas_.structures[a]["name"]),
-                            self._atlas_.get_structure_descendants(self._structure_["id"])
-                            )
-                        )
 
 class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget):
     r"""NOTE: This relates to ALL organs in a BrainGlobeAtlas, not just the brain!"""
@@ -181,28 +136,44 @@ class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget):
         for t in self._localAtlasNames_:
             self.brainAtlasComboBox.addItem(t)
 
-        if isinstance(self._data_.atlasName, str) and self._data_.atlasName in bman.localAtlases.keys():
-            ndx = list(bman.localAtlases.keys()).index(self._data_.atlasName) + 1 # to account for "Undefined"
+        if isinstance(self._data_.atlasName, str) and self._data_.atlasName in self._bman_.localAtlases.keys():
+            ndx = list(self._bman_.localAtlases.keys()).index(self._data_.atlasName) + 1 # to account for "Undefined"
             self.brainAtlasComboBox.setCurrentIndex(ndx)
 
         else:
             self.brainAtlasComboBox.setCurrentIndex(0) # use "Undefined"
 
-        self._structureLookupWidget_ = None
-
         self.brainAtlasComboBox.currentIndexChanged.connect(self._slot_atlasChanged)
 
-        self.structureLookupToolButton.clicked.connect(self._slot_lookupStructure)
+        if (bgbridge.hasBrainGlobe
+            and bgbridge.hasBrainGlobeAtlasAPI):
+            if (isinstance(self._atlas_, bgbridge.BrainGlobeAtlas)
+            and "brainglobe_atlasapi" in type(self._atlas_).__module__):
+                self.bgStructureWidget.atlas = self._atlas_
+                if (isinstance(self._data_.structure, bgbridge.Structure)
+                    and "brainglobe_atlasapi" in type(self._data_.structure).__module__):
+                    self.bgStructureWidget.setValue(self._data_.structure)
+
+        self.bgStructureWidget.sig_valueChanged.connect(self._slot_structureChanged)
+
+    @Slot(object)
+    def _slot_structureChanged(self, val: object):
+        self._data_.structure = val
 
     @Slot(int)
     def _slot_atlasChanged(self, val: int):
-        if not isinstance(val, int) or val <= 0 or val >=len(bman.localAtlases):
+        if not isinstance(val, int) or val <= 0 or val >=len(self._bman_.localAtlases):
             self._data_.atlasName = pd.NA
 
         else:
-            self._data_.atlasName = list(bman.localAtlases.keys())[val-1]
+            self._data_.atlasName = list(self._bman_.localAtlases.keys())[val-1]
 
-        # if self._data_atlasName in bman.localAtlases:
+        if self._data_.atlasName in self._bman_.localAtlases:
+            self._atlas_ = self._bman_.initAtlas(self._data_.atlasName)
+            self.bgStructureWidget.atlas = self._atlas_
+            if self._data_.structure["id"] not in self._atlas_.structures:
+                self._data_.structure = None
+                self.bgStructureWidget.setValue(None)
 
 
         self.sig_valueChanged.emit(self._data_)

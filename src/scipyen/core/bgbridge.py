@@ -259,7 +259,7 @@ class BrainAtlasManager(QtCore.QObject):
 
         """
         super().__init__(parent=parent)
-        self._atlas_ = None
+        # self._atlas_ = None
         self._current_atlas_ = None
         self._atlas_name_to_initialize_ = None
         self._atlas_in_progress_ = None
@@ -749,7 +749,8 @@ class BrainAtlasManager(QtCore.QObject):
         # print(f"{self.__class__.__name__}._slot_extractAtlasArchiveAndInit: target = {target}")
         ret = self._extractAtlasArchive(target)
         if ret and self._atlas_name_to_initialize_ is not None:
-            self._atlas_ = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
+            # self._atlas_ = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
+            self._current_atlas_ = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
             print(f"{print_styled(f'{self._atlas_name_to_initialize_}', 'green')} was initialized")
             self._atlas_name_to_initialize_ = None
 

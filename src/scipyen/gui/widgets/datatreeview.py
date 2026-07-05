@@ -9,7 +9,7 @@ New data viewer widget, based on datatreemodel
 """
 from __future__ import print_function
 
-import os
+import os, sys
 # import warnings
 import types
 import traceback
@@ -67,17 +67,32 @@ import pandas as pd
 
 from core.workspacefunctions import (validate_varname, user_workspace)
 from core import prog
+from core.prog import safewrapper
+from core import strutils
 
 from gui.delegates import PythonItemDelegate
 from gui.workspacegui import WorkspaceGuiMixin
 from gui.itemmodels.roles import * #noqa
 from gui.itemmodels.datatreemodel import DataTreeModel
+from gui import quickdialog
+
+if "darwin" in sys.platform:
+    altKeyDescr = "<Option>"
+    ctrlKeyDescr = "<Command>"
+else:
+    altKeyDescr = "<ALT>"
+    ctrlKeyDescr = "<CTRL>"
 
 class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     sig_itemDoubleClicked = Signal(QtGui.QStandardItem, name="sig_itemDoubleClicked")
     def __init__(self: typing.Self, *args, **kwargs):
         # print(f"{self.__class__.__name__}.__init__")
         parent = kwargs.pop("parent", None)
+        super().__init__(parent=parent)
+        WorkspaceGuiMixin.__init__(self, parent=parent)
+
+        self._defaultEditTriggers_ = self.editTriggers()
+
         initialExpandDepth = kwargs.pop("initialExpandDepth", 1)
         self._showCallables_: bool = kwargs.get("showCallables", False)
         self._showValuesOnly_: bool = kwargs.get("showValuesOnly", True)
@@ -90,7 +105,6 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self.autoResizeColumns: set[int] = kwargs.pop("autoResizeColumns", set())
 
         # self._alwaysSortRows_: bool = False
-        super().__init__(parent=parent)
 
         # NOTE: 2026-03-31 22:47:04
         self.setTextElideMode(QtCore.Qt.ElideMiddle)
@@ -112,7 +126,399 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self._delegate_ = PythonItemDelegate(parent = self)
         self._dragStartPosition_: typing.Optional[QtCore.QPoint] = None
 
+        self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+
+        # TODO implement dragging from here to the workspace
+        self.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
+        self.setDragEnabled(True)
+
+        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.customContextMenuRequested[QtCore.QPoint].connect(
+            self.slot_customContextMenuRequested
+            )
+
+        self.sig_itemDoubleClicked[QtGui.QStandardItem].connect(self.slot_itemDoubleClicked)
+        self.expanded.connect(self._slot_indexExpanded)
+        self.collapsed.connect(self._slot_indexCollapsed)
+
+        self.setAlternatingRowColors(True)
         self.setItemDelegate(self._delegate_)
+
+    @safewrapper
+    def _exportPathsToClipboard_(self, item_paths):
+        if self._scipyenWindow_ is None:
+            return
+
+        if len(item_paths) > 1:
+            if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier):
+                self._scipyenWindow_.app.clipboard().setText(",\n".join(["""%s""" % i for i in item_paths]))
+            else:
+                self._scipyenWindow_.app.clipboard().setText(", ".join(["""%s""" % i for i in item_paths]))
+
+        elif len(item_paths) == 1:
+            self._scipyenWindow_.app.clipboard().setText(item_paths[0])
+
+    def _editExternally_(self, obj:object, name:str, askForParams:bool):
+        from gui.mainwindow import VTH
+        # print(f"{self.__class__.__name__}._editExternally_({type(obj).__name__}, {name}, {askForParams})")
+        if "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+            return
+
+        handler_specs = VTH.get_handler_spec(type(obj))
+
+        tableEdit = list(filter(lambda x: "TableEditor" in x, handler_specs))
+        dataTreeEdit = list(filter(lambda x: "DataTreeViewer" in x, handler_specs))
+        textEdit = list(filter(lambda x: "TextViewer" in x, handler_specs))
+
+        winType = None
+
+        if len(tableEdit) == 1:
+            winType = tableEdit[0][0]
+
+        elif len(dataTreeEdit) == 1:
+            winType = dataTreeEdit[0][0]
+
+        elif len(textEdit) == 1:
+            winType = textEdit[0][0]
+
+        # print(f"\twinType = {winType}")
+
+        if winType:
+            if not self.scipyenWindow.viewObject(obj, name, winType=winType,
+                                    newWindow=True,
+                                    askForParams=askForParams):
+                self._showInConsole_(obj)
+
+    @Slot()
+    @safewrapper
+    def slot_expandAll(self):
+        self.expandAll()
+        self.resizeColumnToContents(0)
+
+    @Slot(QtGui.QStandardItem)
+    def slot_itemDoubleClicked(self: typing.Self, item:QtGui.QStandardItem):
+        # print(f"{self.__class__.__name__}.slot_itemDoubleClicked")
+        askForParams = bool(
+            QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+
+        if not self.model:
+            # print(f"\tno model")
+            return
+
+        if item.column() == 0:
+            readOnly = item.data(ReadOnlyRole) is True # noqa
+            obj = self.sourceModel.getDataObjectForLeaf(item)
+            if obj is None:
+                return
+            name = item.data(QtCore.Qt.DisplayRole)
+            if item.data(ObjectDataEditExternallyRole) is True: # noqa
+                self._editExternally_(obj, name, askForParams)
+
+            else:
+                self.readOnly = readOnly
+                self.view(obj, name)
+
+    @Slot()
+    @safewrapper
+    def slot_copyPaths(self: typing.Self):
+        if self._scipyenWindow_ is None:
+            return
+
+        item_paths = self.getSelectedPaths()
+        self._exportPathsToClipboard_(item_paths)
+
+    @Slot()
+    def slot_exportToConsole(self: typing.Self):
+        if self._scipyenWindow_ is None:
+            return
+
+        item_paths = self.getSelectedPaths()
+        self._exportPathsToClipboard_(item_paths)
+        self._scipyenWindow_.console.paste()
+
+    @Slot()
+    @safewrapper
+    def slot_resizeFitColumns(self):
+        for col in range(self.model.columnCount()):
+            self.resizeColumnToContents(col)
+
+    @Slot(QtCore.QModelIndex)
+    def _slot_indexExpanded(self, index: QtCore.QModelIndex):
+        # print(f"{self.__class__.__name__}._slot_indexExpanded(index={index})")
+        column = index.column()
+        self.resizeColumnToContents(column)
+        if column < (self.sourceModel.columnCount()-1):
+            self.resizeColumnToContents(column+1)
+
+    @Slot(QtCore.QModelIndex)
+    def _slot_indexCollapsed(self, index: QtCore.QModelIndex):
+        column = index.column()
+        self.resizeColumnToContents(column)
+        if column < (self.sourceModel.columnCount()-1):
+            self.resizeColumnToContents(column+1)
+
+    @Slot()
+    @safewrapper
+    def slot_collapseAll(self):
+        sigBlock = QtCore.QSignalBlocker(self)
+        self.collapseAll()
+
+    @Slot(QtCore.QPoint)
+    @safewrapper
+    def slot_customContextMenuRequested(self, point):
+        from gui.mainwindow import VTH
+
+        # FIXME/TODO copy to system clipboard? - what mime type? JSON data?
+        if self._scipyenWindow_ is None:
+            return
+
+        items = self.selectedItems()
+        if len(items) == 0:
+            return
+
+        cm = QtWidgets.QMenu("Data operations", self)
+        cm.setToolTipsVisible(True)
+
+        copyItemData = cm.addAction("Send to workspace")
+        _tip = "Create a reference in the workspace (press and hold SHIFT to assign full path as name)"
+        copyItemData.setToolTip(_tip)
+        copyItemData.setStatusTip(_tip)
+        copyItemData.setWhatsThis("Binds the selected object to a new symbol in the workspace")
+        copyItemData.triggered.connect(self.slot_exportToWorkspace)
+
+        copyItemPath = cm.addAction("Copy path(s)")
+        _tip = "Copy the access path to this object as a string, to system's clipboard."
+        copyItemPath.triggered.connect(self.slot_copyPaths)
+        copyItemPath.setToolTip(_tip)
+        copyItemPath.setStatusTip(_tip)
+        copyItemPath.setWhatsThis(_tip + " When more than one object is selected, the paths will be comma-separated. Press and hold CTRL to have each path on a separate line of text.")
+
+        sendToConsole = cm.addAction("Send path(s) to console")
+        _tip = "Write the access path to this object as a Python statement, ready to execute (press ENTER)."
+        sendToConsole.triggered.connect(self.slot_exportToConsole)
+        sendToConsole.setToolTip(_tip)
+        sendToConsole.setStatusTip(_tip)
+        sendToConsole.setWhatsThis(_tip + " When more than one object is selected, the paths will be comma-separated. Press and hold CTRL to have each path on a separate line of text.")
+
+        # NOTE: 2025-05-28 13:28:36
+        # to keep it simple, restrict the option viewing the selected item, to
+        # the case where a single item is selected
+        if len(items) == 1:
+            names, objects =  self.exportDataForItems(items)
+            if len(objects) == 0:
+                return
+            obj = objects[0]
+            name = names[0]
+            self._obj_to_view_ = (obj, name)
+
+            viewItemData = cm.addAction("View/Edit")
+            viewItemData.setToolTip(f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.setStatusTip(f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.setWhatsThis(f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.triggered.connect(self.slot_viewItem)
+
+            if not issubclass(type(obj), QtWidgets.QWidget):
+                handler_specs = VTH.get_handler_spec(type(obj))
+                if len(handler_specs):
+                    specialViewMenu = cm.addMenu("View with")
+                    for handler_spec in handler_specs:
+                        action = specialViewMenu.addAction(handler_spec[1])
+                        action.setToolTip(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        action.setStatusTip(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        action.setWhatsThis(f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        action.triggered.connect(self.slot_autoSelectViewer)
+
+            cm.addSeparator()
+            viewInConsoleAction = cm.addAction("Display in console")
+            viewInConsoleAction.setToolTip("Display in console")
+            viewInConsoleAction.setStatusTip("Display in console")
+            viewInConsoleAction.setWhatsThis("Display in console")
+
+            viewInConsoleAction.triggered.connect(
+                self.slot_showInConsole)
+
+        # TODO: 2022-10-11 13:45:44
+        # use itemAt (point) to get the index of the item, then if index is in
+        # the leaf column, check if the value is editable (and constraints)
+        # • editable values are, POD types (numeric scalars, strings, bool)
+        # if editable then enable this menu action
+        # • contemplate editing of other data (elements in expanded lists,
+        # expanded dicts, elements of numpy arrays and their subclasses)
+        # editItemData = cm.addAction("Edit")
+        # editItemData.setToolTip("Edit value")
+        # editItemData.setStatusTip("Edit value")
+        # editItemData.setWhatsThis("Edit value")
+        # editItemData.tiggered.connect(self.slot_editItemData)
+
+        cm.popup(self.mapToGlobal(point), copyItemData)
+
+    @Slot()
+    @safewrapper
+    def slot_autoSelectViewer(self):
+        from gui.mainwindow import VTH
+
+        if "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+            return
+
+        if len(self._obj_to_view_) < 2:
+            return
+
+        if self._obj_to_view_[0] is dataclasses.MISSING or len(self._obj_to_view_[1].strip()) == 0:
+            return
+
+        if len(self._obj_to_view_) == 3:
+            newWindow = self._obj_to_view_[2] is True
+
+        else:
+            newWindow = bool(
+                QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
+
+        if len(self._obj_to_view_) == 4:
+            askForParams = self._obj_to_view_[3] is True
+
+        else:
+            askForParams = bool(
+                QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+
+        variable, varname = self._obj_to_view_[:2]
+        # newWindow = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
+        # askForParams = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+        #
+        # variable, varname = self._obj_to_view_
+
+        action = self.sender()
+        actionName = action.text().replace("&", "")
+        handler_specs = VTH.get_handler_spec(type(variable))
+        # print(f"{self.__class__.__name__}.slot_autoSelectViewer: hanler_specs -> {handler_specs}")
+        if len(handler_specs):
+            viewers = [spec[0] for spec in handler_specs if spec[1] == actionName]
+
+            if len(viewers):
+                viewer = viewers[0]
+
+                if not self.scipyenWindow.viewObject(variable, varname, winType=viewer,
+                                       newWindow=newWindow,
+                                       askForParams=askForParams):
+                    self._showInConsole_(variable)
+        else:
+            self._showInConsole_(variable)
+
+        self._obj_to_view_ = (dataclasses.MISSING, "")
+
+    @Slot()
+    @safewrapper
+    def slot_showInConsole(self):
+        if self.scipyenWindow is None or "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+            return
+
+        if self._obj_to_view_[0] is dataclasses.MISSING or len(self._obj_to_view_[1].strip()) == 0:
+            return
+
+        variable, varname = self._obj_to_view_[:2]
+        self._showInConsole_(variable)
+        self._obj_to_view_ = (dataclasses.MISSING, "")
+
+    @Slot()
+    @safewrapper
+    def slot_exportToWorkspace(self: typing.Self):
+        fullPathAsName = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
+
+        if self._scipyenWindow_ is None:
+            return
+
+        items = self.selectedItems()
+
+        if len(items) == 0:
+            return
+
+        names, objects  = self.exportDataForItems(items, fullPathAsName=fullPathAsName)
+
+        if len(objects) == 1:
+            dlg = quickdialog.QuickDialog(self, "Copy to workspace")
+            labelString = "Warning: The current variable name starts with an underscore ('_'), and therefore it will be hidden in the workspace viewer."
+            namePrompt = quickdialog.StringInput(dlg, "Data name:")
+            namePrompt.valueChanged[str].connect(dlg._slot_valueChanged)
+            namePrompt.variable.setClearButtonEnabled(True)
+            namePrompt.variable.redoAvailable=True
+            namePrompt.variable.undoAvailable=True
+            hiddenWarningLabel = QtWidgets.QLabel(labelString, self)
+            hiddenWarningLabel.setVisible(False)
+            dlg.addCallback(lambda s: hiddenWarningLabel.setVisible(s.startswith("_")))
+            dlg.addWidget(hiddenWarningLabel, 0, QtCore.Qt.AlignLeft)
+
+            if strutils.isnumber(names[0][0]):
+                namePrompt.setText(f"data_{names[0]}")
+            else:
+                namePrompt.setText(names[0])
+            dlg.adjustSize()
+
+            if dlg.exec() == QtWidgets.QDialog.Accepted:
+                newVarName = namePrompt.text()
+
+                self._scipyenWindow_.assignToWorkspace(newVarName, objects[0], check_name=False)
+
+        else:
+            for name, obj in zip(names, objects):
+                self._scipyenWindow_.assignToWorkspace(name, obj, check_name=False)
+
+    @Slot()
+    @safewrapper
+    def slot_viewItem(self: typing.Self):
+        # from core.utilities import get_nested_value
+        # print(f"{self.__class__.__name__}.slot_viewItem")
+        # print(f"\t{self._obj_to_view_}")
+        if self.scipyenWindow is None or "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+            return
+
+        if len(self._obj_to_view_) < 2:
+            return
+
+        if self._obj_to_view_[0] is dataclasses.MISSING or len(self._obj_to_view_[1].strip()) == 0:
+            return
+
+        if len(self._obj_to_view_) == 3:
+            newWindow = self._obj_to_view_[2] is True
+
+        else:
+            newWindow = bool(
+                QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.AltModifier)
+
+        if len(self._obj_to_view_) == 4:
+            askForParams = self._obj_to_view_[3] is True
+
+        else:
+            askForParams = bool(
+                QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+
+        variable, varname = self._obj_to_view_[:2]
+
+        if newWindow:
+            if not self.scipyenWindow.viewObject(variable, varname, winType=self.__class__,
+                                    newWindow=True,
+                                    askForParams=askForParams):
+                self._showInConsole_(variable)
+        else:
+            if isinstance(variable, tuple(self.viewer_for_types.keys())):
+                self.view(variable, doc_title = varname)
+            else:
+                self._showInConsole_(variable)
+
+        self._obj_to_view_ = (dataclasses.MISSING, "")
+
+    def _showInConsole_(self, obj):
+        if "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+            return
+        try:
+            # NOTE 2025-05-28 14:22:51
+            # as the object may not exist in the workspace, it gets assigned
+            # there first, under a special (hidden) name, executed, and finally
+            # deleted (i.e. the special (hidden) symbol is removed from the
+            # workspace)
+            self.scipyenWindow.assignToWorkspace("____", obj)
+            self.scipyenWindow.console.execute("____", interactive=False)
+            self.scipyenWindow.console.execute("del ____", hidden=True, interactive=False)
+        except:
+            traceback.print_exc()
 
     def setModel(self: typing.Self, model: QtCore.QAbstractItemModel):
         r"""Overrides QtCore.QAbstractItemModel.setModel() to disallow changing the model"""
@@ -229,9 +635,17 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                                        introspect=introspect,
                                        inlineTables=inlineTables,
                                        valuesOnly=valuesOnly)
+        self.sourceModel.readOnly = self.readOnly
+        if self.readOnly:
+            self.setItemDelegate(self._defaultDelegate_)
+            self.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        else:
+            self.setItemDelegate(self._delegate_)
+            self.setEditTriggers(self._defaultEditTriggers_)
+
         # WARNING: 2026-06-28 11:45:39
         # DO NOT call begin/endResetMdoel on the proxyModel here
-        # see also WARNING: 2026-06-28 11:43:14 in itemmodels.datatreemodeo.DataTreeModel
+        # see also WARNING: 2026-06-28 11:43:14 in itemmodels.datatreemodel.DataTreeModel
         self.proxyModel.setSourceModel(self.sourceModel)
 
         root = self.sourceModel.invisibleRootItem()
@@ -273,7 +687,14 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     def readOnly(self: typing.Self, val: bool):
         self._readOnly_ = val is True
         # self.model().readonly = self._readOnly_
-        self.sourceModel.readonly = self._readOnly_
+        if isinstance(self.sourceModel, DataTreeModel):
+            self.sourceModel.readOnly = self._readOnly_
+        if self._readOnly_:
+            self.setItemDelegate(self._defaultDelegate_)
+            self.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        else:
+            self.setItemDelegate(self._delegate_)
+            self.setEditTriggers(self._defaultEditTriggers_)
         # TODO: 2026-02-09 12:50:43
         # set all editors in column 1 to readOnly
         # set all delegates in column 2 to readOnly
