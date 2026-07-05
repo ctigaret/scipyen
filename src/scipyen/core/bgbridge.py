@@ -817,11 +817,11 @@ class BrainAtlasManager(QtCore.QObject):
                     GuiMessages.informationMessage_static(
                         title = f"Atlas {name}:",
                         text  = "\n".join(
-        [
-            f"Atlas {name} must be installed manually.",
-            "Open a terminal, run 'scipyact' to activate Scipyen's environment,"
-            f"then run 'brainglobe install -a {name}' to install the atlas"
-        ]
+                                [
+                                    f"Atlas {name} must be installed manually.",
+                                    "Open a terminal, run 'scipyact' to activate Scipyen's environment,"
+                                    f"then run 'brainglobe install -a {name}' to install the atlas"
+                                ]
                             )
                         )
                 return

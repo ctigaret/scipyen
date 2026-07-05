@@ -1147,6 +1147,11 @@ def inspect_members(obj:typing.Any, predicate:typing.Optional[typing.Callable] =
 
     for k, mbi_name, mbi_obj in mbi:
         try:
+            # NOTE: for treelib Tree adapt to new API:
+            if mbi_name == "bpointer":
+                mbi_name = "predecessor"
+            if mbi_name == "fpointer":
+                mbi_name = "successors"
             v = getattr(obj, mbi_name)
         except:
             # print(f"Cannot parse member {k}: {mbi_name} which is a {type(mbi_obj)}")

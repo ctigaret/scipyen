@@ -216,8 +216,6 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
 
         self.sig_valueChanged.emit(self._data_)
 
-
-
     @Slot()
     def _slot_showTaxonDetails(self):
         win_title = f"Taxon Details of {getattr(self._data_, 'name', type(self._data_).__name__)}"

@@ -918,7 +918,14 @@ class Organ(ScipyenDataclass):
     parent: Organism = dataclasses.field(default_factory = Organism)
 
 @dataclass
-class Brain(Organ):
+class NervousSystem(Organ):
+    r"""
+Nervous system.
+
+The name of this class is slightly misleading, as it encompasses ANY anatomical
+structure defined in a BrainGlobeAtlas, including those OUTSIDE the brain itself,
+e.g., spinal cord, etc.
+"""
     from core.bgbridge import BGStructureDescriptor
     # Specific organ structure, if relevant.
     #
@@ -949,7 +956,7 @@ class Brain(Organ):
 
     @property
     def name(self) -> str:
-        return "Brain"
+        return "NervousSystem"
 
     @name.setter
     def name(self, val:str):
@@ -968,6 +975,8 @@ class Brain(Organ):
 
     def __hash__(self) -> int:
         return hash((self.atlasName))
+
+Brain = NervousSystem # alias for backward copmatibility
 
 @dataclass
 class Tissue(ScipyenDataclass):

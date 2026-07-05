@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>BGAtlasStructureLookupWidget</class>
+ <widget class="QWidget" name="BGAtlasStructureLookupWidget">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>286</width>
+    <height>216</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <layout class="QVBoxLayout" name="verticalLayout">
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout">
+       <item>
+        <widget class="QLabel" name="label">
+         <property name="text">
+          <string>Acronym or Name:</string>
+         </property>
+         <property name="buddy">
+          <cstring>acronymOrNameEdit</cstring>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="LineEdit" name="acronymOrNameEdit"/>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <widget class="QLabel" name="structureIDAcroNameLabel">
+       <property name="text">
+        <string>ID (acronym - name)</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_2">
+       <item>
+        <widget class="QLabel" name="label_2">
+         <property name="text">
+          <string>Ancestors:</string>
+         </property>
+         <property name="buddy">
+          <cstring>ancestorsComboBox</cstring>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="ancestorsComboBox"/>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QHBoxLayout" name="horizontalLayout_3">
+       <item>
+        <widget class="QLabel" name="label_3">
+         <property name="text">
+          <string>Descendants</string>
+         </property>
+         <property name="buddy">
+          <cstring>descendantsCombBox</cstring>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="descendantsCombBox"/>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <widget class="TreeWidget" name="structureTreeWidget" native="true"/>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>LineEdit</class>
+   <extends>QLineEdit</extends>
+   <header location="global">gui.widgets.small_widgets</header>
+  </customwidget>
+  <customwidget>
+   <class>TreeWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">gui.widgets.treewidget</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>
