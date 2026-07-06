@@ -1282,7 +1282,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     def appWindow(self):
         r"""The parent application window of this window.
 
-        This property has one of following possible values:
+        This property should have one of following possible values:
 
         1) A reference to Scipyen's main window.
 
@@ -1294,17 +1294,17 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         name in Scipyen's workspace table ("User Variables").
 
         2) A reference to a Scipyen 'app' window (e.g LSCaT, mPSC detection,
-        etc.), which also manages this window.
+        etc.), which also manages this window or a container widget.
 
-            In this case, this window is NOT a "top level" window, but has access
+            In this case, appWindow is NOT a "top level" window, but has access
         to Scipyen's user workspace via its parent appWindow.
 
             This is the case of various Scipyen viewers managed by LSCaT, etc.
 
             NOTE: In this case, appWindow is itself a "top level" window.
 
-            Access to the Scipyen's main window is provided by the `scipyenWindow`
-        property.
+            Access to the Scipyen's main window should always be provided by the
+        `scipyenWindow` property.
 
         3) A reference to any QMainWindow which is NEITHER Scipyen's main window
         NOR one of its apps.

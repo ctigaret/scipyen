@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>286</width>
-    <height>216</height>
+    <width>283</width>
+    <height>204</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -44,20 +44,37 @@
       </layout>
      </item>
      <item>
-      <widget class="QLabel" name="structureIDAcroNameLabel">
-       <property name="toolTip">
-        <string>BrainGlobe Struture Acronym (Name: ID)</string>
-       </property>
-       <property name="statusTip">
-        <string>BrainGlobe Struture Acronym (Name: ID)</string>
-       </property>
-       <property name="whatsThis">
-        <string>BrainGlobe Struture Acronym (Name: ID)</string>
-       </property>
-       <property name="text">
-        <string>Acronym (Name: ID)</string>
-       </property>
-      </widget>
+      <layout class="QHBoxLayout" name="horizontalLayout_4">
+       <item>
+        <widget class="QLabel" name="structureIDAcroNameLabel">
+         <property name="toolTip">
+          <string>BrainGlobe Struture Acronym (Name: ID)</string>
+         </property>
+         <property name="statusTip">
+          <string>BrainGlobe Struture Acronym (Name: ID)</string>
+         </property>
+         <property name="whatsThis">
+          <string>BrainGlobe Struture Acronym (Name: ID)</string>
+         </property>
+         <property name="text">
+          <string>Acronym (Name: ID)</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="detailsToolButton">
+         <property name="text">
+          <string>Details</string>
+         </property>
+         <property name="icon">
+          <iconset theme="view-list-tree"/>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
      </item>
      <item>
       <layout class="QHBoxLayout" name="horizontalLayout_2">

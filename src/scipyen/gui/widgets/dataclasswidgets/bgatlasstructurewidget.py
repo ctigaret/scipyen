@@ -76,10 +76,24 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
                  **kwargs):
         super().__init__(parent=parent)
 
+        containerWidget: typing.Optional[QtWidgets.QWidget] = kwargs.pop("containerWidget", None)
+
+        p = self.parent()
+        parents = list()
+        while isinstance(p, QtWidgets.QWidget):
+            parents.append(p)
+            p = p.parent()
+
+        if isinstance(containerWidget, QtWidgets.QWidget) and containerWidget in parents:
+            self._containerWidget_ = containerWidget
+
+        else:
+            self._containerWidget_ = None
 
         self._atlas_ = atlas
         self._structure_ = structure
         self._parseStructureAncestorsAndDescendants()
+        self._detailsViewer_ = None
 
         self._configureUI_()
 
@@ -93,15 +107,35 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
         self.acronymOrNameEdit.sig_enterPressed.connect(self._slot_lookupStructure)
         self.ancestorComboBox.currentIndexChanged.connect(self._slot_ancestorSelected)
         self.descendantComboBox.currentIndexChanged.connect(self._slot_descendantSelected)
+        self.structureTreeView.readOnly=True
+        self.detailsToolButton.clicked.connect(self._slot_showDetails)
+        # parent = self.parent()
+
+        # if isinstance(self._containerWidget_, DataClassWidget):
+        #     self.structureTreeView.setEnabled(False)
+        #     self.structureTreeView.setVisible(False)
+        #     self.detailsToolButton.setEnabled(True)
+        #     self.detailsToolButton.setVisible(True)
+        # else:
+        #     self.structureTreeView.setEnabled(True)
+        #     self.structureTreeView.setVisible(True)
+        #     self.detailsToolButton.setEnabled(False)
+        #     self.detailsToolButton.setVisible(False)
+
+
 
 
     def _setup_UIFields(self):
+        # BUG: 2026-07-06 11:10:34 FIXME in DataTreeViewer TODO
+        # do NOT block signals from this one as it will prevent updating itself
+        #
         sigBlockers = list(
                             map(
                                 lambda w: QtCore.QSignalBlocker(w),
                                 (self.ancestorComboBox,
                                  self.descendantComboBox,
-                                 self.acronymOrNameEdit
+                                 self.acronymOrNameEdit,
+                                 # self._detailsViewer_,
                                 )
                                )
                            )
@@ -120,9 +154,27 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
             self.descendantComboBox.addItem(t)
 
         self.descendantComboBox.setCurrentIndex(0)
-        self.structureTreeView.readOnly=True
-        self.structureTreeView.setData(self._structure_, "structure")
         self.acronymOrNameEdit.clear()
+
+        if isinstance(self._containerWidget_, DataClassWidget):
+            self.structureTreeView.setEnabled(False)
+            self.structureTreeView.setVisible(False)
+            self.detailsToolButton.setEnabled(True)
+            self.detailsToolButton.setVisible(True)
+            if (isinstance(self._detailsViewer_, datatreeviewer.DataTreeViewer)
+                and self._detailsViewer_.isVisible()
+                ):
+                # print(f"{self.__class__.__name__}._setup_UIFields -> updating details viewer for structure {self._structure_}")
+                self._detailsViewer_.view(self._structure_, doc_title="structure")
+
+        else:
+            self.structureTreeView.setEnabled(True)
+            self.structureTreeView.setVisible(True)
+            self.detailsToolButton.setEnabled(False)
+            self.detailsToolButton.setVisible(False)
+            self.structureTreeView.setData(self._structure_, "structure")
+
+        # self.structureTreeView.readOnly=True
 
     def _getStructure_(self, val: str) -> bgbridge.Structure | None:
         if (
@@ -171,8 +223,25 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
                 self._setup_UIFields()
                 self.sig_valueChanged.emit(self._structure_)
 
+    @Slot()
+    def _slot_showDetails(self):
+        if not isinstance(self._containerWidget_, DataClassWidget):
+            return
+
+        if not isinstance(self._detailsViewer_, datatreeviewer.DataTreeViewer):
+            scipyenWindow = getattr(self.containerWidget, "scipyenWindow", None)
+            self._detailsViewer_ = datatreeviewer.DataTreeViewer(
+                scipyenWindow = scipyenWindow,
+                readOnly=True
+                )
+            # self._detailsViewer_.readOnly = True
+
+        self._detailsViewer_.view(self._structure_, doc_title="structure")
+
+
     @Slot(int)
     def _slot_ancestorSelected(self, val: int):
+        # print(f"{self.__class__.__name__}._slot_ancestorSelected({val})")
         if (not bgbridge.hasBrainGlobe or not bgbridge.hasBrainGlobeAtlasAPI or len(self._ancestors_) == 0):
             return
 
@@ -186,6 +255,7 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
 
     @Slot(int)
     def _slot_descendantSelected(self, val: str):
+        # print(f"{self.__class__.__name__}._slot_descendantSelected({val})")
         if (not bgbridge.hasBrainGlobe or not bgbridge.hasBrainGlobeAtlasAPI or len(self._descendants_) == 0):
             return
 
@@ -196,6 +266,27 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
                 self._parseStructureAncestorsAndDescendants()
                 self._setup_UIFields()
                 self.sig_valueChanged.emit(self._structure_)
+
+    @property
+    def containerWidget(self) -> QtWidgets.QWidget | None:
+        return self._containerWidget_
+
+    @containerWidget.setter
+    def containerWidget(self, obj: typing.Optional[QtWidgets.QWidget] = None):
+        if not isinstance(obj, QtWidgets.QWidget):
+            self._containerWidget_ = None
+
+        parents = list()
+        p = self.parent()
+        while isinstance(p, QtWidgets.QWidget):
+            parents.append(p)
+            p = p.parent()
+
+        if obj in parents:
+            self._containerWidget_ = obj
+
+        self._setup_UIFields()
+
 
     @property
     def atlas(self) -> bgbridge.BrainGlobeAtlas | None:

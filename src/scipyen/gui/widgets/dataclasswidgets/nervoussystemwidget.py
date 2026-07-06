@@ -67,8 +67,6 @@ Ui_NervousSystemWidget, _ = loadUiType(
     os.path.join(__module_path__, "nervoussystemwidget.ui")
     )
 
-
-
 class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget):
     r"""NOTE: This relates to ALL organs in a BrainGlobeAtlas, not just the brain!"""
     _objectTypes_ = (sdc.NervousSystem, )
@@ -111,6 +109,7 @@ class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget):
 
     def _configureUI_(self):
         self.setupUi(self)
+        self.bgStructureWidget.containerWidget = self
 
         self.dataExchangeWidget.dataType = type(self._data_)
         self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)

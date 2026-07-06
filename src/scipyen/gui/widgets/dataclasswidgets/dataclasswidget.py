@@ -70,7 +70,7 @@ from iolib import pictio as pio
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-class DataClassWidget(QtWidgets.QWidget):
+class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
     sig_dataSaving = Signal(object, name="sig_dataSaving")
     sig_dataExporting = Signal(object, name="sig_dataExporting")
@@ -83,6 +83,7 @@ class DataClassWidget(QtWidgets.QWidget):
         QtWidgets.QWidget.__init__(self, parent=parent)
         self._isAttribute_: bool = isAttribute
         self._parentEditor_ = None
+        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         # self._customSymbol_: typing.Optional[str] = None
 
     def value(self) -> None:

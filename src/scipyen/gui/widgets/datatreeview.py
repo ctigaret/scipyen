@@ -91,6 +91,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         super().__init__(parent=parent)
         WorkspaceGuiMixin.__init__(self, parent=parent)
 
+        self._readOnly_ = False
         self._defaultEditTriggers_ = self.editTriggers()
 
         initialExpandDepth = kwargs.pop("initialExpandDepth", 1)
@@ -197,12 +198,11 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
     @Slot(QtGui.QStandardItem)
     def slot_itemDoubleClicked(self: typing.Self, item:QtGui.QStandardItem):
-        # print(f"{self.__class__.__name__}.slot_itemDoubleClicked")
+        from gui.datatreeviewer import DataTreeViewer
         askForParams = bool(
             QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
 
         if not self.model:
-            # print(f"\tno model")
             return
 
         if item.column() == 0:
@@ -216,7 +216,10 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
             else:
                 self.readOnly = readOnly
-                self.view(obj, name)
+                if isinstance(self.parent(), DataTreeViewer):
+                    self.parent().view(obj, doc_title = name)
+                else:
+                    self._showInConsole_(obj)
 
     @Slot()
     @safewrapper
@@ -464,6 +467,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     @Slot()
     @safewrapper
     def slot_viewItem(self: typing.Self):
+        from gui.datatreeviewer import DataTreeViewer
         # from core.utilities import get_nested_value
         # print(f"{self.__class__.__name__}.slot_viewItem")
         # print(f"\t{self._obj_to_view_}")
@@ -499,7 +503,10 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                 self._showInConsole_(variable)
         else:
             if isinstance(variable, tuple(self.viewer_for_types.keys())):
-                self.view(variable, doc_title = varname)
+                if isinstance(self.parent(), DataTreeViewer):
+                    self.parent().view(variable, doc_title = varname)
+                else:
+                    self._showInConsole_(variable)
             else:
                 self._showInConsole_(variable)
 
