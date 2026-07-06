@@ -8,15 +8,16 @@ r"""
 """
 
 import sys, os, typing, types, warnings, math, cmath # noqa
-import numbers
-import numpy as np
-import quantities as pq
-import pandas as pd
-import neo
-from tribool import Tribool
+# import numbers
+# import numpy as np
+# import quantities as pq
+# import pandas as pd
+# import neo
+# from tribool import Tribool
 from functools import singledispatchmethod
+import dataclasses
 
-import qtpy
+# import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
@@ -26,7 +27,7 @@ __has_qtdbus__ = False
 
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
+    import PySide6 # noqa
     from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
@@ -52,13 +53,13 @@ except:
 
 from core.prog import scipywarn # noqa
 from core import scipyendataclasses as sdc
-from core import scipyen_quantities as scq
+# from core import scipyen_quantities as scq
 # from gui import guiutils, textviewer
-from gui.widgets import small_widgets as smw
+# from gui.widgets import small_widgets as smw
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
-from gui.workspacegui import WorkspaceGuiMixin
+# from gui.workspacegui import WorkspaceGuiMixin
 # from gui.widgets.datawidgetmixin import DataWidgetMixin
-from iolib import pictio as pio
+# from iolib import pictio as pio
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -91,7 +92,7 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         self._bioSourceTypeNames_ = list(sdc.BioSourceType.names())
 
-        self._specimenTypes_ = [
+        self._specimenTypes_ = (
             sdc.Organism,
             sdc.Organ,
             sdc.Tissue,
@@ -102,8 +103,9 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
             sdc.UltrastructureElement,
             sdc.ChemicalSynapseUltrastructureElement,
             sdc.ScipyenDataclass,
-            # sdc.BiologicalProduct,
-        ]
+            sdc.BiologicalProduct,
+            )
+
 
         self._configureUI_()
 
@@ -141,6 +143,13 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         self.specimenWidget = None
 
+        if isinstance(self._data_.specimen.name, str) and len(self._data_.specimen.name.strip()):
+            spNameLabel = f"{self._data_.specimen.name} ({type(self._data_.specimen).__name__})"
+        else:
+            spNameLabel =f"({type(self._data_.specimen).__name__})"
+
+        self.specimenNameLabel.setText(spNameLabel)
+
         self.showSpecimenToolButton.clicked.connect(self._slot_showSpecimen)
 
 
@@ -151,11 +160,40 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         self.sig_valueChanged.emit(self._data_)
 
+    @Slot(object)
+    def _slot_specimenChanged(self, value: object):
+        if isinstance(value, self._specimenTypes_):
+            self._data_.specimen = value
+        else:
+            spField = list(filter(lambda f: f.name=="specimen",
+                                  dataclasses.fields(self._data_)))[0]
+            self._data_.specimen = spField.default_factory()
+
+        if isinstance(self._data_.specimen.name, str) and len(self._data_.specimen.name.strip()):
+            spNameLabel = f"{self._data_.specimen.name} ({type(self._data_.specimen).__name__})"
+        else:
+            spNameLabel =f"({type(self._data_.specimen).__name__})"
+
+        self.specimenNameLabel.setText(spNameLabel)
+
+        self.sig_valueChanged.emit(self._data_)
+
+
     @Slot()
     def _slot_showSpecimen(self):
         if isinstance(self._data_.specimen, self._specimenTypes_):
-            self._specimenWidget_ = self._createWidget_(self._data_.specimen)
-            self._specimenWidget_.show()
+            if isinstance(self.specimenWidget, QtWidgets.QWidget):
+                self.specimenWidget.close()
+                self.specimenWidget.deleteLater()
+                self.specimenWidget = None
+
+            self.specimenWidget = self._createWidget_(self._data_.specimen)
+            self.specimenWidget.sig_valueChanged.connect(self._slot_specimenChanged)
+            self.specimenWidget.show()
+            if isinstance(self._data_.specimen.name, str) and len(self._data_.specimen.name.strip()):
+                self.specimenWidget.setWindowTitle(f"Specimen: {self._data_.specimen.name} ({type(self._data_.specimen).__name__})")
+            else:
+                self.specimenWidget.setWindowTitle(f"Specimen: {type(self._data_.specimen).__name__}")
 
     @singledispatchmethod
     def _createWidget_(self, obj):
@@ -200,10 +238,41 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         from gui.widgets.dataclasswidgets.chemicalsynapsewidget import ChemicalSynapseWidget
         return ChemicalSynapseWidget(obj)
 
-    @_createWidget_.register(sdc.ScipyenDataClass)
-    def __createWidget__(self, obj: sdc.ScipyenDataClass): # noqa
-        from gui.widgets.dataclasswidgets.chemicalsynapsewidget import ChemicalSynapseWidget
-        return ChemicalSynapseWidget(obj)
+    @_createWidget_.register(sdc.BiologicalProduct)
+    def __createWidget__(self, obj: sdc.BiologicalProduct): # noqa
+        from gui.widgets.dataclasswidgets.biologicalproductwidget import BiologicalProductWidget
+        return BiologicalProductWidget(obj)
+
+    def value(self) -> sdc.BiologicalSource:
+        return self._data_
+
+    def setValue(self, value: sdc.BiologicalSource):
+        if not isinstance(value, sdc.BiologicalSource):
+            self._data_ = sdc.BiologicalSource()
+        else:
+            self._data_ = value
+
+        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+                               (
+                                   self.dataExchangeWidget,
+                                   self.nameDescriptionWidget,
+                                   self.bioSourceTypeComboBox,
+                                   self.specimenNameLabel,
+                                )
+                               )
+                        )
+
+        self.dataExchangeWidget.dataType = type(self._data_)
+        self.nameDescriptionWidget.dataName = self._data_.name
+        self.nameDescriptionWidget.dataDescription = self._data_.description
+        ndx = self._bioSourceTypeNames_.index(self._data_.sourceType.name)
+        self.bioSourceTypeComboBox.setCurrentIndex(ndx)
+        if isinstance(self._data_.specimen.name, str) and len(self._data_.specimen.name.strip()):
+            spNameLabel = f"{self._data_.specimen.name} ({type(self._data_.specimen).__name__})"
+        else:
+            spNameLabel =f"({type(self._data_.specimen).__name__})"
+
+        self.specimenNameLabel.setText(spNameLabel)
 
 
 

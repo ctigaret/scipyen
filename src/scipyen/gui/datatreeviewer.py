@@ -730,7 +730,7 @@ A lot of things copied from there, EXCEPT that it now uses
     def showValuesOnly(self, val: bool):
         self._showValuesOnly_ = val is True
         if self.model.showValuesOnly != self._showValuesOnly_:
-            self.model.showValuesOnly = value is True
+            self.model.showValuesOnly = val is True
             self.slot_refreshDataDisplay()
         signalBlockers = QtCore.QSignalBlocker(self.showValuesOnlyAction)
         self.showValuesOnlyAction.setChecked(self._showValuesOnly_)

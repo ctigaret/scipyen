@@ -691,10 +691,19 @@ class BioProductType(TypeEnum):
     pus         = auto()
 
 @dataclass
-class BiologicalProduct(ScipyenDataClass):
+class BiologicalProduct(ScipyenDataclass):
     r"""Biological product (not cell, tissue, organ or organism)"""
-    type: BioProductType = dataclasses.field(default_value = BioProductType.undefined)
-    parent: typing.Optional[Organism] = dataclasses.field(default = Organism())
+    type: BioProductType = dataclasses.field(default = BioProductType.undefined)
+    parent: Organism = dataclasses.field(default_factory = Organism)
+
+    def getOrganism(self):
+        return self.parent
+
+    def setOrganism(self, value: Organism | None):
+        if isinstance(value, Organism):
+            self.parent = value
+        else:
+            self.parent = Organism()
 
 class ProcedureType(TypeEnum):
     null = 0
@@ -919,6 +928,18 @@ class Organism(ScipyenDataclass):
 class Organ(ScipyenDataclass):
     parent: Organism = dataclasses.field(default_factory = Organism)
 
+    def getOrganism(self) -> Organism:
+        if isinstance(self.parent, Organism):
+            return self.parent
+        return Organism()
+
+    def setOrganism(self, value: Organism):
+        if isinstance(value, Organism):
+            self.parent=value
+        else:
+            self.parent=Organism()
+
+
 @dataclass
 class NervousSystem(Organ):
     r"""
@@ -965,15 +986,17 @@ e.g., spinal cord, etc.
         return
 
 
-    def getOrganism(self):
-        if isinstance(self.parent, Organism):
-            return self.parent
-
-    def setOrganism(self, o:Organism):
-        if isinstance(o, Organism):
-            self.organism = o
-        else:
-            self.organism = Organism()
+    # def getOrganism(self):
+    #     if isinstance(self.parent, Organism):
+    #         return self.parent
+    #     else:
+    #         return Organism()
+    #
+    # def setOrganism(self, value: Organism):
+    #     if isinstance(value, Organism):
+    #         self.parent = value
+    #     else:
+    #         self.parent = Organism()
 
     def __hash__(self) -> int:
         return hash((self.atlasName))
@@ -986,12 +1009,15 @@ class Tissue(ScipyenDataclass):
     parent: Organ = dataclasses.field(default_factory = Organ)
 
     def getOrganism(self):
-        if isinstance(self.parent, Organ):
-            return self.parent.getOrganism()
+        return self.parent.getOrganism()
+        # if isinstance(self.parent, Organ):
+        #     return self.parent.getOrganism()
 
-    def setOrganism(self, o:Organism):
-        if isinstance(self.parent, Organ):
-            self.parent.setOrganism(o)
+    def setOrganism(self, value: Organism):
+        if isinstance(value, Organism):
+            self.parent.setOrganism(value)
+        else:
+            self.parent.setOrganism(Organism())
 
 
 @dataclass
@@ -1002,12 +1028,17 @@ class Cell(ScipyenDataclass):
     parent: typing.Optional[typing.Union[Organ, Tissue]] = dataclasses.field(default_factory = Tissue)
 
     def getOrganism(self):
-        if isinstance(self.parent, (Organ, Tissue)):
-            return self.parent.getOrganism()
+        return self.parent.getOrganism()
+        # if isinstance(self.parent, (Organ, Tissue)):
+        #     return self.parent.getOrganism()
 
-    def setOrganism(self, o:Organism):
-        if isinstance(self.parent, (Organ, Tissue)):
-            self.parent.setOrganism(o)
+    def setOrganism(self, value: Organism):
+        if isinstance(value, Organism):
+            self.parent.setOrganism(value)
+        else:
+            self.parent.setOrganism(Organism())
+        # if isinstance(self.parent, (Organ, Tissue)):
+        #     self.parent.setOrganism(o)
 
 @dataclass
 class Neuron(Cell):
@@ -1040,12 +1071,17 @@ class CellCompartment(ScipyenDataclass):
         return super().__eq__(other)
 
     def getOrganism(self):
-        if isinstance(self.parent, Cell):
-            return self.parent.getOrganism()
+        return self.parent.getOrganism()
+        # if isinstance(self.parent, Cell):
+        #     return self.parent.getOrganism()
 
-    def setOrganism(self, o:Organism):
-        if isinstance(self.parent, Cell):
-            self.parent.setOrganism(o)
+    def setOrganism(self, value: Organism):
+        if isinstance(value, Organism):
+            self.parent.setOrganism(value)
+        else:
+            self.parent.setOrganism(Organism())
+        # if isinstance(self.parent, Cell):
+        #     self.parent.setOrganism(o)
 
 @dataclass
 class NeuronCompartment(CellCompartment):
@@ -1109,6 +1145,9 @@ class ChemicalSynapse(ScipyenDataclass):
                 return organisms[0]
 
     def setOrganism(self, organism: Organism):
+        if not isinstance(organism, Organism):
+            oranism = Organism()
+
         for parent in (self.preSynapticParent, self.postSynapticParent):
             parent.setOrganism(organism)
 
@@ -1118,12 +1157,13 @@ class UltrastructureElement(ScipyenDataclass):
     parent: typing.Union[Cell, CellCompartment, ChemicalSynapse, Tissue, Organ] = dataclasses.field(default_factory = Cell)
 
     def getOrganism(self):
-        if isinstance(self.parent, (Cell, ChemicalSynapse, CellCompartment)):
-            return self.parent.getOrganism()
+        return self.parent.getOrganism()
 
-    def setOrganism(self, o:Organism):
-        if isinstance(self.parent, (Cell, ChemicalSynapse)):
-            self.parent.setOrganism(o)
+    def setOrganism(self, value: Organism):
+        if isinstance(value, Organism):
+            self.parent.setOrganism(value)
+        else:
+            self.parent.setOrganism(Organism())
 
 @dataclass
 class ChemicalSynapseUltrastructureElement(UltrastructureElement):
@@ -1138,6 +1178,7 @@ class BiologicalSource(ScipyenDataclass):
     This may be an entire organism, an organ, tissue, individual cell, or
     subcellular compartment.
     """
+
     # TODO: 2024-11-17 21:11:13 : locate and use neuronal taxonomy API
 
     # The organism of this source.
@@ -1166,7 +1207,7 @@ class BiologicalSource(ScipyenDataclass):
         ChemicalSynapse,
         UltrastructureElement,
         ChemicalSynapseUltrastructureElement,
-        # BiologicalProduct,
+        BiologicalProduct,
         ] = dataclasses.field(
                 default_factory = Cell
             )
@@ -1183,32 +1224,41 @@ class BiologicalSource(ScipyenDataclass):
     def getOrganism(self):
         if isinstance(self.specimen,
                             (
-                                Organism,
                                 Organ,
                                 Tissue,
                                 Cell,
                                 CellCompartment,
                                 ChemicalSynapse,
                                 UltrastructureElement,
-                                ChemicalSynapseUltrastructureElement
+                                ChemicalSynapseUltrastructureElement,
+                                BiologicalProduct
                             )
                         ):
             return self.specimen.getOrganism()
 
-    def setOrganism(val, o:Organism):
-        if isinstance(self.specimen,
+        elif isinstance(self.specimen, Organism):
+            return self.specimen
+
+    def setOrganism(self, value:Organism):
+        if not isinstance(value, Organism):
+            value = Organism()
+
+        if isinstance(self.specimen, Organism):
+            self.specimen = value
+
+        elif isinstance(self.specimen,
                             (
-                                Organism,
                                 Organ,
                                 Tissue,
                                 Cell,
                                 CellCompartment,
                                 ChemicalSynapse,
                                 UltrastructureElement,
-                                ChemicalSynapseUltrastructureElement
+                                ChemicalSynapseUltrastructureElement,
+                                BiologicalProduct
                             )
                         ):
-            self.specimen.setOrganism(o)
+            self.specimen.setOrganism(value)
 
 
 @dataclass
