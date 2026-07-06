@@ -677,6 +677,12 @@ class BioSourceType(TypeEnum):
                 thrombocyte
             )
         )
+    product     = auto()
+
+class Organism : pass
+
+class BioProductType(TypeEnum):
+    undefined = 0
     secretion   = auto()
     urine       = auto()
     faeces      = auto()
@@ -684,15 +690,11 @@ class BioSourceType(TypeEnum):
     exudate     = auto()
     pus         = auto()
 
-#
-# class BioProductType(TypeEnum):
-#     undefined = 0
-#
-#
-# @dataclass
-# class BiologicalProduct(ScipyenDataClass):
-#     r"""Biological product (not cell, tissue, organ or organism)"""
-
+@dataclass
+class BiologicalProduct(ScipyenDataClass):
+    r"""Biological product (not cell, tissue, organ or organism)"""
+    type: BioProductType = dataclasses.field(default_value = BioProductType.undefined)
+    parent: typing.Optional[Organism] = dataclasses.field(default = Organism())
 
 class ProcedureType(TypeEnum):
     null = 0

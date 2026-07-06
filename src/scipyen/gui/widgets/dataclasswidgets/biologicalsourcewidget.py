@@ -96,11 +96,13 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
             sdc.Organ,
             sdc.Tissue,
             sdc.Cell,
+            sdc.NeuronCompartment,
             sdc.CellCompartment,
             sdc.ChemicalSynapse,
             sdc.UltrastructureElement,
             sdc.ChemicalSynapseUltrastructureElement,
-            sdc.BiologicalProduct,
+            sdc.ScipyenDataclass,
+            # sdc.BiologicalProduct,
         ]
 
         self._configureUI_()
@@ -166,14 +168,47 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
     @_createWidget_.register(sdc.Organ)
     @_createWidget_.register(sdc.Tissue)
-    def __createWidget__(self, obj: sdc.Organ):
-        from gui.widgets.dataclasswidgets.organwidget import OrganWidget
+    def __createWidget__(self, obj: sdc.Organ): # noqa
+        from gui.widgets.dataclasswidgets.organtissuewidgets import OrganWidget
         return OrganWidget(obj)
 
-    @_createWidget_.register(sdc.Tissue)
-    def __createWidget__(self, obj: sdc.Tissue):
-        from gui.widgets.dataclasswidgets.tissuewidget import OrganWidget
-        return OrganWidget(obj)
+    @_createWidget_.register(sdc.NervousSystem)
+    def __createWidget__(self, obj: sdc.NervousSystem): # noqa
+        from gui.widgets.dataclasswidgets.nervoussystemwidget import NervousSystemWidget
+        return NervousSystemWidget(obj)
+
+    @_createWidget_.register(sdc.Neuron)
+    def __createWidget__(self, obj: sdc.Neuron): # noqa
+        from gui.widgets.dataclasswidgets.cellwidget import NeuronWidget
+        return NeuronWidget(obj)
+
+    @_createWidget_.register(sdc.Cell)
+    def __createWidget__(self, obj: sdc.Cell): # noqa
+        from gui.widgets.dataclasswidgets.cellwidget import CellWidget
+        return CellWidget(obj)
+
+    @_createWidget_.register(sdc.NeuronCompartment)
+    @_createWidget_.register(sdc.CellCompartment)
+    @_createWidget_.register(sdc.ChemicalSynapseUltrastructureElement)
+    @_createWidget_.register(sdc.UltrastructureElement)
+    def __createWidget__(self, obj: sdc.CellCompartment): # noqa
+        from gui.widgets.dataclasswidgets.cellcompartmentwidget import CellCompartmentWidget
+        return CellCompartmentWidget(obj)
+
+    @_createWidget_.register(sdc.ChemicalSynapse)
+    def __createWidget__(self, obj: sdc.ChemicalSynapse): # noqa
+        from gui.widgets.dataclasswidgets.chemicalsynapsewidget import ChemicalSynapseWidget
+        return ChemicalSynapseWidget(obj)
+
+    @_createWidget_.register(sdc.ScipyenDataClass)
+    def __createWidget__(self, obj: sdc.ScipyenDataClass): # noqa
+        from gui.widgets.dataclasswidgets.chemicalsynapsewidget import ChemicalSynapseWidget
+        return ChemicalSynapseWidget(obj)
+
+
+
+
+
 
 
 

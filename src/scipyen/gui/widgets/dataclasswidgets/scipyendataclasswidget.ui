@@ -23,7 +23,7 @@
     </rect>
    </property>
   </widget>
-  <widget class="DataSymbolWidget" name="objectSymbolWidget" native="true">
+  <widget class="QWidget" name="objectSymbolWidget" native="true">
    <property name="geometry">
     <rect>
      <x>10</x>
@@ -38,13 +38,7 @@
   <customwidget>
    <class>DataExchangeWidget</class>
    <extends>QWidget</extends>
-   <header location="global">gui.widgets.dataexchangewidget</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
-   <class>DataSymbolWidget</class>
-   <extends>QWidget</extends>
-   <header location="global">gui.widgets.datasymbolwidget</header>
+   <header location="global">gui.widgets.dataclasswidgets.dataexchangewidget</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
