@@ -112,7 +112,7 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
     def _configureUI_(self):
         self.setupUi(self)
 
-        self.dataExchangeWidget.dataType = type(self._data_)
+        self.dataExchangeWidget.setValue(self._data_)
         self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
         self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
         self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)

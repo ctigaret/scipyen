@@ -145,24 +145,41 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self.setAlternatingRowColors(True)
         self.setItemDelegate(self._delegate_)
 
+        self._scipyenMainWindow_ = self._scipyenWindow_
+
+        if self._scipyenMainWindow_ is None:
+            allWindows = list(
+                            filter(
+                                    lambda w: "ScipyenWindow" in type(w).__name__,
+                                    # QtWidgets.QApplication.allWindows()
+                                    QtWidgets.QApplication.topLevelWidgets()
+                                    )
+                            )
+            if len(allWindows):
+                self._scipyenMainWindow_ = allWindows[0]
+
     @safewrapper
     def _exportPathsToClipboard_(self, item_paths):
-        if self._scipyenWindow_ is None:
+        if self._scipyenMainWindow_ is None:
             return
 
         if len(item_paths) > 1:
             if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier):
-                self._scipyenWindow_.app.clipboard().setText(",\n".join(["""%s""" % i for i in item_paths]))
+                QtWidgets.QApplication.clipboard().setText(",\n".join(["""%s""" % i for i in item_paths]))
+                # self._scipyenMainWindow_.app.clipboard().setText(",\n".join(["""%s""" % i for i in item_paths]))
             else:
-                self._scipyenWindow_.app.clipboard().setText(", ".join(["""%s""" % i for i in item_paths]))
+                QtWidgets.QApplication.clipboard().setText(", ".join(["""%s""" % i for i in item_paths]))
+                # self._scipyenMainWindow_.app.clipboard().setText(", ".join(["""%s""" % i for i in item_paths]))
 
         elif len(item_paths) == 1:
-            self._scipyenWindow_.app.clipboard().setText(item_paths[0])
+            QtWidgets.QApplication.clipboard().setText(item_paths[0])
+            # self._scipyenMainWindow_.app.clipboard().setText(item_paths[0])
 
     def _editExternally_(self, obj:object, name:str, askForParams:bool):
         from gui.mainwindow import VTH
         # print(f"{self.__class__.__name__}._editExternally_({type(obj).__name__}, {name}, {askForParams})")
-        if "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+        # if "ScipyenWindow" not in type(self.scipyenMainWindow).__name__:
+        if self._scipyenMainWindow_ is None:
             return
 
         handler_specs = VTH.get_handler_spec(type(obj))
@@ -185,7 +202,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         # print(f"\twinType = {winType}")
 
         if winType:
-            if not self.scipyenWindow.viewObject(obj, name, winType=winType,
+            if not self._scipyenMainWindow_.viewObject(obj, name, winType=winType,
                                     newWindow=True,
                                     askForParams=askForParams):
                 self._showInConsole_(obj)
@@ -224,7 +241,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     @Slot()
     @safewrapper
     def slot_copyPaths(self: typing.Self):
-        if self._scipyenWindow_ is None:
+        if self._scipyenMainWindow_ is None:
             return
 
         item_paths = self.getSelectedPaths()
@@ -232,12 +249,12 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
     @Slot()
     def slot_exportToConsole(self: typing.Self):
-        if self._scipyenWindow_ is None:
+        if self._scipyenMainWindow_ is None:
             return
 
         item_paths = self.getSelectedPaths()
         self._exportPathsToClipboard_(item_paths)
-        self._scipyenWindow_.console.paste()
+        self._scipyenMainWindow_.console.paste()
 
     @Slot()
     @safewrapper
@@ -269,10 +286,11 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     @Slot(QtCore.QPoint)
     @safewrapper
     def slot_customContextMenuRequested(self, point):
+        # print(f"{self.__class__.__name__}.slot_customContextMenuRequested")
         from gui.mainwindow import VTH
 
         # FIXME/TODO copy to system clipboard? - what mime type? JSON data?
-        if self._scipyenWindow_ is None:
+        if self._scipyenMainWindow_ is None:
             return
 
         items = self.selectedItems()
@@ -426,7 +444,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     def slot_exportToWorkspace(self: typing.Self):
         fullPathAsName = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ShiftModifier)
 
-        if self._scipyenWindow_ is None:
+        if self._scipyenMainWindow_ is None:
             return
 
         items = self.selectedItems()
@@ -458,11 +476,11 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             if dlg.exec() == QtWidgets.QDialog.Accepted:
                 newVarName = namePrompt.text()
 
-                self._scipyenWindow_.assignToWorkspace(newVarName, objects[0], check_name=False)
+                self._scipyenMainWindow_.assignToWorkspace(newVarName, objects[0], check_name=False)
 
         else:
             for name, obj in zip(names, objects):
-                self._scipyenWindow_.assignToWorkspace(name, obj, check_name=False)
+                self._scipyenMainWindow_.assignToWorkspace(name, obj, check_name=False)
 
     @Slot()
     @safewrapper
@@ -471,7 +489,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         # from core.utilities import get_nested_value
         # print(f"{self.__class__.__name__}.slot_viewItem")
         # print(f"\t{self._obj_to_view_}")
-        if self.scipyenWindow is None or "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+        # if self.scipyenWindow is None or "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+        if self._scipyenMainWindow_ is None:
             return
 
         if len(self._obj_to_view_) < 2:
@@ -497,7 +516,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         variable, varname = self._obj_to_view_[:2]
 
         if newWindow:
-            if not self.scipyenWindow.viewObject(variable, varname, winType=self.__class__,
+            if not self._scipyenMainWindow_.viewObject(variable, varname, winType=self.__class__,
                                     newWindow=True,
                                     askForParams=askForParams):
                 self._showInConsole_(variable)
@@ -513,17 +532,19 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self._obj_to_view_ = (dataclasses.MISSING, "")
 
     def _showInConsole_(self, obj):
-        if "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+        # if "ScipyenWindow" not in type(self.scipyenWindow).__name__:
+        if self._scipyenMainWindow_ is None:
             return
+
         try:
             # NOTE 2025-05-28 14:22:51
             # as the object may not exist in the workspace, it gets assigned
             # there first, under a special (hidden) name, executed, and finally
             # deleted (i.e. the special (hidden) symbol is removed from the
             # workspace)
-            self.scipyenWindow.assignToWorkspace("____", obj)
-            self.scipyenWindow.console.execute("____", interactive=False)
-            self.scipyenWindow.console.execute("del ____", hidden=True, interactive=False)
+            self._scipyenMainWindow_.assignToWorkspace("____", obj)
+            self._scipyenMainWindow_.console.execute("____", interactive=False)
+            self._scipyenMainWindow_.console.execute("del ____", hidden=True, interactive=False)
         except:
             traceback.print_exc()
 

@@ -1213,6 +1213,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         self._appWindow_ = None
 
         if isinstance(appWindow, QtWidgets.QMainWindow) and type(appWindow).__name__ != "ScipyenWindow":
+        # if isinstance(appWindow, QtWidgets.QWidget) and type(appWindow).__name__ != "ScipyenWindow":
             self._appWindow_ = appWindow
 
         elif self._appWindow_ is None:

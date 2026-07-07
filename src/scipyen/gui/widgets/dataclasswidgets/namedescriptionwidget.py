@@ -160,7 +160,8 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
             self._detailsViewer_ = datatreeviewer.DataTreeViewer(
                 parent=self,
                 doc_title=doc_title,
-                title="Detailed view"
+                title="Detailed view",
+                # appWindow = self,
                 )
 
             self._detailsViewer_.autoRaise = False
@@ -168,7 +169,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
             self._detailsViewer_.view(obj, doc_title = doc_title)
             self._detailsViewer_.sig_dataChanged.connect(self._slot_dataChangedInDetailsViewer)
         else:
-            sigBlock = QtCore.QSignalBlocker(self._detailsViewer_)
+            # sigBlock = QtCore.QSignalBlocker(self._detailsViewer_)
             self._detailsViewer_.winTitle = win_title
             self._detailsViewer_.docTitle = doc_title
             self._detailsViewer_.slot_refreshDataDisplay()

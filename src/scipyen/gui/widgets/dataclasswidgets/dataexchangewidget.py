@@ -118,6 +118,7 @@ that `obj` is bound to, in the user space.
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
 
         self._objectType_ = objType
+        self._objSymbol_ = None
 
         self._configureUI_()
 
@@ -202,8 +203,9 @@ that `obj` is bound to, in the user space.
             varName = list(ret.keys())[0]
             obj = ret[varName]
             if isinstance(obj, self._objectType_):
+                self._objSymbol_ = varName
                 if self.receivers(self.sig_dataImported) > 0:
-                    self.sig_symbolChanged.emit(varName)
+                    self.sig_symbolChanged.emit(self._objSymbol_)
                     self.sig_dataImported.emit(obj)
                     # self.objectSymbolLabel.setText(varName)
                     # self.objectSymbolLabel.setToolTip(f"'{varName}' is bound to a {type(obj).__name__} object in the workspace")
@@ -211,23 +213,30 @@ that `obj` is bound to, in the user space.
     @Slot(object)
     def slot_exportData(self, obj):
         if isinstance(obj, self._objectType_):
-            name = obj.name
+            if not isinstance(self._objSymbol_, str) or len(self._objSymbol_.strip()) == 0:
+                name = obj.name
+            else:
+                name = self._objSymbol_
             if not isinstance(name, str) or len(name.strip()) == 0:
                 name = self._objectType_.__name__.lower()
 
-            varName = self.exportDataToWorkspace(obj, name)
+            self._objSymbol_ = self.exportDataToWorkspace(obj, name)
 
-            if isinstance(varName, str):
-                self.objectSymbolLabel.setText(varName)
-                self.objectSymbolLabel.setToolTip(f"'{varName}' is bound to a {type(obj).__name__} object in the workspace")
-                self.sig_symbolChanged.emit(varName)
+            if isinstance(self._objSymbol_, str):
+                self.objectSymbolLabel.setText(self._objSymbol_)
+                self.objectSymbolLabel.setToolTip(f"'{self._objSymbol_}' is bound to a {type(obj).__name__} object in the workspace")
+                self.sig_symbolChanged.emit(self._objSymbol_)
 
     @Slot(object)
     def slot_copyData(self, obj):
         from copy import deepcopy
         if isinstance(obj, self._objectType_):
             obj1 = deepcopy(obj)
-            name = obj1.name
+            if not isinstance(self._objSymbol_, str) or len(self._objSymbol_.strip()) == 0:
+                name = obj1.name
+            else:
+                name = self._objSymbol_
+
             if not isinstance(name, str) or len(name.strip()) == 0:
                 name = self._objectType_.__name__.lower()
 
@@ -236,23 +245,23 @@ that `obj` is bound to, in the user space.
     def setValue(self, obj: typing.Any, objSymbol:typing.Optional[str]=None):
         self.dataType = type(obj)
         if isinstance(objSymbol, str) and len(objSymbol.strip()):
-            varName = objSymbol
+            self._objSymbol_ = objSymbol
         else:
             candidateSymbols = self.getDataSymbolInWorkspace(obj)
             if isinstance(candidateSymbols, str):
-                varName = candidateSymbols
+                self._objSymbol_ = candidateSymbols
 
             elif (isinstance(candidateSymbols, typing.Sequence) and
                 len(candidateSymbols) and
                 all(isinstance(s, str) for s in candidateSymbols)):
-                varName = candidateSymbols[0]
+                self._objSymbol_ = candidateSymbols[0]
             else:
-                varName = None
+                self._objSymbol_ = None
 
-        if isinstance(varName, str) and len(varName.strip()):
-            self.objectSymbolLabel.setText(varName)
-            self.objectSymbolLabel.setToolTip(f"'{varName}' is bound to a {type(obj).__name__} object in the workspace")
-            self.sig_symbolChanged.emit(varName)
+        if isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()):
+            self.objectSymbolLabel.setText(self._objSymbol_)
+            self.objectSymbolLabel.setToolTip(f"'{self._objSymbol_}' is bound to a {type(obj).__name__} object in the workspace")
+            self.sig_symbolChanged.emit(self._objSymbol_)
         else:
             self.objectSymbolLabel.clear()
             self.objectSymbolLabel.setToolTip("")
