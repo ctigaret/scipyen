@@ -135,7 +135,7 @@ A lot of things copied from there, EXCEPT that it now uses
 
     # NOTE: 2022-11-20 22:09:07
     # reserved for future developmet of editing capabilities TODO
-    sig_dataChanged = Signal(name = "sig_dataChanged")
+    sig_modelDataChanged = Signal(name = "sig_modelDataChanged")
 
     # TODO: 2019-11-01 22:44:34
     # implement viewing of other data structures (e.g., viewing their __dict__
@@ -275,7 +275,7 @@ A lot of things copied from there, EXCEPT that it now uses
                                      autoResizeColumns = self._autoResizeColumns_)
 
         self.model = self.treeView.sourceModel
-        self.model.sig_modelDataChanged.connect(self.sig_dataChanged)
+        self.model.sig_modelDataChanged.connect(self.sig_modelDataChanged)
 
         # NOTE: 2026-07-05 22:03:56 moved to datatreeview
         #

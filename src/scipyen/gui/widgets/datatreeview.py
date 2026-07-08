@@ -85,6 +85,8 @@ else:
 
 class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     sig_itemDoubleClicked = Signal(QtGui.QStandardItem, name="sig_itemDoubleClicked")
+    sig_dataChanged = Signal(QtCore.QModelIndex, QtCore.QModelIndex, name="sig_dataChanged")
+    sig_modelDataChanged = Signal(name = "sig_modelDataChanged")
     def __init__(self: typing.Self, *args, **kwargs):
         # print(f"{self.__class__.__name__}.__init__")
         parent = kwargs.pop("parent", None)
@@ -116,6 +118,10 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self.sourceModel = DataTreeModel(showMethods = self._showCallables_,
                                        valuesOnly = self._showValuesOnly_,
                                        parent=self)
+
+        self.sourceModel.dataChanged.connect(self.sig_dataChanged)
+        if hasattr(self.sourceModel, "sig_modelDataChanged"):
+            self.sourceModel.sig_modelDataChanged.connect(self.sig_modelDataChanged)
 
         self.proxyModel = QtCore.QSortFilterProxyModel(self)
         self.proxyModel.setSourceModel(self.sourceModel)
