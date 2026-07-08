@@ -8,23 +8,23 @@ r"""
 """
 
 import sys, os, typing, types, warnings, math, cmath, datetime # noqa
-import numbers
-import numpy as np
-import quantities as pq
-import pandas as pd
-import neo
-from tribool import Tribool
+# import numbers
+# import numpy as np
+# import quantities as pq
+# import pandas as pd
+# import neo
+# from tribool import Tribool
 
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot) #, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -34,7 +34,7 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
+    from qtpy import sip # noqa
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
@@ -42,21 +42,21 @@ else:
     __has_sip__ = True
 
 
-from core.prog import safewrapper, scipywarn, print_styled
-from core.sysutils import adapt_ui_path
+from core.prog import scipywarn
+# from core.sysutils import adapt_ui_path
 
-import core.bgbridge as bgbridge
+import core.bgbridge as bgbridge # noqa
 
-from core import scipyen_quantities as scq
-from core import strutils
-from core.datatypes import UnitTypes, GENOTYPES
+# from core import scipyen_quantities as scq
+# from core import strutils
+# from core.datatypes import UnitTypes, GENOTYPES
 
-from core import workspacefunctions as wsf
+# from core import workspacefunctions as wsf
 # from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
 
 from core.prog import scipywarn # noqa
 from gui import textviewer, datatreeviewer
-from iolib import pictio as pio
+# from iolib import pictio as pio
 
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -73,12 +73,12 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
     sig_descriptionChanged = Signal(str, name="sig_descriptionChanged")
     sig_detailedViewRequest = Signal(name="sig_detailedViewRequest")
 
-    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None):
+    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None, **kwargs):
         QtCore.QObject.__init__(self, parent=parent)
 
         self._dataName_ = ""
         self._dataDescription_ = ""
-        self._objSymbol_ = ""
+        self._objSymbol_ = kwargs.pop("objSymbol", "")
 
         self._configureUI_()
 
@@ -171,7 +171,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
 
             self.detailsViewer.view(obj, doc_title = doc_title, name=doc_title)
             self.detailsViewer.winTitle = win_title
-            self.detailsViewer.sig_dataChanged.connect(self._slot_dataChangedInDetailsViewer)
+            self.detailsViewer.sig_modelDataChanged.connect(self._slot_dataChangedInDetailsViewer)
         else:
             # sigBlock = QtCore.QSignalBlocker(self.detailsViewer)
             self.detailsViewer.view(obj, doc_title = doc_title, name=doc_title)

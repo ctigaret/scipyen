@@ -228,4 +228,6 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
         ndx = self._entityTypeNames_.index(self._data_.compartmentType.name)
         self.typeComboBox.setCurrentIndex(ndx)
 
+        self.sig_valueChanged.emit(self._data_)
+
 

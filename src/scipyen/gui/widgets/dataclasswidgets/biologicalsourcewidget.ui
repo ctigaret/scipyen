@@ -76,6 +76,22 @@
            <property name="icon">
             <iconset theme="application-menu"/>
            </property>
+           <property name="autoRaise">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QToolButton" name="newSpecimenToolButton">
+           <property name="text">
+            <string>New...</string>
+           </property>
+           <property name="icon">
+            <iconset theme="document-new"/>
+           </property>
+           <property name="autoRaise">
+            <bool>true</bool>
+           </property>
           </widget>
          </item>
         </layout>

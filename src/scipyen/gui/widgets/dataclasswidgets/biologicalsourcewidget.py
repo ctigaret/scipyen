@@ -85,6 +85,12 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         DataClassWidget.__init__(self, parent=parent)
 
+        self._objSymbol_ = kwargs.pop("objSymbol", None)
+        if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
+            objSymbols = self.getDataSymbolInWorkspace(value)
+            if len(objSymbols) > 0:
+                self._objSymbol_ = objSymbols[0]
+
         if not isinstance(obj, self._objectTypes_):
             self._data_ = self._objectTypes_[0]()
         else:
@@ -106,13 +112,15 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
             sdc.BiologicalProduct,
             )
 
+        self._specimenTypeNames_ = dict(map(lambda t: (t.__name__, t), self._specimenTypes_))
+
 
         self._configureUI_()
 
     def _configureUI_(self):
         self.setupUi(self)
 
-        self.dataExchangeWidget.setValue(self._data_)
+        self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
         self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
         self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
         self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
@@ -152,6 +160,64 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         self.showSpecimenToolButton.clicked.connect(self._slot_showSpecimen)
 
+        self.newSpecimenToolButton.clicked.connect(self._slot_chooseNewSpecimenType)
+
+    @Slot()
+    def _slot_chooseNewSpecimenType(self):
+        from gui.itemslistdialog import ItemsListDialog
+
+        spTypeNames = list(self._specimenTypeNames_.keys())
+        if type(self._data_.specimen) in self._specimenTypes_:
+            ndx = self._specimenTypes_.index(type(self._data_.specimen))
+            preSelected = spTypeNames[ndx]
+        else:
+            preSelected = spTypeNames[0]
+
+        dlg = ItemsListDialog(parent=self, itemsList=spTypeNames,
+                              title="Create New Specimen",
+                              preSelected=preSelected,
+                              modal=True,
+                              selectmode = QtWidgets.QAbstractItemView.SingleSelection)
+
+        # dlg.itemSelected.connect(self._slot_createNewSpecimen)
+        if dlg.exec() == 1:
+            spTypeName = dlg.selection
+            self._slot_createNewSpecimen(spTypeName)
+
+
+    @Slot(str)
+    def _slot_createNewSpecimen(self, value: str):
+        if value in self._specimenTypeNames_:
+            spType = self._specimenTypeNames_[value]
+            if isinstance(self.specimenWidget, QtWidgets.QWidget):
+                self.specimenWidget.close()
+                self.specimenWidget.deleteLater()
+                self.specimenWidget = None
+
+            newSpecimen = spType()
+            self.specimenWidget = self._createWidget_(newSpecimen)
+            self.specimenWidget.sig_valueChanged.connect(self._slot_specimenChanged)
+            self.specimenWidget.show()
+            self.specimenWidget.setWindowTitle(f"New Specimen: {value}")
+
+    @Slot()
+    def _slot_detailsChanged(self):
+        r"""Overrides DataClassWidget._slot_detailsChanged.
+    Captures changes in the data tree viewer (details viewer)
+    """
+        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+                               (self.nameDescriptionWidget,
+                                self.dataExchangeWidget,
+                                self.bioSourceTypeComboBox
+                                )))
+
+        self.nameDescriptionWidget.dataName = self._data_.name
+        self.nameDescriptionWidget.dataDescription = self._data_.description
+
+        ndx = self._bioSourceTypeNames_.index(self._data_.sourceType.name)
+        self.bioSourceTypeComboBox.setCurrentIndex(ndx)
+
+        self.sig_valueChanged.emit(self._data_)
 
     @Slot(int)
     def _slot_sourceTypeChanged(self, val:int):
@@ -248,11 +314,13 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
     def setValue(self, value: sdc.BiologicalSource, **kwargs):
         from gui.datatreeviewer import DataTreeViewer
-        objSymbol = kwargs.pop("objSymbol", None)
-        if objSymbol is None or (isinstance(objSymbol, str) and len(objSymbol.strip()) == 0):
+        self._objSymbol_ = kwargs.pop("objSymbol", None)
+        if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
             objSymbols = self.getDataSymbolInWorkspace(value)
             if len(objSymbols) > 0:
-                objSymbol = objSymbols[0]
+                self._objSymbol_ = objSymbols[0]
+            else:
+                self._objSymbol_ = ""
 
         if not isinstance(value, sdc.BiologicalSource):
             self._data_ = sdc.BiologicalSource()
@@ -270,9 +338,10 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
                         )
 
         # self.dataExchangeWidget.dataType = type(self._data_)
-        self.dataExchangeWidget.setValue(self._data_, objSymbol)
+        self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
         self.nameDescriptionWidget.dataName = self._data_.name
         self.nameDescriptionWidget.dataDescription = self._data_.description
+
         ndx = self._bioSourceTypeNames_.index(self._data_.sourceType.name)
         self.bioSourceTypeComboBox.setCurrentIndex(ndx)
         if isinstance(self._data_.specimen.name, str) and len(self._data_.specimen.name.strip()):
@@ -285,8 +354,8 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         if (isinstance(self.nameDescriptionWidget.detailsViewer, DataTreeViewer)
             and self.nameDescriptionWidget.detailsViewer.isVisible()):
             self.nameDescriptionWidget.detailsViewer.view(self._data_,
-                                                          doc_title = objSymbol,
-                                                          name = objSymbol)
+                                                          doc_title = self._objSymbol_,
+                                                          name = self._objSymbol_)
 
 
 

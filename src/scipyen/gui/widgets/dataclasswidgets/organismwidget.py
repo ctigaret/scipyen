@@ -84,6 +84,12 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
 
         DataClassWidget.__init__(self, parent=parent)
 
+        self._objSymbol_ = kwargs.pop("objSymbol", None)
+        if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
+            objSymbols = self.getDataSymbolInWorkspace(value)
+            if len(objSymbols) > 0:
+                self._objSymbol_ = objSymbols[0]
+
         if not isinstance(obj, self._objectTypes_):
             self._data_ =  self._objectTypes_[0]()
         else:
@@ -96,7 +102,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
 
         self._taxonDetailsViewer_ = None
 
-        self.dataExchangeWidget.dataType = type(self._data_)
+        self.dataExchangeWidget.dataType = type(self._data_, self._objSymbol_)
         self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
         self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
         self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
@@ -285,11 +291,20 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
     def value(self) -> sdc.Organism:
         return self._data_
 
-    def setValue(self, val:typing.Optional[sdc.Organism]=None):
+    def setValue(self, val:typing.Optional[sdc.Organism]=None, **kwargs):
+        self._objSymbol_ = kwargs.pop("objSymbol", None)
+        if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
+            objSymbols = self.getDataSymbolInWorkspace(value)
+            if len(objSymbols) > 0:
+                self._objSymbol_ = objSymbols[0]
+            else:
+                self._objSymbol_ = ""
+
+
         if isinstance(val, sdc.Organism):
             self._data_ = val
         else:
-            self._data_ = sd.Organism()
+            self._data_ = sdc.Organism()
 
         sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
                                (self.nameDescriptionWidget,
@@ -302,6 +317,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
                                 # self.typeComboBox
                                 )))
 
+        self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
         self.nameDescriptionWidget.dataName = self._data_.name
         self.nameDescriptionWidget.dataDescription = self._data_.description
 

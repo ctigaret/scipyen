@@ -51,7 +51,8 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
     itemSelected = QtCore.Signal(str)
 
     def __init__(self, parent = None, itemsList = None, title = None,
-                 preSelected = None, modal = False,
+                 preSelected = None,
+                 modal = False,
                  selectmode = QtWidgets.QAbstractItemView.SingleSelection):
         super(ItemsListDialog, self).__init__(parent)
         self.setupUi(self)
@@ -229,6 +230,21 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
         self.accept()
 
     @property
-    def selectedItems(self):
+    def selectedItems(self) -> list[QtWidgets.QListWidgetItem]:
         return self.listWidget.selectedItems()
+
+    @property
+    def selection(self) -> list[str]:
+        items = self.selectedItems
+        if len(items):
+            ret = list(map(lambda i: i.text()))
+
+            if len(ret) == 1:
+                return ret[0]
+
+            else:
+                return ret
+
+        else:
+            return list()
 
