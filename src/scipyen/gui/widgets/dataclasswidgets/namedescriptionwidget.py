@@ -144,7 +144,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
     def _slot_symbolChanged(self, val:str):
         self._objSymbol_ = val
         if isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
-            self.detailsViewer.treeView.setRootName(self._objSymbol_)
+            self.detailsViewer.setRootName(self._objSymbol_)
 
     @Slot()
     def _slot_descriptionChanged(self):

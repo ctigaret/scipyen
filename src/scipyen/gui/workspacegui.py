@@ -1491,7 +1491,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
         return newVarName
 
-    def getDataSymbolInWorkspace(self, data=None):
+    def getDataSymbolInWorkspace(self, data=None) -> str | None:
         r"""Calls workspacefunctions.get_symbol_in_namespace for the data.
         """
         if self.isTopLevel and self.appWindow:

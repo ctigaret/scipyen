@@ -704,6 +704,15 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self.sourceModel.beginResetModel()
         self.sourceModel.topObjectItem.setData(value, QtCore.Qt.DisplayRole)
         self.sourceModel.endResetModel()
+        if self.initialExpandDepth == 0:
+            self.collapseAll()
+        else:
+            self.expandToDepth(self.initialExpandDepth)
+
+        for col in self.autoResizeColumns:
+            if col >=0 and col < 3:
+                self.resizeColumnToContents(col)
+        self.proxyModel.sort(-1)
 
     @property
     def hasData(self) -> bool:

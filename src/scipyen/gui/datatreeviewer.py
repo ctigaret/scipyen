@@ -482,7 +482,7 @@ A lot of things copied from there, EXCEPT that it now uses
         if name != self._top_title_:
             name = self._top_title_
             self._obj_cache_[self._cache_index_] = (obj, name)
-        self.treeView.setRootIndex(value)
+        self.treeView.setRootName(value)
 
     def _set_data_(self, data:object, predicate=None, *args, **kwargs):
         r"""

@@ -249,6 +249,11 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
     def setValue(self, value: sdc.BiologicalSource, **kwargs):
         from gui.datatreeviewer import DataTreeViewer
         objSymbol = kwargs.pop("objSymbol", None)
+        if objSymbol is None or (isinstance(objSymbol, str) and len(objSymbol.strip()) == 0):
+            objSymbols = self.getDataSymbolInWorkspace(value)
+            if len(objSymbols) > 0:
+                objSymbol = objSymbols[0]
+
         if not isinstance(value, sdc.BiologicalSource):
             self._data_ = sdc.BiologicalSource()
         else:
@@ -279,7 +284,9 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         if (isinstance(self.nameDescriptionWidget.detailsViewer, DataTreeViewer)
             and self.nameDescriptionWidget.detailsViewer.isVisible()):
-            self.nameDescriptionWidget.detailsViewer.view(obj, doc_title = doc_title)
+            self.nameDescriptionWidget.detailsViewer.view(self._data_,
+                                                          doc_title = objSymbol,
+                                                          name = objSymbol)
 
 
 
