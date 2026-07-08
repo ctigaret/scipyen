@@ -246,7 +246,9 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
     def value(self) -> sdc.BiologicalSource:
         return self._data_
 
-    def setValue(self, value: sdc.BiologicalSource):
+    def setValue(self, value: sdc.BiologicalSource, **kwargs):
+        from gui.datatreeviewer import DataTreeViewer
+        objSymbol = kwargs.pop("objSymbol", None)
         if not isinstance(value, sdc.BiologicalSource):
             self._data_ = sdc.BiologicalSource()
         else:
@@ -262,7 +264,8 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
                                )
                         )
 
-        self.dataExchangeWidget.dataType = type(self._data_)
+        # self.dataExchangeWidget.dataType = type(self._data_)
+        self.dataExchangeWidget.setValue(self._data_, objSymbol)
         self.nameDescriptionWidget.dataName = self._data_.name
         self.nameDescriptionWidget.dataDescription = self._data_.description
         ndx = self._bioSourceTypeNames_.index(self._data_.sourceType.name)
@@ -270,9 +273,15 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         if isinstance(self._data_.specimen.name, str) and len(self._data_.specimen.name.strip()):
             spNameLabel = f"{self._data_.specimen.name} ({type(self._data_.specimen).__name__})"
         else:
-            spNameLabel =f"({type(self._data_.specimen).__name__})"
+            spNameLabel =f"{type(self._data_.specimen).__name__}"
 
         self.specimenNameLabel.setText(spNameLabel)
+
+        if (isinstance(self.nameDescriptionWidget.detailsViewer, DataTreeViewer)
+            and self.nameDescriptionWidget.detailsViewer.isVisible()):
+            self.nameDescriptionWidget.detailsViewer.view(obj, doc_title = doc_title)
+
+
 
 
 

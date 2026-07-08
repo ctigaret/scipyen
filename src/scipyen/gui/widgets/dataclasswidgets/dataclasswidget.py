@@ -158,11 +158,11 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     @Slot(str)
     def _slot_symbolChanged(self, val:str):
-        # from gui.widgets.dataclasswidgets import namedescriptionwidget
-        # if (hasattr(self, "nameDescriptionWidget")
-        #     and isinstance(self.nameDescriptionWidget, namedescriptionwidget.NameDescriptionWidget)):
-        #     self.nameDescriptionWidget._slot_symbolChanged("")
-        pass
+        from gui.widgets.dataclasswidgets import namedescriptionwidget
+        if (hasattr(self, "nameDescriptionWidget")
+            and isinstance(self.nameDescriptionWidget, namedescriptionwidget.NameDescriptionWidget)):
+            self.nameDescriptionWidget._slot_symbolChanged(val)
+        # pass
 
     @Slot()
     def _slot_viewDetails(self):

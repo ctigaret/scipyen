@@ -85,7 +85,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
     def _configureUI_(self):
         self.setupUi(self)
         self._descriptionEditor_ = None
-        self._detailsViewer_ = None
+        self.detailsViewer = None
         self.nameLineEdit.setText(self._dataName_)
         # self.nameLineEdit.undoEnabled = True
         # self.nameLineEdit.redoEnabled = True
@@ -114,10 +114,10 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
             self._dataName_ = val.name
             self.nameLineEdit.setText(self._dataName_)
 
-        if isinstance(self._detailsViewer_, datatreeviewer.DataTreeViewer):# and self._detailsViewer_.isVisible():
-            # print(f"\n\t-> call self._detailsViewer_.view({val},\n{self.symbol})")
-            self._detailsViewer_.view(val, doc_title=self.symbol, autoRaise=False)
-            self._detailsViewer_.slot_refreshDataDisplay()
+        if isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):# and self.detailsViewer.isVisible():
+            # print(f"\n\t-> call self.detailsViewer.view({val},\n{self.symbol})")
+            self.detailsViewer.view(val, doc_title=self.symbol, autoRaise=False)
+            self.detailsViewer.slot_refreshDataDisplay()
 
 
     @Slot(str)
@@ -143,6 +143,8 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
     @Slot(str)
     def _slot_symbolChanged(self, val:str):
         self._objSymbol_ = val
+        if isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
+            self.detailsViewer.treeView.setRootName(self._objSymbol_)
 
     @Slot()
     def _slot_descriptionChanged(self):
@@ -154,27 +156,30 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
     @Slot(object, str)
     def slot_viewDetails(self, obj: object, varName: str):
         # print(f"{self.__class__.__name__}.slot_viewDetails({obj}, \n{varName})")
-        win_title = f"Details of {getattr(obj, 'name', type(obj).__name__)}"
-        doc_title =  varName if len(varName.strip()) else ""
-        if not isinstance(self._detailsViewer_, datatreeviewer.DataTreeViewer):
-            self._detailsViewer_ = datatreeviewer.DataTreeViewer(
+        doc_title =  varName if len(varName.strip()) else {getattr(obj, 'name', type(obj).__name__)}
+        # win_title = f"Details of {varName}"
+        win_title = "Details"
+        if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
+            self.detailsViewer = datatreeviewer.DataTreeViewer(
                 parent=self,
                 doc_title=doc_title,
                 title="Detailed view",
                 # appWindow = self,
                 )
 
-            self._detailsViewer_.autoRaise = False
+            self.detailsViewer.autoRaise = False
 
-            self._detailsViewer_.view(obj, doc_title = doc_title)
-            self._detailsViewer_.sig_dataChanged.connect(self._slot_dataChangedInDetailsViewer)
+            self.detailsViewer.view(obj, doc_title = doc_title, name=doc_title)
+            self.detailsViewer.winTitle = win_title
+            self.detailsViewer.sig_dataChanged.connect(self._slot_dataChangedInDetailsViewer)
         else:
-            # sigBlock = QtCore.QSignalBlocker(self._detailsViewer_)
-            self._detailsViewer_.winTitle = win_title
-            self._detailsViewer_.docTitle = doc_title
-            self._detailsViewer_.slot_refreshDataDisplay()
+            # sigBlock = QtCore.QSignalBlocker(self.detailsViewer)
+            self.detailsViewer.view(obj, doc_title = doc_title, name=doc_title)
+            self.detailsViewer.winTitle = win_title
+            self.detailsViewer.docTitle = doc_title
+            self.detailsViewer.slot_refreshDataDisplay()
 
-        self._detailsViewer_.show()
+        self.detailsViewer.show()
 
     @Slot()
     def _slot_dataChangedInDetailsViewer(self):

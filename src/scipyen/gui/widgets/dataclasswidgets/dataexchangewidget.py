@@ -7,10 +7,10 @@
 
 import sys, os, typing, types, warnings, math, cmath # noqa
 import numbers # noqa
-import dataclasses
+# import dataclasses
 import numpy as np # noqa
 import quantities as pq # noqa
-import neo
+# import neo
 from tribool import Tribool # noqa
 
 import qtpy # noqa
@@ -44,12 +44,12 @@ else:
 try:
     from qtpy import QtDBus# noqa
     __has_qtdbus__ = True
-except:
+except: # noqa
     __has_qtdbus__ = False
 
 from core import datatypes # noqa
 from core.prog import scipywarn # noqa
-from core import utilities
+# from core import utilities
 from gui import (guiutils, interact) # noqa
 from gui.workspacegui import WorkspaceGuiMixin
 from iolib import pictio as pio

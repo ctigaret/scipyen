@@ -93,7 +93,7 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
         self._atlas_ = atlas
         self._structure_ = structure
         self._parseStructureAncestorsAndDescendants()
-        self._detailsViewer_ = None
+        self.detailsViewer = None
 
         self._configureUI_()
 
@@ -135,7 +135,7 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
                                 (self.ancestorComboBox,
                                  self.descendantComboBox,
                                  self.acronymOrNameEdit,
-                                 # self._detailsViewer_,
+                                 # self.detailsViewer,
                                 )
                                )
                            )
@@ -161,11 +161,11 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
             self.structureTreeView.setVisible(False)
             self.detailsToolButton.setEnabled(True)
             self.detailsToolButton.setVisible(True)
-            if (isinstance(self._detailsViewer_, datatreeviewer.DataTreeViewer)
-                and self._detailsViewer_.isVisible()
+            if (isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer)
+                and self.detailsViewer.isVisible()
                 ):
                 # print(f"{self.__class__.__name__}._setup_UIFields -> updating details viewer for structure {self._structure_}")
-                self._detailsViewer_.view(self._structure_, doc_title="structure")
+                self.detailsViewer.view(self._structure_, doc_title="structure")
 
         else:
             self.structureTreeView.setEnabled(True)
@@ -228,15 +228,15 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
         if not isinstance(self._containerWidget_, DataClassWidget):
             return
 
-        if not isinstance(self._detailsViewer_, datatreeviewer.DataTreeViewer):
+        if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
             scipyenWindow = getattr(self.containerWidget, "scipyenWindow", None)
-            self._detailsViewer_ = datatreeviewer.DataTreeViewer(
+            self.detailsViewer = datatreeviewer.DataTreeViewer(
                 scipyenWindow = scipyenWindow,
                 readOnly=True
                 )
-            # self._detailsViewer_.readOnly = True
+            # self.detailsViewer.readOnly = True
 
-        self._detailsViewer_.view(self._structure_, doc_title="structure")
+        self.detailsViewer.view(self._structure_, doc_title="structure")
 
 
     @Slot(int)

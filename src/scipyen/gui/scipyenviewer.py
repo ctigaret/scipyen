@@ -791,7 +791,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         return self._docTitle_
 
     @docTitle.setter
-    def docTitle(self, value: (str, type(None)) = None):
+    def docTitle(self, value: str | None = None):
         r"""Sets the display name of the data.
 
         This is the "document" part of the pattern "document - window" used in the window title.

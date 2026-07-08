@@ -474,23 +474,43 @@ A lot of things copied from there, EXCEPT that it now uses
             if (obj, name) in self._obj_cache_:
                 return self._obj_cache_.index((obj, name))
 
+    def setRootName(self, value: str):
+        self._top_title_ = value
+        if self._cache_index_ >= len(self._obj_cache_):
+            self._cache_index_ = len(self._obj_cache_) - 1
+        obj, name = self._obj_cache_[self._cache_index_]
+        if name != self._top_title_:
+            name = self._top_title_
+            self._obj_cache_[self._cache_index_] = (obj, name)
+        self.treeView.setRootIndex(value)
+
     def _set_data_(self, data:object, predicate=None, *args, **kwargs):
         r"""
         Displays new data
         """
-        # print(f"{self.__class__.__name__}._set_data_({type(data)})")
+        # print(f"{self.__class__.__name__}._set_data_({type(data)},\n\tkwargs = {kwargs})")
         self._readOnly_ = kwargs.get("readOnly", False) or isinstance(data, tuple(self.read_only_types))
 
-        # self.update()
+        objName = kwargs.pop("name", None)
+
         if inspect.isfunction(predicate):
             self.predicate=predicate
 
         if data is not self._data_:
+            # print("\n\tnew data")
             self._data_ = data
             self._dataTypeStr_ = type(self._data_).__name__
-            self._top_title_ = self._docTitle_ if (isinstance(self._docTitle_, str) and len(self._docTitle_.strip())) else "/"
+            if isinstance(objName, str) and len(objName.strip()):
+                self._top_title_ = objName
+
+            elif isinstance(self._docTitle_, str) and len(self._docTitle_.strip()):
+                self._top_title_ = self._docTitle_
+
+            else:
+                self._top_title_ = "/"
 
             if self._check_cache_(self._data_, self._top_title_):
+                # print(f"\n\tcache: {self._obj_cache_}")
                 self._cache_index_ = self._get_cache_index_(self._data_, self._top_title_)
 
                 if self._cache_index_ is None:
@@ -508,11 +528,22 @@ A lot of things copied from there, EXCEPT that it now uses
             worker.signals.signal_Finished.connect(self._slot_treeViewPopulated)
             worker.run()
 
+        else:
+            # print(f"\n\nsame data -> objName = {objName}; top title = {self._top_title_}")
+            if isinstance(objName, str) and len(objName.strip()):
+                if self._top_title_ != objName:
+                    self._top_title_ = objName
+                    self.treeView.setRootName(self._top_title_)
+
+
     def _populateTreeView_(self):
         if len(self._obj_cache_):
             if self._cache_index_ >= len(self._obj_cache_):
                 self._cache_index_ = len(self._obj_cache_) - 1
             obj, name = self._obj_cache_[self._cache_index_]
+            if name != self._top_title_:
+                name = self._top_title_
+                self._obj_cache_[self._cache_index_] = (obj, name)
             # print(f"{self.__class__.__name__}._populateTreeView_: name = {name}")
             self.update_title(doc_title = name, win_title=self._winTitle_)
             what = {"data": obj,
@@ -573,6 +604,16 @@ A lot of things copied from there, EXCEPT that it now uses
         worker = WorkerThread(self, self._populateTreeView_)
         worker.signals.signal_Finished.connect(self._slot_treeViewPopulated)
         worker.run()
+
+#     @property
+#     def docTitle(self):
+#         return super().docTitle
+#
+#     @docTitle.setter
+#     def docTitle(self, value: str | None):
+#         super().docTitle = value
+#         if isinstance(value, str) and len(value.strip()):
+#             self.treeView.
 
     # @Slot()
     # @safewrapper

@@ -697,6 +697,14 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             self.proxyModel.sort(-1)
             # self.proxyModel.setDynamicSortFilter(True)
 
+    def setRootName(self, value: str):
+        # print(f"{self.__class__.__name__}.setRootName({value})")
+        if not isinstance(value, str) or len(value.strip()) == 0:
+            return
+        self.sourceModel.beginResetModel()
+        self.sourceModel.topObjectItem.setData(value, QtCore.Qt.DisplayRole)
+        self.sourceModel.endResetModel()
+
     @property
     def hasData(self) -> bool:
         return self.sourceModel._modelData_ is not None

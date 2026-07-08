@@ -124,7 +124,7 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
 
     def _configureUI_(self):
         self.setupUi(self)
-        # self._detailsViewer_ = None # now part of nameDescriptionWidget
+
         self.dataExchangeWidget.setValue(self._data_)
         self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
         self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
