@@ -85,16 +85,17 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         DataClassWidget.__init__(self, parent=parent)
 
-        self._objSymbol_ = kwargs.pop("objSymbol", None)
-        if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
-            objSymbols = self.getDataSymbolInWorkspace(value)
-            if len(objSymbols) > 0:
-                self._objSymbol_ = objSymbols[0]
 
         if not isinstance(obj, self._objectTypes_):
             self._data_ = self._objectTypes_[0]()
         else:
             self._data_ = obj
+
+        self._objSymbol_ = kwargs.pop("objSymbol", None)
+        if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
+            objSymbols = self.getDataSymbolInWorkspace(self._data_)
+            if len(objSymbols) > 0:
+                self._objSymbol_ = objSymbols[0]
 
         self._bioSourceTypeNames_ = list(sdc.BioSourceType.names())
 
@@ -103,6 +104,7 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
             sdc.Organ,
             sdc.Tissue,
             sdc.Cell,
+            sdc.Neuron,
             sdc.NeuronCompartment,
             sdc.CellCompartment,
             sdc.ChemicalSynapse,
@@ -199,6 +201,8 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
             self.specimenWidget.sig_valueChanged.connect(self._slot_specimenChanged)
             self.specimenWidget.show()
             self.specimenWidget.setWindowTitle(f"New Specimen: {value}")
+
+            # self._data_.specimen = self.specimenWidget.value()
 
     @Slot()
     def _slot_detailsChanged(self):

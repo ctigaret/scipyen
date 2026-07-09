@@ -237,7 +237,7 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
     def selection(self) -> list[str]:
         items = self.selectedItems
         if len(items):
-            ret = list(map(lambda i: i.text()))
+            ret = list(map(lambda i: i.text(), items))
 
             if len(ret) == 1:
                 return ret[0]

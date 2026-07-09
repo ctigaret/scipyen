@@ -220,7 +220,10 @@ that `obj` is bound to, in the user space.
             if not isinstance(name, str) or len(name.strip()) == 0:
                 name = self._objectType_.__name__.lower()
 
-            self._objSymbol_ = self.exportDataToWorkspace(obj, name)
+            newSymbol = self.exportDataToWorkspace(obj, name)
+
+            if isinstance(newSymbol, str) and len(newSymbol.strip()):
+                self._objSymbol_ = newSymbol
 
             if isinstance(self._objSymbol_, str):
                 self.objectSymbolLabel.setText(self._objSymbol_)

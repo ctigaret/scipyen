@@ -1483,6 +1483,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                 if hasattr(self, "statusBar"):
                     self.statusBar().showMessage("Done!")
 
+            else:
+                return
+
         else:
             scipyenWindow.assignToWorkspace(newVarName, data)
 
