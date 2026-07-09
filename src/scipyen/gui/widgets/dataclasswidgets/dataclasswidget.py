@@ -9,23 +9,23 @@ r"""
 
 import sys, os, typing, types, warnings, math, cmath, datetime # noqa
 from functools import singledispatchmethod
-import numbers
+# import numbers
 import dataclasses
-import numpy as np
-import quantities as pq
-import pandas as pd
-import neo
-from tribool import Tribool
+# import numpy as np
+# import quantities as pq
+# import pandas as pd
+# import neo
+# from tribool import Tribool
 
 import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot)# , Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
+    import PySide6 # noqa
     from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
@@ -44,28 +44,31 @@ else:
     __has_sip__ = True
 
 
-from core.prog import safewrapper, scipywarn, print_styled
-from core.sysutils import adapt_ui_path
+from core.prog import scipywarn #, safewrapper, print_styled
+# from core.sysutils import adapt_ui_path
 
-import core.bgbridge as bgbridge
+# import core.bgbridge as bgbridge
 
 from core import scipyen_quantities as scq
-from core import strutils
-from core.datatypes import UnitTypes, GENOTYPES
+# from core import strutils
+# from core.datatypes import UnitTypes, GENOTYPES
 
-from core import workspacefunctions as wsf
-from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
-from gui.widgets.datatreeview import DataTreeView
+# from core import workspacefunctions as wsf
+# from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
+# from gui.widgets.datatreeview import DataTreeView
 
 from core.prog import scipywarn # noqa
 from core import scipyendataclasses as sdc
 from core import scipyen_quantities as scq
 from core import qtutils
-from gui import guiutils, textviewer, datatreeviewer
+# from gui import guiutils, textviewer, datatreeviewer
+from gui.datatreeviewer import DataTreeViewer
+from gui.widgets.dataclasswidgets.dataexchangewidget import DataExchangeWidget
+from gui.widgets.dataclasswidgets.namedescriptionwidget import NameDescriptionWidget
 from gui.textviewer import TextViewer
-from gui.widgets import small_widgets as smw
 from gui.workspacegui import WorkspaceGuiMixin
-from iolib import pictio as pio
+# from gui.widgets import small_widgets as smw
+# from iolib import pictio as pio
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -80,11 +83,46 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None, **kwargs):
         isAttribute = kwargs.pop("isAttribute", False)
+        self.dataExchangeWidget = None
+        self.nameDescriptionWidget = None
+
         QtWidgets.QWidget.__init__(self, parent=parent)
         self._isAttribute_: bool = isAttribute
         self._parentEditor_ = None
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         # self._customSymbol_: typing.Optional[str] = None
+
+        self._objSymbol_ = kwargs.pop("objSymbol", None)
+        if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
+            objSymbols = self.getDataSymbolInWorkspace(self._data_)
+            if isinstance(objSymbols, typing.Sequence) and len(objSymbols) > 0:
+                self._objSymbol_ = objSymbols[0]
+
+    def _configureUI_(self):
+        r"""MUST be called in the subclass once self._data_ was established, e.g. first thing after setupUi()"""
+        if isinstance(self.dataExchangeWidget, DataExchangeWidget) and isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
+            self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+            self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
+            self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
+            self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
+            self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
+            self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
+            self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
+            self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
+            self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
+            self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
+            self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
+
+            self.nameDescriptionWidget.dataName = self._data_.name
+            self.nameDescriptionWidget.dataDescription = self._data_.description
+            self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
+            self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
+            self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
+            self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
+            self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
+            self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
+
+
 
     def value(self) -> None:
         r"""Must override in subclasses"""
@@ -94,7 +132,35 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         r"""Must override in subclasses.
         Implementations must make sure it emits sig_valueChanged Qt signal.
     """
-        pass
+        self._objSymbol_ = kwargs.pop("objSymbol", None)
+        if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
+            objSymbols = self.getDataSymbolInWorkspace(value)
+            if len(objSymbols) > 0:
+                self._objSymbol_ = objSymbols[0]
+            else:
+                self._objSymbol_ = ""
+
+        if isinstance(self.dataExchangeWidget, DataExchangeWidget) and isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
+            if hasattr(self, "_data_"):
+                sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+                                    (
+                                        self.dataExchangeWidget,
+                                        self.nameDescriptionWidget,
+                                        )
+                                    )
+                                )
+
+                self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+                self.nameDescriptionWidget.dataName = self._data_.name
+                self.nameDescriptionWidget.dataDescription = self._data_.description
+
+                if (isinstance(self.nameDescriptionWidget.detailsViewer, DataTreeViewer)
+                    and self.nameDescriptionWidget.detailsViewer.isVisible()):
+                    self.nameDescriptionWidget.detailsViewer.view(self._data_,
+                                                                doc_title = self._objSymbol_,
+                                                                name = self._objSymbol_)
+
+
 
     @property
     def isAttribute(self) -> bool:

@@ -83,19 +83,19 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
             obj = obj_
 
-        DataClassWidget.__init__(self, parent=parent)
-
-
         if not isinstance(obj, self._objectTypes_):
             self._data_ = self._objectTypes_[0]()
         else:
             self._data_ = obj
 
-        self._objSymbol_ = kwargs.pop("objSymbol", None)
-        if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
-            objSymbols = self.getDataSymbolInWorkspace(self._data_)
-            if len(objSymbols) > 0:
-                self._objSymbol_ = objSymbols[0]
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
+
+
+        # self._objSymbol_ = kwargs.pop("objSymbol", None)
+        # if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
+        #     objSymbols = self.getDataSymbolInWorkspace(self._data_)
+        #     if len(objSymbols) > 0:
+        #         self._objSymbol_ = objSymbols[0]
 
         self._bioSourceTypeNames_ = list(sdc.BioSourceType.names())
 
@@ -122,26 +122,28 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
     def _configureUI_(self):
         self.setupUi(self)
 
-        self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
-        self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
-        self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
-        self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
-        self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
-        self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
-        self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
-        self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
-        self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
-        self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
-        self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
+        super()._configureUI_()
 
-        self.nameDescriptionWidget.dataName = self._data_.name
-        self.nameDescriptionWidget.dataDescription = self._data_.description
-        self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
-        self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
-        self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
-        self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
-        self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
-        self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
+        # self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+        # self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
+        # self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
+        # self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
+        # self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
+        # self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
+        # self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
+        # self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
+        # self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
+        # self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
+        # self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
+        #
+        # self.nameDescriptionWidget.dataName = self._data_.name
+        # self.nameDescriptionWidget.dataDescription = self._data_.description
+        # self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
+        # self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
+        # self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
+        # self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
+        # self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
+        # self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
 
         for text in self._bioSourceTypeNames_:
             self.bioSourceTypeComboBox.addItem(text)
@@ -186,7 +188,6 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
             spTypeName = dlg.selection
             self._slot_createNewSpecimen(spTypeName)
 
-
     @Slot(str)
     def _slot_createNewSpecimen(self, value: str):
         if value in self._specimenTypeNames_:
@@ -197,6 +198,7 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
                 self.specimenWidget = None
 
             newSpecimen = spType()
+            self._slot_specimenChanged(newSpecimen)
             self.specimenWidget = self._createWidget_(newSpecimen)
             self.specimenWidget.sig_valueChanged.connect(self._slot_specimenChanged)
             self.specimenWidget.show()
@@ -232,6 +234,7 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
     @Slot(object)
     def _slot_specimenChanged(self, value: object):
+        # print(f"{self.__class__.__name__}._slot_specimenChanged({value})")
         if isinstance(value, self._specimenTypes_):
             self._data_.specimen = value
         else:
@@ -318,23 +321,25 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
     def setValue(self, value: sdc.BiologicalSource, **kwargs):
         from gui.datatreeviewer import DataTreeViewer
-        self._objSymbol_ = kwargs.pop("objSymbol", None)
-        if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
-            objSymbols = self.getDataSymbolInWorkspace(value)
-            if len(objSymbols) > 0:
-                self._objSymbol_ = objSymbols[0]
-            else:
-                self._objSymbol_ = ""
+        # self._objSymbol_ = kwargs.pop("objSymbol", None)
+        # if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
+        #     objSymbols = self.getDataSymbolInWorkspace(value)
+        #     if len(objSymbols) > 0:
+        #         self._objSymbol_ = objSymbols[0]
+        #     else:
+        #         self._objSymbol_ = ""
 
         if not isinstance(value, sdc.BiologicalSource):
             self._data_ = sdc.BiologicalSource()
         else:
             self._data_ = value
 
+        super().setValue(**kwargs)
+
         sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
                                (
-                                   self.dataExchangeWidget,
-                                   self.nameDescriptionWidget,
+                                   # self.dataExchangeWidget,
+                                   # self.nameDescriptionWidget,
                                    self.bioSourceTypeComboBox,
                                    self.specimenNameLabel,
                                 )
@@ -342,9 +347,9 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
                         )
 
         # self.dataExchangeWidget.dataType = type(self._data_)
-        self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
-        self.nameDescriptionWidget.dataName = self._data_.name
-        self.nameDescriptionWidget.dataDescription = self._data_.description
+        # self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+        # self.nameDescriptionWidget.dataName = self._data_.name
+        # self.nameDescriptionWidget.dataDescription = self._data_.description
 
         ndx = self._bioSourceTypeNames_.index(self._data_.sourceType.name)
         self.bioSourceTypeComboBox.setCurrentIndex(ndx)
@@ -355,12 +360,12 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         self.specimenNameLabel.setText(spNameLabel)
 
-        if (isinstance(self.nameDescriptionWidget.detailsViewer, DataTreeViewer)
-            and self.nameDescriptionWidget.detailsViewer.isVisible()):
-            self.nameDescriptionWidget.detailsViewer.view(self._data_,
-                                                          doc_title = self._objSymbol_,
-                                                          name = self._objSymbol_)
-
+        # if (isinstance(self.nameDescriptionWidget.detailsViewer, DataTreeViewer)
+        #     and self.nameDescriptionWidget.detailsViewer.isVisible()):
+        #     self.nameDescriptionWidget.detailsViewer.view(self._data_,
+        #                                                   doc_title = self._objSymbol_,
+        #                                                   name = self._objSymbol_)
+        #
 
 
 

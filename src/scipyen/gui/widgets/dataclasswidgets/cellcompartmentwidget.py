@@ -89,7 +89,6 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
 
             obj = obj_
 
-        DataClassWidget.__init__(self, parent=parent)
 
         if not isinstance(obj, self._objectTypes_):
             self._data_ =  self._objectTypes_[0]()
@@ -99,6 +98,7 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
         self._entityTypeNames_ = self._getEntityTypes_(self._data_)
         self._isAttribute_ = kwargs.get("isAttribute", False)
 
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
         self._configureUI_()
 
     @singledispatchmethod
