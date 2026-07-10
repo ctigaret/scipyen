@@ -8,12 +8,12 @@ r"""
 """
 
 import sys, os, typing, types, warnings, math, cmath # noqa
-import numbers
-import numpy as np
-import quantities as pq
+# import numbers
+# import numpy as np
+# import quantities as pq
 import pandas as pd
-import neo
-from tribool import Tribool
+# import neo
+# from tribool import Tribool
 
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
@@ -84,8 +84,6 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
 
             obj = obj_
 
-        DataClassWidget.__init__(self, parent=parent)
-
         if not isinstance(obj, self._objectTypes_):
             self._data_ =  self._objectTypes_[0]()
         else:
@@ -94,31 +92,35 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
         self._geneticSexNames_ = list(sdc.GeneticSex.names())
         self._devStageNames_ = list(sdc.DevelopmentalStage.names())
 
+        DataClassWidget.__init__(self, parent=parent)
+
         self._configureUI_()
 
     def _configureUI_(self):
         self.setupUi(self)
 
-        self.dataExchangeWidget.dataType = type(self._data_)
-        self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
-        self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
-        self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
-        self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
-        self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
-        self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
-        self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
-        self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
-        self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
-        self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
+        super()._configureUI_()
 
-        self.nameDescriptionWidget.dataName = self._data_.name
-        self.nameDescriptionWidget.dataDescription = self._data_.description
-        self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
-        self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
-        self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
-        self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
-        self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
-        self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
+        # self.dataExchangeWidget.dataType = type(self._data_)
+        # self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
+        # self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
+        # self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
+        # self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
+        # self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
+        # self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
+        # self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
+        # self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
+        # self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
+        # self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
+        #
+        # self.nameDescriptionWidget.dataName = self._data_.name
+        # self.nameDescriptionWidget.dataDescription = self._data_.description
+        # self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
+        # self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
+        # self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
+        # self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
+        # self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
+        # self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
 
         for text in self._devStageNames_:
             self.devStageComboBox.addItem(text)

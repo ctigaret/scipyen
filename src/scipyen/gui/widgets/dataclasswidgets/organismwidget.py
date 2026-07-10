@@ -8,6 +8,7 @@ r"""
 """
 
 import sys, os, typing, types, warnings, math, cmath # noqa
+import dataclasses
 # import numbers
 # import numpy as np
 # import quantities as pq
@@ -103,7 +104,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
 
         super()._configureUI_()
 
-        self._taxonDetailsViewer_ = None
+        self.taxonDetailsViewer = None
 
         # self.dataExchangeWidget.dataType = type(self._data_, self._objSymbol_)
         # self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
@@ -131,6 +132,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         if taxonbridge.hasTaxoniq and isinstance(taxon, taxonbridge.Taxon):
             taxon_name = taxon.scientific_name
             common_name = f"{taxon.common_name}, (species: {taxon_name})"
+
         elif isinstance(taxon,str):
             taxon_name = taxon
             common_name = taxon
@@ -142,52 +144,63 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
 
         self.taxonSpeciesLineEdit.setText(taxon_name)
         self.taxonSpeciesLineEdit.setToolTip(common_name)
+        self.taxonSpeciesLineEdit.lazy = True
         self.taxonSpeciesLineEdit.sig_enterPressed.connect(self._slot_selectTaxon)
 
-        if taxonbridge.hasTaxoniq and isinstance(taxon, taxonbridge.Taxon):
-            self.taxonDetailsToolButton.clicked.connect(self._slot_showTaxonDetails)
-        else:
-            self.taxonDetailsToolButton.setEnabled(False)
+        self.taxonDetailsToolButton.clicked.connect(self._slot_showTaxonDetails)
+        # if taxonbridge.hasTaxoniq and isinstance(taxon, taxonbridge.Taxon):
+        # else:
+        #     self.taxonDetailsToolButton.setEnabled(False)
 
         self.subSpeciesLineEdit.setText(f"{self._data_.subspecies}")
+        self.subSpeciesLineEdit.lazy = True
         self.subSpeciesLineEdit.sig_enterPressed.connect(self._slot_setSubSpecies)
+
         self.strainLineEdit.setText(f"{self._data_.strain}")
+        self.strainLineEdit.lazy = True
         self.strainLineEdit.sig_enterPressed.connect(self._slot_setStrain)
+
         self.facilityIDLineEdit.setText(f"{self._data_.ID}")
+        self.facilityIDLineEdit.lazy = True
         self.facilityIDLineEdit.sig_enterPressed.connect(self._slot_setFacilityID)
 
         self.biometricsWidget.setValue(self._data_.biometrics)
 
     def setTaxon(self, value):
-        if isinstance(val, taxonbridge.Taxon):
-            self._data_.taxon = value
+        # print(f"{self.__class__.__name__}.setTaxon({value})")
+        taxon = pd.NA
 
-        elif isinstance(value, str) or value in (None, datalasses.MISSING, pd.NA):
-            if taxonbridge.hasTaxoniq and isinstance(value, str):
+        if self._isTaxoniqTaxon(value):
+            taxon = value
+
+        elif isinstance(value, str) and len(value.strip()):
+            if taxonbridge.hasTaxoniq:
                 if value in taxonbridge.supported_species:
-                    value = taxonbridge.Taxon(scientific_name=value)
+                    taxon = taxonbridge.Taxon(scientific_name=value)
                 else:
-                    value = taxonbridge.get_taxon(value)
+                    taxon = taxonbridge.get_taxon(value)
 
-            self._data_.taxon = value
-        else:
-            # scipywarn(f"Expecting a str, a Taxon, None, or MISSING; instead, got {type(value).__name__}")
-            self._data_.taxon = pd.NA
+            else:
+                taxon = value
 
-        sigBlocker = QtCore.QSignalBlocker(self.taxonSpeciesLineEdit)
+        self._data_.taxon = taxon
 
-        if taxonbridge.hasTaxoniq and isinstance(self._data_.taxon, taxonbridge.Taxon):
+        if self._isTaxoniqTaxon(self._data_.taxon):
             taxon_name = self._data_.taxon.scientific_name
             common_name = f"{self._data_.taxon.common_name}, (species: {taxon_name})"
+            self.taxonDetailsToolButton.setEnabled(True)
 
-        elif isinstance(self._data_.taxon,str):
+        elif isinstance(self._data_.taxon, str):
             taxon_name = self._data_.taxon
             common_name = self._data_.taxon
+            self.taxonDetailsToolButton.setEnabled(False)
 
         else:
             taxon_name = f"{pd.NA}"
             common_name = f"{pd.NA}"
+            self.taxonDetailsToolButton.setEnabled(False)
 
+        sigBlocker = QtCore.QSignalBlocker(self.taxonSpeciesLineEdit)
         self.taxonSpeciesLineEdit.setText(taxon_name)
         self.taxonSpeciesLineEdit.setToolTip(common_name)
 
@@ -196,6 +209,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
 
     @Slot(str)
     def _slot_selectTaxon(self, value: str):
+        # print(f"{self.__class__.__name__}._slot_selectTaxon({value})")
         self.setTaxon(value)
 
     @Slot(str)
@@ -227,27 +241,34 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
 
     @Slot()
     def _slot_showTaxonDetails(self):
+        print(f"{self.__class__.__name__}._slot_showTaxonDetails")
         win_title = f"Taxon Details of {getattr(self._data_, 'name', type(self._data_).__name__)}"
         doc_title =  "taxon"
         if taxonbridge.hasTaxoniq and isinstance(self._data_.taxon, taxonbridge.Taxon):
-            if not isinstance(self._taxonDetailsViewer_, datatreeviewer.DataTreeViewer):
-                self._taxonDetailsViewer_= datatreeviewer.DataTreeViewer(
+            if not isinstance(self.taxonDetailsViewer, datatreeviewer.DataTreeViewer):
+                self.taxonDetailsViewer= datatreeviewer.DataTreeViewer(
                     parent=self,
                     doc_title=doc_title,
                     title="Detailed view"
                     )
-                self._taxonDetailsViewer_.autoRaise = False
+                self.taxonDetailsViewer.autoRaise = False
 
-                self._taxonDetailsViewer_.view(self._data_.taxon, doc_title = doc_title)
-                self._taxonDetailsViewer_.sig_dataChanged.connect(self._slot_detailsChanged)
+                self.taxonDetailsViewer.view(self._data_.taxon,
+                                             doc_title = doc_title,
+                                             name=doc_title)
+                self.taxonDetailsViewer.winTitle = win_title
+                self.taxonDetailsViewer.sig_modelDataChanged.connect(self._slot_detailsChanged)
 
             else:
-                sigBlock = QtCore.QSignalBlocker(self._taxonDetailsViewer_)
-                self._taxonDetailsViewer_.winTitle = win_title
-                self._taxonDetailsViewer_.docTitle = doc_title
-                self._taxonDetailsViewer_.slot_refreshDataDisplay()
+                # sigBlock = QtCore.QSignalBlocker(self.taxonDetailsViewer)
+                self.taxonDetailsViewer.view(self._data_.taxon,
+                                             doc_title = doc_itle,
+                                             name = doc_title)
+                self.taxonDetailsViewer.winTitle = win_title
+                self.taxonDetailsViewer.docTitle = doc_title
+                self.taxonDetailsViewer.slot_refreshDataDisplay()
 
-            self._taxonDetailsViewer_.show()
+            self.taxonDetailsViewer.show()
 
     @Slot()
     def _slot_detailsChanged(self):
@@ -325,10 +346,13 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         self.nameDescriptionWidget.dataDescription = self._data_.description
 
         taxon = self._data_.taxon
-        if taxonbridge.hasTaxoniq and isinstance(taxon, taxonbridge.Taxon):
+
+        # print(f"{self.__class__.__name__}.setValue -> taxon is a {type(self._data_.taxon)}")
+        if self._isTaxoniqTaxon(taxon):
             taxon_name = taxon.scientific_name
             common_name = f"{taxon.common_name}, (species: {taxon_name})"
             self.taxonDetailsToolButton.setEnabled(True)
+
         elif isinstance(taxon,str):
             taxon_name = taxon
             common_name = taxon
@@ -348,3 +372,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         self.facilityIDLineEdit.setText(f"{self._data_.ID}")
 
         self.biometricsWidget.setValue(self._data_.biometrics)
+
+    def _isTaxoniqTaxon(self, obj) -> bool:
+        return (taxonbridge.hasTaxoniq and isinstance(obj, taxonbridge.Taxon)
+                and "taxoniq" in type(obj).__module__)
