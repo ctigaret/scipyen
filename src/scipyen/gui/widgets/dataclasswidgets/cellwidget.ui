@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>330</width>
-    <height>81</height>
+    <width>224</width>
+    <height>91</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -23,10 +23,36 @@
       <number>3</number>
      </property>
      <widget class="DataExchangeWidget" name="dataExchangeWidget" native="true"/>
-     <widget class="QWidget" name="layoutWidget">
+     <widget class="QWidget" name="">
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
-        <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true"/>
+        <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <item>
+          <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true"/>
+         </item>
+         <item>
+          <widget class="QToolButton" name="editParentToolButton">
+           <property name="toolTip">
+            <string>Edit Parent Object</string>
+           </property>
+           <property name="statusTip">
+            <string>Edit Parent Object</string>
+           </property>
+           <property name="whatsThis">
+            <string>Edit Parent Object</string>
+           </property>
+           <property name="text">
+            <string>Edit Parent</string>
+           </property>
+           <property name="icon">
+            <iconset theme="user"/>
+           </property>
+           <property name="autoRaise">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
        </item>
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout">
@@ -67,28 +93,6 @@
              <horstretch>0</horstretch>
              <verstretch>0</verstretch>
             </sizepolicy>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QToolButton" name="editParentToolButton">
-           <property name="toolTip">
-            <string>Edit Parent Object</string>
-           </property>
-           <property name="statusTip">
-            <string>Edit Parent Object</string>
-           </property>
-           <property name="whatsThis">
-            <string>Edit Parent Object</string>
-           </property>
-           <property name="text">
-            <string>Edit Parent</string>
-           </property>
-           <property name="icon">
-            <iconset theme="user"/>
-           </property>
-           <property name="autoRaise">
-            <bool>true</bool>
            </property>
           </widget>
          </item>

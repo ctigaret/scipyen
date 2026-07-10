@@ -63,9 +63,9 @@ from core import scipyen_quantities as scq
 from core import qtutils
 # from gui import guiutils, textviewer, datatreeviewer
 from gui.datatreeviewer import DataTreeViewer
+from gui.textviewer import TextViewer
 from gui.widgets.dataclasswidgets.dataexchangewidget import DataExchangeWidget
 from gui.widgets.dataclasswidgets.namedescriptionwidget import NameDescriptionWidget
-from gui.textviewer import TextViewer
 from gui.workspacegui import WorkspaceGuiMixin
 # from gui.widgets import small_widgets as smw
 # from iolib import pictio as pio
@@ -87,10 +87,11 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
         self.dataExchangeWidget = None
         self.nameDescriptionWidget = None
+        self.editParentToolButton = None
+        self.parentEditor = None
 
         QtWidgets.QWidget.__init__(self, parent=parent)
         self._isAttribute_: bool = isAttribute
-        self._parentEditor_ = None
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
 
         if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
@@ -99,7 +100,8 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                 self._objSymbol_ = objSymbols[0]
 
     def _configureUI_(self):
-        r"""MUST be called in the subclass once self._data_ was established, e.g. first thing after setupUi()"""
+        r"""MUST be called in the subclass once self._data_ was established,
+        AND first thing after setupUi() was called in the subclass"""
         if isinstance(self.dataExchangeWidget, DataExchangeWidget) and isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
             self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
             self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
@@ -122,6 +124,8 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
             self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
 
+        if isinstance(self.editParentToolButton, QtWidgets.QToolButton):
+            self.editParentToolButton.clicked.connect(self._slot_editParent)
 
 
     def value(self) -> None:
@@ -256,18 +260,18 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
         # print(f"{self.__class__.__name__}._slot_editParent -> {parent}")
 
-        if isinstance(self._parentEditor_, QtWidgets.QWidget) and qtutils.isQObjectAlive(self._parentEditor_):
+        if isinstance(self.parentEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.parentEditor):
             editor = self._createParentEditor_(parent)
-            if type(editor) != type(self._parentEditor_):
-                self._parentEditor_.close()
-                self._parentEditor_.deleteLater()
-                self._parentEditor_ = editor
+            if type(editor) != type(self.parentEditor):
+                self.parentEditor.close()
+                self.parentEditor.deleteLater()
+                self.parentEditor = editor
 
         else:
-            self._parentEditor_ = self._createParentEditor_(parent)
+            self.parentEditor = self._createParentEditor_(parent)
 
-        self._parentEditor_.show()
-        self._parentEditor_.setWindowTitle("Edit parent")
+        self.parentEditor.show()
+        self.parentEditor.setWindowTitle("Edit parent")
 
 
         # TODO: 2026-06-25 16:47:07 finalize me
@@ -281,38 +285,59 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     @_createParentEditor_.register(sdc.Neuron)
     def __createParentEditor(self, obj: sdc.Neuron):
         from gui.widgets.dataclasswidgets.cellwidget import NeuronWidget
-        return NeuronWidget(obj)
+        return NeuronWidget(obj, objSymbol="parent")
 
     @_createParentEditor_.register(sdc.Cell)
     def __createParentEditor(self, obj: sdc.Cell):
         from gui.widgets.dataclasswidgets.cellwidget import CellWidget
-        return CellWidget(obj)
+        return CellWidget(obj, objSymbol="parent")
 
     @_createParentEditor_.register(sdc.CellCompartment)
+    @_createParentEditor_.register(sdc.NeuronCompartment)
     def __createParentEditor(self, obj: sdc.CellCompartment):
         from gui.widgets.dataclasswidgets.cellcompartmentwidget import CellCompartmentWidget
-        return CellCompartmentWidget(obj)
+        return CellCompartmentWidget(obj, objSymbol="parent")
+
+    @_createParentEditor_.register(sdc.ChemicalSynapse)
+    def __createParentEditor(self, obj: sdc.ChemicalSynapse):
+        from gui.widgets.dataclasswidgets.chemicalsynapsewidget import chemicalsynapsewidget
 
     @_createParentEditor_.register(sdc.Organism)
     def __createParentEditor(self, obj: sdc.Organism):
         from gui.widgets.dataclasswidgets.organismwidget import OrganismWidget
-        return OrganismWidget(obj)
-
-    @_createParentEditor_.register(sdc.Brain)
-    def __createParentEditor(self, obj: sdc.Brain):
-        from gui.widgets.dataclasswidgets.organtissuewidgets import BrainWidget
-        return BrainWidget(obj)
+        return OrganismWidget(obj, objSymbol="parent")
 
     @_createParentEditor_.register(sdc.Organ)
-    def __createParentEditor(self, obj: sdc.Organ):
-        from gui.widgets.dataclasswidgets.organtissuewidgets import OrganWidget
-        return OrganWidget(obj)
-
     @_createParentEditor_.register(sdc.Tissue)
-    def __createParentEditor(self, obj: sdc.Tissue):
-        from gui.widgets.dataclasswidgets.organtissuewidgets import TissueWidget
-        return TissueWidget(obj)
+    def __createParentEditor(self, obj: sdc.Organ):
+        from gui.widgets.dataclasswidgets.organtissuewidgets import OrganWidget, TissueWidget
+        if isinstance(obj, sdc.Tissue):
+            return TissueWidget(obj, objSymbol="parent")
+        return OrganWidget(obj, objSymbol="parent")
 
+    @_createParentEditor_.register(sdc.NervousSystem)
+    def __createParentEditor(self, obj: sdc.NervousSystem):
+        from gui.widgets.dataclasswidgets.nervoussystemwidget import NervousSystemWidget
+        return NervousSystemWidget(obj, objSymbol="parent")
+
+    def closeEvent(self, evt):
+        if isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
+            if isinstance(self.nameDescriptionWidget.descriptionEditor, TextViewer):
+                self.nameDescriptionWidget.descriptionEditor.close()
+                self.nameDescriptionWidget.descriptionEditor.deleteLater()
+                self.nameDescriptionWidget.descriptionEditor = None
+
+            if isinstance(self.nameDescriptionWidget.detailsViewer, DataTreeViewer):
+                self.nameDescriptionWidget.detailsViewer.close()
+                self.nameDescriptionWidget.detailsViewer.deleteLater()
+                self.nameDescriptionWidget.detailsViewer = None
+
+            if isinstance(self.parentEditor, QtWidgets.QWidget):
+                self.parentEditor.close()
+                self.parentEditor.deleteLater()
+                self.parentEditor = None
+
+        evt.accept()
 
 
 

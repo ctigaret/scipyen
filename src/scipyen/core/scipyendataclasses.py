@@ -985,19 +985,6 @@ e.g., spinal cord, etc.
     def name(self, val:str):
         return
 
-
-    # def getOrganism(self):
-    #     if isinstance(self.parent, Organism):
-    #         return self.parent
-    #     else:
-    #         return Organism()
-    #
-    # def setOrganism(self, value: Organism):
-    #     if isinstance(value, Organism):
-    #         self.parent = value
-    #     else:
-    #         self.parent = Organism()
-
     def __hash__(self) -> int:
         return hash((self.atlasName))
 
@@ -1006,12 +993,10 @@ Brain = NervousSystem # alias for backward copmatibility
 @dataclass
 class Tissue(ScipyenDataclass):
     r"""Tissue"""
-    parent: Organ = dataclasses.field(default_factory = Organ)
+    parent: typing.Union[Organ, NervousSystem] = dataclasses.field(default_factory = Organ)
 
     def getOrganism(self):
         return self.parent.getOrganism()
-        # if isinstance(self.parent, Organ):
-        #     return self.parent.getOrganism()
 
     def setOrganism(self, value: Organism):
         if isinstance(value, Organism):
@@ -1029,16 +1014,12 @@ class Cell(ScipyenDataclass):
 
     def getOrganism(self):
         return self.parent.getOrganism()
-        # if isinstance(self.parent, (Organ, Tissue)):
-        #     return self.parent.getOrganism()
 
     def setOrganism(self, value: Organism):
         if isinstance(value, Organism):
             self.parent.setOrganism(value)
         else:
             self.parent.setOrganism(Organism())
-        # if isinstance(self.parent, (Organ, Tissue)):
-        #     self.parent.setOrganism(o)
 
 @dataclass
 class Neuron(Cell):

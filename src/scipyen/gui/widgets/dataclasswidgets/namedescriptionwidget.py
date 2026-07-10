@@ -84,11 +84,9 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
 
     def _configureUI_(self):
         self.setupUi(self)
-        self._descriptionEditor_ = None
+        self.descriptionEditor = None
         self.detailsViewer = None
         self.nameLineEdit.setText(self._dataName_)
-        # self.nameLineEdit.undoEnabled = True
-        # self.nameLineEdit.redoEnabled = True
         self.nameLineEdit.setClearButtonEnabled(True)
         self.nameLineEdit.textChanged.connect(self._slot_nameChanged)
         self.descriptionToolButton.clicked.connect(self._slot_editDescription)
@@ -102,13 +100,13 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
                               (self.nameLineEdit,
                                )))
 
-        if isinstance(self._descriptionEditor_, textviewer.TextViewer):
-            sigBlockers.append(QtCore.QSignalBlocker(self._descriptionEditor_))
+        if isinstance(self.descriptionEditor, textviewer.TextViewer):
+            sigBlockers.append(QtCore.QSignalBlocker(self.descriptionEditor))
 
         if hasattr(val, "description") and isinstance(val.description, str):
             self._dataDescription_ = val.description
-            if isinstance(self._descriptionEditor_, textviewer.TextViewer):
-                self._descriptionEditor_.setText(self._dataDescription_)
+            if isinstance(self.descriptionEditor, textviewer.TextViewer):
+                self.descriptionEditor.setText(self._dataDescription_)
 
         if hasattr(val, "name") and isinstance(val.name, str):
             self._dataName_ = val.name
@@ -128,17 +126,17 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
 
     @Slot()
     def _slot_editDescription(self):
-        if not isinstance(self._descriptionEditor_, textviewer.TextViewer):
-            self._descriptionEditor_ = textviewer.TextViewer(self._dataDescription_,
+        if not isinstance(self.descriptionEditor, textviewer.TextViewer):
+            self.descriptionEditor = textviewer.TextViewer(self._dataDescription_,
                                                 parent=self, edit=True,
                                                 win_title="Edit description",
                                                 doc_title="Edit description",
                                                 title="Description")
-            # self._descriptionEditor_.setVisible(False)
-            self._descriptionEditor_.sig_textChanged.connect(self._slot_descriptionChanged)
+            # self.descriptionEditor.setVisible(False)
+            self.descriptionEditor.sig_textChanged.connect(self._slot_descriptionChanged)
 
-        self._descriptionEditor_.setData(self._dataDescription_)
-        self._descriptionEditor_.show()
+        self.descriptionEditor.setData(self._dataDescription_)
+        self.descriptionEditor.show()
 
     @Slot(str)
     def _slot_symbolChanged(self, val:str):
@@ -149,8 +147,8 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
     @Slot()
     def _slot_descriptionChanged(self):
         r"""Captures changes in the description editor"""
-        if isinstance(self._descriptionEditor_, textviewer.TextViewer):
-            self._dataDescription_ = self._descriptionEditor_.text(plain=True)
+        if isinstance(self.descriptionEditor, textviewer.TextViewer):
+            self._dataDescription_ = self.descriptionEditor.text(plain=True)
             self.sig_descriptionChanged.emit(self._dataDescription_)
 
     @Slot(object, str)
@@ -212,7 +210,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
     @dataDescription.setter
     def dataDescription(self, val:str):
         self._dataDescription_ = val
-        if isinstance(self._descriptionEditor_, textviewer.TextViewer):
-            sigBlock = QtCore.QSignalBlocker(self._descriptionEditor_)
-            self._descriptionEditor_.setText(self._dataDescription_)
+        if isinstance(self.descriptionEditor, textviewer.TextViewer):
+            sigBlock = QtCore.QSignalBlocker(self.descriptionEditor)
+            self.descriptionEditor.setText(self._dataDescription_)
         self.sig_descriptionChanged.emit(self._dataDescription_)

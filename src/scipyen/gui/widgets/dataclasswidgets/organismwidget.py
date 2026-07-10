@@ -8,7 +8,7 @@ r"""
 """
 
 import sys, os, typing, types, warnings, math, cmath # noqa
-import dataclasses
+# import dataclasses
 # import numbers
 # import numpy as np
 # import quantities as pq
@@ -26,7 +26,7 @@ __has_qtdbus__ = False
 
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
+    import PySide6 # noqa
     from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
@@ -91,12 +91,6 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
 
         DataClassWidget.__init__(self, parent=parent, **kwargs)
 
-        # self._objSymbol_ = kwargs.pop("objSymbol", None)
-        # if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
-        #     objSymbols = self.getDataSymbolInWorkspace(value)
-        #     if len(objSymbols) > 0:
-        #         self._objSymbol_ = objSymbols[0]
-
         self._configureUI_()
 
     def _configureUI_(self):
@@ -105,27 +99,6 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         super()._configureUI_()
 
         self.taxonDetailsViewer = None
-
-        # self.dataExchangeWidget.dataType = type(self._data_, self._objSymbol_)
-        # self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
-        # self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
-        # self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
-        # self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
-        # self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
-        # self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
-        # self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
-        # self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
-        # self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
-        # self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
-        #
-        # self.nameDescriptionWidget.dataName = self._data_.name
-        # self.nameDescriptionWidget.dataDescription = self._data_.description
-        # self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
-        # self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
-        # self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
-        # self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
-        # self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
-        # self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
 
 
         taxon = self._data_.taxon
@@ -148,9 +121,6 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         self.taxonSpeciesLineEdit.sig_enterPressed.connect(self._slot_selectTaxon)
 
         self.taxonDetailsToolButton.clicked.connect(self._slot_showTaxonDetails)
-        # if taxonbridge.hasTaxoniq and isinstance(taxon, taxonbridge.Taxon):
-        # else:
-        #     self.taxonDetailsToolButton.setEnabled(False)
 
         self.subSpeciesLineEdit.setText(f"{self._data_.subspecies}")
         self.subSpeciesLineEdit.lazy = True

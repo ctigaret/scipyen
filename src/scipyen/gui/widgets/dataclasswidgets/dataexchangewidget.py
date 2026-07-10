@@ -129,10 +129,8 @@ that `obj` is bound to, in the user space.
         self.importToolButton.clicked.connect(self._slot_importData)
         self.saveToolButton.clicked.connect(self.sig_requestDataSave)
         self.copyToolButton.clicked.connect(self.sig_requestDataCopy)
-        # self.saveToolButton.clicked.connect(self._slot_saveData)
         self.exportToolButton.clicked.connect(self.sig_requestDataExport)
         self.newObjectToolButton.clicked.connect(self.sig_requestNewObject)
-        # self.exportToolButton.clicked.connect(self._slot_exportData)
 
     @property
     def varName(self) -> str:
