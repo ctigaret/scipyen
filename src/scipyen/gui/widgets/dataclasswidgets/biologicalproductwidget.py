@@ -49,14 +49,14 @@ try:
 except:
     __has_qtdbus__ = False
 
-from core.prog import scipywarn # noqa
+# from core.prog import scipywarn
 from core import scipyendataclasses as sdc
-from core import scipyen_quantities as scq
-from core import taxonbridge
-from gui import datatreeviewer
-from gui.widgets import small_widgets as smw
+# from core import scipyen_quantities as scq
+# from core import taxonbridge
+# from gui import datatreeviewer
+# from gui.widgets import small_widgets as smw
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
-from gui.workspacegui import WorkspaceGuiMixin
+# from gui.workspacegui import WorkspaceGuiMixin
 # from gui.widgets.datawidgetmixin import DataWidgetMixin
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -67,7 +67,7 @@ Ui_BiologicalProductWidget, _ = loadUiType(
     )
 
 class BiologicalProductWidget(Ui_BiologicalProductWidget, DataClassWidget):
-    self._objectTypes_ = (sdc.BiologicalProduct, )
+    _objectTypes_ = (sdc.BiologicalProduct, )
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.BiologicalSource] = None,
                  **kwargs):
@@ -80,8 +80,6 @@ class BiologicalProductWidget(Ui_BiologicalProductWidget, DataClassWidget):
 
             obj = obj_
 
-        DataClassWidget.__init__(self, parent=parent)
-
         if not isinstance(obj, self._objectTypes_):
             self._data_ = self._objectTypes_[0]()
         else:
@@ -89,32 +87,35 @@ class BiologicalProductWidget(Ui_BiologicalProductWidget, DataClassWidget):
 
         self._entityTypeNames_ = list(sdc.BioProductType.names())
 
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
+
         self._configureUI_()
 
     def _configureUI_(self):
         self.setupui(self)
 
-
-        self.dataExchangeWidget.dataType = type(self._data_)
-        self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
-        self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
-        self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
-        self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
-        self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
-        self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
-        self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
-        self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
-        self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
-        self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
-
-        self.nameDescriptionWidget.dataName = self._data_.name
-        self.nameDescriptionWidget.dataDescription = self._data_.description
-        self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
-        self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
-        self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
-        self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
-        self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
-        self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
+        super()._configureUI_()
+#
+#         self.dataExchangeWidget.dataType = type(self._data_)
+#         self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
+#         self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
+#         self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
+#         self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
+#         self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
+#         self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
+#         self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
+#         self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
+#         self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
+#         self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
+#
+#         self.nameDescriptionWidget.dataName = self._data_.name
+#         self.nameDescriptionWidget.dataDescription = self._data_.description
+#         self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
+#         self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
+#         self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
+#         self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
+#         self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
+#         self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
 
         for t in self._entityTypeNames_:
             self.bioSourceTypeComboBox.addItem(t)
@@ -126,6 +127,6 @@ class BiologicalProductWidget(Ui_BiologicalProductWidget, DataClassWidget):
 
     @Slot(int)
     def _slot_bioSourceTypeChanged(self, val: int):
-        self._data_.type = sdc.BioProductType[self._entityTypeNames_[ndx]]
+        self._data_.type = sdc.BioProductType[self._entityTypeNames_[val]]
 
         self.sig_valueChanged.emit(self._data_)

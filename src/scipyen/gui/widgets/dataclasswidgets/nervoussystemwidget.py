@@ -15,7 +15,7 @@ import pandas as pd
 # import neo
 # from tribool import Tribool
 
-import qtpy
+# import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
@@ -25,7 +25,7 @@ __has_qtdbus__ = False
 
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
+    import PySide6 # noqa
     from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
@@ -49,15 +49,15 @@ try:
 except:
     __has_qtdbus__ = False
 
-from core.prog import scipywarn # noqa
+# from core.prog import scipywarn
 from core import scipyendataclasses as sdc
-from core import scipyen_quantities as scq
-from core import taxonbridge
+# from core import scipyen_quantities as scq
+# from core import taxonbridge
 from core import bgbridge
-from gui import datatreeviewer
-from gui.widgets import small_widgets as smw
+# from gui import datatreeviewer
+# from gui.widgets import small_widgets as smw
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
-from gui.workspacegui import WorkspaceGuiMixin
+# from gui.workspacegui import WorkspaceGuiMixin
 # from gui.widgets.datawidgetmixin import DataWidgetMixin
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -82,8 +82,6 @@ class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget):
 
             obj = obj_
 
-        DataClassWidget.__init__(self, parent=parent)
-
         if not isinstance(obj, self._objectTypes_):
             self._data_ = self._objectTypes_[0]()
         else:
@@ -105,32 +103,37 @@ class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget):
                 self._atlas_ = self._bman_.initAtlas(self._data_.atlasName)
                 self._availableStructures_ = self._atlas_.lookup_df
 
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
+
         self._configureUI_()
 
     def _configureUI_(self):
         self.setupUi(self)
+        super()._configureUI_()
+
         self.bgStructureWidget.containerWidget = self
 
-        self.dataExchangeWidget.dataType = type(self._data_)
-        self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
-        self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
-        self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
-        self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
-        self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
-        self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
-        self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
-        self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
-        self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
-        self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
 
-        self.nameDescriptionWidget.dataName = self._data_.name
-        self.nameDescriptionWidget.dataDescription = self._data_.description
-        self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
-        self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
-        self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
-        self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
-        self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
-        self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
+        # self.dataExchangeWidget.dataType = type(self._data_)
+        # self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
+        # self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
+        # self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
+        # self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
+        # self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
+        # self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
+        # self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
+        # self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
+        # self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
+        # self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
+        #
+        # self.nameDescriptionWidget.dataName = self._data_.name
+        # self.nameDescriptionWidget.dataDescription = self._data_.description
+        # self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
+        # self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
+        # self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
+        # self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
+        # self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
+        # self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
 
         for t in self._localAtlasNames_:
             self.brainAtlasComboBox.addItem(t)

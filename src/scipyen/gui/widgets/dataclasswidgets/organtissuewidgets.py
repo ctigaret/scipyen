@@ -11,13 +11,13 @@ import sys, os, typing, types, warnings, math, cmath # noqa
 # import numbers
 # import numpy as np
 # import quantities as pq
-import pandas as pd
+# import pandas as pd
 # import neo
 # from tribool import Tribool
 
-import qtpy
+# import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
-from qtpy.QtCore import (Signal, Slot, Property,) # noqa
+from qtpy.QtCore import (Signal, Slot)# , Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
@@ -25,7 +25,7 @@ __has_qtdbus__ = False
 
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
+    import PySide6 # noqa
     from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
@@ -51,12 +51,12 @@ except:
 
 from core.prog import scipywarn # noqa
 from core import scipyendataclasses as sdc
-from core import scipyen_quantities as scq
-from core import taxonbridge
-from gui import datatreeviewer
-from gui.widgets import small_widgets as smw
+# from core import scipyen_quantities as scq
+# from core import taxonbridge
+# from gui import datatreeviewer
+# from gui.widgets import small_widgets as smw
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
-from gui.workspacegui import WorkspaceGuiMixin
+# from gui.workspacegui import WorkspaceGuiMixin
 # from gui.widgets.datawidgetmixin import DataWidgetMixin
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -85,38 +85,39 @@ class OrganWidget(Ui_OrganWidget, DataClassWidget):
 
             obj = obj_
 
-        DataClassWidget.__init__(self, parent=parent)
-
         if not isinstance(obj, self._objectTypes_):
             self._data_ = self._objectTypes_[0]()
         else:
             self._data_ = obj
+
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
 
         self._configureUI_()
 
     def _configureUI_(self):
         self.setupUi(self)
 
-        self.dataExchangeWidget.dataType = type(self._data_)
-        self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
-        self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
-        self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
-        self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
-        self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
-        self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
-        self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
-        self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
-        self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
-        self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
-
-        self.nameDescriptionWidget.dataName = self._data_.name
-        self.nameDescriptionWidget.dataDescription = self._data_.description
-        self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
-        self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
-        self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
-        self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
-        self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
-        self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
+        super()._configureUI_()
+        # self.dataExchangeWidget.dataType = type(self._data_)
+        # self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
+        # self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
+        # self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
+        # self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
+        # self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
+        # self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
+        # self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
+        # self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
+        # self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
+        # self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
+        #
+        # self.nameDescriptionWidget.dataName = self._data_.name
+        # self.nameDescriptionWidget.dataDescription = self._data_.description
+        # self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
+        # self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
+        # self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
+        # self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
+        # self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
+        # self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
 
 
 class TissueWidget(Ui_TissueWidget, DataClassWidget):
@@ -133,37 +134,39 @@ class TissueWidget(Ui_TissueWidget, DataClassWidget):
 
             obj = obj_
 
-        DataClassWidget.__init__(self, parent=parent)
-
         if not isinstance(obj, self._objectTypes_):
             self._data_ = self._objectTypes_[0]()
         else:
             self._data_ = obj
+
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
 
         self._configureUI_()
 
     def _configureUI_(self):
         self.setupUi(self)
 
-        self.dataExchangeWidget.dataType = type(self._data_)
-        self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
-        self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
-        self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
-        self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
-        self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
-        self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
-        self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
-        self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
-        self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
-        self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
+        super()._configureUI_()
 
-        self.nameDescriptionWidget.dataName = self._data_.name
-        self.nameDescriptionWidget.dataDescription = self._data_.description
-        self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
-        self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
-        self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
-        self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
-        self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
-        self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
+        # self.dataExchangeWidget.dataType = type(self._data_)
+        # self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
+        # self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
+        # self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
+        # self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
+        # self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
+        # self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
+        # self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
+        # self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
+        # self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
+        # self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
+        #
+        # self.nameDescriptionWidget.dataName = self._data_.name
+        # self.nameDescriptionWidget.dataDescription = self._data_.description
+        # self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
+        # self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
+        # self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
+        # self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
+        # self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
+        # self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
 
 

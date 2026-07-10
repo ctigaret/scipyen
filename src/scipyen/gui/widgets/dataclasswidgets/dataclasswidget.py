@@ -83,6 +83,8 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None, **kwargs):
         isAttribute = kwargs.pop("isAttribute", False)
+        self._objSymbol_ = kwargs.pop("objSymbol", None)
+
         self.dataExchangeWidget = None
         self.nameDescriptionWidget = None
 
@@ -90,9 +92,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         self._isAttribute_: bool = isAttribute
         self._parentEditor_ = None
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
-        # self._customSymbol_: typing.Optional[str] = None
 
-        self._objSymbol_ = kwargs.pop("objSymbol", None)
         if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
             objSymbols = self.getDataSymbolInWorkspace(self._data_)
             if isinstance(objSymbols, typing.Sequence) and len(objSymbols) > 0:

@@ -9,24 +9,24 @@ r"""
 
 import sys, os, typing, types, warnings, math, cmath, datetime # noqa
 from functools import singledispatchmethod
-import numbers
-import dataclasses
-import numpy as np
-import quantities as pq
-import pandas as pd
-import neo
-from tribool import Tribool
+# import numbers
+# import dataclasses
+# import numpy as np
+# import quantities as pq
+# import pandas as pd
+# import neo
+# from tribool import Tribool
 
-import qtpy
+# import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+from qtpy.QtCore import (Signal, Slot) #, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6# noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -36,7 +36,7 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
+    # from qtpy import sip
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
@@ -44,22 +44,22 @@ else:
     __has_sip__ = True
 
 
-from core.prog import safewrapper, scipywarn, print_styled
-from core.sysutils import adapt_ui_path
+from core.prog import scipywarn
+# from core.sysutils import adapt_ui_path
 
-import core.bgbridge as bgbridge
+# import core.bgbridge as bgbridge
 
-from core import scipyen_quantities as scq
-from core import strutils
-from core.datatypes import UnitTypes, GENOTYPES
+# from core import scipyen_quantities as scq
+# from core import strutils
+# from core.datatypes import UnitTypes, GENOTYPES
 
-from core import workspacefunctions as wsf
-from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
-from gui.widgets.datatreeview import DataTreeView
+# from core import workspacefunctions as wsf
+# from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
+# from gui.widgets.datatreeview import DataTreeView
 
-from core.prog import scipywarn # noqa
+# from core.prog import scipywarn
 from core import scipyendataclasses as sdc
-from core import scipyen_quantities as scq
+# from core import scipyen_quantities as scq
 # from gui import guiutils, textviewer, datatreeviewer
 # from gui.widgets import small_widgets as smw
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
@@ -89,7 +89,6 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
 
             obj = obj_
 
-
         if not isinstance(obj, self._objectTypes_):
             self._data_ =  self._objectTypes_[0]()
         else:
@@ -99,6 +98,7 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
         self._isAttribute_ = kwargs.get("isAttribute", False)
 
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+
         self._configureUI_()
 
     @singledispatchmethod
@@ -125,26 +125,28 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
     def _configureUI_(self):
         self.setupUi(self)
 
-        self.dataExchangeWidget.setValue(self._data_)
-        self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
-        self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
-        self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
-        self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
-        self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
-        self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
-        self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
-        self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
-        self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
-        self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
+        super()._configureUI_()
 
-        self.nameDescriptionWidget.dataName = self._data_.name
-        self.nameDescriptionWidget.dataDescription = self._data_.description
-        self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
-        self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
-        self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
-        self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
-        self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
-        self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
+        # self.dataExchangeWidget.setValue(self._data_)
+        # self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
+        # self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
+        # self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
+        # self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
+        # self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
+        # self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
+        # self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
+        # self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
+        # self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
+        # self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
+        #
+        # self.nameDescriptionWidget.dataName = self._data_.name
+        # self.nameDescriptionWidget.dataDescription = self._data_.description
+        # self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
+        # self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
+        # self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
+        # self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
+        # self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
+        # self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
 
         self.editParentToolButton.clicked.connect(self._slot_editParent)
 
