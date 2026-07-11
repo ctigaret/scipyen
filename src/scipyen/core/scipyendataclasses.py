@@ -6,29 +6,29 @@
 
 r"""
 """
-from abc import ABC, ABCMeta, abstractmethod
+# from abc import ABC, ABCMeta, abstractmethod
 import collections
-from collections import deque, namedtuple
-from functools import (singledispatch, singledispatchmethod)
+# from collections import deque, namedtuple
+from functools import singledispatchmethod
 import itertools
 import datetime
 from enum import (Enum, IntEnum, EnumMeta, Flag, auto) #noqa
-import inspect
-import numbers
-import math
+# import inspect
+# import numbers
+# import math
 import dataclasses
-from dataclasses import (dataclass, KW_ONLY, MISSING, field)
-import sys, os
-import time, datetime
-import traceback
+from dataclasses import (dataclass, KW_ONLY)
+# import sys, os
+# import time, datetime
+# import traceback
 import typing
 import types
-import warnings
-import weakref
+# import warnings
+# import weakref
 import h5py
 import treelib # noqa
 import pathlib
-from copy import (deepcopy, copy,)
+# from copy import (deepcopy, copy,)
 
 #### END core python modules
 
@@ -66,31 +66,30 @@ from copy import (deepcopy, copy,)
 #     from PySide6 import (QtGui, QtCore, QtWidgets,)
 # else:
 #     from qtpy import (QtGui, QtCore, QtWidgets,)
-import numpy as np
-from numpy import ndarray
-import numpy.matlib as mlib
+# import numpy as np
+# from numpy import ndarray
+# import numpy.matlib as mlib
 import pandas as pd
 import quantities as pq
-from core.vigra_patches import vigra
-import neo
-from neo.core import (baseneo, basesignal, container,)
-from neo.core.dataobject import (DataObject, ArrayDict,)
+# from core.vigra_patches import vigra
+# import neo
+# from neo.core import (baseneo, basesignal, container,)
+# from neo.core.dataobject import (DataObject, ArrayDict,)
 
 
 #### END 3rd party modules
 
 #### BEGIN pict.core.modules
 from core import scipyen_quantities as scq
-from core import xmlutils
-from core import strutils
-from core.prog import (safewrapper, is_hashable, is_type_or_subclass,
-                       ImmutableDescriptor, scipywarn, NoData, print_styled)
+# from core import xmlutils
+# from core import strutils
+from core.prog import (ImmutableDescriptor, scipywarn)
 # from core.datazone import DataZone
-from core.datasignal import (_new_DataSignal, _new_IrregularlySampledDataSignal, DataSignal, IrregularlySampledDataSignal)
+# from core.datasignal import (_new_DataSignal, _new_IrregularlySampledDataSignal, DataSignal, IrregularlySampledDataSignal)
 # from core import bgbridge
 # from core.bgbridge import (BGStructureDescriptor, BrainGlobeAtlas)
-from core import taxonbridge
-from core.taxonbridge import(Taxon, TaxonDescriptor)
+# from core import taxonbridge
+from core.taxonbridge import TaxonDescriptor
 from core.typeenum import TypeEnum
 from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE,
                             EQUAL_NAN, GENOTYPES)
@@ -177,9 +176,6 @@ class FileOriginDescriptor:
 
         else:
             raise TypeError(f"Expecting a str, pathlib.Path object, or a sequence of these; instead, got a {type(value).__name__}")
-
-
-
 
 @dataclass
 class ScipyenDataclass:
@@ -360,8 +356,8 @@ class ScipyenDataclass:
 
 class NeuronType(TypeEnum):
     r"""Generic classification of neurons beyond that of NeuroMorpho.org
-(pyramidal, non-pyramidal principal, and interneurons).
-"""
+    (pyramidal, non-pyramidal principal, and interneurons).
+    """
     undefined = 0
     pyramidal = auto()
     stellate = auto()
@@ -382,7 +378,7 @@ class NeuronType(TypeEnum):
     other = auto()
 
 class CellCompartmentType(TypeEnum):
-    r"""Insipired by SWC/CNIC specification at
+    r"""Inspired by SWC/CNIC specification at
     http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
 
     Refers to "gross" compartments; for a more granular types see AxonalCompartment
@@ -533,8 +529,8 @@ class PlasmaMembraneSpecializationType(TypeEnum):
 
 class UltrastructureElementType(TypeEnum):
     r"""Organelles, etc.
-Excludes chemical synapse components e.g. postsynaptic density
-"""
+    Excludes chemical synapse components e.g. postsynaptic density
+    """
     undefined = 0
     plasmalemma = auto()
     cytosol = auto()
@@ -645,66 +641,6 @@ class GeneticSex(TypeEnum):
     female = 1
     male = 2
 
-class BioSourceType(TypeEnum):
-    undefined   = 0
-    insilico    = auto()    # biological/biophysical/mathematical model
-    exvivo      = auto()    # tissue or organ sample from organism
-    invitro     = auto()    # culture system, homogenate
-    invivo      = auto()    # e.g. in vivo imaging, electrophysiology, etc
-    organism    = auto()    # for behaviour and systemic measurements (temperature, mass, motor function, etc)
-    organ       = auto()    # e.g. isolated heart, aorta, ileum, 33
-    tissue      = auto()    # e.g. aortic strip, teania caeci/coli, etc
-    cell        = auto()
-    thrombocyte = auto()
-    platelet    = thrombocyte
-    compartment = auto()
-    ultrastructure = auto()
-    serum       = auto()
-    plasma      = auto()
-    homogenate  = auto()
-    cell_fraction = auto()
-    monolayer   = invitro | cell # dissociated cells, cultured, possibly confluent
-    culture     = monolayer
-    acute_slice = exvivo | tissue # e.g. acute brain slice = exvivo | tissue = 17
-    organtypic  = invitro | tissue # e.g. "organotypic" slice culture = invitro | tissue  = 18
-    organoid    = invitro | organ
-    assembloid  = organoid # i.e, 34
-    blood       = sum(
-            (
-                serum,
-                plasma,
-                cell,
-                thrombocyte
-            )
-        )
-    product     = auto()
-
-class Organism : pass
-
-class BioProductType(TypeEnum):
-    undefined = 0
-    secretion   = auto()
-    urine       = auto()
-    faeces      = auto()
-    excretion   = (urine + faeces)
-    exudate     = auto()
-    pus         = auto()
-
-@dataclass
-class BiologicalProduct(ScipyenDataclass):
-    r"""Biological product (not cell, tissue, organ or organism)"""
-    type: BioProductType = dataclasses.field(default = BioProductType.undefined)
-    parent: Organism = dataclasses.field(default_factory = Organism)
-
-    def getOrganism(self):
-        return self.parent
-
-    def setOrganism(self, value: Organism | None):
-        if isinstance(value, Organism):
-            self.parent = value
-        else:
-            self.parent = Organism()
-
 class ProcedureType(TypeEnum):
     null = 0
     mating = auto()
@@ -778,14 +714,118 @@ class AdministrationRoute(Flag):
     other = auto()
     custom = other
 
-# @dataclass
-# class NeuralChemicalSynapse(ScipyenDataclass):
-#     synapseType: ChemicalSynapseType = ChemicalSynapseType.undefined
-#     synapseComponent: ChemicalSynapseCompartment = ChemicalSynapseCompartment.undefined
+class BioSourceType(TypeEnum):
+    undefined   = 0
+    insilico    = auto()    # biological/biophysical/mathematical model
+    exvivo      = auto()    # tissue or organ sample from organism
+    invitro     = auto()    # culture system, homogenate
+    invivo      = auto()    # e.g. in vivo imaging, electrophysiology, etc
+    organism    = auto()    # for behaviour and systemic measurements (temperature, mass, motor function, etc)
+    organ       = auto()    # e.g. isolated heart, aorta, ileum, 33
+    organoid    = invitro | organ
+    assembloid  = organoid # i.e, 34
+    tissue      = auto()    # e.g. aortic strip, teania caeci/coli, etc
+    acute_slice = exvivo | tissue # e.g. acute brain slice = exvivo | tissue = 17
+    organotypic = invitro | tissue # e.g. "organotypic" slice culture = invitro | tissue  = 18
+    cell        = auto()
+    monolayer   = invitro | cell # dissociated cells, cultured, possibly confluent
+    culture     = monolayer
+    thrombocyte = auto()
+    platelet    = thrombocyte
+    compartment = auto()
+    ultrastructure = auto()
+    product     = auto()
 
-# @dataclass
-# class CompartmentSpecification(ScipyenDataclass):
-#     compartmentType: CellCompartmentType = CellCompartmentType.undefined
+# NOTE 2026-07-11 17:26:11
+# Note to self: BioSourceType ↦ Specimen types -> parent types:
+# insilico ↦ ~ any
+#
+# exvivo ↦ Organism
+#        ↦ Organ   -> Organism
+#        ↦ Tissue  -> Organ -> Organism
+#        ↦ NervousSystem -> Organism
+#
+#        ↦ Cell -> Organ -> Organism
+#               -> Tissue -> Organ -> Organism
+#
+#        ↦ Neuron -> NervousSystem -> Organism
+#                 -> Tissue -> Organ -> Organism
+#                 -> Organ -> Organism
+#
+# invitro ↦ BiologicalProduct -> Organism
+#                             -> Organ -> Organism
+#                             -> Tissue -> Organ -> Organism
+#                             -> Cell -> Organ -> Organism
+#                                     -> Tissue -> Organ -> Organism
+#                             -> Neuron -> NervousSystem -> Organism
+#                                       -> Tissue -> Organ -> Organism
+#                                       -> Organ -> Organism
+#         ↦ Cell -> Organ -> Organism
+#                -> Tissue -> Organ -> Organism
+#
+#         ↦ Neuron -> NervousSystem -> Organism
+#                  -> Tissue -> Organ -> Organism
+#                  -> Organ -> Organism
+#
+# invivo  ↦ BiologicalProduct -> Organism
+#                             -> Organ -> Organism
+#                             -> Tissue -> Organ -> Organism
+#                             -> Cell -> Organ -> Organism
+#                                     -> Tissue -> Organ -> Organism
+#                             -> Neuron -> NervousSystem -> Organism
+#                                       -> Tissue -> Organ -> Organism
+#                                       -> Organ -> Organism
+#         ↦ Cell -> Organ -> Organism
+#                -> Tissue -> Organ -> Organism
+#
+#         ↦ Neuron -> NervousSystem -> Organism
+#                  -> Tissue -> Organ -> Organism
+#                  -> Organ -> Organism
+#
+# organism ↦ Organism
+#
+# organ    ↦ Organ -> Organism
+#
+# tissue   ↦ Tissue -> Organ -> Organism
+#
+# cell     ↦ Cell -> Organ -> Organism
+#                -> Tissue -> Organ -> Organism
+#
+#          ↦ Neuron -> NervousSystem -> Organism
+#                   -> Tissue -> Organ -> Organism
+#                   -> Organ -> Organism
+# compartment ↦ CellCompartment -> Cell -> Tissue -> Organ -> Organism
+#                                       -> Organ -> Organism
+#
+#             ↦ NeuronCompartment -> Neuron -> NervousSystem -> Organism
+#                                           -> Tissue -> Organ -> Organism
+#                                           -> Organ -> Organism
+#
+#             ↦ ChemicalSynapse -> NervousSystem -> Organism
+#                               -> Tissue -> Organ -> Organism
+#                               -> Organ
+#
+# ultrastructure ↦ UltrastructureElement -> Cell -> ...
+#                                        -> Neuron -> ...
+#
+# product ↦ BiologicalProduct
+
+# class Organism :
+#     pass
+
+class BioProductType(TypeEnum):
+    undefined = 0
+    homogenate  = auto()
+    cell_fraction = auto()
+    serum       = auto()
+    plasma      = auto()
+    blood       = serum | plasma
+    secretion   = auto()
+    urine       = auto()
+    faeces      = auto()
+    excretion   = urine | faeces
+    exudate     = auto()
+    pus         = auto()
 
 @dataclass
 class Biometrics(ScipyenDataclass):
@@ -923,9 +963,38 @@ class Organism(ScipyenDataclass):
             else:
                 self.biometrics.height = pd.NA
 
+@dataclass
+class BiologicalProduct(ScipyenDataclass):
+    r"""Biological product (not cell, tissue, organ or organism)"""
+    parentType: typing.ClassVar[
+        typing.Union[
+                ScipyenDataclass,
+                typing.Sequence[ScipyenDataclass]
+            ]
+        ] = (Organism, )
+
+    type: BioProductType = dataclasses.field(default = BioProductType.undefined)
+
+    parent: Organism = dataclasses.field(default_factory = Organism)
+
+    def getOrganism(self):
+        return self.parent
+
+    def setOrganism(self, value: Organism | None):
+        if isinstance(value, Organism):
+            self.parent = value
+        else:
+            self.parent = Organism()
 
 @dataclass
 class Organ(ScipyenDataclass):
+    parentTypes: typing.ClassVar[
+        typing.Union[
+                ScipyenDataclass,
+                typing.Sequence[ScipyenDataclass]
+            ]
+        ] = (Organism, )
+
     parent: Organism = dataclasses.field(default_factory = Organism)
 
     def getOrganism(self) -> Organism:
@@ -939,17 +1008,17 @@ class Organ(ScipyenDataclass):
         else:
             self.parent=Organism()
 
-
 @dataclass
 class NervousSystem(Organ):
     r"""
-Nervous system.
+    Nervous system.
 
-The name of this class is slightly misleading, as it encompasses ANY anatomical
-structure defined in a BrainGlobeAtlas, including those OUTSIDE the brain itself,
-e.g., spinal cord, etc.
-"""
+    The name of this class is slightly misleading, as it encompasses ANY anatomical
+    structure defined in a BrainGlobeAtlas, including those OUTSIDE the brain itself,
+    e.g., spinal cord, etc.
+    """
     from core.bgbridge import BGStructureDescriptor
+
     # Specific organ structure, if relevant.
     #
     # For now, only brain atlas api (brainglobe_atlasapi.structure) is supported;
@@ -974,7 +1043,9 @@ e.g., spinal cord, etc.
     #   for equality using only these two attributes (or rather elements of the
     #   source underlying dictionary)
     atlasName: typing.Union[str, type(pd.NA)] = pd.NA
+
     structure: BGStructureDescriptor = BGStructureDescriptor()
+
     parent: Organism = dataclasses.field(default_factory = Organism)
 
     @property
@@ -993,6 +1064,13 @@ Brain = NervousSystem # alias for backward copmatibility
 @dataclass
 class Tissue(ScipyenDataclass):
     r"""Tissue"""
+    parentTypes: typing.ClassVar[
+        typing.Union[
+                ScipyenDataclass,
+                typing.Sequence[ScipyenDataclass]
+            ]
+        ] = (Organ, NervousSystem)
+
     parent: typing.Union[Organ, NervousSystem] = dataclasses.field(default_factory = Organ)
 
     def getOrganism(self):
@@ -1004,13 +1082,20 @@ class Tissue(ScipyenDataclass):
         else:
             self.parent.setOrganism(Organism())
 
-
 @dataclass
 class Cell(ScipyenDataclass):
+    parentTypes: typing.ClassVar[
+        typing.Union[
+                ScipyenDataclass,
+                typing.Sequence[ScipyenDataclass]
+            ]
+        ] = (Organ, Tissue)
+
     cellType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g., "neuron", "glia", etc
+
     cellSubType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
 
-    parent: typing.Optional[typing.Union[Organ, Tissue]] = dataclasses.field(default_factory = Tissue)
+    parent: typing.Union[Organ, Tissue] = dataclasses.field(default_factory = Tissue)
 
     def getOrganism(self):
         return self.parent.getOrganism()
@@ -1023,7 +1108,15 @@ class Cell(ScipyenDataclass):
 
 @dataclass
 class Neuron(Cell):
+    parentTypes: typing.ClassVar[
+        typing.Union[
+            ScipyenDataclass,
+            typing.Sequence[ScipyenDataclass]
+            ]
+        ] = (Organ, Tissue, NervousSystem)
+
     cellSubType: NeuronType = NeuronType.undefined
+
     parent: typing.Optional[typing.Union[Organ, Tissue, NervousSystem]] = dataclasses.field(default_factory = NervousSystem)
 
     @property
@@ -1036,12 +1129,18 @@ class Neuron(Cell):
 
 @dataclass
 class CellCompartment(ScipyenDataclass):
+    parentTypes: typing.ClassVar[
+        typing.Union[
+            ScipyenDataclass,
+            typing.Sequence[ScipyenDataclass]
+            ]
+        ] = (Cell, )
+
     compartmentType: CellCompartmentType = CellCompartmentType.undefined
+
     parent: Cell = dataclasses.field(default_factory = Cell)
 
     def __repr__(self):
-        # indent = lambda x: x.replace("\n", "\n\t") # noqa
-        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f"{x.name} -> {x}" if isinstance(x, Enum) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -1050,32 +1149,31 @@ class CellCompartment(ScipyenDataclass):
 
     def getOrganism(self):
         return self.parent.getOrganism()
-        # if isinstance(self.parent, Cell):
-        #     return self.parent.getOrganism()
 
     def setOrganism(self, value: Organism):
         if isinstance(value, Organism):
             self.parent.setOrganism(value)
         else:
             self.parent.setOrganism(Organism())
-        # if isinstance(self.parent, Cell):
-        #     self.parent.setOrganism(o)
 
 @dataclass
 class NeuronCompartment(CellCompartment):
+    parentTypes: typing.ClassVar[
+        typing.Union[
+            ScipyenDataclass,
+            typing.Sequence[ScipyenDataclass]
+            ]
+        ] = (Neuron, )
+
     compartmentType: NeuronCompartmentType = NeuronCompartmentType.undefined
+
     parent: Neuron = dataclasses.field(default_factory = Neuron)
 
     def __post_init__(self: typing.Self):
         assert isinstance(self.compartmentType, NeuronCompartmentType), f"Wrong compartment type: {self.compartmentType}"
         assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
-        # super().__init__(self, compartmentType = self.compartmentType,
-        #                  compartmentID = self.compartmentID,
-        #                  parent = self.parent)
 
     def __repr__(self):
-        # indent = lambda x: x.replace("\n", "\n\t") # noqa
-        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -1084,6 +1182,12 @@ class NeuronCompartment(CellCompartment):
 
 @dataclass
 class AxonalCompartment(NeuronCompartment):
+    parentTypes: typing.ClassVar[
+        typing.Union[
+            ScipyenDataclass,
+            typing.Sequence[ScipyenDataclass]
+            ]
+        ] = (Neuron, )
     compartmentType: AxonalCompartmentType = AxonalCompartmentType.undefined
     parent: Neuron = dataclasses.field(default_factory = Neuron)
 
@@ -1093,6 +1197,12 @@ class AxonalCompartment(NeuronCompartment):
 
 @dataclass
 class DendriticCompartment(NeuronCompartment):
+    parentTypes: typing.ClassVar[
+        typing.Union[
+            ScipyenDataclass,
+            typing.Sequence[ScipyenDataclass]
+            ]
+        ] = (Neuron, )
     compartmentType: DendriticCompartmentType = DendriticCompartmentType.undefined
     parent: Neuron = dataclasses.field(default_factory = Neuron)
 
@@ -1105,6 +1215,7 @@ class UltrastructureElement:
 
 @dataclass
 class ChemicalSynapse(ScipyenDataclass):
+
     morphologicalType : ChemicalSynapseMorphologicalType = ChemicalSynapseMorphologicalType.undefined
     functionalType: ChemicalSynapseFunctionalType = ChemicalSynapseFunctionalType.undefined
     # postsynapticEntityType: PostsynapticEntityType = PostsynapticEntityType.undefined
@@ -1131,8 +1242,22 @@ class ChemicalSynapse(ScipyenDataclass):
 
 @dataclass
 class UltrastructureElement(ScipyenDataclass):
+    parentTypes: typing.ClassVar[
+        typing.Union[
+            ScipyenDataclass,
+            typing.Sequence[ScipyenDataclass]
+            ]
+        ] = (Cell, Neuron, NeuronCompartment, AxonalCompartment,
+             DendriticCompartment,
+             CellCompartment,
+             ChemicalSynapse, Tissue, Organ)
+
     elementType: UltrastructureElementType = UltrastructureElementType.undefined
-    parent: typing.Union[Cell, CellCompartment, ChemicalSynapse, Tissue, Organ] = dataclasses.field(default_factory = Cell)
+
+    parent: typing.Union[Cell, Neuron, NeuronCompartment, AxonalCompartment,
+             DendriticCompartment,
+             CellCompartment,
+             ChemicalSynapse, Tissue, Organ] = dataclasses.field(default_factory = Cell)
 
     def getOrganism(self):
         return self.parent.getOrganism()
@@ -1145,7 +1270,15 @@ class UltrastructureElement(ScipyenDataclass):
 
 @dataclass
 class ChemicalSynapseUltrastructureElement(UltrastructureElement):
+    parentTypes: typing.ClassVar[
+        typing.Union[
+            ScipyenDataclass,
+            typing.Sequence[ScipyenDataclass]
+            ]
+        ] = (ChemicalSynapse,
+             )
     elementType: ChemicalSynapseUltrastructureElementType = ChemicalSynapseUltrastructureElementType.undefined # noqa
+
     parent: ChemicalSynapse = dataclasses.field(default_factory = ChemicalSynapse)
 
 @dataclass
@@ -1191,8 +1324,6 @@ class BiologicalSource(ScipyenDataclass):
             )
 
     def __repr__(self):
-        # indent = lambda x: x.replace("\n", "\n\t") # noqa
-        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -1311,7 +1442,7 @@ class Treatment(Procedure):
     # Required for interconversion with HDF5
     __match_args__ = tuple(set(Procedure.__match_args__ + ("substance", "route", "type")))
     _:KW_ONLY
-    substance:typing.Union[SubstanceDosage, typing.Sequence[SubstanceDosage]] = field(default_factory=SubstanceDosage)
+    substance:typing.Union[SubstanceDosage, typing.Sequence[SubstanceDosage]] = dataclasses.field(default_factory=SubstanceDosage)
     # allow combination of compounds
     route:AdministrationRoute = AdministrationRoute.null
 
@@ -1348,7 +1479,7 @@ class Episode(ScipyenDataclass):
     beginFrame:int = 0
     endFrame:int = 0
     description:str = ""
-    procedure:typing.Optional[Procedure] = field(default = None)
+    procedure:typing.Optional[Procedure] = dataclasses.field(default = None)
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
@@ -1370,7 +1501,7 @@ class Schedule(ScipyenDataclass):
     """
     # name:str = ""
     _:KW_ONLY
-    episodes:typing.Sequence[Episode] = field(default_factory = lambda : list())
+    episodes:typing.Sequence[Episode] = dataclasses.field(default_factory = lambda : list())
 
     # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("episodes",)))
 

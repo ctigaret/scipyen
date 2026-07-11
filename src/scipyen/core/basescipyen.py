@@ -24,11 +24,12 @@ from core.scipyen_quantities import unitsConvertible
 # from core.datatypes import * # clashes with datetime class imported from datetime module !!!
 from core.typeenum import TypeEnum # noqa
 from core.scipyendataclasses import (Episode, Schedule, ProcedureType, AdministrationRoute, # noqa
-                            Procedure, BioSourceType, TaxonDescriptor, Taxon, # noqa
+                            Procedure, BioSourceType, # noqa
                             BiologicalSource, CellCompartment, CellCompartmentType,
                             Organism, Biometrics, ScipyenDataclass,
                             FileOriginDescriptor
                             )
+# from core.taxonbridge import Taxon, TaxonDescriptor
 
 from iolib.navigation.filesystems import getFileCreationDateTime
 
