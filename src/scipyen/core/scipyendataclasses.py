@@ -354,179 +354,6 @@ class ScipyenDataclass:
     """
         return val in map(lambda f: f.name, dataclasses.fields(cls))
 
-class NeuronType(TypeEnum):
-    r"""Generic classification of neurons beyond that of NeuroMorpho.org
-    (pyramidal, non-pyramidal principal, and interneurons).
-    """
-    undefined = 0
-    pyramidal = auto()
-    stellate = auto()
-    granule = auto()
-    msn = auto()
-    drg = auto()
-    nonpyramidal = sum(
-            (
-                stellate,
-                granule,
-                msn,
-                drg
-            )
-        )
-    principal = pyramidal + nonpyramidal
-    interneuron = auto()
-    inhibitory = auto()
-    other = auto()
-
-class CellCompartmentType(TypeEnum):
-    r"""Inspired by SWC/CNIC specification at
-    http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
-
-    Refers to "gross" compartments; for a more granular types see AxonalCompartment
-    DendriticCompartment ChemicalSynapseCompartment
-    """
-    undefined = 0
-    cell = undefined
-    organelle = auto()
-    cilium = auto()
-    flagellum = auto()
-    microvillus = auto()
-    filopodium = auto()
-    lamellipodium = auto()
-    body = auto()
-
-class NeuronCompartmentType(TypeEnum):
-    undefined = 0
-    cell = undefined
-    organelle = auto()
-    soma = auto()
-    axon = auto()
-    dendrite = auto()
-    chemical_synapse = auto()
-
-class AxonalCompartmentType(TypeEnum):
-    undefined = 0
-    initial = auto() # axon initial segment
-    node = auto() # Ranvier's node
-    internode = auto() # axon segment between two consecutive Ranvier nodes
-    myelin = auto() # myelin sheath
-    bouton = auto() # axonal bouton, "en passant"
-    terminal_bouton = auto()
-    arborization = auto()
-    collateral = auto()
-    other = auto()
-
-class DendriticCompartmentType(TypeEnum):
-    undefined = 0
-    basal = auto() # basal dendrite, shaft
-    apical = auto()# apical dendrite, shaft
-    fork = auto()# dendritic branch point
-    end = auto()# dendritic end point
-    tuft = auto()# apical tuft
-    shaft = auto()
-    spine = auto()
-    spine_head = auto()
-    spine_neck = auto()
-    spine_apparatus = auto()
-    other = auto()
-
-class ChemicalSynapseUltrastructureElementType(TypeEnum):
-    undefined = 0
-    presynaptic_membrane = auto()
-    presynaptic_cytoskeleton = auto()
-    presynaptic_vesicle = auto()
-    presynaptic_docked = auto()
-    rrp = presynaptic_docked
-    presynaptic_recycling_pool = auto()
-    presynaptic_reserve_pool = auto()
-    presynaptic_vesicles = sum(
-            (
-                presynaptic_vesicle,
-                presynaptic_docked,
-                presynaptic_recycling_pool,
-                presynaptic_reserve_pool
-            )
-        )
-    active_zone = auto() # presynaptic active zone
-    presynaptic_compartment = sum(
-            (
-                presynaptic_membrane,
-                presynaptic_cytoskeleton,
-                presynaptic_vesicles,
-                active_zone
-            )
-        )
-    postsynaptic_membrane = auto()
-    postsynaptic_cytoskeleton = auto()
-    psd = auto() # postsynaptic density
-    postsynaptic_compartment = sum(
-            (
-                postsynaptic_membrane,
-                postsynaptic_cytoskeleton,
-                psd
-            )
-        )
-    perisynaptic = auto()
-    extrasynaptic = auto()
-    cleft = auto()
-
-class PostsynapticEntityType(TypeEnum):
-    undefined = 0
-    soma = auto()
-    dendrite = auto()
-    spine = auto()
-    axon = auto()
-
-class ChemicalSynapseFunctionalType(TypeEnum):
-    undefined = 0
-    excitatory = auto()
-    inhibitory = auto()
-
-class ChemicalSynapseMorphologicalType(TypeEnum):
-    undefined = 0
-    symmetrical = auto()
-    asymmetrical = auto()
-    glomerulus = auto() # cerebellar glomerulus
-    mossy = auto() # hippocampal mossy fibre synapse
-    calyx = auto() # calyx of Held
-    nmj = auto() # neuromuscular junction
-    volume = auto()
-    other = auto()
-
-class Neurotransmitter(TypeEnum):
-    undefined = 0
-    Glutamate = auto()
-    Glycine = auto()
-    GABA = auto()
-    Acetylcholine = auto()
-    Adrenaline = auto()
-    Epinephrine = Adrenaline
-    Noradrenaline = auto()
-    Norepinephrine = Noradrenaline
-    Dopamine = auto()
-    Histamine = auto()
-    Serotonin = auto()
-    Tyramine = auto()
-    Octopamine = auto()
-    Endorphins = auto()
-    Endocannabinoids = auto()
-    Neuropeptide = auto()
-    SubstanceP = Neuropeptide
-    ATP = auto()
-    Purines = ATP
-    NO = auto()
-    EDRF = NO
-
-class PlasmaMembraneSpecializationType(TypeEnum):
-    undefined = 0
-    chemical_synapse = auto()
-    neural_synapse = chemical_synapse
-    gap_junction = auto() # electrical synapse
-    electrical_synapse = gap_junction
-    zonula_occludens = auto()
-    zonula_adherens = auto()
-    synapse = auto() # generic synapse including immunological synapse
-    caveolae = auto()
-
 class UltrastructureElementType(TypeEnum):
     r"""Organelles, etc.
     Excludes chemical synapse components e.g. postsynaptic density
@@ -827,6 +654,179 @@ class BioProductType(TypeEnum):
     exudate     = auto()
     pus         = auto()
 
+class NeuronType(TypeEnum):
+    r"""Generic classification of neurons beyond that of NeuroMorpho.org
+    (pyramidal, non-pyramidal principal, and interneurons).
+    """
+    undefined = 0
+    pyramidal = auto()
+    stellate = auto()
+    granule = auto()
+    msn = auto()
+    drg = auto()
+    nonpyramidal = sum(
+            (
+                stellate,
+                granule,
+                msn,
+                drg
+            )
+        )
+    principal = pyramidal + nonpyramidal
+    interneuron = auto()
+    inhibitory = auto()
+    other = auto()
+
+class CellCompartmentType(TypeEnum):
+    r"""Inspired by SWC/CNIC specification at
+    http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
+
+    Refers to "gross" compartments; for a more granular types see AxonalCompartment
+    DendriticCompartment ChemicalSynapseCompartment
+    """
+    undefined = 0
+    cell = undefined
+    organelle = auto()
+    cilium = auto()
+    flagellum = auto()
+    microvillus = auto()
+    filopodium = auto()
+    lamellipodium = auto()
+    body = auto()
+
+class NeuronCompartmentType(TypeEnum):
+    undefined = 0
+    cell = undefined
+    organelle = auto()
+    soma = auto()
+    axon = auto()
+    dendrite = auto()
+    chemical_synapse = auto()
+
+class AxonalCompartmentType(TypeEnum):
+    undefined = 0
+    initial = auto() # axon initial segment
+    node = auto() # Ranvier's node
+    internode = auto() # axon segment between two consecutive Ranvier nodes
+    myelin = auto() # myelin sheath
+    bouton = auto() # axonal bouton, "en passant"
+    terminal_bouton = auto()
+    arborization = auto()
+    collateral = auto()
+    other = auto()
+
+class DendriticCompartmentType(TypeEnum):
+    undefined = 0
+    basal = auto() # basal dendrite, shaft
+    apical = auto()# apical dendrite, shaft
+    fork = auto()# dendritic branch point
+    end = auto()# dendritic end point
+    tuft = auto()# apical tuft
+    shaft = auto()
+    spine = auto()
+    spine_head = auto()
+    spine_neck = auto()
+    spine_apparatus = auto()
+    other = auto()
+
+class ChemicalSynapseUltrastructureElementType(TypeEnum):
+    undefined = 0
+    presynaptic_membrane = auto()
+    presynaptic_cytoskeleton = auto()
+    presynaptic_vesicle = auto()
+    presynaptic_docked = auto()
+    rrp = presynaptic_docked
+    presynaptic_recycling_pool = auto()
+    presynaptic_reserve_pool = auto()
+    presynaptic_vesicles = sum(
+            (
+                presynaptic_vesicle,
+                presynaptic_docked,
+                presynaptic_recycling_pool,
+                presynaptic_reserve_pool
+            )
+        )
+    active_zone = auto() # presynaptic active zone
+    presynaptic_compartment = sum(
+            (
+                presynaptic_membrane,
+                presynaptic_cytoskeleton,
+                presynaptic_vesicles,
+                active_zone
+            )
+        )
+    postsynaptic_membrane = auto()
+    postsynaptic_cytoskeleton = auto()
+    psd = auto() # postsynaptic density
+    postsynaptic_compartment = sum(
+            (
+                postsynaptic_membrane,
+                postsynaptic_cytoskeleton,
+                psd
+            )
+        )
+    perisynaptic = auto()
+    extrasynaptic = auto()
+    cleft = auto()
+
+# class PostsynapticEntityType(TypeEnum):
+#     undefined = 0
+#     soma = auto()
+#     dendrite = auto()
+#     spine = auto()
+#     axon = auto()
+
+class ChemicalSynapseFunctionalType(TypeEnum):
+    undefined = 0
+    excitatory = auto()
+    inhibitory = auto()
+
+class ChemicalSynapseMorphologicalType(TypeEnum):
+    undefined = 0
+    symmetrical = auto()
+    asymmetrical = auto()
+    glomerulus = auto() # cerebellar glomerulus
+    mossy = auto() # hippocampal mossy fibre synapse
+    calyx = auto() # calyx of Held
+    nmj = auto() # neuromuscular junction
+    volume = auto()
+    other = auto()
+
+class Neurotransmitter(TypeEnum):
+    undefined = 0
+    Glutamate = auto()
+    Glycine = auto()
+    GABA = auto()
+    Acetylcholine = auto()
+    Adrenaline = auto()
+    Epinephrine = Adrenaline
+    Noradrenaline = auto()
+    Norepinephrine = Noradrenaline
+    Dopamine = auto()
+    Histamine = auto()
+    Serotonin = auto()
+    Tyramine = auto()
+    Octopamine = auto()
+    Endorphins = auto()
+    Endocannabinoids = auto()
+    Neuropeptide = auto()
+    SubstanceP = Neuropeptide
+    ATP = auto()
+    Purines = ATP
+    NO = auto()
+    EDRF = NO
+
+# class PlasmaMembraneSpecializationType(TypeEnum):
+#     undefined = 0
+#     chemical_synapse = auto()
+#     neural_synapse = chemical_synapse
+#     gap_junction = auto() # electrical synapse
+#     electrical_synapse = gap_junction
+#     zonula_occludens = auto()
+#     zonula_adherens = auto()
+#     synapse = auto() # generic synapse including immunological synapse
+#     caveolae = auto()
+
 @dataclass
 class Biometrics(ScipyenDataclass):
     # genotype of the source - keep it simple
@@ -967,15 +967,15 @@ class Organism(ScipyenDataclass):
 class BiologicalProduct(ScipyenDataclass):
     r"""Biological product (not cell, tissue, organ or organism)"""
     parentType: typing.ClassVar[
-        typing.Union[
-                ScipyenDataclass,
-                typing.Sequence[ScipyenDataclass]
-            ]
+                typing.Tuple[ScipyenDataclass]
         ] = (Organism, )
 
     type: BioProductType = dataclasses.field(default = BioProductType.undefined)
 
     parent: Organism = dataclasses.field(default_factory = Organism)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
 
     def getOrganism(self):
         return self.parent
@@ -989,13 +989,13 @@ class BiologicalProduct(ScipyenDataclass):
 @dataclass
 class Organ(ScipyenDataclass):
     parentTypes: typing.ClassVar[
-        typing.Union[
-                ScipyenDataclass,
-                typing.Sequence[ScipyenDataclass]
-            ]
+                typing.Tuple[ScipyenDataclass]
         ] = (Organism, )
 
     parent: Organism = dataclasses.field(default_factory = Organism)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
 
     def getOrganism(self) -> Organism:
         if isinstance(self.parent, Organism):
@@ -1018,6 +1018,10 @@ class NervousSystem(Organ):
     e.g., spinal cord, etc.
     """
     from core.bgbridge import BGStructureDescriptor
+
+    parentTypes: typing.ClassVar[
+            typing.Tuple[ScipyenDataclass]
+        ] = (Organism, )
 
     # Specific organ structure, if relevant.
     #
@@ -1048,6 +1052,9 @@ class NervousSystem(Organ):
 
     parent: Organism = dataclasses.field(default_factory = Organism)
 
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
+
     @property
     def name(self) -> str:
         return "NervousSystem"
@@ -1065,13 +1072,13 @@ Brain = NervousSystem # alias for backward copmatibility
 class Tissue(ScipyenDataclass):
     r"""Tissue"""
     parentTypes: typing.ClassVar[
-        typing.Union[
-                ScipyenDataclass,
-                typing.Sequence[ScipyenDataclass]
-            ]
+                typing.Tuple[ScipyenDataclass]
         ] = (Organ, NervousSystem)
 
     parent: typing.Union[Organ, NervousSystem] = dataclasses.field(default_factory = Organ)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
 
     def getOrganism(self):
         return self.parent.getOrganism()
@@ -1085,10 +1092,7 @@ class Tissue(ScipyenDataclass):
 @dataclass
 class Cell(ScipyenDataclass):
     parentTypes: typing.ClassVar[
-        typing.Union[
-                ScipyenDataclass,
-                typing.Sequence[ScipyenDataclass]
-            ]
+                typing.Tuple[ScipyenDataclass]
         ] = (Organ, Tissue)
 
     cellType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g., "neuron", "glia", etc
@@ -1096,6 +1100,9 @@ class Cell(ScipyenDataclass):
     cellSubType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
 
     parent: typing.Union[Organ, Tissue] = dataclasses.field(default_factory = Tissue)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
 
     def getOrganism(self):
         return self.parent.getOrganism()
@@ -1109,15 +1116,15 @@ class Cell(ScipyenDataclass):
 @dataclass
 class Neuron(Cell):
     parentTypes: typing.ClassVar[
-        typing.Union[
-            ScipyenDataclass,
-            typing.Sequence[ScipyenDataclass]
-            ]
+            typing.Tuple[ScipyenDataclass]
         ] = (Organ, Tissue, NervousSystem)
 
     cellSubType: NeuronType = NeuronType.undefined
 
     parent: typing.Optional[typing.Union[Organ, Tissue, NervousSystem]] = dataclasses.field(default_factory = NervousSystem)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
 
     @property
     def cellType(self) -> str:
@@ -1130,15 +1137,15 @@ class Neuron(Cell):
 @dataclass
 class CellCompartment(ScipyenDataclass):
     parentTypes: typing.ClassVar[
-        typing.Union[
-            ScipyenDataclass,
-            typing.Sequence[ScipyenDataclass]
-            ]
+            typing.Tuple[ScipyenDataclass]
         ] = (Cell, )
 
     compartmentType: CellCompartmentType = CellCompartmentType.undefined
 
     parent: Cell = dataclasses.field(default_factory = Cell)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
 
     def __repr__(self):
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
@@ -1159,10 +1166,7 @@ class CellCompartment(ScipyenDataclass):
 @dataclass
 class NeuronCompartment(CellCompartment):
     parentTypes: typing.ClassVar[
-        typing.Union[
-            ScipyenDataclass,
-            typing.Sequence[ScipyenDataclass]
-            ]
+            typing.Tuple[ScipyenDataclass]
         ] = (Neuron, )
 
     compartmentType: NeuronCompartmentType = NeuronCompartmentType.undefined
@@ -1170,8 +1174,8 @@ class NeuronCompartment(CellCompartment):
     parent: Neuron = dataclasses.field(default_factory = Neuron)
 
     def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
         assert isinstance(self.compartmentType, NeuronCompartmentType), f"Wrong compartment type: {self.compartmentType}"
-        assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
 
     def __repr__(self):
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
@@ -1183,38 +1187,39 @@ class NeuronCompartment(CellCompartment):
 @dataclass
 class AxonalCompartment(NeuronCompartment):
     parentTypes: typing.ClassVar[
-        typing.Union[
-            ScipyenDataclass,
-            typing.Sequence[ScipyenDataclass]
-            ]
+            typing.Tuple[ScipyenDataclass]
         ] = (Neuron, )
+
     compartmentType: AxonalCompartmentType = AxonalCompartmentType.undefined
+
     parent: Neuron = dataclasses.field(default_factory = Neuron)
 
     def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
         assert isinstance(self.compartmentType, AxonalCompartmentType), f"Wrong compartment type: {self.compartmentType}"
-        assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
 
 @dataclass
 class DendriticCompartment(NeuronCompartment):
     parentTypes: typing.ClassVar[
-        typing.Union[
-            ScipyenDataclass,
-            typing.Sequence[ScipyenDataclass]
-            ]
+            typing.Tuple[ScipyenDataclass]
         ] = (Neuron, )
+
     compartmentType: DendriticCompartmentType = DendriticCompartmentType.undefined
+
     parent: Neuron = dataclasses.field(default_factory = Neuron)
 
     def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
         assert isinstance(self.compartmentType, DendriticCompartmentType), f"Wrong compartment type: {self.compartmentType}"
-        assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
 
 class UltrastructureElement:
     pass
 
 @dataclass
 class ChemicalSynapse(ScipyenDataclass):
+    parentTypes: typing.ClassVar[
+            typing.Tuple[ScipyenDataclass]
+        ] = (CellCompartment, UltrastructureElement)
 
     morphologicalType : ChemicalSynapseMorphologicalType = ChemicalSynapseMorphologicalType.undefined
     functionalType: ChemicalSynapseFunctionalType = ChemicalSynapseFunctionalType.undefined
@@ -1224,8 +1229,9 @@ class ChemicalSynapse(ScipyenDataclass):
     transmitter: Neurotransmitter = Neurotransmitter.undefined
     retrograde: bool = False
 
-    # def __post_init__(self: typing.Self):
-    #     assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.presynaptic, self.parentTypes), f"Wrong presynaptic component: {type(self.presynaptic).__name__}"
+        assert isinstance(self.postsynaptic, self.parentTypes), f"Wrong postsynaptic component: {type(self.postsynaptic).__name__}"
 
     def getOrganism(self):
         if all(isinstance(p, (CellCompartment, NeuronCompartment)) for p in (self.postsynaptic, self.presynaptic)):
@@ -1243,10 +1249,7 @@ class ChemicalSynapse(ScipyenDataclass):
 @dataclass
 class UltrastructureElement(ScipyenDataclass):
     parentTypes: typing.ClassVar[
-        typing.Union[
-            ScipyenDataclass,
-            typing.Sequence[ScipyenDataclass]
-            ]
+            typing.Tuple[ScipyenDataclass]
         ] = (Cell, Neuron, NeuronCompartment, AxonalCompartment,
              DendriticCompartment,
              CellCompartment,
@@ -1258,6 +1261,9 @@ class UltrastructureElement(ScipyenDataclass):
              DendriticCompartment,
              CellCompartment,
              ChemicalSynapse, Tissue, Organ] = dataclasses.field(default_factory = Cell)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
 
     def getOrganism(self):
         return self.parent.getOrganism()
@@ -1271,15 +1277,15 @@ class UltrastructureElement(ScipyenDataclass):
 @dataclass
 class ChemicalSynapseUltrastructureElement(UltrastructureElement):
     parentTypes: typing.ClassVar[
-        typing.Union[
-            ScipyenDataclass,
-            typing.Sequence[ScipyenDataclass]
-            ]
-        ] = (ChemicalSynapse,
-             )
+            typing.Tuple[ScipyenDataclass]
+        ] = (ChemicalSynapse,)
+
     elementType: ChemicalSynapseUltrastructureElementType = ChemicalSynapseUltrastructureElementType.undefined # noqa
 
     parent: ChemicalSynapse = dataclasses.field(default_factory = ChemicalSynapse)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
 
 @dataclass
 class BiologicalSource(ScipyenDataclass):
@@ -1298,6 +1304,20 @@ class BiologicalSource(ScipyenDataclass):
     # See Organism class in this module
     # organism:Organism = dataclasses.field(default=Organism("rat"))
     # organism:Organism = dataclasses.field(default_factory = Organism)
+
+    specimenTypes: typing.ClassVar[
+                typing.Tuple[ScipyenDataclass]
+        ] = (
+                Organism,
+                Organ,
+                Tissue,
+                Cell,
+                CellCompartment,
+                ChemicalSynapse,
+                UltrastructureElement,
+                ChemicalSynapseUltrastructureElement,
+                BiologicalProduct,
+            )
 
     # Type of source: ex vivo, in vitro, culture, whole organism, see BioSourceType
     # Default: BioSourceType.exvivo
@@ -1322,6 +1342,9 @@ class BiologicalSource(ScipyenDataclass):
         ] = dataclasses.field(
                 default_factory = Cell
             )
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.specimen, self.specimenTypes), f"Wrong specimen: {type(self.specimen).__name__}"
 
     def __repr__(self):
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
@@ -1369,6 +1392,7 @@ class BiologicalSource(ScipyenDataclass):
                         ):
             self.specimen.setOrganism(value)
 
+# ------------------------------------------------------------------------------
 
 @dataclass
 class Procedure(ScipyenDataclass):
@@ -1865,7 +1889,7 @@ class Schedule(ScipyenDataclass):
 def isDataclass(o:object):
     r"""Calls dataclasses.is_dataclass(o)
     In case you forget there is such a function 😃
-"""
+    """
     if not isinstance(o, type):
         o = type(o)
 
@@ -1873,80 +1897,80 @@ def isDataclass(o:object):
 
 def mergeDataclasses(typename:str, *args, **kwargs) -> type:
     r"""
-Factory function for dynamic dataclass creation.
+    Factory function for dynamic dataclass creation.
 
-Purpose:
-========
+    Purpose:
+    ========
 
-The function creates a new dataclass-like type and, optionally, an instance of
-it, by merging fields from the dataclass elements in ``*args``. The elements may
-be either dataclass types or instances thereof.
+    The function creates a new dataclass-like type and, optionally, an instance of
+    it, by merging fields from the dataclass elements in ``*args``. The elements may
+    be either dataclass types or instances thereof.
 
-Use as a convenience to pack parameters as a new dataclass type on-the-fly,
-before instantiating it and passing the instance as parameter to a function that
-expects it.
+    Use as a convenience to pack parameters as a new dataclass type on-the-fly,
+    before instantiating it and passing the instance as parameter to a function that
+    expects it.
 
-ATTENTION: The new class is dynamically created, with the implication that, when
-the function is called at the console or in script that is NOT imported as a
-module (i.e., a "merged" dataclass type is generated "on the go"), while it MAY
-be possible to save an instance of the new class to disk as HDF5 file, or to
-serialise it as pickle, reading it back in a subsequent session WILL FAIL
-(simply because the new type is not available yet, unless the exact same
-type is defined by calling this function BEFORE loading the saved instance from
-HDF5 or pickle file)
+    ATTENTION: The new class is dynamically created, with the implication that, when
+    the function is called at the console or in script that is NOT imported as a
+    module (i.e., a "merged" dataclass type is generated "on the go"), while it MAY
+    be possible to save an instance of the new class to disk as HDF5 file, or to
+    serialise it as pickle, reading it back in a subsequent session WILL FAIL
+    (simply because the new type is not available yet, unless the exact same
+    type is defined by calling this function BEFORE loading the saved instance from
+    HDF5 or pickle file)
 
-NOTE: This is not a problem for "merged" dataclass types defined in one of the
-Scipyen's module automatically imported at the launch, or in a Scipyen plugin
-(the "plugin" modules are always imported at the start of a Scipyen session).
+    NOTE: This is not a problem for "merged" dataclass types defined in one of the
+    Scipyen's module automatically imported at the launch, or in a Scipyen plugin
+    (the "plugin" modules are always imported at the start of a Scipyen session).
 
-However, any changes made to the definition of the merged dataclass (e.g.
-change of field names) will invalidate the saved data. In this case, the
-merged dataclass will need to be instantiated again and the new "version"
-pickled, or saved to HDF5, to overwrite the old pickle/HDF5 file.
+    However, any changes made to the definition of the merged dataclass (e.g.
+    change of field names) will invalidate the saved data. In this case, the
+    merged dataclass will need to be instantiated again and the new "version"
+    pickled, or saved to HDF5, to overwrite the old pickle/HDF5 file.
 
-WARNING: All dataclasses that are merged MUST have their field annotated.
+    WARNING: All dataclasses that are merged MUST have their field annotated.
 
-Parameters:
-===========
-    typename:str — name of the new type. Must not be empty, and must be a valid
-        Python identifier; it will be capitalized if necessary.
+    Parameters:
+    ===========
+        typename:str — name of the new type. Must not be empty, and must be a valid
+            Python identifier; it will be capitalized if necessary.
 
-    args: two or more dataclass types or instances
+        args: two or more dataclass types or instances
 
-Var-keyword parameters:
-=======================
-    These are passed to the dataclasses.make_dataclass() function, see Python
-documentation for details.
-When empty, these parameter get their dfault values as per
-``dataclasses.make_dataclass``.
+    Var-keyword parameters:
+    =======================
+        These are passed to the dataclasses.make_dataclass() function, see Python
+    documentation for details.
+    When empty, these parameter get their dfault values as per
+    ``dataclasses.make_dataclass``.
 
-Typically one would use the `module` keyword parameter (with a str value) to
-assign a module to the new type, other than the default ``scipyendataclasses``
-so that instances of the new type can be serialized (i.e., pickled and unpickled)
-or exported to / loaded from HDF5 files (see above).
+    Typically one would use the `module` keyword parameter (with a str value) to
+    assign a module to the new type, other than the default ``scipyendataclasses``
+    so that instances of the new type can be serialized (i.e., pickled and unpickled)
+    or exported to / loaded from HDF5 files (see above).
 
-Returns:
-=======
-A tuple containing:
-• the new type
-• an instance of the new type, if the new type can be instantiated (i.e. all its
-fields have default values), else None, in whch case the new type MUST be
-instantiated separately, after "merging"
+    Returns:
+    =======
+    A tuple containing:
+    • the new type
+    • an instance of the new type, if the new type can be instantiated (i.e. all its
+    fields have default values), else None, in whch case the new type MUST be
+    instantiated separately, after "merging"
 
-If any of the args are INSTANCES of a dataclass type, then the values of their
-parameters will be propagated in the returned instance of the new type.
+    If any of the args are INSTANCES of a dataclass type, then the values of their
+    parameters will be propagated in the returned instance of the new type.
 
-Therefore one may avoid the need to instantiate the new type separately after
-"merging" by supplying instances of the original dataclasses, instead of their
-types, in args.
+    Therefore one may avoid the need to instantiate the new type separately after
+    "merging" by supplying instances of the original dataclasses, instead of their
+    types, in args.
 
-CAUTION: The dataclasses in args MUST have distinct field names. Fields in
-subequent elements of 'args', that have the same name as fields in args[0] will
-be silently ignored. This means that this function can only be used to augment
-the dataclass in args[0] with non-duplicate fields from the subsequent elements
-of 'args'.
+    CAUTION: The dataclasses in args MUST have distinct field names. Fields in
+    subequent elements of 'args', that have the same name as fields in args[0] will
+    be silently ignored. This means that this function can only be used to augment
+    the dataclass in args[0] with non-duplicate fields from the subsequent elements
+    of 'args'.
 
-"""
+    """
     from copy import deepcopy
     from core.utilities import unique
 
@@ -2013,7 +2037,6 @@ of 'args'.
     # #                            weakref_slot=False,
     # #                            module=None)
 
-
 def repr_attr(x):
     indent = lambda x: x.replace("\n", "\n\t") # noqa
     if isinstance(x, str):
@@ -2024,9 +2047,3 @@ def repr_attr(x):
         return f": {type(x).__name__} →  '{x.name}' ({x})"
     else:
         return f": {type(x).__name__} → {x}"
-
-# __all__ = ("AdministrationRoute", "BiologicalSource", "Biometrics",
-#            "BioSourceType", "Cell", "Neuron", "Brain", "CellCompartment","CellCompartmentType", "Episode",
-#            "Organ", "Organism", "DevelopmentalStage", "Procedure", "ProcedureType",
-#            "Schedule", "SubstanceDosage", "Tissue", "Treatment",
-#            "isDataclass", "mergeDataclasses", "ScipyenDataclass")

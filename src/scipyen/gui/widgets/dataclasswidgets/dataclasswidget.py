@@ -120,22 +120,39 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
             self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
             self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
+            self.nameDescriptionWidget.sig_parentEditRequest.connect(self._slot_editParent)
+            self.nameDescriptionWidget.sig_newParentRequest.connect(self._slot_chooseNewParentType)
             self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
             self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
             self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
 
-        if isinstance(self.editParentToolButton, QtWidgets.QToolButton):
-            self.editParentToolButton.clicked.connect(self._slot_editParent)
+            self.nameDescriptionWidget.editParentToolButton.setEnabled(False)
+            self.nameDescriptionWidget.editParentToolButton.setVisible(False)
+            self.nameDescriptionWidget.replaceParentToolButton.setEnabled(False)
+            self.nameDescriptionWidget.replaceParentToolButton.setVisible(False)
 
+            if (
+                hasattr(self, "_data_")
+                and hasattr(self._data_, "parent")
+                ):
+                self.nameDescriptionWidget.editParentToolButton.setEnabled(True)
+                self.nameDescriptionWidget.editParentToolButton.setVisible(True)
+
+                if (
+                    hasattr(self._data_, "parentTypes")
+                    and len(self._data_.parentTypes) > 1
+                    ):
+                    self.nameDescriptionWidget.replaceParentToolButton.setEnabled(True)
+                    self.nameDescriptionWidget.replaceParentToolButton.setVisible(True)
 
     def value(self) -> None:
         r"""Must override in subclasses"""
         pass
 
     def setValue(self, *args, **kwargs):
-        r"""Must override in subclasses.
+        r"""Must override in subclasses, and called from there as super().setValue(…).
         Implementations must make sure it emits sig_valueChanged Qt signal.
-    """
+        """
         self._objSymbol_ = kwargs.pop("objSymbol", None)
         if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
             objSymbols = self.getDataSymbolInWorkspace(value)
@@ -164,7 +181,21 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                                                                 doc_title = self._objSymbol_,
                                                                 name = self._objSymbol_)
 
+                self.nameDescriptionWidget.editParentToolButton.setEnabled(False)
+                self.nameDescriptionWidget.editParentToolButton.setVisible(False)
+                self.nameDescriptionWidget.replaceParentToolButton.setEnabled(False)
+                self.nameDescriptionWidget.replaceParentToolButton.setVisible(False)
 
+                if hasattr(self._data_, "parent"):
+                    self.nameDescriptionWidget.editParentToolButton.setEnabled(True)
+                    self.nameDescriptionWidget.editParentToolButton.setVisible(True)
+
+                    if (
+                        hasattr(self._data_, "parentTypes")
+                        and len(self._data_.parentTypes) > 1
+                        ):
+                        self.nameDescriptionWidget.replaceParentToolButton.setEnabled(True)
+                        self.nameDescriptionWidget.replaceParentToolButton.setVisible(True)
 
     @property
     def isAttribute(self) -> bool:
@@ -219,7 +250,6 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     @Slot(str)
     def _slot_dataDescriptionChanged(self, val:str):
-        # print(f"{self.__class__.__name__}._slot_dataDescriptionChanged({val})")
         if (hasattr(self, "_data_")
             and hasattr(self, "_objectTypes_")
             and isinstance(self._data_, self._objectTypes_)):
@@ -258,19 +288,15 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             and isinstance(self._data_, self._objectTypes_)):
             self.sig_valueChanged.emit(self._data_)
 
-        # if (hasattr(self, "_data_")
-        #     and hasattr(self, "_objectTypes_")
-        #     and isinstance(self._data_, self._objectTypes_)
-        #     and hasattr(self._data_, "parent")
-        #     and dataclasses.is_dataclass(self._data_.parent)):
-        #
-
     @Slot()
     def _slot_editParent(self):
         parent = None
         if (hasattr(self, "_data_")
             and hasattr(self, "_objectTypes_")
-            and isinstance(self._data_, self._objectTypes_) and hasattr(self._data_, "parent") and dataclasses.is_dataclass(self._data_.parent)):
+            and isinstance(self._data_, self._objectTypes_)
+            and hasattr(self._data_, "parentTypes")
+            and hasattr(self._data_, "parent")
+            and isinstance(self._data_.parent, self._data_.parentTypes)): # dataclasses.is_dataclass(self._data_.parent)):
             parent = self._data_.parent
 
         # print(f"{self.__class__.__name__}._slot_editParent -> {parent}")
@@ -296,18 +322,60 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         # what are the possible parents of the CellCompartment/NeuronCompartment
         # propose creating a new one (add create new button to these widgets)
 
+    @Slot()
+    def _slot_chooseNewParentType(self):
+        from gui.itemslistdialog import ItemsListDialog
+        if (hasattr(self, "_data_")
+            and hasattr(self, "_objectTypes_")
+            and isinstance(self._data_, self._objectTypes_)
+            and hasattr(self._data_, "parentTypes")):
+
+            parentTypeNames = list(map(lambda t: t.__name__, self._data_.parentTypes))
+
+            if hasattr(self._data_, "parent"):
+                parentTypeNdx = self._data_.parentTypes.index(type(self._data_.parent))
+                preSelected = parentTypeNames[parentTypeNdx]
+            else:
+                preSelected = parentTypeNames[0]
+
+            dlg = ItemsListDialog(parent=self, itemsList=parentTypeNames,
+                                title="Create New Parent",
+                                preSelected=preSelected,
+                                modal=True,
+                                selectmode = QtWidgets.QAbstractItemView.SingleSelection)
+
+            if dlg.exec() == 1  :
+                parentTypeName = dlg.selection
+                ndx = parentTypeNames.index(parentTypeName)
+                self._slot_newParent(self._data_.parentTypes[ndx])
+
+    @Slot(type)
+    def _slot_newParent(self, value: type):
+        if (hasattr(self, "_data_")
+            and hasattr(self, "_objectTypes_")
+            and isinstance(self._data_, self._objectTypes_)
+            and hasattr(self._data_, "parentTypes")
+            and value in self._data_.parentTypes
+            ):
+
+            newParent = value()
+            self._data_.parent = newParent
+            self._slot_parentChanged(self._data_.parent)
+
+            self._slot_editParent()
+
     @singledispatchmethod
     def _createParentEditor_(self, obj):
         raise NotImplementedError(f"{type(obj)} objects are not supported")
 
     @_createParentEditor_.register(sdc.Neuron)
     def __createParentEditor(self, obj: sdc.Neuron):
-        from gui.widgets.dataclasswidgets.cellwidget import NeuronWidget
+        from gui.widgets.dataclasswidgets.cellwidgets import NeuronWidget
         return NeuronWidget(obj, objSymbol="parent")
 
     @_createParentEditor_.register(sdc.Cell)
     def __createParentEditor(self, obj: sdc.Cell):
-        from gui.widgets.dataclasswidgets.cellwidget import CellWidget
+        from gui.widgets.dataclasswidgets.cellwidgets import CellWidget
         return CellWidget(obj, objSymbol="parent")
 
     @_createParentEditor_.register(sdc.CellCompartment)

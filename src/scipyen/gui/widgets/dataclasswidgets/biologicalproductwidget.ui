@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>246</width>
-    <height>77</height>
+    <width>230</width>
+    <height>73</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -23,7 +23,7 @@
       <number>3</number>
      </property>
      <widget class="DataExchangeWidget" name="dataExchangeWidget" native="true"/>
-     <widget class="QWidget" name="">
+     <widget class="QWidget" name="layoutWidget">
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
         <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true"/>
@@ -47,28 +47,6 @@
              <horstretch>0</horstretch>
              <verstretch>0</verstretch>
             </sizepolicy>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QToolButton" name="editParentToolButton">
-           <property name="toolTip">
-            <string>Edit Parent Object</string>
-           </property>
-           <property name="statusTip">
-            <string>Edit Parent Object</string>
-           </property>
-           <property name="whatsThis">
-            <string>Edit Parent Object</string>
-           </property>
-           <property name="text">
-            <string>Edit Parent</string>
-           </property>
-           <property name="icon">
-            <iconset theme="user"/>
-           </property>
-           <property name="autoRaise">
-            <bool>true</bool>
            </property>
           </widget>
          </item>

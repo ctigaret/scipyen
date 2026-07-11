@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# $Id: cellwidget.py $
+# $Id: cellwidgets.py $
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@proton.me>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -108,14 +108,13 @@ class CellWidget(Ui_CellWidget, DataClassWidget):
 
         super()._configureUI_()
 
-        self.editParentToolButton.clicked.connect(self._slot_editParent)
-
         self.cellTypeNameEdit.setText(f"{self._data_.cellType}")
 
         if isinstance(self._data_, sdc.Neuron):
             self.cellTypeNameEdit.setEnabled(False)
         else:
             self.cellTypeNameEdit.textChanged.connect(self._slot_cellTypeChanged)
+
         self.cellSubTypeNameEdit.setText(f"{self._data_.cellSubType}")
         self.cellSubTypeNameEdit.textChanged.connect(self._slot_cellSubTypeChanged)
 
@@ -189,8 +188,6 @@ class NeuronWidget(Ui_NeuronWidget, DataClassWidget):
         self.setupUi(self)
 
         super()._configureUI_()
-
-        self.editParentToolButton.clicked.connect(self._slot_editParent)
 
         for s in self._entityTypeNames_:
             self.neuronTypeComboBox.addItem(s)

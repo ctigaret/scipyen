@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>307</width>
-    <height>52</height>
+    <width>300</width>
+    <height>44</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -15,68 +15,102 @@
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="0" column="0">
-    <layout class="QVBoxLayout" name="verticalLayout_2">
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <property name="spacing">
+      <number>0</number>
+     </property>
      <item>
-      <layout class="QHBoxLayout" name="horizontalLayout">
-       <item>
-        <widget class="QLabel" name="label">
-         <property name="text">
-          <string>Name:</string>
-         </property>
-         <property name="buddy">
-          <cstring>nameLineEdit</cstring>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="LineEdit" name="nameLineEdit">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="clearButtonEnabled">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="descriptionToolButton">
-         <property name="toolTip">
-          <string>Edit description</string>
-         </property>
-         <property name="statusTip">
-          <string>Edit description</string>
-         </property>
-         <property name="whatsThis">
-          <string>Edit description</string>
-         </property>
-         <property name="text">
-          <string>Description</string>
-         </property>
-         <property name="icon">
-          <iconset theme="description"/>
-         </property>
-         <property name="autoRaise">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="viewDetailsToolButton">
-         <property name="text">
-          <string>Details</string>
-         </property>
-         <property name="icon">
-          <iconset theme="view-list-tree"/>
-         </property>
-         <property name="autoRaise">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-      </layout>
+      <widget class="QLabel" name="label">
+       <property name="text">
+        <string>Name:</string>
+       </property>
+       <property name="buddy">
+        <cstring>nameLineEdit</cstring>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="LineEdit" name="nameLineEdit">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="clearButtonEnabled">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="descriptionToolButton">
+       <property name="toolTip">
+        <string>Edit description</string>
+       </property>
+       <property name="statusTip">
+        <string>Edit description</string>
+       </property>
+       <property name="whatsThis">
+        <string>Edit description</string>
+       </property>
+       <property name="text">
+        <string>Description</string>
+       </property>
+       <property name="icon">
+        <iconset theme="description"/>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="viewDetailsToolButton">
+       <property name="text">
+        <string>Details</string>
+       </property>
+       <property name="icon">
+        <iconset theme="view-list-tree"/>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="editParentToolButton">
+       <property name="toolTip">
+        <string>Edit Parent Object</string>
+       </property>
+       <property name="statusTip">
+        <string>Edit Parent Object</string>
+       </property>
+       <property name="whatsThis">
+        <string>Edit Parent Object</string>
+       </property>
+       <property name="text">
+        <string>Edit Parent</string>
+       </property>
+       <property name="icon">
+        <iconset theme="user"/>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="replaceParentToolButton">
+       <property name="text">
+        <string>Replace Parent</string>
+       </property>
+       <property name="icon">
+        <iconset theme="system-switch-user"/>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
+      </widget>
      </item>
     </layout>
    </item>

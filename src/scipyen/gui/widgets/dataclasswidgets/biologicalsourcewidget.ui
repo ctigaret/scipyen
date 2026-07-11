@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>206</width>
+    <width>216</width>
     <height>107</height>
    </rect>
   </property>
@@ -69,12 +69,21 @@
           </widget>
          </item>
          <item>
-          <widget class="QToolButton" name="showSpecimenToolButton">
+          <widget class="QToolButton" name="editSpecimenToolButton">
+           <property name="toolTip">
+            <string>Edit specimen</string>
+           </property>
+           <property name="statusTip">
+            <string>Edit specimen</string>
+           </property>
+           <property name="whatsThis">
+            <string>Edit specimen</string>
+           </property>
            <property name="text">
             <string>...</string>
            </property>
            <property name="icon">
-            <iconset theme="application-menu"/>
+            <iconset theme="document-properties"/>
            </property>
            <property name="autoRaise">
             <bool>true</bool>
@@ -82,12 +91,21 @@
           </widget>
          </item>
          <item>
-          <widget class="QToolButton" name="newSpecimenToolButton">
+          <widget class="QToolButton" name="replaceSpecimenToolButton">
+           <property name="toolTip">
+            <string>Replace specimen</string>
+           </property>
+           <property name="statusTip">
+            <string>Replace specimen</string>
+           </property>
+           <property name="whatsThis">
+            <string>Replace specimen</string>
+           </property>
            <property name="text">
-            <string>New...</string>
+            <string>Replace Specimen</string>
            </property>
            <property name="icon">
-            <iconset theme="document-new"/>
+            <iconset theme="document-replace"/>
            </property>
            <property name="autoRaise">
             <bool>true</bool>

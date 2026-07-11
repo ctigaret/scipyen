@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>140</width>
-    <height>93</height>
+    <width>226</width>
+    <height>73</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -26,40 +26,14 @@
      <widget class="QWidget" name="">
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
-        <layout class="QHBoxLayout" name="horizontalLayout_2">
-         <item>
-          <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QToolButton" name="editParentToolButton">
-           <property name="toolTip">
-            <string>Edit Parent Object</string>
-           </property>
-           <property name="statusTip">
-            <string>Edit Parent Object</string>
-           </property>
-           <property name="whatsThis">
-            <string>Edit Parent Object</string>
-           </property>
-           <property name="text">
-            <string>Edit Parent</string>
-           </property>
-           <property name="icon">
-            <iconset theme="user"/>
-           </property>
-           <property name="autoRaise">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-        </layout>
+        <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+        </widget>
        </item>
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout">

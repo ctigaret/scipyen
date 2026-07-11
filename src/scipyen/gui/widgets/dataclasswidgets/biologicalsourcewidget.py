@@ -93,24 +93,23 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         self._bioSourceTypeNames_ = list(sdc.BioSourceType.names())
 
-        self._specimenTypes_ = (
-            sdc.Organism,
-            sdc.Organ,
-            sdc.Tissue,
-            sdc.NervousSystem,
-            sdc.Cell,
-            sdc.Neuron,
-            sdc.NeuronCompartment,
-            sdc.CellCompartment,
-            sdc.ChemicalSynapse,
-            sdc.UltrastructureElement,
-            sdc.ChemicalSynapseUltrastructureElement,
-            sdc.ScipyenDataclass,
-            sdc.BiologicalProduct,
-            )
+        # self._specimenTypes_ = (
+        #     sdc.Organism,
+        #     sdc.Organ,
+        #     sdc.Tissue,
+        #     sdc.NervousSystem,
+        #     sdc.Cell,
+        #     sdc.Neuron,
+        #     sdc.NeuronCompartment,
+        #     sdc.CellCompartment,
+        #     sdc.ChemicalSynapse,
+        #     sdc.UltrastructureElement,
+        #     sdc.ChemicalSynapseUltrastructureElement,
+        #     sdc.ScipyenDataclass,
+        #     sdc.BiologicalProduct,
+        #     )
 
-        self._specimenTypeNames_ = dict(map(lambda t: (t.__name__, t), self._specimenTypes_))
-
+        self._specimenTypeNames_ = dict(map(lambda t: (t.__name__, t), self._data_.specimenTypes))
 
         self._configureUI_()
 
@@ -136,17 +135,17 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         self.specimenNameLabel.setText(spNameLabel)
 
-        self.showSpecimenToolButton.clicked.connect(self._slot_showSpecimen)
+        self.editSpecimenToolButton.clicked.connect(self._slot_editSpecimen)
 
-        self.newSpecimenToolButton.clicked.connect(self._slot_chooseNewSpecimenType)
+        self.replaceSpecimenToolButton.clicked.connect(self._slot_chooseNewSpecimenType)
 
     @Slot()
     def _slot_chooseNewSpecimenType(self):
         from gui.itemslistdialog import ItemsListDialog
 
         spTypeNames = list(self._specimenTypeNames_.keys())
-        if type(self._data_.specimen) in self._specimenTypes_:
-            ndx = self._specimenTypes_.index(type(self._data_.specimen))
+        if type(self._data_.specimen) in self._data_.specimenTypes:
+            ndx = self._data_.specimenTypes.index(type(self._data_.specimen))
             preSelected = spTypeNames[ndx]
         else:
             preSelected = spTypeNames[0]
@@ -159,23 +158,24 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         if dlg.exec() == 1:
             spTypeName = dlg.selection
-            self._slot_createNewSpecimen(spTypeName)
+            self._slot_newSpecimen(spTypeName)
 
     @Slot(str)
-    def _slot_createNewSpecimen(self, value: str):
+    def _slot_newSpecimen(self, value: str):
         if value in self._specimenTypeNames_:
             spType = self._specimenTypeNames_[value]
-            if isinstance(self.specimenWidget, QtWidgets.QWidget):
-                self.specimenWidget.close()
-                self.specimenWidget.deleteLater()
-                self.specimenWidget = None
-
             newSpecimen = spType()
             self._slot_specimenChanged(newSpecimen)
-            self.specimenWidget = self._createSpecimenWidget_(newSpecimen)
-            self.specimenWidget.sig_valueChanged.connect(self._slot_specimenChanged)
-            self.specimenWidget.show()
-            self.specimenWidget.setWindowTitle(f"New Specimen: {value}")
+            self._slot_editSpecimen
+            # if isinstance(self.specimenWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenWidget):
+            #     self.specimenWidget.close()
+            #     self.specimenWidget.deleteLater()
+            #     self.specimenWidget = None
+            #
+            # self.specimenWidget = self._createSpecimenWidget_(newSpecimen)
+            # self.specimenWidget.sig_valueChanged.connect(self._slot_specimenChanged)
+            # self.specimenWidget.show()
+            # self.specimenWidget.setWindowTitle(f"New Specimen: {value}")
 
     @Slot()
     def _slot_detailsChanged(self):
@@ -206,7 +206,7 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
     @Slot(object)
     def _slot_specimenChanged(self, value: object):
         # print(f"{self.__class__.__name__}._slot_specimenChanged({value})")
-        if isinstance(value, self._specimenTypes_):
+        if isinstance(value, self._data_.specimenTypes):
             self._data_.specimen = value
         else:
             spField = list(filter(lambda f: f.name=="specimen",
@@ -223,8 +223,8 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         self.sig_valueChanged.emit(self._data_)
 
     @Slot()
-    def _slot_showSpecimen(self):
-        if isinstance(self._data_.specimen, self._specimenTypes_):
+    def _slot_editSpecimen(self):
+        if isinstance(self._data_.specimen, self._data_.specimenTypes):
             if isinstance(self.specimenWidget, QtWidgets.QWidget):
                 self.specimenWidget.close()
                 self.specimenWidget.deleteLater()
@@ -262,12 +262,12 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
     @_createSpecimenWidget_.register(sdc.Neuron)
     def __createSpecimenWidget__(self, obj: sdc.Neuron): # noqa
-        from gui.widgets.dataclasswidgets.cellwidget import NeuronWidget
+        from gui.widgets.dataclasswidgets.cellwidgets import NeuronWidget
         return NeuronWidget(obj, objSymbol="specimen")
 
     @_createSpecimenWidget_.register(sdc.Cell)
     def __createSpecimenWidget__(self, obj: sdc.Cell): # noqa
-        from gui.widgets.dataclasswidgets.cellwidget import CellWidget
+        from gui.widgets.dataclasswidgets.cellwidgets import CellWidget
         return CellWidget(obj, objSymbol="specimen")
 
     @_createSpecimenWidget_.register(sdc.NeuronCompartment)

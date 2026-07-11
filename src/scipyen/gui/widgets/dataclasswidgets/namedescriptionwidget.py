@@ -43,21 +43,7 @@ else:
 
 
 from core.prog import scipywarn
-# from core.sysutils import adapt_ui_path
-
-import core.bgbridge as bgbridge # noqa
-
-# from core import scipyen_quantities as scq
-# from core import strutils
-# from core.datatypes import UnitTypes, GENOTYPES
-
-# from core import workspacefunctions as wsf
-# from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
-
-from core.prog import scipywarn # noqa
 from gui import textviewer, datatreeviewer
-# from iolib import pictio as pio
-
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -72,6 +58,8 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
     sig_nameChanged = Signal(str, name="sig_nameChanged")
     sig_descriptionChanged = Signal(str, name="sig_descriptionChanged")
     sig_detailedViewRequest = Signal(name="sig_detailedViewRequest")
+    sig_parentEditRequest = Signal(name="sig_parentEditRequest")
+    sig_newParentRequest = Signal(name="sig_newParentRequest")
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None, **kwargs):
         QtCore.QObject.__init__(self, parent=parent)
@@ -91,6 +79,8 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         self.nameLineEdit.textChanged.connect(self._slot_nameChanged)
         self.descriptionToolButton.clicked.connect(self._slot_editDescription)
         self.viewDetailsToolButton.clicked.connect(self.sig_detailedViewRequest)
+        self.editParentToolButton.clicked.connect(self.sig_parentEditRequest)
+        self.replaceParentToolButton.clicked.connect(self.sig_newParentRequest)
 
     @Slot(object)
     def _slot_dataChanged(self, val: object):

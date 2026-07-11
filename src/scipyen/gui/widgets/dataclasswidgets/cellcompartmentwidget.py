@@ -126,10 +126,9 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
 
         super()._configureUI_()
 
-        self.editParentToolButton.clicked.connect(self._slot_editParent)
-
         for s in self._entityTypeNames_:
             self.typeComboBox.addItem(s)
+
         ndx = self._entityTypeNames_.index(self._data_.compartmentType.name)
         self.typeComboBox.setCurrentIndex(ndx)
         self.typeComboBox.currentIndexChanged.connect(self._slot_compartmentTypeChanged)
