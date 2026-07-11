@@ -11,11 +11,11 @@ import sys, os, typing, types, warnings, math, cmath # noqa
 # import numbers
 # import numpy as np
 # import quantities as pq
-import pandas as pd
+# import pandas as pd
 # import neo
 # from tribool import Tribool
 
-import qtpy
+# import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
@@ -25,7 +25,7 @@ __has_qtdbus__ = False
 
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
+    import PySide6 # noqa
     from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
@@ -50,14 +50,14 @@ except:
     __has_qtdbus__ = False
 
 from core.prog import scipywarn # noqa
-from core import scipyendataclasses as sdc
-from core import scipyen_quantities as scq
-from core import taxonbridge
+# from core import scipyendataclasses as sdc
+# from core import scipyen_quantities as scq
+# from core import taxonbridge
 from core import bgbridge
 from gui import datatreeviewer
 from gui.widgets import small_widgets as smw
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
-from gui.workspacegui import WorkspaceGuiMixin
+# from gui.workspacegui import WorkspaceGuiMixin
 # from gui.widgets.datawidgetmixin import DataWidgetMixin
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -109,21 +109,6 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
         self.descendantComboBox.currentIndexChanged.connect(self._slot_descendantSelected)
         self.structureTreeView.readOnly=True
         self.detailsToolButton.clicked.connect(self._slot_showDetails)
-        # parent = self.parent()
-
-        # if isinstance(self._containerWidget_, DataClassWidget):
-        #     self.structureTreeView.setEnabled(False)
-        #     self.structureTreeView.setVisible(False)
-        #     self.detailsToolButton.setEnabled(True)
-        #     self.detailsToolButton.setVisible(True)
-        # else:
-        #     self.structureTreeView.setEnabled(True)
-        #     self.structureTreeView.setVisible(True)
-        #     self.detailsToolButton.setEnabled(False)
-        #     self.detailsToolButton.setVisible(False)
-
-
-
 
     def _setup_UIFields(self):
         # BUG: 2026-07-06 11:10:34 FIXME in DataTreeViewer TODO

@@ -1341,7 +1341,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         return valid
 
     def valueFromText(self, text:str):
-        print(f"{self.__class__.__name__}.valueFromText({text}) called")
+        # print(f"{self.__class__.__name__}.valueFromText({text}) called")
         suffix = self._suffix_
         prefix = self._prefix_
         s = text

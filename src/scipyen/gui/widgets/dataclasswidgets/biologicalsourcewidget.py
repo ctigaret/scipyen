@@ -52,6 +52,7 @@ except:
     __has_qtdbus__ = False
 
 from core.prog import scipywarn # noqa
+from core import qtutils
 from core import scipyendataclasses as sdc
 # from core import scipyen_quantities as scq
 # from gui import guiutils, textviewer
@@ -221,7 +222,6 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         self.sig_valueChanged.emit(self._data_)
 
-
     @Slot()
     def _slot_showSpecimen(self):
         if isinstance(self._data_.specimen, self._specimenTypes_):
@@ -253,7 +253,6 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         from gui.widgets.dataclasswidgets.organtissuewidgets import OrganWidget, TissueWidget
         if isinstance(obj, sdc.Tissue):
             return TissueWidget(obj, objSymbol="specimen")
-
         return OrganWidget(obj, objSymbol="specimen")
 
     @_createSpecimenWidget_.register(sdc.NervousSystem)
@@ -288,6 +287,12 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
     def __createSpecimenWidget__(self, obj: sdc.BiologicalProduct): # noqa
         from gui.widgets.dataclasswidgets.biologicalproductwidget import BiologicalProductWidget
         return BiologicalProductWidget(obj, objSymbol="specimen")
+
+    def closeEvent(self, evt):
+        if isinstance(self.specimenWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenWidget):
+            self.specimenWidget.close()
+            self.specimenWidget.deleteLater()
+            self.specimenWidget = None
 
     def value(self) -> sdc.BiologicalSource:
         return self._data_

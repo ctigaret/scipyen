@@ -157,7 +157,6 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             allWindows = list(
                             filter(
                                     lambda w: "ScipyenWindow" in type(w).__name__,
-                                    # QtWidgets.QApplication.allWindows()
                                     QtWidgets.QApplication.topLevelWidgets()
                                     )
                             )

@@ -214,3 +214,15 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
             sigBlock = QtCore.QSignalBlocker(self.descriptionEditor)
             self.descriptionEditor.setText(self._dataDescription_)
         self.sig_descriptionChanged.emit(self._dataDescription_)
+
+    def closeEvent(self, evt):
+        if isinstance(self.descriptionEditor, textviewer.TextViewer):
+            self.descriptionEditor.close()
+            self.descriptionEditor.deleteLater()
+            self.descriptionEditor = None
+
+        if isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
+            self.detailsViewer.close()
+            self.detailsViewer.deleteLater()
+            self.detailsViewer = None
+

@@ -806,7 +806,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             Calls self.update_title()
         """
         if not isinstance(value, (str, type(None))):
-            raise TypeError("Expecting a str, or None; got %s instead" % type(value.__name__))
+            raise TypeError("Expecting a str, or None; got %s instead" % type(value).__name__)
 
         self.update_title(doc_title=value)
 

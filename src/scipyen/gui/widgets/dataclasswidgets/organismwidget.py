@@ -135,6 +135,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         self.facilityIDLineEdit.sig_enterPressed.connect(self._slot_setFacilityID)
 
         self.biometricsWidget.setValue(self._data_.biometrics)
+        self.biometricsWidget.sig_valueChanged.connect(self._slot_biometricsChanged)
 
     def setTaxon(self, value):
         # print(f"{self.__class__.__name__}.setTaxon({value})")
@@ -170,16 +171,25 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
             common_name = f"{pd.NA}"
             self.taxonDetailsToolButton.setEnabled(False)
 
-        sigBlocker = QtCore.QSignalBlocker(self.taxonSpeciesLineEdit)
+        sigBlocker = QtCore.QSignalBlocker(self.taxonSpeciesLineEdit) # noqa
         self.taxonSpeciesLineEdit.setText(taxon_name)
         self.taxonSpeciesLineEdit.setToolTip(common_name)
 
         self.sig_valueChanged.emit(self._data_)
 
+    @Slot(object)
+    def _slot_biometricsChanged(self, value: object):
+        if isinstance(value, sdc.Biometrics):
+            self._data_.biometrics = value
+        else:
+            self._data_.biometrics = sdc.Biometrics()
+
+        self.sig_valueChanged.emit(self._data_)
 
     @Slot(str)
     def _slot_selectTaxon(self, value: str):
         # print(f"{self.__class__.__name__}._slot_selectTaxon({value})")
+        # method called below will also emmit sig_valueChanged
         self.setTaxon(value)
 
     @Slot(str)
@@ -188,7 +198,6 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
             self._data_.subspecies = value
         else:
             self._data_.subspecies = ""
-
         self.sig_valueChanged.emit(self._data_)
 
     @Slot(str)
@@ -197,7 +206,6 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
             self._data_.strain = value
         else:
             self._data_.strain = ""
-
         self.sig_valueChanged.emit(self._data_)
 
     @Slot(str)
@@ -281,6 +289,8 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         self.facilityIDLineEdit.settext(f"{self._data_.ID}")
 
         self.biometricsWidget.setValue(self._data_.biometrics)
+
+        self.sig_valueChanged.emit(self._data_)
 
     def value(self) -> sdc.Organism:
         return self._data_

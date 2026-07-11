@@ -17,14 +17,13 @@ import dataclasses
 # import neo
 # from tribool import Tribool
 
-import qtpy
+# import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot)# , Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
-    __has_PySide6__ = True
     import PySide6 # noqa
     from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
@@ -32,12 +31,13 @@ if os.environ["QT_API"] == "pyside6":
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
+    __has_PySide6__ = True
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    from qtpy import sip # noqa
+    from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -59,7 +59,7 @@ from core import scipyen_quantities as scq
 
 from core.prog import scipywarn # noqa
 from core import scipyendataclasses as sdc
-from core import scipyen_quantities as scq
+# from core import scipyen_quantities as scq
 from core import qtutils
 # from gui import guiutils, textviewer, datatreeviewer
 from gui.datatreeviewer import DataTreeViewer
@@ -250,6 +250,21 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         r"""Must override in subclasses"""
         pass
 
+    @Slot(object)
+    def _slot_parentChanged(self, value: object):
+        # print(f"{self.__class__.__name__}._slot_parentChanged")
+        if (hasattr(self, "_data_")
+            and hasattr(self, "_objectTypes_")
+            and isinstance(self._data_, self._objectTypes_)):
+            self.sig_valueChanged.emit(self._data_)
+
+        # if (hasattr(self, "_data_")
+        #     and hasattr(self, "_objectTypes_")
+        #     and isinstance(self._data_, self._objectTypes_)
+        #     and hasattr(self._data_, "parent")
+        #     and dataclasses.is_dataclass(self._data_.parent)):
+        #
+
     @Slot()
     def _slot_editParent(self):
         parent = None
@@ -262,16 +277,19 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
         if isinstance(self.parentEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.parentEditor):
             editor = self._createParentEditor_(parent)
-            if type(editor) != type(self.parentEditor):
+            editor.sig_valueChanged.connect(self._slot_parentChanged)
+            if type(editor) is not type(self.parentEditor):
                 self.parentEditor.close()
                 self.parentEditor.deleteLater()
                 self.parentEditor = editor
+                # self.parentEditor.sig_valueChanged.connect(self._slot_parentChanged)
 
         else:
             self.parentEditor = self._createParentEditor_(parent)
+            self.parentEditor.sig_valueChanged.connect(self._slot_parentChanged)
 
         self.parentEditor.show()
-        self.parentEditor.setWindowTitle("Edit parent")
+        self.parentEditor.setWindowTitle(f"Edit Parent: {type(parent).__name__}")
 
 
         # TODO: 2026-06-25 16:47:07 finalize me
@@ -300,7 +318,8 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     @_createParentEditor_.register(sdc.ChemicalSynapse)
     def __createParentEditor(self, obj: sdc.ChemicalSynapse):
-        from gui.widgets.dataclasswidgets.chemicalsynapsewidget import chemicalsynapsewidget
+        from gui.widgets.dataclasswidgets.chemicalsynapsewidget import ChemicalSynapseWidget
+        return ChemicalSynapseWidget(obj, objSymbol="parent")
 
     @_createParentEditor_.register(sdc.Organism)
     def __createParentEditor(self, obj: sdc.Organism):
@@ -322,20 +341,14 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     def closeEvent(self, evt):
         if isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
-            if isinstance(self.nameDescriptionWidget.descriptionEditor, TextViewer):
-                self.nameDescriptionWidget.descriptionEditor.close()
-                self.nameDescriptionWidget.descriptionEditor.deleteLater()
-                self.nameDescriptionWidget.descriptionEditor = None
-
-            if isinstance(self.nameDescriptionWidget.detailsViewer, DataTreeViewer):
-                self.nameDescriptionWidget.detailsViewer.close()
-                self.nameDescriptionWidget.detailsViewer.deleteLater()
-                self.nameDescriptionWidget.detailsViewer = None
-
             if isinstance(self.parentEditor, QtWidgets.QWidget):
                 self.parentEditor.close()
                 self.parentEditor.deleteLater()
                 self.parentEditor = None
+
+            self.nameDescriptionWidget.close()
+            self.nameDescriptionWidget.deleteLater()
+            self.nameDescriptionWidget = None
 
         evt.accept()
 

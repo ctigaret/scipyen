@@ -10,7 +10,7 @@ r"""
 import sys, os, typing, types, warnings, math, cmath # noqa
 # import numbers
 # import numpy as np
-# import quantities as pq
+import quantities as pq
 import pandas as pd
 # import neo
 # from tribool import Tribool
@@ -51,7 +51,7 @@ except:
 
 from core.prog import scipywarn # noqa
 from core import scipyendataclasses as sdc
-from core import scipyen_quantities as scq
+# from core import scipyen_quantities as scq
 # from gui import guiutils, textviewer
 from gui.widgets import small_widgets as smw
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
@@ -101,27 +101,6 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
 
         super()._configureUI_()
 
-        # self.dataExchangeWidget.dataType = type(self._data_)
-        # self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
-        # self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
-        # self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
-        # self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
-        # self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
-        # self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
-        # self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
-        # self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
-        # self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
-        # self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
-        #
-        # self.nameDescriptionWidget.dataName = self._data_.name
-        # self.nameDescriptionWidget.dataDescription = self._data_.description
-        # self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
-        # self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
-        # self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
-        # self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
-        # self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
-        # self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
-
         for text in self._devStageNames_:
             self.devStageComboBox.addItem(text)
         ndx = self._devStageNames_.index(self._data_.stage.name)
@@ -137,8 +116,9 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
         self.genotypeLineEdit.setClearButtonEnabled(True)
         self.genotypeLineEdit.redoAvailable = True
         self.genotypeLineEdit.undoAvailable = True
-        self.genotypeLineEdit.textChanged.connect(self._slot_genotypeNameChanged)
-        # self.genotypeLineEdit.sig_enterPressed.connect(self._slot_genotypeChanged)
+        # self.genotypeLineEdit.textChanged.connect(self._slot_genotypeNameChanged)
+        self.genotypeLineEdit.lazy = True
+        self.genotypeLineEdit.sig_enterPressed.connect(self._slot_genotypeNameChanged)
 
         for text in self._geneticSexNames_:
             self.geneticSexComboBox.addItem(text)
@@ -148,13 +128,35 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
 
         self.geneticSexComboBox.currentIndexChanged.connect(self._slot_geneticSexChanged)
 
+        if isinstance(self._data_.age, pq.Quantity):
+            if self._data_.age.units == pq.Dimensionless:
+                self._data_.age = self._data_.age.magnitude * pq.day
+
+        else:
+            self._data_.age = 0 * pq.day
+
         self.ageSpinBox.familyRestriction = "Time"
         self.ageSpinBox.setValue(self._data_.age)
         self.ageSpinBox.sig_valueChanged.connect(self._slot_ageChanged)
 
+        if isinstance(self._data_.weight, pq.Quantity):
+            if self._data_.weight.units == pq.Dimensionless:
+                self._data_.weight = self._data_.weight.magnitude * pq.gram
+
+        else:
+            self._data_.weight = 0 * pq.gram
+
         self.weightSpinBox.familyRestriction = "Mass"
         self.weightSpinBox.setValue(self._data_.weight)
         self.weightSpinBox.sig_valueChanged.connect(self._slot_weightChanged)
+
+
+        if isinstance(self._data_.height, pq.Quantity):
+            if self._data_.height.units == pq.Dimensionless:
+                self._data_.height = self._data_.height.magnitude * pq.cm
+
+        else:
+            self._data_.height = 0*pq.cm
 
         self.heightSpinBox.familyRestriction = "Length"
         self.heightSpinBox.setValue(self._data_.height)
@@ -169,39 +171,33 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
                 self._data_.genotype = val
         else:
             self._data_.genotype = ""
-
         self.sig_valueChanged.emit(self._data_)
 
     @Slot(int)
     def _slot_geneticSexChanged(self, val: int):
         name = self._geneticSexNames_[val]
         self._data_.geneticSex = sdc.GeneticSex[name]
-
         self.sig_valueChanged.emit(self._data_)
 
     @Slot(int)
     def _slot_devStageChanged(self, val:int):
         name = self._devStageNames_[val]
         self._data_.stage = sdc.DevelopmentalStage[name]
-
         self.sig_valueChanged.emit(self._data_)
 
     @Slot()
     def _slot_ageChanged(self):
         self._data_.age = self.ageSpinBox.value()
-
         self.sig_valueChanged.emit(self._data_)
 
     @Slot()
     def _slot_weightChanged(self):
         self._data_.weight = self.weightSpinBox.value()
-
         self.sig_valueChanged.emit(self._data_)
 
     @Slot()
     def _slot_heightChanged(self):
         self._data_.height = self.heightSpinBox.value()
-
         self.sig_valueChanged.emit(self._data_)
 
     def setValue(self, val: typing.Optional[sdc.Biometrics] = None):
@@ -210,7 +206,7 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
 
         self._data_ = val
 
-        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), # noqa
                                (
                                    self.dataExchangeWidget,
                                    self.nameDescriptionWidget,
@@ -237,6 +233,8 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
         self.ageSpinBox.setValue(self._data_.age)
         self.weightSpinBox.setValue(self._data_.weight)
         self.heightSpinBox.setValue(self._data_.height)
+
+        self.sig_valueChanged.emit(self._data_)
 
     def value(self) -> sdc.Biometrics:
         return self._data_

@@ -108,29 +108,6 @@ class CellWidget(Ui_CellWidget, DataClassWidget):
 
         super()._configureUI_()
 
-        # self.dataExchangeWidget.setValue(self._data_)
-        # self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
-        # self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
-        # self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
-        # self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
-        # self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
-        # self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
-        #
-        # self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
-        #
-        # self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
-        # self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
-        #
-        # self.nameDescriptionWidget.dataName = self._data_.name
-        # self.nameDescriptionWidget.dataDescription = self._data_.description
-        # self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
-        # self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
-        # self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
-        # self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
-        # self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
-        # self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
-        # self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
-
         self.editParentToolButton.clicked.connect(self._slot_editParent)
 
         self.cellTypeNameEdit.setText(f"{self._data_.cellType}")
@@ -212,29 +189,6 @@ class NeuronWidget(Ui_NeuronWidget, DataClassWidget):
         self.setupUi(self)
 
         super()._configureUI_()
-
-        # self.dataExchangeWidget.setValue(self._data_)
-        # self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
-        # self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
-        # self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
-        # self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
-        # self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
-        # self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
-        #
-        # self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
-        #
-        # self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
-        # self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
-        #
-        # self.nameDescriptionWidget.dataName = self._data_.name
-        # self.nameDescriptionWidget.dataDescription = self._data_.description
-        # self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
-        # self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
-        # self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
-        # self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
-        # self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
-        # self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
-        # self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
 
         self.editParentToolButton.clicked.connect(self._slot_editParent)
 

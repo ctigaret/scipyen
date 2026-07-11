@@ -1024,6 +1024,7 @@ class Cell(ScipyenDataclass):
 @dataclass
 class Neuron(Cell):
     cellSubType: NeuronType = NeuronType.undefined
+    parent: typing.Optional[typing.Union[Organ, Tissue, NervousSystem]] = dataclasses.field(default_factory = NervousSystem)
 
     @property
     def cellType(self) -> str:
@@ -1032,10 +1033,6 @@ class Neuron(Cell):
     @cellType.setter
     def cellType(self, val:str):
         return
-
-    # def __post_init__(self: typing.Self):
-    #     assert isinstance (self.cellSubType, NeuronType), f"Wrong subtype {self.cellSubType} for Neuron"
-    #     self.cellType = "neuron"
 
 @dataclass
 class CellCompartment(ScipyenDataclass):

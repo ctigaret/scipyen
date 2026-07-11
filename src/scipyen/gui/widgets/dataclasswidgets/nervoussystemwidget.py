@@ -141,6 +141,8 @@ class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget):
     def _slot_structureChanged(self, val: object):
         self._data_.structure = val
 
+        self.sig_valueChanged.emit(self._data_)
+
     @Slot(int)
     def _slot_atlasChanged(self, val: int):
         if not isinstance(val, int) or val <= 0 or val >=len(self._bman_.localAtlases):
@@ -152,15 +154,15 @@ class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget):
         if self._data_.atlasName in self._bman_.localAtlases:
             self._atlas_ = self._bman_.initAtlas(self._data_.atlasName)
             self.bgStructureWidget.atlas = self._atlas_
-            if self._data_.structure["id"] not in self._atlas_.structures:
+            if (self._data_.structure is None or
+                self._data_.structure["id"] not in self._atlas_.structures):
                 self._data_.structure = None
                 self.bgStructureWidget.setValue(None)
 
-
         self.sig_valueChanged.emit(self._data_)
 
-    @Slot()
-    def _slot_lookupStructure(self):
-        pass
+    # @Slot()
+    # def _slot_lookupStructure(self):
+    #     pass
 
 
