@@ -133,6 +133,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self._delegate_ = PythonItemDelegate(parent = self)
         self._dragStartPosition_: typing.Optional[QtCore.QPoint] = None
 
+        self._currentExpansionDepth_: int = 0
+
         self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
         # TODO implement dragging from here to the workspace
@@ -275,6 +277,17 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         if column < (self.sourceModel.columnCount()-1):
             self.resizeColumnToContents(column+1)
 
+        depth = 0
+        parent = index
+        while parent.isValid():
+            depth += 1
+            parent = parent.parent()
+
+        print(f"{self.__class__.__name__}._slot_indexExpanded -> epxansion depth = {depth}")
+
+        self._currentExpansionDepth_ = depth
+        # print(f"{self.__class__.__name__}._slot_indexExpanded -> {type(item)}")
+
     @Slot(QtCore.QModelIndex)
     def _slot_indexCollapsed(self, index: QtCore.QModelIndex):
         column = index.column()
@@ -282,10 +295,21 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         if column < (self.sourceModel.columnCount()-1):
             self.resizeColumnToContents(column+1)
 
+        depth = 0
+        parent = index
+        while parent.isValid():
+            depth += 1
+            parent = parent.parent()
+
+        print(f"{self.__class__.__name__}._slot_indexCollapsed -> depth = {depth}")
+        # item = self.sourceModel.itemFromIndex(index)
+
+
+
     @Slot()
     @safewrapper
     def slot_collapseAll(self):
-        sigBlock = QtCore.QSignalBlocker(self)
+        sigBlock = QtCore.QSignalBlocker(self) # noqa
         self.collapseAll()
 
     @Slot(QtCore.QPoint)

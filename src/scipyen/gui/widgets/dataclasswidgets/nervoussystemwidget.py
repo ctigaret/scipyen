@@ -161,8 +161,5 @@ class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget):
 
         self.sig_valueChanged.emit(self._data_)
 
-    # @Slot()
-    # def _slot_lookupStructure(self):
-    #     pass
 
 

@@ -255,6 +255,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
         return self._topObjectItem_
 
     @property
+    def topIndex(self) -> QtCore.QModelIndex:
+        return self.indexFromItem(self.topObjectItem)
+
+    @property
     def inlineTables(self) -> bool:
         return self._inlineTables_
 

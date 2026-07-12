@@ -93,23 +93,12 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         self._bioSourceTypeNames_ = list(sdc.BioSourceType.names())
 
-        # self._specimenTypes_ = (
-        #     sdc.Organism,
-        #     sdc.Organ,
-        #     sdc.Tissue,
-        #     sdc.NervousSystem,
-        #     sdc.Cell,
-        #     sdc.Neuron,
-        #     sdc.NeuronCompartment,
-        #     sdc.CellCompartment,
-        #     sdc.ChemicalSynapse,
-        #     sdc.UltrastructureElement,
-        #     sdc.ChemicalSynapseUltrastructureElement,
-        #     sdc.ScipyenDataclass,
-        #     sdc.BiologicalProduct,
-        #     )
-
-        self._specimenTypeNames_ = dict(map(lambda t: (t.__name__, t), self._data_.specimenTypes))
+        self._specimenTypeNames_ = dict(
+            map(
+                lambda t: (t.__name__, t),
+                self._data_.sourceSpecimenTypeMap[self._data_.sourceType]
+                )
+            )
 
         self._configureUI_()
 

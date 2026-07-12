@@ -74,9 +74,10 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         self.setupUi(self)
         self.descriptionEditor = None
         self.detailsViewer = None
+        self.nameLineEdit.lazy = True
         self.nameLineEdit.setText(self._dataName_)
         self.nameLineEdit.setClearButtonEnabled(True)
-        self.nameLineEdit.textChanged.connect(self._slot_nameChanged)
+        self.nameLineEdit.sig_enterPressed.connect(self._slot_nameChanged)
         self.descriptionToolButton.clicked.connect(self._slot_editDescription)
         self.viewDetailsToolButton.clicked.connect(self.sig_detailedViewRequest)
         self.editParentToolButton.clicked.connect(self.sig_parentEditRequest)

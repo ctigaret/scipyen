@@ -10,7 +10,7 @@ r"""
 import sys, os, typing, types, warnings, math, cmath, datetime # noqa
 from functools import singledispatchmethod
 # import numbers
-import dataclasses
+# import dataclasses
 # import numpy as np
 # import quantities as pq
 # import pandas as pd
@@ -25,7 +25,7 @@ __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     import PySide6 # noqa
-    from PySide6 import Shiboken
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction

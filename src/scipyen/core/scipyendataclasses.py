@@ -547,7 +547,7 @@ class BioSourceType(TypeEnum):
     exvivo      = auto()    # tissue or organ sample from organism
     invitro     = auto()    # culture system, homogenate
     invivo      = auto()    # e.g. in vivo imaging, electrophysiology, etc
-    organism    = auto()    # for behaviour and systemic measurements (temperature, mass, motor function, etc)
+    # organism    = auto()    # for behaviour and systemic measurements (temperature, mass, motor function, etc)
     organ       = auto()    # e.g. isolated heart, aorta, ileum, 33
     organoid    = invitro | organ
     assembloid  = organoid # i.e, 34
@@ -681,8 +681,8 @@ class CellCompartmentType(TypeEnum):
     r"""Inspired by SWC/CNIC specification at
     http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
 
-    Refers to "gross" compartments; for a more granular types see AxonalCompartment
-    DendriticCompartment ChemicalSynapseCompartment
+    Refers to "gross" compartments; for a more granular types see
+    NeuronCompartment, AxonalCompartment and DendriticCompartment
     """
     undefined = 0
     cell = undefined
@@ -962,6 +962,12 @@ class Organism(ScipyenDataclass):
                 self.biometrics.height = val
             else:
                 self.biometrics.height = pd.NA
+
+    def getOrganism(self) -> typing.Self:
+        return self
+
+    def setOrganism(self, value: typing.Self):
+        return
 
 @dataclass
 class BiologicalProduct(ScipyenDataclass):
@@ -1305,19 +1311,171 @@ class BiologicalSource(ScipyenDataclass):
     # organism:Organism = dataclasses.field(default=Organism("rat"))
     # organism:Organism = dataclasses.field(default_factory = Organism)
 
-    specimenTypes: typing.ClassVar[
-                typing.Tuple[ScipyenDataclass]
-        ] = (
-                Organism,
-                Organ,
-                Tissue,
-                Cell,
-                CellCompartment,
-                ChemicalSynapse,
-                UltrastructureElement,
-                ChemicalSynapseUltrastructureElement,
-                BiologicalProduct,
-            )
+    # specimenTypes: typing.ClassVar[
+    #             typing.Tuple[ScipyenDataclass]
+    #     ] = (
+    #             Organism,
+    #             Organ,
+    #             NervousSystem,
+    #             Tissue,
+    #             Cell,
+    #             Neuron,
+    #             CellCompartment,
+    #             NeuronCompartment,
+    #             AxonalCompartment,
+    #             DendriticCompartment,
+    #             ChemicalSynapse,
+    #             UltrastructureElement,
+    #             ChemicalSynapseUltrastructureElement,
+    #             BiologicalProduct,
+    #         )
+
+
+    # NOTE: 2026-07-12 13:46:12 TODO
+    # preparing API for being more selective to what Python type of
+    # specimen is allowed, contingent on the sourceType field according to the
+    # class variable sourceSpecimenTypeMap.
+    #
+    # ATTENTION: Not implemented yet.
+    # Needs (TODO):
+    # 1) specimen field redefined as a descriptor field, where
+    # the Python type of specimen object is checked against the
+    # value of the sourceType field.
+    #
+    # 2) sourceType field redefined as descriptor field, where
+    # the setter would also check the Python type of the specimen
+    # optionally prompting to a change (or instantiate a default
+    # specimen compliant with the sourceSpecimenTypeMap)
+    #
+    # CAUTION: Until the above is implemented, all code assumes that all specimen
+    # Python types are admissible, as if sourceType was BioSourceType.undefined
+    #
+
+
+    sourceSpecimenTypeMap: typing.ClassVar[
+        dict[BioSourceType, typing.Tuple[type]]
+        ] = {
+            BioSourceType.undefined: (
+                                        Organism,
+                                        Organ,
+                                        NervousSystem,
+                                        Tissue,
+                                        Cell,
+                                        Neuron,
+                                        CellCompartment,
+                                        NeuronCompartment,
+                                        AxonalCompartment,
+                                        DendriticCompartment,
+                                        ChemicalSynapse,
+                                        UltrastructureElement,
+                                        ChemicalSynapseUltrastructureElement,
+                                        BiologicalProduct,
+                                    ),
+            BioSourceType.insilico: (
+                                        Organism,
+                                        Organ,
+                                        NervousSystem,
+                                        Tissue,
+                                        Cell,
+                                        Neuron,
+                                        CellCompartment,
+                                        NeuronCompartment,
+                                        AxonalCompartment,
+                                        DendriticCompartment,
+                                        ChemicalSynapse,
+                                        UltrastructureElement,
+                                        ChemicalSynapseUltrastructureElement,
+                                        BiologicalProduct,
+                                    ),
+            BioSourceType.exvivo: (Organ, NervousSystem, Tissue,
+                                   Cell, Neuron,
+                                   CellCompartment,
+                                   NeuronCompartment,
+                                   AxonalCompartment,
+                                   DendriticCompartment,
+                                   ChemicalSynapse,
+                                   UltrastructureElement,
+                                   ChemicalSynapseUltrastructureElement,
+                                   BiologicalProduct
+                                   ),
+
+            BioSourceType.invitro: (Organ, Tissue, Cell, Neuron,
+                                    CellCompartment, NeuronCompartment,
+                                    AxonalCompartment, DendriticCompartment,
+                                    ChemicalSynapse,
+                                    UltrastructureElement,
+                                    ChemicalSynapseUltrastructureElement,
+                                    BiologicalProduct
+                                    ),
+
+            BioSourceType.invivo: (Organism, Organ,
+                                   NervousSystem,
+                                   Tissue,
+                                   Cell,
+                                   Neuron,
+                                   ),
+
+            BioSourceType.organ: (Organ,
+                                  NervousSystem
+                                  ),
+            BioSourceType.organoid: (Organ,
+                                     NervousSystem
+                                     ),
+            BioSourceType.assembloid: (Organ,
+                                       NervousSystem
+                                       ),
+            BioSourceType.tissue: (Organ,
+                                   NervousSystem,
+                                   Tissue
+                                   ),
+            BioSourceType.acute_slice: (Organ,
+                                        NervousSystem,
+                                        Tissue,
+                                        Cell,
+                                        Neuron,
+                                        CellCompartment,
+                                        NeuronCompartment,
+                                        AxonalCompartment,
+                                        DendriticCompartment,
+                                        ChemicalSynapse
+                                        ),
+            BioSourceType.organotypic: (Organ,
+                                        NervousSystem,
+                                        Tissue,
+                                        Cell,
+                                        Neuron,
+                                        CellCompartment,
+                                        NeuronCompartment,
+                                        AxonalCompartment,
+                                        DendriticCompartment,
+                                        ChemicalSynapse
+                                        ),
+            BioSourceType.cell: (Cell,
+                                 Neuron,
+                                 CellCompartment,
+                                 NeuronCompartment,
+                                 AxonalCompartment,
+                                 DendriticCompartment,
+                                 ChemicalSynapse,
+                                 ChemicalSynapseUltrastructureElement,
+                                 UltrastructureElement,
+                                 ),
+
+            BioSourceType.thrombocyte: (Cell,),
+            BioSourceType.platelet: (Cell,),
+            BioSourceType.compartment: (ChemicalSynapse,
+                                        CellCompartment,
+                                        NeuronCompartment,
+                                        AxonalCompartment,
+                                        DendriticCompartment,
+                                        UltrastructureElement,
+                                        ChemicalSynapseUltrastructureElement
+                                        ),
+            BioSourceType.ultrastructure: (UltrastructureElement,
+                                           ChemicalSynapseUltrastructureElement,
+                                           ),
+            BioSourceType.product: (BiologicalProduct, ),
+            }
 
     # Type of source: ex vivo, in vitro, culture, whole organism, see BioSourceType
     # Default: BioSourceType.exvivo
@@ -1344,7 +1502,9 @@ class BiologicalSource(ScipyenDataclass):
             )
 
     def __post_init__(self: typing.Self):
-        assert isinstance(self.specimen, self.specimenTypes), f"Wrong specimen: {type(self.specimen).__name__}"
+        # NOTE: 2026-07-12 13:32:00
+        # below, keep it general
+        assert isinstance(self.specimen, self.sourceSpecimenTypeMap[BioSourceType.undefined]), f"Wrong specimen: {type(self.specimen).__name__}"
 
     def __repr__(self):
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
@@ -1354,43 +1514,22 @@ class BiologicalSource(ScipyenDataclass):
         return super().__eq__(other)
 
     def getOrganism(self):
-        if isinstance(self.specimen,
-                            (
-                                Organ,
-                                Tissue,
-                                Cell,
-                                CellCompartment,
-                                ChemicalSynapse,
-                                UltrastructureElement,
-                                ChemicalSynapseUltrastructureElement,
-                                BiologicalProduct
-                            )
-                        ):
-            return self.specimen.getOrganism()
+        return self.specimen.getOrganism()
 
-        elif isinstance(self.specimen, Organism):
-            return self.specimen
-
-    def setOrganism(self, value:Organism):
+    def setOrganism(self, value: Organism):
         if not isinstance(value, Organism):
             value = Organism()
 
         if isinstance(self.specimen, Organism):
             self.specimen = value
 
-        elif isinstance(self.specimen,
-                            (
-                                Organ,
-                                Tissue,
-                                Cell,
-                                CellCompartment,
-                                ChemicalSynapse,
-                                UltrastructureElement,
-                                ChemicalSynapseUltrastructureElement,
-                                BiologicalProduct
-                            )
-                        ):
+        else:
             self.specimen.setOrganism(value)
+
+    @property
+    def specimenTypes(self) -> tuple[type]:
+        r"""For backward compatibility"""
+        return self.sourceSpecimenTypeMap[BioSourceType.undefined]
 
 # ------------------------------------------------------------------------------
 
