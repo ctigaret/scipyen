@@ -58,7 +58,8 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
     sig_nameChanged = Signal(str, name="sig_nameChanged")
     sig_descriptionChanged = Signal(str, name="sig_descriptionChanged")
     sig_detailedViewRequest = Signal(name="sig_detailedViewRequest")
-    sig_parentEditRequest = Signal(name="sig_parentEditRequest")
+    # sig_parentEditRequest = Signal(name="sig_parentEditRequest")
+    sig_parentEditRequest = Signal(bool, name="sig_parentEditRequest")
     sig_newParentRequest = Signal(name="sig_newParentRequest")
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None, **kwargs):
@@ -80,7 +81,8 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         self.nameLineEdit.sig_enterPressed.connect(self._slot_nameChanged)
         self.descriptionToolButton.clicked.connect(self._slot_editDescription)
         self.viewDetailsToolButton.clicked.connect(self.sig_detailedViewRequest)
-        self.editParentToolButton.clicked.connect(self.sig_parentEditRequest)
+        # self.editParentToolButton.clicked.connect(self.sig_parentEditRequest)
+        self.editParentToolButton.toggled.connect(self.sig_parentEditRequest)
         self.replaceParentToolButton.clicked.connect(self.sig_newParentRequest)
 
     @Slot(object)

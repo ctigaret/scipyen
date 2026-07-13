@@ -23,7 +23,7 @@
       <number>3</number>
      </property>
      <widget class="DataExchangeWidget" name="dataExchangeWidget" native="true"/>
-     <widget class="QWidget" name="">
+     <widget class="QWidget" name="layoutWidget">
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
         <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true"/>
@@ -84,6 +84,9 @@
            </property>
            <property name="icon">
             <iconset theme="document-properties"/>
+           </property>
+           <property name="checkable">
+            <bool>true</bool>
            </property>
            <property name="autoRaise">
             <bool>true</bool>

@@ -94,6 +94,9 @@
        <property name="icon">
         <iconset theme="user"/>
        </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
        <property name="autoRaise">
         <bool>true</bool>
        </property>
