@@ -244,8 +244,10 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
             self.biometricsWidget.close()
             self.biometricsWidget.deleteLater()
             self.biometricsWidget = None
-        self.biometricsWidget = BiometricsWidget()
+
+        self.biometricsWidget = BiometricsWidget(callingWidget=self)
         self.biometricsWidget.setValue(self._data_.biometrics, objSymbol="biometrics")
+        self.biometricsWidget.setWindowTitle("Biometrics")
         self.biometricsWidget.show()
         self.biometricsWidget.sig_valueChanged.connect(self._slot_biometricsChanged)
 

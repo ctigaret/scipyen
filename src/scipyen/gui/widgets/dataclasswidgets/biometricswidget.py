@@ -92,7 +92,7 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
         self._geneticSexNames_ = list(sdc.GeneticSex.names())
         self._devStageNames_ = list(sdc.DevelopmentalStage.names())
 
-        DataClassWidget.__init__(self, parent=parent)
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
 
         self._configureUI_()
 

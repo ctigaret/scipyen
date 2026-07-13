@@ -83,7 +83,18 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None, **kwargs):
         isAttribute = kwargs.pop("isAttribute", False)
+        callingWidget = kwargs.pop("callingWidget", None)
+        windowFlags = kwargs.pop("windowFlags", None)
         self._objSymbol_ = kwargs.pop("objSymbol", None)
+
+        self._isSubWidget_: bool = False
+        self._positionHint_: typing.Optional[QtCore.QPoint] = None
+
+        if isinstance(callingWidget, QtWidgets.QWidget):
+            self._isSubWidget_ = True
+            # self._positionHint_ = callingWidget.pos()
+            # self._positionHint_ = callingWidget.mapToGlobal(callingWidget.geometry().topRight())
+            self._positionHint_ = callingWidget.geometry().topRight()
 
         self.dataExchangeWidget = None
         self.nameDescriptionWidget = None
@@ -91,13 +102,50 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         self.parentEditor = None
 
         QtWidgets.QWidget.__init__(self, parent=parent)
+        # if isinstance(windowFlags, QtCore.Qt.WindowType):
+        #     QtWidgets.QWidget.__init__(parent=parent, f=windowFlags)
+        # else:
+        #     QtWidgets.QWidget.__init__(self, parent=parent)
         self._isAttribute_: bool = isAttribute
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
+
+        if callingWidget:
+            if isinstance(windowFlags, QtCore.Qt.WindowType):
+                self.setWindowFlags(windowFlags)
+            else:
+                self.setWindowFlags(QtCore.Qt.Tool)
 
         if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
             objSymbols = self.getDataSymbolInWorkspace(self._data_)
             if isinstance(objSymbols, typing.Sequence) and len(objSymbols) > 0:
                 self._objSymbol_ = objSymbols[0]
+
+        self._sizeAnimationMax_ = 200
+        self._sizeAnimation_ = QtCore.QPropertyAnimation(self, b'widgetWidth', self)
+        self._sizeAnimation_.setStartValue(0)
+        self._sizeAnimation_.setDuration(200) # ms
+        self._sizeAnimation_.setEndValue(self._sizeAnimationMax_)
+        self._sizeAnimation_.valueChanged.connect(self._slot_setWidgetWidth)
+
+        self._opacityEffect_ = QtWidgets.QGraphicsOpacityEffect(self)
+        if self._isSubWidget_:
+            self._opacityEffect_.setOpacity(0.0)
+        else:
+            self._opacityEffect_.setOpacity(1.0)
+
+        self._opacityAnimation_ = QtCore.QPropertyAnimation(self._opacityEffect_, b'opacity', self)
+        self._opacityAnimation_.setStartValue(0.0)
+        self._opacityAnimation_.setDuration(200)
+        self._opacityAnimation_.setEndValue(1.0)
+        self._opacityAnimation_.valueChanged.connect(self._slot_setOpacity)
+
+        if self._isSubWidget_:
+            self.setGraphicsEffect(self._opacityEffect_)
+
+        self._animationGroup_ = QtCore.QParallelAnimationGroup()
+        self._animationGroup_.addAnimation(self._sizeAnimation_)
+        self._animationGroup_.addAnimation(self._opacityAnimation_)
+        self._animationGroup_.stateChanged.connect(self._slot_animationStateChanged)
 
     def _configureUI_(self):
         r"""MUST be called in the subclass once self._data_ was established,
@@ -145,9 +193,61 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                     self.nameDescriptionWidget.replaceParentToolButton.setEnabled(True)
                     self.nameDescriptionWidget.replaceParentToolButton.setVisible(True)
 
+
+    @QtCore.Property(int)
+    def widgetWidth(self) -> int:
+        return self.width()
+
+    @widgetWidth.setter
+    def widgetWidth(self, value: int):
+        self.setFixedWidth(value)
+
+    @Slot(QtCore.QVariant)
+    def _slot_setWidgetWidth(self, val: int | QtCore.QVariant):
+        if not isinstance(val, int):
+            val = val.value()
+
+        self.setFixedWidth(val)
+
+    @Slot(QtCore.QVariant)
+    def _slot_setOpacity(self, val: float | QtCore.QVariant):
+        if not isinstance(val, float):
+            val = val.value()
+
+        if val < 0:
+            val = 0.
+        if val > 1:
+            val = 1.
+
+        self._opacityEffect_.setOpacity(val)
+
+    @Slot(QtCore.QAbstractAnimation.State, QtCore.QAbstractAnimation.State)
+    def _slot_animationStateChanged(self, newState: QtCore.QAbstractAnimation.State,
+                                    oldState: QtCore.QAbstractAnimation.State):
+
+        if newState == QtCore.QAbstractAnimation.Running:
+            self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
+            # self._parentOpacityAnimation_.start()
+        elif newState == QtCore.QAbstractAnimation.Stopped:
+            self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
+
     def value(self) -> None:
         r"""Must override in subclasses"""
         pass
+
+    def show(self):
+        if self.isVisible():
+            return
+        if self._isSubWidget_:
+            geometry = self.geometry()
+            geometry.setX(self._positionHint_.x())
+            geometry.setY(self._positionHint_.y())
+            self.setGeometry(geometry)
+            self._animationGroup_.start()
+            super().show()
+
+        else:
+            super().show()
 
     def setValue(self, *args, **kwargs):
         r"""Must override in subclasses, and called from there as super().setValue(…).
@@ -373,41 +473,41 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     @_createParentEditor_.register(sdc.Neuron)
     def __createParentEditor(self, obj: sdc.Neuron):
         from gui.widgets.dataclasswidgets.cellwidgets import NeuronWidget
-        return NeuronWidget(obj, objSymbol="parent")
+        return NeuronWidget(obj, objSymbol="parent", callingWidget=self)
 
     @_createParentEditor_.register(sdc.Cell)
     def __createParentEditor(self, obj: sdc.Cell):
         from gui.widgets.dataclasswidgets.cellwidgets import CellWidget
-        return CellWidget(obj, objSymbol="parent")
+        return CellWidget(obj, objSymbol="parent", callingWidget=self)
 
     @_createParentEditor_.register(sdc.CellCompartment)
     @_createParentEditor_.register(sdc.NeuronCompartment)
     def __createParentEditor(self, obj: sdc.CellCompartment):
         from gui.widgets.dataclasswidgets.cellcompartmentwidget import CellCompartmentWidget
-        return CellCompartmentWidget(obj, objSymbol="parent")
+        return CellCompartmentWidget(obj, objSymbol="parent", callingWidget=self)
 
     @_createParentEditor_.register(sdc.ChemicalSynapse)
     def __createParentEditor(self, obj: sdc.ChemicalSynapse):
         from gui.widgets.dataclasswidgets.chemicalsynapsewidget import ChemicalSynapseWidget
-        return ChemicalSynapseWidget(obj, objSymbol="parent")
+        return ChemicalSynapseWidget(obj, objSymbol="parent", callingWidget=self)
 
     @_createParentEditor_.register(sdc.Organism)
     def __createParentEditor(self, obj: sdc.Organism):
         from gui.widgets.dataclasswidgets.organismwidget import OrganismWidget
-        return OrganismWidget(obj, objSymbol="parent")
+        return OrganismWidget(obj, objSymbol="parent", callingWidget=self)
 
     @_createParentEditor_.register(sdc.Organ)
     @_createParentEditor_.register(sdc.Tissue)
     def __createParentEditor(self, obj: sdc.Organ):
         from gui.widgets.dataclasswidgets.organtissuewidgets import OrganWidget, TissueWidget
         if isinstance(obj, sdc.Tissue):
-            return TissueWidget(obj, objSymbol="parent")
-        return OrganWidget(obj, objSymbol="parent")
+            return TissueWidget(obj, objSymbol="parent", callingWidget=self)
+        return OrganWidget(obj, objSymbol="parent", callingWidget=self)
 
     @_createParentEditor_.register(sdc.NervousSystem)
     def __createParentEditor(self, obj: sdc.NervousSystem):
         from gui.widgets.dataclasswidgets.nervoussystemwidget import NervousSystemWidget
-        return NervousSystemWidget(obj, objSymbol="parent")
+        return NervousSystemWidget(obj, objSymbol="parent", callingWidget=self)
 
     def closeEvent(self, evt):
         # print(f"{self.__class__.__name__}.closeEvent")
