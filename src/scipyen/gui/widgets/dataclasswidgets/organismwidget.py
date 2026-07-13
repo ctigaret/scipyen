@@ -65,7 +65,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 Ui_OrganismWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "organismwidget.ui")
+    os.path.join(__module_path__, "organismwidget2.ui")
     )
 
 class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
@@ -92,6 +92,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
 
         DataClassWidget.__init__(self, parent=parent, **kwargs)
 
+
         self._configureUI_()
 
     def _configureUI_(self):
@@ -100,6 +101,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         super()._configureUI_()
 
         self.taxonDetailsViewer = None
+        self.biometricsWidget = None
 
 
         taxon = self._data_.taxon
@@ -135,8 +137,10 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         self.facilityIDLineEdit.lazy = True
         self.facilityIDLineEdit.sig_enterPressed.connect(self._slot_setFacilityID)
 
-        self.biometricsWidget.setValue(self._data_.biometrics, objSymbol="biometrics")
-        self.biometricsWidget.sig_valueChanged.connect(self._slot_biometricsChanged)
+        self.biometricsPushButton.clicked.connect(self._slot_editBiometrics)
+
+        # self.biometricsWidget.setValue(self._data_.biometrics, objSymbol="biometrics")
+        # self.biometricsWidget.sig_valueChanged.connect(self._slot_biometricsChanged)
 
     def closeEvent(self, evt):
         if isinstance(self.taxonDetailsViewer, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.taxonDetailsViewer):
@@ -144,7 +148,13 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
             self.taxonDetailsViewer.deleteLater()
             self.taxonDetailsViewer = None
 
-        # super.closeEvent(evt)
+        if isinstance(self.biometricsWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biometricsWidget):
+            self.biometricsWidget.close()
+            self.biometricsWidget.deleteLater()
+            self.biometricsWidget = None
+
+
+        super().closeEvent(evt)
         evt.accept()
 
     def setTaxon(self, value):
@@ -226,6 +236,20 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
             self._data_.ID = ""
 
         self.sig_valueChanged.emit(self._data_)
+
+    @Slot()
+    def _slot_editBiometrics(self):
+        from gui.widgets.dataclasswidgets.biometricswidget import BiometricsWidget
+        if isinstance(self.biometricsWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biometricsWidget):
+            self.biometricsWidget.close()
+            self.biometricsWidget.deleteLater()
+            self.biometricsWidget = None
+        self.biometricsWidget = BiometricsWidget()
+        self.biometricsWidget.setValue(self._data_.biometrics, objSymbol="biometrics")
+        self.biometricsWidget.show()
+        self.biometricsWidget.sig_valueChanged.connect(self._slot_biometricsChanged)
+
+
 
     @Slot()
     def _slot_showTaxonDetails(self):
@@ -362,7 +386,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         self.strainLineEdit.setText(f"{self._data_.strain}")
         self.facilityIDLineEdit.setText(f"{self._data_.ID}")
 
-        self.biometricsWidget.setValue(self._data_.biometrics)
+        self.biometricsWidget.setValue(self._data_.biometrics, objSymbol="biometrics")
 
     def _isTaxoniqTaxon(self, obj) -> bool:
         return (taxonbridge.hasTaxoniq and isinstance(obj, taxonbridge.Taxon)

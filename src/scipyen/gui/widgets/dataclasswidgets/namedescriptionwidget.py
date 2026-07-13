@@ -145,7 +145,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
     @Slot(object, str)
     def slot_viewDetails(self, obj: object, varName: str):
         # print(f"{self.__class__.__name__}.slot_viewDetails({obj}, \n{varName})")
-        doc_title =  varName if len(varName.strip()) else {getattr(obj, 'name', type(obj).__name__)}
+        doc_title =  varName if len(varName.strip()) else getattr(obj, 'name', type(obj).__name__)
         # win_title = f"Details of {varName}"
         # win_title = "Details"
         if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
@@ -164,7 +164,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         else:
             # sigBlock = QtCore.QSignalBlocker(self.detailsViewer)
             self.detailsViewer.view(obj, doc_title = doc_title, name=doc_title)
-            self.detailsViewer.winTitle = win_title
+            # self.detailsViewer.winTitle = win_title
             self.detailsViewer.docTitle = doc_title
             self.detailsViewer.slot_refreshDataDisplay()
 
@@ -207,6 +207,10 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         self.sig_descriptionChanged.emit(self._dataDescription_)
 
     def closeEvent(self, evt):
+        self.closeChildren()
+        evt.accept()
+
+    def closeChildren(self):
         if isinstance(self.descriptionEditor, textviewer.TextViewer):
             self.descriptionEditor.close()
             self.descriptionEditor.deleteLater()
@@ -216,4 +220,3 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
             self.detailsViewer.close()
             self.detailsViewer.deleteLater()
             self.detailsViewer = None
-

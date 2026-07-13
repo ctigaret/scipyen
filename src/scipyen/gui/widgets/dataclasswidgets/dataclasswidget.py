@@ -411,18 +411,25 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     def closeEvent(self, evt):
         # print(f"{self.__class__.__name__}.closeEvent")
+        self.closeChildren()
+        # if isinstance(self.parentEditor, QtWidgets.QWidget):
+        #     self.parentEditor.close()
+        #     self.parentEditor.deleteLater()
+        #     self.parentEditor = None
+        #
+        # self.nameDescriptionWidget.closeChildren()
+
+        super().closeEvent(evt)
+        evt.accept()
+
+    def closeChildren(self):
         if isinstance(self.parentEditor, QtWidgets.QWidget):
             self.parentEditor.close()
             self.parentEditor.deleteLater()
             self.parentEditor = None
 
-        if isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
-            self.nameDescriptionWidget.close()
-            self.nameDescriptionWidget.deleteLater()
-            self.nameDescriptionWidget = None
+        self.nameDescriptionWidget.closeChildren()
 
-        super().closeEvent(evt)
-        evt.accept()
 
 
 

@@ -151,7 +151,6 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
         self.weightSpinBox.setValue(self._data_.weight)
         self.weightSpinBox.sig_valueChanged.connect(self._slot_weightChanged)
 
-
         if isinstance(self._data_.height, pq.Quantity):
             if self._data_.height.units == pq.Dimensionless:
                 self._data_.height = self._data_.height.magnitude * pq.cm
@@ -166,7 +165,7 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
     def closeEvent(self, evt):
         self.nameDescriptionWidget.close()
         self.dataExchangeWidget.close()
-        super.closeEvent(evt)
+        super().closeEvent(evt)
         evt.accept()
 
     @Slot(str)

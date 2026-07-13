@@ -6,23 +6,23 @@
 r"""
 """
 
-import typing, warnings, math, cmath, os, traceback, dataclasses, sys
+import typing, warnings, math, cmath, os, traceback, dataclasses, sys # noqa
 import numbers
 import numpy as np
 import quantities as pq
 import pandas as pd
 from tribool import Tribool
 
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+# import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -32,7 +32,7 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
+    from qtpy import sip # noqa
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
@@ -40,7 +40,7 @@ else:
     __has_sip__ = True
 
 
-from core.utilities import (get_least_pwr10, unique)
+from core.utilities import (get_least_pwr10, unique) # noqa
 from core.inputspec import InputSpec
 from gui.painting_shared import (FontStyleType, standardQtFontStyles,
                                  FontWeightType, standardQtFontWeights)
@@ -276,7 +276,8 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
 
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None,
                  unit:typing.Optional[pq.Quantity]=None,
-                 unitsFamily:typing.Optional[str]=None):
+                 unitsFamily:typing.Optional[str]=None,
+                 **kwargs):
         r"""
         Named parameters:
         =================
@@ -303,7 +304,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
 
         myunits = unit.units if isinstance(unit, pq.Quantity) else self._default_units_
 
-        self._restrictedToFamily_ = None
+        self._restrictedToFamily_ = kwargs.pop("restrictedToFamily", None)
 
         self._getUnitFamilyAndUnitFamilyUnits(myunits)
 
@@ -334,19 +335,31 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
                                                    indicate_if_directly_found=True)
 
         # print(f"{self.__class__.__name__}._getUnitFamilyAndUnitFamilyUnits({unit}):")
+        # print(f"\t_restrictedToFamily_ = {self._restrictedToFamily_}")
+        # print(f"\t_family_names = {self._family_names}")
         # print(f"\n\t -> family_name = {family_name}, directly_found = {directly_found}")
-
-        if isinstance(self._restrictedToFamily_, str) and len(self._restrictedToFamily_.strip()) and self._restrictedToFamily_ in self._family_names:
-            self._currentUnitsFamilyName = self._restrictedToFamily_
-        else:
-            self._currentUnitsFamilyName = family_name
-
-        self._currentUnitsFamily = scq.UNITS_DICT[self._currentUnitsFamilyName]
-        self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(family_name)), key = lambda x: x.name)
 
         self._familyIndex = list(scq.UNITS_DICT).index(family_name)
 
+        self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(family_name)), key = lambda x: x.name)
+        # print(f"\t_currentUnitFamilyUnits = {self._currentUnitFamilyUnits}")
+
+        if isinstance(self._restrictedToFamily_, str) and len(self._restrictedToFamily_.strip()) and self._restrictedToFamily_ in self._family_names:
+            self._currentUnitsFamilyName = self._restrictedToFamily_
+            self._currentUnitsFamily = scq.UNITS_DICT[self._currentUnitsFamilyName]
+            self._currentUnitFamilyUnits.extend(sorted(list(scq.familyUnits(self._currentUnitsFamilyName)), key = lambda x: x.name))
+        else:
+            self._currentUnitsFamilyName = family_name
+            self._currentUnitsFamily = scq.UNITS_DICT[self._currentUnitsFamilyName]
+
+        # print(f"\t_currentUnitsFamilyName = {self._currentUnitsFamilyName}")
+
+        # print(f"\t_currentUnitsFamily = {self._currentUnitsFamily}")
+
+        # print(f"\t_familyIndex = {self._familyIndex}")
+
         self._unitIndexInFamily = self._currentUnitFamilyUnits.index(unit.units)
+        # print(f"\t_unitIndexInFamily = {self._unitIndexInFamily}")
 
         # print(f"{self.__class__.__name__}._getUnitFamilyAndUnitFamilyUnits: unit = {unit}")
         # print(f"\tfamily -> {family_name}")
@@ -363,22 +376,30 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         signalBlocker = QtCore.QSignalBlocker(self.unitFamilyComboBox)
         # signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.unitFamilyComboBox, self.unitComboBox)]
         self.unitFamilyComboBox.clear()
-        self.unitFamilyComboBox.addItems(self._family_names)
-        if self._currentUnitsFamilyName in self._family_names:
-            self.unitFamilyComboBox.setCurrentIndex(self._families.index(self._currentUnitsFamily))
-        else:
+        if isinstance(self._restrictedToFamily_, str) and self._restrictedToFamily_ in scq.UNITS_DICT:
+            self.unitFamilyComboBox.addItem(self._restrictedToFamily_)
             self.unitFamilyComboBox.setCurrentIndex(0)
-            self._currentUnitsFamily = self._families[self.unitFamilyComboBox.currentIndex()]
-            self._currentUnitsFamilyName = self._family_names[self.unitFamilyComboBox.currentIndex()]
-            # print(f"{self.__class__.__name__}._setupFamilyCombo:\n\tself._currentUnitsFamilyName = {self._currentUnitsFamilyName}")
-            # print(f"\n\tfamily units: {scq.familyUnits(self._family_names[self.unitFamilyComboBox.currentIndex()])}")
-            self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(self._family_names[self.unitFamilyComboBox.currentIndex()])), key = lambda x: x.name)
+
+        else:
+            self.unitFamilyComboBox.addItems(self._family_names)
+
+            if self._currentUnitsFamilyName in self._family_names:
+                self.unitFamilyComboBox.setCurrentIndex(self._families.index(self._currentUnitsFamily))
+            else:
+                self.unitFamilyComboBox.setCurrentIndex(0)
+                self._currentUnitsFamily = self._families[self.unitFamilyComboBox.currentIndex()]
+                self._currentUnitsFamilyName = self._family_names[self.unitFamilyComboBox.currentIndex()]
+                # print(f"{self.__class__.__name__}._setupFamilyCombo:\n\tself._currentUnitsFamilyName = {self._currentUnitsFamilyName}")
+                # print(f"\n\tfamily units: {scq.familyUnits(self._family_names[self.unitFamilyComboBox.currentIndex()])}")
+                self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(self._family_names[self.unitFamilyComboBox.currentIndex()])), key = lambda x: x.name)
+
 
     def _setupUnitCombo(self):
         r"""Called by _configureUI_ but also when manually setting up a unit
         """
         signalBlocker = QtCore.QSignalBlocker(self.unitComboBox)
         self.unitComboBox.clear()
+
         if self.units == pq.dimensionless:
             u_names = list(map(lambda x: x.name, [pq.dimensionless] + self._currentUnitFamilyUnits))
             u_names_display = list(map(lambda x: f"{x.name} ({x.dimensionality.unicode})" if (x != pq.dimensionless and x.name != x.dimensionality.unicode) else x.name, self._currentUnitFamilyUnits))
@@ -484,6 +505,8 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         else:
             self.unitFamilyComboBox.setEnabled(True)
 
+        # print(f"{self.__class__.__name__}.familyRestriction.setter() -> {self._restrictedToFamily_}")
+
 class LazyLineEdit(QtWidgets.QLineEdit):
     sig_enterPressed = Signal(str, name="sig_enterPressed")
 
@@ -567,6 +590,8 @@ class LineEdit(QtWidgets.QLineEdit):
             else:
                 # needed in order to update the widget
                 super().keyPressEvent(event)
+
+        event.accept()
 
     def contextMenuEvent(self, evt: QtGui.QContextMenuEvent):
         stdMenu = self.createStandardContextMenu()
@@ -828,10 +853,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     sig_valueChanged:Signal = Signal(object, name="sig_valueChanged")
 
     _default_units_:pq.Quantity         =  pq.dimensionless
-    # _default_internal_minimum_:float    = -math.inf
-    # _default_internal_maximum_:float    =  math.inf
-    _default_internal_maximum_:float    = sys.float_info.max
-    # _default_internal_minimum_:float    = sys.float_info.min # WRONG!!!
+    _default_internal_maximum_:float    =  sys.float_info.max
     _default_internal_minimum_:float    = -sys.float_info.max
 
     _default_singleStep_:int = 1
@@ -873,13 +895,11 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         # to minimum - what do we do if minimum is set to 0 which is a valid value?
         # super().setSpecialValueText("NA") # shown when value is at minimum
 
-        # self._default_units_ = pq.dimensionless
-
-        # self._lineEdit_ = LazyLineEdit(self)
         self._lineEdit_ = LineEdit(self)
+        self._lineEdit_.lazy = True
+        self._lineEdit_.sig_enterPressed.connect(self._slot_valueTextChanged)
 
         super().setLineEdit(self._lineEdit_)
-        # self.setLineEdit(self._lineEdit_)
 
         self._keepDimensionless_: bool = keepDimensionless
         self._disableUnitChange_: bool = disableUnitChange
@@ -951,26 +971,18 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             self._decimals_ = decimals
 
         elif decimals is None:
-            # self._decimals_ = np.get_printoptions()["precision"]
             self._decimals_ = self._default_decimals_
 
         else:
             raise TypeError(f"decimals expected to be an int >= 0 or None; instead, got {decimals}")
 
-        # print(f"{self.objectName()}: {self.__class__.__name__}.__init__:  decimals -> {self.decimals}")
-
         self._internal_minimum = self._default_internal_minimum_
         self._internal_maximum = self._default_internal_maximum_
 
         self.setContextMenuPolicy(QtCore.Qt.DefaultContextMenu)
-        # print(f"{self.objectName()}: {self.__class__.__name__}.__init__ DONE")
-
-        # super().setSuffix(self._suffix_)
-        # super().setPrefix(self._prefix_)
 
         self.setSingleStep(self._singleStep_)
         self.setDecimals(self._decimals_) # also calls super().setDecimals(…)
-        # super().setValue(self._magnitude_) # will also set prefix suffix and specialValueText
 
         if isinstance(stepType, QtWidgets.QAbstractSpinBox.StepType):
             self._stepType_ = stepType
@@ -983,12 +995,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         self.setValue(self._magnitude_ * self._units_)
 
-        # super().valueChanged.connect(self._slot_valueChanged)
-        # self.lineEdit().setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
-        # self._lineEdit_.sig_enterPressed.connect(self._slot_valueTextChanged)
         super().lineEdit().sig_enterPressed.connect(self._slot_valueTextChanged)
 
-        # self.lineEdit().installEventFilter(self)
+        self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
     @property
     def fixSingleStep(self) -> bool:
@@ -1090,16 +1099,13 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
     @Slot(str)
     def _slot_valueTextChanged(self, s:str):
-        # print(f"{self.__class__.__name__}._slot_valueTextChanged")
+        print(f"{self.__class__.__name__}._slot_valueTextChanged")
 
         if self._validText_ == QtGui.QValidator.Acceptable:
             try:
                 val = self.valueFromText(s)
-                # if objectName.endswith("startSpinBox"):
-                #     print(f"{oname}{self.__class__.__name__}._slot_valueTextChanged(s = '{s}') -> val = {val}")
                 if isinstance(val, (pq.Quantity, float)):
                     self._magnitude_ = float(val)
-                    # self.setValue(self._magnitude_ * self._units)
                     self.sig_valueChanged.emit(self.value())
             except:
                 traceback.print_exc()
@@ -1109,7 +1115,6 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self.keepDimensionless = val
 
     def contextMenuEvent(self, evt):
-        # print(f"{self.objectName()}: {self.__class__.__name__}.contextMenuEvent: _enforceImmutableUnits_ = {self._enforceImmutableUnits_}")
         cm = QtWidgets.QMenu("Options", self)
         if not (self._keepDimensionless_ or self._forceDimensionless_ or self._disableUnitChange_ or self._enforceImmutableUnits_):
             setUnitsAction = cm.addAction("Set units")
@@ -1347,7 +1352,18 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         return valid
 
-    def valueFromText(self, text:str):
+    def keyPressEvent(self, event):
+        if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+            # print(f"{self.__class__.__name__}.keyPressEvent: text = '{self.text()}'")
+            # self.textChanged.emit(self.text())
+            self.sig_valueChanged.emit(self.value())
+        else:
+            # needed in order to update the widget
+            super().keyPressEvent(event)
+
+        event.accept()
+
+    def valueFromText(self, text:str) -> float | pq.Quantity:
         # print(f"{self.__class__.__name__}.valueFromText({text}) called")
         suffix = self._suffix_
         prefix = self._prefix_
@@ -1380,14 +1396,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                     s = s.replace("-e", "-1e")
 
                 ret = float(s)
-                # try:
-                # except ValueError:
-                #     pass
             units = self.units
             ret = ret * units.units if isinstance(units, pq.Quantity) else ret
 
         return ret
-
 
     def textFromValue(self, value:typing.Union[float, pq.Quantity, np.ndarray]):
         # print(f"{self.objectName()}: {self.__class__.__name__}.textFromValue({value})")
@@ -1651,12 +1663,15 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         else:
             self._restrictedToFamily_ = None
 
+        # print(f"{self.__class__.__name__}.familyRestriction.setter -> {self._restrictedToFamily_}")
+
     @Slot()
     def _slot_setUnitsGUI(self):
         if self._keepDimensionless_ or self._forceDimensionless_:
             return
+        # print(f"{self.__class__.__name__}._slot_setUnitsGUI: self._restrictedToFamily_ = {self._restrictedToFamily_}")
         dlg = qd.QuickDialog(parent = self, title="Set units")
-        quantityWidget = QuantityChooserWidget(parent = dlg)
+        quantityWidget = QuantityChooserWidget(parent = dlg)#, restrictedToFamily=self.familyRestriction)
         quantityWidget.units = self._units_
         if isinstance(self._restrictedToFamily_, str) and self._restrictedToFamily_ in scq.UNITS_DICT:
             quantityWidget.familyRestriction = self._restrictedToFamily_

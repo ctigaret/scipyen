@@ -732,7 +732,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             if self._initialExpandDepth_ == 0 and self._currentExpansionDepth_ == 0:
                 self.collapseAll()
             else:
-                self.expandToDepth(max(self._initialExpandDepth_, self._currentExpansionDepth_))
+                self.expandToDepth(max(self._initialExpandDepth_, self._currentExpansionDepth_-1))
 
             for col in self.autoResizeColumns:
                 if col >=0 and col < 3:
