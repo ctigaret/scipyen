@@ -350,7 +350,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
                                         self.subSpeciesLineEdit,
                                         self.strainLineEdit,
                                         self.facilityIDLineEdit,
-                                        self.biometricsWidget,
+                                        # self.biometricsWidget,
                                     # self.typeComboBox
                                     )
                                 )
@@ -386,7 +386,9 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         self.strainLineEdit.setText(f"{self._data_.strain}")
         self.facilityIDLineEdit.setText(f"{self._data_.ID}")
 
-        self.biometricsWidget.setValue(self._data_.biometrics, objSymbol="biometrics")
+        if isinstance(self.biometricsWidget, DataClassWidget):
+            sb = QtCore.QSignalBlocker(self.biometricsWidget) # noqa
+            self.biometricsWidget.setValue(self._data_.biometrics, objSymbol="biometrics")
 
     def _isTaxoniqTaxon(self, obj) -> bool:
         return (taxonbridge.hasTaxoniq and isinstance(obj, taxonbridge.Taxon)

@@ -158,7 +158,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self._objSymbol_ = kwargs.pop("objSymbol", None)
             if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
                 objSymbols = self.getDataSymbolInWorkspace(value)
-                if len(objSymbols) > 0:
+                if isinstance(objSymbols, typing.Sequence) and len(objSymbols) > 0:
                     self._objSymbol_ = objSymbols[0]
                 else:
                     self._objSymbol_ = ""

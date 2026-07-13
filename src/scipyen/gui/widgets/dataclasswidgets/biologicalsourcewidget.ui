@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>216</width>
-    <height>107</height>
+    <width>246</width>
+    <height>161</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -23,7 +23,7 @@
       <number>3</number>
      </property>
      <widget class="DataExchangeWidget" name="dataExchangeWidget" native="true"/>
-     <widget class="QWidget" name="layoutWidget">
+     <widget class="QWidget" name="">
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
         <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true"/>
@@ -113,6 +113,29 @@
           </widget>
          </item>
         </layout>
+       </item>
+       <item>
+        <widget class="QPushButton" name="organismPushButton">
+         <property name="text">
+          <string>Organism</string>
+         </property>
+         <property name="icon">
+          <iconset theme="document-properties"/>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="verticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
        </item>
       </layout>
      </widget>
