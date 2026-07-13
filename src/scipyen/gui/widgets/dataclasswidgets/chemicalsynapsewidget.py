@@ -36,14 +36,14 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
+    from qtpy import sip # noqa
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-
+from core import scipyendataclasses as sdc
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -90,6 +90,7 @@ class ChemicalSynapseWidget(Ui_ChemicalSynapseWidget, DataClassWidget):
 
         for t in self._morphoTypes_:
             self.synapseMorhpologicalTypeComboBox.addItem(t)
+
         ndx = self._morphoTypes_.index(self._data_.morphologicalType.name)
         self.synapseMorhpologicalTypeComboBox.setCurrentIndex(ndx)
         self.synapseMorhpologicalTypeComboBox.currentIndexChanged.connect(self._slot_morphologicalTypeChanged)
@@ -116,6 +117,10 @@ class ChemicalSynapseWidget(Ui_ChemicalSynapseWidget, DataClassWidget):
         self.postsynapticCompartmentWidget.setValue(self._data_.postsynaptic, isAttribute=True)
         self.postsynapticCompartmentWidget.nameDescriptionWidget.symbol = f"{self.dataExchangeWidget.objectSymbolLabel.text()}.postynaptic"
         self.postsynapticCompartmentWidget.sig_valueChanged.connect(self._slot_postsynapticChanged)
+
+    # def closeEvent(self, evt):
+    #     super.closeEvent(evt)
+    #     evt.accept()
 
     @Slot(int)
     def _slot_morphologicalTypeChanged(self, val:int):
@@ -155,13 +160,14 @@ class ChemicalSynapseWidget(Ui_ChemicalSynapseWidget, DataClassWidget):
             raise TypeError(f"Expecting one of  {self._objectTypes_}; instead, got a {type(val).__name__}")
 
         self._data_ = val
+        super().setValue(self._data_, **kwargs)
         self._isAttribute_ = kwargs.get("isAttribute", False)
 
         sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
                                (
-                                   self.dataExchangeWidget,
-                                   self.nameDescriptionWidget,
-                                   self.editParentToolButton,
+                                   # self.dataExchangeWidget,
+                                   # self.nameDescriptionWidget,
+                                   # self.editParentToolButton,
                                    self.synapseMorhpologicalTypeComboBox,
                                    self.synapseFunctionalTypeComboBox,
                                    self.retrogradeCheckBox,
@@ -170,10 +176,10 @@ class ChemicalSynapseWidget(Ui_ChemicalSynapseWidget, DataClassWidget):
                                 )
                                ))
 
-        self.dataExchangeWidget.setValue(self._data_)
-
-        self.nameDescriptionWidget.dataName = self._data_.name
-        self.nameDescriptionWidget.dataDescription = self._data_.description
+        # self.dataExchangeWidget.setValue(self._data_)
+        #
+        # self.nameDescriptionWidget.dataName = self._data_.name
+        # self.nameDescriptionWidget.dataDescription = self._data_.description
 
         for t in self._functionalTypes_:
             self.synapseFunctionalTypeComboBox.addItem(t)

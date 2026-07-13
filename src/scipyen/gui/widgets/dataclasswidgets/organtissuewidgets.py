@@ -96,7 +96,6 @@ class OrganWidget(Ui_OrganWidget, DataClassWidget):
 
     def _configureUI_(self):
         self.setupUi(self)
-
         super()._configureUI_()
 
 class TissueWidget(Ui_TissueWidget, DataClassWidget):
@@ -124,6 +123,5 @@ class TissueWidget(Ui_TissueWidget, DataClassWidget):
 
     def _configureUI_(self):
         self.setupUi(self)
-
         super()._configureUI_()
 

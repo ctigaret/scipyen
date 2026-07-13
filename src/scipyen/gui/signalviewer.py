@@ -248,8 +248,8 @@ from ephys import ephys as ephys
 #### BEGIN gui modules
 #from . import imageviewer as iv
 from core.pyqtgraph_patch import pyqtgraph as pg
-from core import qtutils as qtutils
-from gui import guiutils as guiutils
+from core import qtutils
+from gui import guiutils
 from gui import pictgui as pgui
 from gui import quickdialog as qd
 from gui import scipyen_colormaps as colormaps

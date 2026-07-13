@@ -54,6 +54,7 @@ from core.prog import scipywarn # noqa
 # from core import scipyen_quantities as scq
 # from core import taxonbridge
 from core import bgbridge
+from core import qtutils
 from gui import datatreeviewer
 from gui.widgets import small_widgets as smw
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
@@ -161,6 +162,15 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
 
         # self.structureTreeView.readOnly=True
 
+    def closeEvent(self, evt):
+        if isinstance(self.detailsViewer, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.detailsViewer):
+            self.detailsViewer.close()
+            self.detailsViewer.deleteLater()
+            self.detailsViewer = None
+
+        super.closeEvent(evt)
+        evt.accept()
+
     def _getStructure_(self, val: str) -> bgbridge.Structure | None:
         if (
             bgbridge.hasBrainGlobe and bgbridge.hasBrainGlobeAtlasAPI
@@ -168,7 +178,6 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
             and "brainglobe_atlasapi" in type(self._atlas_).__module__
             ):
             return bgbridge.get_atlas_structure(val, self._atlas_)
-
 
     def _parseStructureAncestorsAndDescendants(self):
         self._ancestors_ = dict()

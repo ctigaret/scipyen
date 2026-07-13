@@ -147,19 +147,19 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         # print(f"{self.__class__.__name__}.slot_viewDetails({obj}, \n{varName})")
         doc_title =  varName if len(varName.strip()) else {getattr(obj, 'name', type(obj).__name__)}
         # win_title = f"Details of {varName}"
-        win_title = "Details"
+        # win_title = "Details"
         if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
             self.detailsViewer = datatreeviewer.DataTreeViewer(
                 parent=self,
                 doc_title=doc_title,
-                title="Detailed view",
+                # title="Detailed view",
                 # appWindow = self,
                 )
 
             self.detailsViewer.autoRaise = False
 
             self.detailsViewer.view(obj, doc_title = doc_title, name=doc_title)
-            self.detailsViewer.winTitle = win_title
+            # self.detailsViewer.winTitle = win_title
             self.detailsViewer.sig_modelDataChanged.connect(self._slot_dataChangedInDetailsViewer)
         else:
             # sigBlock = QtCore.QSignalBlocker(self.detailsViewer)

@@ -107,7 +107,9 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
             elif isinstance(preSelected, (tuple, list)) and all([(isinstance(s, str) and len(s.strip()) and s in itemsList) for s in preSelected]):
                 self.preSelected = preSelected
 
+            # print(f"{self.__class__.__name__}.__init__ -> self.preSelected = {self.preSelected}")
             self.setItems(itemsList)
+
 
     @Slot(QtCore.QItemSelection, QtCore.QItemSelection)
     def _slot_selectionChanged(self, selected: QtCore.QItemSelection,
@@ -198,11 +200,21 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
             longestItemNdx = np.argmax([len(i) for i in itemsList])
             longestItem = itemsList[longestItemNdx]
 
-            for k, s in enumerate(self.preSelected):
-                ndx = itemsList.index(s)
+            if self.listWidget.selectionMode == QtWidgets.QAbstractItemView.SingleSelection:
+                ndx = itemsList.index(self.preSelected[0])
                 item = self.listWidget.item(ndx)
                 self.listWidget.setCurrentItem(item)
                 self.listWidget.scrollToItem(item)
+
+            else:
+                for k, s in enumerate(self.preSelected):
+                    ndx = itemsList.index(s)
+                    item = self.listWidget.item(ndx)
+                    self.listWidget.setCurrentItem(item, QtCore.QItemSelectionModel.Select)
+
+                lastSelectedItemNdx = itemsList.index(self.preSelected[-1])
+                lastSelectedItem = self.listWidget.item(lastSelectedItemNdx)
+                self.listWidget.scrollToItem(lastSelectedItem)
 
             fm = QtGui.QFontMetrics(self.listWidget.font())
             w = fm.width(longestItem) * 1.1

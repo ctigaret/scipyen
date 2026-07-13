@@ -54,6 +54,7 @@ except: # noqa
 from core import scipyendataclasses as sdc
 # from core import scipyen_quantities as scq # noqa
 from core import taxonbridge
+from core import qtutils
 from gui import datatreeviewer
 # from gui.widgets import small_widgets as smw
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
@@ -134,8 +135,17 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         self.facilityIDLineEdit.lazy = True
         self.facilityIDLineEdit.sig_enterPressed.connect(self._slot_setFacilityID)
 
-        self.biometricsWidget.setValue(self._data_.biometrics)
+        self.biometricsWidget.setValue(self._data_.biometrics, objSymbol="biometrics")
         self.biometricsWidget.sig_valueChanged.connect(self._slot_biometricsChanged)
+
+    def closeEvent(self, evt):
+        if isinstance(self.taxonDetailsViewer, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.taxonDetailsViewer):
+            self.taxonDetailsViewer.close()
+            self.taxonDetailsViewer.deleteLater()
+            self.taxonDetailsViewer = None
+
+        # super.closeEvent(evt)
+        evt.accept()
 
     def setTaxon(self, value):
         # print(f"{self.__class__.__name__}.setTaxon({value})")
@@ -219,26 +229,25 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
 
     @Slot()
     def _slot_showTaxonDetails(self):
-        print(f"{self.__class__.__name__}._slot_showTaxonDetails")
-        win_title = f"Taxon Details of {getattr(self._data_, 'name', type(self._data_).__name__)}"
+        # print(f"{self.__class__.__name__}._slot_showTaxonDetails")
+        # win_title = f"Taxon Details of {getattr(self._data_, 'name', type(self._data_).__name__)}"
         doc_title =  "taxon"
         if taxonbridge.hasTaxoniq and isinstance(self._data_.taxon, taxonbridge.Taxon):
             if not isinstance(self.taxonDetailsViewer, datatreeviewer.DataTreeViewer):
                 self.taxonDetailsViewer= datatreeviewer.DataTreeViewer(
                     parent=self,
                     doc_title=doc_title,
-                    title="Detailed view"
+                    # title="Detailed view"
                     )
                 self.taxonDetailsViewer.autoRaise = False
 
                 self.taxonDetailsViewer.view(self._data_.taxon,
                                              doc_title = doc_title,
                                              name=doc_title)
-                self.taxonDetailsViewer.winTitle = win_title
+                # self.taxonDetailsViewer.winTitle = win_title
                 self.taxonDetailsViewer.sig_modelDataChanged.connect(self._slot_detailsChanged)
 
             else:
-                # sigBlock = QtCore.QSignalBlocker(self.taxonDetailsViewer)
                 self.taxonDetailsViewer.view(self._data_.taxon,
                                              doc_title = doc_itle,
                                              name = doc_title)
@@ -253,23 +262,26 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         r"""Overrides DataClassWidget._slot_detailsChanged.
     Captures changes in the data tree viewer (details viewer)
     """
-        # print(f"{self.__class__.__name__}._slot_detailsChanged")
-        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
-                               (self.nameDescriptionWidget,
-                                self.dataExchangeWidget,
-                                self.taxonSpeciesLineEdit,
-                                self.subSpeciesLineEdit,
-                                self.strainLineEdit,
-                                self.facilityIDLineEdit,
-                                self.biometricsWidget,
-                                # self.typeComboBox
-                                )))
+        sigBlockers = list(
+            map(
+                lambda w: QtCore.QSignalBlocker(w),
+                (
+                    self.nameDescriptionWidget,
+                    self.dataExchangeWidget,
+                    self.taxonSpeciesLineEdit,
+                    self.subSpeciesLineEdit,
+                    self.strainLineEdit,
+                    self.facilityIDLineEdit,
+                    self.biometricsWidget,
+                )
+               )
+        )
 
         self.nameDescriptionWidget.dataName = self._data_.name
         self.nameDescriptionWidget.dataDescription = self._data_.description
 
         taxon = self._data_.taxon
-        if taxonbridge.hasTaxoniq and isinstane(taxon, taxonbridge.Taxon):
+        if taxonbridge.hasTaxoniq and isinstance(taxon, taxonbridge.Taxon):
             taxon_name = taxon.scientific_name
             common_name = f"{taxon.common_name}, (species: {taxon_name})"
         elif isinstance(taxon,str):
@@ -295,35 +307,34 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
     def value(self) -> sdc.Organism:
         return self._data_
 
-    def setValue(self, val:typing.Optional[sdc.Organism]=None, **kwargs):
-        self._objSymbol_ = kwargs.pop("objSymbol", None)
-        if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
-            objSymbols = self.getDataSymbolInWorkspace(value)
-            if len(objSymbols) > 0:
-                self._objSymbol_ = objSymbols[0]
-            else:
-                self._objSymbol_ = ""
-
-
-        if isinstance(val, sdc.Organism):
-            self._data_ = val
+    def setValue(self, value: typing.Optional[sdc.Organism]=None, **kwargs):
+        if isinstance(value, sdc.Organism):
+            self._data_ = value
         else:
             self._data_ = sdc.Organism()
 
-        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
-                               (self.nameDescriptionWidget,
-                                self.dataExchangeWidget,
-                                self.taxonSpeciesLineEdit,
-                                self.subSpeciesLineEdit,
-                                self.strainLineEdit,
-                                self.facilityIDLineEdit,
-                                self.biometricsWidget,
-                                # self.typeComboBox
-                                )))
+        super().setValue(self._data_, **kwargs)
 
-        self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
-        self.nameDescriptionWidget.dataName = self._data_.name
-        self.nameDescriptionWidget.dataDescription = self._data_.description
+
+        sigBlockers = list(
+                            map(
+                                    lambda w: QtCore.QSignalBlocker(w),
+                                    (
+                                        # self.nameDescriptionWidget,
+                                        # self.dataExchangeWidget,
+                                        self.taxonSpeciesLineEdit,
+                                        self.subSpeciesLineEdit,
+                                        self.strainLineEdit,
+                                        self.facilityIDLineEdit,
+                                        self.biometricsWidget,
+                                    # self.typeComboBox
+                                    )
+                                )
+                            )
+
+        # self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+        # self.nameDescriptionWidget.dataName = self._data_.name
+        # self.nameDescriptionWidget.dataDescription = self._data_.description
 
         taxon = self._data_.taxon
 

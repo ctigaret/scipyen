@@ -303,9 +303,9 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
 
         myunits = unit.units if isinstance(unit, pq.Quantity) else self._default_units_
 
-        self._getUnitFamilyAndUnitFamilyUnits(myunits)
-
         self._restrictedToFamily_ = None
+
+        self._getUnitFamilyAndUnitFamilyUnits(myunits)
 
         self._units_ = myunits
 
@@ -336,16 +336,13 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         # print(f"{self.__class__.__name__}._getUnitFamilyAndUnitFamilyUnits({unit}):")
         # print(f"\n\t -> family_name = {family_name}, directly_found = {directly_found}")
 
+        if isinstance(self._restrictedToFamily_, str) and len(self._restrictedToFamily_.strip()) and self._restrictedToFamily_ in self._family_names:
+            self._currentUnitsFamilyName = self._restrictedToFamily_
+        else:
+            self._currentUnitsFamilyName = family_name
 
-        self._currentUnitsFamilyName = family_name
         self._currentUnitsFamily = scq.UNITS_DICT[self._currentUnitsFamilyName]
         self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(family_name)), key = lambda x: x.name)
-
-        # if not directly_found:
-        #     if isinstance(unit, pq.UnitQuantity):
-        #         self._currentUnitFamilyUnits.insert(0, unit)
-        #     else:
-
 
         self._familyIndex = list(scq.UNITS_DICT).index(family_name)
 
@@ -382,8 +379,15 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         """
         signalBlocker = QtCore.QSignalBlocker(self.unitComboBox)
         self.unitComboBox.clear()
-        u_names = list(map(lambda x: x.name, self._currentUnitFamilyUnits))
-        u_names_display = list(map(lambda x: f"{x.name} ({x.dimensionality.unicode})" if (x != pq.dimensionless and x.name != x.dimensionality.unicode) else x.name, self._currentUnitFamilyUnits))
+        if self.units == pq.dimensionless:
+            u_names = list(map(lambda x: x.name, [pq.dimensionless] + self._currentUnitFamilyUnits))
+            u_names_display = list(map(lambda x: f"{x.name} ({x.dimensionality.unicode})" if (x != pq.dimensionless and x.name != x.dimensionality.unicode) else x.name, self._currentUnitFamilyUnits))
+        else:
+            u_names = list(map(lambda x: x.name, self._currentUnitFamilyUnits))
+            u_names_display = list(map(lambda x: f"{x.name} ({x.dimensionality.unicode})" if (x != pq.dimensionless and x.name != x.dimensionality.unicode) else x.name, self._currentUnitFamilyUnits))
+
+        # u_names = list(map(lambda x: x.name, self._currentUnitFamilyUnits))
+        # print(f"{self.__class__.__name__}<{self.objectName()}>._setupUnitCombo -> _currentUnitFamilyUnits = {self._currentUnitFamilyUnits}, u_names = {u_names}")
         self.unitComboBox.addItems(u_names_display)
         u_name = scq.unitName(self._units_)
         if u_name in u_names:
@@ -472,6 +476,9 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
                 scipywarn(f"Family of units named {value} not found")
                 return
             self._restrictedToFamily_ = value
+            self._getUnitFamilyAndUnitFamilyUnits(self.units)
+            self._setupFamilyCombo()
+            self._setupUnitCombo()
             self.unitFamily = value
             self.unitFamilyComboBox.setEnabled(False)
         else:

@@ -103,6 +103,7 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
 
         for text in self._devStageNames_:
             self.devStageComboBox.addItem(text)
+
         ndx = self._devStageNames_.index(self._data_.stage.name)
         self.devStageComboBox.setCurrentIndex(ndx)
 
@@ -162,6 +163,12 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
         self.heightSpinBox.setValue(self._data_.height)
         self.heightSpinBox.sig_valueChanged.connect(self._slot_heightChanged)
 
+    def closeEvent(self, evt):
+        self.nameDescriptionWidget.close()
+        self.dataExchangeWidget.close()
+        super.closeEvent(evt)
+        evt.accept()
+
     @Slot(str)
     def _slot_genotypeNameChanged(self, val: str):
         if isinstance(val, str):
@@ -200,16 +207,18 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
         self._data_.height = self.heightSpinBox.value()
         self.sig_valueChanged.emit(self._data_)
 
-    def setValue(self, val: typing.Optional[sdc.Biometrics] = None):
-        if not isinstance(val, self._objectTypes_):
-            val =  self._objectTypes_[0]()
+    def setValue(self, value: typing.Optional[sdc.Biometrics] = None, **kwargs):
+        if isinstance(value, self._objectTypes_):
+            self._data_ = value
+        else:
+            self._data_ = self._objectTypes_[0]()
 
-        self._data_ = val
+        super().setValue(self._data_, **kwargs)
 
         sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), # noqa
                                (
-                                   self.dataExchangeWidget,
-                                   self.nameDescriptionWidget,
+                                   # self.dataExchangeWidget,
+                                   # self.nameDescriptionWidget,
                                    self.genotypeLineEdit,
                                    self.geneticSexComboBox,
                                    self.devStageComboBox,
@@ -219,11 +228,6 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
                                 )
                                )
                            )
-
-        self.dataExchangeWidget.setValue(self._data_)
-
-        self.nameDescriptionWidget.dataName = self._data_.name
-        self.nameDescriptionWidget.dataDescription = self._data_.description
 
         self.genotypeLineEdit.setText(f"{self._data_.genotype}")
         ndx = self._geneticSexNames_.index(self._data_.geneticSex.name)

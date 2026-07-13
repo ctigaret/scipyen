@@ -144,11 +144,12 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
             raise TypeError(f"Expecting one of  {self._objectTypes_}; instead, got a {type(val).__name__}")
 
         self._data_ = val
+        super().setValue(self._data_, **kwargs)
 
         sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
                                (
-                                   self.dataExchangeWidget,
-                                   self.nameDescriptionWidget,
+                                   # self.dataExchangeWidget,
+                                   # self.nameDescriptionWidget,
                                    self.editParentToolButton,
                                    self.typeComboBox,
                                 )
@@ -156,10 +157,10 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
                         )
 
 
-        self.dataExchangeWidget.setValue(self._data_)
-
-        self.nameDescriptionWidget.dataName = self._data_.name
-        self.nameDescriptionWidget.dataDescription = self._data_.description
+        # self.dataExchangeWidget.setValue(self._data_)
+        #
+        # self.nameDescriptionWidget.dataName = self._data_.name
+        # self.nameDescriptionWidget.dataDescription = self._data_.description
 
         if isinstance(self._data_, sdc.NeuronCompartment):
             self._entityTypeNames_ = list(sdc.NeuronCompartmentType.names())

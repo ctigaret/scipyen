@@ -126,22 +126,23 @@ class CellWidget(Ui_CellWidget, DataClassWidget):
             raise TypeError(f"Expecting one of  {self._objectTypes_}; instead, got a {type(val).__name__}")
 
         self._data_ = val
+        super().setValue(self._data_, **kwargs)
         self._isAttribute_ = kwargs.get("isAttribute", False)
 
         sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
                                (
-                                   self.dataExchangeWidget,
-                                   self.nameDescriptionWidget,
-                                   self.editParentToolButton,
+                                   # self.dataExchangeWidget,
+                                   # self.nameDescriptionWidget,
+                                   # self.editParentToolButton,
                                    self.cellTypeNameEdit,
                                    self.cellSubTypeNameEdit
                                 )
                                ))
-
-        self.dataExchangeWidget.setValue(self._data_)
-
-        self.nameDescriptionWidget.dataName = self._data_.name
-        self.nameDescriptionWidget.dataDescription = self._data_.description
+        #
+        # self.dataExchangeWidget.setValue(self._data_)
+        #
+        # self.nameDescriptionWidget.dataName = self._data_.name
+        # self.nameDescriptionWidget.dataDescription = self._data_.description
 
         if not isinstance(self._data_, sdc.Neuron):
             self.cellTypeNameEdit.setText(f"{self._data_.cellType}")
@@ -204,21 +205,22 @@ class NeuronWidget(Ui_NeuronWidget, DataClassWidget):
             raise TypeError(f"Expecting one of  {self._objectTypes_}; instead, got a {type(val).__name__}")
 
         self._data_ = val
+        super().setValue(self._data_, **kwargs)
         self._isAttribute_ = kwargs.get("isAttribute", False)
 
         sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
                                (
-                                   self.dataExchangeWidget,
-                                   self.nameDescriptionWidget,
+                                   # self.dataExchangeWidget,
+                                   # self.nameDescriptionWidget,
                                    self.editParentToolButton,
                                    self.neuronTypeComboBox,
                                 )
                                ))
 
-        self.dataExchangeWidget.setValue(self._data_)
-
-        self.nameDescriptionWidget.dataName = self._data_.name
-        self.nameDescriptionWidget.dataDescription = self._data_.description
+        # self.dataExchangeWidget.setValue(self._data_)
+        #
+        # self.nameDescriptionWidget.dataName = self._data_.name
+        # self.nameDescriptionWidget.dataDescription = self._data_.description
 
         ndx = self._entityTypeNames_.index(self._data_.cellSubType.name)
         self.neuronTypeComboBox.setCurrentIndex(ndx)

@@ -220,7 +220,7 @@ import colorama  # noqa
 # END 3rd party modules
 
 # BEGIN scipyen modules
-from core import qtutils # noqa
+from core import qtutils
 from core import datazone # noqa
 from core import datatypes # noqa
 from core import basescipyen # noqa
@@ -8228,12 +8228,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot(QtCore.QModelIndex, QtCore.QModelIndex)
     def slot_fileSystemColumnViewCurrentChanged(self, current: QtCore.QModelIndex, prev: QtCore.QModelIndex):
         self.fileSystemColumnViewPreviewWidget.document().clear()
-        icon = self.fileSystemModel.getFileIcon(current).toImage()
-        text = self.fileSystemModel.getFileInfoText(current)
-        docCursor = QtGui.QTextCursor(self.fileSystemColumnViewPreviewWidget.document())
-        docCursor.insertImage(icon)
-        docCursor.insertText("\n")
-        docCursor.insertHtml(text)
+        if isinstance(current, QtCore.QModelIndex):
+            icon = self.fileSystemModel.getFileIcon(current).toImage()
+            text = self.fileSystemModel.getFileInfoText(current)
+            docCursor = QtGui.QTextCursor(self.fileSystemColumnViewPreviewWidget.document())
+            docCursor.insertImage(icon)
+            docCursor.insertText("\n")
+            docCursor.insertHtml(text)
         # self.fileSystemColumnViewPreviewWidget.document().setPlainText(text)
 
     @Slot(QtCore.QUrl)

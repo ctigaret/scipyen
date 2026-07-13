@@ -100,8 +100,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self._showCallables_: bool = kwargs.get("showCallables", False)
         self._showValuesOnly_: bool = kwargs.get("showValuesOnly", True)
 
-        assert (initialExpandDepth >=0 and initialExpandDepth < 3), f"Invalid value for 'initialExpandDepth': expecting an int >=0 and < 3; got {initialExpandDepth} instead"
-        self.initialExpandDepth: int = kwargs.pop("initialExpandDepth", 1)
+        assert isinstance(initialExpandDepth, int) and initialExpandDepth >=0, f"Invalid value for 'initialExpandDepth': expecting an int >=0 ; got {initialExpandDepth} instead"
+        self._initialExpandDepth_: int = initialExpandDepth
 
         autoResizeColumns = kwargs.pop("autoResizeColumns", {0,1})
         assert (isinstance(autoResizeColumns, set) and all((isinstance(v, int) and v in range(3)) for v in autoResizeColumns)), f"Invalid value for 'autoResizeColumns'; expecting a set of ints, each in range(3); instead, got {autoResizeColumns}"
@@ -164,6 +164,19 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                             )
             if len(allWindows):
                 self._scipyenMainWindow_ = allWindows[0]
+
+    @property
+    def initialExpandDepth(self) -> int:
+        return self._initialExpandDepth_
+
+    @initialExpandDepth.setter
+    def initialExpandDepth(self, val:int):
+        assert isinstance(val, int) and val >= 0, f"Invalid value for 'initialExpandDepth': expecting an int >=0 ; got {val} instead"
+        self._initialExpandDepth_ = val
+
+    @property
+    def currentExpansionDepth(self) -> int:
+        return self._currentExpansionDepth_
 
     @safewrapper
     def _exportPathsToClipboard_(self, item_paths):
@@ -283,9 +296,12 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             depth += 1
             parent = parent.parent()
 
-        print(f"{self.__class__.__name__}._slot_indexExpanded -> epxansion depth = {depth}")
+        # print(f"{self.__class__.__name__}._slot_indexExpanded -> epxansion depth = {depth}")
 
-        self._currentExpansionDepth_ = depth
+        if depth > self._currentExpansionDepth_:
+            self._currentExpansionDepth_ = depth
+
+
         # print(f"{self.__class__.__name__}._slot_indexExpanded -> {type(item)}")
 
     @Slot(QtCore.QModelIndex)
@@ -301,11 +317,12 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             depth += 1
             parent = parent.parent()
 
-        print(f"{self.__class__.__name__}._slot_indexCollapsed -> depth = {depth}")
+        # print(f"{self.__class__.__name__}._slot_indexCollapsed -> depth = {depth}")
+        if depth-1 > self._currentExpansionDepth_:
+            self._currentExpansionDepth_ = depth-1
+
+
         # item = self.sourceModel.itemFromIndex(index)
-
-
-
     @Slot()
     @safewrapper
     def slot_collapseAll(self):
@@ -712,10 +729,10 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             # tree; all of objects "internals" are child rows of it.
             objItem = root.child(0,0)
             self._setupChildDataItem_(objItem)
-            if self.initialExpandDepth == 0:
+            if self._initialExpandDepth_ == 0 and self._currentExpansionDepth_ == 0:
                 self.collapseAll()
             else:
-                self.expandToDepth(self.initialExpandDepth)
+                self.expandToDepth(max(self._initialExpandDepth_, self._currentExpansionDepth_))
 
             for col in self.autoResizeColumns:
                 if col >=0 and col < 3:
@@ -733,10 +750,10 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self.sourceModel.beginResetModel()
         self.sourceModel.topObjectItem.setData(value, QtCore.Qt.DisplayRole)
         self.sourceModel.endResetModel()
-        if self.initialExpandDepth == 0:
+        if self._initialExpandDepth_ == 0:
             self.collapseAll()
         else:
-            self.expandToDepth(self.initialExpandDepth)
+            self.expandToDepth(self._initialExpandDepth_)
 
         for col in self.autoResizeColumns:
             if col >=0 and col < 3:
@@ -868,10 +885,10 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
     def update(self):
         super().update()
-        if self.initialExpandDepth == 0:
+        if self._initialExpandDepth_ == 0:
             self.collapseAll()
         else:
-            self.expandToDepth(self.initialExpandDepth)
+            self.expandToDepth(self._initialExpandDepth_)
         for col in self.autoResizeColumns:
             if col >=0 and col < 3:
                 self.resizeColumnToContents(col)

@@ -153,49 +153,51 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         r"""Must override in subclasses, and called from there as super().setValue(…).
         Implementations must make sure it emits sig_valueChanged Qt signal.
         """
-        self._objSymbol_ = kwargs.pop("objSymbol", None)
-        if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
-            objSymbols = self.getDataSymbolInWorkspace(value)
-            if len(objSymbols) > 0:
-                self._objSymbol_ = objSymbols[0]
-            else:
-                self._objSymbol_ = ""
+        if len(args):
+            value = args[0]
+            self._objSymbol_ = kwargs.pop("objSymbol", None)
+            if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
+                objSymbols = self.getDataSymbolInWorkspace(value)
+                if len(objSymbols) > 0:
+                    self._objSymbol_ = objSymbols[0]
+                else:
+                    self._objSymbol_ = ""
 
-        if isinstance(self.dataExchangeWidget, DataExchangeWidget) and isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
-            if hasattr(self, "_data_"):
-                sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
-                                    (
-                                        self.dataExchangeWidget,
-                                        self.nameDescriptionWidget,
+            if isinstance(self.dataExchangeWidget, DataExchangeWidget) and isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
+                if hasattr(self, "_data_"):
+                    sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+                                        (
+                                            self.dataExchangeWidget,
+                                            self.nameDescriptionWidget,
+                                            )
                                         )
                                     )
-                                )
 
-                self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
-                self.nameDescriptionWidget.dataName = self._data_.name
-                self.nameDescriptionWidget.dataDescription = self._data_.description
+                    self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+                    self.nameDescriptionWidget.dataName = self._data_.name
+                    self.nameDescriptionWidget.dataDescription = self._data_.description
 
-                if (isinstance(self.nameDescriptionWidget.detailsViewer, DataTreeViewer)
-                    and self.nameDescriptionWidget.detailsViewer.isVisible()):
-                    self.nameDescriptionWidget.detailsViewer.view(self._data_,
-                                                                doc_title = self._objSymbol_,
-                                                                name = self._objSymbol_)
+                    if (isinstance(self.nameDescriptionWidget.detailsViewer, DataTreeViewer)
+                        and self.nameDescriptionWidget.detailsViewer.isVisible()):
+                        self.nameDescriptionWidget.detailsViewer.view(self._data_,
+                                                                    doc_title = self._objSymbol_,
+                                                                    name = self._objSymbol_)
 
-                self.nameDescriptionWidget.editParentToolButton.setEnabled(False)
-                self.nameDescriptionWidget.editParentToolButton.setVisible(False)
-                self.nameDescriptionWidget.replaceParentToolButton.setEnabled(False)
-                self.nameDescriptionWidget.replaceParentToolButton.setVisible(False)
+                    self.nameDescriptionWidget.editParentToolButton.setEnabled(False)
+                    self.nameDescriptionWidget.editParentToolButton.setVisible(False)
+                    self.nameDescriptionWidget.replaceParentToolButton.setEnabled(False)
+                    self.nameDescriptionWidget.replaceParentToolButton.setVisible(False)
 
-                if hasattr(self._data_, "parent"):
-                    self.nameDescriptionWidget.editParentToolButton.setEnabled(True)
-                    self.nameDescriptionWidget.editParentToolButton.setVisible(True)
+                    if hasattr(self._data_, "parent"):
+                        self.nameDescriptionWidget.editParentToolButton.setEnabled(True)
+                        self.nameDescriptionWidget.editParentToolButton.setVisible(True)
 
-                    if (
-                        hasattr(self._data_, "parentTypes")
-                        and len(self._data_.parentTypes) > 1
-                        ):
-                        self.nameDescriptionWidget.replaceParentToolButton.setEnabled(True)
-                        self.nameDescriptionWidget.replaceParentToolButton.setVisible(True)
+                        if (
+                            hasattr(self._data_, "parentTypes")
+                            and len(self._data_.parentTypes) > 1
+                            ):
+                            self.nameDescriptionWidget.replaceParentToolButton.setEnabled(True)
+                            self.nameDescriptionWidget.replaceParentToolButton.setVisible(True)
 
     @property
     def isAttribute(self) -> bool:
@@ -408,16 +410,18 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         return NervousSystemWidget(obj, objSymbol="parent")
 
     def closeEvent(self, evt):
-        if isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
-            if isinstance(self.parentEditor, QtWidgets.QWidget):
-                self.parentEditor.close()
-                self.parentEditor.deleteLater()
-                self.parentEditor = None
+        # print(f"{self.__class__.__name__}.closeEvent")
+        if isinstance(self.parentEditor, QtWidgets.QWidget):
+            self.parentEditor.close()
+            self.parentEditor.deleteLater()
+            self.parentEditor = None
 
+        if isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
             self.nameDescriptionWidget.close()
             self.nameDescriptionWidget.deleteLater()
             self.nameDescriptionWidget = None
 
+        super().closeEvent(evt)
         evt.accept()
 
 

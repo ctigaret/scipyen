@@ -132,12 +132,23 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
     def _slot_chooseNewSpecimenType(self):
         from gui.itemslistdialog import ItemsListDialog
 
-        spTypeNames = list(self._specimenTypeNames_.keys())
-        if type(self._data_.specimen) in self._data_.specimenTypes:
-            ndx = self._data_.specimenTypes.index(type(self._data_.specimen))
+        # spTypeNames = list(self._specimenTypeNames_.keys())
+        spTypes = self._data_.sourceSpecimenTypeMap[self._data_.sourceType]
+        spTypeNames = list(
+                            map(
+                                lambda t: t.__name__,
+                                spTypes
+                                )
+                          )
+        # if type(self._data_.specimen) in self._data_.specimenTypes:
+        if type(self._data_.specimen) in spTypes:
+            # ndx = self._data_.specimenTypes.index(type(self._data_.specimen))
+            ndx = spTypes.index(type(self._data_.specimen))
             preSelected = spTypeNames[ndx]
         else:
             preSelected = spTypeNames[0]
+
+        # print(f"{self.__class__.__name__}._slot_chooseNewSpecimenType -> preSelected = {preSelected}")
 
         dlg = ItemsListDialog(parent=self, itemsList=spTypeNames,
                               title="Create New Specimen",
@@ -156,22 +167,13 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
             newSpecimen = spType()
             self._slot_specimenChanged(newSpecimen)
             self._slot_editSpecimen
-            # if isinstance(self.specimenWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenWidget):
-            #     self.specimenWidget.close()
-            #     self.specimenWidget.deleteLater()
-            #     self.specimenWidget = None
-            #
-            # self.specimenWidget = self._createSpecimenWidget_(newSpecimen)
-            # self.specimenWidget.sig_valueChanged.connect(self._slot_specimenChanged)
-            # self.specimenWidget.show()
-            # self.specimenWidget.setWindowTitle(f"New Specimen: {value}")
 
     @Slot()
     def _slot_detailsChanged(self):
         r"""Overrides DataClassWidget._slot_detailsChanged.
     Captures changes in the data tree viewer (details viewer)
     """
-        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), # noqa
                                (self.nameDescriptionWidget,
                                 self.dataExchangeWidget,
                                 self.bioSourceTypeComboBox
@@ -282,6 +284,8 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
             self.specimenWidget.close()
             self.specimenWidget.deleteLater()
             self.specimenWidget = None
+        super().closeEvent(evt)
+        evt.accept()
 
     def value(self) -> sdc.BiologicalSource:
         return self._data_
@@ -292,9 +296,9 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         else:
             self._data_ = value
 
-        super().setValue(**kwargs)
+        super().setValue(self._data_, **kwargs)
 
-        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), # noqa
                                (
                                    self.bioSourceTypeComboBox,
                                    self.specimenNameLabel,
