@@ -1099,7 +1099,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
     @Slot(str)
     def _slot_valueTextChanged(self, s:str):
-        print(f"{self.__class__.__name__}._slot_valueTextChanged")
+        # print(f"{self.__class__.__name__}._slot_valueTextChanged")
 
         if self._validText_ == QtGui.QValidator.Acceptable:
             try:
