@@ -89,7 +89,6 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         else:
             self._data_ = obj
 
-        DataClassWidget.__init__(self, parent=parent, **kwargs)
 
         self._bioSourceTypeNames_ = list(sdc.BioSourceType.names())
 
@@ -101,6 +100,8 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
             )
 
         self._needsNewSpecimenWidget_: bool = True
+
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
 
         self._configureUI_()
 
@@ -118,7 +119,7 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         self.bioSourceTypeComboBox.currentIndexChanged.connect(self._slot_sourceTypeChanged)
 
         self.specimenWidget = None
-        self.organismWidget = None
+        # self.organismWidget = None
 
         if isinstance(self._data_.specimen.name, str) and len(self._data_.specimen.name.strip()):
             spNameLabel = f"{self._data_.specimen.name} ({type(self._data_.specimen).__name__})"
@@ -127,36 +128,9 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         self.specimenNameLabel.setText(spNameLabel)
 
-        # self.editSpecimenToolButton.clicked.connect(self._slot_editSpecimen)
         self.editSpecimenToolButton.toggled.connect(self._slot_toggleSpecimenEditor)
 
         self.replaceSpecimenToolButton.clicked.connect(self._slot_chooseNewSpecimenType)
-
-        self.organismPushButton.clicked.connect(self._slot_editOrganism)
-
-    @Slot()
-    def _slot_editOrganism(self):
-        from gui.widgets.dataclasswidgets.organismwidget import OrganismWidget
-        if isinstance(self.organismWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismWidget):
-            self.organismWidget.close()
-            self.organismWidget.deleteLater()
-            self.organismWidget = None
-
-        self.organismWidget = OrganismWidget(callingWidget=self)
-        self.organismWidget.setValue(self._data_.getOrganism(), objSymbol="organism")
-        self.organismWidget.setWindowTitle("Organism")
-        self.organismWidget.show()
-        self.organismWidget.sig_valueChanged.connect(self._slot_organismChanged)
-
-
-    @Slot(object)
-    def _slot_organismChanged(self, value: object):
-        if isinstance(value, sdc.Organism):
-            self._data_.setOrganism(value)
-        else:
-            self._data_.setOrganism(sdc.Organism())
-
-        self.sig_valueChanged.emit(self._data_)
 
     @Slot()
     def _slot_chooseNewSpecimenType(self):
@@ -194,7 +168,8 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
             newSpecimen = spType()
             self._needsNewSpecimenWidget_ = type(newSpecimen) is not type(self._data_.specimen)
             self._slot_specimenChanged(newSpecimen)
-            self._slot_editSpecimen()
+            self.editSpecimenToolButton.setChecked(True)
+            # self._slot_editSpecimen()
 
     @Slot()
     def _slot_detailsChanged(self):
@@ -251,6 +226,11 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
                 self.specimenWidget.collapse(False)
 
     @Slot()
+    def _slot_specimenWidgetClosing(self):
+        sb = QtCore.QSignalBlocker(self.editSpecimenToolButton) # noqa
+        self.editSpecimenToolButton.setChecked(False)
+
+    @Slot()
     def _slot_editSpecimen(self):
         if isinstance(self._data_.specimen, self._data_.specimenTypes):
             if isinstance(self.specimenWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenWidget):
@@ -259,24 +239,16 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
                     self.specimenWidget.deleteLater()
                     self.specimenWidget = None
 
-                    # self.specimenWidget = self._createSpecimenWidget_(self._data_.specimen)
                     spWidgetType = self._createSpecimenWidget_(self._data_.specimen)
                     self.specimenWidget = spWidgetType(self._data_.specimen, objSymbol="specimen", callingWidget=self)
                     self.specimenWidget.sig_valueChanged.connect(self._slot_specimenChanged)
-                    # self.specimenWidget.show()
-                    # if isinstance(self._data_.specimen.name, str) and len(self._data_.specimen.name.strip()):
-                    #     self.specimenWidget.setWindowTitle(f"Specimen: {self._data_.specimen.name} ({type(self._data_.specimen).__name__})")
-                    # else:
-                    #     self.specimenWidget.setWindowTitle(f"Specimen: {type(self._data_.specimen).__name__}")
-
-                # else:
-                #     self.specimenWidget.show()
+                    self.specimenWidget.sig_closing.connect(self._slot_specimenWidgetClosing)
 
             else:
                 spWidgetType = self._createSpecimenWidget_(self._data_.specimen)
                 self.specimenWidget = spWidgetType(self._data_.specimen, objSymbol="specimen", callingWidget=self)
                 self.specimenWidget.sig_valueChanged.connect(self._slot_specimenChanged)
-                self.specimenWidget.show()
+                self.specimenWidget.sig_closing.connect(self._slot_specimenWidgetClosing)
 
             self._needsNewSpecimenWidget_ = False
             self.specimenWidget.show()
@@ -337,14 +309,16 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
     def closeEvent(self, evt):
         if isinstance(self.specimenWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenWidget):
+            # sb = QtCore.QSignalBlocker(self.specimenWidget)
             self.specimenWidget.close()
             self.specimenWidget.deleteLater()
             self.specimenWidget = None
 
-        if isinstance(self.organismWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismWidget):
-            self.organismWidget.close()
-            self.organismWidget.deleteLater()
-            self.organismWidget = None
+        # if isinstance(self.organismWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismWidget):
+        #     sb = QtCore.QSignalBlocker(self.organismWidget)
+        #     self.organismWidget.close()
+        #     self.organismWidget.deleteLater()
+        #     self.organismWidget = None
 
         super().closeEvent(evt)
         evt.accept()
@@ -377,9 +351,9 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         self.specimenNameLabel.setText(spNameLabel)
 
-        if isinstance(self.organismWidget, DataClassWidget):
-            sb = QtCore.QSignalBlocker(self.organismWidget) # noqa
-            self.organismWidget.setValue(self._data_.getOrganism(), objSymbol="organism")
+        if isinstance(self.organismEditor, DataClassWidget):
+            sb = QtCore.QSignalBlocker(self.organismEditor) # noqa
+            self.organismEditor.setValue(self._data_.getOrganism(), objSymbol="organism")
 
 
 

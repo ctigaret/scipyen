@@ -92,7 +92,6 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
 
         DataClassWidget.__init__(self, parent=parent, **kwargs)
 
-
         self._configureUI_()
 
     def _configureUI_(self):
@@ -101,7 +100,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         super()._configureUI_()
 
         self.taxonDetailsViewer = None
-        self.biometricsWidget = None
+        self.biometricsEditor = None
 
 
         taxon = self._data_.taxon
@@ -137,10 +136,8 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         self.facilityIDLineEdit.lazy = True
         self.facilityIDLineEdit.sig_enterPressed.connect(self._slot_setFacilityID)
 
-        self.biometricsPushButton.clicked.connect(self._slot_editBiometrics)
-
-        # self.biometricsWidget.setValue(self._data_.biometrics, objSymbol="biometrics")
-        # self.biometricsWidget.sig_valueChanged.connect(self._slot_biometricsChanged)
+        # self.editBiometricsToolButton.clicked.connect(self._slot_editBiometrics)
+        self.editBiometricsToolButton.toggled.connect(self._slot_toggleBiometricsEditor)
 
     def closeEvent(self, evt):
         if isinstance(self.taxonDetailsViewer, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.taxonDetailsViewer):
@@ -148,10 +145,10 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
             self.taxonDetailsViewer.deleteLater()
             self.taxonDetailsViewer = None
 
-        if isinstance(self.biometricsWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biometricsWidget):
-            self.biometricsWidget.close()
-            self.biometricsWidget.deleteLater()
-            self.biometricsWidget = None
+        if isinstance(self.biometricsEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biometricsEditor):
+            self.biometricsEditor.close()
+            self.biometricsEditor.deleteLater()
+            self.biometricsEditor = None
 
 
         super().closeEvent(evt)
@@ -197,6 +194,14 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
 
         self.sig_valueChanged.emit(self._data_)
 
+    @Slot(bool)
+    def _slot_toggleBiometricsEditor(self, val: bool):
+        if val is True:
+            self._slot_editBiometrics()
+        else:
+            if isinstance(self.biometricsEditor, DataClassWidget) and qtutils.isQObjectAlive(self.biometricsEditor):
+                self.biometricsEditor.collapse(False)
+
     @Slot(object)
     def _slot_biometricsChanged(self, value: object):
         if isinstance(value, sdc.Biometrics):
@@ -240,18 +245,26 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
     @Slot()
     def _slot_editBiometrics(self):
         from gui.widgets.dataclasswidgets.biometricswidget import BiometricsWidget
-        if isinstance(self.biometricsWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biometricsWidget):
-            self.biometricsWidget.close()
-            self.biometricsWidget.deleteLater()
-            self.biometricsWidget = None
+        if not isinstance(self.biometricsEditor, BiometricsWidget):
+            if isinstance(self.biometricsEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biometricsEditor):
+                self.biometricsEditor.close()
+                self.biometricsEditor.deleteLater()
+                self.biometricsEditor = None
 
-        self.biometricsWidget = BiometricsWidget(callingWidget=self)
-        self.biometricsWidget.setValue(self._data_.biometrics, objSymbol="biometrics")
-        self.biometricsWidget.setWindowTitle("Biometrics")
-        self.biometricsWidget.show()
-        self.biometricsWidget.sig_valueChanged.connect(self._slot_biometricsChanged)
+            self.biometricsEditor = BiometricsWidget(callingWidget=self)
+            self.biometricsEditor.setWindowTitle("Biometrics")
+            self.biometricsEditor.sig_valueChanged.connect(self._slot_biometricsChanged)
+            self.biometricsEditor.sig_closing.connect(self._slot_biometricsEditorClosing)
 
+        self.biometricsEditor.setValue(self._data_.biometrics, objSymbol="biometrics")
 
+        if not self.biometricsEditor.isVisible():
+            self.biometricsEditor.show()
+
+    @Slot()
+    def _slot_biometricsEditorClosing(self):
+        sb = QtCore.QSignalBlocker(self.editBiometricsToolButton)
+        self.editBiometricsToolButton.setChecked(False)
 
     @Slot()
     def _slot_showTaxonDetails(self):
@@ -298,7 +311,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
                     self.subSpeciesLineEdit,
                     self.strainLineEdit,
                     self.facilityIDLineEdit,
-                    self.biometricsWidget,
+                    self.biometricsEditor,
                 )
                )
         )
@@ -326,7 +339,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         self.strainLineEdit.setText(f"{self._data_.strain}")
         self.facilityIDLineEdit.settext(f"{self._data_.ID}")
 
-        self.biometricsWidget.setValue(self._data_.biometrics)
+        self.biometricsEditor.setValue(self._data_.biometrics)
 
         self.sig_valueChanged.emit(self._data_)
 
@@ -352,19 +365,14 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
                                         self.subSpeciesLineEdit,
                                         self.strainLineEdit,
                                         self.facilityIDLineEdit,
-                                        # self.biometricsWidget,
+                                        # self.biometricsEditor,
                                     # self.typeComboBox
                                     )
                                 )
                             )
 
-        # self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
-        # self.nameDescriptionWidget.dataName = self._data_.name
-        # self.nameDescriptionWidget.dataDescription = self._data_.description
-
         taxon = self._data_.taxon
 
-        # print(f"{self.__class__.__name__}.setValue -> taxon is a {type(self._data_.taxon)}")
         if self._isTaxoniqTaxon(taxon):
             taxon_name = taxon.scientific_name
             common_name = f"{taxon.common_name}, (species: {taxon_name})"
@@ -388,9 +396,9 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         self.strainLineEdit.setText(f"{self._data_.strain}")
         self.facilityIDLineEdit.setText(f"{self._data_.ID}")
 
-        if isinstance(self.biometricsWidget, DataClassWidget):
-            sb = QtCore.QSignalBlocker(self.biometricsWidget) # noqa
-            self.biometricsWidget.setValue(self._data_.biometrics, objSymbol="biometrics")
+        if isinstance(self.biometricsEditor, DataClassWidget):
+            sb = QtCore.QSignalBlocker(self.biometricsEditor) # noqa
+            self.biometricsEditor.setValue(self._data_.biometrics, objSymbol="biometrics")
 
     def _isTaxoniqTaxon(self, obj) -> bool:
         return (taxonbridge.hasTaxoniq and isinstance(obj, taxonbridge.Taxon)

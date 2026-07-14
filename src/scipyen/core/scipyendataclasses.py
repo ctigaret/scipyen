@@ -1302,8 +1302,6 @@ class BiologicalSource(ScipyenDataclass):
     subcellular compartment.
     """
 
-    # TODO: 2024-11-17 21:11:13 : locate and use neuronal taxonomy API
-
     # The organism of this source.
     # Contains the data related to the taxon, species, subspecies, strain, and
     # biometrics.

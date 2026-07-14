@@ -79,6 +79,8 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     sig_dataExporting = Signal(object, name="sig_dataExporting")
     sig_dataCopy = Signal(object, name="sig_dataCopy")
     sig_detailedView = Signal(object, str, name="sig_detailedView")
+    sig_closing = Signal(name="sig_closing")
+    sig_moved = Signal(QtCore.QPoint, name="sig_moved")
     _objectTypes_ = tuple()
 
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None, **kwargs):
@@ -94,19 +96,20 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         self._needsNewParentWidget_: bool =  True
 
         if isinstance(callingWidget, QtWidgets.QWidget):
+            self._callingWidget_ = callingWidget
             self._isSubWidget_ = True
             self._positionHint_ = callingWidget.geometry().topRight()
+
+        else:
+            self._callingWidget_ = None
 
         self.dataExchangeWidget = None
         self.nameDescriptionWidget = None
         self.editParentToolButton = None
         self.parentEditor = None
+        self.organismEditor = None
 
         QtWidgets.QWidget.__init__(self, parent=parent)
-        # if isinstance(windowFlags, QtCore.Qt.WindowType):
-        #     QtWidgets.QWidget.__init__(parent=parent, f=windowFlags)
-        # else:
-        #     QtWidgets.QWidget.__init__(self, parent=parent)
         self._isAttribute_: bool = isAttribute
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
 
@@ -172,9 +175,9 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
             self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
             self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
-            # self.nameDescriptionWidget.sig_parentEditRequest.connect(self._slot_editParent)
             self.nameDescriptionWidget.sig_parentEditRequest.connect(self._slot_toggleParentEditor)
             self.nameDescriptionWidget.sig_newParentRequest.connect(self._slot_chooseNewParentType)
+            self.nameDescriptionWidget.sig_organismEditRequest.connect(self._slot_toggleOrganismEditor)
             self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
             self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
             self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
@@ -183,13 +186,14 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self.nameDescriptionWidget.editParentToolButton.setVisible(False)
             self.nameDescriptionWidget.replaceParentToolButton.setEnabled(False)
             self.nameDescriptionWidget.replaceParentToolButton.setVisible(False)
+            self.nameDescriptionWidget.organismToolButton.setEnabled(False)
+            self.nameDescriptionWidget.organismToolButton.setVisible(False)
 
-            if (
-                hasattr(self, "_data_")
-                and hasattr(self._data_, "parent")
-                ):
-                self.nameDescriptionWidget.editParentToolButton.setEnabled(True)
-                self.nameDescriptionWidget.editParentToolButton.setVisible(True)
+            if hasattr(self, "_data_"):
+                if hasattr(self._data_, "parent"):
+                    self.nameDescriptionWidget.editParentToolButton.setEnabled(True)
+                    self.nameDescriptionWidget.editParentToolButton.setVisible(True)
+
 
                 if (
                     hasattr(self._data_, "parentTypes")
@@ -198,6 +202,21 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                     self.nameDescriptionWidget.replaceParentToolButton.setEnabled(True)
                     self.nameDescriptionWidget.replaceParentToolButton.setVisible(True)
 
+                # print(f"{self.__class__.__name__}._configureUI_: checking for organism access")
+
+                if (
+                    not isinstance(self._data_, sdc.Organism)
+                    and hasattr(self._data_, "getOrganism")
+                    and hasattr(self._data_, "setOrganism")
+                    ):
+                    self.nameDescriptionWidget.organismToolButton.setEnabled(True)
+                    self.nameDescriptionWidget.organismToolButton.setVisible(True)
+
+        if (
+            isinstance(self._callingWidget_, QtWidgets.QWidget)
+            and hasattr(self._callingWidget_, "_slot_callingWidgetMoved")
+            ):
+            self._callingWidget_.sig_moved.connect(self._slot_callingWidgetMoved)
 
     @QtCore.Property(int)
     def widgetWidth(self) -> int:
@@ -248,6 +267,11 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                 else:
                     self.setVisible(False)
 
+            else:
+                # re-allow manual resizing
+                self.setMinimumSize(QtCore.QSize(0,0))
+                self.setMaximumSize(QtCore.QSize(QtWidgets.QWIDGETSIZE_MAX, QtWidgets.QWIDGETSIZE_MAX))
+
     def value(self) -> None:
         r"""Must override in subclasses"""
         pass
@@ -255,10 +279,12 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     def show(self):
         if self.isVisible():
             return
+
         if self._isSubWidget_:
             self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Forward)
             geometry = self.geometry()
             self._sizeAnimation_.setEndValue(self.sizeHint().width())
+            self._positionHint_ = self._callingWidget_.geometry().topRight()
             geometry.setX(self._positionHint_.x())
             geometry.setY(self._positionHint_.y())
             self.setGeometry(geometry)
@@ -317,6 +343,15 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                             ):
                             self.nameDescriptionWidget.replaceParentToolButton.setEnabled(True)
                             self.nameDescriptionWidget.replaceParentToolButton.setVisible(True)
+
+                    # print(f"{self.__class__.__name__}.setValue(): checking for organism access")
+                    if (
+                        not isinstance(self._data_, sdc.Organism)
+                        and hasattr(self._data_, "getOrganism")
+                        and hasattr(self._data_, "setOrganism")
+                        ):
+                        self.nameDescriptionWidget.organismToolButton.setEnabled(True)
+                        self.nameDescriptionWidget.organismToolButton.setVisible(True)
 
     @property
     def isAttribute(self) -> bool:
@@ -430,38 +465,41 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             and isinstance(self._data_.parent, self._data_.parentTypes)): # dataclasses.is_dataclass(self._data_.parent)):
             parent = self._data_.parent
 
-        # print(f"{self.__class__.__name__}._slot_editParent -> {parent}")
-
         if isinstance(self.parentEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.parentEditor):
             if self._needsNewParentWidget_:
-                # editor = self._createParentEditor_(parent)
                 editorType = self._createParentEditor_(parent)
                 editor = editorType(parent, objSymbol="parent", callingWidget=self)
                 editor.sig_valueChanged.connect(self._slot_parentChanged)
+                editor.sig_closing.connect(self._slot_parentEditorClosing)
                 if type(editor) is not type(self.parentEditor):
                     self.parentEditor.close()
                     self.parentEditor.deleteLater()
                     self.parentEditor = editor
-                    # self.parentEditor.show()
-                    # return
-
-            # elif not self.parentEditor.isVisible():
-            #     self.parentEditor.show()
 
         else:
-            # self.parentEditor = self._createParentEditor_(parent)
             editorType = self._createParentEditor_(parent)
             self.parentEditor = editorType(parent, objSymbol="parent", callingWidget=self)
             self.parentEditor.sig_valueChanged.connect(self._slot_parentChanged)
+            self.parentEditor.sig_closing.connect(self._slot_parentEditorClosing)
 
         self._needsNewParentWidget_ = False
         self.parentEditor.show()
-        self.parentEditor.setWindowTitle(f"Edit Parent: {type(parent).__name__}")
+        self.parentEditor.setWindowTitle(f"Parent: {type(parent).__name__}")
 
 
         # TODO: 2026-06-25 16:47:07 finalize me
         # what are the possible parents of the CellCompartment/NeuronCompartment
         # propose creating a new one (add create new button to these widgets)
+
+    @Slot()
+    def _slot_parentEditorClosing(self):
+        sb = QtCore.QSignalBlocker(self.nameDescriptionWidget.editParentToolButton) # noqa
+        self.nameDescriptionWidget.editParentToolButton.setChecked(False)
+
+    @Slot()
+    def _slot_organismEditorClosing(self):
+        sb = QtCore.QSignalBlocker(self.nameDescriptionWidget.organismToolButton)
+        self.nameDescriptionWidget.organismToolButton.setChecked(False)
 
     @Slot()
     def _slot_chooseNewParentType(self):
@@ -505,6 +543,49 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self._slot_parentChanged(self._data_.parent)
             self.nameDescriptionWidget.editParentToolButton.setChecked(True)
             # self._slot_editParent()
+
+    @Slot(bool)
+    def _slot_toggleOrganismEditor(self, val: bool):
+        if val is True:
+            self._slot_editOrganism()
+        else:
+            if isinstance(self.organismEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismEditor):
+                self.organismEditor.collapse(False)
+
+    @Slot()
+    def _slot_editOrganism(self):
+        from gui.widgets.dataclasswidgets.organismwidget import OrganismWidget
+        if not isinstance(self.organismEditor, OrganismWidget):
+            if isinstance(self.organismEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismEditor):
+                self.organismEditor.close()
+                self.organismEditor.deleteLater()
+                self.organismEditor = None
+
+            self.organismEditor = OrganismWidget(callingWidget=self)
+            self.organismEditor.setWindowTitle("Organism")
+            self.organismEditor.sig_valueChanged.connect(self._slot_organismChanged)
+            self.organismEditor.sig_closing.connect(self._slot_organismEditorClosing)
+
+        try:
+            organism = self._data_.getOrganism()
+        except: # noqa
+            organism = sdc.Organism()
+
+        self.organismEditor.setValue(organism, objSymbol="organism")
+
+        if not self.organismEditor.isVisible():
+            self.organismEditor.show()
+
+    @Slot(object)
+    def _slot_organismChanged(self, value: object):
+        if not isinstance(value, sdc.Organism):
+            value = sdc.Organism()
+        try:
+            self._data_.setOrganism(value)
+            self.sig_valueChanged.emit(self._data_)
+        except: # noqa
+            pass
+
 
     @singledispatchmethod
     def _createParentEditor_(self, obj) -> type:
@@ -558,23 +639,40 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     def closeEvent(self, evt):
         # print(f"{self.__class__.__name__}.closeEvent")
+        self.sig_closing.emit()
         self.closeChildren()
         super().closeEvent(evt)
         evt.accept()
-        # if self._isSubWidget_:
-        #     self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
-        #     self._closeRequestedEvent_ = evt
-        #     self._animationGroup_.start()
-        # else:
-        #     self.closeChildren()
-        #     super().closeEvent(evt)
-        #     evt.accept()
+
+    def moveEvent(self, evt):
+        self.sig_moved.emit(evt.pos())# - evt.oldPos())
+        # print(f"{self.__class__.__name__}.moveEvent")
+        evt.accept()
+
+    @Slot(QtCore.QPoint)
+    def _slot_callingWidgetMoved(self, pos: QtCore.QPoint):
+        # print(f"{self.__class__.__name__}._slot_callingWidgetMoved({pos})")
+        if not self.isVisible():
+            return
+        if not isinstance(self._callingWidget_, QtWidgets.QWidget):
+            return
+        newPos = (pos + QtCore.QPoint(self._callingWidget_.geometry().width(), 0)
+                  - QtCore.QPoint(0, QtWidgets.QApplication.style().pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight)))
+        self.move(newPos)
+
 
     def closeChildren(self):
         if isinstance(self.parentEditor, QtWidgets.QWidget):
+            # sb = QtCore.QSignalBlocker(self.parentEditor) # noqa
             self.parentEditor.close()
             self.parentEditor.deleteLater()
             self.parentEditor = None
+
+        if isinstance(self.organismEditor, QtWidgets.QWidget):
+            # sb = QtCore.QSignalBlocker(self.organismEditor) # noqa
+            self.organismEditor.close()
+            self.organismEditor.deleteLater()
+            self.organismEditor = None
 
         self.nameDescriptionWidget.closeChildren()
 

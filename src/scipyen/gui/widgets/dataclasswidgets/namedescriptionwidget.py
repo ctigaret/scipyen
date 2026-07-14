@@ -61,6 +61,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
     # sig_parentEditRequest = Signal(name="sig_parentEditRequest")
     sig_parentEditRequest = Signal(bool, name="sig_parentEditRequest")
     sig_newParentRequest = Signal(name="sig_newParentRequest")
+    sig_organismEditRequest = Signal(bool, name="sig_organismEditRequest")
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None, **kwargs):
         QtCore.QObject.__init__(self, parent=parent)
@@ -84,6 +85,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         # self.editParentToolButton.clicked.connect(self.sig_parentEditRequest)
         self.editParentToolButton.toggled.connect(self.sig_parentEditRequest)
         self.replaceParentToolButton.clicked.connect(self.sig_newParentRequest)
+        self.organismToolButton.toggled.connect(self.sig_organismEditRequest)
 
     @Slot(object)
     def _slot_dataChanged(self, val: object):

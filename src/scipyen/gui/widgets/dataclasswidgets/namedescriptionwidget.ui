@@ -115,6 +115,31 @@
        </property>
       </widget>
      </item>
+     <item>
+      <widget class="QToolButton" name="organismToolButton">
+       <property name="toolTip">
+        <string>Edit Parent Organism</string>
+       </property>
+       <property name="statusTip">
+        <string>Edit Parent Organism</string>
+       </property>
+       <property name="whatsThis">
+        <string>Edit Parent Organism</string>
+       </property>
+       <property name="text">
+        <string>Organism</string>
+       </property>
+       <property name="icon">
+        <iconset theme="document-properties"/>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
     </layout>
    </item>
   </layout>
