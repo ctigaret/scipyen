@@ -108,7 +108,7 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
     def _configureUI_(self):
         self.setupUi(self)
 
-        super()._configureUI_()
+        super()._configureUI_() # DataClassWidget!
 
         for text in self._bioSourceTypeNames_:
             self.bioSourceTypeComboBox.addItem(text)

@@ -151,10 +151,7 @@ class FileOriginDescriptor:
             return #self._default
         return getattr(obj, self._name, None)
 
-    def __set__(
-        self,
-        obj:object,
-        value:typing.Optional[
+    def __set__(self, obj: object, value: typing.Optional[
             typing.Union[str, pathlib.Path,
                          typing.Sequence[typing.Union[str, pathlib.Path]]]
             ] = None):
