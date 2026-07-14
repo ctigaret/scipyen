@@ -656,8 +656,11 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             return
         if not isinstance(self._callingWidget_, QtWidgets.QWidget):
             return
-        newPos = (pos + QtCore.QPoint(self._callingWidget_.geometry().width(), 0)
-                  - QtCore.QPoint(0, QtWidgets.QApplication.style().pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight)))
+        if isinstance(getattr(self._callingWidget_, "_callingWidget_", None), QtWidgets.QWidget):
+            newPos = pos + QtCore.QPoint(self._callingWidget_.frameGeometry().width(), 0)
+        else:
+            newPos = (pos + QtCore.QPoint(self._callingWidget_.geometry().width(), 0)
+                    - QtCore.QPoint(0, QtWidgets.QApplication.style().pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight)))
         self.move(newPos)
 
 
