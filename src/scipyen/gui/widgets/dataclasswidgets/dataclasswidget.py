@@ -284,7 +284,11 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Forward)
             geometry = self.geometry()
             self._sizeAnimation_.setEndValue(self.sizeHint().width())
-            self._positionHint_ = self._callingWidget_.geometry().topRight()
+            topRight = self._callingWidget_.geometry().topRight()
+            if isinstance(self._callingWidget_.parent(), QtWidgets.QWidget):
+                self._positionHint_ = self._callingWidget_.parent().mapToGlobal(topRight)
+            else:
+                self._positionHint_ = topRight
             geometry.setX(self._positionHint_.x())
             geometry.setY(self._positionHint_.y())
             self.setGeometry(geometry)

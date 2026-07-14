@@ -9,6 +9,7 @@
 r"""
 """
 import sys, os, typing
+import pathlib
 # import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -71,7 +72,7 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
     Where implemented, it also supports editing.
     NOTE/WARNING: Under development
     """
-    sig_valueChanged = Signal(name="sig_valueChanged")
+    sig_valueChanged = Signal(object, name="sig_valueChanged")
     # default_brain_atlas_name =  'whs_sd_rat_39um'
     # default_species = "Rattus norvegicus"
 
@@ -216,11 +217,13 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
             self.recDateTimeLabel.setText("")
 
         if isinstance(self._data_.analysis_datetime, datetime.datetime):
-            self.analysisDateTimeEdit.setDateTime(qtutils.datetime2qt(self._data_.analysis_datetime))
+            self.analysisDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._data_.analysis_datetime))
         else:
-            self.analysisDateTimeEdit.setDateTime(qtutils.datetime2qt(datetime.datetime.now()))
+            self.analysisDateTimeEdit.setDateTime(qtutils.datetime2Qt(datetime.datetime.now()))
 
         self.analysisDateTimeEdit.dateTimeChanged.connect(self._slot_analysisDateTimeChanged)
+
+        self.biologicalSourceWidget.setValue(self._data_.source, objSymbol="source")
 
         # ### BEGIN old code
         # scipywarn(print_styled(f"The class {self.__class__.__name__} is deprecated", "yellow"))
@@ -437,16 +440,22 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
         return ret
 
-    def setValue(self, data:dict):
-        if isinstance(data, dict):
-            self.dataVarName = os.path.splitext(os.path.basename(fileName))
-            self.dataName = data.get("Name", self.dataVarName)
-            self.sourceID = data.get("SourceID", pd.NA)
-            self.cell = data.get("Cell", pd.NA)
-            self.field = data.get("Field", pd.NA)
-            self.age = data.get("Age", pd.NA)
-            self.sex = data.get("Sex", pd.NA)
-            self.genotype = data.get("Genotype", pd.NA)
+    def setValue(self, data: bsc.BaseScipyenData, **kwargs):
+        if not isinstance(data, bsc.BaseScipyenData):
+            self._data_ = bsc.BaseScipyenData()
+        else:
+            self._data_ = data
+
+        super().setValue(self._data_, **kwargs)
+        # if isinstance(data, dict):
+        #     self.dataVarName = os.path.splitext(os.path.basename(fileName))
+        #     self.dataName = data.get("Name", self.dataVarName)
+        #     self.sourceID = data.get("SourceID", pd.NA)
+        #     self.cell = data.get("Cell", pd.NA)
+        #     self.field = data.get("Field", pd.NA)
+        #     self.age = data.get("Age", pd.NA)
+        #     self.sex = data.get("Sex", pd.NA)
+        #     self.genotype = data.get("Genotype", pd.NA)
 
     # def clear(self):
     #     self.dataVarName = ""
