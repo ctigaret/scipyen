@@ -222,8 +222,14 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
             self.analysisDateTimeEdit.setDateTime(qtutils.datetime2Qt(datetime.datetime.now()))
 
         self.analysisDateTimeEdit.dateTimeChanged.connect(self._slot_analysisDateTimeChanged)
-
+        self.biologicalSourceWidget.anchoringWidget = self
+        self.biologicalSourceWidget.overrideAnchor=False
         self.biologicalSourceWidget.setValue(self._data_.source, objSymbol="source")
+
+    def closeEvent(self, evt):
+        self.biologicalSourceWidget.closeChildren()
+        super().closeEvent(evt)
+        evt.accept()
 
         # ### BEGIN old code
         # scipywarn(print_styled(f"The class {self.__class__.__name__} is deprecated", "yellow"))

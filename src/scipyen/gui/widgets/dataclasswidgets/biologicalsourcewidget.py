@@ -232,6 +232,7 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
     @Slot()
     def _slot_editSpecimen(self):
+        anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and not self.overrideAnchor) else self
         if isinstance(self._data_.specimen, self._data_.specimenTypes):
             if isinstance(self.specimenWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenWidget):
                 if self._needsNewSpecimenWidget_:
@@ -240,13 +241,13 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
                     self.specimenWidget = None
 
                     spWidgetType = self._createSpecimenWidget_(self._data_.specimen)
-                    self.specimenWidget = spWidgetType(self._data_.specimen, objSymbol="specimen", callingWidget=self)
+                    self.specimenWidget = spWidgetType(self._data_.specimen, objSymbol="specimen", anchoringWidget=anchoringWidget)
                     self.specimenWidget.sig_valueChanged.connect(self._slot_specimenChanged)
                     self.specimenWidget.sig_closing.connect(self._slot_specimenWidgetClosing)
 
             else:
                 spWidgetType = self._createSpecimenWidget_(self._data_.specimen)
-                self.specimenWidget = spWidgetType(self._data_.specimen, objSymbol="specimen", callingWidget=self)
+                self.specimenWidget = spWidgetType(self._data_.specimen, objSymbol="specimen", anchoringWidget=anchoringWidget)
                 self.specimenWidget.sig_valueChanged.connect(self._slot_specimenChanged)
                 self.specimenWidget.sig_closing.connect(self._slot_specimenWidgetClosing)
 
@@ -264,30 +265,30 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
     @_createSpecimenWidget_.register(sdc.Organism)
     def __createSpecimenWidget__(self, obj: sdc.Organism) -> type:
         from gui.widgets.dataclasswidgets.organismwidget import OrganismWidget
-        return OrganismWidget # (obj, objSymbol="specimen", callingWidget=self)
+        return OrganismWidget
 
     @_createSpecimenWidget_.register(sdc.Organ)
     @_createSpecimenWidget_.register(sdc.Tissue)
     def __createSpecimenWidget__(self, obj: sdc.Organ) -> type: # noqa
         from gui.widgets.dataclasswidgets.organtissuewidgets import OrganWidget, TissueWidget
         if isinstance(obj, sdc.Tissue):
-            return TissueWidget # (obj, objSymbol="specimen", callingWidget=self)
-        return OrganWidget # (obj, objSymbol="specimen", callingWidget=self)
+            return TissueWidget
+        return OrganWidget
 
     @_createSpecimenWidget_.register(sdc.NervousSystem)
     def __createSpecimenWidget__(self, obj: sdc.NervousSystem) -> type: # noqa
         from gui.widgets.dataclasswidgets.nervoussystemwidget import NervousSystemWidget
-        return NervousSystemWidget # (obj, objSymbol="specimen", callingWidget=self)
+        return NervousSystemWidget
 
     @_createSpecimenWidget_.register(sdc.Neuron)
     def __createSpecimenWidget__(self, obj: sdc.Neuron) -> type: # noqa
         from gui.widgets.dataclasswidgets.cellwidgets import NeuronWidget
-        return NeuronWidget # (obj, objSymbol="specimen", callingWidget=self)
+        return NeuronWidget
 
     @_createSpecimenWidget_.register(sdc.Cell)
     def __createSpecimenWidget__(self, obj: sdc.Cell) -> type: # noqa
         from gui.widgets.dataclasswidgets.cellwidgets import CellWidget
-        return CellWidget # (obj, objSymbol="specimen", callingWidget=self)
+        return CellWidget
 
     @_createSpecimenWidget_.register(sdc.NeuronCompartment)
     @_createSpecimenWidget_.register(sdc.CellCompartment)
@@ -295,17 +296,17 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
     @_createSpecimenWidget_.register(sdc.UltrastructureElement)
     def __createSpecimenWidget__(self, obj: sdc.CellCompartment): # noqa
         from gui.widgets.dataclasswidgets.cellcompartmentwidget import CellCompartmentWidget
-        return CellCompartmentWidget # (obj, objSymbol="specimen", callingWidget=self)
+        return CellCompartmentWidget
 
     @_createSpecimenWidget_.register(sdc.ChemicalSynapse)
     def __createSpecimenWidget__(self, obj: sdc.ChemicalSynapse): # noqa
         from gui.widgets.dataclasswidgets.chemicalsynapsewidget import ChemicalSynapseWidget
-        return ChemicalSynapseWidget # (obj, objSymbol="specimen", callingWidget=self)
+        return ChemicalSynapseWidget
 
     @_createSpecimenWidget_.register(sdc.BiologicalProduct)
     def __createSpecimenWidget__(self, obj: sdc.BiologicalProduct): # noqa
         from gui.widgets.dataclasswidgets.biologicalproductwidget import BiologicalProductWidget
-        return BiologicalProductWidget # (obj, objSymbol="specimen", callingWidget=self)
+        return BiologicalProductWidget
 
     def closeEvent(self, evt):
         if isinstance(self.specimenWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenWidget):

@@ -245,13 +245,14 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
     @Slot()
     def _slot_editBiometrics(self):
         from gui.widgets.dataclasswidgets.biometricswidget import BiometricsWidget
+        anchoringWidget = self._anchoringWidget_ if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and not self.overrideAnchor) else self
         if not isinstance(self.biometricsEditor, BiometricsWidget):
             if isinstance(self.biometricsEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biometricsEditor):
                 self.biometricsEditor.close()
                 self.biometricsEditor.deleteLater()
                 self.biometricsEditor = None
 
-            self.biometricsEditor = BiometricsWidget(callingWidget=self)
+            self.biometricsEditor = BiometricsWidget(anchoringWidget=anchoringWidget)
             self.biometricsEditor.setWindowTitle("Biometrics")
             self.biometricsEditor.sig_valueChanged.connect(self._slot_biometricsChanged)
             self.biometricsEditor.sig_closing.connect(self._slot_biometricsEditorClosing)
