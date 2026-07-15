@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>CellWidget</class>
- <widget class="QWidget" name="CellWidget">
+ <class>ASRUWidget</class>
+ <widget class="QWidget" name="ASRUWidget">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>230</width>
-    <height>71</height>
+    <width>294</width>
+    <height>143</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -23,52 +23,48 @@
       <number>3</number>
      </property>
      <widget class="DataExchangeWidget" name="dataExchangeWidget" native="true"/>
-     <widget class="QWidget" name="layoutWidget">
+     <widget class="QWidget" name="">
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
         <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true"/>
        </item>
        <item>
-        <layout class="QHBoxLayout" name="horizontalLayout">
-         <item>
-          <widget class="QLabel" name="label">
+        <layout class="QFormLayout" name="formLayout">
+         <item row="0" column="0">
+          <widget class="QLabel" name="licenseIDLabel">
            <property name="text">
-            <string>Type:</string>
+            <string>License ID: </string>
            </property>
            <property name="buddy">
-            <cstring>cellTypeNameEdit</cstring>
+            <cstring>licenseIDLineEdit</cstring>
            </property>
           </widget>
          </item>
-         <item>
-          <widget class="LineEdit" name="cellTypeNameEdit">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-          </widget>
+         <item row="0" column="1">
+          <widget class="LineEdit" name="licenseIDLineEdit"/>
          </item>
-         <item>
-          <widget class="QLabel" name="label_2">
+         <item row="1" column="0">
+          <widget class="QLabel" name="holderNameLabel">
            <property name="text">
-            <string>Subtype:</string>
+            <string>Holder Name: </string>
            </property>
            <property name="buddy">
-            <cstring>cellSubTypeNameEdit</cstring>
+            <cstring>holderNameLineEdit</cstring>
            </property>
           </widget>
          </item>
-         <item>
-          <widget class="LineEdit" name="cellSubTypeNameEdit">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
+         <item row="1" column="1">
+          <widget class="LineEdit" name="holderNameLineEdit"/>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="holderEMailLabel">
+           <property name="text">
+            <string>Holder e-mail: </string>
            </property>
           </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="LineEdit" name="holderEMailLineEdit"/>
          </item>
         </layout>
        </item>
@@ -79,7 +75,7 @@
          </property>
          <property name="sizeHint" stdset="0">
           <size>
-           <width>207</width>
+           <width>58</width>
            <height>13</height>
           </size>
          </property>

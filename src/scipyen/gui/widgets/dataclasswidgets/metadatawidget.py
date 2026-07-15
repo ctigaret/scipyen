@@ -134,31 +134,32 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
             self.analysisDateTimeEdit.setDateTime(qtutils.datetime2Qt(datetime.datetime.now()))
 
         self.analysisDateTimeEdit.dateTimeChanged.connect(self._slot_analysisDateTimeChanged)
-        self.biologicalSourceWidget.anchoringWidget = self
-        self.biologicalSourceWidget.overrideAnchor=True
-        self.biologicalSourceWidget.setValue(self._data_.source, objSymbol="source")
 
-        self._collapsibleChildren_["biologicalSourceWidget"] = self.biologicalSourceWidget
+        self.biologicalSourceEditor = None
+        self.bioSourceEditorToolButton.toggled.connect(self._slot_toggleBioSourceEditor)
+        self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
+
+        self.asruEditor = None
+        self.editASRUToolButton.toggled.connect(self._slot_toggleASRUEditor)
+        self._collapsibleChildren_["asruEditor"] = self.asruEditor
 
     def closeEvent(self, evt):
-        self.biologicalSourceWidget.collapseSubWidgets()
+        self.closeSubWidgets()
         super().closeEvent(evt)
         evt.accept()
+
+    def closeSubWidgets(self):
+        if isinstance(self.biologicalSourceEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor):
+            self.biologicalSourceEditor.close()
+            self.biologicalSourceEditor.deleteLater()
+            self.biologicalSourceEditor = None
+
+        super().closeSubWidgets()
 
     def value(self):
         r"""Returns a dict with field values takes from individual children
         """
-        ret = dict()
-        ret["VarName"] = strutils.str2symbol(self._dataVarName)
-        ret["Name"] = self.dataNameLineEdit.text()
-        ret["SourceID"] = self.sourceIDLineEdit.text()
-        ret["Cell"] = self.cellIDLineEdit.text()
-        ret["Field"] = self.fieldIDLineEdit.text()
-        ret["Age"] = self.ageSpinBox.value() # will return units of time
-        ret["Sex"] = self.sexComboBox.currentText()
-        ret["Genotype"] = self.genotypeComboBox.currentText()
-
-        return ret
+        return self._data_
 
     def setValue(self, data: bsc.BaseScipyenData, **kwargs):
         if not isinstance(data, bsc.BaseScipyenData):
@@ -167,230 +168,115 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
             self._data_ = data
 
         super().setValue(self._data_, **kwargs)
-        # if isinstance(data, dict):
-        #     self.dataVarName = os.path.splitext(os.path.basename(fileName))
-        #     self.dataName = data.get("Name", self.dataVarName)
-        #     self.sourceID = data.get("SourceID", pd.NA)
-        #     self.cell = data.get("Cell", pd.NA)
-        #     self.field = data.get("Field", pd.NA)
-        #     self.age = data.get("Age", pd.NA)
-        #     self.sex = data.get("Sex", pd.NA)
-        #     self.genotype = data.get("Genotype", pd.NA)
 
-    # def clear(self):
-    #     self.dataVarName = ""
-    #     self.dataName = ""
-    #     self.sourceID = pd.NA
-    #     self.cell = pd.NA
-    #     self.field = pd.NA
-    #     self.age = pd.NA
-    #     self.sex = pd.NA
-    #     self.genotype = pd.NA
+        if isinstance(self.biologicalSourceEditor, DataClassWidget):
+            sb = QtCore.QSignalBlocker(self.biologicalSourceEditor)
+            self.biologicalSourceEditor.setValue(self._data_.source, objSymbol="source")
+
+    @Slot()
+    def _slot_editBiologicalSource(self):
+        from gui.widgets.dataclasswidgets.biologicalsourcewidget import BiologicalSourceWidget
+        anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
+        if not isinstance(self._data_.source, BiologicalSourceWidget):
+            if isinstance(self.biologicalSourceEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor):
+                self.biologicalSourceEditor.close()
+                self.biologicalSourceEditor.deleteLater()
+                self.biologicalSourceEditor = None
+
+            self.biologicalSourceEditor = BiologicalSourceWidget(anchoringWidget=anchoringWidget)
+            self.biologicalSourceEditor.setWindowTitle("Source")
+            self.biologicalSourceEditor.sig_valueChanged.connect(self._slot_biologicalSourceChanged)
+            self.biologicalSourceEditor.sig_closing.connect(self._slot_biologicalSourceEditorClosing)
+            self.biologicalSourceEditor.sig_collapsed.connect(self._slot_biologicalSourceEditorCollapsed)
+
+        self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
+        self.biologicalSourceEditor.setValue(self._data_.source, objSymbol="source")
+
+        if not self.biologicalSourceEditor.isVisible():
+            self.biologicalSourceEditor.show()
+
+    @Slot()
+    def _slot_biologicalSourceEditorCollapsed(self):
+        sb = QtCore.QSignalBlocker(self.bioSourceEditorToolButton) # noqa
+        self.bioSourceEditorToolButton.setChecked(False)
+
+    @Slot()
+    def _slot_biologicalSourceEditorClosing(self):
+        sb = QtCore.QSignalBlocker(self.bioSourceEditorToolButton) # noqa
+        self.bioSourceEditorToolButton.setChecked(False)
+
+    @Slot(object)
+    def _slot_biologicalSourceChanged(self, val: sdc.BiologicalSource):
+        if isinstance(val, sdc.BiologicalSource):
+            self._data_.source = val
+        else:
+            self._data_.source = sdc.BiologicalSource()
+
+        self.sig_valueChanged.emit(self._data_)
+
+    @Slot(bool)
+    def _slot_toggleBioSourceEditor(self, val: bool):
+        if val is True:
+            self._slot_editBiologicalSource()
+        else:
+            if isinstance(self.biologicalSourceEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor):
+                self.biologicalSourceEditor.collapse(False)
+
+    @Slot(bool)
+    def _slot_toggleASRUEditor(self, val: bool):
+        if val is True:
+            self._slot_editASRU()
+        else:
+            if isinstance(self.asruEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.asruEditor):
+                self.asruEditor.collapse(False)
+
+    @Slot()
+    def _slot_editASRU(self): # TODO
+        pass
+        # from gui.widgets.dataclasswidgets.asruwidgets import
+    #     anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
+    #     if not isinstance(self._data_.source, BiologicalSourceWidget):
+    #         if isinstance(self.biologicalSourceEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor):
+    #             self.biologicalSourceEditor.close()
+    #             self.biologicalSourceEditor.deleteLater()
+    #             self.biologicalSourceEditor = None
+    #
+    #         self.biologicalSourceEditor = BiologicalSourceWidget(anchoringWidget=anchoringWidget)
+    #         self.biologicalSourceEditor.setWindowTitle("Source")
+    #         self.biologicalSourceEditor.sig_valueChanged.connect(self._slot_biologicalSourceChanged)
+    #         self.biologicalSourceEditor.sig_closing.connect(self._slot_biologicalSourceEditorClosing)
+    #         self.biologicalSourceEditor.sig_collapsed.connect(self._slot_biologicalSourceEditorCollapsed)
+    #
+    #     self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
+    #     self.biologicalSourceEditor.setValue(self._data_.source, objSymbol="source")
+    #
+    #     if not self.biologicalSourceEditor.isVisible():
+    #         self.biologicalSourceEditor.show()
+    #
+    # @Slot()
+    # def _slot_biologicalSourceEditorCollapsed(self):
+    #     sb = QtCore.QSignalBlocker(self.bioSourceEditorToolButton) # noqa
+    #     self.bioSourceEditorToolButton.setChecked(False)
+    #
+    # @Slot()
+    # def _slot_biologicalSourceEditorClosing(self):
+    #     sb = QtCore.QSignalBlocker(self.bioSourceEditorToolButton) # noqa
+    #     self.bioSourceEditorToolButton.setChecked(False)
+    #
+    # @Slot(object)
+    # def _slot_biologicalSourceChanged(self, val: sdc.BiologicalSource):
+    #     if isinstance(val, sdc.BiologicalSource):
+    #         self._data_.source = val
+    #     else:
+    #         self._data_.source = sdc.BiologicalSource()
+    #
+    #     self.sig_valueChanged.emit(self._data_)
 
     @Slot(QtCore.QDateTime)
     def _slot_analysisDateTimeChanged(self, val: QtCore.QDateTime):
         self._data_.analysis_datetime = qtutils.datetimeFromQt(val)
 
-    # @Slot()
-    # def _slot_setDataName(self):
-    #     self._dataName = strutils.str2symbol(self.dataNameLineEdit.text())
-    #     self.sig_valueChanged.emit()
-    #
-    # @Slot()
-    # def _slot_setSourceID(self):
-    #     self._sourceID = self.sourceIDLineEdit.text()
-    #     if self._sourceID in ("NA", "<NA>"):
-    #         self._sourceID = pd.NA
-    #
-    #     self.sig_valueChanged.emit()
-    #
-    # @Slot()
-    # def _slot_setCell(self):
-    #     self._cell = self.cellIDLineEdit.text()
-    #     if self._cell in ("NA", "<NA>"):
-    #         self._cell = pd.NA
-    #
-    #     self.sig_valueChanged.emit()
-    #
-    # @Slot()
-    # def _slot_setField(self):
-    #     self._field = self.fieldIDLineEdit.text()
-    #     if self._field in ("NA", "<NA>"):
-    #         self._field = pd.NA
-    #
-    #     self.sig_valueChanged.emit()
-    #
-    # @Slot(str)
-    # def _slot_setGenotype(self, value:str):
-    #     if value in ("NA", "<NA>"):
-    #         self._genotype = pd.NA
-    #
-    #     elif len(value.strip()) == 0: # this should never happen, right?
-    #         self._genotpye = pd.NA
-    #
-    #     elif value not in self._available_genotypes_: # and neither this, right?
-    #         self._available_genotypes_.append(value)
-    #         self._genotype = value
-    #
-    #     else:
-    #         self._genotype = value
-    #
-    #     self.sig_valueChanged.emit()
-    #
-    # @Slot(float)
-    # def _slot_setAge(self, value):
-    #     spinBox = self.sender()
-    #     self._age = value * spinBox.units
-    #     self._age_units = spinBox.units
-    #
-    #     self.sig_valueChanged.emit()
-    #
-    #     # alternatively:
-    #     # self._age = spinBox.value()
-    #     # self._age_units = self._age.units
-    #
-    # @Slot(str)
-    # def _slot_speciesChanged(self: typing.Self, val: str):
-    #     # TODO: 2026-02-15 09:42:03
-    #     # choose atlas for species, use interactive modes
-    #     # then populate atlas comboBox
-    #     if not bgbridge.hasBrainGlobeAtlasAPI:
-    #         return
-    #
-    #     if val == self._current_species_:
-    #         # do nothing if species is the same
-    #         return
-    #
-    #     signalBlocker = QtCore.QSignalBlocker(self.atlasesComboBox)
-    #
-    #     if val in self._available_species_:
-    #         # when another species was chose, the list of atlases available for
-    #         # the (new) species must be built, and the atlases combo box re-populated
-    #         # self._current_species_ = val
-    #         atlas_names_for_current_species = self._atlas_manager_.getAtlasNamesForSpecies(val)
-    #
-    #         if len(atlas_names_for_current_species):
-    #             if self.default_brain_atlas_name in atlas_names_for_current_species:
-    #                 self._atlas_ = self._atlas_manager_.initAtlas(self.default_brain_atlas_name, interactive=False)
-    #             else:
-    #                 self._atlas_ = self._atlas_manager_.initAtlas(atlas_names_for_current_species, interactive=True)
-    #
-    #             if isinstance(self._atlas_, bgbridge.BrainGlobeAtlas):
-    #                 self._atlas_names_for_current_species_ = atlas_names_for_current_species
-    #                 self._current_species_ = val
-    #                 self._current_atlas_name_ = self._atlas_.atlas_name
-    #
-    #                 self.atlasesComboBox.clear()
-    #                 self.atlasesComboBox.addItems(self._atlas_names_for_current_species_)
-    #                 ndx = self._atlas_names_for_current_species_.index(self._current_atlas_name_)
-    #                 self.atlasesComboBox.setCurrentIndex(ndx)
-    #
-    #         else:
-    #             if (
-    #                 isinstance(self._atlas_, bgbridge.BrainGlobeAtlas)
-    #                 and isinstance(self._current_atlas_name_, str)
-    #                 and self._current_atlas_name_ in self._atlas_names_for_current_species_
-    #                 ):
-    #                 ndx = self._atlas_names_for_current_species_.index(self._current_atlas_name_)
-    #                 self.atlasesComboBox.setCurrentIndex(ndx)
-    #
-    #             else:
-    #                 self.atlasesComboBox.clear() # also consider making it inactive ?
-    #                 self._atlas_ = None
-    #                 self._current_atlas_name_ = None
-    #                 self._atlas_names_for_current_species_ = list()
-    #
-    # @Slot(str)
-    # def _slot_atlasChanged(self: typing.Self, val: str):
-    #     # only select from the locally available atlases for the given species;
-    #     # to avid complex (and possibly recurrent) code execution, at any one
-    #     # time:
-    #     # 1) there can be only one species "active"
-    #     # 2) there can be only one atlas "active" among the locally available
-    #     #   atlases for the currently "active" species
-    #     #
-    #     #
-    #     # In other words, FIRST select a species, THEN select an atlas from
-    #     # those available for THAT species, if any.
-    #     if not bgbridge.hasBrainGlobeAtlasAPI:
-    #         return
-    #
-    #     atlas = self._atlas_manager_.initAtlas(val, interactive=False)
-    #     if atlas.atlas_name == self._atlas_.atlas_name:
-    #         return
-    #     signalBlocker = QtCore.QSignalBlocker(self.structuresComboBox)
-    #     currently_selected_structure_name = self.structuresComboBox.currentText()
-    #     structure = bgbridge.get_atlas_structure(currently_selected_structure_name,
-    #                                              atlas)
-    #     self._atlas_ = atlas
-    #     self._current_atlas_name_ = self._atlas_.atlas_name
-    #     self.structuresComboBox.clear()
-    #
-    #
-    # @Slot(str)
-    # def _slot_setSex(self, value:str):
-    #     if value in ("NA", "<NA>"):
-    #         self._sex = pd.NA
-    #     elif value not in self._available_sex_: # this should never happen, right?
-    #         self._sex = pd.NA
-    #
-    #     else:
-    #         self._sex = value
-    #
-    #     self.sig_valueChanged.emit()
-    #
-    # @Slot()
-    # def _slot_editAnnotations(self):
-    #     # TODO 2022-11-08 08:31:20
-    #     # enable a scrollable view in GenericMappingDialog
-    #     # when there are more than 5-6 entries in the mapping
-    #     # use that to edit annotations
-    #     self.sig_valueChanged.emit()
-    #
-    #     print("edit annotations")
-    #
-    # @Slot()
-    # def _slot_editBiometrics(self):
-    #     # TODO 2022-11-08 08:32:12
-    #     # use GenericMappingDialog
-    #     self.sig_valueChanged.emit()
-    #
-    #     print("edit biometrics")
-    #
-    # @Slot()
-    # def _slot_editDateTime(self):
-    #     r"""Edits the date & time of analysis.
-    #     Recording date & time should be immutable
-    #     """
-    #     # TODO 2022-11-08 08:32:23
-    #     # create DateTimeInput widget in gui.quickdialog, use here wrapped
-    #     # in a quickdialog
-    #
-    #     from gui import quickdialog as qd
-    #
-    #     qde = QtWidgets.QDateTimeEdit(self._dateTime)
-    #     dfmt = qde.displayFormat()
-    #     dlg = qd.QuickDialog(parent=self, title = "Set analysis date and time")
-    #     dlg.addWidget(qde)
-    #     dlg.adjustSize()
-    #     ret = dlg.exec()
-    #
-    #     if ret == QtWidgets.QDialog.Accepted:
-    #         self._dateTime = qde.dateTime().toPyDateTime()
-    #
-    #     self.sig_valueChanged.emit()
-    #
-    #     print("edit datetime")
-    #
-    # @Slot()
-    # def _slot_descriptionChanged(self):
-    #     self._data_description_ = self._descriptionEditor.text(True)
-    #     self.sig_valueChanged.emit()
-    #
-    # @Slot()
-    # def _slot_editDescription(self):
-    #     self._descriptionEditor.setData(self._data_description_)
-    #     self._descriptionEditor.show()
+        self.sig_valueChanged.emit(self._data_)
 
     @Slot()
     def _slot_editProcedures(self):
@@ -411,169 +297,8 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
         # create a Gantt chart-like widget viewer to include with the
         # epoch editor
 
-        self.sig_valueChanged.emit()
+        self.sig_valueChanged.emit(self._data_)
         print("edit procedures")
-
-    @Slot()
-    def _slot_editTriggers(self):
-        # TODO: 2022-11-08 08:36:10
-        # use gui.triggerprotocolseditordialog.TriggerProtocolsEditorDialog
-        # but with the following functions enabled conditionally:
-        #
-        # trigger detection ↔ is there ephysdata available
-
-        self.sig_valueChanged.emit()
-        print("edit triggers")
-
-    # @Slot()
-    # def _slot_importMetaData(self):
-    #     from gui.workspacegui import WorkspaceGuiMixin
-    #     parentWindow = self.window()
-    #     if isinstance(parentWindow, WorkspaceGuiMixin):
-    #         objs = parentWindow.importWorkspaceData((dict,),
-    #                                                 title="Import MetaData from workspace",
-    #                                                 single=True,
-    #                                                 with_varName=False)
-    #
-    #         if len(objs) == 1:
-    #             self.setValue(objs[0])
-    #
-
-    # @Slot()
-    # def _slot_exportMetaData(self):
-    #     from gui.workspacegui import WorkspaceGuiMixin
-    #     value = self.value()
-    #     parentWindow = self.window()
-    #     if len(value) and isinstance(parentWindow, WorkspaceGuiMixin):
-    #         parentWindow.exportDataToWorkspace(value, "MetaData", title="Export MetaData to Workspace")
-    #
-    # @Slot()
-    # def _slot_loadMetaData(self):
-    #     from gui.workspacegui import WorkspaceGuiMixin
-    #     parentWindow = self.window()
-    #     if isinstance(parentWindow, WorkspaceGuiMixin):
-    #         fileName, fileFilter = self.chooseFile(caption="Open electrophysiology file",
-    #                                             single=True,
-    #                                             save=False,
-    #                                             fileFilter=";;".join(["Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]))
-    #         if isinstance(fileName, str) and os.path.isfile(fileName):
-    #             if "HDF5" in fileFilter:
-    #                 data = pio.loadHDF5File(fileName)
-    #             elif "Pickle" in fileFilter:
-    #                 data = pio.loadPickleFile(fileName)
-    #             else:
-    #                 return
-    #
-    #         self.setValue(data)
-
-    # @Slot()
-    # def _slot_saveMetaData(self):
-    #     from gui.workspacegui import WorkspaceGuiMixin
-    #     value = self.value()
-    #     parentWindow = self.window()
-    #     if len(value) and isinstance(parentWindow, WorkspaceGuiMixin):
-    #         fileName, fileFilter = parentWindow.chooseFile(caption="Save electrophysiology data",
-    #                                             single=True,
-    #                                             save=True,
-    #                                             fileFilter=";;".join(["Pickle files (*.pkl)", "HDF5 Files (*.hdf)"]))
-    #         if isinstance(fileName, str) and len(fileName.strip()):
-    #             if "HDF5" in fileFilter:
-    #                 pio.saveHDF5(value, fileName)
-    #             else:
-    #                 pio.savePickleFile(value, fileName)
-
-
-    # @property
-    # def dataVarName(self):
-    #     return self._dataVarName
-    #
-    # @dataVarName.setter
-    # def dataVarName(self, value:str):
-    #     if isinstance(value, str) and len(value.strip()):
-    #         val = strutils.str2symbol(value)
-    #         self._dataVarName = val
-    #     else:
-    #         self._dataVarName = ""
-    #
-    #     self.dataVarNameLabel.setText(self._dataVarName)
-
-    # @property
-    # def dataDescription(self):
-    #     return self._data_description_
-    #
-    # @dataDescription.setter
-    # def dataDescription(self, value:typing.Optional[str] = None):
-    #     if value is None:
-    #         self._data_description_ = ""
-    #     else:
-    #         self._data_description_ = str(value)
-    #
-    # @property
-    # def dataName(self):
-    #     r"""Getter & setter for the data name"""
-    #     return self._dataName
-    #
-    # @dataName.setter
-    # def dataName(self, value:str):
-    #     # WARNING: 2022-11-09 16:07:02
-    #     # do NOT use this setter from within the slot connected to the
-    #     # dataNameLineEdit!
-    #     signalBlocker = QtCore.QSignalBlocker(self.dataNameLineEdit)
-    #     if isinstance(value, str) and len(value.strip()):
-    #         self._dataName = strutils.str2symbol(value)
-    #     else:
-    #         self._dataName = ""
-    #
-    #     self.dataNameLineEdit.setText(self._dataName)
-
-        self.sig_valueChanged.emit()
-
-    # @property
-    # def sourceID(self):
-    #     return self._sourceID
-    #
-    # @sourceID.setter
-    # def sourceID(self, value:typing.Union[str, type(pd.NA)]):
-    #     signalBlocker = QtCore.QSignalBlocker(self.sourceIDLineEdit)
-    #     if isinstance(value, str) and len(value.strip()):
-    #         self._sourceID = value
-    #         if self._sourceID in ("NA", "<NA>"):
-    #             self._souceID = pd.NA
-    #     else:
-    #         self._sourceID = pd.NA
-    #
-    #     self.sourceIDLineEdit.setText(f"{self._sourceID}")
-    #
-    #     self.sig_valueChanged.emit()
-
-    # @property
-    # def cell(self):
-    #     return self._cell
-    #
-    # @cell.setter
-    # def cell(self, value:typing.Union[str, type(pd.NA)]):
-    #     signalBlocker = QtCore.QSignalBlocker(self.cellIDLineEdit)
-    #     if isinstance(value, str) and len(value.strip()):
-    #         self._cell = value
-    #         if self._cell in ("NA", "<NA>"):
-    #             self._cell = pd.NA
-    #     else:
-    #         self._cell = pd.NA
-    #
-    #     self.cellIDLineEdit.setText(f"{self._cell}")
-    #
-    #     self.sig_valueChanged.emit()
-    #
-    # @property
-    # def analysisDateTime(self):
-    #     return self._dateTime
-    #
-    # @analysisDateTime.setter
-    # def analysisDateTime(self, value:datetime.datetime):
-    #     if not isinstance(value, datetime.datetime):
-    #         raise TypeError(f"Expecting a datetime.datetime; got {type(value).__name__} instead")
-    #
-    #     self._dateTime = value
 
     @property
     def field(self):

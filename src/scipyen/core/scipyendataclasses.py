@@ -1529,6 +1529,66 @@ class BiologicalSource(ScipyenDataclass):
 # ------------------------------------------------------------------------------
 
 @dataclass
+class PPL(ScipyenDataclass):
+    ID: str = ""
+    holderName: str = ""
+    holderEmail: str = ""
+
+    def __eq__(self, other) -> bool:
+        return super().__eq__(other)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.ID, self.holderName, self.holderEmail))
+
+@dataclass
+class PIL(ScipyenDataclass):
+    ID: str = ""
+    holderName: str = ""
+    holderEmail: str = ""
+
+    def __eq__(self, other) -> bool:
+        return super().__eq__(other)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.ID, self.holderName, self.holderEmail))
+
+@datalass
+class PPLProtocol(ScipyenDataclass):
+    ID: str = dataclasses.field(default_factory = str)
+    parent: PPL = dataclasses.field(default_fatory = PPL)
+
+    def __eq__(self, other) -> bool:
+        return super().__eq__(other)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.ID, self.parent))
+
+
+@dataclass
+class PPLProtocolStep(ScipyenDataclass):
+    ID: str = dataclasses.field(default_factory = str)
+    parent: PPLProtocol = dataclasses.field(default_factory = PPLProtocol)
+
+    def __eq__(self, other) -> bool:
+        return super().__eq__(other)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.ID, self.parent))
+
+@dataclass
+class PPLProcedure(ScipyenDataclass)
+    ppl: PPL = dataclasses.field(default_factory=PPL)
+    pil: PIL = dataclasses.field(default_factory=PIL)
+    protocol: PPLProtocol = dataclasses.field(default_factory=PPLProtocol)
+    protocolStep: PPLProtocolStep = dataclasses.field(default_factory=PPLProtocolStep)
+
+    def __eq__(self, other) -> bool:
+        return super().__eq__(other)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.ppl, self.pil, self.protocol, self.protocolStep))
+
+@dataclass
 class Procedure(ScipyenDataclass):
     r"""An experimental procedure: what is being done during an Episode.
 
@@ -1540,8 +1600,10 @@ class Procedure(ScipyenDataclass):
 
     """
     # name:str = ""
+    parent: PPLProtocolStep = dataclasses.field(default_factory=PPLProtocolStep)
     _:KW_ONLY
     procedureType: ProcedureType = ProcedureType.null
+
     # description: str = ""
 
     # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("type", ) )) # "name" and "description" inherited from ScipyenDataclass
@@ -1556,7 +1618,7 @@ class Procedure(ScipyenDataclass):
         return super().__eq__(other)
 
     def __hash__(self) -> int:
-        return hash((self.name, self.description, self.procedureType))
+        return hash((self.name, self.description, self.procedureType, self.parent))
 
 @dataclass
 class SubstanceDosage(ScipyenDataclass):

@@ -8,15 +8,6 @@ r"""
 """
 
 import sys, os, typing, types, warnings, math, cmath, datetime # noqa
-# from functools import singledispatchmethod
-# import numbers
-# import dataclasses
-# import numpy as np
-# import quantities as pq
-# import pandas as pd
-# import neo
-# from tribool import Tribool
-
 # import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot)#, Property,)
@@ -44,28 +35,9 @@ else:
     __has_sip__ = True
 
 
-from core.prog import scipywarn
-# from core.sysutils import adapt_ui_path
-
-# import core.bgbridge as bgbridge
-
 from core import scipyen_quantities as scq
-# from core import strutils
-# from core.datatypes import UnitTypes, GENOTYPES
-
-# from core import workspacefunctions as wsf
-# from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
-# from gui.widgets.datatreeview import DataTreeView
-
-# from core.prog import scipywarn
 from core import scipyendataclasses as sdc
-# from core import scipyen_quantities as scq
-# from gui import guiutils, textviewer, datatreeviewer
-# from gui.textviewer import TextViewer
-# from gui.widgets import small_widgets as smw
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
-# from gui.workspacegui import WorkspaceGuiMixin
-# from iolib import pictio as pio
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -131,18 +103,11 @@ class CellWidget(Ui_CellWidget, DataClassWidget):
 
         sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
                                (
-                                   # self.dataExchangeWidget,
-                                   # self.nameDescriptionWidget,
-                                   # self.editParentToolButton,
                                    self.cellTypeNameEdit,
                                    self.cellSubTypeNameEdit
                                 )
-                               ))
-        #
-        # self.dataExchangeWidget.setValue(self._data_)
-        #
-        # self.nameDescriptionWidget.dataName = self._data_.name
-        # self.nameDescriptionWidget.dataDescription = self._data_.description
+                               )
+                           )
 
         if not isinstance(self._data_, sdc.Neuron):
             self.cellTypeNameEdit.setText(f"{self._data_.cellType}")
@@ -210,17 +175,11 @@ class NeuronWidget(Ui_NeuronWidget, DataClassWidget):
 
         sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
                                (
-                                   # self.dataExchangeWidget,
-                                   # self.nameDescriptionWidget,
                                    self.editParentToolButton,
                                    self.neuronTypeComboBox,
                                 )
-                               ))
-
-        # self.dataExchangeWidget.setValue(self._data_)
-        #
-        # self.nameDescriptionWidget.dataName = self._data_.name
-        # self.nameDescriptionWidget.dataDescription = self._data_.description
+                               )
+                          )
 
         ndx = self._entityTypeNames_.index(self._data_.cellSubType.name)
         self.neuronTypeComboBox.setCurrentIndex(ndx)
@@ -237,7 +196,6 @@ class NeuronWidget(Ui_NeuronWidget, DataClassWidget):
         r"""Overrides DataClassWidget._slot_detailsChanged.
     Captures changes in the data tree viewer (details viewer)
     """
-        # print(f"{self.__class__.__name__}._slot_detailsChanged")
         sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
                                (self.nameDescriptionWidget,
                                 self.dataExchangeWidget,

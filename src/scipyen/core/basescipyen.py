@@ -24,7 +24,8 @@ from core.scipyen_quantities import unitsConvertible
 # from core.datatypes import * # clashes with datetime class imported from datetime module !!!
 from core.typeenum import TypeEnum # noqa
 from core.scipyendataclasses import (Episode, Schedule, ProcedureType, AdministrationRoute, # noqa
-                            Procedure, BioSourceType, # noqa
+                            Procedure, PPL, PIL, PPLProtocol, PPLProtocolStep, PPLProcedure,
+                            BioSourceType, # noqa
                             BiologicalSource, CellCompartment, CellCompartmentType,
                             Organism, Biometrics, ScipyenDataclass,
                             FileOriginDescriptor
@@ -36,21 +37,6 @@ from iolib.navigation.filesystems import getFileCreationDateTime
 @dataclass
 class BaseScipyenData(ScipyenDataclass):
     r"""Encapsulates 'metadata' associated with recorded data or analysis results"""
-
-    # ### BEGIN
-    # NOTE: 2024-11-16 10:07:21
-    # The fields below, from 'name' to 'rec_datetime' are meant to align this
-    # data model to the one used in NeuralEnsemble's neo library.
-    # In addition, I introduce an "analysis_datetime" field to ease up tracking
-    # analysis times, and a "triggers" field (which may not be generally useful,
-    # see NOTE below)
-    # name:str = ""
-    # description:str = ""
-    # file_origin: typing.Union[
-    #     str, pathlib.Path
-    #     ] = dataclasses.field(default="")
-    # ### END
-
 
     # NOTE: 2026-03-05 23:34:21
     # file_origin refers to the file(s) origin of the object that associates
@@ -103,6 +89,8 @@ class BaseScipyenData(ScipyenDataclass):
     # includes treatment, with dosage route, and schedule; does NOT include triggers
     # as these are specific to ephys/imaging protocols.
     procedure: Procedure = dataclasses.field(default_factory=Procedure)
+
+    pplProcedure: PPLProcedure = dataclass.field(default_factory = PPLProcedure)
 
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")

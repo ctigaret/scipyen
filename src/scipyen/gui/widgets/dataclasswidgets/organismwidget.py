@@ -269,12 +269,12 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
 
     @Slot()
     def _slot_biometricsEditorCollapsed(self):
-        sb = QtCore.QSignalBlocker(self.editBiometricsToolButton)
+        sb = QtCore.QSignalBlocker(self.editBiometricsToolButton) # noqa
         self.editBiometricsToolButton.setChecked(False)
 
     @Slot()
     def _slot_biometricsEditorClosing(self):
-        sb = QtCore.QSignalBlocker(self.editBiometricsToolButton)
+        sb = QtCore.QSignalBlocker(self.editBiometricsToolButton) # noqa
         self.editBiometricsToolButton.setChecked(False)
 
     @Slot()
