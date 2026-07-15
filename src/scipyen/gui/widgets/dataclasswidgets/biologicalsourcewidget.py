@@ -319,20 +319,18 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         return BiologicalProductWidget
 
     def closeEvent(self, evt):
+        self.closeSubWidgets()
+
+        super().closeEvent(evt)
+        evt.accept()
+
+    def closeSubWidgets(self):
         if isinstance(self.specimenEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenEditor):
-            # sb = QtCore.QSignalBlocker(self.specimenEditor)
             self.specimenEditor.close()
             self.specimenEditor.deleteLater()
             self.specimenEditor = None
 
-        # if isinstance(self.organismEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismEditor):
-        #     sb = QtCore.QSignalBlocker(self.organismEditor)
-        #     self.organismEditor.close()
-        #     self.organismEditor.deleteLater()
-        #     self.organismEditor = None
-
-        super().closeEvent(evt)
-        evt.accept()
+        super().closeSubWidgets()
 
     def value(self) -> sdc.BiologicalSource:
         return self._data_
@@ -358,7 +356,7 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         if isinstance(self._data_.specimen.name, str) and len(self._data_.specimen.name.strip()):
             spNameLabel = f"{self._data_.specimen.name} ({type(self._data_.specimen).__name__})"
         else:
-            spNameLabel =f"{type(self._data_.specimen).__name__}"
+            spNameLabel =f"({type(self._data_.specimen).__name__})"
 
         self.specimenNameLabel.setText(spNameLabel)
 

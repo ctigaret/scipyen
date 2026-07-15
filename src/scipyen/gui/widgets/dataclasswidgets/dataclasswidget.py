@@ -49,7 +49,7 @@ from core.prog import scipywarn #, safewrapper, print_styled
 
 # import core.bgbridge as bgbridge
 
-from core import scipyen_quantities as scq
+# from core import scipyen_quantities as scq
 # from core import strutils
 # from core.datatypes import UnitTypes, GENOTYPES
 
@@ -63,7 +63,7 @@ from core import scipyendataclasses as sdc
 from core import qtutils
 # from gui import guiutils, textviewer, datatreeviewer
 from gui.datatreeviewer import DataTreeViewer
-from gui.textviewer import TextViewer
+# from gui.textviewer import TextViewer
 from gui.widgets.dataclasswidgets.dataexchangewidget import DataExchangeWidget
 from gui.widgets.dataclasswidgets.namedescriptionwidget import NameDescriptionWidget
 from gui.workspacegui import WorkspaceGuiMixin
@@ -210,7 +210,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                 # print(f"{self.__class__.__name__}._configureUI_: checking for organism access")
 
                 if (
-                    not isinstance(self._data_, sdc.Organism)
+                    not isinstance(self._data_, (sdc.Organism, sdc.Organ))
                     and hasattr(self._data_, "getOrganism")
                     and hasattr(self._data_, "setOrganism")
                     ):
@@ -320,7 +320,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
             if isinstance(self.dataExchangeWidget, DataExchangeWidget) and isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
                 if hasattr(self, "_data_"):
-                    sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+                    sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), # noqa
                                         (
                                             self.dataExchangeWidget,
                                             self.nameDescriptionWidget,
@@ -356,7 +356,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
                     # print(f"{self.__class__.__name__}.setValue(): checking for organism access")
                     if (
-                        not isinstance(self._data_, sdc.Organism)
+                        not isinstance(self._data_, (sdc.Organism, sdc.Organ))
                         and hasattr(self._data_, "getOrganism")
                         and hasattr(self._data_, "setOrganism")
                         ):
@@ -512,7 +512,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     @Slot()
     def _slot_organismEditorClosing(self):
-        sb = QtCore.QSignalBlocker(self.nameDescriptionWidget.organismToolButton)
+        sb = QtCore.QSignalBlocker(self.nameDescriptionWidget.organismToolButton) # noqa
         self.nameDescriptionWidget.organismToolButton.setChecked(False)
 
     @Slot()
@@ -556,7 +556,6 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self._data_.parent = newParent
             self._slot_parentChanged(self._data_.parent)
             self.nameDescriptionWidget.editParentToolButton.setChecked(True)
-            # self._slot_editParent()
 
     @Slot(bool)
     def _slot_toggleOrganismEditor(self, val: bool):
@@ -596,12 +595,12 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     @Slot()
     def _slot_organismEditorCollapsed(self):
-        sb = QtCore.QSignalBlocker(self.nameDescriptionWidget)
+        sb = QtCore.QSignalBlocker(self.nameDescriptionWidget) # noqa
         self.nameDescriptionWidget.organismToolButton.setChecked(False)
 
     @Slot()
     def _slot_parentEditorCollapsed(self):
-        sb = QtCore.QSignalBlocker(self.nameDescriptionWidget)
+        sb = QtCore.QSignalBlocker(self.nameDescriptionWidget) # noqa
         self.nameDescriptionWidget.editParentToolButton.setChecked(False)
 
     @Slot(object)
@@ -660,25 +659,40 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     def collapse(self, close: bool=False):
         if self._isSubWidget_:
-            self._collapseChildren_(close)
+            self.collapseSubWidgets(close)
             self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
             self._closeRequested_ = close
             self._animationGroup_.start()
 
-    def _collapseChildren_(self, close: bool= False):
+    def collapseSubWidgets(self, close: bool= False):
         for obj in self._collapsibleChildren_.values():
             if isinstance(obj, QtWidgets.QWidget) and qtutils.isQObjectAlive(obj):
                 try:
                     obj.collapse(close)
-                except:
+                except: # noqa
                     pass
 
     def closeEvent(self, evt):
         # print(f"{self.__class__.__name__}.closeEvent")
         self.sig_closing.emit()
-        self.closeChildren()
+        self.closeSubWidgets()
         super().closeEvent(evt)
         evt.accept()
+
+    def closeSubWidgets(self):
+        if isinstance(self.parentEditor, QtWidgets.QWidget):
+            # sb = QtCore.QSignalBlocker(self.parentEditor) # noqa
+            self.parentEditor.close()
+            self.parentEditor.deleteLater()
+            self.parentEditor = None
+
+        if isinstance(self.organismEditor, QtWidgets.QWidget):
+            # sb = QtCore.QSignalBlocker(self.organismEditor) # noqa
+            self.organismEditor.close()
+            self.organismEditor.deleteLater()
+            self.organismEditor = None
+
+        self.nameDescriptionWidget.closeSubWidgets()
 
     def moveEvent(self, evt):
         self.sig_moved.emit(evt.pos())# - evt.oldPos())
@@ -727,21 +741,6 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             newPos = self._anchoringWidget_.frameGeometry().topRight()
 
         self.move(newPos)
-
-    def closeChildren(self):
-        if isinstance(self.parentEditor, QtWidgets.QWidget):
-            # sb = QtCore.QSignalBlocker(self.parentEditor) # noqa
-            self.parentEditor.close()
-            self.parentEditor.deleteLater()
-            self.parentEditor = None
-
-        if isinstance(self.organismEditor, QtWidgets.QWidget):
-            # sb = QtCore.QSignalBlocker(self.organismEditor) # noqa
-            self.organismEditor.close()
-            self.organismEditor.deleteLater()
-            self.organismEditor = None
-
-        self.nameDescriptionWidget.closeChildren()
 
 
 

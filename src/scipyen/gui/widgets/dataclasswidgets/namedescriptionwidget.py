@@ -211,10 +211,10 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         self.sig_descriptionChanged.emit(self._dataDescription_)
 
     def closeEvent(self, evt):
-        self.closeChildren()
+        self.closeSubWidgets()
         evt.accept()
 
-    def closeChildren(self):
+    def closeSubWidgets(self):
         if isinstance(self.descriptionEditor, textviewer.TextViewer):
             self.descriptionEditor.close()
             self.descriptionEditor.deleteLater()

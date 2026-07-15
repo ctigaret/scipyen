@@ -23,7 +23,7 @@
       <number>3</number>
      </property>
      <widget class="DataExchangeWidget" name="dataExchangeWidget" native="true"/>
-     <widget class="QWidget" name="">
+     <widget class="QWidget" name="layoutWidget">
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
         <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true"/>
@@ -32,6 +32,9 @@
         <widget class="QTabWidget" name="tabWidget">
          <property name="currentIndex">
           <number>0</number>
+         </property>
+         <property name="movable">
+          <bool>true</bool>
          </property>
          <widget class="QWidget" name="dataRecordTab">
           <attribute name="title">
@@ -43,7 +46,7 @@
              <item>
               <widget class="QLabel" name="label">
                <property name="text">
-                <string>File Origin:</string>
+                <string>File Origin: </string>
                </property>
               </widget>
              </item>
@@ -67,7 +70,7 @@
              <item>
               <widget class="QLabel" name="label_3">
                <property name="text">
-                <string>Recorded:</string>
+                <string>Recorded: </string>
                </property>
               </widget>
              </item>
@@ -91,7 +94,7 @@
              <item>
               <widget class="QLabel" name="label_5">
                <property name="text">
-                <string>Analysed:</string>
+                <string>Analysed: </string>
                </property>
               </widget>
              </item>

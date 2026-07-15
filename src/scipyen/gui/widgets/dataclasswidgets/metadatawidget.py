@@ -223,11 +223,13 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
         self.analysisDateTimeEdit.dateTimeChanged.connect(self._slot_analysisDateTimeChanged)
         self.biologicalSourceWidget.anchoringWidget = self
-        self.biologicalSourceWidget.overrideAnchor=False
+        self.biologicalSourceWidget.overrideAnchor=True
         self.biologicalSourceWidget.setValue(self._data_.source, objSymbol="source")
 
+        self._collapsibleChildren_["biologicalSourceWidget"] = self.biologicalSourceWidget
+
     def closeEvent(self, evt):
-        self.biologicalSourceWidget.closeChildren()
+        self.biologicalSourceWidget.collapseSubWidgets()
         super().closeEvent(evt)
         evt.accept()
 

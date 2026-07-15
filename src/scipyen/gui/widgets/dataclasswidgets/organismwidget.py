@@ -65,7 +65,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 Ui_OrganismWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "organismwidget2.ui")
+    os.path.join(__module_path__, "organismwidget.ui")
     )
 
 class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
@@ -299,7 +299,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
 
             else:
                 self.taxonDetailsViewer.view(self._data_.taxon,
-                                             doc_title = doc_itle,
+                                             doc_title = doc_title,
                                              name = doc_title)
                 self.taxonDetailsViewer.winTitle = win_title
                 self.taxonDetailsViewer.docTitle = doc_title
