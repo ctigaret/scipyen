@@ -118,8 +118,8 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         self.bioSourceTypeComboBox.currentIndexChanged.connect(self._slot_sourceTypeChanged)
 
-        self.specimenWidget = None
-        # self.organismWidget = None
+        self.specimenEditor = None
+        # self.organismEditor = None
 
         if isinstance(self._data_.specimen.name, str) and len(self._data_.specimen.name.strip()):
             spNameLabel = f"{self._data_.specimen.name} ({type(self._data_.specimen).__name__})"
@@ -131,6 +131,8 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         self.editSpecimenToolButton.toggled.connect(self._slot_toggleSpecimenEditor)
 
         self.replaceSpecimenToolButton.clicked.connect(self._slot_chooseNewSpecimenType)
+
+        self._collapsibleChildren_["specimenEditor"] = self.specimenEditor
 
     @Slot()
     def _slot_chooseNewSpecimenType(self):
@@ -222,41 +224,49 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
             self._slot_editSpecimen()
 
         else:
-            if isinstance(self.specimenWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenWidget):
-                self.specimenWidget.collapse(False)
+            if isinstance(self.specimenEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenEditor):
+                self.specimenEditor.collapse(False)
 
     @Slot()
-    def _slot_specimenWidgetClosing(self):
+    def _slot_specimenEditorClosing(self):
         sb = QtCore.QSignalBlocker(self.editSpecimenToolButton) # noqa
         self.editSpecimenToolButton.setChecked(False)
 
     @Slot()
+    def _slot_specimenEditorCollapsed(self):
+        sb = QtCore.QSignalBlocker(self.editSpecimenToolButton)
+        self.editSpecimenToolButton.setChecked(False)
+
+    @Slot()
     def _slot_editSpecimen(self):
-        anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and not self.overrideAnchor) else self
+        anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
         if isinstance(self._data_.specimen, self._data_.specimenTypes):
-            if isinstance(self.specimenWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenWidget):
+            if isinstance(self.specimenEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenEditor):
                 if self._needsNewSpecimenWidget_:
-                    self.specimenWidget.close()
-                    self.specimenWidget.deleteLater()
-                    self.specimenWidget = None
+                    self.specimenEditor.close()
+                    self.specimenEditor.deleteLater()
+                    self.specimenEditor = None
 
                     spWidgetType = self._createSpecimenWidget_(self._data_.specimen)
-                    self.specimenWidget = spWidgetType(self._data_.specimen, objSymbol="specimen", anchoringWidget=anchoringWidget)
-                    self.specimenWidget.sig_valueChanged.connect(self._slot_specimenChanged)
-                    self.specimenWidget.sig_closing.connect(self._slot_specimenWidgetClosing)
+                    self.specimenEditor = spWidgetType(self._data_.specimen, objSymbol="specimen", anchoringWidget=anchoringWidget)
+                    self.specimenEditor.sig_valueChanged.connect(self._slot_specimenChanged)
+                    self.specimenEditor.sig_closing.connect(self._slot_specimenEditorClosing)
+                    self.specimenEditor.sig_collapsed.connect(self._slot_specimenEditorCollapsed)
 
             else:
                 spWidgetType = self._createSpecimenWidget_(self._data_.specimen)
-                self.specimenWidget = spWidgetType(self._data_.specimen, objSymbol="specimen", anchoringWidget=anchoringWidget)
-                self.specimenWidget.sig_valueChanged.connect(self._slot_specimenChanged)
-                self.specimenWidget.sig_closing.connect(self._slot_specimenWidgetClosing)
+                self.specimenEditor = spWidgetType(self._data_.specimen, objSymbol="specimen", anchoringWidget=anchoringWidget)
+                self.specimenEditor.sig_valueChanged.connect(self._slot_specimenChanged)
+                self.specimenEditor.sig_closing.connect(self._slot_specimenEditorClosing)
+                self.specimenEditor.sig_collapsed.connect(self._slot_specimenEditorCollapsed)
 
             self._needsNewSpecimenWidget_ = False
-            self.specimenWidget.show()
+            self._collapsibleChildren_["specimenEditor"] = self.specimenEditor
+            self.specimenEditor.show()
             if isinstance(self._data_.specimen.name, str) and len(self._data_.specimen.name.strip()):
-                self.specimenWidget.setWindowTitle(f"Specimen: {self._data_.specimen.name} ({type(self._data_.specimen).__name__})")
+                self.specimenEditor.setWindowTitle(f"Specimen: {self._data_.specimen.name} ({type(self._data_.specimen).__name__})")
             else:
-                self.specimenWidget.setWindowTitle(f"Specimen: {type(self._data_.specimen).__name__}")
+                self.specimenEditor.setWindowTitle(f"Specimen: {type(self._data_.specimen).__name__}")
 
     @singledispatchmethod
     def _createSpecimenWidget_(self, obj) -> type:
@@ -309,17 +319,17 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         return BiologicalProductWidget
 
     def closeEvent(self, evt):
-        if isinstance(self.specimenWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenWidget):
-            # sb = QtCore.QSignalBlocker(self.specimenWidget)
-            self.specimenWidget.close()
-            self.specimenWidget.deleteLater()
-            self.specimenWidget = None
+        if isinstance(self.specimenEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenEditor):
+            # sb = QtCore.QSignalBlocker(self.specimenEditor)
+            self.specimenEditor.close()
+            self.specimenEditor.deleteLater()
+            self.specimenEditor = None
 
-        # if isinstance(self.organismWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismWidget):
-        #     sb = QtCore.QSignalBlocker(self.organismWidget)
-        #     self.organismWidget.close()
-        #     self.organismWidget.deleteLater()
-        #     self.organismWidget = None
+        # if isinstance(self.organismEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismEditor):
+        #     sb = QtCore.QSignalBlocker(self.organismEditor)
+        #     self.organismEditor.close()
+        #     self.organismEditor.deleteLater()
+        #     self.organismEditor = None
 
         super().closeEvent(evt)
         evt.accept()

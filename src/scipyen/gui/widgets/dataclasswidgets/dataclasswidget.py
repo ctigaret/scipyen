@@ -81,12 +81,13 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     sig_detailedView = Signal(object, str, name="sig_detailedView")
     sig_closing = Signal(name="sig_closing")
     sig_moved = Signal(QtCore.QPoint, name="sig_moved")
+    sig_collapsed = Signal(name="sig_collapsed")
     _objectTypes_ = tuple()
 
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None, **kwargs):
         isAttribute = kwargs.pop("isAttribute", False)
         anchoringWidget = kwargs.pop("anchoringWidget", None)
-        self._overrideAnchor_ = kwargs.pop("overrideAnchor", True)
+        self._overrideAnchor_ = kwargs.pop("overrideAnchor", False)
         windowFlags = kwargs.pop("windowFlags", None)
         self._objSymbol_ = kwargs.pop("objSymbol", None)
 
@@ -109,6 +110,9 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         self.editParentToolButton = None
         self.parentEditor = None
         self.organismEditor = None
+
+        self._collapsibleChildren_ = {"parentEditor":self.parentEditor,
+                                      "organismEditor":self.organismEditor}
 
         QtWidgets.QWidget.__init__(self, parent=parent)
         self._isAttribute_: bool = isAttribute
@@ -263,6 +267,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
             # if isinstance(self._closeRequestedEvent_, QtGui.QCloseEvent):
             if self._animationGroup_.direction() == QtCore.QAbstractAnimation.Backward:
+                self.sig_collapsed.emit()
                 if self._closeRequested_ is True:
                     self.close()
                 else:
@@ -461,7 +466,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     @Slot()
     def _slot_editParent(self):
-        anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and not self.overrideAnchor) else self
+        anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
         parent = None
         if (hasattr(self, "_data_")
             and hasattr(self, "_objectTypes_")
@@ -477,6 +482,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                 editor = editorType(parent, objSymbol="parent", anchoringWidget=anchoringWidget)
                 editor.sig_valueChanged.connect(self._slot_parentChanged)
                 editor.sig_closing.connect(self._slot_parentEditorClosing)
+                editor.sig_collapsed.connect(self._slot_parentEditorCollapsed)
                 if type(editor) is not type(self.parentEditor):
                     self.parentEditor.close()
                     self.parentEditor.deleteLater()
@@ -487,8 +493,10 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self.parentEditor = editorType(parent, objSymbol="parent", anchoringWidget=anchoringWidget)
             self.parentEditor.sig_valueChanged.connect(self._slot_parentChanged)
             self.parentEditor.sig_closing.connect(self._slot_parentEditorClosing)
+            self.parentEditor.sig_collapsed.connect(self._slot_parentEditorCollapsed)
 
         self._needsNewParentWidget_ = False
+        self._collapsibleChildren_["parentEditor"] = self.parentEditor
         self.parentEditor.show()
         self.parentEditor.setWindowTitle(f"Parent: {type(parent).__name__}")
 
@@ -567,23 +575,34 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                 self.organismEditor.deleteLater()
                 self.organismEditor = None
 
-            anchoringWidget = self._anchoringWidget_
-            if not isinstance(self._anchoringWidget_, QtWidgets.QWidget):
-                anchoringWidget = self
+            anchoringWidget = self._anchoringWidget_ if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
             self.organismEditor = OrganismWidget(anchoringWidget=anchoringWidget)
             self.organismEditor.setWindowTitle("Organism")
             self.organismEditor.sig_valueChanged.connect(self._slot_organismChanged)
             self.organismEditor.sig_closing.connect(self._slot_organismEditorClosing)
+            self.organismEditor.sig_collapsed.connect(self._slot_organismEditorCollapsed)
 
         try:
             organism = self._data_.getOrganism()
         except: # noqa
             organism = sdc.Organism()
 
+        self._collapsibleChildren_["organismEditor"] = self.organismEditor
+
         self.organismEditor.setValue(organism, objSymbol="organism")
 
         if not self.organismEditor.isVisible():
             self.organismEditor.show()
+
+    @Slot()
+    def _slot_organismEditorCollapsed(self):
+        sb = QtCore.QSignalBlocker(self.nameDescriptionWidget)
+        self.nameDescriptionWidget.organismToolButton.setChecked(False)
+
+    @Slot()
+    def _slot_parentEditorCollapsed(self):
+        sb = QtCore.QSignalBlocker(self.nameDescriptionWidget)
+        self.nameDescriptionWidget.editParentToolButton.setChecked(False)
 
     @Slot(object)
     def _slot_organismChanged(self, value: object):
@@ -641,9 +660,18 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     def collapse(self, close: bool=False):
         if self._isSubWidget_:
+            self._collapseChildren_(close)
             self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
             self._closeRequested_ = close
             self._animationGroup_.start()
+
+    def _collapseChildren_(self, close: bool= False):
+        for obj in self._collapsibleChildren_.values():
+            if isinstance(obj, QtWidgets.QWidget) and qtutils.isQObjectAlive(obj):
+                try:
+                    obj.collapse(close)
+                except:
+                    pass
 
     def closeEvent(self, evt):
         # print(f"{self.__class__.__name__}.closeEvent")
@@ -673,12 +701,14 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     def anchoringWidget(self, obj: QtWidgets.QWidget):
         if isinstance(obj, QtWidgets.QWidget):
             self._anchoringWidget_ = obj
+            self._isSubWidget_ = True
         else:
             self._anchoringWidget_ = None
+            self._isSubWidget_ = False
 
     @Slot(QtCore.QPoint)
     def _slot_anchoringWidgetMoved(self, pos: QtCore.QPoint):
-        # print(f"{self.__class__.__name__}._slot_anchoringWidgetMoved({pos})")
+        # print(f"{self.__class__.__name__}<{self.objectName()}>._slot_anchoringWidgetMoved({pos})\n")
         if not self.isVisible():
             return
 
@@ -688,39 +718,15 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         if isinstance(self.parent(), QtWidgets.QWidget):
             return
 
-        if self._anchoringWidget_.parent() is None:
-            # newPos = (pos + QtCore.QPoint(self._anchoringWidget_.geometry().width(), 0)
-            #             - QtCore.QPoint(0, QtWidgets.QApplication.style().pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight)))
-            newPos = pos + QtCore.QPoint(self._anchoringWidget_.geometry().width(), -QtWidgets.QApplication.style().pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight))
-                        # - QtCore.QPoint(0, QtWidgets.QApplication.style().pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight)))
+        # titleBarHeight = QtWidgets.QApplication.style().pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight)
+
+        if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
+            newPos = self._anchoringWidget_.parent().mapToGlobal(self._anchoringWidget_.geometry().topRight())
+
         else:
-            newPos = pos + QtCore.QPoint(self._anchoringWidget_.frameGeometry().width(), 0)
-            # if isinstance(getattr(self._anchoringWidget_, "_anchoringWidget_", None), QtWidgets.QWidget):
-            #     newPos = pos + QtCore.QPoint(self._anchoringWidget_.frameGeometry().width(), 0)
-            # else:
-            #     newPos = (pos + QtCore.QPoint(self._anchoringWidget_.geometry().width(), 0)
-            #             - QtCore.QPoint(0, QtWidgets.QApplication.style().pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight)))
-            # newPos = pos + QtCore.QPoint(self._anchoringWidget_.frameGeometry().width(), 0)
+            newPos = self._anchoringWidget_.frameGeometry().topRight()
+
         self.move(newPos)
-
-        # topWidget = self._anchoringWidget_
-        # parent=topWidget.parent()
-        # while isinstance(parent, QtWidgets.QWidget):
-        #     topWidget = parent
-        #     parent=parent.parent()
-        #
-        # # print(f"{self.__class__.__name__}._slot_anchoringWidgetMoved: topWidget = {topWidget}")
-        # if topWidget == self._anchoringWidget_:
-        #     if isinstance(getattr(self._anchoringWidget_, "_anchoringWidget_", None), QtWidgets.QWidget):
-        #         newPos = pos + QtCore.QPoint(self._anchoringWidget_.frameGeometry().width(), 0)
-        #     else:
-        #         newPos = (pos + QtCore.QPoint(self._anchoringWidget_.geometry().width(), 0)
-        #                 - QtCore.QPoint(0, QtWidgets.QApplication.style().pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight)))
-        # else:
-        #     newPos = pos + QtCore.QPoint(topWidget.frameGeometry().width(), 0)
-        #
-        # self.move(newPos)
-
 
     def closeChildren(self):
         if isinstance(self.parentEditor, QtWidgets.QWidget):

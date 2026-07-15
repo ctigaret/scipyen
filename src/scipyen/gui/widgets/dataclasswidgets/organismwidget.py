@@ -139,6 +139,8 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         # self.editBiometricsToolButton.clicked.connect(self._slot_editBiometrics)
         self.editBiometricsToolButton.toggled.connect(self._slot_toggleBiometricsEditor)
 
+        self._collapsibleChildren_["biometricsEditor"] = self.biometricsEditor
+
     def closeEvent(self, evt):
         if isinstance(self.taxonDetailsViewer, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.taxonDetailsViewer):
             self.taxonDetailsViewer.close()
@@ -245,7 +247,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
     @Slot()
     def _slot_editBiometrics(self):
         from gui.widgets.dataclasswidgets.biometricswidget import BiometricsWidget
-        anchoringWidget = self._anchoringWidget_ if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and not self.overrideAnchor) else self
+        anchoringWidget = self._anchoringWidget_ if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
         if not isinstance(self.biometricsEditor, BiometricsWidget):
             if isinstance(self.biometricsEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biometricsEditor):
                 self.biometricsEditor.close()
@@ -256,11 +258,19 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
             self.biometricsEditor.setWindowTitle("Biometrics")
             self.biometricsEditor.sig_valueChanged.connect(self._slot_biometricsChanged)
             self.biometricsEditor.sig_closing.connect(self._slot_biometricsEditorClosing)
+            self.biometricsEditor.sig_collapsed.connect(self._slot_biometricsEditorCollapsed)
+
+        self._collapsibleChildren_["biometricsEditor"] = self.biometricsEditor
 
         self.biometricsEditor.setValue(self._data_.biometrics, objSymbol="biometrics")
 
         if not self.biometricsEditor.isVisible():
             self.biometricsEditor.show()
+
+    @Slot()
+    def _slot_biometricsEditorCollapsed(self):
+        sb = QtCore.QSignalBlocker(self.editBiometricsToolButton)
+        self.editBiometricsToolButton.setChecked(False)
 
     @Slot()
     def _slot_biometricsEditorClosing(self):
