@@ -223,6 +223,13 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             ):
             self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
 
+        sizes = self.splitter.sizes()
+        sizes[0] = 0
+        sizes[-1] = self.splitter.widget(len(sizes)-1).size().height()
+        self.splitter.setSizes(sizes)
+        self.splitter.setToolTip("Drag (⇓) handle to reveal data input/output tools")
+        # self.splitter.setStretchFactor(len(sizes)-1, 1)
+
     @QtCore.Property(int)
     def widgetWidth(self) -> int:
         return self.width()
@@ -259,6 +266,10 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     @Slot(QtCore.QAbstractAnimation.State, QtCore.QAbstractAnimation.State)
     def _slot_animationStateChanged(self, newState: QtCore.QAbstractAnimation.State,
                                     oldState: QtCore.QAbstractAnimation.State):
+
+        if (not isinstance(self._animationGroup_, QtCore.QParallelAnimationGroup)
+            or not qtutils.isQObjectAlive(self._animationGroup_)):
+            return
 
         if newState == QtCore.QAbstractAnimation.Running:
             self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
