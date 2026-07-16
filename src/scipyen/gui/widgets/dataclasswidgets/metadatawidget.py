@@ -8,9 +8,10 @@
 
 r"""
 """
-import sys, os, typing
+import sys, os, typing # noqa
 import pathlib
-# import qtpy
+from functools import singledispatchmethod
+import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
@@ -65,7 +66,6 @@ from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
 # from gui.widgets.datatreeview import DataTreeView
 
 Ui_MetaDataWidget, QWidget = loadUiType(os.path.join(__module_path__, "metadatawidget.ui"))
-# Ui_MetaDataWidget, QWidget = loadUiType(os.path.join(__module_path__, "metadatawidget_new_26b13.ui"))
 
 class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
     r"""Widget for displaying BaseScipyenData objectx.
@@ -107,6 +107,7 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
         file_origin = ""
         if isinstance(self._data_.file_origin, pathlib.Path):
             file_origin = self._data_.file_origin.as_posix()
+
         elif isinstance(self._data_.file_origin, str):
             file_origin = self._data_.file_origin
 
@@ -233,20 +234,46 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
     @Slot()
     def _slot_editProcedure(self): # TODO
-        from gui.widgets.dataclasswidgets.asruwidgets import (PPLProcedureWidget, ProcedureWidget)
+        from gui.widgets.dataclasswidgets.asruwidgets.pplprocedurewidget import PPLProcedureWidget
+        from gui.widgets.dataclasswidgets.procedurewidget import ProcedureWidget
         anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
 
-        if isinstance(self._data_.procedure, Procedure):
-            if not isinstance(self.procedureEditor, ProcedureWidget):
-                if isinstance(self.procedureEditor, PPLProcedureWidget):
-                    self.procedureEditor.collapse(True)
-                    self.procedureEditor.deleteLater()
-                    self.procedureEditor = None
+        wType = self._createProcedureWidget_(self._data_.procedure)
 
-                self.procedureEditor = ProcedureWidget(anchoringWidget=anchoringWidget)
+        if isinstance(self.procedureEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.procedureEditor):
+            if not isinstance(self.procedureEditor, wType):
+                self.procedureEditor.collapse(True)
+                self.procedureEditor.deleteLater()
+                self.procedureEditor = None
+
+                self.procedureEditor = wType(self._data_.procedure, objSymbol="procedure", anchoringWidget=anchoringWidget)
                 self.procedureEditor.sig_valueChanged.connect(self._slot_procedureChanged)
                 self.procedureEditor.sig_closing.connect(self._slot_procedureEditorClosing)
                 self.procedureEditor.sig_collapsed.connect(self._slot_procedureEditorCollapsed)
+
+        else:
+            self.procedureEditor = wType(self._data_.procedure, objSymbol="procedure", anchoringWidget=anchoringWidget)
+            self.procedureEditor.sig_valueChanged.connect(self._slot_procedureChanged)
+            self.procedureEditor.sig_closing.connect(self._slot_procedureEditorClosing)
+            self.procedureEditor.sig_collapsed.connect(self._slot_procedureEditorCollapsed)
+
+        self._collapsibleChildren_["procedureEditor"]=self.procedureEditor
+        self.procedureEditor.show()
+
+        if isinstance(self._data_.procedure.name, str) and len(self._data_.procedure.name.strip()):
+            self.procedureEditor.setWindowTitle(f"Procedure: {self._data_.procedure.name} ({type(self._data_.procedure).__name__})")
+        else:
+            self.procedureEditor.setWindowTitle(f"Procedure: {type(self._data_.procedure).__name__}")
+
+    @Slot()
+    def _slot_procedureEditorClosing(self):
+        sb = QtCore.QSignalBlocker(self.toggleProcedureEditorToolButton) # noqa
+        self.toggleProcedureEditorToolButton.setChecked(False)
+
+    @Slot()
+    def _slot_procedureEditorCollapsed(self):
+        sb = QtCore.QSignalBlocker(self.toggleProcedureEditorToolButton) # noqa
+        self.toggleProcedureEditorToolButton.setChecked(False)
 
 
     @Slot(object)
@@ -269,28 +296,6 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
         self.sig_valueChanged.emit(self._data_)
 
-    @Slot()
-    def _slot_editProcedures(self):
-        # TODO: 2022-11-08 08:35:39
-        # use GenericMappingDialog
-        # TODO: 2022-11-08 08:36:52
-        # create an EpochWidget for gui.quickdialog, to edit/generate
-        # neo.Epoch with intervals
-        # SUGGEST: use TriggerProtocolsEditorDialog as a model of what an
-        # EpochEditor may look like:
-        # A QListView with Epoch names (thus being able to handle more
-        # than one Epoch)
-        # a QTableView with headings: "Name", "Start", "Duration" and one row
-        # per Epoch interval - populated with data from the Epoch selected in
-        # the list view
-        #
-        # TODO: 2022-11-08 08:37:39 (maybe)
-        # create a Gantt chart-like widget viewer to include with the
-        # epoch editor
-
-        self.sig_valueChanged.emit(self._data_)
-        print("edit procedures")
-
     @property
     def field(self):
         return self._field
@@ -308,6 +313,24 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
         self.fieldIDLineEdit.setText(f"{self._field}")
 
         self.sig_valueChanged.emit()
+
+    @singledispatchmethod
+    def _createProcedureWidget_(self, obj) -> type:
+        raise NotImplementedError(f"Objects of type {type(obj)} are not supported")
+
+    @_createProcedureWidget_.register(sdc.PPLProcedure)
+    def __createProcedureWidget__(self, obj: sdc.PPLProcedure):
+        from gui.widgets.dataclasswidgets.asruwidgets.pplprocedurewidget import PPLProcedureWidget
+        return PPLProcedureWidget
+
+    @_createProcedureWidget_.register(sdc.Procedure)
+    def __createProcedureWidget__(self, obj: sdc.Procedure): # noqa
+        from gui.widgets.dataclasswidgets.procedurewidget import ProcedureWidget
+        return ProcedureWidget
+
+
+
+
 
     # @property
     # def genotype(self):

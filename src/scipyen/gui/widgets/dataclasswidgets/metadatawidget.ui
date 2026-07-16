@@ -121,6 +121,15 @@
          </item>
          <item>
           <widget class="QToolButton" name="toggleSourceEditorToolButton">
+           <property name="toolTip">
+            <string>Edit Source</string>
+           </property>
+           <property name="statusTip">
+            <string>Edit Source</string>
+           </property>
+           <property name="whatsThis">
+            <string>Edit Source</string>
+           </property>
            <property name="text">
             <string>Source Editor</string>
            </property>
@@ -161,6 +170,15 @@
          </item>
          <item>
           <widget class="QToolButton" name="toggleProcedureEditorToolButton">
+           <property name="toolTip">
+            <string>Edit procedure</string>
+           </property>
+           <property name="statusTip">
+            <string>Edit procedure</string>
+           </property>
+           <property name="whatsThis">
+            <string>Edit procedure</string>
+           </property>
            <property name="text">
             <string>Procedure Editor</string>
            </property>

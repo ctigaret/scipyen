@@ -234,7 +234,7 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
     @Slot()
     def _slot_specimenEditorCollapsed(self):
-        sb = QtCore.QSignalBlocker(self.editSpecimenToolButton)
+        sb = QtCore.QSignalBlocker(self.editSpecimenToolButton) # noqa
         self.editSpecimenToolButton.setChecked(False)
 
     @Slot()

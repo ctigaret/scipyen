@@ -93,19 +93,19 @@
   <customwidget>
    <class>ASRUWidget</class>
    <extends>QWidget</extends>
-   <header location="global">gui.widgets.dataclasswidgets.asruwidgets</header>
+   <header location="global">gui.widgets.dataclasswidgets.asruwidgets.asruwidget</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>PPLProtocolStepWidget</class>
    <extends>QWidget</extends>
-   <header location="global">gui.widgets.dataclasswidgets.asruwidgets</header>
+   <header location="global">gui.widgets.dataclasswidgets.asruwidgets.pplprotocolstepwidget</header>
    <container>1</container>
   </customwidget>
   <customwidget>
    <class>ProcedureWidget</class>
    <extends>QWidget</extends>
-   <header location="global">gui.widgets.dataclasswidgets.asruwidgets</header>
+   <header location="global">gui.widgets.dataclasswidgets.procedurewidget</header>
    <container>1</container>
   </customwidget>
  </customwidgets>
