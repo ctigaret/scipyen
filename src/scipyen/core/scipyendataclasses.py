@@ -1552,10 +1552,10 @@ class PIL(ScipyenDataclass):
     def __hash__(self) -> int:
         return hash((self.name, self.description, self.ID, self.holderName, self.holderEmail))
 
-@datalass
+@dataclass
 class PPLProtocol(ScipyenDataclass):
     ID: str = dataclasses.field(default_factory = str)
-    parent: PPL = dataclasses.field(default_fatory = PPL)
+    parent: PPL = dataclasses.field(default_factory = PPL)
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
@@ -1575,18 +1575,6 @@ class PPLProtocolStep(ScipyenDataclass):
     def __hash__(self) -> int:
         return hash((self.name, self.description, self.ID, self.parent))
 
-@dataclass
-class PPLProcedure(ScipyenDataclass)
-    ppl: PPL = dataclasses.field(default_factory=PPL)
-    pil: PIL = dataclasses.field(default_factory=PIL)
-    protocol: PPLProtocol = dataclasses.field(default_factory=PPLProtocol)
-    protocolStep: PPLProtocolStep = dataclasses.field(default_factory=PPLProtocolStep)
-
-    def __eq__(self, other) -> bool:
-        return super().__eq__(other)
-
-    def __hash__(self) -> int:
-        return hash((self.name, self.description, self.ppl, self.pil, self.protocol, self.protocolStep))
 
 @dataclass
 class Procedure(ScipyenDataclass):
@@ -1619,6 +1607,20 @@ class Procedure(ScipyenDataclass):
 
     def __hash__(self) -> int:
         return hash((self.name, self.description, self.procedureType, self.parent))
+
+@dataclass
+class PPLProcedure(ScipyenDataclass):
+    ppl: PPL = dataclasses.field(default_factory=PPL)
+    pil: PIL = dataclasses.field(default_factory=PIL)
+    protocol: PPLProtocol = dataclasses.field(default_factory=PPLProtocol)
+    protocolStep: PPLProtocolStep = dataclasses.field(default_factory=PPLProtocolStep)
+    procedure: Procedure = dataclasses.field(default_factory = Procedure)
+
+    def __eq__(self, other) -> bool:
+        return super().__eq__(other)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.ppl, self.pil, self.protocol, self.protocolStep, self.procedure))
 
 @dataclass
 class SubstanceDosage(ScipyenDataclass):

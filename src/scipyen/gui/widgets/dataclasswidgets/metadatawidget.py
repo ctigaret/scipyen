@@ -136,7 +136,7 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
         self.analysisDateTimeEdit.dateTimeChanged.connect(self._slot_analysisDateTimeChanged)
 
         self.biologicalSourceEditor = None
-        self.bioSourceEditorToolButton.toggled.connect(self._slot_toggleBioSourceEditor)
+        self.editSourceToolButton.toggled.connect(self._slot_toggleBioSourceEditor)
         self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
 
         self.asruEditor = None
@@ -197,13 +197,13 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
     @Slot()
     def _slot_biologicalSourceEditorCollapsed(self):
-        sb = QtCore.QSignalBlocker(self.bioSourceEditorToolButton) # noqa
-        self.bioSourceEditorToolButton.setChecked(False)
+        sb = QtCore.QSignalBlocker(self.editSourceToolButton) # noqa
+        self.editSourceToolButton.setChecked(False)
 
     @Slot()
     def _slot_biologicalSourceEditorClosing(self):
-        sb = QtCore.QSignalBlocker(self.bioSourceEditorToolButton) # noqa
-        self.bioSourceEditorToolButton.setChecked(False)
+        sb = QtCore.QSignalBlocker(self.editSourceToolButton) # noqa
+        self.editSourceToolButton.setChecked(False)
 
     @Slot(object)
     def _slot_biologicalSourceChanged(self, val: sdc.BiologicalSource):
@@ -253,24 +253,6 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
     #     if not self.biologicalSourceEditor.isVisible():
     #         self.biologicalSourceEditor.show()
     #
-    # @Slot()
-    # def _slot_biologicalSourceEditorCollapsed(self):
-    #     sb = QtCore.QSignalBlocker(self.bioSourceEditorToolButton) # noqa
-    #     self.bioSourceEditorToolButton.setChecked(False)
-    #
-    # @Slot()
-    # def _slot_biologicalSourceEditorClosing(self):
-    #     sb = QtCore.QSignalBlocker(self.bioSourceEditorToolButton) # noqa
-    #     self.bioSourceEditorToolButton.setChecked(False)
-    #
-    # @Slot(object)
-    # def _slot_biologicalSourceChanged(self, val: sdc.BiologicalSource):
-    #     if isinstance(val, sdc.BiologicalSource):
-    #         self._data_.source = val
-    #     else:
-    #         self._data_.source = sdc.BiologicalSource()
-    #
-    #     self.sig_valueChanged.emit(self._data_)
 
     @Slot(QtCore.QDateTime)
     def _slot_analysisDateTimeChanged(self, val: QtCore.QDateTime):
