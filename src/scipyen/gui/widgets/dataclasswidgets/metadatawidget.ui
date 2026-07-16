@@ -23,7 +23,7 @@
       <number>3</number>
      </property>
      <widget class="DataExchangeWidget" name="dataExchangeWidget" native="true"/>
-     <widget class="QWidget" name="">
+     <widget class="QWidget" name="layoutWidget">
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
         <widget class="NameDescriptionWidget" name="nameDescriptionWidget" native="true"/>
@@ -120,9 +120,9 @@
           </spacer>
          </item>
          <item>
-          <widget class="QToolButton" name="editSourceToolButton">
+          <widget class="QToolButton" name="toggleSourceEditorToolButton">
            <property name="text">
-            <string>...</string>
+            <string>Source Editor</string>
            </property>
            <property name="icon">
             <iconset theme="document-properties"/>
@@ -142,7 +142,7 @@
          <item>
           <widget class="QLabel" name="label_4">
            <property name="text">
-            <string>ASRU: </string>
+            <string>Procedure: </string>
            </property>
           </widget>
          </item>
@@ -160,9 +160,9 @@
           </spacer>
          </item>
          <item>
-          <widget class="QToolButton" name="editASRUToolButton">
+          <widget class="QToolButton" name="toggleProcedureEditorToolButton">
            <property name="text">
-            <string>...</string>
+            <string>Procedure Editor</string>
            </property>
            <property name="icon">
             <iconset theme="document-properties"/>

@@ -1609,12 +1609,14 @@ class Procedure(ScipyenDataclass):
         return hash((self.name, self.description, self.procedureType, self.parent))
 
 @dataclass
-class PPLProcedure(ScipyenDataclass):
+class PPLProcedure(Procedure):
+    r"""Procedure reulated under appropriate legislation"""
     ppl: PPL = dataclasses.field(default_factory=PPL)
     pil: PIL = dataclasses.field(default_factory=PIL)
     protocol: PPLProtocol = dataclasses.field(default_factory=PPLProtocol)
     protocolStep: PPLProtocolStep = dataclasses.field(default_factory=PPLProtocolStep)
-    procedure: Procedure = dataclasses.field(default_factory = Procedure)
+    framework: str="ASPA 1986"
+    # procedure: Procedure = dataclasses.field(default_factory = Procedure)
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)

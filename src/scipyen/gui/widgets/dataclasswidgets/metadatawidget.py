@@ -136,12 +136,12 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
         self.analysisDateTimeEdit.dateTimeChanged.connect(self._slot_analysisDateTimeChanged)
 
         self.biologicalSourceEditor = None
-        self.editSourceToolButton.toggled.connect(self._slot_toggleBioSourceEditor)
+        self.toggleSourceEditorToolButton.toggled.connect(self._slot_toggleBioSourceEditor)
         self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
 
-        self.asruEditor = None
-        self.editASRUToolButton.toggled.connect(self._slot_toggleASRUEditor)
-        self._collapsibleChildren_["asruEditor"] = self.asruEditor
+        self.procedureEditor = None
+        self.toggleProcedureEditorToolButton.toggled.connect(self._slot_toggleProcedureEditor)
+        self._collapsibleChildren_["procedureEditor"] = self.procedureEditor
 
     def closeEvent(self, evt):
         self.closeSubWidgets()
@@ -170,7 +170,7 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
         super().setValue(self._data_, **kwargs)
 
         if isinstance(self.biologicalSourceEditor, DataClassWidget):
-            sb = QtCore.QSignalBlocker(self.biologicalSourceEditor)
+            sb = QtCore.QSignalBlocker(self.biologicalSourceEditor) # noqa
             self.biologicalSourceEditor.setValue(self._data_.source, objSymbol="source")
 
     @Slot()
@@ -185,9 +185,9 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
             self.biologicalSourceEditor = BiologicalSourceWidget(anchoringWidget=anchoringWidget)
             self.biologicalSourceEditor.setWindowTitle("Source")
-            self.biologicalSourceEditor.sig_valueChanged.connect(self._slot_biologicalSourceChanged)
             self.biologicalSourceEditor.sig_closing.connect(self._slot_biologicalSourceEditorClosing)
             self.biologicalSourceEditor.sig_collapsed.connect(self._slot_biologicalSourceEditorCollapsed)
+            self.biologicalSourceEditor.sig_valueChanged.connect(self._slot_biologicalSourceChanged)
 
         self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
         self.biologicalSourceEditor.setValue(self._data_.source, objSymbol="source")
@@ -197,13 +197,13 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
     @Slot()
     def _slot_biologicalSourceEditorCollapsed(self):
-        sb = QtCore.QSignalBlocker(self.editSourceToolButton) # noqa
-        self.editSourceToolButton.setChecked(False)
+        sb = QtCore.QSignalBlocker(self.toggleSourceEditorToolButton) # noqa
+        self.toggleSourceEditorToolButton.setChecked(False)
 
     @Slot()
     def _slot_biologicalSourceEditorClosing(self):
-        sb = QtCore.QSignalBlocker(self.editSourceToolButton) # noqa
-        self.editSourceToolButton.setChecked(False)
+        sb = QtCore.QSignalBlocker(self.toggleSourceEditorToolButton) # noqa
+        self.toggleSourceEditorToolButton.setChecked(False)
 
     @Slot(object)
     def _slot_biologicalSourceChanged(self, val: sdc.BiologicalSource):
@@ -220,39 +220,48 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
             self._slot_editBiologicalSource()
         else:
             if isinstance(self.biologicalSourceEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor):
+                sb = QtCore.QSignalBlocker(self.biologicalSourceEditor)
                 self.biologicalSourceEditor.collapse(False)
 
     @Slot(bool)
-    def _slot_toggleASRUEditor(self, val: bool):
+    def _slot_toggleProcedureEditor(self, val: bool):
         if val is True:
-            self._slot_editASRU()
+            self._slot_editProcedure()
         else:
-            if isinstance(self.asruEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.asruEditor):
-                self.asruEditor.collapse(False)
+            if isinstance(self.procedureEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.procedureEditor):
+                self.procedureEditor.collapse(False)
 
     @Slot()
-    def _slot_editASRU(self): # TODO
-        pass
-        # from gui.widgets.dataclasswidgets.asruwidgets import
-    #     anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
-    #     if not isinstance(self._data_.source, BiologicalSourceWidget):
-    #         if isinstance(self.biologicalSourceEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor):
-    #             self.biologicalSourceEditor.close()
-    #             self.biologicalSourceEditor.deleteLater()
-    #             self.biologicalSourceEditor = None
-    #
-    #         self.biologicalSourceEditor = BiologicalSourceWidget(anchoringWidget=anchoringWidget)
-    #         self.biologicalSourceEditor.setWindowTitle("Source")
-    #         self.biologicalSourceEditor.sig_valueChanged.connect(self._slot_biologicalSourceChanged)
-    #         self.biologicalSourceEditor.sig_closing.connect(self._slot_biologicalSourceEditorClosing)
-    #         self.biologicalSourceEditor.sig_collapsed.connect(self._slot_biologicalSourceEditorCollapsed)
-    #
-    #     self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
-    #     self.biologicalSourceEditor.setValue(self._data_.source, objSymbol="source")
-    #
-    #     if not self.biologicalSourceEditor.isVisible():
-    #         self.biologicalSourceEditor.show()
-    #
+    def _slot_editProcedure(self): # TODO
+        from gui.widgets.dataclasswidgets.asruwidgets import (PPLProcedureWidget, ProcedureWidget)
+        anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
+
+        if isinstance(self._data_.procedure, Procedure):
+            if not isinstance(self.procedureEditor, ProcedureWidget):
+                if isinstance(self.procedureEditor, PPLProcedureWidget):
+                    self.procedureEditor.collapse(True)
+                    self.procedureEditor.deleteLater()
+                    self.procedureEditor = None
+
+                self.procedureEditor = ProcedureWidget(anchoringWidget=anchoringWidget)
+                self.procedureEditor.sig_valueChanged.connect(self._slot_procedureChanged)
+                self.procedureEditor.sig_closing.connect(self._slot_procedureEditorClosing)
+                self.procedureEditor.sig_collapsed.connect(self._slot_procedureEditorCollapsed)
+
+
+    @Slot(object)
+    def _slot_procedureChanged(self, value: sdc.Procedure):
+        from gui.widgets.dataclasswidgets.asruwidgets import (PPLProcedureWidget, ProcedureWidget)
+        if not isinstance(value, sdc.Procedure):
+            if isinstance(self.sender(), PPLProcedureWidget):
+                value = sdc.PPLProcedure()
+
+            else:
+                value = sdc.Procedure()
+
+        self._data_.procedure = value
+
+        self.sig_valueChanged.emit(self._data_)
 
     @Slot(QtCore.QDateTime)
     def _slot_analysisDateTimeChanged(self, val: QtCore.QDateTime):

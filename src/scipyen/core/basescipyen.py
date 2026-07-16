@@ -90,7 +90,7 @@ class BaseScipyenData(ScipyenDataclass):
     # as these are specific to ephys/imaging protocols.
     procedure: Procedure = dataclasses.field(default_factory=Procedure)
 
-    pplProcedure: PPLProcedure = dataclasses.field(default_factory = PPLProcedure)
+    # pplProcedure: PPLProcedure = dataclasses.field(default_factory = PPLProcedure)
 
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")
