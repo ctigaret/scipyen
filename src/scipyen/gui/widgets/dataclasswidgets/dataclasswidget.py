@@ -83,6 +83,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     sig_moved = Signal(QtCore.QPoint, name="sig_moved")
     sig_collapsed = Signal(name="sig_collapsed")
     sig_topWidgetCollapsed = Signal(name="sig_topWidgetCollapsed")
+    sig_topWidgetRestored = Signal(name="sig_topWidgetRestored")
     _objectTypes_ = tuple()
 
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None, **kwargs):
@@ -93,7 +94,8 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         self._objSymbol_ = kwargs.pop("objSymbol", None)
 
         self._isSubWidget_: bool = False
-        # self._topWidgetCollapsed_:bool = False
+        self._topWidgetCollapsed_:bool = False
+        self._outerFrameGeometry_ = None
 
         self._positionHint_: typing.Optional[QtCore.QPoint] = None
         # self._closeRequestedEvent_: typing.Optional[QtGui.QCloseEvent] = None
@@ -227,10 +229,12 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         sizes[0] = 0
         sizes[-1] = self.splitter.widget(len(sizes)-1).size().height()
         self.splitter.setSizes(sizes)
-        self.splitter.setStretchFactor(1,0)
+        # self.splitter.setStretchFactor(1,0)
         self.splitter.setToolTip("Drag (⇓) handle to reveal data input/output tools")
         # self.splitter.splitterMoved.connect(self._slot_splitterMoved)
-        # self._topWidgetCollapsed_ = True
+        # self.sig_topWidgetCollapsed.connect(self._slot_topWidgetCollapsed)
+        # self.sig_topWidgetRestored.connect(self._slot_topWidgetRestored)
+        self._topWidgetCollapsed_ = True
 
     @QtCore.Property(int)
     def widgetWidth(self) -> int:
@@ -528,47 +532,77 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         sb = QtCore.QSignalBlocker(self.nameDescriptionWidget.organismToolButton) # noqa
         self.nameDescriptionWidget.organismToolButton.setChecked(False)
 
-    # @Slot(int, int)
-    # def _slot_splitterMoved(self, pos: int, index: int):
-    #     print(f"\n{self.__class__.__name__}._slot_splitterMoved(pos={pos}, index={index})")
-    #     topWidgetHeight = self.splitter.widget(0).sizeHint().height()
-    #     bottomWidgetHeight = self.splitter.widget(1).sizeHint().height()
-    #     print(f"\n\t top: -> {topWidgetHeight} -> {self.splitter.sizes()[0]}")
-    #     print(f"\n\t bottom: -> {bottomWidgetHeight} -> {self.splitter.sizes()[1]}" )
-    #     if pos==0:
-    #         self.sig_topWidgetCollapsed.emit()
-        # parent = self.parent()
-        # if parent is None:
-        #     topW = self
-        # while isinstance(parent, QtWidgets.QWidget):
-        #     topW = parent
-        #     parent=parent()
+    @Slot(int, int)
+    def _slot_splitterMoved(self, pos: int, index: int):
+        # print(f"\n{self.__class__.__name__}._slot_splitterMoved(pos={pos}, index={index})")
+        topWidgetHeightHint = self.splitter.widget(0).sizeHint().height()
+        topWidgetHeight = self.splitter.sizes()[0]
+        bottomWidgetHeightHint = self.splitter.widget(1).sizeHint().height()
+        bottomWidgetHeight = self.splitter.sizes()[1]
+        # print(f"\n\t top: -> hint {topWidgetHeightHint} -> size {topWidgetHeightHint}")
+        # print(f"\n\t bottom: -> hint {bottomWidgetHeightHint} -> size {bottomWidgetHeight}" )
+        if pos == 0:
+            self.sig_topWidgetCollapsed.emit()
 
-        # if pos == 0:
-        #     geometry = topW.frameGeometry()
-        #     newHeight = geometry.height() - topWidgetHeight
-        #     geometry.setHeight(newHeight)
-        #     topW.setGeometry(geometry)
+        elif pos == topWidgetHeightHint:
+            self.sig_topWidgetRestored.emit()
 
-    # @Slot()
-    # def _slot_topWidgetCollapsed(self):
-    #     if self._topWidgetCollapsed_:
-    #         return
-    #     # parent = self.parent()
-    #     # if parent is None:
-    #     #     topW = self
-    #     # while isinstance(parent, QtWidgets.QWidget):
-    #     #     topW = parent
-    #     #     parent=parent()
-    #     # topW.resize(topW.width(),-1)
-    #     self._topWidgetCollapsed_ = True
-    #
-    # @Slot()
-    # def _slot_topWidgetRestored(self):
-    #     if not self._topWidgetCollapsed_:
-    #         return
-    #     self.resize(-1,-1)
-    #     self._topWidgetCollapsed_ = False
+    @Slot()
+    def _slot_topWidgetCollapsed(self):
+        if self._topWidgetCollapsed_:
+            return
+        # return # for now !!!
+        print("\n*** collapsed ***\n")
+        topWidgetHeightHint = self.splitter.widget(0).sizeHint().height()
+        # topWidgetHeight = self.splitter.sizes()[0]
+        # bottomWidgetHeightHint = self.splitter.widget(1).sizeHint().height()
+        # bottomWidgetHeight = self.splitter.sizes()[1]
+        parent = self.parent()
+        if parent is None:
+            topW = self
+        while isinstance(parent, QtWidgets.QWidget):
+            topW = parent
+            parent=parent()
+        sb = list(map(lambda w: QtCore.QSignalBlocker(w), (self, self.splitter, topW))) # noqa
+        # sizes = self.splitter.sizes()
+        # sizes[0] = 0
+        # sizes[-1] = bottomWidgetHeight
+        # self.splitter.setSizes(sizes)
+        geometry = topW.frameGeometry()
+        newHeight = geometry.height() - topWidgetHeightHint
+        geometry.setHeight(newHeight)
+        topW.setGeometry(geometry)
+        self._topWidgetCollapsed_ = True
+        print(f"collapsed: {self._topWidgetCollapsed_}")
+
+    @Slot()
+    def _slot_topWidgetRestored(self):
+        if self.splitter.sizes()[0]> 0:
+            return
+        print("\n*** restored ***\n")
+        topWidgetHeightHint = self.splitter.widget(0).sizeHint().height()
+        # topWidgetHeight = self.splitter.sizes()[0]
+        # bottomWidgetHeightHint = self.splitter.widget(1).sizeHint().height()
+        bottomWidgetHeight = self.splitter.sizes()[1]
+        # print(f"\n{self.__class__.__name__}._slot_topWidgetRestored")
+        # print(f"\ntop -> hint {topWidgetHeightHint} for {topWidgetHeight}")
+        # print(f"\nbottom -> hint {bottomWidgetHeightHint} for {bottomWidgetHeight}")
+        parent = self.parent()
+        if parent is None:
+            topW = self
+        while isinstance(parent, QtWidgets.QWidget):
+            topW = parent
+            parent=parent()
+        sb = list(map(lambda w: QtCore.QSignalBlocker(w), (self, self.splitter, topW))) # noqa
+        sizes = self.splitter.sizes()
+        sizes[0] = topWidgetHeightHint
+        sizes[-1] = bottomWidgetHeight
+        self.splitter.setSizes(sizes)
+        geometry = topW.frameGeometry()
+        newHeight = geometry.height() + topWidgetHeightHint
+        geometry.setHeight(newHeight)
+        topW.setGeometry(geometry)
+        self._topWidgetCollapsed_ = False
 
     @Slot()
     def _slot_chooseNewParentType(self):
