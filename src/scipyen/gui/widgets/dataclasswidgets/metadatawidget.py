@@ -155,6 +155,11 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
             self.biologicalSourceEditor.deleteLater()
             self.biologicalSourceEditor = None
 
+        if isinstance(self.procedureEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.procedureEditor):
+            self.procedureEditor.close()
+            self.procedureEditor.deleteLater()
+            self.procedureEditor = None
+
         super().closeSubWidgets()
 
     def value(self):
@@ -177,15 +182,15 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
     @Slot()
     def _slot_editBiologicalSource(self):
         from gui.widgets.dataclasswidgets.biologicalsourcewidget import BiologicalSourceWidget
-        anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
-        if not isinstance(self._data_.source, BiologicalSourceWidget):
+        if not isinstance(self.biologicalSourceEditor, BiologicalSourceWidget):
             if isinstance(self.biologicalSourceEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor):
                 self.biologicalSourceEditor.close()
                 self.biologicalSourceEditor.deleteLater()
                 self.biologicalSourceEditor = None
 
+            anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
             self.biologicalSourceEditor = BiologicalSourceWidget(anchoringWidget=anchoringWidget)
-            self.biologicalSourceEditor.setWindowTitle("Source")
+            # self.biologicalSourceEditor.setWindowTitle("Source")
             self.biologicalSourceEditor.sig_closing.connect(self._slot_biologicalSourceEditorClosing)
             self.biologicalSourceEditor.sig_collapsed.connect(self._slot_biologicalSourceEditorCollapsed)
             self.biologicalSourceEditor.sig_valueChanged.connect(self._slot_biologicalSourceChanged)
@@ -195,6 +200,11 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
         if not self.biologicalSourceEditor.isVisible():
             self.biologicalSourceEditor.show()
+
+        if isinstance(self._data_.source.name, str) and len(self._data_.source.name.strip()):
+            self.biologicalSourceEditor.setWindowTitle(f"Source: {self._data_.source.name} ({type(self._data_.source).__name__})")
+        else:
+            self.biologicalSourceEditor.setWindowTitle(f"Source: {type(self._data_.source).__name__}")
 
     @Slot()
     def _slot_biologicalSourceEditorCollapsed(self):
@@ -278,7 +288,8 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
     @Slot(object)
     def _slot_procedureChanged(self, value: sdc.Procedure):
-        from gui.widgets.dataclasswidgets.asruwidgets import (PPLProcedureWidget, ProcedureWidget)
+        from gui.widgets.dataclasswidgets.asruwidgets.pplprocedurewidget import PPLProcedureWidget
+        from gui.widgets.dataclasswidgets.procedurewidget import ProcedureWidget
         if not isinstance(value, sdc.Procedure):
             if isinstance(self.sender(), PPLProcedureWidget):
                 value = sdc.PPLProcedure()

@@ -114,3 +114,6 @@ class TaxonDescriptor:
             scipywarn(f"Expecting a str, a Taxon, None, or MISSING; instead, got {type(value).__name__}")
             setattr(obj, self._name, pd.NA)
             # raise TypeError(f"Expecting a str, a Taxon, None, or MISSING; instead, got {type(value).__name__}")
+
+def isTaxoniqTaxon(obj) -> bool:
+    return hasTaxoniq and isinstance(obj, Taxon) and "taxoniq" in type(obj).__module__

@@ -476,9 +476,6 @@ class GuiMessages(object):
             if highlightInfo:
                 if isinstance(info, str) and len(info.strip()):
                     info = helputils.highlight(info, lexer, helputils.HtmlFormatter(noclasses=True, nobackground=True, style=style))
-            # if highlightDetail:
-            #     if isinstance(detail, str) and len(detail.strip()):
-            #         detail = helputils.highlight(detail, lexer, helputils.HtmlFormatter(noclasses=True, nobackground=True, style=style))
 
         msgbox.setText(text)
         if isinstance(info, str) and len(info.strip()):

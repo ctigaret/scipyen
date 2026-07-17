@@ -5,6 +5,10 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""
+TODO: 2026-07-17 10:17:11 FIXME
+
+• in PPLProtocolStepWidget: include a QComboBox to select a protocol step, when
+    the widget's data is a PPLProtocol
 """
 
 import sys, os, typing, types, warnings, math, cmath, datetime # noqa

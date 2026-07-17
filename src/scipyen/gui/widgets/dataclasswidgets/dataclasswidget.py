@@ -46,7 +46,7 @@ else:
 
 from core.prog import scipywarn #, safewrapper, print_styled
 # from core.sysutils import adapt_ui_path
-
+import core.taxonbridge as taxonbridge
 # import core.bgbridge as bgbridge
 
 # from core import scipyen_quantities as scq
@@ -82,6 +82,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     sig_closing = Signal(name="sig_closing")
     sig_moved = Signal(QtCore.QPoint, name="sig_moved")
     sig_collapsed = Signal(name="sig_collapsed")
+    sig_topWidgetCollapsed = Signal(name="sig_topWidgetCollapsed")
     _objectTypes_ = tuple()
 
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None, **kwargs):
@@ -92,6 +93,8 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         self._objSymbol_ = kwargs.pop("objSymbol", None)
 
         self._isSubWidget_: bool = False
+        # self._topWidgetCollapsed_:bool = False
+
         self._positionHint_: typing.Optional[QtCore.QPoint] = None
         # self._closeRequestedEvent_: typing.Optional[QtGui.QCloseEvent] = None
         self._closeRequested_: bool = False
@@ -123,9 +126,6 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                 self.setWindowFlags(windowFlags)
             else:
                 self.setWindowFlags(QtCore.Qt.Tool)
-                # self.setWindowFlags(QtCore.Qt.Popup)
-                # self.setWindowFlags(QtCore.Qt.Popup | QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint)
-                # self.setWindowFlags(QtCore.Qt.Popup | QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint)
 
         if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
             objSymbols = self.getDataSymbolInWorkspace(self._data_)
@@ -227,8 +227,10 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         sizes[0] = 0
         sizes[-1] = self.splitter.widget(len(sizes)-1).size().height()
         self.splitter.setSizes(sizes)
+        self.splitter.setStretchFactor(1,0)
         self.splitter.setToolTip("Drag (⇓) handle to reveal data input/output tools")
-        # self.splitter.setStretchFactor(len(sizes)-1, 1)
+        # self.splitter.splitterMoved.connect(self._slot_splitterMoved)
+        # self._topWidgetCollapsed_ = True
 
     @QtCore.Property(int)
     def widgetWidth(self) -> int:
@@ -526,6 +528,48 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         sb = QtCore.QSignalBlocker(self.nameDescriptionWidget.organismToolButton) # noqa
         self.nameDescriptionWidget.organismToolButton.setChecked(False)
 
+    # @Slot(int, int)
+    # def _slot_splitterMoved(self, pos: int, index: int):
+    #     print(f"\n{self.__class__.__name__}._slot_splitterMoved(pos={pos}, index={index})")
+    #     topWidgetHeight = self.splitter.widget(0).sizeHint().height()
+    #     bottomWidgetHeight = self.splitter.widget(1).sizeHint().height()
+    #     print(f"\n\t top: -> {topWidgetHeight} -> {self.splitter.sizes()[0]}")
+    #     print(f"\n\t bottom: -> {bottomWidgetHeight} -> {self.splitter.sizes()[1]}" )
+    #     if pos==0:
+    #         self.sig_topWidgetCollapsed.emit()
+        # parent = self.parent()
+        # if parent is None:
+        #     topW = self
+        # while isinstance(parent, QtWidgets.QWidget):
+        #     topW = parent
+        #     parent=parent()
+
+        # if pos == 0:
+        #     geometry = topW.frameGeometry()
+        #     newHeight = geometry.height() - topWidgetHeight
+        #     geometry.setHeight(newHeight)
+        #     topW.setGeometry(geometry)
+
+    # @Slot()
+    # def _slot_topWidgetCollapsed(self):
+    #     if self._topWidgetCollapsed_:
+    #         return
+    #     # parent = self.parent()
+    #     # if parent is None:
+    #     #     topW = self
+    #     # while isinstance(parent, QtWidgets.QWidget):
+    #     #     topW = parent
+    #     #     parent=parent()
+    #     # topW.resize(topW.width(),-1)
+    #     self._topWidgetCollapsed_ = True
+    #
+    # @Slot()
+    # def _slot_topWidgetRestored(self):
+    #     if not self._topWidgetCollapsed_:
+    #         return
+    #     self.resize(-1,-1)
+    #     self._topWidgetCollapsed_ = False
+
     @Slot()
     def _slot_chooseNewParentType(self):
         from gui.itemslistdialog import ItemsListDialog
@@ -587,7 +631,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
             anchoringWidget = self._anchoringWidget_ if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
             self.organismEditor = OrganismWidget(anchoringWidget=anchoringWidget)
-            self.organismEditor.setWindowTitle("Organism")
+            # self.organismEditor.setWindowTitle("Organism")
             self.organismEditor.sig_valueChanged.connect(self._slot_organismChanged)
             self.organismEditor.sig_closing.connect(self._slot_organismEditorClosing)
             self.organismEditor.sig_collapsed.connect(self._slot_organismEditorCollapsed)
@@ -603,6 +647,26 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
         if not self.organismEditor.isVisible():
             self.organismEditor.show()
+
+        if taxonbridge.isTaxoniqTaxon(organism.taxon):
+            taxonName = taxon.scientific_name
+
+        elif isinstance(organism.taxon, str) and len(organism.taxon.strip()):
+            taxonName = organism.taxon
+
+        else:
+            taxonName = ""
+
+        if isinstance(organism.name, str) and len(organism.strip()):
+            wTitle = f"Organism: {organism.name}"
+
+        else:
+            wTitle = f"Organism:"
+
+        if len(taxonName.strip()):
+            wTitle += f" ({taxonName})"
+
+        self.organismEditor.setWindowTitle(wTitle)
 
     @Slot()
     def _slot_organismEditorCollapsed(self):

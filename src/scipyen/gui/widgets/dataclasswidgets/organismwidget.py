@@ -412,5 +412,6 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
             self.biometricsEditor.setValue(self._data_.biometrics, objSymbol="biometrics")
 
     def _isTaxoniqTaxon(self, obj) -> bool:
-        return (taxonbridge.hasTaxoniq and isinstance(obj, taxonbridge.Taxon)
-                and "taxoniq" in type(obj).__module__)
+        return taxonbridge.isTaxoniqTaxon(obj)
+        # return (taxonbridge.hasTaxoniq and isinstance(obj, taxonbridge.Taxon)
+        #         and "taxoniq" in type(obj).__module__)

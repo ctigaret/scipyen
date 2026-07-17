@@ -1528,11 +1528,15 @@ class BiologicalSource(ScipyenDataclass):
 
 # ------------------------------------------------------------------------------
 
+class PPLProtocol: pass
+class PPLProtocolStep: pass
+
 @dataclass
 class PPL(ScipyenDataclass):
     ID: str = ""
     holderName: str = ""
     holderEmail: str = ""
+    protocols: list[PPLProtocol] = dataclasses.field(default_factory=list)
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
@@ -1556,6 +1560,13 @@ class PIL(ScipyenDataclass):
 class PPLProtocol(ScipyenDataclass):
     ID: str = dataclasses.field(default_factory = str)
     parent: PPL = dataclasses.field(default_factory = PPL)
+    steps: list[PPLProtocolStep] = dataclasses.field(default_factory=list)
+
+    def __post_init__(self):
+        # check that the instance is among the authorized protocols of the parent
+        # (a PPL)
+        if len(self.parent.protocols) and self not in self.parent.protocols:
+            scipywarn(f"This PPL Protocol ({self.name}, ID: {self.ID}) does not appear to be authorized in the PPL {self.parent.name} (ID: {self.parent.ID})")
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
@@ -1568,6 +1579,12 @@ class PPLProtocol(ScipyenDataclass):
 class PPLProtocolStep(ScipyenDataclass):
     ID: str = dataclasses.field(default_factory = str)
     parent: PPLProtocol = dataclasses.field(default_factory = PPLProtocol)
+
+    def __post_init__(self):
+        # check that the instance is among the authorized steps of the parent
+        # (a PPLProtocol)
+        if len(self.parent.steps) and self not in self.parent.steps:
+            scipywarn(f"This PPL Protocol Step ({self.name}, ID: {self.ID}) does not appear to be authorized in the protocol {self.parent.name} (ID: {self.parent.ID})")
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
@@ -1588,13 +1605,10 @@ class Procedure(ScipyenDataclass):
 
     """
     # name:str = ""
-    parent: PPLProtocolStep = dataclasses.field(default_factory=PPLProtocolStep)
-    _:KW_ONLY
     procedureType: ProcedureType = ProcedureType.null
 
-    # description: str = ""
-
-    # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("type", ) )) # "name" and "description" inherited from ScipyenDataclass
+    def __post_init__(self):
+        self.regulated=False
 
     def __repr__(self):
         # indent = lambda x: x.replace("\n", "\n\t")
@@ -1617,6 +1631,9 @@ class PPLProcedure(Procedure):
     protocolStep: PPLProtocolStep = dataclasses.field(default_factory=PPLProtocolStep)
     framework: str="ASPA 1986"
     # procedure: Procedure = dataclasses.field(default_factory = Procedure)
+
+    def __post_init__(self):
+        self.regulated = True
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)

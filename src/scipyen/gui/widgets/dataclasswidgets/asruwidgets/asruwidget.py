@@ -5,6 +5,9 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""
+TODO: 2026-07-17 10:15:32 FIXME
+• in PPL widget: include a QCOmboBox to select one of the protocol(s) authorized on the PPL
+
 """
 
 import sys, os, typing, types, warnings, math, cmath, datetime # noqa
