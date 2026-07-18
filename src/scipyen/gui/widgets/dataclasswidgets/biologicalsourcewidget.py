@@ -239,7 +239,14 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
     @Slot()
     def _slot_editSpecimen(self):
-        anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
+        anchoringWidget = self._getAnchoringWidget_()
+        # if anchoringWidget is None:
+        #     anchoringWidget = self if self.parent() is None else None
+        # anchoringWidget = (
+        #     self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor)
+        #     else self if self.parent() is None
+        #     else None
+        #     )
         if isinstance(self._data_.specimen, self._data_.specimenTypes):
             if isinstance(self.specimenEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenEditor):
                 if self._needsNewSpecimenWidget_:

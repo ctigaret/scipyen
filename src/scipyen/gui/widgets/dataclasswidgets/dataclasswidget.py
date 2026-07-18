@@ -64,7 +64,7 @@ from core import qtutils
 # from gui import guiutils, textviewer, datatreeviewer
 from gui.datatreeviewer import DataTreeViewer
 # from gui.textviewer import TextViewer
-from gui.widgets.dataclasswidgets.dataexchangewidget import DataExchangeWidget
+# from gui.widgets.dataclasswidgets.dataexchangewidget import DataExchangeWidget
 from gui.widgets.dataclasswidgets.namedescriptionwidget import NameDescriptionWidget
 from gui.workspacegui import WorkspaceGuiMixin
 # from gui.widgets import small_widgets as smw
@@ -82,11 +82,14 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     sig_closing = Signal(name="sig_closing")
     sig_moved = Signal(QtCore.QPoint, name="sig_moved")
     sig_collapsed = Signal(name="sig_collapsed")
-    sig_topWidgetCollapsed = Signal(name="sig_topWidgetCollapsed")
-    sig_topWidgetRestored = Signal(name="sig_topWidgetRestored")
+
+    # sig_topWidgetCollapsed = Signal(name="sig_topWidgetCollapsed")
+    # sig_topWidgetRestored = Signal(name="sig_topWidgetRestored")
+
     _objectTypes_ = tuple()
 
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None, **kwargs):
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
+                 **kwargs):
         isAttribute = kwargs.pop("isAttribute", False)
         anchoringWidget = kwargs.pop("anchoringWidget", None)
         self._overrideAnchor_ = kwargs.pop("overrideAnchor", False)
@@ -94,8 +97,9 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         self._objSymbol_ = kwargs.pop("objSymbol", None)
 
         self._isSubWidget_: bool = False
-        self._topWidgetCollapsed_:bool = False
-        self._outerFrameGeometry_ = None
+
+        # self._topWidgetCollapsed_:bool = False
+        # self._outerFrameGeometry_ = None
 
         self._positionHint_: typing.Optional[QtCore.QPoint] = None
         # self._closeRequestedEvent_: typing.Optional[QtGui.QCloseEvent] = None
@@ -110,7 +114,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         else:
             self._anchoringWidget_ = None
 
-        self.dataExchangeWidget = None
+        # self.dataExchangeWidget = None
         self.nameDescriptionWidget = None
         self.editParentToolButton = None
         self.parentEditor = None
@@ -119,8 +123,9 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         self._collapsibleChildren_ = {"parentEditor":self.parentEditor,
                                       "organismEditor":self.organismEditor}
 
-        QtWidgets.QWidget.__init__(self, parent=parent)
         self._isAttribute_: bool = isAttribute
+
+        QtWidgets.QWidget.__init__(self, parent=parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
 
         if anchoringWidget:
@@ -164,18 +169,19 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     def _configureUI_(self):
         r"""MUST be called in the subclass once self._data_ was established,
         AND first thing after setupUi() was called in the subclass"""
-        if isinstance(self.dataExchangeWidget, DataExchangeWidget) and isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
-            self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
-            self.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
-            self.sig_dataExporting.connect(self.dataExchangeWidget.slot_exportData)
-            self.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
-            self.sig_dataSaving.connect(self.dataExchangeWidget.slot_saveData)
-            self.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
-            self.sig_dataCopy.connect(self.dataExchangeWidget.slot_copyData)
-            self.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
-            self.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
-            self.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
-            self.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
+        # if isinstance(self.dataExchangeWidget, DataExchangeWidget) and isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
+        if isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
+            self.nameDescriptionWidget.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+            self.nameDescriptionWidget.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
+            self.sig_dataExporting.connect(self.nameDescriptionWidget.dataExchangeWidget.slot_exportData)
+            self.nameDescriptionWidget.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
+            self.sig_dataSaving.connect(self.nameDescriptionWidget.dataExchangeWidget.slot_saveData)
+            self.nameDescriptionWidget.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
+            self.sig_dataCopy.connect(self.nameDescriptionWidget.dataExchangeWidget.slot_copyData)
+            self.nameDescriptionWidget.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
+            self.nameDescriptionWidget.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
+            self.nameDescriptionWidget.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
+            self.nameDescriptionWidget.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
 
             self.nameDescriptionWidget.dataName = self._data_.name
             self.nameDescriptionWidget.dataDescription = self._data_.description
@@ -188,6 +194,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
             self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
             self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
+            # self.nameDescriptionWidget.sig_toggleDataExchange.connect(self._slot_dataExchangeWidgetToggled)
 
             self.nameDescriptionWidget.editParentToolButton.setEnabled(False)
             self.nameDescriptionWidget.editParentToolButton.setVisible(False)
@@ -221,20 +228,20 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
         if (
             isinstance(self._anchoringWidget_, QtWidgets.QWidget)
-            and hasattr(self._anchoringWidget_, "_slot_anchoringWidgetMoved")
+            and hasattr(self._anchoringWidget_, "sig_moved")
             ):
             self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
 
-        sizes = self.splitter.sizes()
-        sizes[0] = 0
-        sizes[-1] = self.splitter.widget(len(sizes)-1).size().height()
-        self.splitter.setSizes(sizes)
-        # self.splitter.setStretchFactor(1,0)
-        self.splitter.setToolTip("Drag (⇓) handle to reveal data input/output tools")
-        # self.splitter.splitterMoved.connect(self._slot_splitterMoved)
-        # self.sig_topWidgetCollapsed.connect(self._slot_topWidgetCollapsed)
-        # self.sig_topWidgetRestored.connect(self._slot_topWidgetRestored)
-        self._topWidgetCollapsed_ = True
+        # sizes = self.splitter.sizes()
+        # sizes[0] = 0
+        # sizes[-1] = self.splitter.widget(len(sizes)-1).size().height()
+        # self.splitter.setSizes(sizes)
+        # # self.splitter.setStretchFactor(1,0)
+        # self.splitter.setToolTip("Drag (⇓) handle to reveal data input/output tools")
+        # # self.splitter.splitterMoved.connect(self._slot_splitterMoved)
+        # # self.sig_topWidgetCollapsed.connect(self._slot_topWidgetCollapsed)
+        # # self.sig_topWidgetRestored.connect(self._slot_topWidgetRestored)
+        # self._topWidgetCollapsed_ = True
 
     @QtCore.Property(int)
     def widgetWidth(self) -> int:
@@ -335,18 +342,21 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                 else:
                     self._objSymbol_ = ""
 
-            if isinstance(self.dataExchangeWidget, DataExchangeWidget) and isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
+            # if isinstance(self.dataExchangeWidget, DataExchangeWidget) and isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
+            if isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
                 if hasattr(self, "_data_"):
                     sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), # noqa
                                         (
-                                            self.dataExchangeWidget,
+                                            # self.dataExchangeWidget,
                                             self.nameDescriptionWidget,
                                             )
                                         )
                                     )
 
-                    self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+                    # self.nameDescriptionWidget.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+                    self.nameDescriptionWidget.setData(self._data_)
                     self.nameDescriptionWidget.dataName = self._data_.name
+                    self.nameDescriptionWidget.symbol = self._objSymbol_
                     self.nameDescriptionWidget.dataDescription = self._data_.description
 
                     if (isinstance(self.nameDescriptionWidget.detailsViewer, DataTreeViewer)
@@ -449,13 +459,14 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     @Slot()
     def _slot_viewDetails(self):
-        from gui.widgets.dataclasswidgets import dataexchangewidget
+        # from gui.widgets.dataclasswidgets import dataexchangewidget
         if (hasattr(self, "_data_")
             and hasattr(self, "_objectTypes_")
             and isinstance(self._data_, self._objectTypes_)
-            and hasattr(self, "dataExchangeWidget")
-            and isinstance(self.dataExchangeWidget, dataexchangewidget.DataExchangeWidget)):
-            varName = self.dataExchangeWidget.varName
+            # and hasattr(self, "dataExchangeWidget")
+            # and isinstance(self.dataExchangeWidget, dataexchangewidget.DataExchangeWidget)
+            ):
+            varName = self.nameDescriptionWidget.dataExchangeWidget.varName
             self.sig_detailedView.emit(self._data_, varName)
 
     @Slot()
@@ -483,7 +494,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     @Slot()
     def _slot_editParent(self):
-        anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
+        anchoringWidget = self._getAnchoringWidget_()
         parent = None
         if (hasattr(self, "_data_")
             and hasattr(self, "_objectTypes_")
@@ -532,77 +543,77 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         sb = QtCore.QSignalBlocker(self.nameDescriptionWidget.organismToolButton) # noqa
         self.nameDescriptionWidget.organismToolButton.setChecked(False)
 
-    @Slot(int, int)
-    def _slot_splitterMoved(self, pos: int, index: int):
-        # print(f"\n{self.__class__.__name__}._slot_splitterMoved(pos={pos}, index={index})")
-        topWidgetHeightHint = self.splitter.widget(0).sizeHint().height()
-        topWidgetHeight = self.splitter.sizes()[0]
-        bottomWidgetHeightHint = self.splitter.widget(1).sizeHint().height()
-        bottomWidgetHeight = self.splitter.sizes()[1]
-        # print(f"\n\t top: -> hint {topWidgetHeightHint} -> size {topWidgetHeightHint}")
-        # print(f"\n\t bottom: -> hint {bottomWidgetHeightHint} -> size {bottomWidgetHeight}" )
-        if pos == 0:
-            self.sig_topWidgetCollapsed.emit()
+    # @Slot(int, int)
+    # def _slot_splitterMoved(self, pos: int, index: int):
+    #     # print(f"\n{self.__class__.__name__}._slot_splitterMoved(pos={pos}, index={index})")
+    #     topWidgetHeightHint = self.splitter.widget(0).sizeHint().height()
+    #     topWidgetHeight = self.splitter.sizes()[0]
+    #     bottomWidgetHeightHint = self.splitter.widget(1).sizeHint().height()
+    #     bottomWidgetHeight = self.splitter.sizes()[1]
+    #     # print(f"\n\t top: -> hint {topWidgetHeightHint} -> size {topWidgetHeightHint}")
+    #     # print(f"\n\t bottom: -> hint {bottomWidgetHeightHint} -> size {bottomWidgetHeight}" )
+    #     if pos == 0:
+    #         self.sig_topWidgetCollapsed.emit()
+    #
+    #     elif pos == topWidgetHeightHint:
+    #         self.sig_topWidgetRestored.emit()
 
-        elif pos == topWidgetHeightHint:
-            self.sig_topWidgetRestored.emit()
-
-    @Slot()
-    def _slot_topWidgetCollapsed(self):
-        if self._topWidgetCollapsed_:
-            return
-        # return # for now !!!
-        print("\n*** collapsed ***\n")
-        topWidgetHeightHint = self.splitter.widget(0).sizeHint().height()
-        # topWidgetHeight = self.splitter.sizes()[0]
-        # bottomWidgetHeightHint = self.splitter.widget(1).sizeHint().height()
-        # bottomWidgetHeight = self.splitter.sizes()[1]
-        parent = self.parent()
-        if parent is None:
-            topW = self
-        while isinstance(parent, QtWidgets.QWidget):
-            topW = parent
-            parent=parent()
-        sb = list(map(lambda w: QtCore.QSignalBlocker(w), (self, self.splitter, topW))) # noqa
-        # sizes = self.splitter.sizes()
-        # sizes[0] = 0
-        # sizes[-1] = bottomWidgetHeight
-        # self.splitter.setSizes(sizes)
-        geometry = topW.frameGeometry()
-        newHeight = geometry.height() - topWidgetHeightHint
-        geometry.setHeight(newHeight)
-        topW.setGeometry(geometry)
-        self._topWidgetCollapsed_ = True
-        print(f"collapsed: {self._topWidgetCollapsed_}")
-
-    @Slot()
-    def _slot_topWidgetRestored(self):
-        if self.splitter.sizes()[0]> 0:
-            return
-        print("\n*** restored ***\n")
-        topWidgetHeightHint = self.splitter.widget(0).sizeHint().height()
-        # topWidgetHeight = self.splitter.sizes()[0]
-        # bottomWidgetHeightHint = self.splitter.widget(1).sizeHint().height()
-        bottomWidgetHeight = self.splitter.sizes()[1]
-        # print(f"\n{self.__class__.__name__}._slot_topWidgetRestored")
-        # print(f"\ntop -> hint {topWidgetHeightHint} for {topWidgetHeight}")
-        # print(f"\nbottom -> hint {bottomWidgetHeightHint} for {bottomWidgetHeight}")
-        parent = self.parent()
-        if parent is None:
-            topW = self
-        while isinstance(parent, QtWidgets.QWidget):
-            topW = parent
-            parent=parent()
-        sb = list(map(lambda w: QtCore.QSignalBlocker(w), (self, self.splitter, topW))) # noqa
-        sizes = self.splitter.sizes()
-        sizes[0] = topWidgetHeightHint
-        sizes[-1] = bottomWidgetHeight
-        self.splitter.setSizes(sizes)
-        geometry = topW.frameGeometry()
-        newHeight = geometry.height() + topWidgetHeightHint
-        geometry.setHeight(newHeight)
-        topW.setGeometry(geometry)
-        self._topWidgetCollapsed_ = False
+    # @Slot()
+    # def _slot_topWidgetCollapsed(self):
+    #     if self._topWidgetCollapsed_:
+    #         return
+    #     # return # for now !!!
+    #     print("\n*** collapsed ***\n")
+    #     topWidgetHeightHint = self.splitter.widget(0).sizeHint().height()
+    #     # topWidgetHeight = self.splitter.sizes()[0]
+    #     # bottomWidgetHeightHint = self.splitter.widget(1).sizeHint().height()
+    #     # bottomWidgetHeight = self.splitter.sizes()[1]
+    #     parent = self.parent()
+    #     if parent is None:
+    #         topW = self
+    #     while isinstance(parent, QtWidgets.QWidget):
+    #         topW = parent
+    #         parent=parent()
+    #     sb = list(map(lambda w: QtCore.QSignalBlocker(w), (self, self.splitter, topW))) # noqa
+    #     # sizes = self.splitter.sizes()
+    #     # sizes[0] = 0
+    #     # sizes[-1] = bottomWidgetHeight
+    #     # self.splitter.setSizes(sizes)
+    #     geometry = topW.frameGeometry()
+    #     newHeight = geometry.height() - topWidgetHeightHint
+    #     geometry.setHeight(newHeight)
+    #     topW.setGeometry(geometry)
+    #     self._topWidgetCollapsed_ = True
+    #     print(f"collapsed: {self._topWidgetCollapsed_}")
+    #
+    # @Slot()
+    # def _slot_topWidgetRestored(self):
+    #     if self.splitter.sizes()[0]> 0:
+    #         return
+    #     print("\n*** restored ***\n")
+    #     topWidgetHeightHint = self.splitter.widget(0).sizeHint().height()
+    #     # topWidgetHeight = self.splitter.sizes()[0]
+    #     # bottomWidgetHeightHint = self.splitter.widget(1).sizeHint().height()
+    #     bottomWidgetHeight = self.splitter.sizes()[1]
+    #     # print(f"\n{self.__class__.__name__}._slot_topWidgetRestored")
+    #     # print(f"\ntop -> hint {topWidgetHeightHint} for {topWidgetHeight}")
+    #     # print(f"\nbottom -> hint {bottomWidgetHeightHint} for {bottomWidgetHeight}")
+    #     parent = self.parent()
+    #     if parent is None:
+    #         topW = self
+    #     while isinstance(parent, QtWidgets.QWidget):
+    #         topW = parent
+    #         parent=parent()
+    #     sb = list(map(lambda w: QtCore.QSignalBlocker(w), (self, self.splitter, topW))) # noqa
+    #     sizes = self.splitter.sizes()
+    #     sizes[0] = topWidgetHeightHint
+    #     sizes[-1] = bottomWidgetHeight
+    #     self.splitter.setSizes(sizes)
+    #     geometry = topW.frameGeometry()
+    #     newHeight = geometry.height() + topWidgetHeightHint
+    #     geometry.setHeight(newHeight)
+    #     topW.setGeometry(geometry)
+    #     self._topWidgetCollapsed_ = False
 
     @Slot()
     def _slot_chooseNewParentType(self):
@@ -654,6 +665,15 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             if isinstance(self.organismEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismEditor):
                 self.organismEditor.collapse(False)
 
+    def _getAnchoringWidget_(self) -> QtWidgets.QWidget | None:
+        if isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor:
+            return self._anchoringWidget_
+
+        if self.parent() is None:
+            return self
+
+        return None
+
     @Slot()
     def _slot_editOrganism(self):
         from gui.widgets.dataclasswidgets.organismwidget import OrganismWidget
@@ -663,7 +683,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                 self.organismEditor.deleteLater()
                 self.organismEditor = None
 
-            anchoringWidget = self._anchoringWidget_ if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
+            anchoringWidget = self._getAnchoringWidget_()
             self.organismEditor = OrganismWidget(anchoringWidget=anchoringWidget)
             # self.organismEditor.setWindowTitle("Organism")
             self.organismEditor.sig_valueChanged.connect(self._slot_organismChanged)
@@ -682,16 +702,18 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         if not self.organismEditor.isVisible():
             self.organismEditor.show()
 
-        if taxonbridge.isTaxoniqTaxon(organism.taxon):
+        taxon = organism.taxon
+
+        if taxonbridge.isTaxoniqTaxon(taxon):
             taxonName = taxon.scientific_name
 
-        elif isinstance(organism.taxon, str) and len(organism.taxon.strip()):
-            taxonName = organism.taxon
+        elif isinstance(taxon, str) and len(taxon.strip()):
+            taxonName = taxon
 
         else:
             taxonName = ""
 
-        if isinstance(organism.name, str) and len(organism.strip()):
+        if isinstance(organism.name, str) and len(organism.name.strip()):
             wTitle = f"Organism: {organism.name}"
 
         else:
@@ -721,7 +743,6 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self.sig_valueChanged.emit(self._data_)
         except: # noqa
             pass
-
 
     @singledispatchmethod
     def _createParentEditor_(self, obj) -> type:
@@ -832,16 +853,14 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     @Slot(QtCore.QPoint)
     def _slot_anchoringWidgetMoved(self, pos: QtCore.QPoint):
         # print(f"{self.__class__.__name__}<{self.objectName()}>._slot_anchoringWidgetMoved({pos})\n")
-        if not self.isVisible():
-            return
+        # if not self.isVisible():
+        #     return
 
         if not isinstance(self._anchoringWidget_, QtWidgets.QWidget):
             return
 
         if isinstance(self.parent(), QtWidgets.QWidget):
             return
-
-        # titleBarHeight = QtWidgets.QApplication.style().pixelMetric(QtWidgets.QStyle.PM_TitleBarHeight)
 
         if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
             newPos = self._anchoringWidget_.parent().mapToGlobal(self._anchoringWidget_.geometry().topRight())

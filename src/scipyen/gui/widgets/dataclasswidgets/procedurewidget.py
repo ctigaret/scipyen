@@ -183,13 +183,14 @@ class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
                                           description=self._data_.description,
                                           procedureType=self._data_.procedureType)
 
+                self._data_ = procedure
 
                 self.pplWidget.setValue(sdc.PPL())
                 self.pilWidget.setValue(sdc.PIL())
                 self.protocolWidget.setValue(sdc.PPLProtocol)
                 self.protocolStepWidget.setValue(sdc.PPLProtocolStep)
 
-                ndx = self._procedureTypeNames_.index(self._data_.procedureType)
+                ndx = self._procedureTypeNames_.index(self._data_.procedureType.name)
                 self.typeComboBox.setCurrentIndex(ndx)
 
                 self.sig_valueChanged.emit(self._data_)

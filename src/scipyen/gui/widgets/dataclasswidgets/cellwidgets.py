@@ -37,6 +37,7 @@ else:
 
 from core import scipyen_quantities as scq
 from core import scipyendataclasses as sdc
+from gui.widgets.anchoredwidgetmixin import AnchoredWidgetMixin
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -74,6 +75,8 @@ class CellWidget(Ui_CellWidget, DataClassWidget):
         DataClassWidget.__init__(self, parent=parent, **kwargs)
 
         self._configureUI_()
+
+        # self.setAnchoring()
 
     def _configureUI_(self):
         self.setupUi(self)

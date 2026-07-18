@@ -1504,7 +1504,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                 return
 
         if data is None:
-            data = self._data_
+            data = getattr(self, "_data_", None)
 
         if data is not None and isinstance(scipyenWindow, QtWidgets.QMainWindow) and scipyenWindow.__class__.__name__.startswith("ScipyenWindow"):
             return get_symbol_in_namespace(data, scipyenWindow.workspace)
@@ -1664,9 +1664,3 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             if len(children):
                 for child in children:
                     self.adaptToRCIcons(child)
-
-        # NOTE: 2026-06-05 13:01:59
-        # the following still need individual updates -- why ?!?
-        # obj_name = obj.objectName()
-        #
-        # if obj_name == "selDirBtn"

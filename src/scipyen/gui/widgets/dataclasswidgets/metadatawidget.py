@@ -244,25 +244,25 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
     @Slot()
     def _slot_editProcedure(self): # TODO
-        from gui.widgets.dataclasswidgets.asruwidgets.pplprocedurewidget import PPLProcedureWidget
+        # from gui.widgets.dataclasswidgets.asruwidgets.pplprocedurewidget import PPLProcedureWidget
         from gui.widgets.dataclasswidgets.procedurewidget import ProcedureWidget
         anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
 
-        wType = self._createProcedureWidget_(self._data_.procedure)
+        # wType = ProcedureWidget(self._data_.procedure)
 
         if isinstance(self.procedureEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.procedureEditor):
-            if not isinstance(self.procedureEditor, wType):
+            if not isinstance(self.procedureEditor, ProcedureWidget):
                 self.procedureEditor.collapse(True)
                 self.procedureEditor.deleteLater()
                 self.procedureEditor = None
 
-                self.procedureEditor = wType(self._data_.procedure, objSymbol="procedure", anchoringWidget=anchoringWidget)
+                self.procedureEditor = ProcedureWidget(self._data_.procedure, objSymbol="procedure", anchoringWidget=anchoringWidget)
                 self.procedureEditor.sig_valueChanged.connect(self._slot_procedureChanged)
                 self.procedureEditor.sig_closing.connect(self._slot_procedureEditorClosing)
                 self.procedureEditor.sig_collapsed.connect(self._slot_procedureEditorCollapsed)
 
         else:
-            self.procedureEditor = wType(self._data_.procedure, objSymbol="procedure", anchoringWidget=anchoringWidget)
+            self.procedureEditor = ProcedureWidget(self._data_.procedure, objSymbol="procedure", anchoringWidget=anchoringWidget)
             self.procedureEditor.sig_valueChanged.connect(self._slot_procedureChanged)
             self.procedureEditor.sig_closing.connect(self._slot_procedureEditorClosing)
             self.procedureEditor.sig_collapsed.connect(self._slot_procedureEditorCollapsed)
@@ -288,14 +288,14 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
     @Slot(object)
     def _slot_procedureChanged(self, value: sdc.Procedure):
-        from gui.widgets.dataclasswidgets.asruwidgets.pplprocedurewidget import PPLProcedureWidget
-        from gui.widgets.dataclasswidgets.procedurewidget import ProcedureWidget
-        if not isinstance(value, sdc.Procedure):
-            if isinstance(self.sender(), PPLProcedureWidget):
-                value = sdc.PPLProcedure()
-
-            else:
-                value = sdc.Procedure()
+        # from gui.widgets.dataclasswidgets.asruwidgets.pplprocedurewidget import PPLProcedureWidget
+        # from gui.widgets.dataclasswidgets.procedurewidget import ProcedureWidget
+        # if not isinstance(value, sdc.Procedure):
+        #     if isinstance(self.sender(), PPLProcedureWidget):
+        #         value = sdc.PPLProcedure()
+        #
+        #     else:
+        #         value = sdc.Procedure()
 
         self._data_.procedure = value
 
@@ -325,19 +325,19 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
         self.sig_valueChanged.emit()
 
-    @singledispatchmethod
-    def _createProcedureWidget_(self, obj) -> type:
-        raise NotImplementedError(f"Objects of type {type(obj)} are not supported")
-
-    @_createProcedureWidget_.register(sdc.PPLProcedure)
-    def __createProcedureWidget__(self, obj: sdc.PPLProcedure):
-        from gui.widgets.dataclasswidgets.asruwidgets.pplprocedurewidget import PPLProcedureWidget
-        return PPLProcedureWidget
-
-    @_createProcedureWidget_.register(sdc.Procedure)
-    def __createProcedureWidget__(self, obj: sdc.Procedure): # noqa
-        from gui.widgets.dataclasswidgets.procedurewidget import ProcedureWidget
-        return ProcedureWidget
+    # @singledispatchmethod
+    # def _createProcedureWidget_(self, obj) -> type:
+    #     raise NotImplementedError(f"Objects of type {type(obj)} are not supported")
+    #
+    # @_createProcedureWidget_.register(sdc.PPLProcedure)
+    # def __createProcedureWidget__(self, obj: sdc.PPLProcedure):
+    #     from gui.widgets.dataclasswidgets.asruwidgets.pplprocedurewidget import PPLProcedureWidget
+    #     return PPLProcedureWidget
+    #
+    # @_createProcedureWidget_.register(sdc.Procedure)
+    # def __createProcedureWidget__(self, obj: sdc.Procedure): # noqa
+    #     from gui.widgets.dataclasswidgets.procedurewidget import ProcedureWidget
+    #     return ProcedureWidget
 
 
 

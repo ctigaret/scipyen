@@ -42,8 +42,10 @@ else:
     __has_sip__ = True
 
 
-from core.prog import scipywarn
+from core.prog import scipywarn #noqa
+from core import qtutils
 from gui import textviewer, datatreeviewer
+from gui.widgets.dataclasswidgets.dataexchangewidget import DataExchangeWidget
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -62,13 +64,39 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
     sig_parentEditRequest = Signal(bool, name="sig_parentEditRequest")
     sig_newParentRequest = Signal(name="sig_newParentRequest")
     sig_organismEditRequest = Signal(bool, name="sig_organismEditRequest")
+    # sig_toggleDataExchange = Signal(bool, name="sig_toggleDataExchange")
 
-    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None, **kwargs):
+    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
+                 obj: typing.Optional[typing.Any] = None,
+                 **kwargs):
+        if not isinstance(parent, QtWidgets.QWidget):
+            obj_ = parent
+            if isinstance(obj, QtWidgets.QWidget):
+                parent = obj
+            else:
+                parent = None
+
+            obj = obj_
+
+        self._data_ = obj
+
         QtCore.QObject.__init__(self, parent=parent)
 
-        self._dataName_ = ""
-        self._dataDescription_ = ""
+        self._dataName_ = kwargs.pop("dataName", "")
+        self._dataDescription_ = kwargs.pop("dataDescription", "")
         self._objSymbol_ = kwargs.pop("objSymbol", "")
+        self._collapsibleChildren_ = dict()
+
+        anchoringWidget = self if self.parent() is None else self.parent()
+
+        self.dataExchangeWidget = DataExchangeWidget(anchoringWidget=anchoringWidget)
+        self.dataExchangeWidget.setWindowTitle("Input/Output")
+        self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+        self.dataExchangeWidget.setVisible(False)
+        self.dataExchangeWidget.sig_closing.connect(self._slot_dataExchangeWidgetClosing)
+        self.dataExchangeWidget.sig_collapsed.connect(self._slot_dataExchangeWidgetCollapsed)
+
+        self._collapsibleChildren_["dataExchangeWidget"] = self.dataExchangeWidget
 
         self._configureUI_()
 
@@ -86,6 +114,51 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         self.editParentToolButton.toggled.connect(self.sig_parentEditRequest)
         self.replaceParentToolButton.clicked.connect(self.sig_newParentRequest)
         self.organismToolButton.toggled.connect(self.sig_organismEditRequest)
+        self.toggleDataExchangeWidgetToolButton.toggled.connect(self._slot_dataExchangeWidgetToggled)
+
+        # self.dataExchangeWidget = DataExchangeWidget(anchoringWidget=self)
+        # self.dataExchangeWidget.setWindowTitle("Input/Output")
+        # if self._data_ is not None:
+        #     self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+
+        self.dataExchangeWidget.setVisible(False)
+
+        self._collapsibleChildren_ = {"dataExchangeWidget": self.dataExchangeWidget}
+
+    @Slot()
+    def _slot_dataExchangeWidgetClosing(self):
+        sb = QtCore.QSignalBlocker(self.toggleDataExchangeWidgetToolButton) # noqa
+        self.toggleDataExchangeWidgetToolButton.setChecked(False)
+
+    @Slot()
+    def _slot_dataExchangeWidgetCollapsed(self):
+        sb = QtCore.QSignalBlocker(self.toggleDataExchangeWidgetToolButton) # noqa
+        self.toggleDataExchangeWidgetToolButton.setChecked(False)
+
+    @Slot(bool)
+    def _slot_dataExchangeWidgetToggled(self, val: bool):
+        if val is True:
+            if not isinstance(self.dataExchangeWidget, DataExchangeWidget):
+                if isinstance(self.dataExchangeWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.dataExchangeWidget):
+                    self.dataExchangeWidget.close()
+                    self.dataExchangeWidget.deleteLater()
+                    self.dataExchangeWidget = None
+
+                self.dataExchangeWidget = DataExchangeWidget(anchoringWidget = self)
+                self.dataExchangeWidget.setWindowTitle("Input/Output")
+                self.dataExchangeWidget.sig_closing.connect(self._slot_dataExchangeWidgetClosing)
+                self.dataExchangeWidget.sig_collapsed.connect(self._slot_dataExchangeWidgetCollapsed)
+
+                if self._data_ is not None:
+                    self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+
+                self._collapsibleChildren_["dataExchangeWidget"] = self.dataExchangeWidget
+
+
+            self.dataExchangeWidget.show()
+
+        else:
+            self.dataExchangeWidget.collapse(False)
 
     @Slot(object)
     def _slot_dataChanged(self, val: object):
@@ -194,7 +267,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
     @dataName.setter
     def dataName(self, val:str):
         self._dataName_ = val
-        sigBlock = QtCore.QSignalBlocker(self.nameLineEdit)
+        sigBlock = QtCore.QSignalBlocker(self.nameLineEdit) # noqa
         self.nameLineEdit.setText(self._dataName_)
         self.sig_nameChanged.emit(self._dataName_)
 
@@ -206,7 +279,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
     def dataDescription(self, val:str):
         self._dataDescription_ = val
         if isinstance(self.descriptionEditor, textviewer.TextViewer):
-            sigBlock = QtCore.QSignalBlocker(self.descriptionEditor)
+            sigBlock = QtCore.QSignalBlocker(self.descriptionEditor) # noqa
             self.descriptionEditor.setText(self._dataDescription_)
         self.sig_descriptionChanged.emit(self._dataDescription_)
 
@@ -224,3 +297,11 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
             self.detailsViewer.close()
             self.detailsViewer.deleteLater()
             self.detailsViewer = None
+
+        if isinstance(self.dataExchangeWidget, DataExchangeWidget):
+            self.dataExchangeWidget.close()
+            self.dataExchangeWidget.deleteLater()
+            self.dataExchangeWidget = None
+
+    def setData(self, obj: typing.Any):
+        self._data_ = obj

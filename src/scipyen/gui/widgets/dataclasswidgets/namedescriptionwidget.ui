@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>328</width>
+    <width>329</width>
     <height>44</height>
    </rect>
   </property>
@@ -131,6 +131,31 @@
        </property>
        <property name="icon">
         <iconset theme="document-properties"/>
+       </property>
+       <property name="checkable">
+        <bool>true</bool>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="toggleDataExchangeWidgetToolButton">
+       <property name="toolTip">
+        <string>Data IO Actions</string>
+       </property>
+       <property name="statusTip">
+        <string>Toggle Data IO Actions</string>
+       </property>
+       <property name="whatsThis">
+        <string>Toggle Data IO Actions</string>
+       </property>
+       <property name="text">
+        <string>Data IO</string>
+       </property>
+       <property name="icon">
+        <iconset theme="arrow-right-double"/>
        </property>
        <property name="checkable">
         <bool>true</bool>

@@ -48,6 +48,7 @@ except: # noqa
     __has_qtdbus__ = False
 
 from core import datatypes # noqa
+from core import qtutils
 from core.prog import scipywarn # noqa
 # from core import utilities
 from gui import (guiutils, interact) # noqa
@@ -99,9 +100,16 @@ that `obj` is bound to, in the user space.
     sig_requestDataCopy = Signal(name="sig_requestDataCopy")
     sig_requestNewObject = Signal(name="sig_requestNewObject")
     sig_symbolChanged = Signal(str, name="sig_symbolChanged")
+    sig_closing = Signal(name="sig_closing")
+    sig_moved = Signal(QtCore.QPoint, name="sig_moved")
+    sig_collapsed = Signal(name="sig_collapsed")
 
     def __init__(self, objType: typing.Optional[type]=None,
-                 parent: typing.Optional[QtWidgets.QWidget] = None, **kwargs):
+                 parent: typing.Optional[QtWidgets.QWidget] = None,
+                 **kwargs):
+        anchoringWidget = kwargs.pop("anchoringWidget", None)
+        self._overrideAnchor_ = kwargs.pop("overrideAnchor", False)
+        windowFlags = kwargs.pop("windowFlags", None)
 
         if isinstance(objType, QtWidgets.QWidget):
             obj_ = parent
@@ -114,11 +122,43 @@ that `obj` is bound to, in the user space.
         if objType is None:
             objType = type(None)
 
-        QtCore.QObject.__init__(self, parent=parent)
-        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
-
         self._objectType_ = objType
         self._objSymbol_ = None
+
+        QtCore.QObject.__init__(self, parent=parent)
+
+        self._isSubWidget_: bool = False
+        self._closeRequested_: bool = False
+
+        self._positionHint_: typing.Optional[QtCore.QPoint] = None
+
+        if isinstance(anchoringWidget, QtWidgets.QWidget):
+            self._anchoringWidget_ = anchoringWidget
+            self._isSubWidget_ = True
+            self._positionHint_ = anchoringWidget.geometry().topRight()
+
+        else:
+            self._anchoringWidget_ = None
+
+        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
+
+        if anchoringWidget:
+            if isinstance(windowFlags, QtCore.Qt.WindowType):
+                self.setWindowFlags(windowFlags)
+            else:
+                self.setWindowFlags(QtCore.Qt.Tool)
+
+        self._sizeAnimationMax_ = 200
+        self._sizeAnimation_ = QtCore.QPropertyAnimation(self, b'widgetWidth', self)
+        self._sizeAnimation_.setStartValue(0)
+        self._sizeAnimation_.setDuration(200) # ms
+        self._sizeAnimation_.setEndValue(self._sizeAnimationMax_)
+        self._sizeAnimation_.valueChanged.connect(self._slot_setWidgetWidth)
+
+        self._animationGroup_ = QtCore.QParallelAnimationGroup()
+        self._animationGroup_.addAnimation(self._sizeAnimation_)
+        # self._animationGroup_.addAnimation(self._opacityAnimation_)
+        self._animationGroup_.stateChanged.connect(self._slot_animationStateChanged)
 
         self._configureUI_()
 
@@ -131,6 +171,83 @@ that `obj` is bound to, in the user space.
         self.copyToolButton.clicked.connect(self.sig_requestDataCopy)
         self.exportToolButton.clicked.connect(self.sig_requestDataExport)
         self.newObjectToolButton.clicked.connect(self.sig_requestNewObject)
+
+        if (
+            isinstance(self._anchoringWidget_, QtWidgets.QWidget)
+            and hasattr(self._anchoringWidget_, "_slot_anchoringWidgetMoved")
+            ):
+            self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
+
+    @property
+    def overrideAnchor(self) -> bool:
+        return self._overrideAnchor_
+
+    @overrideAnchor.setter
+    def overrideAnchor(self, val: bool):
+        self._overrideAnchor_ = val is True
+
+    @property
+    def anchoringWidget(self) -> QtWidgets.QWidget | None:
+        return self._anchoringWidget_
+
+    @anchoringWidget.setter
+    def anchoringWidget(self, obj: QtWidgets.QWidget):
+        if isinstance(obj, QtWidgets.QWidget):
+            self._anchoringWidget_ = obj
+            self._isSubWidget_ = True
+        else:
+            self._anchoringWidget_ = None
+            self._isSubWidget_ = False
+
+    @Slot(QtCore.QPoint)
+    def _slot_anchoringWidgetMoved(self, pos: QtCore.QPoint):
+        # print(f"{self.__class__.__name__}<{self.objectName()}>._slot_anchoringWidgetMoved({pos})\n")
+        # if not self.isVisible():
+        #     return
+
+        if not isinstance(self._anchoringWidget_, QtWidgets.QWidget):
+            return
+
+        if isinstance(self.parent(), QtWidgets.QWidget):
+            return
+
+        if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
+            newPos = self._anchoringWidget_.parent().mapToGlobal(self._anchoringWidget_.geometry().topRight())
+
+        else:
+            newPos = self._anchoringWidget_.frameGeometry().topRight()
+
+        self.move(newPos)
+
+    def collapse(self, close: bool=False):
+        if self._isSubWidget_:
+            # self.collapseSubWidgets(close)
+            self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
+            self._closeRequested_ = close
+            self._animationGroup_.start()
+
+    def show(self):
+        if self.isVisible():
+            return
+
+        if self._isSubWidget_:
+            self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Forward)
+            geometry = self.geometry()
+            self._sizeAnimation_.setEndValue(self.sizeHint().width())
+            topRight = self._anchoringWidget_.geometry().topRight()
+            if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
+                self._positionHint_ = self._anchoringWidget_.parent().mapToGlobal(topRight)
+            else:
+                self._positionHint_ = topRight
+
+            geometry.setX(self._positionHint_.x())
+            geometry.setY(self._positionHint_.y())
+            self.setGeometry(geometry)
+            self._animationGroup_.start()
+            super().show()
+
+        else:
+            super().show()
 
     @property
     def varName(self) -> str:
@@ -152,6 +269,46 @@ that `obj` is bound to, in the user space.
             raise TypeError(f"Expecting a type or None; instead got {type(val).__name__}")
 
         self._objectType_ = val
+
+    @QtCore.Property(int)
+    def widgetWidth(self) -> int:
+        return self.width()
+
+    @widgetWidth.setter
+    def widgetWidth(self, value: int):
+        self.setFixedWidth(value)
+
+    @Slot(QtCore.QVariant)
+    def _slot_setWidgetWidth(self, val: int | QtCore.QVariant):
+        if not isinstance(val, int):
+            val = val.value()
+        self.setFixedWidth(val)
+
+    @Slot(QtCore.QAbstractAnimation.State, QtCore.QAbstractAnimation.State)
+    def _slot_animationStateChanged(self, newState: QtCore.QAbstractAnimation.State,
+                                    oldState: QtCore.QAbstractAnimation.State):
+
+        if (not isinstance(self._animationGroup_, QtCore.QParallelAnimationGroup)
+            or not qtutils.isQObjectAlive(self._animationGroup_)):
+            return
+
+        if newState == QtCore.QAbstractAnimation.Running:
+            self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
+            # self._parentOpacityAnimation_.start()
+        elif newState == QtCore.QAbstractAnimation.Stopped:
+            self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
+            # if isinstance(self._closeRequestedEvent_, QtGui.QCloseEvent):
+            if self._animationGroup_.direction() == QtCore.QAbstractAnimation.Backward:
+                self.sig_collapsed.emit()
+                if self._closeRequested_ is True:
+                    self.close()
+                else:
+                    self.setVisible(False)
+
+            else:
+                # re-allow manual resizing
+                self.setMinimumSize(QtCore.QSize(0,0))
+                self.setMaximumSize(QtCore.QSize(QtWidgets.QWIDGETSIZE_MAX, QtWidgets.QWIDGETSIZE_MAX))
 
     @Slot()
     def _slot_loadData(self):
@@ -267,5 +424,14 @@ that `obj` is bound to, in the user space.
             self.objectSymbolLabel.clear()
             self.objectSymbolLabel.setToolTip("")
             self.sig_symbolChanged.emit("")
+
+    def _getAnchoringWidget_(self) -> QtWidgets.QWidget | None:
+        if isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor:
+            return self._anchoringWidget_
+
+        if self.parent() is None:
+            return self
+
+        return None
 
 
