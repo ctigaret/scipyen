@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>306</width>
+    <width>329</width>
     <height>267</height>
    </rect>
   </property>
@@ -58,7 +58,7 @@
      <item>
       <widget class="QLabel" name="label_3">
        <property name="text">
-        <string>Protocol:</string>
+        <string>Recording Protocol:</string>
        </property>
       </widget>
      </item>
@@ -78,6 +78,9 @@
        </property>
        <property name="icon">
         <iconset theme="preview"/>
+       </property>
+       <property name="checkable">
+        <bool>false</bool>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
@@ -125,6 +128,9 @@
    </item>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout_2">
+     <property name="spacing">
+      <number>0</number>
+     </property>
      <item>
       <widget class="QLabel" name="label_9">
        <property name="text">

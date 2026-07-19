@@ -745,7 +745,7 @@ A lot of things copied from there, EXCEPT that it now uses
         if self.model.showPrivateMembers != self._showPrivateMembers_:
             self.model.showPrivateMembers = self._showPrivateMembers_
             self.slot_refreshDataDisplay()
-        signalBlockers = QtCore.QSignalBlocker(self.showPrivateMembersAction)
+        signalBlockers = QtCore.QSignalBlocker(self.showPrivateMembersAction) # noqa
         self.showPrivateMembersAction.setChecked(self._showPrivateMembers_)
 
     @property
@@ -759,7 +759,7 @@ A lot of things copied from there, EXCEPT that it now uses
         if self.model.showIntrospection != self._showIntrospection_:
             self.model.showIntrospection = self._showIntrospection_
             self.slot_refreshDataDisplay()
-        signalBlockers = QtCore.QSignalBlocker(self.showIntrospectAction)
+        signalBlockers = QtCore.QSignalBlocker(self.showIntrospectAction) # noqa
         self.showIntrospectAction.setChecked(self._showIntrospection_)
 
     @property
@@ -773,7 +773,7 @@ A lot of things copied from there, EXCEPT that it now uses
         if self.model.showValuesOnly != self._showValuesOnly_:
             self.model.showValuesOnly = val is True
             self.slot_refreshDataDisplay()
-        signalBlockers = QtCore.QSignalBlocker(self.showValuesOnlyAction)
+        signalBlockers = QtCore.QSignalBlocker(self.showValuesOnlyAction) # noqa
         self.showValuesOnlyAction.setChecked(self._showValuesOnly_)
 
         # if self._data_ is not None:

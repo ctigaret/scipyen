@@ -141,6 +141,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
 
     def _configureUI_(self):
         self.setupUi(self)
+        self.detailsViewer = None
 
         self.nameLineEdit.undoAvailable=True
         self.nameLineEdit.redoAvailable=True
@@ -159,6 +160,8 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
             self.protocolNameLabel.setText(self._protocol_.name)
         else:
             self.protocolNameLabel.setText("")
+
+        self.previewProtocolToolButton.clicked.connect(self.slot_viewProtocolDetails)
 
         for text in self._recordingEpisodeNames_:
             self.episodeTypeComboBox.addItem(text)
@@ -266,6 +269,44 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
 
         self.sig_valueChanged.emit(self.value())
 
+    @Slot()
+    def slot_viewProtocolDetails(self):
+        from gui import datatreeviewer
+        if self._protocol_ is None:
+            return
+
+        doc_title = self._protocol_.name
+        if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
+            topWindow = self.getTopParentWindow()
+            if topWindow is self:
+                appWindow = None
+            else:
+                appWindow = topWindow
+
+            self.detailsViewer = datatreeviewer.DataTreeViewer(
+                parent=self,
+                doc_title=doc_title,
+                appWindow = appWindow,
+                )
+
+            self.detailsViewer.autoRaise = False
+
+            self.detailsViewer.view(self._protocol_, doc_title = doc_title, name=doc_title)
+            self.detailsViewer.readOnly = True
+            self.detailsViewer.showIntrospection = True
+            # self.detailsViewer.sig_modelDataChanged.connect(self._slot_dataChangedInDetailsViewer)
+        else:
+            # sigBlock = QtCore.QSignalBlocker(self.detailsViewer)
+            self.detailsViewer.view(self._protocol_, doc_title = doc_title, name=doc_title)
+            self.detailsViewer.readOnly = True
+            self.detailsViewer.showIntrospection = True
+            # self.detailsViewer.winTitle = win_title
+            self.detailsViewer.docTitle = doc_title
+            self.detailsViewer.slot_refreshDataDisplay()
+
+        self.detailsViewer.show()
+
+
     @Slot(str)
     @Slot(int)
     def _slot_episodeTypeChanged(self, val: int | str):
@@ -356,10 +397,11 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
 
     def _uiLoadTrials_(self):
         from gui.workspacegui import FileIOGui
-        if isinstance(self._name_, str) and len(self._name_.strip()):
-            fileNameFilter = f"{self._name_}*.abf;{self._name_}*.pkl"
-        else:
-            fileNameFilter = "*.abf;*.pkl"
+        # if isinstance(self._name_, str) and len(self._name_.strip()):
+        #     fileNameFilter = f"{self._name_}*.abf;{self._name_}*.pkl"
+        # else:
+        #     fileNameFilter = "*.abf;*.pkl"
+        fileNameFilter = "*.abf *.pkl"
         fn, fl = FileIOGui.chooseFile_static(caption="Open trials",
                                             fileFilter = fileNameFilter,
                                             single=False)
