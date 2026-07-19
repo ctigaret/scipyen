@@ -617,7 +617,7 @@ class WorkspaceViewer(QtWidgets.QTableView):
 
                 for varName in varNames:
                     drag = QtGui.QDrag(self)
-                    mimData = QtCore.QMimeData()
+                    mimeData = QtCore.QMimeData()
                     mimeData.setText(varName)
                     drag.setMimeData(mimeData)
                     dropAction = drag.exec(QtCore.Qt.CopyAction)
@@ -1121,6 +1121,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     _useDefaultQApplicationFont:bool = True
 
     _defaultIconSize_:int = 16
+
+    _defaultIconModeIconSize_: int = 48
 
     _defaultNewNavigatorLook_:bool = False
 
@@ -1720,7 +1722,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._lockedToolBar:bool = True
         self._guiIconSize_ = self._defaultIconSize_
         self._workspaceIconSize_ = self._defaultIconSize_
-        self._fileSystemIconSize_ = self._defaultIconSize_
+        self._fileSystemListTreeColumnModeIconSize_ = self._defaultIconSize_
+        self._fileSystemIconModeIconSize_ = self._defaultIconModeIconSize_
         self._newNavigatorLook_ = self._defaultNewNavigatorLook_
         self._fileNamesFiltersHides_:bool = False
         self._toolButtonStyle_:int = QtCore.Qt.ToolButtonFollowStyle.value
@@ -2402,7 +2405,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         cb = qd.QuickDialogComboBox(dlg, "Icon Size:")
         dlg.addWidget(cb)
         cb.setItems(texts)
-        currentIS = self.fileSystemTreeView.iconSize().width()
+        if self.fileSystemViewMode == "Icons":
+            currentIS = self.fileSystemIconModeIconSize
+        else:
+            currentIS = self.fileSystemTreeView.iconSize().width()
 
         if currentIS not in icon_sizes.values():
             if currentIS <= 16:
@@ -2427,16 +2433,26 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         else:
             newVal = currentIS
 
-        self.fileSystemIconSize = newVal
+        if self.fileSystemViewMode == "Icons":
+            self.fileSystemIconModeIconSize = newVal
+        else:
+            self.fileSystemIconSize = newVal
 
     @property
     def fileSystemIconSize(self) -> int:
-        self._fileSystemIconSize_ = self.fileSystemTreeView.iconSize().width()
-        return self._fileSystemIconSize_
+        self._fileSystemListTreeColumnModeIconSize_ = self.fileSystemTreeView.iconSize().width()
+        return self._fileSystemListTreeColumnModeIconSize_
+
 
     def _set_filesystem_icon_size(self, val:int):
         iconSize = QtCore.QSize(val, val)
         self.fileSystemTreeView.setIconSize(iconSize)
+        self.fileSystemColumnView.setIconSize(iconSize)
+        if self.fileSystemViewMode == "List":
+            self.fileSystemListView.setIconSize(iconSize)
+        else:
+            self.fileSystemListView.setIconSize(QtCore.QSize(self._fileSystemIconModeIconSize_,
+                                                             self._fileSystemIconModeIconSize_))
 
     @markConfigurable("FileSystemViewerIconSize", "Qt")
     @fileSystemIconSize.setter
@@ -2451,8 +2467,33 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 val = 32
             else:
                 val = 48
-        self._fileSystemIconSize_ = val
+        self._fileSystemListTreeColumnModeIconSize_ = val
         self._set_filesystem_icon_size(val)
+
+    @property
+    def fileSystemIconModeIconSize(self) -> int:
+        return self._fileSystemIconModeIconSize_
+
+    @markConfigurable("FileSystemIconModeIconSize", "Qt")
+    @fileSystemIconModeIconSize.setter
+    def fileSystemIconModeIconSize(self, val:int):
+        val = int(val)
+        if val not in [16,22,32,48]:
+            if val <= 16:
+                val = 16
+            elif val <= 22:
+                val = 22
+            elif val <= 32:
+                val = 32
+            else:
+                val = 48
+
+        self._fileSystemIconModeIconSize_ = val
+
+        if self.fileSystemViewMode == "Icon":
+            self.fileSystemListView.setIconSize(self._fileSystemIconModeIconSize_)
+        # else:
+        #     self.fileSystemListView.setIconSize(self._fileSystemIconModeIconSize_)
 
     @Slot()
     def _slot_configureIconSize(self):
@@ -2761,7 +2802,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self._fileSystemViewMode_ = val
 
-        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), # noqa
                                   (self.actionTreeView, self.actionListView,
                                    self.actionIconView, self.actionColumnView,
                                    self.fileSystemViewToolButton,
@@ -2772,6 +2813,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.actionTreeView.setChecked(True)
             for a in (self.actionListView,self.actionIconView, self.actionColumnView):
                 a.setChecked(False)
+            self.fileSystemTreeView.setIconSize(QtCore.QSize(self._fileSystemListTreeColumnModeIconSize_,
+                                                               self._fileSystemListTreeColumnModeIconSize_))
             ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemTreeViewPage)
             self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
 
@@ -2781,6 +2824,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             for a in (self.actionTreeView,self.actionIconView, self.actionColumnView):
                 a.setChecked(False)
             self.fileSystemListView.setViewMode(QtWidgets.QListView.ListMode)
+            self.fileSystemListView.setIconSize(QtCore.QSize(self._fileSystemListTreeColumnModeIconSize_,
+                                                             self._fileSystemListTreeColumnModeIconSize_))
             ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemListViewPage)
             self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
 
@@ -2790,6 +2835,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             for a in (self.actionTreeView,self.actionListView, self.actionColumnView):
                 a.setChecked(False)
             self.fileSystemListView.setViewMode(QtWidgets.QListView.IconMode)
+            self.fileSystemListView.setIconSize(QtCore.QSize(self._fileSystemIconModeIconSize_,
+                                                             self._fileSystemIconModeIconSize_))
             ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemListViewPage)
             self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
 
@@ -2798,6 +2845,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.actionColumnView.setChecked(True)
             for a in (self.actionTreeView,self.actionListView, self.actionIconView):
                 a.setChecked(False)
+            self.fileSystemColumnView.setIconSize(QtCore.QSize(self._fileSystemListTreeColumnModeIconSize_,
+                                                               self._fileSystemListTreeColumnModeIconSize_))
             ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemColumnViewPage)
             self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
 
@@ -2820,7 +2869,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def _slot_fileViewColumnMode(self, val:bool):
         if val is True:
             self.fileSystemViewMode = "Column"
-
 
     @property
     def maxRecentDirectories(self):
@@ -2975,7 +3023,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self._fileSystemTimeDisplayFormat_ = "Standard"
             self.fileSystemModel.timeFormat = None
 
-        self.fileSystemTreeView.update()
+        for w in (self.fileSystemTreeView, self.fileSystemListView, self.fileSystemColumnView):
+            w.update()
 
     @Slot()
     def _slot_setFilesystemTimeDisplayFormat(self):
@@ -4476,7 +4525,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             # effectively delegates the loading of file system url (see above)
             # from the console to the code in ScipyenWindow.
-            self.console.loadUrls[object, bool, QtCore.QPoint].connect(self.slot_loadDroppedURLs)
+            # self.console.loadUrls[object, bool, QtCore.QPoint].connect(self.slot_loadDroppedURLs)
+            # self.console.loadUrls[object, QtCore.Qt.KeyboardModifier, QtCore.QPoint].connect(self.slot_loadDroppedURLs)
+            self.console.loadUrls.connect(self.slot_loadDroppedURLs)
 
             # as above
             self.console.pythonFileReceived[str, QtCore.QPoint].connect(self.slot_handlePythonTextFile)
@@ -6822,23 +6873,30 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.fileSystemTreeView.setModel(self.fileSystemModel)
         self.fileSystemTreeView.setAlternatingRowColors(True)
+
         self.fileSystemTreeView.activated[QtCore.QModelIndex].connect(
             self.slot_fileSystemItemActivated)
+
         self.fileSystemTreeView.collapsed[QtCore.QModelIndex].connect(
             self.slot_resizeFileTreeViewFirstColumn)
+
         self.fileSystemTreeView.expanded[QtCore.QModelIndex].connect(
             self.slot_resizeFileTreeViewFirstColumn)
+
         self.fileSystemTreeView.customContextMenuRequested[QtCore.QPoint].connect(
             self.slot_fileSystemContextMenuRequest)
+
         self.fileSystemTreeView.sortByColumn(0, QtCore.Qt.AscendingOrder)
         self.fileSystemTreeView.setRootIsDecorated(True)
         self.fileSystemTreeView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        # self.fileSystemTreeView.setHorizontalScrollBarPolicy(
-        #     QtCore.Qt.ScrollBarAlwaysOn)
 
         self.fileSystemListView.setModel(self.fileSystemModel)
+
         self.fileSystemListView.activated[QtCore.QModelIndex].connect(
             self.slot_fileSystemItemActivated)
+
+        self.fileSystemListView.customContextMenuRequested[QtCore.QPoint].connect(
+            self.slot_fileSystemContextMenuRequest)
 
         self.fileSystemColumnViewPreviewWidget = QtWidgets.QTextEdit(self)
         self.fileSystemColumnViewPreviewWidget.setReadOnly(True)
@@ -6873,6 +6931,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.fileSystemColumnView.selectionModel().currentChanged.connect(
             self.slot_fileSystemColumnViewCurrentChanged)
 
+        self.fileSystemColumnView.customContextMenuRequested[QtCore.QPoint].connect(
+            self.slot_fileSystemContextMenuRequest)
+
         self.fileSystemModel.directoryLoaded[str].connect(
             self.slot_resizeFileTreeColumnForPath)
 
@@ -6884,7 +6945,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.dirFileMonitor = QtCore.QFileSystemWatcher(parent = self)
         self.dirFileMonitor.directoryChanged.connect(self._slot_monitoredDirectoryContentsChanged)
-        # self.dirFileMonitor.fileChanged.connect(self._slot_monitoredFileChanged)
 
         self.navigator.urlChanged[QtCore.QUrl].connect(self.slot_chDirUrl)
 
@@ -6895,7 +6955,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.navigator.setHomeUrl(QtCore.QUrl(pathlib.Path(target).as_uri()))
         self.navigator.newLook = self.useNewNavigatorLook
-        # self.navigator.newWindowRequested.connect()
 
         self.fileSystemFilter.lineEdit().setClearButtonEnabled(True)
         self.fileSystemFilter.lineEdit().setPlaceholderText("Enter file name filter...")
@@ -7121,11 +7180,23 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if not isinstance(self.fileTransferJob, str) or self.fileTransferJob not in ("copy", "move", "trash", "delete"):
             return
 
+        fileSystemView = None
+        if self.fileSystemViewMode == "Tree":
+            fileSystemView = self.fileSystemTreeView
+        elif self.fileSystemViewMode in ("Icon", "List"):
+            fileSystemView = self.fileSystemListView
+        elif self.fileSystemViewMode == "Column":
+            fileSystemView = self.fileSystemColumnView
+
+        if not isinstance(fileSystemView, QtWidgets.QAbstractItemView):
+            return
+
+
         if self.fileTransferJob in ("copy", "move"):
             clipboard = QtGui.QGuiApplication.clipboard()
             mimeData = QtCore.QMimeData()
             if not self.fileSystemModel.rootDirectory().isEmpty():
-                selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+                selectedItems = [item for item in fileSystemView.selectedIndexes()
                                 if item.column() == 0]  # list of QModelIndex
                 fileNames = set([self.fileSystemModel.filePath(i) for i in selectedItems])
                 fileUrls = list(sorted(map(lambda i: QtCore.QUrl(f"file://{i}"), fileNames)))
@@ -7137,7 +7208,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot()
     def _slot_pasteIntoFileSystemDirectory(self):
         from iolib.navigation.filesystems import FileOperationJob
-        selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+        fileSystemView = None
+        if self.fileSystemViewMode == "Tree":
+            fileSystemView = self.fileSystemTreeView
+        elif self.fileSystemViewMode in ("Icon", "List"):
+            fileSystemView = self.fileSystemListView
+        elif self.fileSystemViewMode == "Column":
+            fileSystemView = self.fileSystemColumnView
+
+        if not isinstance(fileSystemView, QtWidgets.QAbstractItemView):
+            return
+
+        selectedItems = [item for item in fileSystemView.selectedIndexes()
                         if item.column() == 0]  # list of QModelIndex
 
         if len(selectedItems) == 1:
@@ -7235,7 +7317,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def _slot_trashFileItems(self):
         from iolib.navigation.filesystems import FileOperationJob
         self.fileTransferJob = "trash"
-        selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+        fileSystemView = None
+        if self.fileSystemViewMode == "Tree":
+            fileSystemView = self.fileSystemTreeView
+        elif self.fileSystemViewMode in ("Icon", "List"):
+            fileSystemView = self.fileSystemListView
+        elif self.fileSystemViewMode == "Column":
+            fileSystemView = self.fileSystemColumnView
+
+        if not isinstance(fileSystemView, QtWidgets.QAbstractItemView):
+            return
+
+        selectedItems = [item for item in fileSystemView.selectedIndexes()
                         if item.column() == 0]  # list of QModelIndex
 
         source = list(map(lambda i: pathlib.Path(self.fileSystemModel.filePath(i)), selectedItems))
@@ -7261,7 +7354,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def _slot_deleteFileItems(self):
         from iolib.navigation.filesystems import FileOperationJob
         self.fileTransferJob = "delete"
-        selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+        fileSystemView = None
+        if self.fileSystemViewMode == "Tree":
+            fileSystemView = self.fileSystemTreeView
+        elif self.fileSystemViewMode in ("Icon", "List"):
+            fileSystemView = self.fileSystemListView
+        elif self.fileSystemViewMode == "Column":
+            fileSystemView = self.fileSystemColumnView
+
+        if not isinstance(fileSystemView, QtWidgets.QAbstractItemView):
+            return
+
+        selectedItems = [item for item in fileSystemView.selectedIndexes()
                         if item.column() == 0]  # list of QModelIndex
 
         source = list(map(lambda i: pathlib.Path(self.fileSystemModel.filePath(i)), selectedItems))
@@ -7287,7 +7391,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @Slot()
     def _slot_renameFileSystemItem(self):
-        selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+        fileSystemView = None
+        if self.fileSystemViewMode == "Tree":
+            fileSystemView = self.fileSystemTreeView
+        elif self.fileSystemViewMode in ("Icon", "List"):
+            fileSystemView = self.fileSystemListView
+        elif self.fileSystemViewMode == "Column":
+            fileSystemView = self.fileSystemColumnView
+
+        if not isinstance(fileSystemView, QtWidgets.QAbstractItemView):
+            return
+
+        selectedItems = [item for item in fileSystemView.selectedIndexes()
                         if item.column() == 0]  # list of QModelIndex
 
         if len(selectedItems) != 1:
@@ -7360,8 +7475,19 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         entries = list()
 
+        fileSystemView = None
+        if self.fileSystemViewMode == "Tree":
+            fileSystemView = self.fileSystemTreeView
+        elif self.fileSystemViewMode in ("Icon", "List"):
+            fileSystemView = self.fileSystemListView
+        elif self.fileSystemViewMode == "Column":
+            fileSystemView = self.fileSystemColumnView
+
+        if not isinstance(fileSystemView, QtWidgets.QAbstractItemView):
+            return
+
         if not self.fileSystemModel.rootDirectory().isEmpty():
-            selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+            selectedItems = [item for item in fileSystemView.selectedIndexes()
                             if item.column() == 0]  # list of QModelIndex
 
             if len(selectedItems) == 1:
@@ -7437,7 +7563,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @safewrapper
     def slot_systemOpenSelectedFiles(self):
         r"""Opens selected file(s) or directory/ies in the system application"""
-        selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+        fileSystemView = None
+        if self.fileSystemViewMode == "Tree":
+            fileSystemView = self.fileSystemTreeView
+        elif self.fileSystemViewMode in ("Icon", "List"):
+            fileSystemView = self.fileSystemListView
+        elif self.fileSystemViewMode == "Column":
+            fileSystemView = self.fileSystemColumnView
+
+        if not isinstance(fileSystemView, QtWidgets.QAbstractItemView):
+            return
+
+        selectedItems = [item for item in fileSystemView.selectedIndexes()
                          if item.column() == 0]  # list of QModelIndex
 
         for item in selectedItems:
@@ -7691,10 +7828,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         return menu
 
 
-    @Slot(object, bool, QtCore.QPoint)
+    # @Slot(object, QtCore.Qt.KeyboardModifier, QtCore.QPoint)
+    @Slot(object, object, QtCore.QPoint)
     @safewrapper
-    def slot_loadDroppedURLs(self, urls, chdirs, pos):
+    def slot_loadDroppedURLs(self, urls: object,
+                             chdirs: typing.Union[bool, QtCore.Qt.KeyboardModifier],
+                             pos: QtCore.QPoint):
         # print(f"{self.__class__.__name__}.slot_loadDroppedURLs ({urls})")
+        chdirs = chdirs is True or (isinstance(chdirs, QtCore.Qt.KeyboardModifier) and chdirs & QtCore.Qt.ShiftModifier)
         if isinstance(urls, (tuple, list)) and all([isinstance(url, QtCore.QUrl) for url in urls]):
             if len(urls) == 1 and (urls[0].isRelative() or urls[0].isLocalFile()) and os.path.isfile(urls[0].path()):
                 # check if this is a python source file
@@ -7749,11 +7890,22 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         paste_action = None
         # open_link_target_action = None
 
+        fileSystemView = None
+        if self.fileSystemViewMode == "Tree":
+            fileSystemView = self.fileSystemTreeView
+        elif self.fileSystemViewMode in ("Icon", "List"):
+            fileSystemView = self.fileSystemListView
+        elif self.fileSystemViewMode == "Column":
+            fileSystemView = self.fileSystemColumnView
+
+        if not isinstance(fileSystemView, QtWidgets.QAbstractItemView):
+            return
+
         clipboard = QtGui.QGuiApplication.clipboard()
         mimeData = clipboard.mimeData()
         if mimeData.hasUrls():
             nUrls = len(mimeData.urls())
-            pasteActionName = f"Paste {nUrls} {pluralize("item", nUrls)}"
+            pasteActionName = f"Paste {nUrls} {pluralize('item', nUrls)}"
 
         elif any([mimeData.hasText(), mimeData.hasImage(), mimeData.hasHtml(), mimeData.hasColor()]):
             pasteActionName = "Paste clipboard contents"
@@ -7763,7 +7915,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if not self.fileSystemModel.rootDirectory().isEmpty():
             cm = QtWidgets.QMenu("Selected Items", self)
 
-            selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+            selectedItems = [item for item in fileSystemView.selectedIndexes()
                             if item.column() == 0]  # list of QModelIndex
 
 
@@ -7799,14 +7951,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     if len(infos) == 1:
                         if infos[0].isDir():
                             openIcon = guiutils.getIcon("document-open-folder")
-                            # openIcon = QtGui.QIcon.fromTheme("document-open-folder")
                         else:
                             openIcon = guiutils.getIcon("document-open")
-                            # openIcon = QtGui.QIcon.fromTheme("document-open")
 
                     else:
                         openIcon = guiutils.getIcon("project-open")
-                        # openIcon = QtGui.QIcon.fromTheme("project-open")
+
                     openFileObjects = cm.addAction(openIcon, "Open")
                     openFileObjects.triggered.connect(self.slot_openSelectedFileItems)
 
@@ -7890,15 +8040,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         openFolderInFileManager = cm.addAction(guiutils.getIcon("document-open-folder"),
             "Open This Folder In File Manager")
-        # openFolderInFileManager = cm.addAction(QtGui.QIcon.fromTheme("document-open-folder"),
-        #     "Open This Folder In File Manager")
+
         openFolderInFileManager.triggered.connect(
             self.slot_systemOpenCurrentFolder)
 
         openParentFolderInSystemApp = cm.addAction(guiutils.getIcon("go-parent-folder"),
             "Open Parent Folder In File Manager")
-        # openParentFolderInSystemApp = cm.addAction(QtGui.QIcon.fromTheme("go-parent-folder"),
-        #     "Open Parent Folder In File Manager")
+
         openParentFolderInSystemApp.triggered.connect(
             self.slot_systemOpenParentFolderForSelectedItems)
 
@@ -7907,7 +8055,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 action_0 = create_new
             action_0 = openParentFolderInSystemApp
 
-        cm.popup(self.fileSystemTreeView.mapToGlobal(point), action_0)
+        cm.popup(fileSystemView.mapToGlobal(point), action_0)
 
     @Slot()
     @safewrapper
@@ -8221,10 +8369,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot(QtCore.QModelIndex)
     def slot_fileSystemItemPressedInColumnView(self, index:QtCore.QModelIndex):
         self.fileSystemColumnViewPreviewWidget.document().setPlainText(self.fileSystemModel.getFileInfoText(index))
-        # self.fileSystemColumnViewPreviewWidget.setText(self._getFileInfoText_(index))
-        # self.fileSystemColumnViewPreviewWidget.document().setPlainText(self.fileSystemModel.getFileInfoText(index))
-        # self.fileSystemColumnViewPreviewWidgetTextEdit.document().setPlainText(self._getFileInfoText_(index))
-        # self.fileSystemColumnViewPreviewWidgetTextEdit.document().adjustSize()
 
     @Slot(QtCore.QModelIndex, QtCore.QModelIndex)
     def slot_fileSystemColumnViewCurrentChanged(self, current: QtCore.QModelIndex, prev: QtCore.QModelIndex):
@@ -8495,7 +8639,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot()
     @safewrapper
     def slot_importDataFrame(self):
-        selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+        fileSystemView = None
+        if self.fileSystemViewMode == "Tree":
+            fileSystemView = self.fileSystemTreeView
+        elif self.fileSystemViewMode in ("Icon", "List"):
+            fileSystemView = self.fileSystemListView
+        elif self.fileSystemViewMode == "Column":
+            fileSystemView = self.fileSystemColumnView
+
+        if not isinstance(fileSystemView, QtWidgets.QAbstractItemView):
+            return
+
+        selectedItems = [item for item in fileSystemView.selectedIndexes()
                          if item.column() == 0 and not self.fileSystemModel.isDir(item)]  # list of QModelIndex
 
         if len(selectedItems) == 0:
@@ -8510,7 +8665,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @safewrapper
     def slot_openSelectedFileItems(self) -> bool:
         r"""Opens files via (triggered from) context menu in File system browser"""
-        selectedItems = [self.fileSystemModel.filePath(item) for item in self.fileSystemTreeView.selectedIndexes()
+        fileSystemView = None
+        if self.fileSystemViewMode == "Tree":
+            fileSystemView = self.fileSystemTreeView
+        elif self.fileSystemViewMode in ("Icon", "List"):
+            fileSystemView = self.fileSystemListView
+        elif self.fileSystemViewMode == "Column":
+            fileSystemView = self.fileSystemColumnView
+
+        if not isinstance(fileSystemView, QtWidgets.QAbstractItemView):
+            return
+
+        selectedItems = [self.fileSystemModel.filePath(item) for item in fileSystemView.selectedIndexes()
                          if item.column() == 0 and not self.fileSystemModel.isDir(item)]  # list of QModelIndex
 
         nItems = len(selectedItems)
@@ -8585,7 +8751,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded resultSignal = {resultSignal}")
         canceledSignal = kwargs.pop("canceledSignal", None)
         ioReader = kwargs.pop("ioReader", None)
-        separateWorkspaceViewUpdate = kwargs.pop("updateAfter", False) == True
+        # separateWorkspaceViewUpdate = kwargs.pop("updateAfter", False) is True
         updateUi = kwargs.pop("updateUi", True)
 
         if not isinstance(ioReader, typing.Callable):
@@ -8598,7 +8764,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.updateUiWithFileLoad is def'ed in WorkspaceGuiMixin
         self.updateUiWithFileLoad = updateUi
 
-        canceled = False
+        # canceled = False # noqa
 
         for k, item in enumerate(filePaths):
             # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded ({k}, {item})")
@@ -8610,11 +8776,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded loaded ({k}, {item})")
                     progressSignal.emit(k)
 
-            except:
+            except: # noqa
                 traceback.print_exc()
                 continue
 
-            if isinstance(loopControl, dict) and loopControl.get("break", None) == True:
+            if isinstance(loopControl, dict) and loopControl.get("break", None) is True:
                 if isinstance(canceledSignal, QtCore.SignalInstance):
                     canceledSignal.emit()
                 break
@@ -8691,7 +8857,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot()
     @safewrapper
     def slot_systemOpenParentFolderForSelectedItems(self):
-        selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+        fileSystemView = None
+        if self.fileSystemViewMode == "Tree":
+            fileSystemView = self.fileSystemTreeView
+        elif self.fileSystemViewMode in ("Icon", "List"):
+            fileSystemView = self.fileSystemListView
+        elif self.fileSystemViewMode == "Column":
+            fileSystemView = self.fileSystemColumnView
+
+        if not isinstance(fileSystemView, QtWidgets.QAbstractItemView):
+            return
+
+        selectedItems = [item for item in fileSystemView.selectedIndexes()
                          if item.column() == 0]  # list of QModelIndex
 
         parentFolders = unique([os.path.dirname(
@@ -9317,13 +9494,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         """
         from core.utilities import make_file_filter_string
 
-        # FIXME: 2023-05-27 14:51:46
-        # the below becomes a threaded version, therefore we need to move the code
-        # that is coming past it, to the function that processes the result of the
-        # file loading thread
-        # selectedItems = [self.fileSystemModel.filePath(item) for item in self.fileSystemTreeView.selectedIndexes()
-        #                  if item.column() == 0 and not self.fileSystemModel.isDir(item)]  # list of QModelIndex
-        # if len(selectedItems):
         if self.slot_openSelectedFileItems():
             return
 
@@ -9839,7 +10009,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @Slot()
     def _slot_cm_AddPythonScriptToManager(self):
-        selectedItems = [item for item in self.fileSystemTreeView.selectedIndexes()
+        fileSystemView = None
+        if self.fileSystemViewMode == "Tree":
+            fileSystemView = self.fileSystemTreeView
+        elif self.fileSystemViewMode in ("Icon", "List"):
+            fileSystemView = self.fileSystemListView
+        elif self.fileSystemViewMode == "Column":
+            fileSystemView = self.fileSystemColumnView
+
+        if not isinstance(fileSystemView, QtWidgets.QAbstractItemView):
+            return
+
+        selectedItems = [item for item in fileSystemView.selectedIndexes()
                          if item.column() == 0 and not self.fileSystemModel.isDir(item)]  # list of QModelIndex
 
         if len(selectedItems) == 0:

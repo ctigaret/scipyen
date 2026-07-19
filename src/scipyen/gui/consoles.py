@@ -3222,7 +3222,8 @@ class ScipyenConsoleWidget(ConsoleWidget):
     workspaceItemsDropped = Signal()
     fileSystemItemsDropped = Signal()
     #workspaceItemsDropped = Signal(bool)
-    loadUrls = Signal(object, bool, QtCore.QPoint)
+    loadUrls = Signal(object, object, QtCore.QPoint)
+    # loadUrls = Signal([object], [bool, QtCore.Qt.KeyboardModifier], [QtCore.QPoint])
     pythonFileReceived = Signal(str, QtCore.QPoint)
 
     def __init__(self, *args, **kwargs):
@@ -3530,7 +3531,9 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     historyItemsDropped = Signal()
     workspaceItemsDropped = Signal()
     fileSystemItemsDropped = Signal()
-    loadUrls = Signal(object, bool, QtCore.QPoint)
+    # loadUrls = Signal(object, bool, QtCore.QPoint)
+    loadUrls = Signal(object, object, QtCore.QPoint)
+    # loadUrls = Signal([object], [bool, QtCore.Qt.KeyboardModifier], [QtCore.QPoint])
     pythonFileReceived = Signal(str, QtCore.QPoint)
     executed = Signal()
 

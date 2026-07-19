@@ -1188,8 +1188,17 @@ NOTE: you can click anywhere in the row to select</string>
           <layout class="QGridLayout" name="gridLayout_3">
            <item row="0" column="0">
             <widget class="QListView" name="fileSystemListView">
+             <property name="contextMenuPolicy">
+              <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
+             </property>
              <property name="editTriggers">
               <set>QAbstractItemView::EditTrigger::EditKeyPressed</set>
+             </property>
+             <property name="dragDropMode">
+              <enum>QAbstractItemView::DragDropMode::DragOnly</enum>
+             </property>
+             <property name="selectionMode">
+              <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
              </property>
             </widget>
            </item>
@@ -1199,8 +1208,14 @@ NOTE: you can click anywhere in the row to select</string>
           <layout class="QGridLayout" name="gridLayout">
            <item row="0" column="0">
             <widget class="QColumnView" name="fileSystemColumnView">
+             <property name="contextMenuPolicy">
+              <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
+             </property>
              <property name="editTriggers">
               <set>QAbstractItemView::EditTrigger::EditKeyPressed</set>
+             </property>
+             <property name="dragDropMode">
+              <enum>QAbstractItemView::DragDropMode::DragOnly</enum>
              </property>
             </widget>
            </item>
