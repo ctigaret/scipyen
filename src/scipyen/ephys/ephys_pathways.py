@@ -3001,7 +3001,9 @@ class SynapticPathway:
         self.pathType = self._pathwayType_
 
     def __hash__(self) -> int:
-        return hash((self.name, self.adc, self.dac, self.stimulus, self.electrodeMode, self.pathwayType, self.schedule, tuple(self.measuremments)))
+        return hash((self.name, self.adc, self.dac, self.stimulus,
+                     self.electrodeMode, self.pathwayType,
+                     tuple(self.measurements)))
 
     @property
     def electrodeMode(self) -> ephys.ElectrodeMode:
@@ -3051,7 +3053,7 @@ class SynapticPathway:
         return "".join(ret)
 
     def __eq__(self, other) -> bool:
-        from dataclasses import fields
+        # from dataclasses import fields
         ret = type(self) is type(other)
 
         if not ret:

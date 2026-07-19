@@ -707,7 +707,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
                         widget.sig_dataChanged.connect(self.slot_dataChanged)
                         widget.sig_indexChanged.connect(self.sig_indexChanged) # connect signal 2 signal directly
-                        widget.sig_indexChanged[Qt].connect(self.sig_indexChanged) # connect signal 2 signal directly
+                        # widget.sig_indexChanged[Qt].connect(self.sig_indexChanged) # connect signal 2 signal directly
                         # widget.sig_indexChanged
 
         elif isinstance(data, np.ndarray):
