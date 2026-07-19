@@ -212,6 +212,12 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
         self.sig_nameChanged.emit(self._dataName_)
 
     @Slot()
+    def _slot_descriptionEditorClosed(self):
+        if isinstance(self.descriptionEditor, textviewer.TextViewer) and qtutils.isQObjectAlive(self.descriptionEditor):
+            self.descriptionEditor.deleteLater()
+            self.descriptionEditor = None
+
+    @Slot()
     def _slot_editDescription(self):
         if not isinstance(self.descriptionEditor, textviewer.TextViewer):
             self.descriptionEditor = textviewer.TextViewer(self._dataDescription_,

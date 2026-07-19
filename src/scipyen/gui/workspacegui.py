@@ -1239,19 +1239,19 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         Otherwise, this property returns None.
 
         """
-        # return self._scipyenWindow_
-        if self.isTopLevel:
-            return self._scipyenWindow_
-        else:
-            p = self.parent()
-            sciwin = None
-            while p is not None: # this is None for top-application's window
-                if getattr(p, "isTopLevel", False):
-                    sciwin = p.parent()
-                    break
-                else:
-                    p = p.parent()
-            return sciwin
+        return self._scipyenWindow_
+        # if self.isTopLevel:
+        #     return self._scipyenWindow_
+        # else:
+        #     p = self.parent()
+        #     sciwin = None
+        #     while p is not None: # this is None for top-application's window
+        #         if getattr(p, "isTopLevel", False):
+        #             sciwin = p.parent()
+        #             break
+        #         else:
+        #             p = p.parent()
+        #     return sciwin
 
     @property
     def isTopLevel(self):
@@ -1435,19 +1435,19 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                               dialog:bool=True) -> str | None:
         r"""Returns the new variable symbol (name) bound to the object in the workspace"""
         newVarName = strutils.str2symbol(var_name)
-        if self.isTopLevel and self.appWindow:
-            scipyenWindow = self.appWindow
-        else:
-            parent = self.parent()
-            if getattr(parent, "isTopLevel", None) == True:
-                scipyenWindow = parent.appWindow
-            else:
-                return
+        # if self.isTopLevel and self.appWindow:
+        #     scipyenWindow = self.appWindow
+        # else:
+        #     parent = self.parent()
+        #     if getattr(parent, "isTopLevel", None) == True:
+        #         scipyenWindow = parent.appWindow
+        #     else:
+        #         return
 
         if not isinstance(title, str) or len(title.strip()) == 0:
             title = "Export data to workspace"
 
-        newVarName = validate_varname(newVarName, ws = scipyenWindow.workspace,
+        newVarName = validate_varname(newVarName, ws = self.scipyenWindow.workspace,
                                       returns_counter = False)
 
         # print(f"{self.__class__.__name__}.exportDataToWorkspace: -> newVarName = {newVarName}")
@@ -1466,13 +1466,13 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             if dlg.exec() == QtWidgets.QDialog.Accepted:
                 newVarName = namePrompt.text()
                 # newVarName = validate_varname(namePrompt.text(), scipyenWindow.workspace)
-                if newVarName in scipyenWindow.workspace:
+                if newVarName in self.scipyenWindow.workspace:
                     accept = self.questionMessage(title, f"A variable named {newVarName} exists in the workspace. Overwrite?")
                     # accept = self.questionMessage("Export to workspace", f"A variable named {newVarName} exists in the workspace. Overwrite?")
                     if accept not in (QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Yes):
                         return
 
-                scipyenWindow.assignToWorkspace(newVarName, data)
+                self.scipyenWindow.assignToWorkspace(newVarName, data)
 
                 if hasattr(data, "modified") and isinstance(data.modified, bool):
                     data.modified=False
