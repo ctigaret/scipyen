@@ -3686,9 +3686,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     wt += winVarName[1:]
                 winVarName = wt
 
-            if "parent" not in kwargs:
-                kwargs["parent"] = self # needed on X11 platform, but not on Wayland,
-                                        # see NOTE: 2024-04-17 11:53:29 in scipyenviewer.py
+            # if "parent" not in kwargs:
+            #     kwargs["parent"] = self # needed on X11 platform, but not on Wayland,
+            #                             # see NOTE: 2024-04-17 11:53:29 in scipyenviewer.py
 
             # NOTE: 2026-05-06 09:30:20
             # the viewer is instantiated here:
@@ -3867,8 +3867,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 winEvtFilter = WindowEventFilter(win, parent=self)
                 win.installEventFilter(winEvtFilter)
 
-            if getattr(win, "appWindow", None) is not self:
-                win.setParent(self)
+            # NOTE: 2026-07-19 11:15:44 avoid this !!!
+            # if getattr(win, "appWindow", None) is not self:
+            #     win.setParent(self)
 
         if winClass not in self.viewers:
             self.viewers[winClass] = list()

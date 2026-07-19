@@ -242,6 +242,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self._grab_focus_:bool = False
         self._alwaysShow_: bool = True
 
+        # print(f"{self.__class__.__name__}.__init__(parent={parent})")
+
         super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
 
