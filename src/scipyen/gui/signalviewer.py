@@ -3240,7 +3240,7 @@ anything else       anything else       ❌
         # TODO/FIXME 2022-11-16 21:37:13
         # pgmembers = inspect.getmembers(self, lambda x: isinstance(x, (pg.GraphicsItem, pg.GraphicsView, QtWidgets.QWidget)))
 
-        if getattr(self, "_delete_on_close_", False) or getattr(self.appWindow, "autoRemoveViewers", False):
+        if getattr(self, "_delete_on_close_", False) or getattr(self.scipyenWindow, "autoRemoveViewers", False):
             if len(self._signal_axes_):
                 self._signal_axes_.clear()
 

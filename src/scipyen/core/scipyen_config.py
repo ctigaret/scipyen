@@ -1178,7 +1178,7 @@ class ScipyenConfigurable(object):
     def _get_parent_(self):
         """Returns the parent 'appWindow' (if defined) or the Qt parent object.
     This is so that scipyen viewers that are created a children of other Scipyen apps
-    can have their confugrables saved in a subgroup belonging to that 'parent' app.
+    can have their configurables saved in a subgroup belonging to that 'parent' app.
 
     The 'appWindow' attribute, if it exists, should not be confused with the Qt
     'parent' object (typically, a widget or window)
@@ -1187,6 +1187,8 @@ class ScipyenConfigurable(object):
 
         if hasattr(self, "appWindow"):
             parent = self.appWindow
+        elif hasattr(self, "scipyenWindow"):
+            parent = self.scipyenWindow
 
         if parent is None:
             parent_f = inspect.getattr_static(self, "parent", None)
@@ -1441,7 +1443,14 @@ class ScipyenConfigurable(object):
         # keep Qt settings segregated
         if len(cfg):
             isTop = hasattr(self, "isTopLevel") and self.isTopLevel
-            parent = self._get_parent_()
+            if isTop:
+                parent = getattr(self, "scipyenWindow", None)
+            else:
+                if hasattr(self, "appWindow"):
+                    parent = self.appWindow
+                if parent is None:
+                    parent = self._get_parent_()
+            # parent = self._get_parent_()
             tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
             user_conf = self._get_config_view_(isTop, parent, tag)
 
@@ -1488,10 +1497,15 @@ class ScipyenConfigurable(object):
         if len(cfg):
             isTop = hasattr(self, "isTopLevel") and self.isTopLevel
             parent = None
-            if hasattr(self, "appWindow"):
-                parent = self.appWindow
-            if parent is None:
-                parent = self._get_parent_()
+            if isTop:
+                parent = getattr(self, "scipyenWindow", None)
+            else:
+                if hasattr(self, "appWindow"):
+                    parent = self.appWindow
+                if parent is None:
+                    parent = self._get_parent_()
+
+            # print(f"{self.__class__.__name__}.saveSettings: parent -> {parent}")
             tag = self.configTag if hasattr(self, "configTag") and isinstance(self.configTag, str) and len(self.configTag.strip()) else None
             user_conf = self._get_config_view_(isTop, parent, tag)
 

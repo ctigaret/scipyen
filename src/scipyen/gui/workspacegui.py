@@ -1151,7 +1151,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     _owncfg = Bunch()
 
     def workspaceSymbolForData(self, data):
-        ws = self.appWindow.workspace
+        ws = self.scipyenWindow.workspace
         return get_symbol_in_namespace(data, ws)
 
     def __init__(self, parent: (QtWidgets.QMainWindow, type(None)) = None,
@@ -1177,6 +1177,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         scipyenWindow = kwargs.pop("scipyenWindow", None)
 
         appWindow = kwargs.pop("appWindow", None)
+
+        # print(f"{self.__class__.__name__}.__init__: appWindow -> {appWindow}")
 
         parent_obj = parent
 
@@ -1272,7 +1274,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         which Scipyen communicates.
 
         """
-        return self.appWindow is self._scipyenWindow_
+        return self.appWindow is None
         # return self._scipyenWindow_.__class__.__name__ == "ScipyenWindow"
         # return self.appWindow is not None and self.appWindow is self._scipyenWindow_
 
@@ -1328,6 +1330,18 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         """
         return self._appWindow_
 
+    def getTopParentWindow(self):
+        parent = self.parent()
+        if parent is None:
+            topW = self
+
+        while isinstance(parent, QtWidgets.QWidget):
+            topW = parent
+            parent = parent.parent()
+
+        return topW
+
+
     @safewrapper
     def importWorkspaceData(self, dataTypes: typing.Union[typing.Type[typing.Any],
                                                          typing.Sequence[typing.Type[typing.Any]]
@@ -1355,17 +1369,17 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
         from core.workspacefunctions import getvarsbytype
         #print("dataTypes", dataTypes)
-        if self.isTopLevel and self.appWindow:
-            scipyenWindow = self.appWindow
-        else:
-            parent = self.parent()
-            if getattr(parent, "isTopLevel", None) is True:
-                scipyenWindow = parent.appWindow
-            else:
-                return
+        # if self.isTopLevel and self.appWindow:
+        #     scipyenWindow = self.appWindow
+        # else:
+        #     parent = self.parent()
+        #     if getattr(parent, "isTopLevel", None) is True:
+        #         scipyenWindow = parent.appWindow
+        #     else:
+        #         return
 
 
-        user_ns_visible = dict([(k,v) for k,v in scipyenWindow.workspace.items() if k not in scipyenWindow.workspaceModel.user_ns_hidden])
+        user_ns_visible = dict([(k,v) for k,v in self.scipyenWindow.workspace.items() if k not in self.scipyenWindow.workspaceModel.user_ns_hidden])
 
         name_vars = getvarsbytype(dataTypes, ws = user_ns_visible, predicate=predicate)
 
@@ -1388,9 +1402,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
         if ans == QtWidgets.QDialog.Accepted:
             if with_varName:
-                return [(i, scipyenWindow.workspace[i]) for i in dialog.selectedItemsText]
+                return [(i, self.scipyenWindow.workspace[i]) for i in dialog.selectedItemsText]
             else:
-                return [scipyenWindow.workspace[i] for i in dialog.selectedItemsText]
+                return [self.scipyenWindow.workspace[i] for i in dialog.selectedItemsText]
 
         return list()
 
@@ -1494,20 +1508,20 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     def getDataSymbolInWorkspace(self, data=None) -> str | None:
         r"""Calls workspacefunctions.get_symbol_in_namespace for the data.
         """
-        if self.isTopLevel and self.appWindow:
-            scipyenWindow = self.appWindow
-        else:
-            parent = self.parent()
-            if getattr(parent, "isTopLevel", None) == True:
-                scipyenWindow = parent.appWindow
-            else:
-                return
+        # if self.isTopLevel and self.appWindow:
+        #     scipyenWindow = self.appWindow
+        # else:
+        #     parent = self.parent()
+        #     if getattr(parent, "isTopLevel", None) == True:
+        #         scipyenWindow = parent.appWindow
+        #     else:
+        #         return
 
         if data is None:
             data = getattr(self, "_data_", None)
 
-        if data is not None and isinstance(scipyenWindow, QtWidgets.QMainWindow) and scipyenWindow.__class__.__name__.startswith("ScipyenWindow"):
-            return get_symbol_in_namespace(data, scipyenWindow.workspace)
+        if data is not None and isinstance(self.scipyenWindow, QtWidgets.QMainWindow) and self.scipyenWindow.__class__.__name__.startswith("ScipyenWindow"):
+            return get_symbol_in_namespace(data, self.scipyenWindow.workspace)
 
     def saveOptionsToUserFile(self):
         r"""

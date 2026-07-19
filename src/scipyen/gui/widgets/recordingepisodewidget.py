@@ -343,14 +343,14 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
                                         single=False,
                                         var_type = neo.Block,
                                         retrieve_all = True,
-                                        ws = self.appWindow.workspace,
+                                        ws = self.scipyenWindow.workspace,
                                         ) # noqa
         else:
             ret = interact.selectWSData(title = "Select Trial Blocks",
                                         single=False,
                                         var_type = neo.Block,
                                         retrieve_all = True,
-                                        ws = self.appWindow.workspace,
+                                        ws = self.scipyenWindow.workspace,
                                         ) # noqa
         self.trials = ret
 

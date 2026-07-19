@@ -219,12 +219,19 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
 
     @Slot()
     def _slot_editDescription(self):
+        topWindow = self.getTopParentWindow()
+        if topWindow is self:
+            appWindow = None
+        else:
+            appWindow = topWindow
+
         if not isinstance(self.descriptionEditor, textviewer.TextViewer):
             self.descriptionEditor = textviewer.TextViewer(self._dataDescription_,
                                                 parent=self, edit=True,
                                                 win_title="Edit description",
                                                 doc_title="Edit description",
-                                                title="Description")
+                                                title="Description",
+                                                appWindow = appWindow)
             self.descriptionEditor.sig_textChanged.connect(self._slot_descriptionChanged)
             self.descriptionEditor.sig_closeMe.connect(self._slot_descriptionEditorClosed)
 
@@ -245,9 +252,15 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
         # win_title = f"Details of {varName}"
         # win_title = "Details"
         if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
+            topWindow = self.getTopParentWindow()
+            if topWindow is self:
+                appWindow = None
+            else:
+                appWindow = topWindow
             self.detailsViewer = datatreeviewer.DataTreeViewer(
                 parent=self,
                 doc_title=doc_title,
+                appWindow = appWindow,
                 )
 
             self.detailsViewer.autoRaise = False
