@@ -5,7 +5,7 @@
 
 import os, sys
 import numpy as np
-
+import typing
 import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
@@ -197,6 +197,9 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
             elif isinstance(preSelected, str) and len(preSelected.strip()) and preSelected in itemsList:
                 self.preSelected = [preSelected]
 
+            else:
+                self.preSelected = list()
+
             longestItemNdx = np.argmax([len(i) for i in itemsList])
             longestItem = itemsList[longestItemNdx]
 
@@ -207,14 +210,15 @@ class ItemsListDialog(QDialog, Ui_ItemsListDialog):
                 self.listWidget.scrollToItem(item)
 
             else:
-                for k, s in enumerate(self.preSelected):
-                    ndx = itemsList.index(s)
-                    item = self.listWidget.item(ndx)
-                    self.listWidget.setCurrentItem(item, QtCore.QItemSelectionModel.Select)
+                if isinstance(self.preSelected, typing.Sequence) and len(self.preSelected):
+                    for k, s in enumerate(self.preSelected):
+                        ndx = itemsList.index(s)
+                        item = self.listWidget.item(ndx)
+                        self.listWidget.setCurrentItem(item, QtCore.QItemSelectionModel.Select)
 
-                lastSelectedItemNdx = itemsList.index(self.preSelected[-1])
-                lastSelectedItem = self.listWidget.item(lastSelectedItemNdx)
-                self.listWidget.scrollToItem(lastSelectedItem)
+                    lastSelectedItemNdx = itemsList.index(self.preSelected[-1])
+                    lastSelectedItem = self.listWidget.item(lastSelectedItemNdx)
+                    self.listWidget.scrollToItem(lastSelectedItem)
 
             fm = QtGui.QFontMetrics(self.listWidget.font())
             w = fm.width(longestItem) * 1.1

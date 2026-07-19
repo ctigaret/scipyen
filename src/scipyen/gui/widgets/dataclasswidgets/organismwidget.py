@@ -120,21 +120,21 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         self.taxonSpeciesLineEdit.setText(taxon_name)
         self.taxonSpeciesLineEdit.setToolTip(common_name)
         self.taxonSpeciesLineEdit.lazy = True
-        self.taxonSpeciesLineEdit.sig_enterPressed.connect(self._slot_selectTaxon)
+        self.taxonSpeciesLineEdit.sig_textChanged.connect(self._slot_selectTaxon)
 
         self.taxonDetailsToolButton.clicked.connect(self._slot_showTaxonDetails)
 
         self.subSpeciesLineEdit.setText(f"{self._data_.subspecies}")
         self.subSpeciesLineEdit.lazy = True
-        self.subSpeciesLineEdit.sig_enterPressed.connect(self._slot_setSubSpecies)
+        self.subSpeciesLineEdit.sig_textChanged.connect(self._slot_setSubSpecies)
 
         self.strainLineEdit.setText(f"{self._data_.strain}")
         self.strainLineEdit.lazy = True
-        self.strainLineEdit.sig_enterPressed.connect(self._slot_setStrain)
+        self.strainLineEdit.sig_textChanged.connect(self._slot_setStrain)
 
         self.facilityIDLineEdit.setText(f"{self._data_.ID}")
         self.facilityIDLineEdit.lazy = True
-        self.facilityIDLineEdit.sig_enterPressed.connect(self._slot_setFacilityID)
+        self.facilityIDLineEdit.sig_textChanged.connect(self._slot_setFacilityID)
 
         # self.editBiometricsToolButton.clicked.connect(self._slot_editBiometrics)
         self.editBiometricsToolButton.toggled.connect(self._slot_toggleBiometricsEditor)

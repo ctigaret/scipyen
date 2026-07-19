@@ -141,6 +141,8 @@ def selectWSData(*args, title="", single=True, asDict=False,
 
     name_list = sorted([name for name in name_vars])
 
+    # print(f"interact.selectWSData: single -> {single}")
+
     selectionMode = (QtWidgets.QAbstractItemView.SingleSelection if single
                      else QtWidgets.QAbstractItemView.ExtendedSelection)
 
@@ -149,15 +151,15 @@ def selectWSData(*args, title="", single=True, asDict=False,
     else:
         dtitle = "Select Workspace Variable(s)"
 
-    # dialog = ItemsListDialog(title=dtitle, itemsList = name_list,
-    #                         selectmode = selectionMode)
-
     if isinstance(preselected, str) and len(preselected.strip()) and preselected in name_list:
-        dialog = ItemsListDialog(parent=parent, title=title, itemsList = name_list,
-                                selectmode = selectionMode, preSelected=preselected)
+        dialog = ItemsListDialog(parent=parent, title=dtitle,
+                                 itemsList = name_list,
+                                 selectmode = selectionMode,
+                                 preSelected=preselected)
     else:
-        dialog = ItemsListDialog(parent=parent, title=title, itemsList = name_list,
-                                selectmode = selectionMode)
+        dialog = ItemsListDialog(parent=parent, title=dtitle,
+                                 itemsList = name_list,
+                                 selectmode = selectionMode)
 
     ans = dialog.exec()
 

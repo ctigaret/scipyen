@@ -6,22 +6,21 @@
 
 r"""Superclass for Scipyen viewer windows
 """
-import typing, warnings, inspect, sys, platform, os
+import typing, warnings, inspect, sys, platform, os # noqa
 from dataclasses import MISSING
-from abc import (ABC, ABCMeta, abstractmethod,)
+from abc import (ABC, ABCMeta, abstractmethod,) # noqa
 from traitlets import Bunch
-import functools
 #from abc import (abstractmethod,)
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, QtDBus)
-from qtpy.QtCore import (Signal, Slot, Property,)
+import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, QtDBus) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -31,8 +30,8 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    from qtpy import sip # noqa
+    from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -42,7 +41,7 @@ __has_qtdbus__ = False
 try:
     from qtpy import QtDBus
     __has_qtdbus__ = True
-except:
+except: # noqa
     __has_qtdbus__ = False
 
 
@@ -50,12 +49,12 @@ from core.utilities import safewrapper
 # from core import workspacefunctions as wfunc
 # from .workspacegui import (WorkspaceGuiMixin, _X11WMBridge_,
 #                            saveWindowSettings, loadWindowSettings)
-from gui.workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
+from gui.workspacegui import WorkspaceGuiMixin #, saveWindowSettings, loadWindowSettings)
 from gui.widgets.spinboxslider import SpinBoxSlider
-from gui.itemmodels.workspacemodel import WorkspaceModel
+# from gui.itemmodels.workspacemodel import WorkspaceModel
 from gui.pictgui import WorkerThread
-from core import sysutils, desktoputils
-from iolib import pictio as pio
+from core import desktoputils
+# from iolib import pictio as pio
 from pandas import NA
 
 
@@ -246,7 +245,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
 
-        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, False);
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, False)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose, on=False)
         self._docTitle_ = doc_title
         self._winTitle_ = win_title # force auto-set in update_title()
@@ -321,7 +320,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         else:
             self._ID_  = int(self.winId()) # this is the wm ID of the window
 
-        # self.update() # why is this needed !?
         # NOTE: 2021-09-16 12:26:09
         # This SHOULD be implemented in the derived class
         self._configureUI_()
@@ -330,18 +328,10 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
         self.loadSettings() # inherited from ScipyenConfigurable (via WorkspaceGuiMixin)
 
-        # self._sig_setNewDataBegin.connect(self._slot_beginSetData)
-
         # NOTE: 2021-08-17 12:59:02
         # setData ALMOST SURELY needs the ui elements to be initialized - hence
         # it is called here, AFTER self._configureUI_()
         if data is not None:
-            # NOTE: 2022-01-17 12:39:49 this will call _set_data_
-            # subclasses can override this by implementing their own setData()
-            # see e.g., SignalViewer
-            # fn = functools.partialmethod(self.setData, data = data, doc_title = doc_title)
-            # QtCore.QTimer.singleShot(500, fn)
-            # self._sig_setNewDataBegin.emit(data, tuple(), {"doc_title": doc_title})
             self.setData(data = data, doc_title = doc_title)
 
         else:
@@ -428,9 +418,9 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
     def getAppMenu(self):
         if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
-            service_name = self._global_menu_service_
-            service_path = "/com/canonical/AppMenu/Registrar"
-            interface = "com.canonical.AppMenu.Registrar"
+            # service_name = self._global_menu_service_
+            # service_path = "/com/canonical/AppMenu/Registrar"
+            # interface = "com.canonical.AppMenu.Registrar"
             dbusinterface = QtDBus.QDBusInterface(self._global_menu_service_, "/"+self._global_menu_service_.replace(".", "/"),
                                                   self._global_menu_service_)
             dbusinterface.setTimeout(100)
@@ -917,8 +907,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                 if old_v.convert(QtCore.QVariant.UInt) and new_v.convert(QtCore.QVariant.UInt):
                     # deregister old WM window ID, then register the new one
                     # to the same DBus object path (i.e. dbusmenu instance)
-                    dereg_reply = dbusinterface.call("UnregisterWindow", old_v)
-                    newreg_reply = dbusinterface.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self._app_menu_[1]))
+                    dereg_reply = dbusinterface.call("UnregisterWindow", old_v) # noqa
+                    newreg_reply = dbusinterface.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self._app_menu_[1])) # noqa
 
     @Slot()
     @safewrapper
@@ -1324,7 +1314,7 @@ class ScipyenFrameViewer(ScipyenViewer):
             blocked_signal_emitters.append(self._frames_spinBoxSlider_)
 
         if len(blocked_signal_emitters):
-            signalBlockers = [QtCore.QSignalBlocker(w) for w in blocked_signal_emitters]
+            signalBlockers = [QtCore.QSignalBlocker(w) for w in blocked_signal_emitters] # noqa
 
             if isinstance(self._frames_slider_, QtWidgets.QSlider):
                 self._frames_slider_.setValue(value)

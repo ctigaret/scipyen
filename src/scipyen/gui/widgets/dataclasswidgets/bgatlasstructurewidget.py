@@ -105,7 +105,7 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
         self.acronymOrNameEdit.undoEnabled = True
         self.acronymOrNameEdit.redoEnabled = True
         self.acronymOrNameEdit.setClearButtonEnabled(True)
-        self.acronymOrNameEdit.sig_enterPressed.connect(self._slot_lookupStructure)
+        self.acronymOrNameEdit.sig_textChanged.connect(self._slot_lookupStructure)
         self.ancestorComboBox.currentIndexChanged.connect(self._slot_ancestorSelected)
         self.descendantComboBox.currentIndexChanged.connect(self._slot_descendantSelected)
         self.structureTreeView.readOnly=True

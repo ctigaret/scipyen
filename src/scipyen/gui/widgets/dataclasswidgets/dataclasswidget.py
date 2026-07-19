@@ -171,26 +171,28 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         AND first thing after setupUi() was called in the subclass"""
         # if isinstance(self.dataExchangeWidget, DataExchangeWidget) and isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
         if isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
-            self.nameDescriptionWidget.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
-            self.nameDescriptionWidget.dataExchangeWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
-            self.sig_dataExporting.connect(self.nameDescriptionWidget.dataExchangeWidget.slot_exportData)
-            self.nameDescriptionWidget.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
-            self.sig_dataSaving.connect(self.nameDescriptionWidget.dataExchangeWidget.slot_saveData)
-            self.nameDescriptionWidget.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
-            self.sig_dataCopy.connect(self.nameDescriptionWidget.dataExchangeWidget.slot_copyData)
-            self.nameDescriptionWidget.dataExchangeWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
-            self.nameDescriptionWidget.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
-            self.nameDescriptionWidget.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
-            self.nameDescriptionWidget.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
-
+            self.nameDescriptionWidget.setData(self._data_)#, self._objSymbol_)
             self.nameDescriptionWidget.dataName = self._data_.name
             self.nameDescriptionWidget.dataDescription = self._data_.description
+            # self.nameDescriptionWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
+            # self.sig_dataExporting.connect(self.nameDescriptionWidget.dataExchangeWidget.slot_exportData)
+            # self.nameDescriptionWidget.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
+            # self.sig_dataSaving.connect(self.nameDescriptionWidget.dataExchangeWidget.slot_saveData)
+            # self.nameDescriptionWidget.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
+            # self.sig_dataCopy.connect(self.nameDescriptionWidget.dataExchangeWidget.slot_copyData)
+            # self.nameDescriptionWidget.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
+            # self.nameDescriptionWidget.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
+            # self.nameDescriptionWidget.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
+
+            self.nameDescriptionWidget.sig_valueChanged.connect(self._slot_dataReceived)
+            # self.nameDescriptionWidget.sig_dataImported.connect(self._slot_dataReceived)
             self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
             self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
             self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
             self.nameDescriptionWidget.sig_parentEditRequest.connect(self._slot_toggleParentEditor)
             self.nameDescriptionWidget.sig_newParentRequest.connect(self._slot_chooseNewParentType)
             self.nameDescriptionWidget.sig_organismEditRequest.connect(self._slot_toggleOrganismEditor)
+            self.nameDescriptionWidget.sig_requestNewObject.connect(self._slot_newObjectRequested)
             self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
             self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
             self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
@@ -253,6 +255,11 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         # geometry.setWidth(value)
         # self.setGeometry(geometry)
         self.setFixedWidth(value)
+
+    @Slot(object)
+    def _slot_dataReceived(self, obj: typing.Any):
+        if isinstance(obj, self._objectTypes_):
+            self.setValue(obj)
 
     @Slot(QtCore.QVariant)
     def _slot_setWidgetWidth(self, val: int | QtCore.QVariant):
@@ -449,13 +456,13 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self._data_.description = val
             self.sig_valueChanged.emit(self._data_)
 
-    @Slot(str)
-    def _slot_symbolChanged(self, val:str):
-        from gui.widgets.dataclasswidgets import namedescriptionwidget
-        if (hasattr(self, "nameDescriptionWidget")
-            and isinstance(self.nameDescriptionWidget, namedescriptionwidget.NameDescriptionWidget)):
-            self.nameDescriptionWidget._slot_symbolChanged(val)
-        # pass
+    # @Slot(str)
+    # def _slot_symbolChanged(self, val:str):
+    #     from gui.widgets.dataclasswidgets import namedescriptionwidget
+    #     if (hasattr(self, "nameDescriptionWidget")
+    #         and isinstance(self.nameDescriptionWidget, namedescriptionwidget.NameDescriptionWidget)):
+    #         self.nameDescriptionWidget._slot_symbolChanged(val)
+    #     # pass
 
     @Slot()
     def _slot_viewDetails(self):
@@ -717,7 +724,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             wTitle = f"Organism: {organism.name}"
 
         else:
-            wTitle = f"Organism:"
+            wTitle = "Organism:"
 
         if len(taxonName.strip()):
             wTitle += f" ({taxonName})"

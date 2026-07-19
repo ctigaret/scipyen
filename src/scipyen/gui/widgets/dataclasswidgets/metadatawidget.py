@@ -231,7 +231,7 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
             self._slot_editBiologicalSource()
         else:
             if isinstance(self.biologicalSourceEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor):
-                sb = QtCore.QSignalBlocker(self.biologicalSourceEditor)
+                sb = QtCore.QSignalBlocker(self.biologicalSourceEditor) # noqa
                 self.biologicalSourceEditor.collapse(False)
 
     @Slot(bool)
@@ -244,11 +244,8 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
     @Slot()
     def _slot_editProcedure(self): # TODO
-        # from gui.widgets.dataclasswidgets.asruwidgets.pplprocedurewidget import PPLProcedureWidget
         from gui.widgets.dataclasswidgets.procedurewidget import ProcedureWidget
         anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
-
-        # wType = ProcedureWidget(self._data_.procedure)
 
         if isinstance(self.procedureEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.procedureEditor):
             if not isinstance(self.procedureEditor, ProcedureWidget):
@@ -288,17 +285,7 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
     @Slot(object)
     def _slot_procedureChanged(self, value: sdc.Procedure):
-        # from gui.widgets.dataclasswidgets.asruwidgets.pplprocedurewidget import PPLProcedureWidget
-        # from gui.widgets.dataclasswidgets.procedurewidget import ProcedureWidget
-        # if not isinstance(value, sdc.Procedure):
-        #     if isinstance(self.sender(), PPLProcedureWidget):
-        #         value = sdc.PPLProcedure()
-        #
-        #     else:
-        #         value = sdc.Procedure()
-
         self._data_.procedure = value
-
         self.sig_valueChanged.emit(self._data_)
 
     @Slot(QtCore.QDateTime)
@@ -313,7 +300,7 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
     @field.setter
     def field(self, value:typing.Union[str, type(pd.NA)]):
-        signalBlocker = QtCore.QSignalBlocker(self.fieldIDLineEdit)
+        signalBlocker = QtCore.QSignalBlocker(self.fieldIDLineEdit) # noqa
         if isinstance(value, str) and len(value.strip()):
             self._field = value
             if self._field in ("NA", "<NA>"):
@@ -324,106 +311,4 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
         self.fieldIDLineEdit.setText(f"{self._field}")
 
         self.sig_valueChanged.emit()
-
-    # @singledispatchmethod
-    # def _createProcedureWidget_(self, obj) -> type:
-    #     raise NotImplementedError(f"Objects of type {type(obj)} are not supported")
-    #
-    # @_createProcedureWidget_.register(sdc.PPLProcedure)
-    # def __createProcedureWidget__(self, obj: sdc.PPLProcedure):
-    #     from gui.widgets.dataclasswidgets.asruwidgets.pplprocedurewidget import PPLProcedureWidget
-    #     return PPLProcedureWidget
-    #
-    # @_createProcedureWidget_.register(sdc.Procedure)
-    # def __createProcedureWidget__(self, obj: sdc.Procedure): # noqa
-    #     from gui.widgets.dataclasswidgets.procedurewidget import ProcedureWidget
-    #     return ProcedureWidget
-
-
-
-
-
-    # @property
-    # def genotype(self):
-    #     return self._genotype
-    #
-    # @genotype.setter
-    # def genotype(self, value:typing.Union[str, type(pd.NA)]):
-    #     updateCombo = False
-    #     if isinstance(value, str):
-    #         if len(value.strip()):
-    #             if value in ("NA", "<NA>"):
-    #                 self._genotype = pd.NA
-    #             elif value not in self._available_genotypes_:
-    #                 self._available_genotypes_.append(value)
-    #                 updateCombo = True
-    #                 self._genotype = value
-    #             else:
-    #                 self._genotype = value
-    #
-    #     else:
-    #         self._genotype = pd.NA
-    #
-    #     signalBlocker = QtCore.QSignalBlocker(self.genotypeComboBox)
-    #     if updateCombo:
-    #         self.genotypeComboBox.clear()
-    #         self.genotypeComboBox.setItems(self._available_genotypes_)
-    #
-    #     if self._genotype is pd.NA:
-    #         self.genotypeComboBox.setCurrentIndex(0)
-    #     else:
-    #         ndx = self._available_genotypes_.index(self._genotype)
-    #         self.genotypeComboBox.setCurrentIndex(ndx)
-    #
-    #     self.sig_valueChanged.emit()
-    #
-    # @property
-    # def sex(self):
-    #     return self._sex
-    #
-    # @sex.setter
-    # def sex(self, value:typing.Union[str, type(pd.NA)]):
-    #     if isinstance(value, str):
-    #         if value in ("NA", "<NA>"):
-    #             self._sex = pd.NA
-    #             sex_ndx = 0
-    #
-    #         elif value in self._available_sex_:
-    #             self._sex = value
-    #             sex_ndx = self._available_sex_.index(value)
-    #
-    #         else:
-    #             self._sex = pd.NA
-    #             sex_ndx = 0
-    #     else:
-    #         self._sex = pd.NA
-    #         sex_ndx = 0
-    #
-    #     signalBlocker = QtCore.QSignalBlocker(self.sexComboBox)
-    #     self.sexComboBox.setCurrentIndex(sex_ndx)
-    #
-    #     self.sig_valueChanged.emit()
-    #
-    # @property
-    # def age(self):
-    #     return self._age
-    #
-    # @age.setter
-    # def age(self, value):
-    #     if isinstance(value, pq.Quantity):
-    #         if not scq.checkTimeUnits(value):
-    #             raise TypeError(f"Age must be given in time units; instead got {value}")
-    #
-    #         self._age_units = value.units
-    #     else:
-    #         self._age_units = pq.div
-    #         self._age  = value * self._age_units
-    #
-    #     signalBlocker = QtCore.QSignalBlocker(self.ageSpinBox)
-    #     self.ageSpinBox.setValue(self._age)
-    #
-    #     self.sig_valueChanged.emit()
-
-
-
 

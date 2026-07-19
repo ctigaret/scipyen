@@ -615,10 +615,10 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
         if val is True:
             if self.timesLineEdit.receivers(self.timesLineEdit.textChanged) > 0:
                 self.timesLineEdit.textChanged.disconnect(self._slot_timesChanged)
-            self.timesLineEdit.sig_enterPressed.connect(self._slot_timesChanged)
+            self.timesLineEdit.sig_textChanged.connect(self._slot_timesChanged)
         else:
-            if self.timesLineEdit.receivers(self.timesLineEdit.sig_enterPressed) > 0:
-                self.timesLineEdit.sig_enterPressed.disconnect(self._slot_timesChanged)
+            if self.timesLineEdit.receivers(self.timesLineEdit.sig_textChanged) > 0:
+                self.timesLineEdit.sig_textChanged.disconnect(self._slot_timesChanged)
             self.timesLineEdit.textChanged.connect(self._slot_timesChanged)
 
 

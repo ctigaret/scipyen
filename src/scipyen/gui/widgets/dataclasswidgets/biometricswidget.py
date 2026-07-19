@@ -119,7 +119,7 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
         self.genotypeLineEdit.undoAvailable = True
         # self.genotypeLineEdit.textChanged.connect(self._slot_genotypeNameChanged)
         self.genotypeLineEdit.lazy = True
-        self.genotypeLineEdit.sig_enterPressed.connect(self._slot_genotypeNameChanged)
+        self.genotypeLineEdit.sig_textChanged.connect(self._slot_genotypeNameChanged)
 
         for text in self._geneticSexNames_:
             self.geneticSexComboBox.addItem(text)

@@ -508,7 +508,7 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         # print(f"{self.__class__.__name__}.familyRestriction.setter() -> {self._restrictedToFamily_}")
 
 class LazyLineEdit(QtWidgets.QLineEdit):
-    sig_enterPressed = Signal(str, name="sig_enterPressed")
+    sig_textChanged = Signal(str, name="sig_textChanged")
 
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
@@ -516,7 +516,7 @@ class LazyLineEdit(QtWidgets.QLineEdit):
     def keyPressEvent(self, event):
         if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
             # print(f"{self.__class__.__name__}.keyPressEvent: text = '{self.text()}'")
-            self.sig_enterPressed.emit(self.text())
+            self.sig_textChanged.emit(self.text())
         else:
             super().keyPressEvent(event)
 
@@ -527,7 +527,7 @@ class LineEdit(QtWidgets.QLineEdit):
 
     The inherited Qt signal "textChanged" is still available!
 """
-    sig_enterPressed = Signal(str, name="sig_enterPressed")
+    sig_textChanged = Signal(str, name="sig_textChanged")
     sig_lazy = Signal(bool, name="sig_lazy")
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
@@ -562,6 +562,8 @@ class LineEdit(QtWidgets.QLineEdit):
         if isinstance(self._variable_, str):
             self.setText(self._variable_)
 
+        self._old_text_: str = ""
+
     def value(self) -> str:
         self._variable_ = super().text()
         return self._variable_
@@ -579,6 +581,21 @@ class LineEdit(QtWidgets.QLineEdit):
     def setText(self, val:str):
         self.setValue(val)
 
+    def focusInEvent(self, event):
+        self._old_text_ = self.text()
+        super().focusInEvent(event)
+        event.accept()
+
+    def focusOutEvent(self, event):
+        newText = self.text()
+        if newText != self._old_text_:
+            self._old_text_ = newText
+            self.sig_textChanged.emit(newText)
+
+        super().focusOutEvent(event)
+
+        event.accept()
+
     def keyPressEvent(self, event):
         if not self._lazy_:
             super().keyPressEvent(event)
@@ -586,7 +603,10 @@ class LineEdit(QtWidgets.QLineEdit):
             if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
                 # print(f"{self.__class__.__name__}.keyPressEvent: text = '{self.text()}'")
                 # self.textChanged.emit(self.text())
-                self.sig_enterPressed.emit(self.text())
+                text = self.text()
+                if text != self._old_text_:
+                    self._old_text_ = text
+                self.sig_textChanged.emit(text)
             else:
                 # needed in order to update the widget
                 super().keyPressEvent(event)
@@ -623,8 +643,8 @@ class LineEdit(QtWidgets.QLineEdit):
             else:
                 return True
 
-    def setValidator(self, val):
-        self.validator = val
+    # def setValidator(self, val):
+    #     self.validator = val
 
     @property
     def validator(self) -> typing.Optional[QtGui.QValidator]:
@@ -670,9 +690,9 @@ class LineEdit(QtWidgets.QLineEdit):
 
     @property
     def lazy(self) -> bool:
-        r"""When True, the widget emits sig_enterPressed after pressing the Enter (Return) key.
+        r"""When True, the widget emits sig_textChanged after pressing the Enter (Return) key.
     The textChanged signal should NOT be connected to any slot in your UI.
-    Instead, connect the sig_enterPressed signal of this widget to your UI slot(s).
+    Instead, connect the sig_textChanged signal of this widget to your UI slot(s).
 
     When, False, then you should connect the textChanged signal to your UI slot(s)
     as per usual.
@@ -680,7 +700,7 @@ class LineEdit(QtWidgets.QLineEdit):
     To be notified by changes in the "lazy" status, connect to the sig_lazy signal
 
     .. warning::
-        If sig_enterPressed is also connected you may obtain undesired, duplicate
+        If textChanged is also connected you may obtain undesired, duplicate
         notifications.
     """
         return self._lazy_
@@ -796,10 +816,10 @@ class ArrayEditorWidget(QtWidgets.QFrame):
         if val is True:
             if self._inputWidget_.receivers(self._inputWidget_.textChanged) > 0:
                 self._inputWidget_.textChanged.disconnect(self._slot_timesChanged)
-            self._inputWidget_.sig_enterPressed.connect(self._slot_timesChanged)
+            self._inputWidget_.sig_textChanged.connect(self._slot_timesChanged)
         else:
-            if self.timesLineEdit.receivers(self.timesLineEdit.sig_enterPressed) > 0:
-                self.timesLineEdit.sig_enterPressed.disconnect(self._slot_timesChanged)
+            if self.timesLineEdit.receivers(self.timesLineEdit.sig_textChanged) > 0:
+                self.timesLineEdit.sig_textChanged.disconnect(self._slot_timesChanged)
             self.timesLineEdit.textChanged.connect(self._slot_timesChanged)
 
     @Slot(str)
@@ -897,7 +917,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         self._lineEdit_ = LineEdit(self)
         self._lineEdit_.lazy = True
-        self._lineEdit_.sig_enterPressed.connect(self._slot_valueTextChanged)
+        self._lineEdit_.sig_textChanged.connect(self._slot_valueTextChanged)
 
         super().setLineEdit(self._lineEdit_)
 
@@ -995,7 +1015,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         self.setValue(self._magnitude_ * self._units_)
 
-        super().lineEdit().sig_enterPressed.connect(self._slot_valueTextChanged)
+        super().lineEdit().sig_textChanged.connect(self._slot_valueTextChanged)
 
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 

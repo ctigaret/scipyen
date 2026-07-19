@@ -96,9 +96,9 @@ class ASRUWidget(Ui_ASRUWidget, DataClassWidget):
         self.holderNameLineEdit.setText(self._data_.holderName)
         self.holderEMailLineEdit.setText(self._data_.holderEmail)
 
-        self.licenseIDLineEdit.sig_enterPressed.connect(self._slot_licenseIDChanged)
-        self.holderNameLineEdit.sig_enterPressed.connect(self._slot_holderNameChanged)
-        self.holderEMailLineEdit.sig_enterPressed.connect(self._slot_holderEmailChanged)
+        self.licenseIDLineEdit.sig_textChanged.connect(self._slot_licenseIDChanged)
+        self.holderNameLineEdit.sig_textChanged.connect(self._slot_holderNameChanged)
+        self.holderEMailLineEdit.sig_textChanged.connect(self._slot_holderEmailChanged)
 
 
     @Slot(str)

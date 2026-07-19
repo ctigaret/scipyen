@@ -759,7 +759,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                         widget.setValue(data)
                         # widget.setText(data)
 
-                    widget.sig_enterPressed.connect(self.slot_dataChanged)
+                    widget.sig_textChanged.connect(self.slot_dataChanged)
 
             else:
                 widget = TableEditorWidget(parent, readOnly=False)
@@ -859,7 +859,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     if not inModel:
                         widget.setValue(data)
 
-                    widget.sig_enterPressed.connect(self.slot_dataChanged)
+                    widget.sig_textChanged.connect(self.slot_dataChanged)
 
                 else:
                     return

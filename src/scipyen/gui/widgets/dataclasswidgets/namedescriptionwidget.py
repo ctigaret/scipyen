@@ -44,7 +44,10 @@ else:
 
 from core.prog import scipywarn #noqa
 from core import qtutils
+from iolib import pictio as pio
+
 from gui import textviewer, datatreeviewer
+from gui.workspacegui import WorkspaceGuiMixin
 from gui.widgets.dataclasswidgets.dataexchangewidget import DataExchangeWidget
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -54,17 +57,16 @@ Ui_NameDescriptionWidget, QWidget = loadUiType(
     os.path.join(__module_path__, "namedescriptionwidget.ui")
     )
 
-class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiMixin):
+class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
     sig_detailsChanged = Signal(name="sig_dataChanged")
     sig_nameChanged = Signal(str, name="sig_nameChanged")
     sig_descriptionChanged = Signal(str, name="sig_descriptionChanged")
     sig_detailedViewRequest = Signal(name="sig_detailedViewRequest")
-    # sig_parentEditRequest = Signal(name="sig_parentEditRequest")
     sig_parentEditRequest = Signal(bool, name="sig_parentEditRequest")
     sig_newParentRequest = Signal(name="sig_newParentRequest")
     sig_organismEditRequest = Signal(bool, name="sig_organismEditRequest")
-    # sig_toggleDataExchange = Signal(bool, name="sig_toggleDataExchange")
+    sig_requestNewObject = Signal(name="sig_requestNewObject")
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[typing.Any] = None,
@@ -79,6 +81,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
             obj = obj_
 
         self._data_ = obj
+        self._objectType_ = type(self._data_)
 
         QtCore.QObject.__init__(self, parent=parent)
 
@@ -87,16 +90,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         self._objSymbol_ = kwargs.pop("objSymbol", "")
         self._collapsibleChildren_ = dict()
 
-        anchoringWidget = self if self.parent() is None else self.parent()
-
-        self.dataExchangeWidget = DataExchangeWidget(anchoringWidget=anchoringWidget)
-        self.dataExchangeWidget.setWindowTitle("Input/Output")
-        self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
-        self.dataExchangeWidget.setVisible(False)
-        self.dataExchangeWidget.sig_closing.connect(self._slot_dataExchangeWidgetClosing)
-        self.dataExchangeWidget.sig_collapsed.connect(self._slot_dataExchangeWidgetCollapsed)
-
-        self._collapsibleChildren_["dataExchangeWidget"] = self.dataExchangeWidget
+        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
 
         self._configureUI_()
 
@@ -107,23 +101,34 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         self.nameLineEdit.lazy = True
         self.nameLineEdit.setText(self._dataName_)
         self.nameLineEdit.setClearButtonEnabled(True)
-        self.nameLineEdit.sig_enterPressed.connect(self._slot_nameChanged)
+        self.nameLineEdit.sig_textChanged.connect(self._slot_nameChanged)
         self.descriptionToolButton.clicked.connect(self._slot_editDescription)
         self.viewDetailsToolButton.clicked.connect(self.sig_detailedViewRequest)
         # self.editParentToolButton.clicked.connect(self.sig_parentEditRequest)
         self.editParentToolButton.toggled.connect(self.sig_parentEditRequest)
         self.replaceParentToolButton.clicked.connect(self.sig_newParentRequest)
         self.organismToolButton.toggled.connect(self.sig_organismEditRequest)
-        self.toggleDataExchangeWidgetToolButton.toggled.connect(self._slot_dataExchangeWidgetToggled)
+        self.toggleDataExchangeWidgetToolButton.toggled.connect(self._slot_toggleDataExchangeWidget)
 
-        # self.dataExchangeWidget = DataExchangeWidget(anchoringWidget=self)
-        # self.dataExchangeWidget.setWindowTitle("Input/Output")
-        # if self._data_ is not None:
-        #     self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+        anchoringWidget = self if self.parent() is None else self.parent()
+
+        self.dataExchangeWidget = DataExchangeWidget(anchoringWidget=anchoringWidget)
+        self.dataExchangeWidget.setWindowTitle("Input/Output")
+        self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+        self.dataExchangeWidget.setVisible(False)
+        self.dataExchangeWidget.sig_closing.connect(self._slot_dataExchangeWidgetClosing)
+        self.dataExchangeWidget.sig_collapsed.connect(self._slot_dataExchangeWidgetCollapsed)
+
+        self.dataExchangeWidget.sig_requestDataExport.connect(self.slot_exportData)
+        self.dataExchangeWidget.sig_requestDataSave.connect(self.slot_saveData)
+        self.dataExchangeWidget.sig_requestDataCopy.connect(self.slot_copyData)
+        self.dataExchangeWidget.sig_requestImportData.connect(self._slot_importData)
+        self.dataExchangeWidget.sig_requestLoadData.connect(self._slot_loadData)
+        self.dataExchangeWidget.sig_requestNewObject.connect(self.sig_requestNewObject)
+
+        self._collapsibleChildren_["dataExchangeWidget"] = self.dataExchangeWidget
 
         self.dataExchangeWidget.setVisible(False)
-
-        self._collapsibleChildren_ = {"dataExchangeWidget": self.dataExchangeWidget}
 
     @Slot()
     def _slot_dataExchangeWidgetClosing(self):
@@ -136,7 +141,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         self.toggleDataExchangeWidgetToolButton.setChecked(False)
 
     @Slot(bool)
-    def _slot_dataExchangeWidgetToggled(self, val: bool):
+    def _slot_toggleDataExchangeWidget(self, val: bool):
         if val is True:
             if not isinstance(self.dataExchangeWidget, DataExchangeWidget):
                 if isinstance(self.dataExchangeWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.dataExchangeWidget):
@@ -149,6 +154,13 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
                 self.dataExchangeWidget.sig_closing.connect(self._slot_dataExchangeWidgetClosing)
                 self.dataExchangeWidget.sig_collapsed.connect(self._slot_dataExchangeWidgetCollapsed)
 
+                self.dataExchangeWidget.sig_requestDataExport.connect(self.slot_exportData)
+                self.dataExchangeWidget.sig_requestDataSave.connect(self.slot_saveData)
+                self.dataExchangeWidget.sig_requestDataCopy.connect(self.slot_copyData)
+                self.dataExchangeWidget.sig_requestImportData.connect(self._slot_importData)
+                self.dataExchangeWidget.sig_requestLoadData.connect(self._slot_loadData)
+                self.dataExchangeWidget.sig_requestNewObject.connect(self.sig_requestNewObject)
+
                 if self._data_ is not None:
                     self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
 
@@ -159,6 +171,13 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
 
         else:
             self.dataExchangeWidget.collapse(False)
+
+    @Slot()
+    def _slot_dataExportRequested(self):
+        if (hasattr(self, "_data_")
+            and hasattr(self, "_objectTypes_")
+            and isinstance(self._data_, self._objectTypes_)):
+            self.sig_dataExporting.emit(self._data_)
 
     @Slot(object)
     def _slot_dataChanged(self, val: object):
@@ -174,7 +193,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         if hasattr(val, "description") and isinstance(val.description, str):
             self._dataDescription_ = val.description
             if isinstance(self.descriptionEditor, textviewer.TextViewer):
-                self.descriptionEditor.setText(self._dataDescription_)
+                self.descriptionEditor.setText(self._dataDescription_, show=False)
 
         if hasattr(val, "name") and isinstance(val.name, str):
             self._dataName_ = val.name
@@ -200,17 +219,11 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
                                                 win_title="Edit description",
                                                 doc_title="Edit description",
                                                 title="Description")
-            # self.descriptionEditor.setVisible(False)
             self.descriptionEditor.sig_textChanged.connect(self._slot_descriptionChanged)
+            self.descriptionEditor.sig_closeMe.connect(self._slot_descriptionEditorClosed)
 
-        self.descriptionEditor.setData(self._dataDescription_)
+        self.descriptionEditor.setData(self._dataDescription_, show=False)
         self.descriptionEditor.show()
-
-    @Slot(str)
-    def _slot_symbolChanged(self, val:str):
-        self._objSymbol_ = val
-        if isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
-            self.detailsViewer.setRootName(self._objSymbol_)
 
     @Slot()
     def _slot_descriptionChanged(self):
@@ -229,14 +242,11 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
             self.detailsViewer = datatreeviewer.DataTreeViewer(
                 parent=self,
                 doc_title=doc_title,
-                # title="Detailed view",
-                # appWindow = self,
                 )
 
             self.detailsViewer.autoRaise = False
 
             self.detailsViewer.view(obj, doc_title = doc_title, name=doc_title)
-            # self.detailsViewer.winTitle = win_title
             self.detailsViewer.sig_modelDataChanged.connect(self._slot_dataChangedInDetailsViewer)
         else:
             # sigBlock = QtCore.QSignalBlocker(self.detailsViewer)
@@ -252,13 +262,104 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         r"""Captures changes in the details viewer (a DataTreeViewer)"""
         self.sig_detailsChanged.emit()
 
+    @Slot()
+    def _slot_loadData(self):
+        fileNameFilter = "*.pkl"
+        fn, fl = self.chooseFile(caption = "Open Pickle File",
+                                fileFilter = fileNameFilter,
+                                single=True)
+
+        if len(fn.strip()):
+            self._data_ = pio.loadFile(fn)
+            varName = os.path.basename(fn)
+            self._updateSymbol_(varName)
+            self.sig_valueChanged.emit(self._data_)
+
+    @Slot()
+    def slot_saveData(self):
+        if self._data_ is None:
+            return
+
+        fileNameFilter = "*.pkl"
+
+        fn, fl = self.chooseFile(caption = f"Save {type(self._data_).__name__} as Pickle File",
+                                fileFilter = fileNameFilter,
+                                single=True, save=True)
+
+        if len(fn.strip()):
+            pio.savePickle(self._data_, fn)
+
+
+    @Slot()
+    def _slot_importData(self):
+        if self._data_ is None:
+            ret = self.importFromWorkSpace(
+                title = "Select Object in Workspace",
+                single=True,
+                with_varName=True,
+                retrieve_all = True,
+                )
+        else:
+            ret = self.importFromWorkSpace(
+                dataTypes = self._objectType_,
+                title=f"Select {self._objectType_.__name__} Object in Workspace",
+                single=True,
+                with_varName=True,
+                retrieve_all = True
+                )
+
+        if isinstance(ret, dict) and len(ret) == 1:
+            varName = list(ret.keys())[0]
+            self._data_ = ret[varName]
+            self._updateSymbol_(varName)
+            self.sig_valueChanged.emit(self._data_)
+
+    @Slot()
+    def slot_exportData(self):
+        if self._data_ is None:
+            return
+        name = getattr(self._data_, "name", self._objSymbol_)
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name = type(self._data_).__name__.lower()
+
+        newSymbol = self.exportDataToWorkspace(self._data_, name)
+        self._updateSymbol_(newSymbol)
+
+    def _updateSymbol_(self, val: str):
+        if isinstance(val, str) and len(val.strip()):
+            self._objSymbol_ = val
+            if (
+                isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer)
+                and qtutils.isQObjectAlive(self.detailsViewer)
+                ):
+                self.detailsViewer.setRootName(self._objSymbol_)
+
+            if (
+                isinstance(self.dataExchangeWidget, DataExchangeWidget)
+                and qtutils.isQObjectAlive(self.dataExchangeWidget)
+                ):
+                self.dataExchangeWidget.setObjectSymbol(self._objSymbol_)
+
+    @Slot()
+    def slot_copyData(self):
+        from copy import deepcopy
+        if self._data_ is None:
+            return
+        obj1 = deepcopy(self._data_)
+        name = getattr(self._data_, "name", self._objSymbol_)
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            name = type(self._data_).__name__.lower()
+
+        self.exportDataToWorkspace(obj1, name)
+
     @property
     def symbol(self) -> str:
         return self._objSymbol_
 
     @symbol.setter
     def symbol(self, val:str):
-        self._objSymbol_ = val
+        self._updateSymbol_(val)
+        # self._objSymbol_ = val
 
     @property
     def dataName(self) -> str:
@@ -280,7 +381,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
         self._dataDescription_ = val
         if isinstance(self.descriptionEditor, textviewer.TextViewer):
             sigBlock = QtCore.QSignalBlocker(self.descriptionEditor) # noqa
-            self.descriptionEditor.setText(self._dataDescription_)
+            self.descriptionEditor.setText(self._dataDescription_, show=False)
         self.sig_descriptionChanged.emit(self._dataDescription_)
 
     def closeEvent(self, evt):
@@ -305,3 +406,4 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget): #, WorkspaceGuiM
 
     def setData(self, obj: typing.Any):
         self._data_ = obj
+        self._objectType_ = type(self._data_)
