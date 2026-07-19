@@ -8,22 +8,22 @@
 '''
 Various utilities
 '''
-import traceback, re, itertools, functools, time, typing, types, warnings
-import operator, inspect, random, math, pprint, datetime, pathlib, sys, os
-import collections, collections.abc, dataclasses
+import traceback, re, itertools, functools, time, typing, types, warnings # noqa
+import operator, inspect, random, math, pprint, datetime, pathlib, sys, os # noqa
+import collections, collections.abc, dataclasses # noqa
 import numbers
-from numbers import Number
+from numbers import Number # noqa
 from sys import (getsizeof, stderr)
-from copy import (copy, deepcopy,)
-from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
+from copy import (copy, deepcopy,) # noqa
+from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction, # noqa
                      isgeneratorfunction, iscoroutinefunction,
-                     iscoroutine, isawaitable, isasyncgenfunction,
+                     iscoroutine, isawaitable, isasyncgenfunction, # noqa
                      isasyncgen, istraceback, isframe, 
                      isabstract, ismethoddescriptor, isdatadescriptor,
                      isgetsetdescriptor, ismemberdescriptor,
                      signature,
                      )
-from functools import (partial, partialmethod, reduce, singledispatch)
+from functools import (partial, partialmethod, reduce, singledispatch) # noqa
 from itertools import chain
 from collections import deque, OrderedDict
 from dataclasses import MISSING
@@ -33,7 +33,7 @@ import PIL
 from PIL.Image import Image as PILImage
 from IPython.display import Image as IPImage
 import neo
-from neo.core.dataobject import DataObject as NeoDataObject
+from neo.core.dataobject import DataObject as NeoDataObject # noqa
 from neo.core.container import Container as NeoContainer
 
 __has_graphviz__:bool = False
@@ -41,7 +41,7 @@ try:
     import graphviz
     GraphSource:typing.TypeAlias = graphviz.Source
     __has_graphviz__ = True
-except:
+except: # noqa
     GraphSource:typing.TypeAlias = types.NoneType
 
 # NOTE: SpikeTrainList is a ObjectList in recent nwo versions
@@ -57,17 +57,17 @@ import pyqtgraph # for their own eq operator
 import matplotlib as mpl
 #import language_tool_python
 
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
-    # from PySide6.QtCore import (Signal, Slot, Property,)
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
+    from PySide6.QtCore import (Signal, Slot, Property,) # noqa
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
@@ -76,8 +76,8 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
         
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    from qtpy import sip # noqa
+    from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -93,9 +93,10 @@ else:
 #     from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 
 from core import prog
-from .prog import safewrapper, deprecation, with_doc, is_hashable, scipywarn
+from core import qtutils
+from .prog import safewrapper, deprecation, with_doc, is_hashable, scipywarn # noqa
 
-from .strutils import get_int_sfx
+from .strutils import get_int_sfx # noqa
 from .scipyen_quantities import unitsConvertible
 # from .datazone import DataZone
 
@@ -141,14 +142,14 @@ class SafeComparator(object):
     # operator.le ge lt gt accept ONLY numeric values hence MAY not work with
     # either numpy array or pandas objects
     
-    def __init__(comp=pyqtgraph.eq):
+    def __init__(self, comp = pyqtgraph.eq):
         self.comp = comp
         
     def __call__(self, x, y):
         try:
             ret = True
             
-            ret &= type(x) == type(y)
+            ret &= type(x) is type(y)
             
             if not ret:
                 return ret
@@ -3327,11 +3328,14 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
     # ttip = ".".join([module_name, typename])
     ttip = f"{typename}"
     
-    if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
+    if isinstance(obj, (QtWidgets.QWidget, mpl.figure.Figure)):
         icon = getIcon("window")
         # icon = QtGui.QIcon.fromTheme("window")
-        if isinstance(obj, QtWidgets.QMainWindow):
-            ttip = "\n".join([f"Window: {obj.windowTitle()}", ttip])
+        if isinstance(obj, QtWidgets.QWidget):
+            if qtutils.isQObjectAlive(obj):
+                ttip = "\n".join([f"{obj.windowTitle()}", ttip])
+            else:
+                ttip = "Deleted Qt (C++) object"
         
     # if typename == "module":
     #     icon = QtGui.QIcon.fromTheme("class-or-package")

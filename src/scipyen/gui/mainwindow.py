@@ -6424,17 +6424,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                                  self.workspace.values()))
 
         for w in openWindows:
-            w.close()
-
-        # open_windows = ((name, obj) for (name, obj) in self.workspace.items() if isinstance(obj, QtWidgets.QWidget))
-        # for win in open_windows:
-        #     if win[1] is not self:
-        #         win[1].close()
+            if qtutils.isQObjectAlive(w):
+                w.close()
 
         # see NOTE: 2024-04-17 11:53:29 in scipyenviewer.py
         if sys.platform.startswith("win32") or os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
             QtWidgets.QApplication.closeAllWindows()
-        # QtWidgets.QApplication.closeAllWindows()
 
         evt.accept()
 
@@ -6871,6 +6866,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # ### BEGIN file system view, navigation widgets & actions
         #
 
+        # ### BEGIN File system tree view
+        #
         self.fileSystemTreeView.setModel(self.fileSystemModel)
         self.fileSystemTreeView.setAlternatingRowColors(True)
 
@@ -6889,7 +6886,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.fileSystemTreeView.sortByColumn(0, QtCore.Qt.AscendingOrder)
         self.fileSystemTreeView.setRootIsDecorated(True)
         self.fileSystemTreeView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        #
+        # ### END   File system tree view
 
+        # ### BEGIN File system list / icon view
+        #
         self.fileSystemListView.setModel(self.fileSystemModel)
 
         self.fileSystemListView.activated[QtCore.QModelIndex].connect(
@@ -6898,6 +6899,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.fileSystemListView.customContextMenuRequested[QtCore.QPoint].connect(
             self.slot_fileSystemContextMenuRequest)
 
+        #
+        # ### END   File system list / icon view
+
+        # ### BEGIN File system column view
+        #
         self.fileSystemColumnViewPreviewWidget = QtWidgets.QTextEdit(self)
         self.fileSystemColumnViewPreviewWidget.setReadOnly(True)
         self.fileSystemColumnViewPreviewWidget.setLineWrapMode(QtWidgets.QTextEdit.WidgetWidth)
@@ -6924,12 +6930,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             previewParentLayout.addWidget(self.fileSystemColumnViewPreviewWidget)
 
         self.fileSystemColumnView.setModel(self.fileSystemModel)
+        self.fileSystemColumnView.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
         self.fileSystemColumnView.activated[QtCore.QModelIndex].connect(
             self.slot_fileSystemItemActivated)
 
         self.fileSystemColumnView.selectionModel().currentChanged.connect(
             self.slot_fileSystemColumnViewCurrentChanged)
+        #
+        # ### END   File system column view
 
         self.fileSystemColumnView.customContextMenuRequested[QtCore.QPoint].connect(
             self.slot_fileSystemContextMenuRequest)
@@ -8366,12 +8375,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.loadFiles([self.fileSystemModel.filePath(ndx)],
                            self._openSelectedFileItemsThreaded)
 
-    @Slot(QtCore.QModelIndex)
-    def slot_fileSystemItemPressedInColumnView(self, index:QtCore.QModelIndex):
-        self.fileSystemColumnViewPreviewWidget.document().setPlainText(self.fileSystemModel.getFileInfoText(index))
+    # @Slot(QtCore.QModelIndex)
+    # def slot_fileSystemItemPressedInColumnView(self, index:QtCore.QModelIndex):
+    #     self.fileSystemColumnViewPreviewWidget.document().setPlainText(self.fileSystemModel.getFileInfoText(index))
 
     @Slot(QtCore.QModelIndex, QtCore.QModelIndex)
-    def slot_fileSystemColumnViewCurrentChanged(self, current: QtCore.QModelIndex, prev: QtCore.QModelIndex):
+    def slot_fileSystemColumnViewCurrentChanged(self,
+                                                current: QtCore.QModelIndex,
+                                                prev: QtCore.QModelIndex):
         self.fileSystemColumnViewPreviewWidget.document().clear()
         if isinstance(current, QtCore.QModelIndex):
             icon = self.fileSystemModel.getFileIcon(current).toImage()
@@ -8381,6 +8392,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             docCursor.insertText("\n")
             docCursor.insertHtml(text)
         # self.fileSystemColumnViewPreviewWidget.document().setPlainText(text)
+        self.fileSystemColumnView.selectionModel().select(
+            QtCore.QItemSelection(current, current),
+            QtCore.QItemSelectionModel.Current
+            )
 
     @Slot(QtCore.QUrl)
     @safewrapper
@@ -11053,7 +11068,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             varnames = reverse_mapping_lookup(variables, win)
 
-            listedWindows = [self.workspace[n] for n in varnames if type(self.workspace[n]) == winType]
+            listedWindows = [self.workspace[n] for n in varnames if type(self.workspace[n]) is winType]
 
             if win not in listedWindows:
                 # create a binding in the workspace
@@ -11064,6 +11079,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
 
         if win is None:
+            return False
+
+        elif isinstance(win, QtCore.QObject) and not qtutils.isQObjectAlive(win):
             return False
 
         win.show()  # generic way also works for maplotlib figure

@@ -52,6 +52,7 @@ from core.strutils import (is_cached_output_varname, is_cached_input_varname)
 
 from core.prog import (safewrapper, timefunc, processtimefunc, timeblock, print_styled)
 from core.typeenum import TypeEnum
+from core import qtutils
 # from jupyter_core.paths import jupyter_runtime_dir
 
 import qtpy
@@ -1281,10 +1282,21 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         #
         # symbols present in the namespace
         current_user_varnames = set(ns.keys())
+
+        deadQObjects = set(
+            list(
+                    filter(lambda k: isinstance(ns[k], QtCore.QObject) and not qtutils.isQObjectAlive(ns[k]),
+                            ns.keys())
+                )
+            )
+
         # varnames that are currently monitored
         observed_varnames = set(self.internalVariablesMonitor.keys())
         # varnames that have been removed
         del_vars = observed_varnames - current_user_varnames
+
+        if len(deadQObjects):
+            del_vars = del_vars + deadQObjects
 
         # print(f"{print_styled(f'\n{self.__class__.__name__}._updateModel_ del_vars = {del_vars}', 'magenta')}")
 
@@ -1355,6 +1367,10 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     def _slot_itemGuiObjectTitleChanged(self, val:str):
         r"""For dynamic update of 1st line of tooltip of items representing a QWidget"""
         obj = self.sender()
+
+        if not qtutils.isQObjectAlive(obj):
+            return
+
         if __has_PySide6__:
             if not isinstance(obj, (QtWidgets.QWidget,Shiboken.Object)):
                 return
@@ -1368,7 +1384,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 
         if not isinstance(item, QtGui.QStandardItem):
             return
-
 
         ttip = item.toolTip()
 
@@ -1394,7 +1409,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # NOTE: 2023-09-16 18:31:13
         # block self from emitting itemChanged (triggered whenever some item has
         # changed), to prevent symbol mangling in the workspace
-        signalBlocker = QtCore.QSignalBlocker(self)
+        signalBlocker = QtCore.QSignalBlocker(self) # noqa
 
         item.setToolTip(ttip)
         item.setStatusTip(tooltip)
@@ -1675,14 +1690,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         else:
             self.removeRow(row)
 
-    # def addRowForVariable(self, dataname, data):
-    #     r"""CAUTION Only use for data in the internal workspace, not in remote ones.
-    #     """
-    #     # print("addRowForVariable: ", dataname, data)
-    #     # generate model view row contents
-    #     v_row = self.generateRowContents(dataname, data)
-    #     self.appendRow(v_row)  # append the row to the model
-
     @Slot(dict, str, str)
     def addRowForVariable2(self, ns: dict, dataname: str, ns_name: str = "Internal"):
         r"""CAUTION Only use for data in the internal workspace, not in remote ones.
@@ -1698,7 +1705,6 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         if dataname not in ns:
             return
 
-
         data = ns[dataname]
         # print(f"{self.__class__.__name__}.addRowForVariable2 dataname = {dataname}, ns_name={ns_name}")
 
@@ -1708,7 +1714,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # this causes a rename to the variables, which shouldn't happen; the
         # BUG is subtle and related to how the variables are assigned to symbols
         # in the workspace - clearly a flaw in how I designed all of this...
-        if isinstance(data, QtWidgets.QWidget):
+        if isinstance(data, QtWidgets.QWidget) and qtutils.isQObjectAlive(data):
             data.windowTitleChanged.connect(self._slot_itemGuiObjectTitleChanged)
         self.appendRow(v_row)  # append the row to the model
 
@@ -1872,7 +1878,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
 #             return
 #
         # currently displayed variables in the viewer widget
-        displayed_var_names = set(self.getDisplayedVariableNames())
+        # displayed_var_names = set(self.getDisplayedVariableNames())
 
         # current variable names in the namespace, which should be available to
         # the user - is this faster?
@@ -1894,18 +1900,25 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         # current_vars = dict([item for item in self.shell.user_ns.items(
         # ) if not item[0].startswith("_") and self.isDisplayable(item[0], item[1])])
 
-        new_vars = dict(filter(lambda x: not x[0] in displayed_var_names, current_vars.items()))
+        deadQObjects = set(
+            list(
+                    filter(
+                        lambda k: (isinstance(self.shell.user_ns[k], QtCore.QObject)
+                                   and not qtutils.isQObjectAlive(self.shell.user_ns[k])),
+                        self.shell.user_ns.keys()
+                        )
+                )
+            )
 
-        mod_vars = dict(filter(lambda x: x[0] in displayed_var_names, current_vars.items()))
+        if len(deadQObjects):
+            del_vars = del_vars + deadQObjects
+
+        # new_vars = dict(filter(lambda x: not x[0] in displayed_var_names, current_vars.items()))
+        #
+        # mod_vars = dict(filter(lambda x: x[0] in displayed_var_names, current_vars.items()))
 
         self.internalVariablesMonitor.delete(*list(del_vars)) # -> WorkspaceVarChange.Removed
         self.internalVariablesMonitor.update(current_vars) # -> WorkspaceVarChange.New or WorkspaceVarChange.Modified
-
-        # try:
-        #     self.internalVariableChanged.disconnect(self._slot_cacheInternalVariableChange_)
-        # except:
-        #     traceback.print_exc()
-        # self.internalVariableChanged.connect(self._slot_internalVariableChanged_)
 
         self.sig_startAsyncUpdate.emit(self.shell.user_ns)
 
