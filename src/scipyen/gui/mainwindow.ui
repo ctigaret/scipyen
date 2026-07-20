@@ -1102,7 +1102,7 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QStackedWidget" name="fileSystemViewStackedWidget">
          <property name="currentIndex">
-          <number>0</number>
+          <number>2</number>
          </property>
          <widget class="QWidget" name="fileSystemTreeViewPage">
           <layout class="QGridLayout" name="gridLayout_4">
@@ -1216,6 +1216,9 @@ NOTE: you can click anywhere in the row to select</string>
              </property>
              <property name="dragDropMode">
               <enum>QAbstractItemView::DragDropMode::DragOnly</enum>
+             </property>
+             <property name="selectionBehavior">
+              <enum>QAbstractItemView::SelectionBehavior::SelectItems</enum>
              </property>
             </widget>
            </item>

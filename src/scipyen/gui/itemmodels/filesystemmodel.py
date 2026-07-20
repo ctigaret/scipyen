@@ -110,9 +110,10 @@ class FileSystemModel(QtGui.QFileSystemModel):
         self._cutIndexes_ = value
 
     def getFileIcon(self, index: QtCore.QModelIndex,
-                    size: QtCore.QSize = QtCore.QSize(48, 48)) -> QtGui.QPixmap:
+                    size: QtCore.QSize = QtCore.QSize(48, 48)) -> QtGui.QPixmap | None:
         icon = index.data(QtGui.QFileSystemModel.FileIconRole)
-        return icon.pixmap(size)
+        if isinstance(icon, QtGui.QIcon):
+            return icon.pixmap(size)
 
     def getFileInfoText(self, index: QtCore.QModelIndex):
         mimeDb = QtCore.QMimeDatabase()

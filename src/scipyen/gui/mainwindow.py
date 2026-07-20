@@ -6930,18 +6930,22 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             previewParentLayout.addWidget(self.fileSystemColumnViewPreviewWidget)
 
         self.fileSystemColumnView.setModel(self.fileSystemModel)
-        self.fileSystemColumnView.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        # self.fileSystemColumnView.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
         self.fileSystemColumnView.activated[QtCore.QModelIndex].connect(
             self.slot_fileSystemItemActivated)
 
-        self.fileSystemColumnView.selectionModel().currentChanged.connect(
-            self.slot_fileSystemColumnViewCurrentChanged)
-        #
-        # ### END   File system column view
+        # self.fileSystemColumnView.selectionModel().currentChanged.connect(
+        #     self.slot_fileSystemColumnViewCurrentChanged)
+
+        self.fileSystemColumnView.selectionModel().selectionChanged.connect(
+            self.slot_fileSystemColumnViewSelectionChanged
+            )
 
         self.fileSystemColumnView.customContextMenuRequested[QtCore.QPoint].connect(
             self.slot_fileSystemContextMenuRequest)
+        #
+        # ### END   File system column view
 
         self.fileSystemModel.directoryLoaded[str].connect(
             self.slot_resizeFileTreeColumnForPath)
@@ -7515,6 +7519,24 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             elif len(selectedItems) == 0:
                 parent = self.fileSystemModel.rootDirectory()
                 path = pathlib.Path(self.fileSystemModel.rootPath())
+
+            else:
+                dirItems = list(
+                    filter(
+                        lambda i: self.fileSystemModel.isDir(i),
+                        selectedItems
+                        )
+                    )
+
+                if len(dirItems) == 0:
+                    parent = self.fileSystemModel.parent(selectedItems[0])
+
+                else:
+                    parent = dirItems[-1]
+
+                info = parent.data(QtGui.QFileSystemModel.FileInfoRole)
+                if not parent.exists() or not parent.isDir() or not parent.isWritable():
+                    return
 
         else:
             parent = self.fileSystemModel.rootDirectory()
@@ -8379,23 +8401,38 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     # def slot_fileSystemItemPressedInColumnView(self, index:QtCore.QModelIndex):
     #     self.fileSystemColumnViewPreviewWidget.document().setPlainText(self.fileSystemModel.getFileInfoText(index))
 
-    @Slot(QtCore.QModelIndex, QtCore.QModelIndex)
-    def slot_fileSystemColumnViewCurrentChanged(self,
-                                                current: QtCore.QModelIndex,
-                                                prev: QtCore.QModelIndex):
-        self.fileSystemColumnViewPreviewWidget.document().clear()
-        if isinstance(current, QtCore.QModelIndex):
-            icon = self.fileSystemModel.getFileIcon(current).toImage()
-            text = self.fileSystemModel.getFileInfoText(current)
-            docCursor = QtGui.QTextCursor(self.fileSystemColumnViewPreviewWidget.document())
-            docCursor.insertImage(icon)
-            docCursor.insertText("\n")
-            docCursor.insertHtml(text)
+    # @Slot(QtCore.QModelIndex, QtCore.QModelIndex)
+    # def slot_fileSystemColumnViewCurrentChanged(self,
+    #                                             current: QtCore.QModelIndex,
+    #                                             prev: QtCore.QModelIndex):
         # self.fileSystemColumnViewPreviewWidget.document().setPlainText(text)
-        self.fileSystemColumnView.selectionModel().select(
-            QtCore.QItemSelection(current, current),
-            QtCore.QItemSelectionModel.Current
-            )
+        # self.fileSystemColumnView.selectionModel().select(
+        #     QtCore.QItemSelection(current, current),
+        #     QtCore.QItemSelectionModel.Current
+        #     )
+
+    @Slot(QtCore.QItemSelection, QtCore.QItemSelection)
+    def slot_fileSystemColumnViewSelectionChanged(self, selected: QtCore.QItemSelection,
+                                                  deselected: QtCore.QItemSelection):
+        indexes = selected.indexes()
+        if len(indexes) == 1:
+            self._fileSystemColumnViewPopulatePreview(indexes[0])
+        # else:
+
+
+    def _fileSystemColumnViewPopulatePreview(self, index: QtCore.QModelIndex):
+        self.fileSystemColumnViewPreviewWidget.document().clear()
+        if isinstance(index, QtCore.QModelIndex):
+            icon = self.fileSystemModel.getFileIcon(index)
+            text = self.fileSystemModel.getFileInfoText(index)
+            docCursor = QtGui.QTextCursor(self.fileSystemColumnViewPreviewWidget.document())
+            if isinstance(icon, QtGui.QPixmap):
+                icon = icon.toImage()
+                docCursor.insertImage(icon)
+                docCursor.insertText("\n")
+            docCursor.insertHtml(text)
+
+
 
     @Slot(QtCore.QUrl)
     @safewrapper
@@ -8420,7 +8457,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @Slot(QAction, QtCore.Qt.MouseButton)
     def slot_recentDirActivated(self, action:QAction, button:QtCore.Qt.MouseButton):
         r"""Used when recent directories menu is actioned from a tool button"""
-        from gui import guiutils
+        # from gui import guiutils
         index = action.data()
         # print(f"{self.__class__.__name__}.slot_recentDirActivated: index = {index}")
         if not isinstance(index, int) or index < 0 or index >= len(self._recentDirectories):
