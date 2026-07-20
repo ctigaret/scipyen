@@ -2713,7 +2713,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
             scipywarn(f"{self.__class__.__name__}.addCurvesOverlay: no curves to overlay!")
             return
 
-        print(f"{self.__class__.__name__}.addCurvesOverlay: curveItems = {curveItems}")
+        # print(f"{self.__class__.__name__}.addCurvesOverlay: curveItems = {curveItems}")
 
         if frameNdx not in self._curve_overlays_:
             self._curve_overlays_[frameNdx] = dict()
