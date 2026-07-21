@@ -431,7 +431,7 @@ data object after loading from file or importing from the workspace.
             self.objectSymbolLabel.setToolTip("")
             self.sig_symbolChanged.emit("")
 
-    def _getAnchoringWidget_(self) -> QtWidgets.QWidget | None:
+    def provideAnchoringWidget(self) -> QtWidgets.QWidget | None:
         if isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor:
             return self._anchoringWidget_
 

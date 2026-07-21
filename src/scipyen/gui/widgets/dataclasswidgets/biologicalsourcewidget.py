@@ -48,7 +48,7 @@ else:
 try:
     from qtpy import QtDBus # noqa
     __has_qtdbus__ = True
-except:
+except: # noqa
     __has_qtdbus__ = False
 
 from core.prog import scipywarn # noqa
@@ -239,7 +239,7 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
     @Slot()
     def _slot_editSpecimen(self):
-        anchoringWidget = self._getAnchoringWidget_()
+        anchoringWidget = self.provideAnchoringWidget()
         # if anchoringWidget is None:
         #     anchoringWidget = self if self.parent() is None else None
         # anchoringWidget = (

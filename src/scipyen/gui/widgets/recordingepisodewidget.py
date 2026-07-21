@@ -59,6 +59,7 @@ except:
 
 from ephys import ephys
 from ephys import ephys_pathways
+from ephys import ephys_protocol
 from core import datatypes # noqa
 from core import strutils
 from core.prog import scipywarn
@@ -76,6 +77,8 @@ Ui_RecordingEpisodeWidget, QWidget = loadUiType(
 
 class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMixin):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
+    sig_trialsChanged = Signal(name="sig_trialsChanged")
+    sig_protocolChanged = Signal(name="sig_protocolChanged")
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[ephys_pathways.RecordingEpisode] = None):
@@ -162,6 +165,8 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
             self.protocolNameLabel.setText("")
 
         self.previewProtocolToolButton.clicked.connect(self.slot_viewProtocolDetails)
+
+        self.previewStimulusLayoutToolButton.connect(self.slot_previewStimLayout)
 
         for text in self._recordingEpisodeNames_:
             self.episodeTypeComboBox.addItem(text)
@@ -270,6 +275,10 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
         self.sig_valueChanged.emit(self.value())
 
     @Slot()
+    def slot_previewStimLayout(self):
+        pass
+
+    @Slot()
     def slot_viewProtocolDetails(self):
         from gui import datatreeviewer
         if self._protocol_ is None:
@@ -277,7 +286,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
 
         doc_title = self._protocol_.name
         if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
-            topWindow = self.getTopParentWindow()
+            topWindow = self.getUppermostParent()
             if topWindow is self:
                 appWindow = None
             else:
@@ -475,6 +484,8 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
 
         self.trialsInfoLabel.setText(f"{len(self._blocks_)} Trials")
 
+        self.sig_trialsChanged.emit(self.trials)
+
     @property
     def protocol(self) -> ephys.ElectrophysiologyProtocol | None:
         return self._protocol_
@@ -496,6 +507,8 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
             self.protocolNameLabel.setText(self._protocol_.name)
         else:
             self.protocolNameLabel.setText("")
+
+        self.sig_protocolChanged.emit(self.protocol)
 
     @property
     def begin(self) -> datetime.datetime:

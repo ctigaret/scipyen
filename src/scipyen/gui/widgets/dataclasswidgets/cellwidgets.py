@@ -9,8 +9,8 @@ r"""
 
 import sys, os, typing, types, warnings, math, cmath, datetime # noqa
 # import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot)#, Property,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot)#, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
@@ -35,9 +35,8 @@ else:
     __has_sip__ = True
 
 
-from core import scipyen_quantities as scq
+from core import scipyen_quantities as scq # noqa
 from core import scipyendataclasses as sdc
-from gui.widgets.anchoredwidgetmixin import AnchoredWidgetMixin
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -104,7 +103,7 @@ class CellWidget(Ui_CellWidget, DataClassWidget):
         super().setValue(self._data_, **kwargs)
         self._isAttribute_ = kwargs.get("isAttribute", False)
 
-        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), # noqa
                                (
                                    self.cellTypeNameEdit,
                                    self.cellSubTypeNameEdit
@@ -176,7 +175,7 @@ class NeuronWidget(Ui_NeuronWidget, DataClassWidget):
         super().setValue(self._data_, **kwargs)
         self._isAttribute_ = kwargs.get("isAttribute", False)
 
-        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), # noqa
                                (
                                    self.editParentToolButton,
                                    self.neuronTypeComboBox,
@@ -199,7 +198,7 @@ class NeuronWidget(Ui_NeuronWidget, DataClassWidget):
         r"""Overrides DataClassWidget._slot_detailsChanged.
     Captures changes in the data tree viewer (details viewer)
     """
-        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w),
+        sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), # noqa
                                (self.nameDescriptionWidget,
                                 self.dataExchangeWidget,
                                 self.neuronTypeComboBox

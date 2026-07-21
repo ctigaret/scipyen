@@ -9,11 +9,11 @@
 r"""
 """
 import sys, os, typing # noqa
-import pathlib
-from functools import singledispatchmethod
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+import pathlib # noqa
+from functools import singledispatchmethod # noqa
+import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
@@ -30,7 +30,7 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
+    from qtpy import sip # noqa
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
@@ -38,30 +38,30 @@ else:
     __has_sip__ = True
 
 
-from core.prog import safewrapper, scipywarn, print_styled
-from core.sysutils import adapt_ui_path
+from core.prog import safewrapper, scipywarn, print_styled # noqa
+from core.sysutils import adapt_ui_path # noqa
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-import math, datetime
-import numpy as np
-import quantities as pq
-import pandas as pd
+import math, datetime # noqa
+import numpy as np # noqa
+import quantities as pq # noqa
+import pandas as pd # noqa
 
-import core.bgbridge as bgbridge
+import core.bgbridge as bgbridge # noqa
 
-from core import scipyendataclasses as sdc
-from core import basescipyen as bsc
-from core import scipyen_quantities as scq
-from core import strutils
-from core import qtutils
-from core.datatypes import UnitTypes, GENOTYPES
+from core import scipyendataclasses as sdc # noqa
+from core import basescipyen as bsc # noqa
+from core import scipyen_quantities as scq # noqa
+from core import strutils # noqa
+from core import qtutils # noqa
+from core.datatypes import UnitTypes, GENOTYPES # noqa
 
-from core import workspacefunctions as wsf
-from dataclasses import (dataclass, asdict)
+from core import workspacefunctions as wsf # noqa
+from dataclasses import (dataclass, asdict) # noqa
 
-from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
-from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget
+from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget # noqa
+from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget # noqa
 # from gui.textviewer import TextViewer
 # from gui.widgets.datatreeview import DataTreeView
 
@@ -188,7 +188,17 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
                 self.biologicalSourceEditor.deleteLater()
                 self.biologicalSourceEditor = None
 
-            anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
+            anchoringWidget = self.provideAnchoringWidget()
+
+            # topWindow = self.getUppermostParent()
+            # if isinstance(self.anchoringWidget, QtWidgets.QWidget) and self.overrideAnchor:
+            #     anchoringWidget = self.anchoringWidget
+            # anchoringWidget = (self.anchoringWidget if (
+            #         isinstance(self._anchoringWidget_, QtWidgets.QWidget)
+            #         and self.overrideAnchor
+            #     )
+            #     else self if self.parent() is None else None
+            # )
             self.biologicalSourceEditor = BiologicalSourceWidget(anchoringWidget=anchoringWidget)
             # self.biologicalSourceEditor.setWindowTitle("Source")
             self.biologicalSourceEditor.sig_closing.connect(self._slot_biologicalSourceEditorClosing)
@@ -245,7 +255,8 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
     @Slot()
     def _slot_editProcedure(self): # TODO
         from gui.widgets.dataclasswidgets.procedurewidget import ProcedureWidget
-        anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
+        anchoringWidget = self.provideAnchoringWidget()
+        # anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
 
         if isinstance(self.procedureEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.procedureEditor):
             if not isinstance(self.procedureEditor, ProcedureWidget):

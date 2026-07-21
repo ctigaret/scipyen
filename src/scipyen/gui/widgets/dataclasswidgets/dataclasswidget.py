@@ -234,26 +234,12 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             ):
             self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
 
-        # sizes = self.splitter.sizes()
-        # sizes[0] = 0
-        # sizes[-1] = self.splitter.widget(len(sizes)-1).size().height()
-        # self.splitter.setSizes(sizes)
-        # # self.splitter.setStretchFactor(1,0)
-        # self.splitter.setToolTip("Drag (⇓) handle to reveal data input/output tools")
-        # # self.splitter.splitterMoved.connect(self._slot_splitterMoved)
-        # # self.sig_topWidgetCollapsed.connect(self._slot_topWidgetCollapsed)
-        # # self.sig_topWidgetRestored.connect(self._slot_topWidgetRestored)
-        # self._topWidgetCollapsed_ = True
-
     @QtCore.Property(int)
     def widgetWidth(self) -> int:
         return self.width()
 
     @widgetWidth.setter
     def widgetWidth(self, value: int):
-        # geometry = self.geometry()
-        # geometry.setWidth(value)
-        # self.setGeometry(geometry)
         self.setFixedWidth(value)
 
     @Slot(object)
@@ -265,10 +251,6 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     def _slot_setWidgetWidth(self, val: int | QtCore.QVariant):
         if not isinstance(val, int):
             val = val.value()
-        #
-        # geometry = self.geometry()
-        # geometry.setWidth(val)
-        # self.setGeometry(geometry)
         self.setFixedWidth(val)
 
     # @Slot(QtCore.QVariant)
@@ -501,7 +483,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     @Slot()
     def _slot_editParent(self):
-        anchoringWidget = self._getAnchoringWidget_()
+        anchoringWidget = self.provideAnchoringWidget()
         parent = None
         if (hasattr(self, "_data_")
             and hasattr(self, "_objectTypes_")
@@ -672,15 +654,6 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             if isinstance(self.organismEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismEditor):
                 self.organismEditor.collapse(False)
 
-    def _getAnchoringWidget_(self) -> QtWidgets.QWidget | None:
-        if isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor:
-            return self._anchoringWidget_
-
-        if self.parent() is None:
-            return self
-
-        return None
-
     @Slot()
     def _slot_editOrganism(self):
         from gui.widgets.dataclasswidgets.organismwidget import OrganismWidget
@@ -690,7 +663,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                 self.organismEditor.deleteLater()
                 self.organismEditor = None
 
-            anchoringWidget = self._getAnchoringWidget_()
+            anchoringWidget = self.provideAnchoringWidget()
             self.organismEditor = OrganismWidget(anchoringWidget=anchoringWidget)
             # self.organismEditor.setWindowTitle("Organism")
             self.organismEditor.sig_valueChanged.connect(self._slot_organismChanged)
@@ -832,8 +805,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         self.nameDescriptionWidget.closeSubWidgets()
 
     def moveEvent(self, evt):
-        self.sig_moved.emit(evt.pos())# - evt.oldPos())
-        # print(f"{self.__class__.__name__}.moveEvent")
+        # # self.sig_moved.emit(evt.pos())# - evt.oldPos())
         evt.accept()
 
     @property
@@ -876,7 +848,5 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             newPos = self._anchoringWidget_.frameGeometry().topRight()
 
         self.move(newPos)
-
-
 
 

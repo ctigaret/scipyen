@@ -247,7 +247,8 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
     @Slot()
     def _slot_editBiometrics(self):
         from gui.widgets.dataclasswidgets.biometricswidget import BiometricsWidget
-        anchoringWidget = self._anchoringWidget_ if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
+        anchoringWidget = self.provideAnchoringWidget()
+        # anchoringWidget = self._anchoringWidget_ if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
         if not isinstance(self.biometricsEditor, BiometricsWidget):
             if isinstance(self.biometricsEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biometricsEditor):
                 self.biometricsEditor.close()
@@ -301,7 +302,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
                 self.taxonDetailsViewer.view(self._data_.taxon,
                                              doc_title = doc_title,
                                              name = doc_title)
-                self.taxonDetailsViewer.winTitle = win_title
+                self.taxonDetailsViewer.winTitle = doc_title
                 self.taxonDetailsViewer.docTitle = doc_title
                 self.taxonDetailsViewer.slot_refreshDataDisplay()
 

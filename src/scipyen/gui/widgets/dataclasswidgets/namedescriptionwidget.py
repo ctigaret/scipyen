@@ -110,7 +110,8 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
         self.organismToolButton.toggled.connect(self.sig_organismEditRequest)
         self.toggleDataExchangeWidgetToolButton.toggled.connect(self._slot_toggleDataExchangeWidget)
 
-        anchoringWidget = self if self.parent() is None else self.parent()
+        anchoringWidget = self.provideAnchoringWidget()
+        # anchoringWidget = self if self.parent() is None else self.parent()
 
         self.dataExchangeWidget = DataExchangeWidget(anchoringWidget=anchoringWidget)
         self.dataExchangeWidget.setWindowTitle("Input/Output")
@@ -219,7 +220,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
 
     @Slot()
     def _slot_editDescription(self):
-        topWindow = self.getTopParentWindow()
+        topWindow = self.getUppermostParent()
         if topWindow is self:
             appWindow = None
         else:
@@ -252,7 +253,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
         # win_title = f"Details of {varName}"
         # win_title = "Details"
         if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
-            topWindow = self.getTopParentWindow()
+            topWindow = self.getUppermostParent()
             if topWindow is self:
                 appWindow = None
             else:
