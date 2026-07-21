@@ -166,7 +166,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
 
         self.previewProtocolToolButton.clicked.connect(self.slot_viewProtocolDetails)
 
-        self.previewStimulusLayoutToolButton.connect(self.slot_previewStimLayout)
+        self.previewStimulusLayoutToolButton.clicked.connect(self.slot_previewStimLayout)
 
         for text in self._recordingEpisodeNames_:
             self.episodeTypeComboBox.addItem(text)
@@ -276,6 +276,42 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
 
     @Slot()
     def slot_previewStimLayout(self):
+        from gui import datatreeviewer
+        if isinstance(self._data_, ephys_pathways.RecordingEpisode):
+            if isinstance(self._data_.stimulusLayout, ephys_pathways.PathwaysStimulationLayout):
+                doc_title = self._data_.stimulusLayout.source.name
+                if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
+                    topWindow = self.getUppermostParent()
+                    if topWindow is self:
+                        appWindow = None
+                    else:
+                        appWindow = topWindow
+
+                    self.detailsViewer = datatreeviewer.DataTreeViewer(
+                        parent=self,
+                        doc_title=doc_title,
+                        appWindow = appWindow,
+                        )
+
+                    self.detailsViewer.autoRaise = False
+
+                    self.detailsViewer.view(self._data_.stimulusLayout,
+                                            doc_title = doc_title, name=doc_title)
+                    self.detailsViewer.readOnly = True
+                    self.detailsViewer.showIntrospection = True
+
+                else:
+                    # sigBlock = QtCore.QSignalBlocker(self.detailsViewer)
+                    self.detailsViewer.view(self._data_.stimulusLayout,
+                                            doc_title = doc_title, name=doc_title)
+                    self.detailsViewer.readOnly = True
+                    self.detailsViewer.showIntrospection = True
+                    # self.detailsViewer.winTitle = win_title
+                    self.detailsViewer.docTitle = doc_title
+                    self.detailsViewer.slot_refreshDataDisplay()
+
+                self.detailsViewer.show()
+
         pass
 
     @Slot()
@@ -484,7 +520,8 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
 
         self.trialsInfoLabel.setText(f"{len(self._blocks_)} Trials")
 
-        self.sig_trialsChanged.emit(self.trials)
+        # self.sig_trialsChanged.emit(self.trials)
+        self.sig_trialsChanged.emit()
 
     @property
     def protocol(self) -> ephys.ElectrophysiologyProtocol | None:
@@ -502,13 +539,13 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
         else:
             self._data_.protocol = self._protocol_
 
-        sigBlock = QtCore.QSignalBlocker(self.protocolNameLabel)
+        sigBlock = QtCore.QSignalBlocker(self.protocolNameLabel) # noqa
         if isinstance(self._protocol_, ephys.ElectrophysiologyProtocol):
             self.protocolNameLabel.setText(self._protocol_.name)
         else:
             self.protocolNameLabel.setText("")
 
-        self.sig_protocolChanged.emit(self.protocol)
+        self.sig_protocolChanged.emit()
 
     @property
     def begin(self) -> datetime.datetime:

@@ -64,6 +64,7 @@ Ui_RecordingSourceWidget, QWidget = loadUiType(
     )
 
 T = ephys_pathways.RecordingSource
+
 class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
     _objectType_ = ephys_pathways.RecordingSource

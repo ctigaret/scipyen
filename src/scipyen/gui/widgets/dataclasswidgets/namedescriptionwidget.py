@@ -150,7 +150,8 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
                     self.dataExchangeWidget.deleteLater()
                     self.dataExchangeWidget = None
 
-                self.dataExchangeWidget = DataExchangeWidget(anchoringWidget = self)
+                anchoringWidget = self.provideAnchoringWidget()
+                self.dataExchangeWidget = DataExchangeWidget(anchoringWidget = anchoringWidget)
                 self.dataExchangeWidget.setWindowTitle("Input/Output")
                 self.dataExchangeWidget.sig_closing.connect(self._slot_dataExchangeWidgetClosing)
                 self.dataExchangeWidget.sig_collapsed.connect(self._slot_dataExchangeWidgetCollapsed)

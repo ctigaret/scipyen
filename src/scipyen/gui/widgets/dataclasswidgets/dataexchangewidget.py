@@ -170,9 +170,14 @@ data object after loading from file or importing from the workspace.
 
         if (
             isinstance(self._anchoringWidget_, QtWidgets.QWidget)
-            and hasattr(self._anchoringWidget_, "_slot_anchoringWidgetMoved")
+            and hasattr(self._anchoringWidget_, "sig_moved")
             ):
             self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
+        # if (
+        #     isinstance(self._anchoringWidget_, QtWidgets.QWidget)
+        #     and hasattr(self._anchoringWidget_, "_slot_anchoringWidgetMoved")
+        #     ):
+        #     self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
 
     @property
     def overrideAnchor(self) -> bool:
@@ -239,6 +244,8 @@ data object after loading from file or importing from the workspace.
         if self._isSubWidget_:
             self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Forward)
             geometry = self.geometry()
+            height = geometry.height()
+            heightHint = self.sizeHint().height()
             self._sizeAnimation_.setEndValue(self.sizeHint().width())
             topRight = self._anchoringWidget_.geometry().topRight()
             if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
@@ -248,6 +255,7 @@ data object after loading from file or importing from the workspace.
 
             geometry.setX(self._positionHint_.x())
             geometry.setY(self._positionHint_.y())
+            geometry.setHeight(heightHint)
             self.setGeometry(geometry)
             self._animationGroup_.start()
             super().show()
@@ -431,13 +439,13 @@ data object after loading from file or importing from the workspace.
             self.objectSymbolLabel.setToolTip("")
             self.sig_symbolChanged.emit("")
 
-    def provideAnchoringWidget(self) -> QtWidgets.QWidget | None:
-        if isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor:
-            return self._anchoringWidget_
-
-        if self.parent() is None:
-            return self
-
-        return None
+    # def provideAnchoringWidget(self) -> QtWidgets.QWidget | None:
+    #     if isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor:
+    #         return self._anchoringWidget_
+    #
+    #     if self.parent() is None:
+    #         return self
+    #
+    #     return None
 
 

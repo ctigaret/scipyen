@@ -66,7 +66,9 @@ from gui.datatreeviewer import DataTreeViewer
 # from gui.textviewer import TextViewer
 # from gui.widgets.dataclasswidgets.dataexchangewidget import DataExchangeWidget
 from gui.widgets.dataclasswidgets.namedescriptionwidget import NameDescriptionWidget
-from gui.workspacegui import WorkspaceGuiMixin
+from gui.workspacegui import (WorkspaceGuiMixin,
+                              MoveEventFilterObject,
+                              CloseEventFilterObject)
 # from gui.widgets import small_widgets as smw
 # from iolib import pictio as pio
 
@@ -97,6 +99,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         self._objSymbol_ = kwargs.pop("objSymbol", None)
 
         self._isSubWidget_: bool = False
+        self._moveEventDispatcher_ = None
 
         # self._topWidgetCollapsed_:bool = False
         # self._outerFrameGeometry_ = None
@@ -230,9 +233,14 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
         if (
             isinstance(self._anchoringWidget_, QtWidgets.QWidget)
-            and hasattr(self._anchoringWidget_, "sig_moved")
             ):
-            self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
+            if hasattr(self._anchoringWidget_, "sig_moved"):
+                self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
+            else:
+                self._moveEventDispatcher_ = MoveEventFilterObject(self,
+                                                                   anchoredWidget=self)
+                self._anchoringWidget_.installEventFilter(self._moveEventDispatcher_)
+
 
     @QtCore.Property(int)
     def widgetWidth(self) -> int:
@@ -299,9 +307,13 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         if self.isVisible():
             return
 
+        # print(f"{self.__class__.__name__}.show(): sub widget: {self._isSubWidget_}")
         if self._isSubWidget_:
             self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Forward)
             geometry = self.geometry()
+            # height = geometry.height()
+            heightHint = self.sizeHint().height()
+            # print(f"height hint: {heightHint} -> height: {height}")
             self._sizeAnimation_.setEndValue(self.sizeHint().width())
             topRight = self._anchoringWidget_.geometry().topRight()
             if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
@@ -310,6 +322,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                 self._positionHint_ = topRight
             geometry.setX(self._positionHint_.x())
             geometry.setY(self._positionHint_.y())
+            geometry.setHeight(heightHint)
             self.setGeometry(geometry)
             self._animationGroup_.start()
             super().show()
@@ -805,7 +818,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         self.nameDescriptionWidget.closeSubWidgets()
 
     def moveEvent(self, evt):
-        # # self.sig_moved.emit(evt.pos())# - evt.oldPos())
+        self.sig_moved.emit(evt.pos())# - evt.oldPos())
         evt.accept()
 
     @property
@@ -824,6 +837,13 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     def anchoringWidget(self, obj: QtWidgets.QWidget):
         if isinstance(obj, QtWidgets.QWidget):
             self._anchoringWidget_ = obj
+            if hasattr(self._anchoringWidget_, "sig_moved"):
+                self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
+            else:
+                self._moveEventDispatcher_ = MoveEventFilterObject(self,
+                                                                   anchoredWidget=self)
+                self._anchoringWidget_.installEventFilter(self._moveEventDispatcher_)
+
             self._isSubWidget_ = True
         else:
             self._anchoringWidget_ = None

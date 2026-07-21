@@ -10,9 +10,7 @@
 import typing, warnings, os, inspect, sys, traceback, types # noqa
 import pathlib
 from pprint import pprint # noqa
-#### BEGIN Configurable objects with traitlets.config
 from traitlets import (config, Bunch) # noqa
-#### END Configurable objects with traitlets.config
 import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,) # noqa
@@ -48,7 +46,7 @@ from core.utilities import safewrapper
 from core.workspacefunctions import (user_workspace, validate_varname, get_symbol_in_namespace)
 from core.scipyen_config import (ScipyenConfigurable, saveWindowSettings, loadWindowSettings) # noqa
 
-from core import strutils, sysutils
+from core import strutils, sysutils, qtutils
 from core.strutils import InflectEngine # noqa
 from core.prog import (print_styled, scipywarn) # noqa
 import gui.quickdialog as qd
@@ -993,12 +991,37 @@ class FileStatChecker(QtCore.QObject):
                 if inspect.isfunction(self._callback_) or inspect.ismethod(self._callback_):
                     self._callback_(self._filePath_)
 
+# class AnchorEventFilterObject(QtCore.QObject):
+#     sig_moved = Signal(QtCore.QPoint, name="sig_moved")
+#     sig_closing = Signal(name="sig_closing")
+#
+#     def __init__(self, /, parent: typing.Optional[QtWidgets.QWidget] = None,
+#                  anchoredWidget: typing.Optional[QtWidgets.QWidget] = None):
+#         super().__init__(parent=parent)
+#         self._anchoredWidget_ = anchoredWidget
+#         if (
+#             hasattr(self._anchoredWidget_, "_slot_anchoringWidgetMoved")
+#             and inspect.ismethod(self._anchoredWidget_._slot_anchoringWidgetMoved)
+#             ):
+#             self.sig_moved.connect(self._anchoredWidget_._slot_anchoringWidgetMoved)
+#
+#         if (
+#             hasattr(self._anchoredWidget_, "_slot_")
+#             )
+
 class MoveEventFilterObject(QtCore.QObject):
     sig_moved = Signal(QtCore.QPoint, name="sig_moved")
     def __init__(self, /, parent: typing.Optional[QtWidgets.QWidget] = None,
                  anchoredWidget: typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
         self._anchoredWidget_ = anchoredWidget
+        if isinstance(self._anchoredWidget_, QtWidgets.QWidget):
+            if (
+                hasattr(self._anchoredWidget_, "_slot_anchoringWidgetMoved")
+                and inspect.ismethod(self._anchoredWidget_._slot_anchoringWidgetMoved)
+                ):
+                self.sig_moved.connect(self._anchoredWidget_._slot_anchoringWidgetMoved)
+
 
     @property
     def anchoredWidget(self) -> QtWidgets.QWidget | None:
@@ -1270,12 +1293,15 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
         ScipyenConfigurable.__init__(self, *args, **kwargs)
 
-        if isinstance(self, QtWidgets.QWidget):
-            self._moveEventFilterObject_ = MoveEventFilterObject(self)
-            self._closeEventFilterObject_ = CloseEventFilterObject(self)
-        else:
-            self._moveEventFilterObject_ = MoveEventFilterObject()
-            self._closeEventFilterObject_ = CloseEventFilterObject()
+        # self._moveEventFilterObject_ = None
+        # self._closeEventFilterObject_ = None
+        #
+        # if isinstance(self, QtWidgets.QWidget):
+        #     self._moveEventFilterObject_ = MoveEventFilterObject(self)
+        #     self._closeEventFilterObject_ = CloseEventFilterObject(self)
+        # else:
+        #     self._moveEventFilterObject_ = MoveEventFilterObject()
+        #     self._closeEventFilterObject_ = CloseEventFilterObject()
 
     @property
     def scipyenWindow(self):
@@ -1423,29 +1449,36 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                 # frame to serve as anchor
                 aw = topWindow
 
-        if isinstance(widget, QtWidgets.QWidget) and qtutils.isQObjectAlive(widget):
-            self._moveEventFilterObject_.anchoredWidget = widget
-            if isinstance(aw, QtWidgets.QWidget):
-                if not hasattr(aw, "sig_moved"):
-                    print(f"\n{self.__class__.__name__}.provideAnchoringWidget -> installing event filter {self._moveEventFilterObject_}")
-                    aw.installEventFilter(self._moveEventFilterObject_)
-
-                    # anchored =
-                    if not isinstance(self._moveEventFilterObject_.anchoredWidget, QtWidgets.QWidget):
-                        if (hasattr(self, "_slot_anchoringWidgetMoved")
-                            and inspect.ismethod(self._slot_anchoringWidgetMoved)
-                            ):
-                            print(f"\n{self.__class__.__name__}.provideAnchoringWidget -> connecting event filter sig_moved signal")
-                            self._moveEventFilterObject_.sig_moved.connect(self._slot_anchoringWidgetMoved)
-                        else:
-                            if (isinstance(self._moveEventFilterObject_.anchoredWidget, QtWidgets.QWidget)
-                                and hasattr(self._moveEventFilterObject_.anchoredWidget, "_slot_anchoringWidgetMoved")
-                                and inspect.ismethod(self._moveEventFilterObject_.anchoredWidget._slot_anchoringWidgetMoved)
-                                ):
-
-                                self._moveEventFilterObject_.sig_moved.connect(
-                                    self._moveEventFilterObject_.anchoredWidget._slot_anchoringWidgetMoved
-                                    )
+        # if isinstance(aw, QtWidgets.QWidget):
+        #     if not hasattr(aw, "sig_moved"):
+        #         print(f"\n{self.__class__.__name__}.provideAnchoringWidget -> installing event filter {self._moveEventFilterObject_}")
+        #         if (
+        #             not isinstance(self._moveEventFilterObject_, MoveEventFilterObject)
+        #             or not qtutils.isQObjectAlive(self._moveEventFilterObject_)
+        #             ):
+        #             self._moveEventFilterObject_ = MoveEventFilterObject(self)
+        #
+        #         if isinstance(widget, QtWidgets.QWidget) and qtutils.isQObjectAlive(widget):
+        #             self._moveEventFilterObject_.anchoredWidget = widget
+        #
+        #         aw.installEventFilter(self._moveEventFilterObject_)
+        #
+        #         # anchored =
+        #         if not isinstance(self._moveEventFilterObject_.anchoredWidget, QtWidgets.QWidget):
+        #             if (hasattr(self, "_slot_anchoringWidgetMoved")
+        #                 and inspect.ismethod(self._slot_anchoringWidgetMoved)
+        #                 ):
+        #                 print(f"\n{self.__class__.__name__}.provideAnchoringWidget -> connecting event filter sig_moved signal")
+        #                 self._moveEventFilterObject_.sig_moved.connect(self._slot_anchoringWidgetMoved)
+        #             else:
+        #                 if (isinstance(self._moveEventFilterObject_.anchoredWidget, QtWidgets.QWidget)
+        #                     and hasattr(self._moveEventFilterObject_.anchoredWidget, "_slot_anchoringWidgetMoved")
+        #                     and inspect.ismethod(self._moveEventFilterObject_.anchoredWidget._slot_anchoringWidgetMoved)
+        #                     ):
+        #
+        #                     self._moveEventFilterObject_.sig_moved.connect(
+        #                         self._moveEventFilterObject_.anchoredWidget._slot_anchoringWidgetMoved
+        #                         )
 
 
             # if not hasattr(aw, "sig_closing"):
