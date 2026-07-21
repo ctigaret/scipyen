@@ -795,7 +795,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         if not isinstance(model, TabularDataModel) or not model.canAlterRows:
             return
 
-        modelIndexes = self.tableView.selectedIndexes()
+        # modelIndexes = self.tableView.selectedIndexes()
         row = model.rowCount()
 
         if row < model.rowCount():

@@ -26,7 +26,7 @@ __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
+    import PySide6 # noqa
     from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
@@ -37,7 +37,7 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
+    from qtpy import sip # noqa
     from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
@@ -81,6 +81,7 @@ import core.datatypes as dt
 from core.datatypes import array_slice # noqa
 from core.sysutils import adapt_ui_path # noqa
 from core import scipyen_quantities as scq
+from core import scipyendataclasses as sdc
 from core import neoutils # noqa
 from ephys import (ephys, ephys_pathways)
 
@@ -464,6 +465,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @_insertDataRow_.register(ephys_pathways.SynapticPathwayList)
     @_insertDataRow_.register(ephys_pathways.AuxiliaryInputList)
     @_insertDataRow_.register(ephys_pathways.AuxiliaryOutputList)
+    @_insertDataRow_.register(ephys_pathways.RecordingSchedule)
     @_insertDataRow_.register(ephys_pathways.SynapticStimulusChannelList)
     @_insertDataRow_.register(TriggerProtocolList)
     def __insertDataRow__(self, mdata: typing.Union[ # noqa
@@ -471,6 +473,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         ephys_pathways.AuxiliaryInputList,
         ephys_pathways.AuxiliaryOutputList,
         ephys_pathways.SynapticStimulusChannelList,
+        ephys_pathways.RecordingSchedule,
+        TriggerProtocolList
         ], # noqa
         row: int,
         obj: typing.Optional[ephys_pathways.SynapticPathway] = None) -> bool:
@@ -487,6 +491,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
             elif isinstance(mdata, ephys_pathways.SynapticStimulusChannelList):
                 obj = ephys_pathways.SynapticStimulusChannel()
+
+            elif isinstance(mdata, ephys_pathways.RecordingSchedule):
+                obj = ephys_pathways.RecordingEpisode()
 
             elif isinstance(mdata, TriggerProtocolList):
                 obj = TriggerProtocol()
@@ -992,6 +999,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                     ephys_pathways.SynapticPathwayList,
                                     ephys_pathways.AuxiliaryInputList,
                                     ephys_pathways.AuxiliaryOutputList,
+                                    ephys_pathways.RecordingSchedule,
                                     ephys_pathways.SynapticStimulusChannelList,
                                 )
                             ):
@@ -1279,6 +1287,23 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._original_data_ = data
         self._canAddRemoveRows_ = False
         self._canAddRemoveColumns_ = False
+        self._modelDataRowIndexName_ = "Index"
+
+    @_makeModelData_.register(ephys_pathways.RecordingSchedule)
+    def __makeModelData__(self, data: ephys_pathways.RecordingSchedule): # noqa
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+        self._modelData_ = data
+        self._modelDataRows_ = len(data)
+        self._modelDataColumnHeaders_ = dict(
+            tuple(
+                map(
+                    lambda x: (x[0], f"{x[1]}"),
+                    enumerate(("name", "episodeType", "Edit"))
+                    )
+                )
+            )
+        self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
         self._modelDataRowIndexName_ = "Index"
 
     @_makeModelData_.register(TriggerProtocolList)
@@ -1654,7 +1679,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     self._canAddRemoveRows_ = True
 
                 else:
-                    scipywarn(f"{self.__class__.__name__} <with parent: {self.parent().objectName() if isinstance(self.parent(), QtWidgets.QWidget) else None}>: Unsupported sequence element types")
+                    scipywarn(f"{self.__class__.__name__} <with parent widget: {self.parent().objectName() if isinstance(self.parent(), QtWidgets.QWidget) else None}>: Unsupported sequence element types")
                     self._modelDataColumns_ = 0
                     self._modelDataRows_ = 0
                     self._modelDataColumnHeaders_ = dict()
@@ -1789,11 +1814,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @_setValueInModelData_.register(ephys_pathways.SynapticPathwayList)
     @_setValueInModelData_.register(ephys_pathways.AuxiliaryInputList)
     @_setValueInModelData_.register(ephys_pathways.AuxiliaryOutputList)
+    @_setValueInModelData_.register(ephys_pathways.RecordingSchedule)
     @_setValueInModelData_.register(ephys_pathways.SynapticStimulusChannelList)
     def __setValueInModelData__(self, mdata: typing.Union[ # noqa
                                                 ephys_pathways.SynapticPathwayList,
                                                 ephys_pathways.AuxiliaryInputList,
                                                 ephys_pathways.AuxiliaryOutputList,
+                                                ephys_pathways.RecordingSchedule,
                                                 ephys_pathways.SynapticStimulusChannelList,
                                                 ], pyvalue, row, col) -> bool:
         if row >= len(mdata):

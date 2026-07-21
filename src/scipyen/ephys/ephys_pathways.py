@@ -392,7 +392,7 @@ class RecordingEpisode(Episode):
                     raise ValueError(f"Invalid 'endFrame': {endFrame} must be larger than {beginFrame}")
 
                 if len(self._blocks_):
-                    nframes = self.nFrames # cache that:)
+                    nFrames = self.nFrames # cache that:)
                     if endFrame >= nFrames:
                         raise ValueError(f"Invalid 'endFrame': {endFrame} must be smaller than {nFrames}  frames")
 
