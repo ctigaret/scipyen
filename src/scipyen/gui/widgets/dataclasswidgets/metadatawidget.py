@@ -99,6 +99,11 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
         self._configureUI_()
 
+        self.biologicalSourceEditor = None
+        self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
+        self.procedureEditor = None
+        self._collapsibleChildren_["procedureEditor"] = self.procedureEditor
+
     def _configureUI_(self):
         self.setupUi(self)
 
@@ -136,13 +141,9 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
         self.analysisDateTimeEdit.dateTimeChanged.connect(self._slot_analysisDateTimeChanged)
 
-        self.biologicalSourceEditor = None
         self.toggleSourceEditorToolButton.toggled.connect(self._slot_toggleBioSourceEditor)
-        self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
 
-        self.procedureEditor = None
         self.toggleProcedureEditorToolButton.toggled.connect(self._slot_toggleProcedureEditor)
-        self._collapsibleChildren_["procedureEditor"] = self.procedureEditor
 
     def closeEvent(self, evt):
         self.closeSubWidgets()
@@ -189,21 +190,43 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
                 self.biologicalSourceEditor.deleteLater()
                 self.biologicalSourceEditor = None
 
-                self.biologicalSourceEditor = BiologicalSourceWidget(self._data_.source, objSymbol="source", anchoringWidget=anchoringWidget)
-                # self.biologicalSourceEditor.setWindowTitle("Source")
-                self.biologicalSourceEditor.sig_valueChanged.connect(self._slot_biologicalSourceChanged)
-                self.biologicalSourceEditor.sig_closing.connect(self._slot_biologicalSourceEditorClosing)
-                self.biologicalSourceEditor.sig_collapsed.connect(self._slot_biologicalSourceEditorCollapsed)
+                self.biologicalSourceEditor = self._setupCollapsibleChild_(
+                    BiologicalSourceWidget,
+                    "biologicalSourceEditor",
+                    self._slot_biologicalSourceChanged,
+                    self.toggleSourceEditorToolButton,
+                    anchoringWidget,
+                    self._data_.source,
+                    objSymbol="source"
+                    )
+
+                # self.biologicalSourceEditor = BiologicalSourceWidget(self._data_.source, objSymbol="source", anchoringWidget=anchoringWidget)
+                # # self.biologicalSourceEditor.setWindowTitle("Source")
+                # self.biologicalSourceEditor.sig_valueChanged.connect(self._slot_biologicalSourceChanged)
+                # self.biologicalSourceEditor.sig_closing.connect(self._slot_biologicalSourceEditorClosing)
+                # self.biologicalSourceEditor.sig_collapsed.connect(self._slot_biologicalSourceEditorCollapsed)
+                # self.biologicalSourceEditor.setObjectName("biologicalSourceEditor")
 
         else:
-            self.biologicalSourceEditor = BiologicalSourceWidget(self._data_.source, objSymbol="source", anchoringWidget=anchoringWidget)
-            # self.biologicalSourceEditor.setWindowTitle("Source")
-            self.biologicalSourceEditor.sig_valueChanged.connect(self._slot_biologicalSourceChanged)
-            self.biologicalSourceEditor.sig_closing.connect(self._slot_biologicalSourceEditorClosing)
-            self.biologicalSourceEditor.sig_collapsed.connect(self._slot_biologicalSourceEditorCollapsed)
+            self.biologicalSourceEditor = self._setupCollapsibleChild_(
+                BiologicalSourceWidget,
+                "biologicalSourceEditor",
+                self._slot_biologicalSourceChanged,
+                self.toggleSourceEditorToolButton,
+                anchoringWidget,
+                self._data_.source,
+                objSymbol="source"
+                )
+
+            # self.biologicalSourceEditor = BiologicalSourceWidget(self._data_.source, objSymbol="source", anchoringWidget=anchoringWidget)
+            # # self.biologicalSourceEditor.setWindowTitle("Source")
+            # self.biologicalSourceEditor.sig_valueChanged.connect(self._slot_biologicalSourceChanged)
+            # self.biologicalSourceEditor.sig_closing.connect(self._slot_biologicalSourceEditorClosing)
+            # self.biologicalSourceEditor.sig_collapsed.connect(self._slot_biologicalSourceEditorCollapsed)
+            # self.biologicalSourceEditor.setObjectName("biologicalSourceEditor")
 
 
-        self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
+        # self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
         # self.biologicalSourceEditor.setValue(self._data_.source, objSymbol="source")
 
         if not self.biologicalSourceEditor.isVisible():
@@ -262,18 +285,37 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
                 self.procedureEditor.deleteLater()
                 self.procedureEditor = None
 
-                self.procedureEditor = ProcedureWidget(self._data_.procedure, objSymbol="procedure", anchoringWidget=anchoringWidget)
-                self.procedureEditor.sig_valueChanged.connect(self._slot_procedureChanged)
-                self.procedureEditor.sig_closing.connect(self._slot_procedureEditorClosing)
-                self.procedureEditor.sig_collapsed.connect(self._slot_procedureEditorCollapsed)
+                self.procedureEditor = self._setupCollapsibleChild_(
+                    ProcedureWidget,
+                    "procedureEditor",
+                    self._slot_procedureChanged,
+                    self.toggleSourceEditorToolButton,
+                    anchoringWidget,
+                    windowTitle =
+                    self._data_.procedure, objSymbol="procedure"
+                    )
+
+                # self.procedureEditor = ProcedureWidget(self._data_.procedure, objSymbol="procedure", anchoringWidget=anchoringWidget)
+                # self.procedureEditor.sig_valueChanged.connect(self._slot_procedureChanged)
+                # self.procedureEditor.sig_closing.connect(self._slot_procedureEditorClosing)
+                # self.procedureEditor.sig_collapsed.connect(self._slot_procedureEditorCollapsed)
+                # self.procedureEditor.setObjectName("procedureEditor")
 
         else:
-            self.procedureEditor = ProcedureWidget(self._data_.procedure, objSymbol="procedure", anchoringWidget=anchoringWidget)
-            self.procedureEditor.sig_valueChanged.connect(self._slot_procedureChanged)
-            self.procedureEditor.sig_closing.connect(self._slot_procedureEditorClosing)
-            self.procedureEditor.sig_collapsed.connect(self._slot_procedureEditorCollapsed)
+            self.procedureEditor = self._setupCollapsibleChild_(
+                ProcedureWidget,
+                "procedureEditor",
+                self._slot_procedureChanged,
+                self.toggleSourceEditorToolButton,
+                anchoringWidget,
+                self._data_.procedure, objSymbol="procedure"
+                )
+            # self.procedureEditor = ProcedureWidget(self._data_.procedure, objSymbol="procedure", anchoringWidget=anchoringWidget)
+            # self.procedureEditor.sig_valueChanged.connect(self._slot_procedureChanged)
+            # self.procedureEditor.sig_closing.connect(self._slot_procedureEditorClosing)
+            # self.procedureEditor.sig_collapsed.connect(self._slot_procedureEditorCollapsed)
+            # self.procedureEditor.setObjectName("procedureEditor")
 
-        self._collapsibleChildren_["procedureEditor"]=self.procedureEditor
         if not self.procedureEditor.isVisible():
             self.procedureEditor.show()
 

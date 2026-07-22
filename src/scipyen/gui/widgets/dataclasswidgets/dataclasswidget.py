@@ -81,41 +81,38 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     sig_dataExporting = Signal(object, name="sig_dataExporting")
     sig_dataCopy = Signal(object, name="sig_dataCopy")
     sig_detailedView = Signal(object, str, name="sig_detailedView")
-    sig_closing = Signal(name="sig_closing")
-    sig_moved = Signal(QtCore.QPoint, name="sig_moved")
-    sig_collapsed = Signal(name="sig_collapsed")
-
-    # sig_topWidgetCollapsed = Signal(name="sig_topWidgetCollapsed")
-    # sig_topWidgetRestored = Signal(name="sig_topWidgetRestored")
+    # sig_closing = Signal(name="sig_closing")
+    # sig_moved = Signal(QtCore.QPoint, name="sig_moved")
+    # sig_collapsed = Signal(name="sig_collapsed")
 
     _objectTypes_ = tuple()
 
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
                  **kwargs):
-        isAttribute = kwargs.pop("isAttribute", False)
-        anchoringWidget = kwargs.pop("anchoringWidget", None)
-        self._overrideAnchor_ = kwargs.pop("overrideAnchor", False)
-        windowFlags = kwargs.pop("windowFlags", None)
+        # isAttribute = kwargs.pop("isAttribute", False)
+        # anchoringWidget = kwargs.pop("anchoringWidget", None)
+        # self._overrideAnchor_ = kwargs.pop("overrideAnchor", False)
+        # windowFlags = kwargs.pop("windowFlags", None)
         self._objSymbol_ = kwargs.pop("objSymbol", None)
 
-        self._isSubWidget_: bool = False
-        self._moveEventDispatcher_ = None
+        # self._isSubWidget_: bool = False
+        # self._moveEventDispatcher_ = None
 
         # self._topWidgetCollapsed_:bool = False
         # self._outerFrameGeometry_ = None
 
-        self._positionHint_: typing.Optional[QtCore.QPoint] = None
-        # self._closeRequestedEvent_: typing.Optional[QtGui.QCloseEvent] = None
-        self._closeRequested_: bool = False
+        # self._positionHint_: typing.Optional[QtCore.QPoint] = None
+        # # self._closeRequestedEvent_: typing.Optional[QtGui.QCloseEvent] = None
+        # self._closeRequested_: bool = False
         self._needsNewParentWidget_: bool =  True
 
-        if isinstance(anchoringWidget, QtWidgets.QWidget):
-            self._anchoringWidget_ = anchoringWidget
-            self._isSubWidget_ = True
-            self._positionHint_ = anchoringWidget.geometry().topRight()
-
-        else:
-            self._anchoringWidget_ = None
+        # if isinstance(anchoringWidget, QtWidgets.QWidget):
+        #     self._anchoringWidget_ = anchoringWidget
+        #     self._isSubWidget_ = True
+        #     self._positionHint_ = anchoringWidget.geometry().topRight()
+        #
+        # else:
+        #     self._anchoringWidget_ = None
 
         # self.dataExchangeWidget = None
         self.nameDescriptionWidget = None
@@ -123,31 +120,32 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         self.parentEditor = None
         self.organismEditor = None
 
-        self._collapsibleChildren_ = {"parentEditor":self.parentEditor,
-                                      "organismEditor":self.organismEditor}
 
-        self._isAttribute_: bool = isAttribute
+        # self._isAttribute_: bool = isAttribute
 
         QtWidgets.QWidget.__init__(self, parent=parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
 
-        if anchoringWidget:
-            if isinstance(windowFlags, QtCore.Qt.WindowType):
-                self.setWindowFlags(windowFlags)
-            else:
-                self.setWindowFlags(QtCore.Qt.Tool)
+        # self._collapsibleChildren_ = {"parentEditor":self.parentEditor,
+        #                               "organismEditor":self.organismEditor}
+
+        # if anchoringWidget:
+        #     if isinstance(windowFlags, QtCore.Qt.WindowType):
+        #         self.setWindowFlags(windowFlags)
+        #     else:
+        #         self.setWindowFlags(QtCore.Qt.Tool)
 
         if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
             objSymbols = self.getDataSymbolInWorkspace(self._data_)
             if isinstance(objSymbols, typing.Sequence) and len(objSymbols) > 0:
                 self._objSymbol_ = objSymbols[0]
 
-        self._sizeAnimationMax_ = 200
-        self._sizeAnimation_ = QtCore.QPropertyAnimation(self, b'widgetWidth', self)
-        self._sizeAnimation_.setStartValue(0)
-        self._sizeAnimation_.setDuration(200) # ms
-        self._sizeAnimation_.setEndValue(self._sizeAnimationMax_)
-        self._sizeAnimation_.valueChanged.connect(self._slot_setWidgetWidth)
+        # self._sizeAnimationMax_ = 200
+        # self._sizeAnimation_ = QtCore.QPropertyAnimation(self, b'widgetWidth', self)
+        # self._sizeAnimation_.setStartValue(0)
+        # self._sizeAnimation_.setDuration(200) # ms
+        # self._sizeAnimation_.setEndValue(self._sizeAnimationMax_)
+        # self._sizeAnimation_.valueChanged.connect(self._slot_setWidgetWidth)
 
         # self._opacityEffect_ = QtWidgets.QGraphicsOpacityEffect(self)
         # if self._isSubWidget_:
@@ -164,10 +162,10 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         # if self._isSubWidget_:
         #     self.setGraphicsEffect(self._opacityEffect_)
 
-        self._animationGroup_ = QtCore.QParallelAnimationGroup()
-        self._animationGroup_.addAnimation(self._sizeAnimation_)
-        # self._animationGroup_.addAnimation(self._opacityAnimation_)
-        self._animationGroup_.stateChanged.connect(self._slot_animationStateChanged)
+        # self._animationGroup_ = QtCore.QParallelAnimationGroup()
+        # self._animationGroup_.addAnimation(self._sizeAnimation_)
+        # # self._animationGroup_.addAnimation(self._opacityAnimation_)
+        # self._animationGroup_.stateChanged.connect(self._slot_animationStateChanged)
 
     def _configureUI_(self):
         r"""MUST be called in the subclass once self._data_ was established,
@@ -177,18 +175,8 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self.nameDescriptionWidget.setData(self._data_)#, self._objSymbol_)
             self.nameDescriptionWidget.dataName = self._data_.name
             self.nameDescriptionWidget.dataDescription = self._data_.description
-            # self.nameDescriptionWidget.sig_requestDataExport.connect(self._slot_dataExportRequested)
-            # self.sig_dataExporting.connect(self.nameDescriptionWidget.dataExchangeWidget.slot_exportData)
-            # self.nameDescriptionWidget.dataExchangeWidget.sig_requestDataSave.connect(self._slot_dataSaveRequested)
-            # self.sig_dataSaving.connect(self.nameDescriptionWidget.dataExchangeWidget.slot_saveData)
-            # self.nameDescriptionWidget.dataExchangeWidget.sig_requestDataCopy.connect(self._slot_dataCopyRequested)
-            # self.sig_dataCopy.connect(self.nameDescriptionWidget.dataExchangeWidget.slot_copyData)
-            # self.nameDescriptionWidget.dataExchangeWidget.sig_dataLoaded.connect(self._slot_dataReceived)
-            # self.nameDescriptionWidget.dataExchangeWidget.sig_dataImported.connect(self._slot_dataReceived)
-            # self.nameDescriptionWidget.dataExchangeWidget.sig_symbolChanged.connect(self._slot_symbolChanged)
 
             self.nameDescriptionWidget.sig_valueChanged.connect(self._slot_dataReceived)
-            # self.nameDescriptionWidget.sig_dataImported.connect(self._slot_dataReceived)
             self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
             self.nameDescriptionWidget.sig_descriptionChanged.connect(self._slot_dataDescriptionChanged)
             self.nameDescriptionWidget.sig_detailedViewRequest.connect(self._slot_viewDetails)
@@ -199,7 +187,6 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self.sig_detailedView.connect(self.nameDescriptionWidget.slot_viewDetails)
             self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
             self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
-            # self.nameDescriptionWidget.sig_toggleDataExchange.connect(self._slot_dataExchangeWidgetToggled)
 
             self.nameDescriptionWidget.editParentToolButton.setEnabled(False)
             self.nameDescriptionWidget.editParentToolButton.setVisible(False)
@@ -231,35 +218,35 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                     self.nameDescriptionWidget.organismToolButton.setEnabled(True)
                     self.nameDescriptionWidget.organismToolButton.setVisible(True)
 
-        if (
-            isinstance(self._anchoringWidget_, QtWidgets.QWidget)
-            ):
-            if hasattr(self._anchoringWidget_, "sig_moved"):
-                self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
-            else:
-                self._moveEventDispatcher_ = MoveEventFilterObject(self,
-                                                                   anchoredWidget=self)
-                self._anchoringWidget_.installEventFilter(self._moveEventDispatcher_)
+        # if (
+        #     isinstance(self._anchoringWidget_, QtWidgets.QWidget)
+        #     ):
+        #     if hasattr(self._anchoringWidget_, "sig_moved"):
+        #         self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
+            # else:
+            #     self._moveEventDispatcher_ = MoveEventFilterObject(self,
+            #                                                        anchoredWidget=self)
+            #     self._anchoringWidget_.installEventFilter(self._moveEventDispatcher_)
 
 
-    @QtCore.Property(int)
-    def widgetWidth(self) -> int:
-        return self.width()
-
-    @widgetWidth.setter
-    def widgetWidth(self, value: int):
-        self.setFixedWidth(value)
+    # @QtCore.Property(int)
+    # def widgetWidth(self) -> int:
+    #     return self.width()
+    #
+    # @widgetWidth.setter
+    # def widgetWidth(self, value: int):
+    #     self.setFixedWidth(value)
 
     @Slot(object)
     def _slot_dataReceived(self, obj: typing.Any):
         if isinstance(obj, self._objectTypes_):
             self.setValue(obj)
 
-    @Slot(QtCore.QVariant)
-    def _slot_setWidgetWidth(self, val: int | QtCore.QVariant):
-        if not isinstance(val, int):
-            val = val.value()
-        self.setFixedWidth(val)
+    # @Slot(QtCore.QVariant)
+    # def _slot_setWidgetWidth(self, val: int | QtCore.QVariant):
+    #     if not isinstance(val, int):
+    #         val = val.value()
+    #     self.setFixedWidth(val)
 
     # @Slot(QtCore.QVariant)
     # def _slot_setOpacity(self, val: float | QtCore.QVariant):
@@ -273,62 +260,62 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     #
     #     self._opacityEffect_.setOpacity(val)
 
-    @Slot(QtCore.QAbstractAnimation.State, QtCore.QAbstractAnimation.State)
-    def _slot_animationStateChanged(self, newState: QtCore.QAbstractAnimation.State,
-                                    oldState: QtCore.QAbstractAnimation.State):
-
-        if (not isinstance(self._animationGroup_, QtCore.QParallelAnimationGroup)
-            or not qtutils.isQObjectAlive(self._animationGroup_)):
-            return
-
-        if newState == QtCore.QAbstractAnimation.Running:
-            self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
-            # self._parentOpacityAnimation_.start()
-        elif newState == QtCore.QAbstractAnimation.Stopped:
-            self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
-            # if isinstance(self._closeRequestedEvent_, QtGui.QCloseEvent):
-            if self._animationGroup_.direction() == QtCore.QAbstractAnimation.Backward:
-                self.sig_collapsed.emit()
-                if self._closeRequested_ is True:
-                    self.close()
-                else:
-                    self.setVisible(False)
-
-            else:
-                # re-allow manual resizing
-                self.setMinimumSize(QtCore.QSize(0,0))
-                self.setMaximumSize(QtCore.QSize(QtWidgets.QWIDGETSIZE_MAX, QtWidgets.QWIDGETSIZE_MAX))
+    # @Slot(QtCore.QAbstractAnimation.State, QtCore.QAbstractAnimation.State)
+    # def _slot_animationStateChanged(self, newState: QtCore.QAbstractAnimation.State,
+    #                                 oldState: QtCore.QAbstractAnimation.State):
+    #
+    #     if (not isinstance(self._animationGroup_, QtCore.QParallelAnimationGroup)
+    #         or not qtutils.isQObjectAlive(self._animationGroup_)):
+    #         return
+    #
+    #     if newState == QtCore.QAbstractAnimation.Running:
+    #         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
+    #         # self._parentOpacityAnimation_.start()
+    #     elif newState == QtCore.QAbstractAnimation.Stopped:
+    #         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
+    #         # if isinstance(self._closeRequestedEvent_, QtGui.QCloseEvent):
+    #         if self._animationGroup_.direction() == QtCore.QAbstractAnimation.Backward:
+    #             self.sig_collapsed.emit()
+    #             if self._closeRequested_ is True:
+    #                 self.close()
+    #             else:
+    #                 self.setVisible(False)
+    #
+    #         else:
+    #             # re-allow manual resizing
+    #             self.setMinimumSize(QtCore.QSize(0,0))
+    #             self.setMaximumSize(QtCore.QSize(QtWidgets.QWIDGETSIZE_MAX, QtWidgets.QWIDGETSIZE_MAX))
 
     def value(self) -> None:
         r"""Must override in subclasses"""
         pass
 
-    def show(self):
-        if self.isVisible():
-            return
-
-        # print(f"{self.__class__.__name__}.show(): sub widget: {self._isSubWidget_}")
-        if self._isSubWidget_:
-            self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Forward)
-            geometry = self.geometry()
-            # height = geometry.height()
-            heightHint = self.sizeHint().height()
-            # print(f"height hint: {heightHint} -> height: {height}")
-            self._sizeAnimation_.setEndValue(self.sizeHint().width())
-            topRight = self._anchoringWidget_.geometry().topRight()
-            if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
-                self._positionHint_ = self._anchoringWidget_.parent().mapToGlobal(topRight)
-            else:
-                self._positionHint_ = topRight
-            geometry.setX(self._positionHint_.x())
-            geometry.setY(self._positionHint_.y())
-            geometry.setHeight(heightHint)
-            self.setGeometry(geometry)
-            self._animationGroup_.start()
-            super().show()
-
-        else:
-            super().show()
+    # def show(self):
+    #     if self.isVisible():
+    #         return
+    #
+    #     # print(f"{self.__class__.__name__}.show(): sub widget: {self._isSubWidget_}")
+    #     if self._isSubWidget_:
+    #         self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Forward)
+    #         geometry = self.geometry()
+    #         # height = geometry.height()
+    #         heightHint = self.sizeHint().height()
+    #         # print(f"height hint: {heightHint} -> height: {height}")
+    #         self._sizeAnimation_.setEndValue(self.sizeHint().width())
+    #         topRight = self._anchoringWidget_.geometry().topRight()
+    #         if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
+    #             self._positionHint_ = self._anchoringWidget_.parent().mapToGlobal(topRight)
+    #         else:
+    #             self._positionHint_ = topRight
+    #         geometry.setX(self._positionHint_.x())
+    #         geometry.setY(self._positionHint_.y())
+    #         geometry.setHeight(heightHint)
+    #         self.setGeometry(geometry)
+    #         self._animationGroup_.start()
+    #         super().show()
+    #
+    #     else:
+    #         super().show()
 
     def setValue(self, *args, **kwargs):
         r"""Must override in subclasses, and called from there as super().setValue(…).
@@ -392,13 +379,13 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                         self.nameDescriptionWidget.organismToolButton.setEnabled(True)
                         self.nameDescriptionWidget.organismToolButton.setVisible(True)
 
-    @property
-    def isAttribute(self) -> bool:
-        return self._isAttribute_
-
-    @isAttribute.setter
-    def isAttribute(self, val: bool):
-        self._isAttribute_ = val is True
+    # @property
+    # def isAttribute(self) -> bool:
+    #     return self._isAttribute_
+    #
+    # @isAttribute.setter
+    # def isAttribute(self, val: bool):
+    #     self._isAttribute_ = val is True
 
     @Slot()
     def _slot_dataExportRequested(self):
@@ -451,14 +438,6 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             self._data_.description = val
             self.sig_valueChanged.emit(self._data_)
 
-    # @Slot(str)
-    # def _slot_symbolChanged(self, val:str):
-    #     from gui.widgets.dataclasswidgets import namedescriptionwidget
-    #     if (hasattr(self, "nameDescriptionWidget")
-    #         and isinstance(self.nameDescriptionWidget, namedescriptionwidget.NameDescriptionWidget)):
-    #         self.nameDescriptionWidget._slot_symbolChanged(val)
-    #     # pass
-
     @Slot()
     def _slot_viewDetails(self):
         # from gui.widgets.dataclasswidgets import dataexchangewidget
@@ -507,26 +486,52 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             parent = self._data_.parent
 
         if isinstance(self.parentEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.parentEditor):
-            if self._needsNewParentWidget_:
-                editorType = self._createParentEditor_(parent)
-                editor = editorType(parent, objSymbol="parent", anchoringWidget=anchoringWidget)
-                editor.sig_valueChanged.connect(self._slot_parentChanged)
-                editor.sig_closing.connect(self._slot_parentEditorClosing)
-                editor.sig_collapsed.connect(self._slot_parentEditorCollapsed)
-                if type(editor) is not type(self.parentEditor):
-                    self.parentEditor.close()
-                    self.parentEditor.deleteLater()
-                    self.parentEditor = editor
+            editorWidgetType = self._setParentEditorType_(parent)
+            if self._needsNewParentWidget_ or type(self.parentEditor) is not editorWidgetType:
+                self.parentEditor.close()
+                self.parentEditor.deleteLater()
+                # self.parentEditor = editor
+                self.parentEditor.setObjetName("parentEditor")
+
+                self.parentEditor = self._setupCollapsibleChild_(
+                    editorWidgetType,
+                    "parentEditor",
+                    self._slot_parentChanged,
+                    self.nameDescriptionWidget.editParentToolButton,
+                    anchoringWidget,
+                    parent,
+                    objSymbol="parent"
+                    )
+
+                # editor = editorWidgetType(parent, objSymbol="parent", anchoringWidget=anchoringWidget)
+                # editor.sig_valueChanged.connect(self._slot_parentChanged)
+                # editor.sig_closing.connect(self._slot_parentEditorClosing)
+                # editor.sig_collapsed.connect(self._slot_parentEditorCollapsed)
+                # if type(editor) is not type(self.parentEditor):
+                #     self.parentEditor.close()
+                #     self.parentEditor.deleteLater()
+                #     self.parentEditor = editor
+                #     self.parentEditor.setObjetName("parentEditor")
 
         else:
-            editorType = self._createParentEditor_(parent)
-            self.parentEditor = editorType(parent, objSymbol="parent", anchoringWidget=anchoringWidget)
-            self.parentEditor.sig_valueChanged.connect(self._slot_parentChanged)
-            self.parentEditor.sig_closing.connect(self._slot_parentEditorClosing)
-            self.parentEditor.sig_collapsed.connect(self._slot_parentEditorCollapsed)
+            editorWidgetType = self._setParentEditorType_(parent)
+            self.parentEditor = self._setupCollapsibleChild_(
+                editorWidgetType,
+                "parentEditor",
+                self._slot_parentChanged,
+                self.nameDescriptionWidget.editParentToolButton,
+                anchoringWidget,
+                parent,
+                objSymbol="parent"
+                )
+            # self.parentEditor = editorWidgetType(parent, objSymbol="parent", anchoringWidget=anchoringWidget)
+            # self.parentEditor.sig_valueChanged.connect(self._slot_parentChanged)
+            # self.parentEditor.sig_closing.connect(self._slot_parentEditorClosing)
+            # self.parentEditor.sig_collapsed.connect(self._slot_parentEditorCollapsed)
+            # self.parentEditor.setObjetName("parentEditor")
 
         self._needsNewParentWidget_ = False
-        self._collapsibleChildren_["parentEditor"] = self.parentEditor
+        # self._collapsibleChildren_["parentEditor"] = self.parentEditor
         self.parentEditor.show()
         self.parentEditor.setWindowTitle(f"Parent: {type(parent).__name__}")
 
@@ -535,15 +540,15 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         # what are the possible parents of the CellCompartment/NeuronCompartment
         # propose creating a new one (add create new button to these widgets)
 
-    @Slot()
-    def _slot_parentEditorClosing(self):
-        sb = QtCore.QSignalBlocker(self.nameDescriptionWidget.editParentToolButton) # noqa
-        self.nameDescriptionWidget.editParentToolButton.setChecked(False)
-
-    @Slot()
-    def _slot_organismEditorClosing(self):
-        sb = QtCore.QSignalBlocker(self.nameDescriptionWidget.organismToolButton) # noqa
-        self.nameDescriptionWidget.organismToolButton.setChecked(False)
+    # @Slot()
+    # def _slot_parentEditorClosing(self):
+    #     sb = QtCore.QSignalBlocker(self.nameDescriptionWidget.editParentToolButton) # noqa
+    #     self.nameDescriptionWidget.editParentToolButton.setChecked(False)
+    #
+    # @Slot()
+    # def _slot_organismEditorClosing(self):
+    #     sb = QtCore.QSignalBlocker(self.nameDescriptionWidget.organismToolButton) # noqa
+    #     self.nameDescriptionWidget.organismToolButton.setChecked(False)
 
     # @Slot(int, int)
     # def _slot_splitterMoved(self, pos: int, index: int):
@@ -670,27 +675,47 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     @Slot()
     def _slot_editOrganism(self):
         from gui.widgets.dataclasswidgets.organismwidget import OrganismWidget
-        if not isinstance(self.organismEditor, OrganismWidget):
-            if isinstance(self.organismEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismEditor):
-                self.organismEditor.close()
-                self.organismEditor.deleteLater()
-                self.organismEditor = None
-
-            anchoringWidget = self.provideAnchoringWidget()
-            self.organismEditor = OrganismWidget(anchoringWidget=anchoringWidget)
-            # self.organismEditor.setWindowTitle("Organism")
-            self.organismEditor.sig_valueChanged.connect(self._slot_organismChanged)
-            self.organismEditor.sig_closing.connect(self._slot_organismEditorClosing)
-            self.organismEditor.sig_collapsed.connect(self._slot_organismEditorCollapsed)
-
+        anchoringWidget = self.provideAnchoringWidget()
         try:
             organism = self._data_.getOrganism()
         except: # noqa
             organism = sdc.Organism()
+        if isinstance(self.organismEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismEditor):
+            if not isinstance(self.organismEditor, OrganismWidget):
+                self.organismEditor.close()
+                self.organismEditor.deleteLater()
+                self.organismEditor = None
 
-        self._collapsibleChildren_["organismEditor"] = self.organismEditor
+                self.organismEditor = self._setupCollapsibleChild_(
+                    OrganismWidget,
+                    "organismEditor",
+                    self._slot_organismChanged,
+                    self.nameDescriptionWidget.organismToolButton,
+                    anchoringWidget,
+                    organism,
+                    objSymbol="organism"
+                    )
 
-        self.organismEditor.setValue(organism, objSymbol="organism")
+                # self.organismEditor = OrganismWidget(anchoringWidget=anchoringWidget)
+                # # self.organismEditor.setWindowTitle("Organism")
+                # self.organismEditor.sig_valueChanged.connect(self._slot_organismChanged)
+                # self.organismEditor.sig_closing.connect(self._slot_organismEditorClosing)
+                # self.organismEditor.sig_collapsed.connect(self._slot_organismEditorCollapsed)
+
+
+        # self._collapsibleChildren_["organismEditor"] = self.organismEditor
+        else:
+            self.organismEditor = self._setupCollapsibleChild_(
+                OrganismWidget,
+                "organismEditor",
+                self._slot_organismChanged,
+                self.nameDescriptionWidget.organismToolButton,
+                anchoringWidget,
+                organism,
+                objSymbol="organism"
+                )
+
+        # self.organismEditor.setValue(organism, objSymbol="organism")
 
         if not self.organismEditor.isVisible():
             self.organismEditor.show()
@@ -717,15 +742,15 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
         self.organismEditor.setWindowTitle(wTitle)
 
-    @Slot()
-    def _slot_organismEditorCollapsed(self):
-        sb = QtCore.QSignalBlocker(self.nameDescriptionWidget) # noqa
-        self.nameDescriptionWidget.organismToolButton.setChecked(False)
-
-    @Slot()
-    def _slot_parentEditorCollapsed(self):
-        sb = QtCore.QSignalBlocker(self.nameDescriptionWidget) # noqa
-        self.nameDescriptionWidget.editParentToolButton.setChecked(False)
+    # @Slot()
+    # def _slot_organismEditorCollapsed(self):
+    #     sb = QtCore.QSignalBlocker(self.nameDescriptionWidget) # noqa
+    #     self.nameDescriptionWidget.organismToolButton.setChecked(False)
+    #
+    # @Slot()
+    # def _slot_parentEditorCollapsed(self):
+    #     sb = QtCore.QSignalBlocker(self.nameDescriptionWidget) # noqa
+    #     self.nameDescriptionWidget.editParentToolButton.setChecked(False)
 
     @Slot(object)
     def _slot_organismChanged(self, value: object):
@@ -738,135 +763,136 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             pass
 
     @singledispatchmethod
-    def _createParentEditor_(self, obj) -> type:
+    def _setParentEditorType_(self, obj) -> type:
         raise NotImplementedError(f"{type(obj)} objects are not supported")
 
-    @_createParentEditor_.register(sdc.Neuron)
-    def __createParentEditor(self, obj: sdc.Neuron) -> type:
+    @_setParentEditorType_.register(sdc.Neuron)
+    def __setParentEditorType__(self, obj: sdc.Neuron) -> type:
         from gui.widgets.dataclasswidgets.cellwidgets import NeuronWidget
         return NeuronWidget
 
-    @_createParentEditor_.register(sdc.Cell)
-    def __createParentEditor(self, obj: sdc.Cell) -> type:
+    @_setParentEditorType_.register(sdc.Cell)
+    def __setParentEditorType__(self, obj: sdc.Cell) -> type: # noqa
         from gui.widgets.dataclasswidgets.cellwidgets import CellWidget
         return CellWidget
 
-    @_createParentEditor_.register(sdc.CellCompartment)
-    @_createParentEditor_.register(sdc.NeuronCompartment)
-    def __createParentEditor(self, obj: sdc.CellCompartment) -> type:
+    @_setParentEditorType_.register(sdc.CellCompartment)
+    @_setParentEditorType_.register(sdc.NeuronCompartment)
+    def __setParentEditorType__(self, obj: sdc.CellCompartment) -> type: # noqa
         from gui.widgets.dataclasswidgets.cellcompartmentwidget import CellCompartmentWidget
         return CellCompartmentWidget
 
-    @_createParentEditor_.register(sdc.ChemicalSynapse)
-    def __createParentEditor(self, obj: sdc.ChemicalSynapse) -> type:
+    @_setParentEditorType_.register(sdc.ChemicalSynapse)
+    def __setParentEditorType__(self, obj: sdc.ChemicalSynapse) -> type: # noqa
         from gui.widgets.dataclasswidgets.chemicalsynapsewidget import ChemicalSynapseWidget
         return ChemicalSynapseWidget
 
-    @_createParentEditor_.register(sdc.Organism)
-    def __createParentEditor(self, obj: sdc.Organism) -> type:
+    @_setParentEditorType_.register(sdc.Organism)
+    def __setParentEditorType__(self, obj: sdc.Organism) -> type: # noqa
         from gui.widgets.dataclasswidgets.organismwidget import OrganismWidget
         return OrganismWidget
 
-    @_createParentEditor_.register(sdc.Organ)
-    @_createParentEditor_.register(sdc.Tissue)
-    def __createParentEditor(self, obj: sdc.Organ) -> type:
+    @_setParentEditorType_.register(sdc.Organ)
+    @_setParentEditorType_.register(sdc.Tissue)
+    def __setParentEditorType__(self, obj: sdc.Organ) -> type: # noqa
         from gui.widgets.dataclasswidgets.organtissuewidgets import OrganWidget, TissueWidget
         if isinstance(obj, sdc.Tissue):
             return TissueWidget
         return OrganWidget
 
-    @_createParentEditor_.register(sdc.NervousSystem)
-    def __createParentEditor(self, obj: sdc.NervousSystem) -> type:
+    @_setParentEditorType_.register(sdc.NervousSystem)
+    def __setParentEditorType__(self, obj: sdc.NervousSystem) -> type: # noqa
         from gui.widgets.dataclasswidgets.nervoussystemwidget import NervousSystemWidget
         return NervousSystemWidget
 
-    def collapse(self, close: bool=False):
-        if self._isSubWidget_:
-            self.collapseSubWidgets(close)
-            self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
-            self._closeRequested_ = close
-            self._animationGroup_.start()
+    # def collapse(self, close: bool=False):
+    #     if self._isSubWidget_:
+    #         self.collapseSubWidgets(close)
+    #         self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
+    #         self._closeRequested_ = close
+    #         self._animationGroup_.start()
+    #
+    # def collapseSubWidgets(self, close: bool= False):
+    #     for obj, toggle in self._collapsibleChildren_.values():
+    #         if isinstance(obj, QtWidgets.QWidget) and qtutils.isQObjectAlive(obj):
+    #             try:
+    #                 obj.collapse(close)
+    #             except: # noqa
+    #                 pass
 
-    def collapseSubWidgets(self, close: bool= False):
-        for obj in self._collapsibleChildren_.values():
-            if isinstance(obj, QtWidgets.QWidget) and qtutils.isQObjectAlive(obj):
-                try:
-                    obj.collapse(close)
-                except: # noqa
-                    pass
-
-    def closeEvent(self, evt):
-        # print(f"{self.__class__.__name__}.closeEvent")
-        self.sig_closing.emit()
-        self.closeSubWidgets()
-        super().closeEvent(evt)
-        evt.accept()
+    # def closeEvent(self, evt):
+    #     # print(f"{self.__class__.__name__}.closeEvent")
+    #     self.sig_closing.emit()
+    #     self.closeSubWidgets()
+    #     super().closeEvent(evt)
+    #     evt.accept()
 
     def closeSubWidgets(self):
-        if isinstance(self.parentEditor, QtWidgets.QWidget):
-            # sb = QtCore.QSignalBlocker(self.parentEditor) # noqa
-            self.parentEditor.close()
-            self.parentEditor.deleteLater()
-            self.parentEditor = None
-
-        if isinstance(self.organismEditor, QtWidgets.QWidget):
-            # sb = QtCore.QSignalBlocker(self.organismEditor) # noqa
-            self.organismEditor.close()
-            self.organismEditor.deleteLater()
-            self.organismEditor = None
+        super().closeSubWidgets()
+        # if isinstance(self.parentEditor, QtWidgets.QWidget):
+        #     # sb = QtCore.QSignalBlocker(self.parentEditor) # noqa
+        #     self.parentEditor.close()
+        #     self.parentEditor.deleteLater()
+        #     self.parentEditor = None
+        #
+        # if isinstance(self.organismEditor, QtWidgets.QWidget):
+        #     # sb = QtCore.QSignalBlocker(self.organismEditor) # noqa
+        #     self.organismEditor.close()
+        #     self.organismEditor.deleteLater()
+        #     self.organismEditor = None
 
         self.nameDescriptionWidget.closeSubWidgets()
 
-    def moveEvent(self, evt):
-        self.sig_moved.emit(evt.pos())# - evt.oldPos())
-        evt.accept()
+    # def moveEvent(self, evt):
+    #     self.sig_moved.emit(evt.pos())# - evt.oldPos())
+    #     evt.accept()
 
-    @property
-    def overrideAnchor(self) -> bool:
-        return self._overrideAnchor_
+    # @property
+    # def overrideAnchor(self) -> bool:
+    #     return self._overrideAnchor_
+    #
+    # @overrideAnchor.setter
+    # def overrideAnchor(self, val: bool):
+    #     self._overrideAnchor_ = val is True
 
-    @overrideAnchor.setter
-    def overrideAnchor(self, val: bool):
-        self._overrideAnchor_ = val is True
+    # @property
+    # def anchoringWidget(self) -> QtWidgets.QWidget | None:
+    #     return self._anchoringWidget_
 
-    @property
-    def anchoringWidget(self) -> QtWidgets.QWidget | None:
-        return self._anchoringWidget_
+    # @anchoringWidget.setter
+    # def anchoringWidget(self, obj: QtWidgets.QWidget):
+    #     if isinstance(obj, QtWidgets.QWidget):
+    #         self._anchoringWidget_ = obj
+    #         if hasattr(self._anchoringWidget_, "sig_moved"):
+    #             self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
+    #         # else:
+    #         #     self._moveEventDispatcher_ = MoveEventFilterObject(self,
+    #         #                                                        anchoredWidget=self)
+    #         #     self._anchoringWidget_.installEventFilter(self._moveEventDispatcher_)
+    #
+    #         self._isSubWidget_ = True
+    #     else:
+    #         self._anchoringWidget_ = None
+    #         self._isSubWidget_ = False
 
-    @anchoringWidget.setter
-    def anchoringWidget(self, obj: QtWidgets.QWidget):
-        if isinstance(obj, QtWidgets.QWidget):
-            self._anchoringWidget_ = obj
-            if hasattr(self._anchoringWidget_, "sig_moved"):
-                self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
-            else:
-                self._moveEventDispatcher_ = MoveEventFilterObject(self,
-                                                                   anchoredWidget=self)
-                self._anchoringWidget_.installEventFilter(self._moveEventDispatcher_)
-
-            self._isSubWidget_ = True
-        else:
-            self._anchoringWidget_ = None
-            self._isSubWidget_ = False
-
-    @Slot(QtCore.QPoint)
-    def _slot_anchoringWidgetMoved(self, pos: QtCore.QPoint):
-        # print(f"{self.__class__.__name__}<{self.objectName()}>._slot_anchoringWidgetMoved({pos})\n")
-        # if not self.isVisible():
-        #     return
-
-        if not isinstance(self._anchoringWidget_, QtWidgets.QWidget):
-            return
-
-        if isinstance(self.parent(), QtWidgets.QWidget):
-            return
-
-        if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
-            newPos = self._anchoringWidget_.parent().mapToGlobal(self._anchoringWidget_.geometry().topRight())
-
-        else:
-            newPos = self._anchoringWidget_.frameGeometry().topRight()
-
-        self.move(newPos)
+    # @Slot(QtCore.QPoint)
+    # def _slot_anchoringWidgetMoved(self, pos: QtCore.QPoint):
+    #     # print(f"{self.__class__.__name__}<{self.objectName()}>._slot_anchoringWidgetMoved({pos})\n")
+    #     # if not self.isVisible():
+    #     #     return
+    #
+    #     if not isinstance(self._anchoringWidget_, QtWidgets.QWidget):
+    #         return
+    #
+    #     if isinstance(self.parent(), QtWidgets.QWidget):
+    #         return
+    #
+    #     if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
+    #         newPos = self._anchoringWidget_.parent().mapToGlobal(self._anchoringWidget_.geometry().topRight())
+    #
+    #     else:
+    #         newPos = self._anchoringWidget_.frameGeometry().topRight()
+    #
+    #     self.move(newPos)
 
 
