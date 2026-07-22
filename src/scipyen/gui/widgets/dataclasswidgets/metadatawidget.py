@@ -182,31 +182,29 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
     @Slot()
     def _slot_editBiologicalSource(self):
         from gui.widgets.dataclasswidgets.biologicalsourcewidget import BiologicalSourceWidget
-        if not isinstance(self.biologicalSourceEditor, BiologicalSourceWidget):
-            if isinstance(self.biologicalSourceEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor):
-                self.biologicalSourceEditor.close()
+        anchoringWidget = self.provideAnchoringWidget()
+        if isinstance(self.biologicalSourceEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor):
+            if not isinstance(self.biologicalSourceEditor, BiologicalSourceWidget):
+                self.biologicalSourceEditor.collapse(True)
                 self.biologicalSourceEditor.deleteLater()
                 self.biologicalSourceEditor = None
 
-            anchoringWidget = self.provideAnchoringWidget()
+                self.biologicalSourceEditor = BiologicalSourceWidget(self._data_.source, objSymbol="source", anchoringWidget=anchoringWidget)
+                # self.biologicalSourceEditor.setWindowTitle("Source")
+                self.biologicalSourceEditor.sig_valueChanged.connect(self._slot_biologicalSourceChanged)
+                self.biologicalSourceEditor.sig_closing.connect(self._slot_biologicalSourceEditorClosing)
+                self.biologicalSourceEditor.sig_collapsed.connect(self._slot_biologicalSourceEditorCollapsed)
 
-            # topWindow = self.getUppermostParent()
-            # if isinstance(self.anchoringWidget, QtWidgets.QWidget) and self.overrideAnchor:
-            #     anchoringWidget = self.anchoringWidget
-            # anchoringWidget = (self.anchoringWidget if (
-            #         isinstance(self._anchoringWidget_, QtWidgets.QWidget)
-            #         and self.overrideAnchor
-            #     )
-            #     else self if self.parent() is None else None
-            # )
-            self.biologicalSourceEditor = BiologicalSourceWidget(anchoringWidget=anchoringWidget)
+        else:
+            self.biologicalSourceEditor = BiologicalSourceWidget(self._data_.source, objSymbol="source", anchoringWidget=anchoringWidget)
             # self.biologicalSourceEditor.setWindowTitle("Source")
+            self.biologicalSourceEditor.sig_valueChanged.connect(self._slot_biologicalSourceChanged)
             self.biologicalSourceEditor.sig_closing.connect(self._slot_biologicalSourceEditorClosing)
             self.biologicalSourceEditor.sig_collapsed.connect(self._slot_biologicalSourceEditorCollapsed)
-            self.biologicalSourceEditor.sig_valueChanged.connect(self._slot_biologicalSourceChanged)
+
 
         self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
-        self.biologicalSourceEditor.setValue(self._data_.source, objSymbol="source")
+        # self.biologicalSourceEditor.setValue(self._data_.source, objSymbol="source")
 
         if not self.biologicalSourceEditor.isVisible():
             self.biologicalSourceEditor.show()
@@ -276,7 +274,8 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
             self.procedureEditor.sig_collapsed.connect(self._slot_procedureEditorCollapsed)
 
         self._collapsibleChildren_["procedureEditor"]=self.procedureEditor
-        self.procedureEditor.show()
+        if not self.procedureEditor.isVisible():
+            self.procedureEditor.show()
 
         if isinstance(self._data_.procedure.name, str) and len(self._data_.procedure.name.strip()):
             self.procedureEditor.setWindowTitle(f"Procedure: {self._data_.procedure.name} ({type(self._data_.procedure).__name__})")

@@ -1415,7 +1415,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
     def provideAnchoringWidget(self, widget: typing.Optional[QtWidgets.QWidget] = None) -> QtWidgets.QWidget | None:
         r"""Provides an anchoring widget to a collapsible child widget, if required.
-        The anchoring of collapsible children MUST be the window frame enclosing
+        The anchoring of collapsible children is the window frame enclosing
         this widget (and its parents, if any).
 
         Collapsible children are used mainly in the DataClassWidget hierarchy.
@@ -1431,8 +1431,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             getattr(self, "overrideAnchor", False)
             and isinstance(getattr(self, "anchoringWidget", None), QtWidgets.QWidget)
             ):
-            # if overrideAnchor is True then the child index will be anchored to
-            # the same anchoring as this one - not sure this is good
+            # if overrideAnchor is True while THIS widget has its own anhoring widget,
+            # then the child index will be anchored to the same anchoring as this one - not sure this is good
             aw = self.anchoringWidget
 
         if not isinstance(aw, QtWidgets.QWidget):
@@ -1448,41 +1448,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                 # highest parent in the hierarchy, so that there is a window
                 # frame to serve as anchor
                 aw = topWindow
-
-        # if isinstance(aw, QtWidgets.QWidget):
-        #     if not hasattr(aw, "sig_moved"):
-        #         print(f"\n{self.__class__.__name__}.provideAnchoringWidget -> installing event filter {self._moveEventFilterObject_}")
-        #         if (
-        #             not isinstance(self._moveEventFilterObject_, MoveEventFilterObject)
-        #             or not qtutils.isQObjectAlive(self._moveEventFilterObject_)
-        #             ):
-        #             self._moveEventFilterObject_ = MoveEventFilterObject(self)
-        #
-        #         if isinstance(widget, QtWidgets.QWidget) and qtutils.isQObjectAlive(widget):
-        #             self._moveEventFilterObject_.anchoredWidget = widget
-        #
-        #         aw.installEventFilter(self._moveEventFilterObject_)
-        #
-        #         # anchored =
-        #         if not isinstance(self._moveEventFilterObject_.anchoredWidget, QtWidgets.QWidget):
-        #             if (hasattr(self, "_slot_anchoringWidgetMoved")
-        #                 and inspect.ismethod(self._slot_anchoringWidgetMoved)
-        #                 ):
-        #                 print(f"\n{self.__class__.__name__}.provideAnchoringWidget -> connecting event filter sig_moved signal")
-        #                 self._moveEventFilterObject_.sig_moved.connect(self._slot_anchoringWidgetMoved)
-        #             else:
-        #                 if (isinstance(self._moveEventFilterObject_.anchoredWidget, QtWidgets.QWidget)
-        #                     and hasattr(self._moveEventFilterObject_.anchoredWidget, "_slot_anchoringWidgetMoved")
-        #                     and inspect.ismethod(self._moveEventFilterObject_.anchoredWidget._slot_anchoringWidgetMoved)
-        #                     ):
-        #
-        #                     self._moveEventFilterObject_.sig_moved.connect(
-        #                         self._moveEventFilterObject_.anchoredWidget._slot_anchoringWidgetMoved
-        #                         )
-
-
-            # if not hasattr(aw, "sig_closing"):
-            #     aw.installEventFilter(self._closeEventFilterObject_)
 
         return aw
 
