@@ -66,11 +66,7 @@ from gui.datatreeviewer import DataTreeViewer
 # from gui.textviewer import TextViewer
 # from gui.widgets.dataclasswidgets.dataexchangewidget import DataExchangeWidget
 from gui.widgets.dataclasswidgets.namedescriptionwidget import NameDescriptionWidget
-from gui.workspacegui import (WorkspaceGuiMixin,
-                              MoveEventFilterObject,
-                              CloseEventFilterObject)
-# from gui.widgets import small_widgets as smw
-# from iolib import pictio as pio
+from gui.workspacegui import WorkspaceGuiMixin
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]

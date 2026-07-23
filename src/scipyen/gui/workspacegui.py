@@ -1238,15 +1238,16 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         windowFlags = kwargs.pop("windowFlags", None)
         # self._objSymbol_ = kwargs.pop("objSymbol", None)
         self._isAttribute_: bool = isAttribute
+        self._useOpacityEffect_: bool = kwargs.pop("useOpacityEffect", False)
 
-        self._isSubWidget_: bool = False
+        # self._isSubWidget_: bool = False
         self._positionHint_: typing.Optional[QtCore.QPoint] = None
         self._closeRequested_: bool = False
         # self._needsNewParentWidget_: bool =  True
 
         if isinstance(anchoringWidget, QtWidgets.QWidget):
             self._anchoringWidget_ = anchoringWidget
-            self._isSubWidget_ = True
+            # self._isSubWidget_ = True
             self._positionHint_ = anchoringWidget.geometry().topRight()
 
         else:
@@ -1322,54 +1323,41 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             else:
                 self.setWindowFlags(QtCore.Qt.Tool)
 
-        self._collapsibleChildren_ = dict() # Qt objectName ↦ (widget, toggle control widget)
+        self._collapsibleChildren_ = dict() # Qt objectName ↦ (collapsible widget, toggle control widget, collapsible widget id)
 
-        self._sizeAnimationMax_ = 200
-        self._sizeAnimation_ = QtCore.QPropertyAnimation(self, b'widgetWidth', self)
-        self._sizeAnimation_.setStartValue(0)
-        self._sizeAnimation_.setDuration(200) # ms
-        self._sizeAnimation_.setEndValue(self._sizeAnimationMax_)
-        self._sizeAnimation_.valueChanged.connect(self._slot_setWidgetWidth)
+        # if isinstance(self.anchoringWidget, QtWidgets.QWidget):
+        if self.anchoringWidget:
+            self._sizeAnimationMax_ = 200
+            self._sizeAnimation_ = QtCore.QPropertyAnimation(self, b'widgetWidth', self)
+            self._sizeAnimation_.setStartValue(0)
+            self._sizeAnimation_.setDuration(200) # ms
+            self._sizeAnimation_.setEndValue(self._sizeAnimationMax_)
+            self._sizeAnimation_.valueChanged.connect(self._slot_setWidgetWidth)
 
-        # self._opacityEffect_ = QtWidgets.QGraphicsOpacityEffect(self)
-        # if self._isSubWidget_:
-        #     self._opacityEffect_.setOpacity(0.0)
-        # else:
-        #     self._opacityEffect_.setOpacity(1.0)
-        #
-        # self._opacityAnimation_ = QtCore.QPropertyAnimation(self._opacityEffect_, b'opacity', self)
-        # self._opacityAnimation_.setStartValue(0.0)
-        # self._opacityAnimation_.setDuration(200)
-        # self._opacityAnimation_.setEndValue(1.0)
-        # self._opacityAnimation_.valueChanged.connect(self._slot_setOpacity)
+            if self._useOpacityEffect_:
+                self._opacityEffect_ = QtWidgets.QGraphicsOpacityEffect(self)
+                if self.anchoringWidget:
+                    self._opacityEffect_.setOpacity(0.0)
+                    self.setGraphicsEffect(self._opacityEffect_)
+                    self._opacityAnimation_ = QtCore.QPropertyAnimation(self._opacityEffect_, b'opacity', self)
+                    self._opacityAnimation_.setStartValue(0.0)
+                    self._opacityAnimation_.setDuration(200)
+                    self._opacityAnimation_.setEndValue(1.0)
+                    self._opacityAnimation_.valueChanged.connect(self._slot_setOpacity)
+                # else:
+                #     self._opacityEffect_.setOpacity(1.0)
 
-        # if self._isSubWidget_:
-        #     self.setGraphicsEffect(self._opacityEffect_)
-
-        self._animationGroup_ = QtCore.QParallelAnimationGroup()
-        self._animationGroup_.addAnimation(self._sizeAnimation_)
-        # self._animationGroup_.addAnimation(self._opacityAnimation_)
-        self._animationGroup_.stateChanged.connect(self._slot_animationStateChanged)
-
-        # self._moveEventFilterObject_ = None
-        # self._closeEventFilterObject_ = None
-        #
-        # if isinstance(self, QtWidgets.QWidget):
-        #     self._moveEventFilterObject_ = MoveEventFilterObject(self)
-        #     self._closeEventFilterObject_ = CloseEventFilterObject(self)
-        # else:
-        #     self._moveEventFilterObject_ = MoveEventFilterObject()
-        #     self._closeEventFilterObject_ = CloseEventFilterObject()
+            self._animationGroup_ = QtCore.QParallelAnimationGroup()
+            self._animationGroup_.addAnimation(self._sizeAnimation_)
+            if self._useOpacityEffect_:
+                self._animationGroup_.addAnimation(self._opacityAnimation_)
+            self._animationGroup_.stateChanged.connect(self._slot_animationStateChanged)
 
         if (
             isinstance(self._anchoringWidget_, QtWidgets.QWidget)
             ):
             if hasattr(self._anchoringWidget_, "sig_moved"):
                 self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
-            # else:
-            #     self._moveEventDispatcher_ = MoveEventFilterObject(self,
-            #                                                        anchoredWidget=self)
-            #     self._anchoringWidget_.installEventFilter(self._moveEventDispatcher_)
 
     @property
     def scipyenWindow(self):
@@ -1504,7 +1492,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             objectName = widgetType.__name__
             objectName = objectName[0].lower() + objectName[1:]
         child.setObjectName(objectName)
-        if hasattr(child, "sig_valueChanged"):
+        if hasattr(child, "sig_valueChanged") and inspect.ismethod(valueChangedSlot):
             child.sig_valueChanged.connect(valueChangedSlot)
         if hasattr(child, "sig_closing"):
             child.sig_closing.connect(self._slot_anchoredWidgetClosingOrCollapsing)
@@ -1515,15 +1503,20 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
         if not isinstance(getattr(anchoringWidget, "_collapsibleChildren_", None), dict):
             anchoringWidget._collapsibleChildren_ = dict()
-        anchoringWidget._collapsibleChildren_[objectName] = (child, toggleControl)
+
+        # anchoringWidget._collapsibleChildren_[objectName] = (child, toggleControl)
+        anchoringWidget._collapsibleChildren_[id(child)] = (child, toggleControl, objectName)
 
         return child
 
     @Slot()
     def _slot_anchoredWidgetClosingOrCollapsing(self):
         widget = self.sender()
-        if widget.objectName() in self._collapsibleChildren_:
-            toggle = self._collapsibleChildren_[widget.objectName()][1]
+        wid = id(widget)
+        # if widget.objectName() in self._collapsibleChildren_:
+        if wid in self._collapsibleChildren_:
+            # toggle = self._collapsibleChildren_[widget.objectName()][1]
+            toggle = self._collapsibleChildren_[wid][1]
 
             if isinstance(toggle, QtWidgets.QWidget) and hasattr(toggle, "setChecked"):
                 sb = QtCore.QSignalBlocker(toggle) # noqa
@@ -1924,6 +1917,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     def _slot_animationStateChanged(self, newState: QtCore.QAbstractAnimation.State,
                                     oldState: QtCore.QAbstractAnimation.State):
 
+        if not self.anchoringWidget:
+            return
+
         if (not isinstance(self._animationGroup_, QtCore.QParallelAnimationGroup)
             or not qtutils.isQObjectAlive(self._animationGroup_)):
             return
@@ -1933,7 +1929,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             # self._parentOpacityAnimation_.start()
         elif newState == QtCore.QAbstractAnimation.Stopped:
             self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
-            # if isinstance(self._closeRequestedEvent_, QtGui.QCloseEvent):
             if self._animationGroup_.direction() == QtCore.QAbstractAnimation.Backward:
                 self.sig_collapsed.emit()
                 if self._closeRequested_ is True:
@@ -1947,11 +1942,13 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                 self.setMaximumSize(QtCore.QSize(QtWidgets.QWIDGETSIZE_MAX, QtWidgets.QWIDGETSIZE_MAX))
 
     def show(self):
+        if self.isAnchoredWidget:
+            print(f"{self._class__.__name__}.show()")
         if self.isVisible():
             return
 
         # print(f"{self.__class__.__name__}.show(): sub widget: {self._isSubWidget_}")
-        if self._isSubWidget_:
+        if self.isAnchoredWidget:
             self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Forward)
             geometry = self.geometry()
             # height = geometry.height()
@@ -1981,29 +1978,36 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     def isAttribute(self, val: bool):
         self._isAttribute_ = val is True
 
+    @property
+    def isAnchoredWidget(self):
+        return isinstance(self.anchoringWidget, QtWidgets.QWidget)
+
     def collapse(self, close: bool=False):
-        if hasattr(self, "getObjectName"):
-            myName = f"<{self.getObjectName()}>"
+        if hasattr(self, "objectName"):
+            myName = f"<{self.objectName()}>"
         else:
             myName=""
         print(f"{self.__class__.__name__}{myName}.collapse")
-        if self._isSubWidget_:
+        if self.isAnchoredWidget:
             self.collapseSubWidgets(close)
             self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
             self._closeRequested_ = close
             self._animationGroup_.start()
 
+        if close:
+            self.close()
+
     def collapseSubWidgets(self, close: bool= False):
-        if hasattr(self, "getObjectName"):
-            myName = f"<{self.getObjectName()}>"
+        if hasattr(self, "objectName"):
+            myName = f"<{self.objectName()}>"
         else:
             myName=""
         print(f"{self.__class__.__name__}{myName}>.collapseSubWidgets")
 
         if len(self._collapsibleChildren_) == 0:
             return
-        print(f"{self._collapsibleChildren_}")
-        for obj, toggle in self._collapsibleChildren_.values():
+        # print(f"{self._collapsibleChildren_}")
+        for obj, toggle, objName in self._collapsibleChildren_.values():
             if isinstance(obj, QtWidgets.QWidget) and qtutils.isQObjectAlive(obj):
                 try:
                     obj.collapse(close)
@@ -2011,8 +2015,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                     pass
 
     def closeEvent(self, evt):
-        if hasattr(self, "getObjectName"):
-            myName = f"<{self.getObjectName()}>"
+        if hasattr(self, "objectName"):
+            myName = f"<{self.objectName()}>"
         else:
             myName=""
         print(f"{self.__class__.__name__}{myName}.closeEvent")
@@ -2027,35 +2031,22 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         evt.accept()
 
     def closeSubWidgets(self):
-        if hasattr(self, "getObjectName"):
-            myName = f"<{self.getObjectName()}>"
+        if hasattr(self, "objectName"):
+            myName = f"<{self.objectName()}>"
         else:
             myName=""
         print(f"{self.__class__.__name__}{myName}.closeSubWidgets")
         if len(self._collapsibleChildren_) == 0:
             return
-        for obj, toggle in self._collapsibleChildren_.values():
+        for obj, toggle, objName in self._collapsibleChildren_.values():
             if isinstance(obj, QtWidgets.QWidget):
                 obj.close()
                 obj.deleteLater()
                 obj = None
-        # if isinstance(self.parentEditor, QtWidgets.QWidget):
-        #     # sb = QtCore.QSignalBlocker(self.parentEditor) # noqa
-        #     self.parentEditor.close()
-        #     self.parentEditor.deleteLater()
-        #     self.parentEditor = None
-        #
-        # if isinstance(self.organismEditor, QtWidgets.QWidget):
-        #     # sb = QtCore.QSignalBlocker(self.organismEditor) # noqa
-        #     self.organismEditor.close()
-        #     self.organismEditor.deleteLater()
-        #     self.organismEditor = None
-
-        # self.nameDescriptionWidget.closeSubWidgets()
 
     def moveEvent(self, evt):
-        if hasattr(self, "getObjectName"):
-            myName = f"<{self.getObjectName()}>"
+        if hasattr(self, "objectName"):
+            myName = f"<{self.objectName()}>"
         else:
             myName=""
         print(f"{self.__class__.__name__}{myName}.moveEvent")
@@ -2080,15 +2071,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             self._anchoringWidget_ = obj
             if hasattr(self._anchoringWidget_, "sig_moved"):
                 self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
-            # else:
-            #     self._moveEventDispatcher_ = MoveEventFilterObject(self,
-            #                                                        anchoredWidget=self)
-            #     self._anchoringWidget_.installEventFilter(self._moveEventDispatcher_)
-
-            self._isSubWidget_ = True
+            # self.setGraphicsEffect(self._opacityEffect_)
         else:
             self._anchoringWidget_ = None
-            self._isSubWidget_ = False
 
     @Slot(QtCore.QPoint)
     def _slot_anchoringWidgetMoved(self, pos: QtCore.QPoint):

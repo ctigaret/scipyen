@@ -48,7 +48,6 @@ except: # noqa
     __has_qtdbus__ = False
 
 from core import datatypes # noqa
-from core import qtutils
 from core.prog import scipywarn # noqa
 # from core import utilities
 from gui import (guiutils, interact) # noqa
@@ -105,7 +104,7 @@ data object after loading from file or importing from the workspace.
                  **kwargs):
         anchoringWidget = kwargs.pop("anchoringWidget", None)
         self._overrideAnchor_ = kwargs.pop("overrideAnchor", False)
-        windowFlags = kwargs.pop("windowFlags", None)
+        # windowFlags = kwargs.pop("windowFlags", None)
 
         if isinstance(objType, QtWidgets.QWidget):
             obj_ = parent
@@ -283,136 +282,6 @@ data object after loading from file or importing from the workspace.
             raise TypeError(f"Expecting a type or None; instead got {type(val).__name__}")
 
         self._objectType_ = val
-
-    # @QtCore.Property(int)
-    # def widgetWidth(self) -> int:
-    #     return self.width()
-    #
-    # @widgetWidth.setter
-    # def widgetWidth(self, value: int):
-    #     self.setFixedWidth(value)
-    #
-    # @Slot(QtCore.QVariant)
-    # def _slot_setWidgetWidth(self, val: int | QtCore.QVariant):
-    #     if not isinstance(val, int):
-    #         val = val.value()
-    #     self.setFixedWidth(val)
-    #
-    # @Slot(QtCore.QAbstractAnimation.State, QtCore.QAbstractAnimation.State)
-    # def _slot_animationStateChanged(self, newState: QtCore.QAbstractAnimation.State,
-    #                                 oldState: QtCore.QAbstractAnimation.State):
-    #
-    #     if (not isinstance(self._animationGroup_, QtCore.QParallelAnimationGroup)
-    #         or not qtutils.isQObjectAlive(self._animationGroup_)):
-    #         return
-    #
-    #     if newState == QtCore.QAbstractAnimation.Running:
-    #         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
-    #         # self._parentOpacityAnimation_.start()
-    #     elif newState == QtCore.QAbstractAnimation.Stopped:
-    #         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
-    #         # if isinstance(self._closeRequestedEvent_, QtGui.QCloseEvent):
-    #         if self._animationGroup_.direction() == QtCore.QAbstractAnimation.Backward:
-    #             self.sig_collapsed.emit()
-    #             if self._closeRequested_ is True:
-    #                 self.close()
-    #             else:
-    #                 self.setVisible(False)
-    #
-    #         else:
-    #             # re-allow manual resizing
-    #             self.setMinimumSize(QtCore.QSize(0,0))
-    #             self.setMaximumSize(QtCore.QSize(QtWidgets.QWIDGETSIZE_MAX, QtWidgets.QWIDGETSIZE_MAX))
-
-    # @Slot()
-    # def _slot_loadData(self):
-    #     fileNameFilter = "*.pkl"
-    #     fn, fl = self.chooseFile(caption = f"Open {self._objectType_.__name__} Pickle File",
-    #                             fileFilter = fileNameFilter,
-    #                             single=True)
-    #
-    #     if len(fn.strip()):
-    #         obj = pio.loadFile(fn)
-    #         if isinstance(obj, self._objectType_):
-    #             if self.receivers(self.sig_dataLoaded) > 0:
-    #                 self.sig_dataLoaded.emit(obj)
-    #                 # varName = os.path.basename(fn)
-    #                 # self.objectSymbolLabel.setText(varName)
-    #                 # self.objectSymbolLabel.setToolTip(f"'{varName}' is a {type(obj).__name__} object")
-    #             else:
-    #                 self.setValue(obj)
-    #
-    #         else:
-    #             self.errorMessage(title = f"Open {self._objectType_.__name__} Pickle File",
-    #                             text = f"Expecting a {self._objectType_.__name__}; intead got a {type(obj).__name__}")
-
-    # @Slot(object)
-    # def slot_saveData(self, obj):
-    #     if not isinstance(obj, self._objectType_):
-    #         return
-    #
-    #     fileNameFilter = "*.pkl"
-    #
-    #     fn, fl = self.chooseFile(caption = f"Save {self._objectType_.__name__} as Pickle File",
-    #                             fileFilter = fileNameFilter,
-    #                             single=True, save=True)
-    #
-    #     if len(fn.strip()):
-    #         pio.savePickle(obj, fn)
-
-
-    # @Slot()
-    # def _slot_importData(self):
-    #     ret = self.importFromWorkSpace(dataTypes = self._objectType_,
-    #                                 title=f"Select {self._objectType_.__name__} Object in Workspace",
-    #                                 single=True,
-    #                                 with_varName=True,
-    #                                 retrieve_all = True)
-    #     if isinstance(ret, dict) and len(ret) == 1:
-    #         varName = list(ret.keys())[0]
-    #         obj = ret[varName]
-    #         if isinstance(obj, self._objectType_):
-    #             self._objSymbol_ = varName
-    #             if self.receivers(self.sig_dataImported) > 0:
-    #                 self.sig_symbolChanged.emit(self._objSymbol_)
-    #                 self.sig_dataImported.emit(obj)
-    #                 # self.objectSymbolLabel.setText(varName)
-    #                 # self.objectSymbolLabel.setToolTip(f"'{varName}' is bound to a {type(obj).__name__} object in the workspace")
-
-    # @Slot(object)
-    # def slot_exportData(self, obj):
-    #     if isinstance(obj, self._objectType_):
-    #         if not isinstance(self._objSymbol_, str) or len(self._objSymbol_.strip()) == 0:
-    #             name = obj.name
-    #         else:
-    #             name = self._objSymbol_
-    #         if not isinstance(name, str) or len(name.strip()) == 0:
-    #             name = self._objectType_.__name__.lower()
-    #
-    #         newSymbol = self.exportDataToWorkspace(obj, name)
-    #
-    #         if isinstance(newSymbol, str) and len(newSymbol.strip()):
-    #             self._objSymbol_ = newSymbol
-    #
-    #         if isinstance(self._objSymbol_, str):
-    #             self.objectSymbolLabel.setText(self._objSymbol_)
-    #             self.objectSymbolLabel.setToolTip(f"'{self._objSymbol_}' is bound to a {type(obj).__name__} object in the workspace")
-    #             self.sig_symbolChanged.emit(self._objSymbol_)
-
-    # @Slot(object)
-    # def slot_copyData(self, obj):
-    #     from copy import deepcopy
-    #     if isinstance(obj, self._objectType_):
-    #         obj1 = deepcopy(obj)
-    #         if not isinstance(self._objSymbol_, str) or len(self._objSymbol_.strip()) == 0:
-    #             name = obj1.name
-    #         else:
-    #             name = self._objSymbol_
-    #
-    #         if not isinstance(name, str) or len(name.strip()) == 0:
-    #             name = self._objectType_.__name__.lower()
-    #
-    #         self.exportDataToWorkspace(obj1, name)
 
     def setValue(self, obj: typing.Any, objSymbol:typing.Optional[str]=None):
         self.dataType = type(obj)
