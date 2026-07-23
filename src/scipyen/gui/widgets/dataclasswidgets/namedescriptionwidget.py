@@ -112,14 +112,22 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
 
         anchoringWidget = self.provideAnchoringWidget()
         # anchoringWidget = self if self.parent() is None else self.parent()
+        self.dataExchangeWidget = self._setupCollapsibleChild_(
+            DataExchangeWidget,
+            "dataExchangeWidget",
+            None,
+            self.toggleDataExchangeWidgetToolButton,
+            anchoringWidget,
+            self._data_,
+            objSymbol = self._objSymbol_
+            )
 
-        self.dataExchangeWidget = DataExchangeWidget(anchoringWidget=anchoringWidget)
+        # self.dataExchangeWidget = DataExchangeWidget(anchoringWidget=anchoringWidget)
         self.dataExchangeWidget.setWindowTitle("Input/Output")
-        self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+        # self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
         self.dataExchangeWidget.setVisible(False)
-        self.dataExchangeWidget.sig_closing.connect(self._slot_dataExchangeWidgetClosing)
-        self.dataExchangeWidget.sig_collapsed.connect(self._slot_dataExchangeWidgetCollapsed)
-
+        # self.dataExchangeWidget.sig_closing.connect(self._slot_dataExchangeWidgetClosing)
+        # self.dataExchangeWidget.sig_collapsed.connect(self._slot_dataExchangeWidgetCollapsed)
         self.dataExchangeWidget.sig_requestDataExport.connect(self.slot_exportData)
         self.dataExchangeWidget.sig_requestDataSave.connect(self.slot_saveData)
         self.dataExchangeWidget.sig_requestDataCopy.connect(self.slot_copyData)
@@ -127,46 +135,69 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
         self.dataExchangeWidget.sig_requestLoadData.connect(self._slot_loadData)
         self.dataExchangeWidget.sig_requestNewObject.connect(self.sig_requestNewObject)
 
-        self._collapsibleChildren_["dataExchangeWidget"] = self.dataExchangeWidget
+        # self._collapsibleChildren_["dataExchangeWidget"] = self.dataExchangeWidget
 
-        self.dataExchangeWidget.setVisible(False)
+        # self.dataExchangeWidget.setVisible(False)
 
-    @Slot()
-    def _slot_dataExchangeWidgetClosing(self):
-        sb = QtCore.QSignalBlocker(self.toggleDataExchangeWidgetToolButton) # noqa
-        self.toggleDataExchangeWidgetToolButton.setChecked(False)
-
-    @Slot()
-    def _slot_dataExchangeWidgetCollapsed(self):
-        sb = QtCore.QSignalBlocker(self.toggleDataExchangeWidgetToolButton) # noqa
-        self.toggleDataExchangeWidgetToolButton.setChecked(False)
+    # @Slot()
+    # def _slot_dataExchangeWidgetClosing(self):
+    #     sb = QtCore.QSignalBlocker(self.toggleDataExchangeWidgetToolButton) # noqa
+    #     self.toggleDataExchangeWidgetToolButton.setChecked(False)
+    #
+    # @Slot()
+    # def _slot_dataExchangeWidgetCollapsed(self):
+    #     sb = QtCore.QSignalBlocker(self.toggleDataExchangeWidgetToolButton) # noqa
+    #     self.toggleDataExchangeWidgetToolButton.setChecked(False)
 
     @Slot(bool)
     def _slot_toggleDataExchangeWidget(self, val: bool):
         if val is True:
-            if not isinstance(self.dataExchangeWidget, DataExchangeWidget):
-                if isinstance(self.dataExchangeWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.dataExchangeWidget):
+            anchoringWidget = self.provideAnchoringWidget()
+            if isinstance(self.dataExchangeWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.dataExchangeWidget):
+                if not isinstance(self.dataExchangeWidget, DataExchangeWidget):
                     self.dataExchangeWidget.close()
                     self.dataExchangeWidget.deleteLater()
                     self.dataExchangeWidget = None
 
-                anchoringWidget = self.provideAnchoringWidget()
-                self.dataExchangeWidget = DataExchangeWidget(anchoringWidget = anchoringWidget)
-                self.dataExchangeWidget.setWindowTitle("Input/Output")
-                self.dataExchangeWidget.sig_closing.connect(self._slot_dataExchangeWidgetClosing)
-                self.dataExchangeWidget.sig_collapsed.connect(self._slot_dataExchangeWidgetCollapsed)
+                    self.dataExchangeWidget = self._setupCollapsibleChild_(
+                        DataExchangeWidget,
+                        "dataExchangeWidget",
+                        None,
+                        self.toggleDataExchangeWidgetToolButton,
+                        anchoringWidget,
+                        self._data_,
+                        objSymbol = self._objSymbol_
+                        )
 
-                self.dataExchangeWidget.sig_requestDataExport.connect(self.slot_exportData)
-                self.dataExchangeWidget.sig_requestDataSave.connect(self.slot_saveData)
-                self.dataExchangeWidget.sig_requestDataCopy.connect(self.slot_copyData)
-                self.dataExchangeWidget.sig_requestImportData.connect(self._slot_importData)
-                self.dataExchangeWidget.sig_requestLoadData.connect(self._slot_loadData)
-                self.dataExchangeWidget.sig_requestNewObject.connect(self.sig_requestNewObject)
+                    # self.dataExchangeWidget = DataExchangeWidget(anchoringWidget=anchoringWidget)
+                    self.dataExchangeWidget.setWindowTitle("Input/Output")
+                    # self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+                    self.dataExchangeWidget.setVisible(False)
+                    # self.dataExchangeWidget.sig_closing.connect(self._slot_dataExchangeWidgetClosing)
+                    # self.dataExchangeWidget.sig_collapsed.connect(self._slot_dataExchangeWidgetCollapsed)
+                    self.dataExchangeWidget.sig_requestDataExport.connect(self.slot_exportData)
+                    self.dataExchangeWidget.sig_requestDataSave.connect(self.slot_saveData)
+                    self.dataExchangeWidget.sig_requestDataCopy.connect(self.slot_copyData)
+                    self.dataExchangeWidget.sig_requestImportData.connect(self._slot_importData)
+                    self.dataExchangeWidget.sig_requestLoadData.connect(self._slot_loadData)
+                    self.dataExchangeWidget.sig_requestNewObject.connect(self.sig_requestNewObject)
 
-                if self._data_ is not None:
-                    self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+                # self.dataExchangeWidget = DataExchangeWidget(anchoringWidget = anchoringWidget)
+                # self.dataExchangeWidget.setWindowTitle("Input/Output")
+                # self.dataExchangeWidget.sig_closing.connect(self._slot_dataExchangeWidgetClosing)
+                # self.dataExchangeWidget.sig_collapsed.connect(self._slot_dataExchangeWidgetCollapsed)
+                #
+                # self.dataExchangeWidget.sig_requestDataExport.connect(self.slot_exportData)
+                # self.dataExchangeWidget.sig_requestDataSave.connect(self.slot_saveData)
+                # self.dataExchangeWidget.sig_requestDataCopy.connect(self.slot_copyData)
+                # self.dataExchangeWidget.sig_requestImportData.connect(self._slot_importData)
+                # self.dataExchangeWidget.sig_requestLoadData.connect(self._slot_loadData)
+                # self.dataExchangeWidget.sig_requestNewObject.connect(self.sig_requestNewObject)
+                #
+                # if self._data_ is not None:
+                #     self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
 
-                self._collapsibleChildren_["dataExchangeWidget"] = self.dataExchangeWidget
+                # self._collapsibleChildren_["dataExchangeWidget"] = self.dataExchangeWidget
 
 
             self.dataExchangeWidget.show()

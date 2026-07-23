@@ -119,7 +119,7 @@ data object after loading from file or importing from the workspace.
             objType = type(None)
 
         self._objectType_ = objType
-        self._objSymbol_ = None
+        self._objSymbol_ = kwargs.pop("objSymbol", None)
 
         QtCore.QObject.__init__(self, parent=parent)
 
@@ -138,23 +138,23 @@ data object after loading from file or importing from the workspace.
 
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
 
-        if anchoringWidget:
-            if isinstance(windowFlags, QtCore.Qt.WindowType):
-                self.setWindowFlags(windowFlags)
-            else:
-                self.setWindowFlags(QtCore.Qt.Tool)
-
-        self._sizeAnimationMax_ = 200
-        self._sizeAnimation_ = QtCore.QPropertyAnimation(self, b'widgetWidth', self)
-        self._sizeAnimation_.setStartValue(0)
-        self._sizeAnimation_.setDuration(200) # ms
-        self._sizeAnimation_.setEndValue(self._sizeAnimationMax_)
-        self._sizeAnimation_.valueChanged.connect(self._slot_setWidgetWidth)
-
-        self._animationGroup_ = QtCore.QParallelAnimationGroup()
-        self._animationGroup_.addAnimation(self._sizeAnimation_)
-        # self._animationGroup_.addAnimation(self._opacityAnimation_)
-        self._animationGroup_.stateChanged.connect(self._slot_animationStateChanged)
+        # if anchoringWidget:
+        #     if isinstance(windowFlags, QtCore.Qt.WindowType):
+        #         self.setWindowFlags(windowFlags)
+        #     else:
+        #         self.setWindowFlags(QtCore.Qt.Tool)
+        #
+        # self._sizeAnimationMax_ = 200
+        # self._sizeAnimation_ = QtCore.QPropertyAnimation(self, b'widgetWidth', self)
+        # self._sizeAnimation_.setStartValue(0)
+        # self._sizeAnimation_.setDuration(200) # ms
+        # self._sizeAnimation_.setEndValue(self._sizeAnimationMax_)
+        # self._sizeAnimation_.valueChanged.connect(self._slot_setWidgetWidth)
+        #
+        # self._animationGroup_ = QtCore.QParallelAnimationGroup()
+        # self._animationGroup_.addAnimation(self._sizeAnimation_)
+        # # self._animationGroup_.addAnimation(self._opacityAnimation_)
+        # self._animationGroup_.stateChanged.connect(self._slot_animationStateChanged)
 
         self._configureUI_()
 
@@ -168,100 +168,100 @@ data object after loading from file or importing from the workspace.
         self.exportToolButton.clicked.connect(self.sig_requestDataExport)
         self.newObjectToolButton.clicked.connect(self.sig_requestNewObject)
 
-        if (
-            isinstance(self._anchoringWidget_, QtWidgets.QWidget)
-            and hasattr(self._anchoringWidget_, "sig_moved")
-            ):
-            self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
+        # if (
+        #     isinstance(self._anchoringWidget_, QtWidgets.QWidget)
+        #     and hasattr(self._anchoringWidget_, "sig_moved")
+        #     ):
+        #     self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
         # if (
         #     isinstance(self._anchoringWidget_, QtWidgets.QWidget)
         #     and hasattr(self._anchoringWidget_, "_slot_anchoringWidgetMoved")
         #     ):
         #     self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
 
-    @property
-    def overrideAnchor(self) -> bool:
-        return self._overrideAnchor_
+    # @property
+    # def overrideAnchor(self) -> bool:
+    #     return self._overrideAnchor_
+    #
+    # @overrideAnchor.setter
+    # def overrideAnchor(self, val: bool):
+    #     self._overrideAnchor_ = val is True
 
-    @overrideAnchor.setter
-    def overrideAnchor(self, val: bool):
-        self._overrideAnchor_ = val is True
+    # @property
+    # def anchoringWidget(self) -> QtWidgets.QWidget | None:
+    #     return self._anchoringWidget_
+    #
+    # @anchoringWidget.setter
+    # def anchoringWidget(self, obj: QtWidgets.QWidget):
+    #     if isinstance(obj, QtWidgets.QWidget):
+    #         self._anchoringWidget_ = obj
+    #         self._isSubWidget_ = True
+    #     else:
+    #         self._anchoringWidget_ = None
+    #         self._isSubWidget_ = False
 
-    @property
-    def anchoringWidget(self) -> QtWidgets.QWidget | None:
-        return self._anchoringWidget_
-
-    @anchoringWidget.setter
-    def anchoringWidget(self, obj: QtWidgets.QWidget):
-        if isinstance(obj, QtWidgets.QWidget):
-            self._anchoringWidget_ = obj
-            self._isSubWidget_ = True
-        else:
-            self._anchoringWidget_ = None
-            self._isSubWidget_ = False
-
-    @Slot(QtCore.QPoint)
-    def _slot_anchoringWidgetMoved(self, pos: QtCore.QPoint):
-        # print(f"{self.__class__.__name__}<{self.objectName()}>._slot_anchoringWidgetMoved({pos})\n")
-        # if not self.isVisible():
-        #     return
-
-        if not isinstance(self._anchoringWidget_, QtWidgets.QWidget):
-            return
-
-        if isinstance(self.parent(), QtWidgets.QWidget):
-            return
-
-        if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
-            newPos = self._anchoringWidget_.parent().mapToGlobal(self._anchoringWidget_.geometry().topRight())
-
-        else:
-            newPos = self._anchoringWidget_.frameGeometry().topRight()
-
-        self.move(newPos)
+    # @Slot(QtCore.QPoint)
+    # def _slot_anchoringWidgetMoved(self, pos: QtCore.QPoint):
+    #     # print(f"{self.__class__.__name__}<{self.objectName()}>._slot_anchoringWidgetMoved({pos})\n")
+    #     # if not self.isVisible():
+    #     #     return
+    #
+    #     if not isinstance(self._anchoringWidget_, QtWidgets.QWidget):
+    #         return
+    #
+    #     if isinstance(self.parent(), QtWidgets.QWidget):
+    #         return
+    #
+    #     if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
+    #         newPos = self._anchoringWidget_.parent().mapToGlobal(self._anchoringWidget_.geometry().topRight())
+    #
+    #     else:
+    #         newPos = self._anchoringWidget_.frameGeometry().topRight()
+    #
+    #     self.move(newPos)
 
     def setObjectSymbol(self, val: str):
         self.objectSymbolLabel.setText(val)
 
-    def closeEvent(self, evt):
-        # print(f"{self.__class__.__name__}.closeEvent")
-        self.sig_closing.emit()
-        # self.closeSubWidgets()
-        super().closeEvent(evt)
-        evt.accept()
+    # def closeEvent(self, evt):
+    #     # print(f"{self.__class__.__name__}.closeEvent")
+    #     self.sig_closing.emit()
+    #     # self.closeSubWidgets()
+    #     super().closeEvent(evt)
+    #     evt.accept()
+    #
+    # def collapse(self, close: bool=False):
+    #     if self._isSubWidget_:
+    #         # self.collapseSubWidgets(close)
+    #         self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
+    #         self._closeRequested_ = close
+    #         self._animationGroup_.start()
 
-    def collapse(self, close: bool=False):
-        if self._isSubWidget_:
-            # self.collapseSubWidgets(close)
-            self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
-            self._closeRequested_ = close
-            self._animationGroup_.start()
-
-    def show(self):
-        if self.isVisible():
-            return
-
-        if self._isSubWidget_:
-            self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Forward)
-            geometry = self.geometry()
-            height = geometry.height()
-            heightHint = self.sizeHint().height()
-            self._sizeAnimation_.setEndValue(self.sizeHint().width())
-            topRight = self._anchoringWidget_.geometry().topRight()
-            if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
-                self._positionHint_ = self._anchoringWidget_.parent().mapToGlobal(topRight)
-            else:
-                self._positionHint_ = topRight
-
-            geometry.setX(self._positionHint_.x())
-            geometry.setY(self._positionHint_.y())
-            geometry.setHeight(heightHint)
-            self.setGeometry(geometry)
-            self._animationGroup_.start()
-            super().show()
-
-        else:
-            super().show()
+    # def show(self):
+    #     if self.isVisible():
+    #         return
+    #
+    #     if self._isSubWidget_:
+    #         self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Forward)
+    #         geometry = self.geometry()
+    #         height = geometry.height()
+    #         heightHint = self.sizeHint().height()
+    #         self._sizeAnimation_.setEndValue(self.sizeHint().width())
+    #         topRight = self._anchoringWidget_.geometry().topRight()
+    #         if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
+    #             self._positionHint_ = self._anchoringWidget_.parent().mapToGlobal(topRight)
+    #         else:
+    #             self._positionHint_ = topRight
+    #
+    #         geometry.setX(self._positionHint_.x())
+    #         geometry.setY(self._positionHint_.y())
+    #         geometry.setHeight(heightHint)
+    #         self.setGeometry(geometry)
+    #         self._animationGroup_.start()
+    #         super().show()
+    #
+    #     else:
+    #         super().show()
 
     @property
     def varName(self) -> str:
@@ -284,45 +284,45 @@ data object after loading from file or importing from the workspace.
 
         self._objectType_ = val
 
-    @QtCore.Property(int)
-    def widgetWidth(self) -> int:
-        return self.width()
-
-    @widgetWidth.setter
-    def widgetWidth(self, value: int):
-        self.setFixedWidth(value)
-
-    @Slot(QtCore.QVariant)
-    def _slot_setWidgetWidth(self, val: int | QtCore.QVariant):
-        if not isinstance(val, int):
-            val = val.value()
-        self.setFixedWidth(val)
-
-    @Slot(QtCore.QAbstractAnimation.State, QtCore.QAbstractAnimation.State)
-    def _slot_animationStateChanged(self, newState: QtCore.QAbstractAnimation.State,
-                                    oldState: QtCore.QAbstractAnimation.State):
-
-        if (not isinstance(self._animationGroup_, QtCore.QParallelAnimationGroup)
-            or not qtutils.isQObjectAlive(self._animationGroup_)):
-            return
-
-        if newState == QtCore.QAbstractAnimation.Running:
-            self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
-            # self._parentOpacityAnimation_.start()
-        elif newState == QtCore.QAbstractAnimation.Stopped:
-            self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
-            # if isinstance(self._closeRequestedEvent_, QtGui.QCloseEvent):
-            if self._animationGroup_.direction() == QtCore.QAbstractAnimation.Backward:
-                self.sig_collapsed.emit()
-                if self._closeRequested_ is True:
-                    self.close()
-                else:
-                    self.setVisible(False)
-
-            else:
-                # re-allow manual resizing
-                self.setMinimumSize(QtCore.QSize(0,0))
-                self.setMaximumSize(QtCore.QSize(QtWidgets.QWIDGETSIZE_MAX, QtWidgets.QWIDGETSIZE_MAX))
+    # @QtCore.Property(int)
+    # def widgetWidth(self) -> int:
+    #     return self.width()
+    #
+    # @widgetWidth.setter
+    # def widgetWidth(self, value: int):
+    #     self.setFixedWidth(value)
+    #
+    # @Slot(QtCore.QVariant)
+    # def _slot_setWidgetWidth(self, val: int | QtCore.QVariant):
+    #     if not isinstance(val, int):
+    #         val = val.value()
+    #     self.setFixedWidth(val)
+    #
+    # @Slot(QtCore.QAbstractAnimation.State, QtCore.QAbstractAnimation.State)
+    # def _slot_animationStateChanged(self, newState: QtCore.QAbstractAnimation.State,
+    #                                 oldState: QtCore.QAbstractAnimation.State):
+    #
+    #     if (not isinstance(self._animationGroup_, QtCore.QParallelAnimationGroup)
+    #         or not qtutils.isQObjectAlive(self._animationGroup_)):
+    #         return
+    #
+    #     if newState == QtCore.QAbstractAnimation.Running:
+    #         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
+    #         # self._parentOpacityAnimation_.start()
+    #     elif newState == QtCore.QAbstractAnimation.Stopped:
+    #         self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
+    #         # if isinstance(self._closeRequestedEvent_, QtGui.QCloseEvent):
+    #         if self._animationGroup_.direction() == QtCore.QAbstractAnimation.Backward:
+    #             self.sig_collapsed.emit()
+    #             if self._closeRequested_ is True:
+    #                 self.close()
+    #             else:
+    #                 self.setVisible(False)
+    #
+    #         else:
+    #             # re-allow manual resizing
+    #             self.setMinimumSize(QtCore.QSize(0,0))
+    #             self.setMaximumSize(QtCore.QSize(QtWidgets.QWIDGETSIZE_MAX, QtWidgets.QWIDGETSIZE_MAX))
 
     # @Slot()
     # def _slot_loadData(self):

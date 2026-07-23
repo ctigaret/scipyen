@@ -491,7 +491,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                 self.parentEditor.close()
                 self.parentEditor.deleteLater()
                 # self.parentEditor = editor
-                self.parentEditor.setObjetName("parentEditor")
+                self.parentEditor.setObjectName("parentEditor")
 
                 self.parentEditor = self._setupCollapsibleChild_(
                     editorWidgetType,
@@ -511,7 +511,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                 #     self.parentEditor.close()
                 #     self.parentEditor.deleteLater()
                 #     self.parentEditor = editor
-                #     self.parentEditor.setObjetName("parentEditor")
+                #     self.parentEditor.setObjectName("parentEditor")
 
         else:
             editorWidgetType = self._setParentEditorType_(parent)
@@ -528,7 +528,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             # self.parentEditor.sig_valueChanged.connect(self._slot_parentChanged)
             # self.parentEditor.sig_closing.connect(self._slot_parentEditorClosing)
             # self.parentEditor.sig_collapsed.connect(self._slot_parentEditorCollapsed)
-            # self.parentEditor.setObjetName("parentEditor")
+            # self.parentEditor.setObjectName("parentEditor")
 
         self._needsNewParentWidget_ = False
         # self._collapsibleChildren_["parentEditor"] = self.parentEditor

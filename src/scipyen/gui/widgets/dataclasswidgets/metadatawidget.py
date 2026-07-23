@@ -100,9 +100,9 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
         self._configureUI_()
 
         self.biologicalSourceEditor = None
-        self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
+        # self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
         self.procedureEditor = None
-        self._collapsibleChildren_["procedureEditor"] = self.procedureEditor
+        # self._collapsibleChildren_["procedureEditor"] = self.procedureEditor
 
     def _configureUI_(self):
         self.setupUi(self)
@@ -291,7 +291,6 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
                     self._slot_procedureChanged,
                     self.toggleSourceEditorToolButton,
                     anchoringWidget,
-                    windowTitle =
                     self._data_.procedure, objSymbol="procedure"
                     )
 

@@ -1484,8 +1484,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     def _setupCollapsibleChild_(self, widgetType:type, objectName: str,
                                 valueChangedSlot: Slot,
                                 toggleControl:QtWidgets.QWidget,
+                                anchoringWidget, # = None,
                                 # setVisible:bool=True,
-                                anchoringWidget = None,
                                 # windowTitle:str =  None,
                                 *args, **kwargs):
         r"""
@@ -1513,7 +1513,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         if hasattr(child, "_slot_anchoringWidgetMoved"):
             self.sig_moved.connect(child._slot_anchoringWidgetMoved)
 
-        self._collapsibleChildren_[objectName] = (child, toggleControl)
+        if not isinstance(getattr(anchoringWidget, "_collapsibleChildren_", None), dict):
+            anchoringWidget._collapsibleChildren_ = dict()
+        anchoringWidget._collapsibleChildren_[objectName] = (child, toggleControl)
 
         return child
 
@@ -1980,6 +1982,11 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         self._isAttribute_ = val is True
 
     def collapse(self, close: bool=False):
+        if hasattr(self, "getObjectName"):
+            myName = f"<{self.getObjectName()}>"
+        else:
+            myName=""
+        print(f"{self.__class__.__name__}{myName}.collapse")
         if self._isSubWidget_:
             self.collapseSubWidgets(close)
             self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
@@ -1987,8 +1994,15 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             self._animationGroup_.start()
 
     def collapseSubWidgets(self, close: bool= False):
+        if hasattr(self, "getObjectName"):
+            myName = f"<{self.getObjectName()}>"
+        else:
+            myName=""
+        print(f"{self.__class__.__name__}{myName}>.collapseSubWidgets")
+
         if len(self._collapsibleChildren_) == 0:
             return
+        print(f"{self._collapsibleChildren_}")
         for obj, toggle in self._collapsibleChildren_.values():
             if isinstance(obj, QtWidgets.QWidget) and qtutils.isQObjectAlive(obj):
                 try:
@@ -1997,13 +2011,27 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                     pass
 
     def closeEvent(self, evt):
-        # print(f"{self.__class__.__name__}.closeEvent")
+        if hasattr(self, "getObjectName"):
+            myName = f"<{self.getObjectName()}>"
+        else:
+            myName=""
+        print(f"{self.__class__.__name__}{myName}.closeEvent")
         self.sig_closing.emit()
         self.closeSubWidgets()
-        super().closeEvent(evt)
+        if hasattr(super(), "closeEvent"):
+            super().closeEvent(evt)
+        # try:
+        #     super().closeEvent(evt)
+        # except: # noqa
+        #     pass
         evt.accept()
 
     def closeSubWidgets(self):
+        if hasattr(self, "getObjectName"):
+            myName = f"<{self.getObjectName()}>"
+        else:
+            myName=""
+        print(f"{self.__class__.__name__}{myName}.closeSubWidgets")
         if len(self._collapsibleChildren_) == 0:
             return
         for obj, toggle in self._collapsibleChildren_.values():
@@ -2026,6 +2054,11 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         # self.nameDescriptionWidget.closeSubWidgets()
 
     def moveEvent(self, evt):
+        if hasattr(self, "getObjectName"):
+            myName = f"<{self.getObjectName()}>"
+        else:
+            myName=""
+        print(f"{self.__class__.__name__}{myName}.moveEvent")
         self.sig_moved.emit(evt.pos())# - evt.oldPos())
         evt.accept()
 

@@ -65,7 +65,7 @@
       </widget>
      </item>
      <item>
-      <widget class="QToolButton" name="editSpecimenToolButton">
+      <widget class="QToolButton" name="toggleSpecimenEditorToolButton">
        <property name="toolTip">
         <string>Edit specimen</string>
        </property>
