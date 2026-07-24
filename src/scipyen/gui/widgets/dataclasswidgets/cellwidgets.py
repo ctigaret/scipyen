@@ -92,6 +92,9 @@ class CellWidget(Ui_CellWidget, DataClassWidget):
         self.cellSubTypeNameEdit.setText(f"{self._data_.cellSubType}")
         self.cellSubTypeNameEdit.textChanged.connect(self._slot_cellSubTypeChanged)
 
+        self.sig_uiConfigured.emit()
+
+
     def value(self) -> sdc.Cell:
         return self._data_
 
@@ -163,6 +166,8 @@ class NeuronWidget(Ui_NeuronWidget, DataClassWidget):
         ndx = self._entityTypeNames_.index(self._data_.cellSubType.name)
         self.neuronTypeComboBox.setCurrentIndex(ndx)
         self.neuronTypeComboBox.currentIndexChanged.connect(self._slot_neuronTypeChanged)
+
+        self.sig_uiConfigured.emit()
 
     def value(self) -> sdc.Neuron:
         return self._data_

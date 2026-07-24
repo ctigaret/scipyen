@@ -129,8 +129,6 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         self.replaceSpecimenToolButton.clicked.connect(self._slot_chooseNewSpecimenType)
 
-        # self._collapsibleChildren_["specimenEditor"] = self.specimenEditor
-
         self.sig_uiConfigured.emit()
 
 
@@ -241,39 +239,23 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
     def _slot_editSpecimen(self):
         anchoringWidget = self.provideAnchoringWidget()
         if isinstance(self._data_.specimen, self._data_.specimenTypes):
-            if isinstance(self.specimenEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenEditor):
-                spWidgetType = self._setSpecimenWidgetType_(self._data_.specimen)
-                if self._needsNewSpecimenWidget_ or type(self.specimenEditor) is not spWidgetType:
-                    self.specimenEditor.close()
-                    self.specimenEditor.deleteLater()
-                    self.specimenEditor = None
+            spWidgetType = self._setSpecimenWidgetType_(self._data_.specimen)
+            if not isinstance(self.specimenEditor, spWidgetType) or self._needsNewSpecimenWidget_:
+                self._removeAnchoringCollapsibleWidget_(self.specimenEditor)
+                # self.specimenEditor.deleteLater()
+                # self.specimenEditor = None
+                self.specimenEditor = self._setupCollapsibleChild_(
+                    spWidgetType,
+                    "specimenEditor",
+                    self._slot_specimenChanged,
+                    self.toggleSpecimenEditorToolButton,
+                    anchoringWidget,
+                    self._data_.specimen,
+                    objSymbol = "specimen"
+                    )
 
-                    self.specimenEditor = self._setupCollapsibleChild_(
-                        spWidgetType,
-                        "specimenEditor",
-                        self._slot_specimenChanged,
-                        self.toggleSpecimenEditorToolButton,
-                        anchoringWidget,
-                        self._data_.specimen,
-                        objSymbol = "specimen"
+                self._needsNewSpecimenWidget_ = False
 
-                        )
-
-                    self._needsNewSpecimenWidget_ = False
-                    # self.specimenEditor = spWidgetType(self._data_.specimen, objSymbol="specimen", anchoringWidget=anchoringWidget)
-                    # self.specimenEditor.sig_valueChanged.connect(self._slot_specimenChanged)
-                    # self.specimenEditor.sig_closing.connect(self._slot_specimenEditorClosing)
-                    # self.specimenEditor.sig_collapsed.connect(self._slot_specimenEditorCollapsed)
-
-            # else:
-            #     spWidgetType = self._setSpecimenWidgetType_(self._data_.specimen)
-            #     self.specimenEditor = spWidgetType(self._data_.specimen, objSymbol="specimen", anchoringWidget=anchoringWidget)
-            #     self.specimenEditor.sig_valueChanged.connect(self._slot_specimenChanged)
-            #     self.specimenEditor.sig_closing.connect(self._slot_specimenEditorClosing)
-            #     self.specimenEditor.sig_collapsed.connect(self._slot_specimenEditorCollapsed)
-            #
-            # self._needsNewSpecimenWidget_ = False
-            # self._collapsibleChildren_["specimenEditor"] = self.specimenEditor
             self.specimenEditor.show()
             if isinstance(self._data_.specimen.name, str) and len(self._data_.specimen.name.strip()):
                 self.specimenEditor.setWindowTitle(f"Specimen: {self._data_.specimen.name} ({type(self._data_.specimen).__name__})")

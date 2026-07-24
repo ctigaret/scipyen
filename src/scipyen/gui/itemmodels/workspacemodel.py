@@ -1296,7 +1296,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         del_vars = observed_varnames - current_user_varnames
 
         if len(deadQObjects):
-            del_vars = del_vars + deadQObjects
+            del_vars = del_vars | deadQObjects
 
         # print(f"{print_styled(f'\n{self.__class__.__name__}._updateModel_ del_vars = {del_vars}', 'magenta')}")
 
@@ -1911,7 +1911,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
             )
 
         if len(deadQObjects):
-            del_vars = del_vars + deadQObjects
+            del_vars = del_vars | deadQObjects
 
         # new_vars = dict(filter(lambda x: not x[0] in displayed_var_names, current_vars.items()))
         #

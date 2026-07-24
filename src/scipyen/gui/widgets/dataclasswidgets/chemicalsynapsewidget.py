@@ -118,9 +118,7 @@ class ChemicalSynapseWidget(Ui_ChemicalSynapseWidget, DataClassWidget):
         self.postsynapticCompartmentWidget.nameDescriptionWidget.symbol = f"{self.dataExchangeWidget.objectSymbolLabel.text()}.postynaptic"
         self.postsynapticCompartmentWidget.sig_valueChanged.connect(self._slot_postsynapticChanged)
 
-    # def closeEvent(self, evt):
-    #     super.closeEvent(evt)
-    #     evt.accept()
+        self.sig_uiConfigured.emit()
 
     @Slot(int)
     def _slot_morphologicalTypeChanged(self, val:int):

@@ -133,6 +133,8 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
         self.typeComboBox.setCurrentIndex(ndx)
         self.typeComboBox.currentIndexChanged.connect(self._slot_compartmentTypeChanged)
 
+        self.sig_uiConfigured.emit()
+
     def value(self) -> sdc.CellCompartment:
         r"""Overrides DataClassWidget.value()"""
         return self._data_

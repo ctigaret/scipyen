@@ -1216,7 +1216,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
     _owncfg = Bunch()
 
-    # sig_moved = Signal(QtCore.QPoint, name="sig_moved")
+    sig_moved = Signal(QtCore.QPoint, name="sig_moved")
     # sig_closing = Signal(name="sig_closing")
     # sig_collapsed = Signal(name="sig_collapsed")
     # sig_uiConfigured = Signal(name="sig_uiConfigured")
@@ -1292,6 +1292,13 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             self.setWindowTitle(title)
 
         ScipyenConfigurable.__init__(self, *args, **kwargs)
+
+        # NOTE: 2026-07-24 16:43:45
+        # functionality needed for AnchoringCollapsibleWidget components
+        # used by WorkspaceGuiMixin subclasses that do not implement
+        # AnchoringCollapsibleWidget
+        # FIXME: I know, crappy design ⌢
+        self._collapsibleChildren_ = dict()
 
     @property
     def scipyenWindow(self):
@@ -1698,3 +1705,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     @isAttribute.setter
     def isAttribute(self, val: bool):
         self._isAttribute_ = val is True
+
+    def moveEvent(self, evt):
+        self.sig_moved.emit(evt.pos())
+        evt.accept()

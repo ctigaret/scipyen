@@ -143,6 +143,8 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
         self.toggleProcedureEditorToolButton.toggled.connect(self._slot_toggleProcedureEditor)
 
+        self.sig_uiConfigured.emit()
+
     def closeEvent(self, evt):
         self.closeSubWidgets()
         super().closeEvent(evt)
@@ -277,11 +279,9 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
         anchoringWidget = self.provideAnchoringWidget()
         # anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
 
-        if isinstance(self.procedureEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.procedureEditor):
-            if not isinstance(self.procedureEditor, ProcedureWidget):
-                self.procedureEditor.collapse(True)
-                self.procedureEditor.deleteLater()
-                self.procedureEditor = None
+        if not isinstance(self.procedureEditor, ProcedureWidget):
+            if isinstance(self.procedureEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.procedureEditor):
+                self._removeAnchoringCollapsibleWidget_(self.procedureEditor)
 
                 self.procedureEditor = self._setupCollapsibleChild_(
                     ProcedureWidget,
@@ -292,44 +292,23 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
                     self._data_.procedure, objSymbol="procedure"
                     )
 
-                # self.procedureEditor = ProcedureWidget(self._data_.procedure, objSymbol="procedure", anchoringWidget=anchoringWidget)
-                # self.procedureEditor.sig_valueChanged.connect(self._slot_procedureChanged)
-                # self.procedureEditor.sig_closing.connect(self._slot_procedureEditorClosing)
-                # self.procedureEditor.sig_collapsed.connect(self._slot_procedureEditorCollapsed)
-                # self.procedureEditor.setObjectName("procedureEditor")
-
-        else:
-            self.procedureEditor = self._setupCollapsibleChild_(
-                ProcedureWidget,
-                "procedureEditor",
-                self._slot_procedureChanged,
-                self.toggleSourceEditorToolButton,
-                anchoringWidget,
-                self._data_.procedure, objSymbol="procedure"
-                )
-            # self.procedureEditor = ProcedureWidget(self._data_.procedure, objSymbol="procedure", anchoringWidget=anchoringWidget)
-            # self.procedureEditor.sig_valueChanged.connect(self._slot_procedureChanged)
-            # self.procedureEditor.sig_closing.connect(self._slot_procedureEditorClosing)
-            # self.procedureEditor.sig_collapsed.connect(self._slot_procedureEditorCollapsed)
-            # self.procedureEditor.setObjectName("procedureEditor")
-
-        if not self.procedureEditor.isVisible():
-            self.procedureEditor.show()
-
         if isinstance(self._data_.procedure.name, str) and len(self._data_.procedure.name.strip()):
             self.procedureEditor.setWindowTitle(f"Procedure: {self._data_.procedure.name} ({type(self._data_.procedure).__name__})")
         else:
             self.procedureEditor.setWindowTitle(f"Procedure: {type(self._data_.procedure).__name__}")
 
-    @Slot()
-    def _slot_procedureEditorClosing(self):
-        sb = QtCore.QSignalBlocker(self.toggleProcedureEditorToolButton) # noqa
-        self.toggleProcedureEditorToolButton.setChecked(False)
+        if not self.procedureEditor.isVisible():
+            self.procedureEditor.show()
 
-    @Slot()
-    def _slot_procedureEditorCollapsed(self):
-        sb = QtCore.QSignalBlocker(self.toggleProcedureEditorToolButton) # noqa
-        self.toggleProcedureEditorToolButton.setChecked(False)
+    # @Slot()
+    # def _slot_procedureEditorClosing(self):
+    #     sb = QtCore.QSignalBlocker(self.toggleProcedureEditorToolButton) # noqa
+    #     self.toggleProcedureEditorToolButton.setChecked(False)
+    #
+    # @Slot()
+    # def _slot_procedureEditorCollapsed(self):
+    #     sb = QtCore.QSignalBlocker(self.toggleProcedureEditorToolButton) # noqa
+    #     self.toggleProcedureEditorToolButton.setChecked(False)
 
 
     @Slot(object)

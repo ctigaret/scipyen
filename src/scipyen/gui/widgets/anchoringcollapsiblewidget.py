@@ -38,7 +38,7 @@ from core import qtutils
 from gui.workspacegui import WorkspaceGuiMixin
 
 class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
-    sig_moved = Signal(QtCore.QPoint, name="sig_moved")
+    # sig_moved = Signal(QtCore.QPoint, name="sig_moved")
     sig_closing = Signal(name="sig_closing")
     sig_collapsed = Signal(name="sig_collapsed")
     sig_uiConfigured = Signal(name="sig_uiConfigured")
@@ -114,9 +114,9 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         if hasattr(child, "sig_valueChanged") and inspect.ismethod(valueChangedSlot):
             child.sig_valueChanged.connect(valueChangedSlot)
         if hasattr(child, "sig_closing"):
-            child.sig_closing.connect(self._slot_anchoredWidgetClosingOrCollapsing)
+            child.sig_closing.connect(self._slot_anchoredWidgetClosingOrCollapsing, QtCore.Qt.QueuedConnection)
         if hasattr(child, "sig_collapsed"):
-            child.sig_collapsed.connect(self._slot_anchoredWidgetClosingOrCollapsing)
+            child.sig_collapsed.connect(self._slot_anchoredWidgetClosingOrCollapsing, QtCore.Qt.QueuedConnection)
         if hasattr(child, "_slot_anchoringWidgetMoved"):
             self.sig_moved.connect(child._slot_anchoringWidgetMoved)
 
@@ -133,11 +133,19 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     def _removeAnchoringCollapsibleWidget_(self, widget: QtWidgets.QWidget):
         if isinstance(widget, QtWidgets.QWidget):
             wid = id(widget)
-            if widget.isAnchoredWidget and wid in widget.anchoringWidget._collapsibleChildren_:
-                del widget.anchoringWidget._collapsibleChildren_[wid]
 
             if qtutils.isQObjectAlive(widget):
                 widget.close()
+                if widget.isAnchoredWidget and wid in widget.anchoringWidget._collapsibleChildren_:
+                    toggle = widget.anchoringWidget._collapsibleChildren_[wid][1]
+                    if (
+                        isinstance(toggle, QtWidgets.QWidget)
+                        and hasattr(toggle, "setChecked")
+                        and qtutils.isQObjectAlive(toggle)
+                        ):
+                        sb = QtCore.QSignalBlocker(toggle) # noqa
+                        toggle.setChecked(False)
+                    del widget.anchoringWidget._collapsibleChildren_[wid]
                 widget.deleteLater()
                 widget = None
 
@@ -199,18 +207,33 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     @Slot()
     def _slot_anchoredWidgetClosingOrCollapsing(self):
+        # BUG?: 2026-07-24 16:25:48 FIXME?
+        # the problem here is that the widget might have been already removed
+        # from _collapsibleChildren_, or not even having been added to this, but
+        # rather in an anchoring widget higher up th hierarchy
+        #
+        # The latter case is NOT A BUG but it MUST be captured in closeSubWidgets
         widget = self.sender()
-        print(f"{self.__class__.__name__}._slot_anchoredWidgetClosingOrCollapsing: widget = {widget}")
+        # print(f"{self.__class__.__name__}._slot_anchoredWidgetClosingOrCollapsing: widget = {widget}")
         wid = id(widget)
-        # if widget.objectName() in self._collapsibleChildren_:
-        if wid in self._collapsibleChildren_:
-            # toggle = self._collapsibleChildren_[widget.objectName()][1]
-            toggle = self._collapsibleChildren_[wid][1]
-            print(f"{self.__class__.__name__}._slot_anchoredWidgetClosingOrCollapsing: toggle -> {toggle}")
+        if (
+            isinstance(getattr(widget, "anchoringWidget", None), QtWidgets.QWidget)
+            and len(getattr(widget.anchoringWidget, "_collapsibleChildren_", dict()))
+            ):
+            aw = widget.anchoringWidget
+            ccd = aw._collapsibleChildren_
+            if wid in ccd:
+                # toggle = self._collapsibleChildren_[widget.objectName()][1]
+                toggle = ccd[wid][1]
+                # print(f"{self.__class__.__name__}._slot_anchoredWidgetClosingOrCollapsing: toggle -> {toggle}")
 
-            if isinstance(toggle, QtWidgets.QWidget) and hasattr(toggle, "setChecked"):
-                sb = QtCore.QSignalBlocker(toggle) # noqa
-                toggle.setChecked(False)
+                if (
+                    isinstance(toggle, QtWidgets.QWidget)
+                    and hasattr(toggle, "setChecked")
+                    and qtutils.isQObjectAlive(toggle)
+                    ):
+                    sb = QtCore.QSignalBlocker(toggle) # noqa
+                    toggle.setChecked(False)
 
     def provideAnchoringWidget(self, widget: typing.Optional[QtWidgets.QWidget] = None) -> QtWidgets.QWidget | None:
         r"""Provides an anchoring widget to a collapsible child widget, if required.
@@ -285,15 +308,41 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     def closeSubWidgets(self):
         if len(self._collapsibleChildren_) == 0:
             return
+
+        # NOTE: 2026-07-24 16:35:05
+        # cache widget IDs to avoid _collapsibleChildren_ changing size during iteration
+        wids = list()
         for obj, toggle, objName in self._collapsibleChildren_.values():
             if isinstance(obj, QtWidgets.QWidget):
+                if obj.isAnchoredWidget:
+                    wids.append(id(obj))
+
+                # NOTE: 2026-07-24 16:28:06
+                # see # BUG?: 2026-07-24 16:25:48 FIXME?
+                if (
+                    isinstance(toggle, QtWidgets.QWidget)
+                    and hasattr(toggle, "setChecked")
+                    and qtutils.isQObjectAlive(toggle)
+                    ):
+                    sb = QtCore.QSignalBlocker(toggle) # noqa
+                    toggle.setChecked(False)
+
                 obj.close()
                 obj.deleteLater()
                 obj = None
 
-    def moveEvent(self, evt):
-        self.sig_moved.emit(evt.pos())# - evt.oldPos())
-        evt.accept()
+        for wid in wids:
+            if wid in self._collapsibleChildren_:
+                del self._collapsibleChildren_[wid]
+
+            if self.anchoringWidget:
+                if wid in self.anchoringWidget._collapsibleChildren_:
+                    del self.anchoringWidget._collapsibleChildren_[wid]
+
+
+    # def moveEvent(self, evt):
+    #     self.sig_moved.emit(evt.pos())# - evt.oldPos())
+    #     evt.accept()
 
     @property
     def overrideAnchor(self) -> bool:
