@@ -312,20 +312,6 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         from gui.widgets.dataclasswidgets.biologicalproductwidget import BiologicalProductWidget
         return BiologicalProductWidget
 
-    def closeEvent(self, evt):
-        self.closeSubWidgets()
-
-        super().closeEvent(evt)
-        evt.accept()
-
-    def closeSubWidgets(self):
-        if isinstance(self.specimenEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenEditor):
-            self.specimenEditor.close()
-            self.specimenEditor.deleteLater()
-            self.specimenEditor = None
-
-        super().closeSubWidgets()
-
     def value(self) -> sdc.BiologicalSource:
         return self._data_
 

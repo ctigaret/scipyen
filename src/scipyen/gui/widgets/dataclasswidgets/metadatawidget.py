@@ -184,30 +184,10 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
     def _slot_editBiologicalSource(self):
         from gui.widgets.dataclasswidgets.biologicalsourcewidget import BiologicalSourceWidget
         anchoringWidget = self.provideAnchoringWidget()
-        if isinstance(self.biologicalSourceEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor):
-            if not isinstance(self.biologicalSourceEditor, BiologicalSourceWidget):
-                self.biologicalSourceEditor.collapse(True)
-                self.biologicalSourceEditor.deleteLater()
-                self.biologicalSourceEditor = None
+        if not isinstance(self.biologicalSourceEditor, BiologicalSourceWidget):
+            if isinstance(self.biologicalSourceEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor):
+                self._removeAnchoringCollapsibleWidget_(self.biologicalSourceEditor)
 
-                self.biologicalSourceEditor = self._setupCollapsibleChild_(
-                    BiologicalSourceWidget,
-                    "biologicalSourceEditor",
-                    self._slot_biologicalSourceChanged,
-                    self.toggleSourceEditorToolButton,
-                    anchoringWidget,
-                    self._data_.source,
-                    objSymbol="source"
-                    )
-
-                # self.biologicalSourceEditor = BiologicalSourceWidget(self._data_.source, objSymbol="source", anchoringWidget=anchoringWidget)
-                # # self.biologicalSourceEditor.setWindowTitle("Source")
-                # self.biologicalSourceEditor.sig_valueChanged.connect(self._slot_biologicalSourceChanged)
-                # self.biologicalSourceEditor.sig_closing.connect(self._slot_biologicalSourceEditorClosing)
-                # self.biologicalSourceEditor.sig_collapsed.connect(self._slot_biologicalSourceEditorCollapsed)
-                # self.biologicalSourceEditor.setObjectName("biologicalSourceEditor")
-
-        else:
             self.biologicalSourceEditor = self._setupCollapsibleChild_(
                 BiologicalSourceWidget,
                 "biologicalSourceEditor",
@@ -218,34 +198,16 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
                 objSymbol="source"
                 )
 
-            # self.biologicalSourceEditor = BiologicalSourceWidget(self._data_.source, objSymbol="source", anchoringWidget=anchoringWidget)
-            # # self.biologicalSourceEditor.setWindowTitle("Source")
-            # self.biologicalSourceEditor.sig_valueChanged.connect(self._slot_biologicalSourceChanged)
-            # self.biologicalSourceEditor.sig_closing.connect(self._slot_biologicalSourceEditorClosing)
-            # self.biologicalSourceEditor.sig_collapsed.connect(self._slot_biologicalSourceEditorCollapsed)
-            # self.biologicalSourceEditor.setObjectName("biologicalSourceEditor")
-
-
-        # self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
-        # self.biologicalSourceEditor.setValue(self._data_.source, objSymbol="source")
-
-        if not self.biologicalSourceEditor.isVisible():
-            self.biologicalSourceEditor.show()
+        else:
+            self.biologicalSourceEditor.setValue(self._data_.source,
+                                                 objSymbol="source")
 
         if isinstance(self._data_.source.name, str) and len(self._data_.source.name.strip()):
             self.biologicalSourceEditor.setWindowTitle(f"Source: {self._data_.source.name} ({type(self._data_.source).__name__})")
         else:
             self.biologicalSourceEditor.setWindowTitle(f"Source: {type(self._data_.source).__name__}")
 
-    @Slot()
-    def _slot_biologicalSourceEditorCollapsed(self):
-        sb = QtCore.QSignalBlocker(self.toggleSourceEditorToolButton) # noqa
-        self.toggleSourceEditorToolButton.setChecked(False)
-
-    @Slot()
-    def _slot_biologicalSourceEditorClosing(self):
-        sb = QtCore.QSignalBlocker(self.toggleSourceEditorToolButton) # noqa
-        self.toggleSourceEditorToolButton.setChecked(False)
+        self.biologicalSourceEditor.show()
 
     @Slot(object)
     def _slot_biologicalSourceChanged(self, val: sdc.BiologicalSource):
@@ -283,33 +245,24 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
             if isinstance(self.procedureEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.procedureEditor):
                 self._removeAnchoringCollapsibleWidget_(self.procedureEditor)
 
-                self.procedureEditor = self._setupCollapsibleChild_(
-                    ProcedureWidget,
-                    "procedureEditor",
-                    self._slot_procedureChanged,
-                    self.toggleSourceEditorToolButton,
-                    anchoringWidget,
-                    self._data_.procedure, objSymbol="procedure"
-                    )
+            self.procedureEditor = self._setupCollapsibleChild_(
+                ProcedureWidget,
+                "procedureEditor",
+                self._slot_procedureChanged,
+                self.toggleProcedureEditorToolButton,
+                anchoringWidget,
+                self._data_.procedure, objSymbol="procedure"
+                )
+        else:
+            self.procedureEditor.setValue(self._data_.procedure,
+                                          objSymbol="procedure")
 
         if isinstance(self._data_.procedure.name, str) and len(self._data_.procedure.name.strip()):
             self.procedureEditor.setWindowTitle(f"Procedure: {self._data_.procedure.name} ({type(self._data_.procedure).__name__})")
         else:
             self.procedureEditor.setWindowTitle(f"Procedure: {type(self._data_.procedure).__name__}")
 
-        if not self.procedureEditor.isVisible():
-            self.procedureEditor.show()
-
-    # @Slot()
-    # def _slot_procedureEditorClosing(self):
-    #     sb = QtCore.QSignalBlocker(self.toggleProcedureEditorToolButton) # noqa
-    #     self.toggleProcedureEditorToolButton.setChecked(False)
-    #
-    # @Slot()
-    # def _slot_procedureEditorCollapsed(self):
-    #     sb = QtCore.QSignalBlocker(self.toggleProcedureEditorToolButton) # noqa
-    #     self.toggleProcedureEditorToolButton.setChecked(False)
-
+        self.procedureEditor.show()
 
     @Slot(object)
     def _slot_procedureChanged(self, value: sdc.Procedure):

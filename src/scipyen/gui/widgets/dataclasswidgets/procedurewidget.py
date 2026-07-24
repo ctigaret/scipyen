@@ -120,14 +120,14 @@ class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
     def value(self) -> sdc.Procedure:
         return self._data_
 
-    def setValue(self, val: sdc.Procedure):
+    def setValue(self, val: sdc.Procedure, **kwargs):
         if not isinstance(val, sdc.Procedure):
             val = sdc.Procedure()
 
         self._data_ = val
 
         sb = QtCore.QSignalBlocker(self.typeComboBox) # noqa
-        ndx = self._procedureTypeNames_.index(self._data_.procedureType)
+        ndx = self._procedureTypeNames_.index(self._data_.procedureType.name)
         self.typeComboBox.setCurrentIndex(ndx)
 
     @Slot(int)

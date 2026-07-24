@@ -86,83 +86,21 @@ class DataClassWidget(AnchoringCollapsibleWidget):
 
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
                  **kwargs):
-        # isAttribute = kwargs.pop("isAttribute", False)
-        # anchoringWidget = kwargs.pop("anchoringWidget", None)
-        # self._overrideAnchor_ = kwargs.pop("overrideAnchor", False)
-        # windowFlags = kwargs.pop("windowFlags", None)
         self._objSymbol_ = kwargs.pop("objSymbol", None)
 
-        # self._isSubWidget_: bool = False
-        # self._moveEventDispatcher_ = None
-
-        # self._topWidgetCollapsed_:bool = False
-        # self._outerFrameGeometry_ = None
-
-        # self._positionHint_: typing.Optional[QtCore.QPoint] = None
-        # # self._closeRequestedEvent_: typing.Optional[QtGui.QCloseEvent] = None
-        # self._closeRequested_: bool = False
         self._needsNewParentWidget_: bool =  True
 
-        # if isinstance(anchoringWidget, QtWidgets.QWidget):
-        #     self._anchoringWidget_ = anchoringWidget
-        #     self._isSubWidget_ = True
-        #     self._positionHint_ = anchoringWidget.geometry().topRight()
-        #
-        # else:
-        #     self._anchoringWidget_ = None
-
-        # self.dataExchangeWidget = None
         self.nameDescriptionWidget = None
         self.editParentToolButton = None
         self.parentEditor = None
         self.organismEditor = None
 
 
-        # self._isAttribute_: bool = isAttribute
-
         AnchoringCollapsibleWidget.__init__(self, parent=parent, **kwargs)
-        # WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
-
-        # self._collapsibleChildren_ = {"parentEditor":self.parentEditor,
-        #                               "organismEditor":self.organismEditor}
-
-        # if anchoringWidget:
-        #     if isinstance(windowFlags, QtCore.Qt.WindowType):
-        #         self.setWindowFlags(windowFlags)
-        #     else:
-        #         self.setWindowFlags(QtCore.Qt.Tool)
-
         if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
             objSymbols = self.getDataSymbolInWorkspace(self._data_)
             if isinstance(objSymbols, typing.Sequence) and len(objSymbols) > 0:
                 self._objSymbol_ = objSymbols[0]
-
-        # self._sizeAnimationMax_ = 200
-        # self._sizeAnimation_ = QtCore.QPropertyAnimation(self, b'widgetWidth', self)
-        # self._sizeAnimation_.setStartValue(0)
-        # self._sizeAnimation_.setDuration(200) # ms
-        # self._sizeAnimation_.setEndValue(self._sizeAnimationMax_)
-        # self._sizeAnimation_.valueChanged.connect(self._slot_setWidgetWidth)
-
-        # self._opacityEffect_ = QtWidgets.QGraphicsOpacityEffect(self)
-        # if self._isSubWidget_:
-        #     self._opacityEffect_.setOpacity(0.0)
-        # else:
-        #     self._opacityEffect_.setOpacity(1.0)
-        #
-        # self._opacityAnimation_ = QtCore.QPropertyAnimation(self._opacityEffect_, b'opacity', self)
-        # self._opacityAnimation_.setStartValue(0.0)
-        # self._opacityAnimation_.setDuration(200)
-        # self._opacityAnimation_.setEndValue(1.0)
-        # self._opacityAnimation_.valueChanged.connect(self._slot_setOpacity)
-
-        # if self._isSubWidget_:
-        #     self.setGraphicsEffect(self._opacityEffect_)
-
-        # self._animationGroup_ = QtCore.QParallelAnimationGroup()
-        # self._animationGroup_.addAnimation(self._sizeAnimation_)
-        # # self._animationGroup_.addAnimation(self._opacityAnimation_)
-        # self._animationGroup_.stateChanged.connect(self._slot_animationStateChanged)
 
     def _configureUI_(self):
         self.sig_uiConfigured.connect(self._slot_uiConfigured_)
