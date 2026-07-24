@@ -97,6 +97,8 @@ class OrganWidget(Ui_OrganWidget, DataClassWidget):
     def _configureUI_(self):
         self.setupUi(self)
         super()._configureUI_()
+        self.sig_uiConfigured.emit()
+
 
 class TissueWidget(Ui_TissueWidget, DataClassWidget):
     _objectTypes_ = (sdc.Tissue, sdc.BiologicalProduct,)
@@ -124,4 +126,6 @@ class TissueWidget(Ui_TissueWidget, DataClassWidget):
     def _configureUI_(self):
         self.setupUi(self)
         super()._configureUI_()
+        self.sig_uiConfigured.emit()
+
 

@@ -58,9 +58,6 @@ from core import scipyendataclasses as sdc
 # from gui import guiutils, textviewer
 # from gui.widgets import small_widgets as smw
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
-# from gui.workspacegui import WorkspaceGuiMixin
-# from gui.widgets.datawidgetmixin import DataWidgetMixin
-# from iolib import pictio as pio
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -133,6 +130,9 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         self.replaceSpecimenToolButton.clicked.connect(self._slot_chooseNewSpecimenType)
 
         # self._collapsibleChildren_["specimenEditor"] = self.specimenEditor
+
+        self.sig_uiConfigured.emit()
+
 
     @Slot()
     def _slot_chooseNewSpecimenType(self):

@@ -46,7 +46,7 @@ from core.utilities import safewrapper
 from core.workspacefunctions import (user_workspace, validate_varname, get_symbol_in_namespace)
 from core.scipyen_config import (ScipyenConfigurable, saveWindowSettings, loadWindowSettings) # noqa
 
-from core import strutils, sysutils, qtutils
+from core import strutils, sysutils # , qtutils
 from core.strutils import InflectEngine # noqa
 from core.prog import (print_styled, scipywarn) # noqa
 import gui.quickdialog as qd
@@ -421,7 +421,7 @@ class GuiMessages(object):
         title: str  = dialog title
         text:str =  main message
         info:str (optional, default is None) informative text
-        detail:str (optional default is None) = detaile dtext shown by expanding
+        detail:str (optional default is None) = detailed text shown by expanding
             the dialog
         msgType:str (optional default is 'Information')
             Allowed values are:
@@ -499,7 +499,7 @@ class GuiMessages(object):
         title: str  = dialog title
         text:str =  main message
         info:str (optional, default is None) informative text
-        detail:str (optional default is None) = detaile dtext shown by expanding
+        detail:str (optional default is None) = detailed text shown by expanding
             the dialog
         msgType:str (optional default is 'Information')
             Allowed values are:
@@ -1009,57 +1009,57 @@ class FileStatChecker(QtCore.QObject):
 #             hasattr(self._anchoredWidget_, "_slot_")
 #             )
 
-class MoveEventFilterObject(QtCore.QObject):
-    sig_moved = Signal(QtCore.QPoint, name="sig_moved")
-    def __init__(self, /, parent: typing.Optional[QtWidgets.QWidget] = None,
-                 anchoredWidget: typing.Optional[QtWidgets.QWidget] = None):
-        super().__init__(parent=parent)
-        self._anchoredWidget_ = anchoredWidget
-        if isinstance(self._anchoredWidget_, QtWidgets.QWidget):
-            if (
-                hasattr(self._anchoredWidget_, "_slot_anchoringWidgetMoved")
-                and inspect.ismethod(self._anchoredWidget_._slot_anchoringWidgetMoved)
-                ):
-                self.sig_moved.connect(self._anchoredWidget_._slot_anchoringWidgetMoved)
-
-
-    @property
-    def anchoredWidget(self) -> QtWidgets.QWidget | None:
-        return self._anchoredWidget_
-
-    @anchoredWidget.setter
-    def anchoredWidget(self, widget: QtWidgets.QWidget):
-        if not isinstance(widget, QtWidgets.QWidget):
-            widget = None
-
-        self._anchoredWidget_ = widget
-
-        if (
-            hasattr(self._anchoredWidget_, "_slot_anchoringWidgetMoved")
-            and inspect.ismethod(self._anchoredWidget_._slot_anchoringWidgetMoved)
-            ):
-            self.sig_moved.connect(self._anchoredWidget_._slot_anchoringWidgetMoved)
-
-    def eventFilter(self, obj: QtCore.QObject, evt: QtCore.QEvent) -> bool:
-        if isinstance(evt, QtGui.QMoveEvent):
-            self.sig_moved.emit(evt.pos())
-
-        evt.accept()
-
-        return True
-
-class CloseEventFilterObject(QtCore.QObject):
-    sig_closing = Signal(name="sig_closing")
-    def __init__(self, parent = None):
-        super().__init__(parent=parent)
-
-    def eventFilter(self, obj: QtCore.QObject, evt: QtCore.QEvent) -> bool:
-        if isinstance(evt, QtGui.QCloseEvent):
-            self.sig_closing.emit()
-
-        evt.accept()
-
-        return True
+# class MoveEventFilterObject(QtCore.QObject):
+#     sig_moved = Signal(QtCore.QPoint, name="sig_moved")
+#     def __init__(self, /, parent: typing.Optional[QtWidgets.QWidget] = None,
+#                  anchoredWidget: typing.Optional[QtWidgets.QWidget] = None):
+#         super().__init__(parent=parent)
+#         self._anchoredWidget_ = anchoredWidget
+#         if isinstance(self._anchoredWidget_, QtWidgets.QWidget):
+#             if (
+#                 hasattr(self._anchoredWidget_, "_slot_anchoringWidgetMoved")
+#                 and inspect.ismethod(self._anchoredWidget_._slot_anchoringWidgetMoved)
+#                 ):
+#                 self.sig_moved.connect(self._anchoredWidget_._slot_anchoringWidgetMoved)
+#
+#
+#     @property
+#     def anchoredWidget(self) -> QtWidgets.QWidget | None:
+#         return self._anchoredWidget_
+#
+#     @anchoredWidget.setter
+#     def anchoredWidget(self, widget: QtWidgets.QWidget):
+#         if not isinstance(widget, QtWidgets.QWidget):
+#             widget = None
+#
+#         self._anchoredWidget_ = widget
+#
+#         if (
+#             hasattr(self._anchoredWidget_, "_slot_anchoringWidgetMoved")
+#             and inspect.ismethod(self._anchoredWidget_._slot_anchoringWidgetMoved)
+#             ):
+#             self.sig_moved.connect(self._anchoredWidget_._slot_anchoringWidgetMoved)
+#
+#     def eventFilter(self, obj: QtCore.QObject, evt: QtCore.QEvent) -> bool:
+#         if isinstance(evt, QtGui.QMoveEvent):
+#             self.sig_moved.emit(evt.pos())
+#
+#         evt.accept()
+#
+#         return True
+#
+# class CloseEventFilterObject(QtCore.QObject):
+#     sig_closing = Signal(name="sig_closing")
+#     def __init__(self, parent = None):
+#         super().__init__(parent=parent)
+#
+#     def eventFilter(self, obj: QtCore.QObject, evt: QtCore.QEvent) -> bool:
+#         if isinstance(evt, QtGui.QCloseEvent):
+#             self.sig_closing.emit()
+#
+#         evt.accept()
+#
+#         return True
 
 class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     r"""Mixin type for windows that need to be aware of Scipyen's main workspace.
@@ -1216,9 +1216,10 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
     _owncfg = Bunch()
 
-    sig_moved = Signal(QtCore.QPoint, name="sig_moved")
-    sig_closing = Signal(name="sig_closing")
-    sig_collapsed = Signal(name="sig_collapsed")
+    # sig_moved = Signal(QtCore.QPoint, name="sig_moved")
+    # sig_closing = Signal(name="sig_closing")
+    # sig_collapsed = Signal(name="sig_collapsed")
+    # sig_uiConfigured = Signal(name="sig_uiConfigured")
 
     def workspaceSymbolForData(self, data):
         ws = self.scipyenWindow.workspace
@@ -1233,30 +1234,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     the 'parent' parameter is checked to see whether itselt is Scipyen main window
     """
         isAttribute = kwargs.pop("isAttribute", False)
-        anchoringWidget = kwargs.pop("anchoringWidget", None)
-        self._overrideAnchor_ = kwargs.pop("overrideAnchor", False)
-        windowFlags = kwargs.pop("windowFlags", None)
-        # self._objSymbol_ = kwargs.pop("objSymbol", None)
         self._isAttribute_: bool = isAttribute
-        self._useOpacityEffect_: bool = kwargs.pop("useOpacityEffect", False)
-
-        # self._isSubWidget_: bool = False
-        self._positionHint_: typing.Optional[QtCore.QPoint] = None
-        self._closeRequested_: bool = False
-        # self._needsNewParentWidget_: bool =  True
-
-        if isinstance(anchoringWidget, QtWidgets.QWidget):
-            self._anchoringWidget_ = anchoringWidget
-            # self._isSubWidget_ = True
-            self._positionHint_ = anchoringWidget.geometry().topRight()
-
-        else:
-            self._anchoringWidget_ = None
 
         self._scipyenWindow_ = None
-
-        # self._fileLoadWorker_ = None
-        # self._fileLoadController_ = None
 
         # NOTE: 2023-05-27 13:46:40
         # mutable control data for the worker loops, to communicate with the
@@ -1302,62 +1282,16 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         self._appWindow_ = None
 
         if isinstance(appWindow, QtWidgets.QMainWindow) and type(appWindow).__name__ != "ScipyenWindow":
-        # if isinstance(appWindow, QtWidgets.QWidget) and type(appWindow).__name__ != "ScipyenWindow":
             self._appWindow_ = appWindow
 
         elif self._appWindow_ is None:
             if isinstance(parent_obj, QtWidgets.QMainWindow):
                 self._appWindow_ = parent_obj
 
-            # else:
-            #     self._appWindow_ = self._scipyenWindow_
-
         if isinstance(title, str) and len(title.strip()):
             self.setWindowTitle(title)
 
         ScipyenConfigurable.__init__(self, *args, **kwargs)
-
-        if anchoringWidget:
-            if isinstance(windowFlags, QtCore.Qt.WindowType):
-                self.setWindowFlags(windowFlags)
-            else:
-                self.setWindowFlags(QtCore.Qt.Tool)
-
-        self._collapsibleChildren_ = dict() # Qt objectName ↦ (collapsible widget, toggle control widget, collapsible widget id)
-
-        # if isinstance(self.anchoringWidget, QtWidgets.QWidget):
-        if self.anchoringWidget:
-            self._sizeAnimationMax_ = 200
-            self._sizeAnimation_ = QtCore.QPropertyAnimation(self, b'widgetWidth', self)
-            self._sizeAnimation_.setStartValue(0)
-            self._sizeAnimation_.setDuration(200) # ms
-            self._sizeAnimation_.setEndValue(self._sizeAnimationMax_)
-            self._sizeAnimation_.valueChanged.connect(self._slot_setWidgetWidth)
-
-            if self._useOpacityEffect_:
-                self._opacityEffect_ = QtWidgets.QGraphicsOpacityEffect(self)
-                if self.anchoringWidget:
-                    self._opacityEffect_.setOpacity(0.0)
-                    self.setGraphicsEffect(self._opacityEffect_)
-                    self._opacityAnimation_ = QtCore.QPropertyAnimation(self._opacityEffect_, b'opacity', self)
-                    self._opacityAnimation_.setStartValue(0.0)
-                    self._opacityAnimation_.setDuration(200)
-                    self._opacityAnimation_.setEndValue(1.0)
-                    self._opacityAnimation_.valueChanged.connect(self._slot_setOpacity)
-                # else:
-                #     self._opacityEffect_.setOpacity(1.0)
-
-            self._animationGroup_ = QtCore.QParallelAnimationGroup()
-            self._animationGroup_.addAnimation(self._sizeAnimation_)
-            if self._useOpacityEffect_:
-                self._animationGroup_.addAnimation(self._opacityAnimation_)
-            self._animationGroup_.stateChanged.connect(self._slot_animationStateChanged)
-
-        if (
-            isinstance(self._anchoringWidget_, QtWidgets.QWidget)
-            ):
-            if hasattr(self._anchoringWidget_, "sig_moved"):
-                self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
 
     @property
     def scipyenWindow(self):
@@ -1395,8 +1329,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
         """
         return self.appWindow is None
-        # return self._scipyenWindow_.__class__.__name__ == "ScipyenWindow"
-        # return self.appWindow is not None and self.appWindow is self._scipyenWindow_
 
     @property
     def appWindow(self):
@@ -1450,116 +1382,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         """
         return self._appWindow_
 
-    def getUppermostParent(self) -> QtWidgets.QWidget:
-        r"""Retrieves the highest level QMainWindow that contains this object.
-        This may be:
-        * the object itself, if the object is a QMainWindow, or a QWidget without
-        parent (in which case the system's window manager automatically encloses
-        the widget in a window instance)
-        * the object's immediate parent, if the parent is a QMainWindow
-        * the window enclosing all the parent hierarchy of this object
-        """
-        parent = self.parent()
-        if parent is None:
-            topW = self
-
-        while isinstance(parent, QtWidgets.QWidget):
-            topW = parent
-            parent = parent.parent()
-
-        return topW
-
-    def _setupCollapsibleChild_(self, widgetType:type, objectName: str,
-                                valueChangedSlot: Slot,
-                                toggleControl:QtWidgets.QWidget,
-                                anchoringWidget, # = None,
-                                # setVisible:bool=True,
-                                # windowTitle:str =  None,
-                                *args, **kwargs):
-        r"""
-        :widgetType: child widget class
-        :objectName: Qt name of the new child widget instance
-        :toggleControl: a QWidget with setChecked method (e.g., a QToolButton or a QCheckBox, etc)
-        :anchoringWidget: widget
-        Passed to the child widget c'tor
-        :*args:
-        :**kwargs:
-
-        """
-        print(f"{self.__class__.__name__}._setupCollapsibleChild_: anchoringWidget = {anchoringWidget}")
-        child = widgetType(*args, **kwargs, anchoringWidget=anchoringWidget)
-        if len(objectName.strip()) == 0:
-            objectName = widgetType.__name__
-            objectName = objectName[0].lower() + objectName[1:]
-        child.setObjectName(objectName)
-        if hasattr(child, "sig_valueChanged") and inspect.ismethod(valueChangedSlot):
-            child.sig_valueChanged.connect(valueChangedSlot)
-        if hasattr(child, "sig_closing"):
-            child.sig_closing.connect(self._slot_anchoredWidgetClosingOrCollapsing)
-        if hasattr(child, "sig_collapsed"):
-            child.sig_collapsed.connect(self._slot_anchoredWidgetClosingOrCollapsing)
-        if hasattr(child, "_slot_anchoringWidgetMoved"):
-            self.sig_moved.connect(child._slot_anchoringWidgetMoved)
-
-        if not isinstance(getattr(anchoringWidget, "_collapsibleChildren_", None), dict):
-            anchoringWidget._collapsibleChildren_ = dict()
-
-        # anchoringWidget._collapsibleChildren_[objectName] = (child, toggleControl)
-        anchoringWidget._collapsibleChildren_[id(child)] = (child, toggleControl, objectName)
-
-        return child
-
-    @Slot()
-    def _slot_anchoredWidgetClosingOrCollapsing(self):
-        widget = self.sender()
-        wid = id(widget)
-        # if widget.objectName() in self._collapsibleChildren_:
-        if wid in self._collapsibleChildren_:
-            # toggle = self._collapsibleChildren_[widget.objectName()][1]
-            toggle = self._collapsibleChildren_[wid][1]
-
-            if isinstance(toggle, QtWidgets.QWidget) and hasattr(toggle, "setChecked"):
-                sb = QtCore.QSignalBlocker(toggle) # noqa
-                toggle.setChecked(False)
-
-    def provideAnchoringWidget(self, widget: typing.Optional[QtWidgets.QWidget] = None) -> QtWidgets.QWidget | None:
-        r"""Provides an anchoring widget to a collapsible child widget, if required.
-        The anchoring of collapsible children is the window frame enclosing
-        this widget (and its parents, if any).
-
-        Collapsible children are used mainly in the DataClassWidget hierarchy.
-
-        Parameters:
-        ===========
-        widget: the anchored widget
-
-        """
-        topWindow = self.getUppermostParent()
-        aw = None
-        if (
-            getattr(self, "overrideAnchor", False)
-            and isinstance(getattr(self, "anchoringWidget", None), QtWidgets.QWidget)
-            ):
-            # if overrideAnchor is True while THIS widget has its own anhoring widget,
-            # then the child index will be anchored to the same anchoring as this one - not sure this is good
-            aw = self.anchoringWidget
-
-        if not isinstance(aw, QtWidgets.QWidget):
-            if self.parent() is None:
-                # null parent means that this widget is wrapped in a window by
-                # the underlying OS/Desktop system; this means the widget CAN
-                # (and SHOULD) be used as anchoring widget
-                aw = self
-            else:
-                # the immediate parent might itself be a child widget, hence
-                # without an anchoring
-                # therefore the anchoring offered here is corresponding to the
-                # highest parent in the hierarchy, so that there is a window
-                # frame to serve as anchor
-                aw = topWindow
-
-        return aw
-
     @safewrapper
     def importWorkspaceData(self, dataTypes: typing.Union[typing.Type[typing.Any],
                                                          typing.Sequence[typing.Type[typing.Any]]
@@ -1586,16 +1408,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         # TODO: 2026-06-21 15:45:41 harmonize with self.importWorkspaceData and interact.selectWSData
 
         from core.workspacefunctions import getvarsbytype
-        #print("dataTypes", dataTypes)
-        # if self.isTopLevel and self.appWindow:
-        #     scipyenWindow = self.appWindow
-        # else:
-        #     parent = self.parent()
-        #     if getattr(parent, "isTopLevel", None) is True:
-        #         scipyenWindow = parent.appWindow
-        #     else:
-        #         return
-
 
         user_ns_visible = dict([(k,v) for k,v in self.scipyenWindow.workspace.items() if k not in self.scipyenWindow.workspaceModel.user_ns_hidden])
 
@@ -1640,17 +1452,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         # TODO: 2026-06-21 15:46:19 harmonize with self.importWorkspaceData
         from gui import interact
 
-        # if self.isTopLevel and self.appWindow:
-        #     scipyenWindow = self.appWindow
-        # else:
-        #     parent = self.parent()
-        #     if getattr(parent, "isTopLevel", None) is True:
-        #         scipyenWindow = parent.appWindow
-        #     else:
-        #         return
-
-        # user_ns_visible = dict([(k,v) for k,v in self.scipyenWindow.workspace.items() if k not in self.scipyenWindow.workspaceModel.user_ns_hidden])
-
         ret = interact.selectWSData(title = title, single = single,
                                     asDict = with_varName,
                                     var_type = dataTypes,
@@ -1687,10 +1488,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
 
             if dlg.exec() == QtWidgets.QDialog.Accepted:
                 newVarName = namePrompt.text()
-                # newVarName = validate_varname(namePrompt.text(), scipyenWindow.workspace)
                 if newVarName in self.scipyenWindow.workspace:
                     accept = self.questionMessage(title, f"A variable named {newVarName} exists in the workspace. Overwrite?")
-                    # accept = self.questionMessage("Export to workspace", f"A variable named {newVarName} exists in the workspace. Overwrite?")
                     if accept not in (QtWidgets.QMessageBox.Ok, QtWidgets.QMessageBox.Yes):
                         return
 
@@ -1716,14 +1515,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     def getDataSymbolInWorkspace(self, data=None) -> str | None:
         r"""Calls workspacefunctions.get_symbol_in_namespace for the data.
         """
-        # if self.isTopLevel and self.appWindow:
-        #     scipyenWindow = self.appWindow
-        # else:
-        #     parent = self.parent()
-        #     if getattr(parent, "isTopLevel", None) == True:
-        #         scipyenWindow = parent.appWindow
-        #     else:
-        #         return
 
         if data is None:
             data = getattr(self, "_data_", None)
@@ -1742,7 +1533,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             return
 
         # NOTE: 2023-01-22 16:22:18
-        # these are kept in sync with clsconfigurables by the ScipyenConfigurable superclass
+        # these are kept in sync with "clsconfigurables" by the ScipyenConfigurable superclass
         configData = dict((k, self.get_configurable_attribute(k, cfg)) for k in cfg)
 
         if len(configData):
@@ -1788,7 +1579,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         r"""To be connected to the `canceled` signal of a progress dialog.
         Modifies the loopControl variable to interrupt a worker loop gracefully.
         """
-        # print(f"{self.__class__.__name__}._slot_breakLoop")
         self.loopControl["break"] = True
 
     @safewrapper
@@ -1901,75 +1691,6 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             val = val.value()
         self.setFixedWidth(val)
 
-    # @Slot(QtCore.QVariant)
-    # def _slot_setOpacity(self, val: float | QtCore.QVariant):
-    #     if not isinstance(val, float):
-    #         val = val.value()
-    #
-    #     if val < 0:
-    #         val = 0.
-    #     if val > 1:
-    #         val = 1.
-    #
-    #     self._opacityEffect_.setOpacity(val)
-
-    @Slot(QtCore.QAbstractAnimation.State, QtCore.QAbstractAnimation.State)
-    def _slot_animationStateChanged(self, newState: QtCore.QAbstractAnimation.State,
-                                    oldState: QtCore.QAbstractAnimation.State):
-
-        if not self.anchoringWidget:
-            return
-
-        if (not isinstance(self._animationGroup_, QtCore.QParallelAnimationGroup)
-            or not qtutils.isQObjectAlive(self._animationGroup_)):
-            return
-
-        if newState == QtCore.QAbstractAnimation.Running:
-            self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
-            # self._parentOpacityAnimation_.start()
-        elif newState == QtCore.QAbstractAnimation.Stopped:
-            self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
-            if self._animationGroup_.direction() == QtCore.QAbstractAnimation.Backward:
-                self.sig_collapsed.emit()
-                if self._closeRequested_ is True:
-                    self.close()
-                else:
-                    self.setVisible(False)
-
-            else:
-                # re-allow manual resizing
-                self.setMinimumSize(QtCore.QSize(0,0))
-                self.setMaximumSize(QtCore.QSize(QtWidgets.QWIDGETSIZE_MAX, QtWidgets.QWIDGETSIZE_MAX))
-
-    def show(self):
-        if self.isAnchoredWidget:
-            print(f"{self._class__.__name__}.show()")
-        if self.isVisible():
-            return
-
-        # print(f"{self.__class__.__name__}.show(): sub widget: {self._isSubWidget_}")
-        if self.isAnchoredWidget:
-            self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Forward)
-            geometry = self.geometry()
-            # height = geometry.height()
-            heightHint = self.sizeHint().height()
-            # print(f"height hint: {heightHint} -> height: {height}")
-            self._sizeAnimation_.setEndValue(self.sizeHint().width())
-            topRight = self._anchoringWidget_.geometry().topRight()
-            if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
-                self._positionHint_ = self._anchoringWidget_.parent().mapToGlobal(topRight)
-            else:
-                self._positionHint_ = topRight
-            geometry.setX(self._positionHint_.x())
-            geometry.setY(self._positionHint_.y())
-            geometry.setHeight(heightHint)
-            self.setGeometry(geometry)
-            self._animationGroup_.start()
-            super().show()
-
-        else:
-            super().show()
-
     @property
     def isAttribute(self) -> bool:
         return self._isAttribute_
@@ -1977,120 +1698,3 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     @isAttribute.setter
     def isAttribute(self, val: bool):
         self._isAttribute_ = val is True
-
-    @property
-    def isAnchoredWidget(self):
-        return isinstance(self.anchoringWidget, QtWidgets.QWidget)
-
-    def collapse(self, close: bool=False):
-        if hasattr(self, "objectName"):
-            myName = f"<{self.objectName()}>"
-        else:
-            myName=""
-        print(f"{self.__class__.__name__}{myName}.collapse")
-        if self.isAnchoredWidget:
-            self.collapseSubWidgets(close)
-            self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
-            self._closeRequested_ = close
-            self._animationGroup_.start()
-
-        if close:
-            self.close()
-
-    def collapseSubWidgets(self, close: bool= False):
-        if hasattr(self, "objectName"):
-            myName = f"<{self.objectName()}>"
-        else:
-            myName=""
-        print(f"{self.__class__.__name__}{myName}>.collapseSubWidgets")
-
-        if len(self._collapsibleChildren_) == 0:
-            return
-        # print(f"{self._collapsibleChildren_}")
-        for obj, toggle, objName in self._collapsibleChildren_.values():
-            if isinstance(obj, QtWidgets.QWidget) and qtutils.isQObjectAlive(obj):
-                try:
-                    obj.collapse(close)
-                except: # noqa
-                    pass
-
-    def closeEvent(self, evt):
-        if hasattr(self, "objectName"):
-            myName = f"<{self.objectName()}>"
-        else:
-            myName=""
-        print(f"{self.__class__.__name__}{myName}.closeEvent")
-        self.sig_closing.emit()
-        self.closeSubWidgets()
-        if hasattr(super(), "closeEvent"):
-            super().closeEvent(evt)
-        # try:
-        #     super().closeEvent(evt)
-        # except: # noqa
-        #     pass
-        evt.accept()
-
-    def closeSubWidgets(self):
-        if hasattr(self, "objectName"):
-            myName = f"<{self.objectName()}>"
-        else:
-            myName=""
-        print(f"{self.__class__.__name__}{myName}.closeSubWidgets")
-        if len(self._collapsibleChildren_) == 0:
-            return
-        for obj, toggle, objName in self._collapsibleChildren_.values():
-            if isinstance(obj, QtWidgets.QWidget):
-                obj.close()
-                obj.deleteLater()
-                obj = None
-
-    def moveEvent(self, evt):
-        if hasattr(self, "objectName"):
-            myName = f"<{self.objectName()}>"
-        else:
-            myName=""
-        print(f"{self.__class__.__name__}{myName}.moveEvent")
-        self.sig_moved.emit(evt.pos())# - evt.oldPos())
-        evt.accept()
-
-    @property
-    def overrideAnchor(self) -> bool:
-        return self._overrideAnchor_
-
-    @overrideAnchor.setter
-    def overrideAnchor(self, val: bool):
-        self._overrideAnchor_ = val is True
-
-    @property
-    def anchoringWidget(self) -> QtWidgets.QWidget | None:
-        return self._anchoringWidget_
-
-    @anchoringWidget.setter
-    def anchoringWidget(self, obj: QtWidgets.QWidget):
-        if isinstance(obj, QtWidgets.QWidget):
-            self._anchoringWidget_ = obj
-            if hasattr(self._anchoringWidget_, "sig_moved"):
-                self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
-            # self.setGraphicsEffect(self._opacityEffect_)
-        else:
-            self._anchoringWidget_ = None
-
-    @Slot(QtCore.QPoint)
-    def _slot_anchoringWidgetMoved(self, pos: QtCore.QPoint):
-        # print(f"{self.__class__.__name__}<{self.objectName()}>._slot_anchoringWidgetMoved({pos})\n")
-        # if not self.isVisible():
-        #     return
-
-        if not isinstance(self._anchoringWidget_, QtWidgets.QWidget):
-            return
-
-        if isinstance(self.parent(), QtWidgets.QWidget):
-            return
-
-        if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
-            newPos = self._anchoringWidget_.parent().mapToGlobal(self._anchoringWidget_.geometry().topRight())
-
-        else:
-            newPos = self._anchoringWidget_.frameGeometry().topRight()
-
-        self.move(newPos)

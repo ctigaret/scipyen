@@ -137,6 +137,8 @@ class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget):
 
         self.bgStructureWidget.sig_valueChanged.connect(self._slot_structureChanged)
 
+        self.sig_uiConfigured.emit()
+
     @Slot(object)
     def _slot_structureChanged(self, val: object):
         self._data_.structure = val

@@ -51,7 +51,8 @@ from core import datatypes # noqa
 from core.prog import scipywarn # noqa
 # from core import utilities
 from gui import (guiutils, interact) # noqa
-from gui.workspacegui import WorkspaceGuiMixin
+# from gui.workspacegui import WorkspaceGuiMixin
+from gui.widgets.anchoringcollapsiblewidget import AnchoringCollapsibleWidget
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -60,7 +61,7 @@ Ui_DataExchangeWidget, QWidget = loadUiType(
     os.path.join(__module_path__, "dataexchangewidget.ui")
     )
 
-class DataExchangeWidget(Ui_DataExchangeWidget, QWidget, WorkspaceGuiMixin):
+class DataExchangeWidget(Ui_DataExchangeWidget, AnchoringCollapsibleWidget):
     r"""Common widget to use as 1st level child in various Scipyen compound widgets.
 Contains a set of tool buttons for loading/saving data to/from piclkle files and
 for importing/exporting data to the user workspace.
@@ -102,10 +103,6 @@ data object after loading from file or importing from the workspace.
     def __init__(self, objType: typing.Optional[type]=None,
                  parent: typing.Optional[QtWidgets.QWidget] = None,
                  **kwargs):
-        # anchoringWidget = kwargs.pop("anchoringWidget", None)
-        # self._overrideAnchor_ = kwargs.pop("overrideAnchor", False)
-        # windowFlags = kwargs.pop("windowFlags", None)
-
         if isinstance(objType, QtWidgets.QWidget):
             obj_ = parent
             if isinstance(parent, type):
@@ -120,40 +117,7 @@ data object after loading from file or importing from the workspace.
         self._objectType_ = objType
         self._objSymbol_ = kwargs.pop("objSymbol", None)
 
-        QtCore.QObject.__init__(self, parent=parent)
-
-        # self._isSubWidget_: bool = False
-        # self._closeRequested_: bool = False
-        #
-        # self._positionHint_: typing.Optional[QtCore.QPoint] = None
-        #
-        # if isinstance(anchoringWidget, QtWidgets.QWidget):
-        #     self._anchoringWidget_ = anchoringWidget
-        #     self._isSubWidget_ = True
-        #     self._positionHint_ = anchoringWidget.geometry().topRight()
-        #
-        # else:
-        #     self._anchoringWidget_ = None
-
-        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
-
-        # if anchoringWidget:
-        #     if isinstance(windowFlags, QtCore.Qt.WindowType):
-        #         self.setWindowFlags(windowFlags)
-        #     else:
-        #         self.setWindowFlags(QtCore.Qt.Tool)
-        #
-        # self._sizeAnimationMax_ = 200
-        # self._sizeAnimation_ = QtCore.QPropertyAnimation(self, b'widgetWidth', self)
-        # self._sizeAnimation_.setStartValue(0)
-        # self._sizeAnimation_.setDuration(200) # ms
-        # self._sizeAnimation_.setEndValue(self._sizeAnimationMax_)
-        # self._sizeAnimation_.valueChanged.connect(self._slot_setWidgetWidth)
-        #
-        # self._animationGroup_ = QtCore.QParallelAnimationGroup()
-        # self._animationGroup_.addAnimation(self._sizeAnimation_)
-        # # self._animationGroup_.addAnimation(self._opacityAnimation_)
-        # self._animationGroup_.stateChanged.connect(self._slot_animationStateChanged)
+        AnchoringCollapsibleWidget.__init__(self, parent=parent, **kwargs)
 
         self._configureUI_()
 
@@ -167,100 +131,11 @@ data object after loading from file or importing from the workspace.
         self.exportToolButton.clicked.connect(self.sig_requestDataExport)
         self.newObjectToolButton.clicked.connect(self.sig_requestNewObject)
 
-        # if (
-        #     isinstance(self._anchoringWidget_, QtWidgets.QWidget)
-        #     and hasattr(self._anchoringWidget_, "sig_moved")
-        #     ):
-        #     self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
-        # if (
-        #     isinstance(self._anchoringWidget_, QtWidgets.QWidget)
-        #     and hasattr(self._anchoringWidget_, "_slot_anchoringWidgetMoved")
-        #     ):
-        #     self._anchoringWidget_.sig_moved.connect(self._slot_anchoringWidgetMoved)
-
-    # @property
-    # def overrideAnchor(self) -> bool:
-    #     return self._overrideAnchor_
-    #
-    # @overrideAnchor.setter
-    # def overrideAnchor(self, val: bool):
-    #     self._overrideAnchor_ = val is True
-
-    # @property
-    # def anchoringWidget(self) -> QtWidgets.QWidget | None:
-    #     return self._anchoringWidget_
-    #
-    # @anchoringWidget.setter
-    # def anchoringWidget(self, obj: QtWidgets.QWidget):
-    #     if isinstance(obj, QtWidgets.QWidget):
-    #         self._anchoringWidget_ = obj
-    #         self._isSubWidget_ = True
-    #     else:
-    #         self._anchoringWidget_ = None
-    #         self._isSubWidget_ = False
-
-    # @Slot(QtCore.QPoint)
-    # def _slot_anchoringWidgetMoved(self, pos: QtCore.QPoint):
-    #     # print(f"{self.__class__.__name__}<{self.objectName()}>._slot_anchoringWidgetMoved({pos})\n")
-    #     # if not self.isVisible():
-    #     #     return
-    #
-    #     if not isinstance(self._anchoringWidget_, QtWidgets.QWidget):
-    #         return
-    #
-    #     if isinstance(self.parent(), QtWidgets.QWidget):
-    #         return
-    #
-    #     if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
-    #         newPos = self._anchoringWidget_.parent().mapToGlobal(self._anchoringWidget_.geometry().topRight())
-    #
-    #     else:
-    #         newPos = self._anchoringWidget_.frameGeometry().topRight()
-    #
-    #     self.move(newPos)
+        self.sig_uiConfigured.connect(self._slot_uiConfigured_)
+        self.sig_uiConfigured.emit()
 
     def setObjectSymbol(self, val: str):
         self.objectSymbolLabel.setText(val)
-
-    # def closeEvent(self, evt):
-    #     # print(f"{self.__class__.__name__}.closeEvent")
-    #     self.sig_closing.emit()
-    #     # self.closeSubWidgets()
-    #     super().closeEvent(evt)
-    #     evt.accept()
-    #
-    # def collapse(self, close: bool=False):
-    #     if self._isSubWidget_:
-    #         # self.collapseSubWidgets(close)
-    #         self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
-    #         self._closeRequested_ = close
-    #         self._animationGroup_.start()
-
-    # def show(self):
-    #     if self.isVisible():
-    #         return
-    #
-    #     if self._isSubWidget_:
-    #         self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Forward)
-    #         geometry = self.geometry()
-    #         height = geometry.height()
-    #         heightHint = self.sizeHint().height()
-    #         self._sizeAnimation_.setEndValue(self.sizeHint().width())
-    #         topRight = self._anchoringWidget_.geometry().topRight()
-    #         if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
-    #             self._positionHint_ = self._anchoringWidget_.parent().mapToGlobal(topRight)
-    #         else:
-    #             self._positionHint_ = topRight
-    #
-    #         geometry.setX(self._positionHint_.x())
-    #         geometry.setY(self._positionHint_.y())
-    #         geometry.setHeight(heightHint)
-    #         self.setGeometry(geometry)
-    #         self._animationGroup_.start()
-    #         super().show()
-    #
-    #     else:
-    #         super().show()
 
     @property
     def varName(self) -> str:
@@ -307,14 +182,4 @@ data object after loading from file or importing from the workspace.
             self.objectSymbolLabel.clear()
             self.objectSymbolLabel.setToolTip("")
             self.sig_symbolChanged.emit("")
-
-    # def provideAnchoringWidget(self) -> QtWidgets.QWidget | None:
-    #     if isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor:
-    #         return self._anchoringWidget_
-    #
-    #     if self.parent() is None:
-    #         return self
-    #
-    #     return None
-
 

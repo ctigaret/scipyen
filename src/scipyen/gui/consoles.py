@@ -158,7 +158,8 @@ from core.scipyen_config import (markConfigurable, ScipyenConfigurable,
 
 from gui.workspacegui import WorkspaceGuiMixin
 from gui import scipyen_console_styles
-from gui.scipyen_console_styles import *
+# also imports PYGMENT_STYLES
+from gui.scipyen_console_styles import * # noqa
 # from gui.kepler_dark_console_pygment_style import KeplerDark
 
 from gui.guiutils import (get_font_style, get_font_weight,)
@@ -3600,15 +3601,29 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
         self.listMagicsAction.triggered.connect(self._slot_listMagics)
 
-        available_syntax_styles = scipyen_console_styles.get_available_syntax_styles() # defined in this module
+        # available_syntax_styles = scipyen_console_styles.get_available_syntax_styles() # defined in this module
 
         # if len(available_syntax_styles):
-        if len(PYGMENT_STYLES):
+        if len(PYGMENT_STYLES): # noqa
             self.syntax_style_menu = self.settings_menu.addMenu("Syntax Style")
 
             style_group = QActionGroup(self)
 
-            actions = [QAction("{}".format(s), self, triggered = partial(self.active_frontend._set_syntax_style, s)) for s in PYGMENT_STYLES]
+            # actions = [
+            #     QAction("{}".format(s), self, triggered = partial(self.active_frontend._set_syntax_style, s)) for s in PYGMENT_STYLES # noqa
+            #     ]
+
+            actions = list(
+                map(
+                    lambda s: QAction("{}".format(s), self,
+                                      triggered = partial(
+                                          self.active_frontend._set_syntax_style,
+                                          s
+                                          )
+                                      ),
+                    PYGMENT_STYLES # noqa
+                    )
+                )
 
             for action in actions:
                 action.setCheckable(True)
@@ -3631,7 +3646,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                 action.setChecked(True)
                 self.colors_menu.setDefaultAction(action)
 
-        scrollbar_pos = ("left", "right")
+        # scrollbar_pos = ("left", "right")
         self.sb_menu = self.settings_menu.addMenu("Scrollbar Position")
         sb_group = QActionGroup(self)
         for s in self.active_frontend.scrollbar_positions.values():
@@ -3678,7 +3693,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
     @Slot(bool)
     def _slot_useAutomagic(self, val:bool):
-        self.shellAutomagic = val==True
+        self.shellAutomagic = val is True
 
     @Slot()
     def _slot_listMagics(self):
@@ -3713,7 +3728,6 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         if len(text.strip()):
             self._saveToFile(text, mode="python")
 
-
     def _saveToFile(self, text, mode="python"):
         from iolib import pictio as pio
 
@@ -3729,7 +3743,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # therefore, I first remove the "static" part of the ipkernel banner
         # ('tipless') - thankfully, this dynamic tip is just one line (so far...)
         ipkbanner = self.consoleWidget.ipkernel.banner.split("\n")
-        nlines = len(ipkbanner)-1
+        # nlines = len(ipkbanner)-1
 
         tipless = "\n".join(ipkbanner[:-2])
 

@@ -281,7 +281,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
             if isinstance(self._data_.stimulusLayout, ephys_pathways.PathwaysStimulationLayout):
                 doc_title = self._data_.stimulusLayout.source.name
                 if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
-                    topWindow = self.getUppermostParent()
+                    topWindow = self.getHighestAncestor()
                     if topWindow is self:
                         appWindow = None
                     else:
@@ -322,7 +322,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
 
         doc_title = self._protocol_.name
         if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
-            topWindow = self.getUppermostParent()
+            topWindow = self.getHighestAncestor()
             if topWindow is self:
                 appWindow = None
             else:

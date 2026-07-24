@@ -62,8 +62,6 @@ from dataclasses import (dataclass, asdict) # noqa
 
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget # noqa
 from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget # noqa
-# from gui.textviewer import TextViewer
-# from gui.widgets.datatreeview import DataTreeView
 
 Ui_MetaDataWidget, QWidget = loadUiType(os.path.join(__module_path__, "metadatawidget.ui"))
 

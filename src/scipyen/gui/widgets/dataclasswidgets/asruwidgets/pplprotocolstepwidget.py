@@ -78,6 +78,8 @@ class PPLProtocolStepWidget(Ui_PPLProtocolStepWidget, DataClassWidget):
         self.setupUi(self)
 
         super()._configureUI_()
+        self.sig_uiConfigured.emit()
+
 
 
 

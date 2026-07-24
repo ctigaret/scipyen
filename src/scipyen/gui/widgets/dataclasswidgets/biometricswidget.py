@@ -162,11 +162,13 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
         self.heightSpinBox.setValue(self._data_.height)
         self.heightSpinBox.sig_valueChanged.connect(self._slot_heightChanged)
 
-    def closeEvent(self, evt):
-        # self.nameDescriptionWidget.close()
-        # self.dataExchangeWidget.close()
-        super().closeEvent(evt)
-        evt.accept()
+        self.sig_uiConfigured.emit()
+
+    # def closeEvent(self, evt):
+    #     # self.nameDescriptionWidget.close()
+    #     # self.dataExchangeWidget.close()
+    #     super().closeEvent(evt)
+    #     evt.accept()
 
     @Slot(str)
     def _slot_genotypeNameChanged(self, val: str):

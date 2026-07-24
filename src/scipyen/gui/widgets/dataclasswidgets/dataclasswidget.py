@@ -65,13 +65,14 @@ from core import qtutils
 from gui.datatreeviewer import DataTreeViewer
 # from gui.textviewer import TextViewer
 # from gui.widgets.dataclasswidgets.dataexchangewidget import DataExchangeWidget
+from gui.widgets.anchoringcollapsiblewidget import AnchoringCollapsibleWidget
 from gui.widgets.dataclasswidgets.namedescriptionwidget import NameDescriptionWidget
-from gui.workspacegui import WorkspaceGuiMixin
+# from gui.workspacegui import WorkspaceGuiMixin
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
+class DataClassWidget(AnchoringCollapsibleWidget):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
     sig_dataSaving = Signal(object, name="sig_dataSaving")
     sig_dataExporting = Signal(object, name="sig_dataExporting")
@@ -119,8 +120,8 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
         # self._isAttribute_: bool = isAttribute
 
-        QtWidgets.QWidget.__init__(self, parent=parent)
-        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
+        AnchoringCollapsibleWidget.__init__(self, parent=parent, **kwargs)
+        # WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
 
         # self._collapsibleChildren_ = {"parentEditor":self.parentEditor,
         #                               "organismEditor":self.organismEditor}
@@ -164,6 +165,7 @@ class DataClassWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         # self._animationGroup_.stateChanged.connect(self._slot_animationStateChanged)
 
     def _configureUI_(self):
+        self.sig_uiConfigured.connect(self._slot_uiConfigured_)
         r"""MUST be called in the subclass once self._data_ was established,
         AND first thing after setupUi() was called in the subclass"""
         # if isinstance(self.dataExchangeWidget, DataExchangeWidget) and isinstance(self.nameDescriptionWidget, NameDescriptionWidget):

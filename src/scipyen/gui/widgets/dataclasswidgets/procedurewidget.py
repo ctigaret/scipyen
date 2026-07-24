@@ -115,6 +115,8 @@ class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
         self.protocolStepWidget.sig_valueChanged.connect(self._slot_pplProtocolStepChanged)
         self.isRegulatedCheckBox.toggled.connect(self._slot_setIsRegulatedProcedure)
 
+        self.sig_uiConfigured.emit()
+
     def value(self) -> sdc.Procedure:
         return self._data_
 

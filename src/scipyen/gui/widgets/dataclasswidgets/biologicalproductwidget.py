@@ -104,6 +104,8 @@ class BiologicalProductWidget(Ui_BiologicalProductWidget, DataClassWidget):
 
         self.bioSourceTypeComboBox.currentIndexChanged.connect(self._slot_bioSourceTypeChanged)
 
+        self.sig_uiConfigured.emit()
+
     @Slot(int)
     def _slot_bioSourceTypeChanged(self, val: int):
         self._data_.type = sdc.BioProductType[self._entityTypeNames_[val]]

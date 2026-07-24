@@ -47,8 +47,9 @@ from core import qtutils
 from iolib import pictio as pio
 
 from gui import textviewer, datatreeviewer
-from gui.workspacegui import WorkspaceGuiMixin
+# from gui.workspacegui import WorkspaceGuiMixin
 from gui.widgets.dataclasswidgets.dataexchangewidget import DataExchangeWidget
+from gui.widgets.anchoringcollapsiblewidget import AnchoringCollapsibleWidget
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -57,7 +58,7 @@ Ui_NameDescriptionWidget, QWidget = loadUiType(
     os.path.join(__module_path__, "namedescriptionwidget.ui")
     )
 
-class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin):
+class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
     sig_detailsChanged = Signal(name="sig_dataChanged")
     sig_nameChanged = Signal(str, name="sig_nameChanged")
@@ -83,15 +84,16 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
         self._data_ = obj
         self._objectType_ = type(self._data_)
 
-        QtCore.QObject.__init__(self, parent=parent)
-
         self._dataName_ = kwargs.pop("dataName", "")
         self._dataDescription_ = kwargs.pop("dataDescription", "")
         self._objSymbol_ = kwargs.pop("objSymbol", "")
-        self.dataExchangeWidget = None
-        # self._collapsibleChildren_ = dict()
 
-        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
+        AnchoringCollapsibleWidget.__init__(self, parent=parent, **kwargs)
+        # QtCore.QObject.__init__(self, parent=parent)
+
+        self.dataExchangeWidget = None
+
+        # WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
 
         self._configureUI_()
 
@@ -105,32 +107,12 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
         self.nameLineEdit.sig_textChanged.connect(self._slot_nameChanged)
         self.descriptionToolButton.clicked.connect(self._slot_editDescription)
         self.viewDetailsToolButton.clicked.connect(self.sig_detailedViewRequest)
-        # self.editParentToolButton.clicked.connect(self.sig_parentEditRequest)
         self.editParentToolButton.toggled.connect(self.sig_parentEditRequest)
         self.replaceParentToolButton.clicked.connect(self.sig_newParentRequest)
         self.organismToolButton.toggled.connect(self.sig_organismEditRequest)
         self.toggleDataExchangeWidgetToolButton.toggled.connect(self._slot_toggleDataExchangeWidget)
-        #
-        # self.dataExchangeWidget.sig_requestDataExport.connect(self.slot_exportData)
-        # self.dataExchangeWidget.sig_requestDataSave.connect(self.slot_saveData)
-        # self.dataExchangeWidget.sig_requestDataCopy.connect(self.slot_copyData)
-        # self.dataExchangeWidget.sig_requestImportData.connect(self._slot_importData)
-        # self.dataExchangeWidget.sig_requestLoadData.connect(self._slot_loadData)
-        # self.dataExchangeWidget.sig_requestNewObject.connect(self.sig_requestNewObject)
 
-        # self._collapsibleChildren_["dataExchangeWidget"] = self.dataExchangeWidget
-
-        # self.dataExchangeWidget.setVisible(False)
-
-    # @Slot()
-    # def _slot_dataExchangeWidgetClosing(self):
-    #     sb = QtCore.QSignalBlocker(self.toggleDataExchangeWidgetToolButton) # noqa
-    #     self.toggleDataExchangeWidgetToolButton.setChecked(False)
-    #
-    # @Slot()
-    # def _slot_dataExchangeWidgetCollapsed(self):
-    #     sb = QtCore.QSignalBlocker(self.toggleDataExchangeWidgetToolButton) # noqa
-    #     self.toggleDataExchangeWidgetToolButton.setChecked(False)
+        self.sig_uiConfigured.emit()
 
     @Slot(bool)
     def _slot_toggleDataExchangeWidget(self, val: bool):
@@ -143,37 +125,11 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
     @Slot()
     def _slot_showDataExchangeWidget(self):
         anchoringWidget = self.provideAnchoringWidget()
-        print(f"{self.__class__.__name__}._slot_showDataExchangeWidget: anchoringWidget -> {anchoringWidget} for anchored widget")
-        if isinstance(self.dataExchangeWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.dataExchangeWidget):
-            if not isinstance(self.dataExchangeWidget, DataExchangeWidget):
-                self.dataExchangeWidget.close()
-                self.dataExchangeWidget.deleteLater()
-                self.dataExchangeWidget = None
+        # print(f"{self.__class__.__name__}._slot_showDataExchangeWidget: anchoringWidget -> {anchoringWidget} for anchored widget")
+        if not isinstance(self.dataExchangeWidget, DataExchangeWidget):
+            if isinstance(self.dataExchangeWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.dataExchangeWidget):
+                self._removeAnchoringCollapsibleWidget_(self.dataExchangeWidget)
 
-                self.dataExchangeWidget = self._setupCollapsibleChild_(
-                    DataExchangeWidget,
-                    "dataExchangeWidget",
-                    None,
-                    self.toggleDataExchangeWidgetToolButton,
-                    anchoringWidget,
-                    self._data_,
-                    objSymbol = self._objSymbol_
-                    )
-
-                self.dataExchangeWidget.setWindowTitle("Input/Output")
-                self.dataExchangeWidget.setVisible(False)
-                self.dataExchangeWidget.sig_requestDataExport.connect(self.slot_exportData)
-                self.dataExchangeWidget.sig_requestDataSave.connect(self.slot_saveData)
-                self.dataExchangeWidget.sig_requestDataCopy.connect(self.slot_copyData)
-                self.dataExchangeWidget.sig_requestImportData.connect(self._slot_importData)
-                self.dataExchangeWidget.sig_requestLoadData.connect(self._slot_loadData)
-                self.dataExchangeWidget.sig_requestNewObject.connect(self.sig_requestNewObject)
-
-            else:
-                self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
-
-
-        else:
             self.dataExchangeWidget = self._setupCollapsibleChild_(
                 DataExchangeWidget,
                 "dataExchangeWidget",
@@ -183,8 +139,9 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
                 self._data_,
                 objSymbol = self._objSymbol_
                 )
+
             self.dataExchangeWidget.setWindowTitle("Input/Output")
-            self.dataExchangeWidget.setVisible(False)
+            # self.dataExchangeWidget.setVisible(False)
             self.dataExchangeWidget.sig_requestDataExport.connect(self.slot_exportData)
             self.dataExchangeWidget.sig_requestDataSave.connect(self.slot_saveData)
             self.dataExchangeWidget.sig_requestDataCopy.connect(self.slot_copyData)
@@ -192,9 +149,9 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
             self.dataExchangeWidget.sig_requestLoadData.connect(self._slot_loadData)
             self.dataExchangeWidget.sig_requestNewObject.connect(self.sig_requestNewObject)
 
+        self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
 
         self.dataExchangeWidget.show()
-
 
     @Slot()
     def _slot_dataExportRequested(self):
@@ -243,7 +200,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
 
     @Slot()
     def _slot_editDescription(self):
-        topWindow = self.getUppermostParent()
+        topWindow = self.getHighestAncestor()
         if topWindow is self:
             appWindow = None
         else:
@@ -276,7 +233,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, QWidget, WorkspaceGuiMixin
         # win_title = f"Details of {varName}"
         # win_title = "Details"
         if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
-            topWindow = self.getUppermostParent()
+            topWindow = self.getHighestAncestor()
             if topWindow is self:
                 appWindow = None
             else:

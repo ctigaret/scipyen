@@ -141,6 +141,8 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
 
         # self._collapsibleChildren_["biometricsEditor"] = self.biometricsEditor
 
+        self.sig_uiConfigured.emit()
+
     def closeEvent(self, evt):
         if isinstance(self.taxonDetailsViewer, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.taxonDetailsViewer):
             self.taxonDetailsViewer.close()
