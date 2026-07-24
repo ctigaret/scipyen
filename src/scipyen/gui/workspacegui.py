@@ -1486,7 +1486,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         :**kwargs:
 
         """
-
+        print(f"{self.__class__.__name__}._setupCollapsibleChild_: anchoringWidget = {anchoringWidget}")
         child = widgetType(*args, **kwargs, anchoringWidget=anchoringWidget)
         if len(objectName.strip()) == 0:
             objectName = widgetType.__name__

@@ -102,8 +102,8 @@ data object after loading from file or importing from the workspace.
     def __init__(self, objType: typing.Optional[type]=None,
                  parent: typing.Optional[QtWidgets.QWidget] = None,
                  **kwargs):
-        anchoringWidget = kwargs.pop("anchoringWidget", None)
-        self._overrideAnchor_ = kwargs.pop("overrideAnchor", False)
+        # anchoringWidget = kwargs.pop("anchoringWidget", None)
+        # self._overrideAnchor_ = kwargs.pop("overrideAnchor", False)
         # windowFlags = kwargs.pop("windowFlags", None)
 
         if isinstance(objType, QtWidgets.QWidget):
@@ -122,18 +122,18 @@ data object after loading from file or importing from the workspace.
 
         QtCore.QObject.__init__(self, parent=parent)
 
-        self._isSubWidget_: bool = False
-        self._closeRequested_: bool = False
-
-        self._positionHint_: typing.Optional[QtCore.QPoint] = None
-
-        if isinstance(anchoringWidget, QtWidgets.QWidget):
-            self._anchoringWidget_ = anchoringWidget
-            self._isSubWidget_ = True
-            self._positionHint_ = anchoringWidget.geometry().topRight()
-
-        else:
-            self._anchoringWidget_ = None
+        # self._isSubWidget_: bool = False
+        # self._closeRequested_: bool = False
+        #
+        # self._positionHint_: typing.Optional[QtCore.QPoint] = None
+        #
+        # if isinstance(anchoringWidget, QtWidgets.QWidget):
+        #     self._anchoringWidget_ = anchoringWidget
+        #     self._isSubWidget_ = True
+        #     self._positionHint_ = anchoringWidget.geometry().topRight()
+        #
+        # else:
+        #     self._anchoringWidget_ = None
 
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
 
