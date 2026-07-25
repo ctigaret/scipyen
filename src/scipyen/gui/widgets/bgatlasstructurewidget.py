@@ -46,7 +46,7 @@ else:
 try:
     from qtpy import QtDBus # noqa
     __has_qtdbus__ = True
-except:
+except: # noqa
     __has_qtdbus__ = False
 
 from core.prog import scipywarn # noqa
@@ -108,7 +108,7 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
         self.acronymOrNameEdit.sig_textChanged.connect(self._slot_lookupStructure)
         self.ancestorComboBox.currentIndexChanged.connect(self._slot_ancestorSelected)
         self.descendantComboBox.currentIndexChanged.connect(self._slot_descendantSelected)
-        self.structureTreeView.readOnly=True
+        # self.structureTreeView.readOnly=True
         self.detailsToolButton.clicked.connect(self._slot_showDetails)
 
     def _setup_UIFields(self):
@@ -142,23 +142,23 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
         self.descendantComboBox.setCurrentIndex(0)
         self.acronymOrNameEdit.clear()
 
-        if isinstance(self._containerWidget_, DataClassWidget):
-            self.structureTreeView.setEnabled(False)
-            self.structureTreeView.setVisible(False)
-            self.detailsToolButton.setEnabled(True)
-            self.detailsToolButton.setVisible(True)
-            if (isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer)
-                and self.detailsViewer.isVisible()
-                ):
-                # print(f"{self.__class__.__name__}._setup_UIFields -> updating details viewer for structure {self._structure_}")
-                self.detailsViewer.view(self._structure_, doc_title="structure")
-
-        else:
-            self.structureTreeView.setEnabled(True)
-            self.structureTreeView.setVisible(True)
-            self.detailsToolButton.setEnabled(False)
-            self.detailsToolButton.setVisible(False)
-            self.structureTreeView.setData(self._structure_, "structure")
+        # if isinstance(self._containerWidget_, DataClassWidget):
+        #     self.structureTreeView.setEnabled(False)
+        #     self.structureTreeView.setVisible(False)
+        #     self.detailsToolButton.setEnabled(True)
+        #     self.detailsToolButton.setVisible(True)
+        #     if (isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer)
+        #         and self.detailsViewer.isVisible()
+        #         ):
+        #         # print(f"{self.__class__.__name__}._setup_UIFields -> updating details viewer for structure {self._structure_}")
+        #         self.detailsViewer.view(self._structure_, doc_title="structure")
+        #
+        # else:
+        #     self.structureTreeView.setEnabled(True)
+        #     self.structureTreeView.setVisible(True)
+        #     self.detailsToolButton.setEnabled(False)
+        #     self.detailsToolButton.setVisible(False)
+        #     self.structureTreeView.setData(self._structure_, "structure")
 
         # self.structureTreeView.readOnly=True
 

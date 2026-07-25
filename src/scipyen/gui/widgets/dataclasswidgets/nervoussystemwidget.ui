@@ -56,7 +56,7 @@
   <customwidget>
    <class>BGAtlasStructureLookupWidget</class>
    <extends>QWidget</extends>
-   <header location="global">gui.widgets.dataclasswidgets.bgatlasstructurewidget</header>
+   <header location="global">gui.widgets.bgatlasstructurewidget</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

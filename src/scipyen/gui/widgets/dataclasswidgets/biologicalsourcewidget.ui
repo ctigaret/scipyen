@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>246</width>
-    <height>134</height>
+    <width>204</width>
+    <height>98</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -58,61 +58,6 @@
     </layout>
    </item>
    <item row="2" column="0">
-    <layout class="QHBoxLayout" name="horizontalLayout_3">
-     <item>
-      <widget class="QLabel" name="label_3">
-       <property name="toolTip">
-        <string>Select Specimen Type</string>
-       </property>
-       <property name="statusTip">
-        <string>Select Specimen Type</string>
-       </property>
-       <property name="whatsThis">
-        <string>Select Specimen Type</string>
-       </property>
-       <property name="text">
-        <string>Type:</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <spacer name="horizontalSpacer">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QToolButton" name="replaceSpecimenToolButton">
-       <property name="toolTip">
-        <string>Replace specimen</string>
-       </property>
-       <property name="statusTip">
-        <string>Replace specimen</string>
-       </property>
-       <property name="whatsThis">
-        <string>Replace specimen</string>
-       </property>
-       <property name="text">
-        <string>Replace Specimen</string>
-       </property>
-       <property name="icon">
-        <iconset theme="document-replace"/>
-       </property>
-       <property name="autoRaise">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item row="3" column="0">
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
       <widget class="QLabel" name="label_2">
@@ -147,6 +92,28 @@
        </property>
        <property name="checkable">
         <bool>true</bool>
+       </property>
+       <property name="autoRaise">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="replaceSpecimenToolButton">
+       <property name="toolTip">
+        <string>Replace specimen</string>
+       </property>
+       <property name="statusTip">
+        <string>Replace specimen</string>
+       </property>
+       <property name="whatsThis">
+        <string>Replace specimen</string>
+       </property>
+       <property name="text">
+        <string>Replace Specimen</string>
+       </property>
+       <property name="icon">
+        <iconset theme="document-replace"/>
        </property>
        <property name="autoRaise">
         <bool>true</bool>
