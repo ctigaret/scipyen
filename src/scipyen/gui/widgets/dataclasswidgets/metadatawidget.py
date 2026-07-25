@@ -93,9 +93,15 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
         else:
             self._data_ = obj
 
+        objSymbol = kwargs.get("objSymbol", "")
+        if len(objSymbol.strip()) == 0:
+            kwargs["objSymbol"] = "metadata"
+
         DataClassWidget.__init__(self, parent=parent, **kwargs)
 
+
         self._configureUI_()
+        # self.nameDescriptionWidget.symbol="metadata"
 
         self.biologicalSourceEditor = None
         # self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor

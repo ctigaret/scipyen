@@ -1774,11 +1774,11 @@ def get_atlas_structure(name:str, atlas:BrainGlobeAtlas,
         scipywarn("The 'brainglobe_atlasapi' package is not installed")
         return
 
-    if not isinstance(name, str):
-        raise TypeError(f"Expecting a str; got {type(name).__name__} instead")
+    if not isinstance(name, str) or len(name.strip()) == 0:
+        raise TypeError(f"Expecting a non-empty string; got {name} instead")
 
-    if len(name.strip()) == 0:
-        raise ValueError("Expecting a non-empty string")
+    # if len(name.strip()) == 0:
+    #     raise ValueError("Expecting a non-empty string")
 
     # structures, snames, sacronyms, sids = zip(*[(s, s["name"], s["acronym"], s["id"]) for s in atlas.structures_list])
     structures, snames, sacronyms = zip(*[(s, s["name"], s["acronym"]) for s in atlas.structures_list])

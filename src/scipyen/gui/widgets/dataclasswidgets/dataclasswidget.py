@@ -91,7 +91,7 @@ class DataClassWidget(AnchoringCollapsibleWidget):
         self._needsNewParentWidget_: bool =  True
 
         self.nameDescriptionWidget = None
-        self.editParentToolButton = None
+        self.toggleParentEditorToolButton = None
         self.parentEditor = None
         self.organismEditor = None
 
@@ -111,6 +111,7 @@ class DataClassWidget(AnchoringCollapsibleWidget):
             self.nameDescriptionWidget.setData(self._data_)#, self._objSymbol_)
             self.nameDescriptionWidget.dataName = self._data_.name
             self.nameDescriptionWidget.dataDescription = self._data_.description
+            self.nameDescriptionWidget.symbol = self._objSymbol_
 
             self.nameDescriptionWidget.sig_valueChanged.connect(self._slot_dataReceived)
             self.nameDescriptionWidget.sig_nameChanged.connect(self._slot_dataNameChanged)
@@ -124,8 +125,8 @@ class DataClassWidget(AnchoringCollapsibleWidget):
             self.nameDescriptionWidget.sig_detailsChanged.connect(self._slot_detailsChanged)
             self.sig_valueChanged.connect(self.nameDescriptionWidget._slot_dataChanged)
 
-            self.nameDescriptionWidget.editParentToolButton.setEnabled(False)
-            self.nameDescriptionWidget.editParentToolButton.setVisible(False)
+            self.nameDescriptionWidget.toggleParentEditorToolButton.setEnabled(False)
+            self.nameDescriptionWidget.toggleParentEditorToolButton.setVisible(False)
             self.nameDescriptionWidget.replaceParentToolButton.setEnabled(False)
             self.nameDescriptionWidget.replaceParentToolButton.setVisible(False)
             self.nameDescriptionWidget.organismToolButton.setEnabled(False)
@@ -133,8 +134,8 @@ class DataClassWidget(AnchoringCollapsibleWidget):
 
             if hasattr(self, "_data_"):
                 if hasattr(self._data_, "parent"):
-                    self.nameDescriptionWidget.editParentToolButton.setEnabled(True)
-                    self.nameDescriptionWidget.editParentToolButton.setVisible(True)
+                    self.nameDescriptionWidget.toggleParentEditorToolButton.setEnabled(True)
+                    self.nameDescriptionWidget.toggleParentEditorToolButton.setVisible(True)
 
 
                 if (
@@ -200,14 +201,14 @@ class DataClassWidget(AnchoringCollapsibleWidget):
                                                                     doc_title = self._objSymbol_,
                                                                     name = self._objSymbol_)
 
-                    self.nameDescriptionWidget.editParentToolButton.setEnabled(False)
-                    self.nameDescriptionWidget.editParentToolButton.setVisible(False)
+                    self.nameDescriptionWidget.toggleParentEditorToolButton.setEnabled(False)
+                    self.nameDescriptionWidget.toggleParentEditorToolButton.setVisible(False)
                     self.nameDescriptionWidget.replaceParentToolButton.setEnabled(False)
                     self.nameDescriptionWidget.replaceParentToolButton.setVisible(False)
 
                     if hasattr(self._data_, "parent"):
-                        self.nameDescriptionWidget.editParentToolButton.setEnabled(True)
-                        self.nameDescriptionWidget.editParentToolButton.setVisible(True)
+                        self.nameDescriptionWidget.toggleParentEditorToolButton.setEnabled(True)
+                        self.nameDescriptionWidget.toggleParentEditorToolButton.setVisible(True)
 
                         if (
                             hasattr(self._data_, "parentTypes")
@@ -334,7 +335,7 @@ class DataClassWidget(AnchoringCollapsibleWidget):
                     editorWidgetType,
                     "parentEditor",
                     self._slot_parentChanged,
-                    self.nameDescriptionWidget.editParentToolButton,
+                    self.nameDescriptionWidget.toggleParentEditorToolButton,
                     anchoringWidget,
                     parent,
                     objSymbol="parent"
@@ -346,7 +347,7 @@ class DataClassWidget(AnchoringCollapsibleWidget):
                 editorWidgetType,
                 "parentEditor",
                 self._slot_parentChanged,
-                self.nameDescriptionWidget.editParentToolButton,
+                self.nameDescriptionWidget.toggleParentEditorToolButton,
                 anchoringWidget,
                 parent,
                 objSymbol="parent"
@@ -391,12 +392,13 @@ class DataClassWidget(AnchoringCollapsibleWidget):
             and hasattr(self._data_, "parentTypes")
             and value in self._data_.parentTypes
             ):
-
+            organism = self._data_.getOrganism()
             newParent = value()
+            newParent.setOrganism(organism)
             self._needsNewParentWidget_ = type(newParent) is not type(self._data_.parent)
             self._data_.parent = newParent
             self._slot_parentChanged(self._data_.parent)
-            self.nameDescriptionWidget.editParentToolButton.setChecked(True)
+            self.nameDescriptionWidget.toggleParentEditorToolButton.setChecked(True)
 
     @Slot(bool)
     def _slot_toggleOrganismEditor(self, val: bool):

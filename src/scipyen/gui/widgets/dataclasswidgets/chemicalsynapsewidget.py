@@ -165,7 +165,7 @@ class ChemicalSynapseWidget(Ui_ChemicalSynapseWidget, DataClassWidget):
                                (
                                    # self.dataExchangeWidget,
                                    # self.nameDescriptionWidget,
-                                   # self.editParentToolButton,
+                                   # self.toggleParentEditorToolButton,
                                    self.synapseMorhpologicalTypeComboBox,
                                    self.synapseFunctionalTypeComboBox,
                                    self.retrogradeCheckBox,

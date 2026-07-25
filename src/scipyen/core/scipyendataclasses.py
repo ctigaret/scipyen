@@ -1006,6 +1006,7 @@ class Organ(ScipyenDataclass):
         return Organism()
 
     def setOrganism(self, value: Organism):
+        # print(f"{self.__class__.__name__}.setOrganism({value})")
         if isinstance(value, Organism):
             self.parent=value
         else:
@@ -1087,6 +1088,7 @@ class Tissue(ScipyenDataclass):
         return self.parent.getOrganism()
 
     def setOrganism(self, value: Organism):
+        # print(f"{self.__class__.__name__}.setOrganism({value})")
         if isinstance(value, Organism):
             self.parent.setOrganism(value)
         else:
@@ -1096,7 +1098,7 @@ class Tissue(ScipyenDataclass):
 class Cell(ScipyenDataclass):
     parentTypes: typing.ClassVar[
                 typing.Tuple[ScipyenDataclass]
-        ] = (Organ, Tissue)
+        ] = (Organ, Tissue, NervousSystem)
 
     cellType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g., "neuron", "glia", etc
 
@@ -1111,6 +1113,7 @@ class Cell(ScipyenDataclass):
         return self.parent.getOrganism()
 
     def setOrganism(self, value: Organism):
+        # print(f"{self.__class__.__name__}.setOrganism({value})")
         if isinstance(value, Organism):
             self.parent.setOrganism(value)
         else:
@@ -1161,6 +1164,7 @@ class CellCompartment(ScipyenDataclass):
         return self.parent.getOrganism()
 
     def setOrganism(self, value: Organism):
+        # print(f"{self.__class__.__name__}.setOrganism({value})")
         if isinstance(value, Organism):
             self.parent.setOrganism(value)
         else:
@@ -1243,8 +1247,9 @@ class ChemicalSynapse(ScipyenDataclass):
                 return organisms[0]
 
     def setOrganism(self, organism: Organism):
+        # print(f"{self.__class__.__name__}.setOrganism({organism})")
         if not isinstance(organism, Organism):
-            oranism = Organism()
+            organism = Organism()
 
         for parent in (self.preSynapticParent, self.postSynapticParent):
             parent.setOrganism(organism)
@@ -1272,6 +1277,7 @@ class UltrastructureElement(ScipyenDataclass):
         return self.parent.getOrganism()
 
     def setOrganism(self, value: Organism):
+        # print(f"{self.__class__.__name__}.setOrganism({value})")
         if isinstance(value, Organism):
             self.parent.setOrganism(value)
         else:
@@ -1485,6 +1491,7 @@ class BiologicalSource(ScipyenDataclass):
     specimen: typing.Union[
         Organism,
         Organ,
+        NervousSystem,
         Tissue,
         Cell,
         CellCompartment,

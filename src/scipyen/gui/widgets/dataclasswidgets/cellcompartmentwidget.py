@@ -152,7 +152,7 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
                                (
                                    # self.dataExchangeWidget,
                                    # self.nameDescriptionWidget,
-                                   self.editParentToolButton,
+                                   self.toggleParentEditorToolButton,
                                    self.typeComboBox,
                                 )
                             )

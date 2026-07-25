@@ -315,7 +315,8 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         for obj, toggle, objName in self._collapsibleChildren_.values():
             if isinstance(obj, QtWidgets.QWidget):
                 if obj.isAnchoredWidget:
-                    wids.append(id(obj))
+                    objId = id(obj)
+                    # wids.append(id(obj))
 
                 # NOTE: 2026-07-24 16:28:06
                 # see # BUG?: 2026-07-24 16:25:48 FIXME?
@@ -327,8 +328,10 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                     sb = QtCore.QSignalBlocker(toggle) # noqa
                     toggle.setChecked(False)
 
-                obj.close()
-                obj.deleteLater()
+                if qtutils.isQObjectAlive(obj):
+                    obj.close()
+                    obj.deleteLater()
+                wids.append(objId)
                 obj = None
 
         for wid in wids:
@@ -339,10 +342,6 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                 if wid in self.anchoringWidget._collapsibleChildren_:
                     del self.anchoringWidget._collapsibleChildren_[wid]
 
-
-    # def moveEvent(self, evt):
-    #     self.sig_moved.emit(evt.pos())# - evt.oldPos())
-    #     evt.accept()
 
     @property
     def overrideAnchor(self) -> bool:

@@ -62,16 +62,20 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_OrganWidget, _ = loadUiType(
-    os.path.join(__module_path__, "organwidget.ui")
+Ui_OrganTissueWidget, _ = loadUiType(
+    os.path.join(__module_path__, "organtissuewidget.ui")
     )
 
-Ui_TissueWidget, _ = loadUiType(
-    os.path.join(__module_path__, "tissuewidget.ui")
-    )
+# Ui_OrganWidget, _ = loadUiType(
+#     os.path.join(__module_path__, "organwidget.ui")
+#     )
+#
+# Ui_TissueWidget, _ = loadUiType(
+#     os.path.join(__module_path__, "tissuewidget.ui")
+#     )
 
 
-class OrganWidget(Ui_OrganWidget, DataClassWidget):
+class OrganWidget(Ui_OrganTissueWidget, DataClassWidget):
     _objectTypes_ = (sdc.Organ, )
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.BiologicalSource] = None,
@@ -100,7 +104,7 @@ class OrganWidget(Ui_OrganWidget, DataClassWidget):
         self.sig_uiConfigured.emit()
 
 
-class TissueWidget(Ui_TissueWidget, DataClassWidget):
+class TissueWidget(Ui_OrganTissueWidget, DataClassWidget):
     _objectTypes_ = (sdc.Tissue, sdc.BiologicalProduct,)
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[typing.Union[sdc.Tissue, sdc.BiologicalProduct]] = None,

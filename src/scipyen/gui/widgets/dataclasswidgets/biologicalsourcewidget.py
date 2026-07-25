@@ -166,6 +166,8 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         if value in self._specimenTypeNames_:
             spType = self._specimenTypeNames_[value]
             newSpecimen = spType()
+            organism = self._data_.getOrganism()
+            newSpecimen.setOrganism(organism)
             self._needsNewSpecimenWidget_ = type(newSpecimen) is not type(self._data_.specimen)
             self._slot_specimenChanged(newSpecimen)
             self.toggleSpecimenEditorToolButton.setChecked(True)

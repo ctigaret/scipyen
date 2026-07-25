@@ -107,7 +107,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
         self.nameLineEdit.sig_textChanged.connect(self._slot_nameChanged)
         self.descriptionToolButton.clicked.connect(self._slot_editDescription)
         self.viewDetailsToolButton.clicked.connect(self.sig_detailedViewRequest)
-        self.editParentToolButton.toggled.connect(self.sig_parentEditRequest)
+        self.toggleParentEditorToolButton.toggled.connect(self.sig_parentEditRequest)
         self.replaceParentToolButton.clicked.connect(self.sig_newParentRequest)
         self.organismToolButton.toggled.connect(self.sig_organismEditRequest)
         self.toggleDataExchangeWidgetToolButton.toggled.connect(self._slot_toggleDataExchangeWidget)

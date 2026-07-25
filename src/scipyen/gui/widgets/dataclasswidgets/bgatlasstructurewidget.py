@@ -209,6 +209,8 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
 
     @Slot(str)
     def _slot_lookupStructure(self, val: str):
+        if not isinstance(val, str) or len(val.strip()) == 0:
+            return
         if (bgbridge.hasBrainGlobe and bgbridge.hasBrainGlobeAtlasAPI
             and isinstance(self._atlas_, bgbridge.BrainGlobeAtlas) and "brainglobe_atlasapi" in type(self._atlas_).__module__):
             self._structure_ = self._getStructure_(val)

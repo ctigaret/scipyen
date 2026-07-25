@@ -182,7 +182,7 @@ class NeuronWidget(Ui_NeuronWidget, DataClassWidget):
 
         sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), # noqa
                                (
-                                   self.editParentToolButton,
+                                   self.toggleParentEditorToolButton,
                                    self.neuronTypeComboBox,
                                 )
                                )

@@ -90,6 +90,10 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         else:
             self._data_ = obj
 
+        objSymbol = kwargs.get("objSymbol", "")
+        if len(objSymbol.strip()) == 0:
+            kwargs["objSymbol"] = "organism"
+
         DataClassWidget.__init__(self, parent=parent, **kwargs)
 
         self._configureUI_()
@@ -251,31 +255,26 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         from gui.widgets.dataclasswidgets.biometricswidget import BiometricsWidget
         anchoringWidget = self.provideAnchoringWidget()
         # anchoringWidget = self._anchoringWidget_ if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
-        if isinstance(self.biometricsEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biometricsEditor):
-            if not isinstance(self.biometricsEditor, BiometricsWidget):
-                self.biometricsEditor.close()
-                self.biometricsEditor.deleteLater()
-                self.biometricsEditor = None
+        if not isinstance(self.biometricsEditor, BiometricsWidget):
+            if isinstance(self.biometricsEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biometricsEditor):
+                self._removeAnchoringCollapsibleWidget_(self.biometricsEditor)
 
-                self.biometricsEditor = self._setupCollapsibleChild_(
-                    BiometricsWidget,
-                    "biometricsEditor",
-                    self._slot_biometricsChanged,
-                    self.toggleBiometricsToolButton,
-                    anchoringWidget,
-                    self._data_.biometrics,
-                    objSymbol="biometrics"
-                    )
 
-            # self.biometricsEditor = BiometricsWidget(anchoringWidget=anchoringWidget)
+            self.biometricsEditor = self._setupCollapsibleChild_(
+                BiometricsWidget,
+                "biometricsEditor",
+                self._slot_biometricsChanged,
+                self.toggleBiometricsToolButton,
+                anchoringWidget,
+                self._data_.biometrics,
+                objSymbol="biometrics"
+                )
+
             self.biometricsEditor.setWindowTitle("Biometrics")
-            # self.biometricsEditor.sig_valueChanged.connect(self._slot_biometricsChanged)
-            # self.biometricsEditor.sig_closing.connect(self._slot_biometricsEditorClosing)
-            # self.biometricsEditor.sig_collapsed.connect(self._slot_biometricsEditorCollapsed)
 
-        # self._collapsibleChildren_["biometricsEditor"] = self.biometricsEditor,
-
-        # self.biometricsEditor.setValue(self._data_.biometrics, objSymbol="biometrics")
+        else:
+            self.biometricsEditor.setValue(self._data_.biometrics,
+                                           objSymbol="biometrics")
 
         if not self.biometricsEditor.isVisible():
             self.biometricsEditor.show()
