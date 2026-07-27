@@ -77,7 +77,7 @@ These operations communicate with the parent widget via Qt signal/slots.
 
 The only prerequisites for the parent widget are:
 
-1. On the "output side": the parent widget shoulwd sends the data object via one
+1. On the "output side": the parent widget should send the data object via one
 of two signals: sig_dataSaving and sig_dataExporting to trigger respectively,
 saving and exporting logic. These two signals (in the parent widget) MUST be
 connected to the public Qt slots of this widget: ``slot_saveData`` and ``slot_exportData``.

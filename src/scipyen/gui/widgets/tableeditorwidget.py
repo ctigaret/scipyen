@@ -17,15 +17,15 @@ from collections import deque
 
 #### BEGIN 3rd party modules
 import qtpy # noqa
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -69,13 +69,16 @@ from core.prog import (safewrapper, scipywarn) # noqa
 
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType) # noqa
 from core.triggerprotocols import TriggerProtocolList
-from core.datazone import DataZone
+from core.datazone import DataZone # noqa
 
 import core.datasignal # noqa
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.datatypes import array_slice
 from core.sysutils import adapt_ui_path
-from core import scipyen_quantities as scq
+from core import scipyen_quantities as scq # noqa
+from ephys import ephys_pathways # noqa
+from core import qtutils
+
 
 #### END pict.core modules
 
@@ -84,7 +87,7 @@ from core import scipyen_quantities as scq
 from gui import (quickdialog, guiutils) # noqa
 from gui.delegates import PythonItemDelegate
 # from gui.widgets.tabledataview import TableDataView
-from gui.itemmodels.tabulardatamodel import TabularDataModel
+from gui.itemmodels.tabulardatamodel import TabularDataModel, TabularType
 from gui.itemmodels.roles import * # noqa
 # from gui import resources_rc
 # from gui import icons_rc
@@ -99,15 +102,6 @@ __ui_path__ = adapt_ui_path(__module_path__, "tableeditorwidget.ui")
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-TabularType = typing.Union[pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
-                           neo.AnalogSignal, neo.IrregularlySampledSignal,
-                           neo.Epoch, neo.Event, neo.SpikeTrain,
-                           DataSignal, IrregularlySampledDataSignal,
-                           TriggerEvent, TriggerProtocolList,
-                           np.ndarray, vigra.VigraArray,
-                           vigra.filters.Kernel1D, vigra.filters.Kernel2D,
-                           NeoObjectList, list, tuple, deque]
-
 Ui_TableEditorWidget, QWidget = loadUiType(__ui_path__)
 
 class TableEditorWidget(QWidget, Ui_TableEditorWidget):
@@ -119,7 +113,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                        neo.Epoch, neo.Event, neo.SpikeTrain,
                        DataSignal, IrregularlySampledDataSignal,
                        TriggerEvent, TriggerProtocolList,
-                       np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D)
+                       np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D,
+                       vigra.filters.Kernel2D)
 
     view_action_name = "Table"
 
@@ -128,6 +123,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     sig_valueChanged = sig_dataChanged
     sig_indexChanged = Signal([int, int], [QtCore.QModelIndex], name="sig_indexChanged")
     sig_indexesChanged = Signal(QtCore.QModelIndex, QtCore.QModelIndex, list, name="sig_indexesChanged")
+    sig_requestDataRow = Signal(name="sig_requestDataRow")
 
     def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None,
                  readOnly:bool=True, enforceFloat:bool=False,
@@ -276,7 +272,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         for row in range(self._dataModel_.rowCount()):
             for col in range(self._dataModel_.columnCount()):
                 index = self._dataModel_.index(row, col)
-                indexData = index.data(ObjectDataRole)
+                indexData = index.data(ObjectDataRole) # noqa
                 if indexData is None:
                     indexData = index.data(QtCore.Qt.EditRole)
 
@@ -288,12 +284,13 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                         self.tableView.openPersistentEditor(index)
 
 
-        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), (self.tableView.horizontalHeader(), self.tableView.verticalHeader())))
-        if self.isAutoResizeColumns:
-            self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
+        with qtutils.SignalBlocker((self.tableView.horizontalHeader(), self.tableView.verticalHeader())):
+        # signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), (self.tableView.horizontalHeader(), self.tableView.verticalHeader())))
+            if self.isAutoResizeColumns:
+                self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
-        if self.isAutoResizeRows:
-            self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
+            if self.isAutoResizeRows:
+                self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
 
     @Slot()
@@ -350,8 +347,9 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self.autoResizeRows()
 
     def autoResizeRows(self):
-        signalBlocker = QtCore.QSignalBlocker(self.tableView.verticalHeader()) # noqa
-        self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
+        # signalBlocker = QtCore.QSignalBlocker(self.tableView.verticalHeader()) # noqa
+        with qtutils.SignalBlocker(self.tableView.verticalHeader()):
+            self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
     @property
     def isAutoResizeColumns(self) -> bool:
@@ -364,8 +362,9 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self.autoResizeColumns()
 
     def autoResizeColumns(self):
-        signalBlocker = QtCore.QSignalBlocker(self.tableView.horizontalHeader()) # noqa
-        self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
+        # signalBlocker = QtCore.QSignalBlocker(self.tableView.horizontalHeader()) # noqa
+        with qtutils.SignalBlocker(self.tableView.horizontalHeader()):
+            self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
     @property
     def currentSlice(self):
@@ -413,13 +412,14 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     def enforceReadOnly(self, val:bool):
         self._enforceReadOnly_ = val == True
 
-        sigBlocker = QtCore.QSignalBlocker(self.setEditableToolButton)
-        if self._enforceReadOnly_:
-            self.readOnly = True
-            self.setEditableToolButton.setChecked(False)
-            self.setEditableToolButton.setEnabled(False)
-            self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-locked"))
-            self.setEditableToolButton.setToolTip("Editing disabled; set enforceReadOnly to True to enable this switch then then toggle to enable")
+        # sigBlocker = QtCore.QSignalBlocker(self.setEditableToolButton)
+        with qtutils.SignalBlocker(self.setEditableToolButton):
+            if self._enforceReadOnly_:
+                self.readOnly = True
+                self.setEditableToolButton.setChecked(False)
+                self.setEditableToolButton.setEnabled(False)
+                self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-locked"))
+                self.setEditableToolButton.setToolTip("Editing disabled; set enforceReadOnly to True to enable this switch then then toggle to enable")
 
 
     @property
@@ -428,29 +428,30 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 
     @readOnly.setter
     def readOnly(self, val:bool):
-        self._readOnly_ = val == True
-        signalBlocker = QtCore.QSignalBlocker(self.setEditableToolButton)
-        if self._readOnly_:
-            self.tableView.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-            self.tableView.setItemDelegate(self._defaultItemDelegate_)
-            # NOTE:2026-03-08 09:38:02
-            # don't change these: these depend on the type of the data represented
-            # in the model
-            # self.tableView.model.canAlterRows = False
-            # self.tableVire.model.canAlterColumns = False
-            self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-locked"))
-            self.setEditableToolButton.setToolTip("Editing disabled; toggle to enable")
-        else:
-            # NOTE:2026-03-08 09:38:02
-            # don't change these: these depend on the type of the data represented
-            # in the model
-            # self.tableView.model.canAlterRows = True
-            # self.tableVire.model.canAlterColumns = True
-            self.tableView.setEditTriggers(self._defaultEditTriggers_)
-            self.tableView.setItemDelegate(self._editItemDelegate_)
+        self._readOnly_ = val is True
+        # signalBlocker = QtCore.QSignalBlocker(self.setEditableToolButton)
+        with qtutils.SignalBlocker(self.setEditableToolButton):
+            if self._readOnly_:
+                self.tableView.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+                self.tableView.setItemDelegate(self._defaultItemDelegate_)
+                # NOTE:2026-03-08 09:38:02
+                # don't change these: these depend on the type of the data represented
+                # in the model
+                # self.tableView.model.canAlterRows = False
+                # self.tableVire.model.canAlterColumns = False
+                self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-locked"))
+                self.setEditableToolButton.setToolTip("Editing disabled; toggle to enable")
+            else:
+                # NOTE:2026-03-08 09:38:02
+                # don't change these: these depend on the type of the data represented
+                # in the model
+                # self.tableView.model.canAlterRows = True
+                # self.tableVire.model.canAlterColumns = True
+                self.tableView.setEditTriggers(self._defaultEditTriggers_)
+                self.tableView.setItemDelegate(self._editItemDelegate_)
 
-            self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-unlocked"))
-            self.setEditableToolButton.setToolTip("Editing enabled; toggle to disable")
+                self.setEditableToolButton.setIcon(QtGui.QIcon.fromTheme("object-unlocked"))
+                self.setEditableToolButton.setToolTip("Editing enabled; toggle to disable")
 
     def setEditTriggers(self, val):
         r"""See documentation for QtWidgets.QAbstractItemView.setEditTriggers()
@@ -522,13 +523,15 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     @Slot()
     def slot_resizeAllColumnsToContents(self):
         #print("TableEditorWidget slot_resizeAllColumnsToContents")
-        signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
-        self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
+        # signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
+        with qtutils.SignalBlocker((self.tableView.horizontalHeader(), self.tableView.verticalHeader())):
+            self.tableView.horizontalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
     @Slot()
     def slot_resizeAllRowsToContents(self):
-        signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
-        self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
+        # signalBlockers = [QtCore.QSignalBlocker(v) for v in (self.tableView.horizontalHeader(), self.tableView.verticalHeader())]
+        with qtutils.SignalBlocker((self.tableView.horizontalHeader(), self.tableView.verticalHeader())):
+            self.tableView.verticalHeader().resizeSections(QtWidgets.QHeaderView.ResizeToContents)
 
     @Slot(QtCore.QPoint)
     @safewrapper
@@ -726,20 +729,20 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         if not isinstance(self.selectedRowIndex, int):
             return
 
-        signalBlocker = QtCore.QSignalBlocker(self.tableView.verticalHeader())
+        # signalBlocker = QtCore.QSignalBlocker(self.tableView.verticalHeader())
+        with qtutils.SignalBlocker(self.tableView.verticalHeader()):
+            if len(self.tableView.selectionModel().selectedRows()) > 1:
+                row_indices = [ndx.row() for ndx in self.tableView.selectionModel().selectedColumns()]
 
-        if len(self.tableView.selectionModel().selectedRows()) > 1:
-            row_indices = [ndx.row() for ndx in self.tableView.selectionModel().selectedColumns()]
+                for ndx in row_indices:
+                    sizeHint = max([self.tableView.sizeHintForRow(ndx), self.tableView.verticalHeader().sectionSizeHint(ndx)])
+                    #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(ndx)
+                    self.tableView.verticalHeader().resizeSection(ndx, sizeHint)
 
-            for ndx in row_indices:
-                sizeHint = max([self.tableView.sizeHintForRow(ndx), self.tableView.verticalHeader().sectionSizeHint(ndx)])
-                #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(ndx)
-                self.tableView.verticalHeader().resizeSection(ndx, sizeHint)
-
-        else:
-            sizeHint = max([self.tableView.sizeHintForRow(self.selectedRowIndex), self.tableView.verticalHeader().sectionSizeHint(self.selectedRowIndex)])
-            #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
-            self.tableView.verticalHeader().resizeSection(self.selectedRowIndex, sizeHint)
+            else:
+                sizeHint = max([self.tableView.sizeHintForRow(self.selectedRowIndex), self.tableView.verticalHeader().sectionSizeHint(self.selectedRowIndex)])
+                #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
+                self.tableView.verticalHeader().resizeSection(self.selectedRowIndex, sizeHint)
 
     @Slot()
     @safewrapper
@@ -747,20 +750,21 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         if not isinstance(self.selectedColumnIndex, int):
             return
 
-        signalBlocker = QtCore.QSignalBlocker(self.tableView.horizontalHeader())
+        # signalBlocker = QtCore.QSignalBlocker(self.tableView.horizontalHeader())
 
-        if len(self.tableView.selectionModel().selectedColumns()) > 1:
-            col_indices = [ndx.column() for ndx in self.tableView.selectionModel().selectedColumns()]
+        with qtutils.SignalBlocker(self.tableView.horizontalHeader()):
+            if len(self.tableView.selectionModel().selectedColumns()) > 1:
+                col_indices = [ndx.column() for ndx in self.tableView.selectionModel().selectedColumns()]
 
-            for ndx in col_indices:
-                sizeHint = max([self.tableView.sizeHintForColumn(ndx), self.tableView.horizontalHeader().sectionSizeHint(ndx)])
-                #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(ndx)
-                self.tableView.horizontalHeader().resizeSection(ndx, sizeHint)
+                for ndx in col_indices:
+                    sizeHint = max([self.tableView.sizeHintForColumn(ndx), self.tableView.horizontalHeader().sectionSizeHint(ndx)])
+                    #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(ndx)
+                    self.tableView.horizontalHeader().resizeSection(ndx, sizeHint)
 
-        else:
-            sizeHint = max([self.tableView.sizeHintForColumn(self.selectedColumnIndex), self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)])
-            #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
-            self.tableView.horizontalHeader().resizeSection(self.selectedColumnIndex, sizeHint)
+            else:
+                sizeHint = max([self.tableView.sizeHintForColumn(self.selectedColumnIndex), self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)])
+                #sizeHint = self.tableView.horizontalHeader().sectionSizeHint(self.selectedColumnIndex)
+                self.tableView.horizontalHeader().resizeSection(self.selectedColumnIndex, sizeHint)
 
     @Slot()
     def slot_insertRowAbove(self):
@@ -788,14 +792,12 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self._data_ = model._modelData_
             self.sig_dataChanged.emit()
 
-
     @Slot()
     def slot_insertRow(self):
         model = self.tableView.model()
         if not isinstance(model, TabularDataModel) or not model.canAlterRows:
             return
 
-        # modelIndexes = self.tableView.selectedIndexes()
         row = model.rowCount()
 
         if row < model.rowCount():
@@ -804,6 +806,26 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         if model.insertModelRow(row, None, QtCore.QModelIndex()):
             self._data_ = model._modelData_
             self.sig_dataChanged.emit()
+
+    @Slot(object, int, bool)
+    def slot_dataRowReceived(self, obj:object, index: int, insert: bool):
+        model = self.tableView.model()
+        if not isinstance(model, TabularDataModel):
+            return
+
+        if index >= len(model.rowCount()):
+            index = model.rowCount()
+            insert = True
+
+        if insert:
+            if model.insertModelRow(index, obj, QtCore.QModelIndex()):
+                self._data_ = model._modelData_
+                self.sig_dataChanged.emit()
+
+        # else:
+
+
+
 
 
     @Slot()

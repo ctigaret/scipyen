@@ -68,7 +68,7 @@ import core.utilities as utilities # noqa
 import core.strutils as strutils # noqa
 from core.strutils import str2float # noqa
 
-from core.prog import (safewrapper, scipywarn)
+from core.prog import (safewrapper, scipywarn, unwind_type)
 
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType) # noqa
 from core.marktrain import MarkTrain
@@ -97,6 +97,19 @@ from gui.itemmodels.roles import * # noqa
 #### END pict.iolib modules
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
+
+TabularType = typing.Union[pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
+                           neo.AnalogSignal, neo.IrregularlySampledSignal,
+                           neo.Epoch, neo.Event, neo.SpikeTrain,
+                           DataSignal, IrregularlySampledDataSignal,
+                           TriggerEvent, TriggerProtocolList,
+                           np.ndarray, vigra.VigraArray,
+                           vigra.filters.Kernel1D, vigra.filters.Kernel2D,
+                           NeoObjectList,
+                           ephys_pathways.RecordingSchedule,
+                           list, tuple, deque]
+
+TabularTypes = tuple(unwind_type(TabularType))
 
 class TabularDataModel(QtCore.QAbstractTableModel):
     r"""Table item model for tabular data in Scipyen.
@@ -595,8 +608,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     @Slot(object)
     def populateModel(self, data):
-        from core import datatypes
-        from imaging import vigrautils
+        # from core import datatypes
+        # from imaging import vigrautils
 
         # print(f"{self.__class__.__name__}.populateModel({type(data).__name__})")
         # ### BEGIN Define timer to debug
@@ -1104,9 +1117,23 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         disp = f"{val.name}"
                     else:
                         disp = f"{val}"
-                    ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp
+                    ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
                 else:
                     return QtCore.QVariant()
+
+            elif isinstance(self._modelData_, ephys_pathways.RecordingSchedule):
+                obj = self._modelData_[row]
+                attribute = self._modelDataColumnHeaders_[col]
+                if attribute.lower() != "edit":
+                    val = getattr(obj, attribute)
+                    if isinstance(val, enum.Enum):
+                        disp = f"{val.name}"
+                    else:
+                        disp = f"{val}"
+                    ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
+                else:
+                    return QtCore.QVariant()
+
 
             elif isinstance(self._modelData_, typing.Sequence):
                 if all(isinstance(d, ephys_pathways.RecordingSource) for d in self._modelData_):
@@ -1299,7 +1326,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             tuple(
                 map(
                     lambda x: (x[0], f"{x[1]}"),
-                    enumerate(("name", "episodeType", "Edit"))
+                    enumerate(("name", "type", "Edit"))
                     )
                 )
             )

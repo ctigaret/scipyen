@@ -118,8 +118,13 @@ from ephys.ephys_protocol import ElectrophysiologyProtocol
 
 #### END pict.core modules
 
+# ### BEGIN forward class declarations
 class SynapticPathway: pass # noqa
 class PathwaysStimulationLayout: pass # noqa
+class SynapticPathwayList: pass # noqa
+class RecordingSource: pass # noqa
+
+# ### END   forward class declarations
 
 class RecordingEpisodeType(TypeEnum):
     r"""Once can define valid type combinations as follows:
@@ -404,7 +409,7 @@ class RecordingEpisode(Episode):
     def __repr__(self) -> str:
         ret = list()
         ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}), with:")
-        ret.append(f"\t{len.self.blocks} trials")
+        ret.append(f"\t{len(self.blocks)} trials")
         ret.append(f"\t{self.nFrames} frames")
         ret.append(f"\tbegin={self.begin}, end={self.end}")
         ret.append(f"\tbeginFrame={self.beginFrame}, endFrame={self.endFrame}")
@@ -440,15 +445,17 @@ class RecordingEpisode(Episode):
             p.text("Pathways:")
             p.breakable()
             for k, v in enumerate(self.pathways):
-                p.text(f"{k} ↦ {v}")
+                p.text(f"{k} ↦ {v}\n")
 
             if isinstance(self.stimulusLayout, PathwaysStimulationLayout):
-                link = " \u2192 "
+                link = " \u2192 " # noqa
                 txt = ["Stimulus Layout:"]
 
                 for k,v in enumerate(self.stimulusLayout.pathways):
-                    txt.append(f"Synaptic Pathway {k} ↦ {v}")
+                    txt.append(f"\nSynaptic Pathway {k} ↦ {v}")
+
                 xTalk = self.stimulusLayout.getCrossTalkLayout()
+
                 if len(xTalk):
                     txt.append("Cross-talk:")
                     for k, v in xTalk.items():
@@ -995,7 +1002,7 @@ class SynapticPathwayType(TypeEnum):
 #     dig: bool=True
 
 @dataclass
-class SynapticStimulusChannel():
+class SynapticStimulusChannel(ScipyenDataclass):
     r"""Logical association between digital or analog outputs and synaptic stimulation.
 
     Attributes:
@@ -1293,7 +1300,7 @@ def synstim(name:str, channel:typing.Optional[int]=None, dig:bool=True) -> Synap
     return SynapticStimulusChannel(name, channel, dig)
 
 @dataclass
-class AuxiliaryInput():
+class AuxiliaryInput(ScipyenDataclass):
     r""" ADC for recording a signal other than the primary amplifier output.
 
     This can be, for example, a secondary amplifier output, 'copies' (or signal proxies)
@@ -1591,7 +1598,7 @@ def auxinput(name:str, adc:typing.Optional[int]=None, cmd:typing.Optional[bool]=
     return AuxiliaryInput(name, adc, cmd)
 
 @dataclass
-class AuxiliaryOutput():
+class AuxiliaryOutput(ScipyenDataclass):
     r""" An auxiliary (analog — DAC — or a digital — DIG) output channel of the DAQ device.
 
     This channel is used for sending waveforms other than for clamping or synaptic
@@ -1888,27 +1895,1007 @@ def auxoutput(name:str, channel:typing.Optional[int]=None, digttl:typing.Optiona
     return AuxiliaryOutput(name, channel, digttl)
 
 @dataclass
-class RecordingSource():
-    name: str = "cell"
+class PathwaysCrossTalk(ScipyenDataclass):
+    r"""Encapsulates an ordered pair of synaptic pathways tested for crosstalk.
+
+"""
+    path0: typing.Union[SynapticPathway, str, int] = dataclasses.field(default_factory=SynapticPathway)
+    path1: typing.Union[SynapticPathway, str, int] = dataclasses.field(default_factory=SynapticPathway)
+
+@dataclass
+class SweepPathCommands(ScipyenDataclass):
+    r"""Encapsulates the DAC and DIG commands sent to the pathway during a given sweep.
+    """
+    pathway: SynapticPathway = dataclasses.field(default_factory=SynapticPathway)
+    abfEpochs: dict = dataclasses.field(default_factory = dict)
+    triggers: typing.Sequence[TriggerEvent] = dataclasses.field(default_factory = list)
+
+class PathwaysStimulationLayout():
+    r"""Represents the sequence of pathway stimulations per sweep, as defined in a protocol.
+
+    .. |nbsp| unicode:: 0xA0
+        :trim:
+
+    This function helps identifying cases where an protocol is configured to |nbsp|
+    digitally stimulate more than one synaptic pathway during the same sweep(s).
+
+    This strategy is typically used to test cross-talk, or overlap, between two synaptic |nbsp|
+    pathways based on short-term plasticity phenomena such as paired-pulse |nbsp|
+    facilitation). cases, reporting the order in which |nbsp|
+    the pathways are individually stimulated, in each sweep.
+
+
+    The layout is stored as a (possibly empty) mapping key -> value, where:
+
+        :key: index (``int``) of sweep in the protocol (0-based)
+
+        :value: a ``list`` of tuples (X, Y, Z) with
+
+            :X: SynapticPathway object (or name, or index)
+
+            :Y: Dict mapping ABFEpoch number to a tuple of ABFEpoch and its role (see parseEpochs) for this pathway & sweep combination
+
+            :Z: List of TriggerEvent objects with the time stamps for the activation of the SynapticPathway object X
+
+            This captures the case when more than one pathway is activated during the same sweep.
+
+
+    .. note::
+        The fundamental difference from the ``getPathwayStimulationSequence`` function |nbsp|
+    is that this function reports *which synaptic pathway* is stimulated during every |nbsp|
+    protocol sweep, and *when* is that pathway stimulated, relative to the start of that sweep. |nbsp|
+    In contrast, the ``getPathwayStimulationSequence`` function reports the sweep number(s) |nbsp|
+    where a given ``SynapticPathway`` is stimulated, and the stimulation times within that sweep.
+
+    Examples:
+    ---------
+
+    Example 1:
+    ==========
+
+    Consider a ``RecordingSource`` object "source" defining two SynapticPathway objects, |nbsp|
+    and an ``ABFProtocol`` object "protocol" configured to deliver a pair of stimuli |nbsp|
+    to each pathway, respectively via digital channels DIG 0 and DIG 1, on alternative sweeps. |nbsp|
+
+    ::
+
+        source = synevoke.twoPathwaysSource(0, 0, name="Two-pathways CA3-CA1 EPSCs")
+
+    The stimulus pair is delivered at 0.26562 s since the start of the sweep, with 50 ms inter-stimulus interval) , according |nbsp|
+    to the schematic below.
+
+    .. note::
+        In this example there is one epoch triggering a pathway in |nbsp|
+        all sweeps, but the epochs uses a TTL train instead of a pulse.
+
+
+    ::
+
+        sweep 0 (even sweeps):
+
+            path 0 (DIG 0)  ______|_|_________
+
+            path 1 (DIG 1)  __________________
+
+
+
+        sweep 1 (odd sweeps):
+
+            path 0 (DIG 0)  __________________
+
+            path 1 (DIG 1)  ______|_|_________
+
+
+        synevoke.getPathwaysStimulationLayout(source.pathways, protocol, reportPathNames=True)
+
+        ->
+
+        {0: [('path0', {}, [TriggerEvent 'presynaptic' (presynaptic): EPSC0@0.26562 s, EPSC1@0.31562 s])],
+        1: [('path1', {}, [TriggerEvent 'presynaptic' (presynaptic): EPSC0@0.26562 s, EPSC1@0.31562 s])]}
+
+
+    Example 2:
+    ==========
+    The same source as in Example 1, but the protocol stimulates  the pathways |nbsp|
+    according to the scheme below:
+
+
+    ::
+
+        sweep 0 (even sweeps):
+
+            path 0 (DIG 0)  ______|___________
+
+            path 1 (DIG 1)  ________|_________
+
+
+        sweep 1 (odd sweeps):
+
+            path 0 (DIG 0)  ________|_________
+
+            path 1 (DIG 1)  ______|___________
+
+
+    .. note::
+        The postsynaptic cells still receives a pair of synaptic stimuli, but each |nbsp|
+        stimulus in the pair comes via a *distinct* pathway; the *order* in which the |nbsp|
+        pathways are stimulated is *different* in subsequent sweeps. Stimulus timings |nbsp|
+        are as in Exmaple 1, above.
+
+    ::
+
+        synevoke.getPathwaysStimulationLayout(source.pathways, protocol, reportPathNames=True)
+
+        ->
+
+        {0: [('path0', {}, [TriggerEvent 'presynaptic' (presynaptic): ['EPSC0']@[0.2656] s]),
+            ('path1', {}, [TriggerEvent 'presynaptic' (presynaptic): ['EPSC0']@[0.3156] s])],
+        1: [('path1', {}, [TriggerEvent 'presynaptic' (presynaptic): ['EPSC0']@[0.2656] s]),
+            ('path0', {}, [TriggerEvent 'presynaptic' (presynaptic): ['EPSC0']@[0.3156] s])]}
+
+
+
+    """
+    # NOTE: 2026-05-04 09:02:28
+    # implementing dict API - put on hold for now...
+
+    def __init__(self, source: typing.Union[RecordingSource,
+                                            typing.Sequence[SynapticPathway]],
+                 protocol: ElectrophysiologyProtocol, /,
+                 temporalOrder: bool = True,
+                 **kwargs,
+                 ):
+        """Constructor for PathwaysStimulationLayout.
+
+        .. |nbsp| unicode:: 0xA0
+            :trim:
+
+        Parameters:
+        -----------
+
+        :pathways: sequence (tuple or list) of ``SynapticPathway`` objects
+
+        :protocol: Acquisition protocol used in the experiment. Currently, only Clampex |nbsp|
+            protocols (``ABFProtocol`` objects) are supported.
+
+        :temporalOrder: When ``True`` (default), the reported pathway stimulation sequence |nbsp|
+            reflects the temporal order of the pathway stimulations (see Examples, below) |nbsp|
+
+            When ``False`` the reported pathway stimulation sequence reflects the |nbsp|
+            order of the pathways in the pathways sequence (``pathways`` parameter).
+        """
+        # print(f"{self.__class__.__name__}.__init__: kwargs = {kwargs}")
+        if isinstance(source, RecordingSource):
+            assert len(source.pathways) and all(isinstance(p, SynapticPathway) for p in source.pathways), "'source' must be a RecordingSource with a non-empty sequence of SynapticPathway objects"
+            self._source_ = source
+            self._pathways_ = source.pathways
+
+        elif isinstance(source, typing.Sequence):
+            assert len(source) and all(isinstance(p, SynapticPathway) for p in source), "'source' must be a sequence of SynapticPathway objects"
+            adc = source[0].adc
+            dac = source[0].dac
+            assert all(p.adc == adc for p in source[1:]), "All synaptic pathways should use the same ADC channel"
+            assert all(p.dac == dac for p in source[1:]), "All synaptic pathways should use the same DAC channel"
+            electrodeMode = kwargs.pop("electrodeMode", None)
+            assert isinstance(electrodeMode, ephys.ElectrodeMode), f"The 'electrodeMode' keyword parameter must be specified with an ephys.ElectrodeMode enum value; got {type(electrodeMode).__name__} instead"
+            name = kwargs.pop("name", None)
+            assert (isinstance(name, str) and len(name.strip()) > 0), f"The 'name' keyword parameter must be specified with a non empty string; instead got {name}"
+
+            self._pathways_ = source
+            syn = tuple(map(lambda p: p.stimulus, self._pathways_))
+            self._source_ = RecordingSource(name, adc, dac, syn, electrodeMode = electrodeMode)
+
+        else:
+            raise TypeError(f"'source' must be a Recording Source or a sequence of SynapticPathway objects; instead got {type(source).__name__}")
+
+        assert isinstance(protocol, pab.ABFProtocol), f"'protocol' expected to be an ABFProtocol; instead got a  {type(protocol).__name__}"
+        self._protocol_ = protocol
+        self._layout_ = self._parseLayout_(temporalOrder)
+        # self._layout_ = self._parseLayout_(pathways, protocol, temporalOrder)
+
+    def _parseLayout_(self, temporalOrder: bool = True) -> dict:
+        stimulusLayout = dict()
+
+        stimByPaths = tuple(map(lambda p: (p, getPathwayStimulationSequence(p, self._protocol_)), self._pathways_))
+
+        for sweep in range(self._protocol_.nSweeps):
+            for path, pStim in stimByPaths:
+                if sweep in pStim:
+                    triggers = pStim[sweep]
+                    epochsDict = parseEpochs(path, self._protocol_, sweep)
+
+                    sPC = SweepPathCommands(pathway=path, abfEpochs=epochsDict,
+                                            triggers=triggers)
+
+                    if sweep in stimulusLayout:
+                        stimulusLayout[sweep].append(sPC)
+
+                    else:
+                        stimulusLayout[sweep] = [sPC]
+
+        if temporalOrder:
+            for sweep in stimulusLayout:
+                pps = sorted(stimulusLayout[sweep],
+                            key = lambda sPC: min(list(map(lambda tr: tr.times[0], sPC.triggers))))
+
+                stimulusLayout[sweep] = pps
+
+        return stimulusLayout
+
+    @property
+    def protocol(self):
+        r"""The ABFProtocol used to generate this PathwaysStimulationLayout instance"""
+        return self._protocol_
+
+    @property
+    def pathways(self):
+        r"""The SynapticPathways in this instrance of PathwaysStimulationLayout"""
+        return self._pathways_
+
+    @property
+    def source(self) -> RecordingSource:
+        return self._source_
+
+    @property
+    def electrodeMode(self) -> ephys.ElectrodeMode:
+        return self._source_.electrodeMode
+
+    @property
+    def sweeps(self) -> dict[int, list[SweepPathCommands]]:
+        r"""Underlying dictionary holding the layout.
+        .. |nbsp| unicode:: 0xA0
+            :trim:
+
+        This is a **read-only** mapping of sweep indexes (``int``) to sequences of |nbsp|
+        SweepPathCommands objects, which is populated by "parsing" an ABFProtocol.
+        """
+        return self._layout_
+
+    def getSweepsForPathway(self, pathway:SynapticPathway
+                            ) -> typing.Optional[int | tuple[int]]:
+        result = list()
+        for sweep, sPCs in self.sweeps.items():
+            if len(sPCs) == 0:
+                continue
+
+            for sPC in sPCs:
+                if sPC.pathway == pathway:
+                    result.append(sweep)
+
+        if len(result) > 1:
+            return tuple(result)
+
+        elif len(result) == 1:
+            return result[0]
+
+    def _getSweepEpochsWithRoleForPathway_(self, pathway: SynapticPathway, sweep: int,
+                            role: pab.ABFEpochRole,
+                            ensureUnique: bool = True,
+                            asNeoEpoch: bool = False) -> typing.Optional[
+                                typing.Union[pab.ABFEpoch,
+                                             typing.List[pab.ABFEpoch]
+                                             ]
+                                ]:
+        assert isinstance(pathway, SynapticPathway), f"'pathway' expected to be an SynapticPathway; instead, got a {type(pathway).__name__}"
+        assert isinstance(role, pab.ABFEpochRole), f"'role' expected to be an ABFEpochRole; instead, got a {type(role).__name__}"
+
+        # sPC is a sweep/pathway combination
+        sweepSPCs = list(filter(lambda sPC: sPC.pathway == pathway, self.sweeps[sweep]))
+
+        if len(sweepSPCs) == 0:
+            return
+
+        if len(sweepSPCs) > 1:
+            scipywarn(f"Pathway {pathway.name} has multiple SweepPathCommands entries for sweep {sweep}; will use the first one!")
+
+        sPC = sweepSPCs[0]
+
+        if len(sPC.abfEpochs) == 0:
+            return
+
+        # -> list of lists; inner lists are pairs of epoch, epoch role!
+        epochs_roles = list(filter(lambda e: e[1] == role, sPC.abfEpochs.values()))
+
+        if len(epochs_roles) == 0:
+            return
+
+        if len(epochs_roles) > 1:
+            if ensureUnique:
+                scipywarn(f"There are {len(epochs_roles)} membrane test epochs for pathway {pathway.name} in sweep {sweep}; will use the first one!")
+                e = epochs_roles[0][0]
+                return self._protocol_.getNeoEpoch(epoch=e, dac=pathway.dac, sweep=sweep) if asNeoEpoch else e
+            else:
+                return list(map(lambda e: self._protocol_.getNeoEpoch(epoch=e[0], dac=pathway.dac, sweep=sweep) if asNeoEpoch else e[0], epochs_roles))
+
+        else:
+            e = epochs_roles[0][0]
+            return self._protocol_.getNeoEpoch(epoch=e, dac=pathway.dac, sweep=sweep) if asNeoEpoch else e
+
+    def getEpochsWithRole(self, pathway:SynapticPathway, role: pab.ABFEpochRole,
+                         ensureUnique: bool = False,
+                         sweep:typing.Optional[int] = None,
+                         asNeoEpoch: bool = False) -> typing.Optional[
+                                                typing.Union[
+                                                    pab.ABFEpoch,
+                                                    neo.Epoch,
+                                                    list[pab.ABFEpoch],
+                                                    list[neo.Epoch],
+                                                    dict[int, pab.ABFEpoch],
+                                                    dict[int, neo.Epoch],
+                                                    dict[int, list[neo.Epoch]]]
+                                                ]:
+        r"""Queries the epoch(s) fulfilling a specific role.
+
+        .. |nbsp| unicode:: 0xA0
+        :trim:
+
+        Searches and returns the epochs that fulfil a specific role (see ABFEpochRole) |nbsp|
+        on a given pathway, during a given sweep.
+
+
+        Parameters:
+        -----------
+        :pathway: Must exist in the stimulation layout
+
+        :role: Specific role for the Epoch. See ABFEpochRole enumeration for details.
+
+        :ensureUnique: When True, warns if the stimulation layout for a specific pathway & sweep
+            combination has more than one ABF epoch with the specified role, and returns
+            the first epoch that was found. When False (the default) the method returns
+            a sequence of epochs or just an epoch, if there is only one fulfilling the role.
+
+        :sweep: Optional, default is None. When None, the method will query the stimulus
+            layout for all the sweeps where the specified pathway is recorded. When an int,
+            the query will be restricted to the combination of pathway and the specified sweep,
+            if it exists in the stimulus layout.
+
+        :asNeoEpoch: When True, the epochs will be returned as neo.Epoch objects with timings as output during the actual recording.
+                This is useful for further analysis of recorded data.
+
+                Optional, default is False.
+
+        Returns:
+        --------
+
+        .. note::
+            Below, an 'epoch' is either an pyabfbridge.ABFEpoch object or a neo.Epoch object, depending on the value of the 'asNeoEpoch' parameter.
+
+        * When sweep is an integer (index of sweep in the protocol), then for the combination of 'pathway' and 'sweep':
+            * if 'ensureUnique' is True, returns the single epoch fulfilling 'role', or None if no such epoch exists.
+
+            * if 'ensureUnique' is False, returns a list of epochs fulfilling this role, or None if no such epoch exists
+
+        * When 'sweep' is None, then for all the protocol sweeps where 'pathway' is recorded, returns a dictionary that
+
+                maps sweep index to an epoch or list of epochs fulfiling the 'role', for the sweep where such epochs are found
+
+                The dictionary may be empty.
+
+        If 'pathway' is not recorded in the given sweep (or in any of the protocol's sweeps) returns None.
+
+        """
+        sweeps = self.getSweepsForPathway(pathway)
+
+        if isinstance(sweeps, int):
+            sweeps = [sweeps]
+
+        elif not isinstance(sweeps, typing.Sequence) or len(sweeps) == 0 or not all(isinstance(s, int) for s in sweeps):
+            return
+
+        result = dict()
+
+        if isinstance(sweep, int):
+            if sweep not in sweeps:
+                return
+
+            return self._getSweepEpochsWithRoleForPathway_(pathway, sweep, role, ensureUnique, asNeoEpoch)
+
+        for sweep in sweeps:
+            if sweep not in self.sweeps:
+                continue
+
+            epochs = self._getSweepEpochsWithRoleForPathway_(pathway, sweep, role, ensureUnique, asNeoEpoch)
+            if isinstance(epochs, (pab.ABFEpoch, neo.Epoch)):
+                result[sweep] = epochs
+            elif isinstance(epochs, list) and len(epochs) and all(isinstance(e, (pab.ABFEpoch, neo.Epoch)) for e in epochs):
+                result[sweep] = epochs
+
+        return result
+
+
+    def getMembraneTestEpoch(self, pathway:SynapticPathway,
+                             sweep: typing.Optional[int] = None,
+                             asNeoEpoch: bool = False) -> typing.Optional[
+                                            typing.Union[pab.ABFEpoch,
+                                                        neo.Epoch,
+                                                        dict[int, pab.ABFEpoch],
+                                                        dict[int, neo.Epoch]]
+                                            ]:
+        r"""Returns the ABF epochs used for membrane test in a pathway during a given sweep.
+
+        .. |nbsp| unicode:: 0xA0
+        :trim:
+
+        Parameters:
+        -----------
+
+        :pathway: The pathway where membrane test epochs are to be queried.
+
+        :sweep: Index of the sweep (0-based) or None (default).
+
+        :asNeoEpoch: When True, all returned epochs are neo.Epoch objects; otherwise, they are pyabfbridge.ABFEpoch objects.
+
+        Returns:
+        --------
+        When ``sweep`` is None (default) returns a dictionary mapping sweep index to a possibly empty list of epochs
+
+        When ``sweep`` is specified, returns the epoch used for membrane test or None if such epoch is not found.
+
+        .. note::
+                Membrane test epochs should be unique in any given sweep
+
+        """
+        return self.getEpochsWithRole(pathway, pab.ABFEpochRole.MembraneTestRole,
+                                     True, sweep, asNeoEpoch)
+
+
+    def getBaselineEpoch(self, pathway: SynapticPathway,
+                        sweep: typing.Optional[int] = None,
+                        asNeoEpoch: bool = False) -> typing.Optional[
+                                            typing.Union[pab.ABFEpoch,
+                                                        neo.Epoch,
+                                                        dict[int, pab.ABFEpoch],
+                                                        dict[int, neo.Epoch]]
+                                            ]:
+        r"""Returns the epoch used for measuring the signal baseline.
+
+        .. |nbsp| unicode:: 0xA0
+        :trim:
+
+        See self.getMembraneTestEpoch for details about parameters and return types.
+
+        .. note::
+            There shoud be only one such epoch in any given sweep.
+
+            The notion of signal 'baseline' refers to the region of the signal |nbsp|
+        *before* any challenge applied to the recording source (membrane test, |nbsp|
+        stimulation, etc).
+
+        """
+        return self.getEpochsWithRole(pathway, pab.ABFEpochRole.BaselineRole,
+                                     True, sweep, asNeoEpoch)
+
+    def getStimulationEpochs(self, pathway: SynapticPathway,
+                             sweep: typing.Optional[int] = None,
+                             asNeoEpoch: bool = False) -> typing.Optional[
+                                                typing.Union[
+                                                    pab.ABFEpoch,
+                                                    neo.Epoch,
+                                                    list[pab.ABFEpoch],
+                                                    list[neo.Epoch],
+                                                    dict[int, pab.ABFEpoch],
+                                                    dict[int, neo.Epoch],
+                                                    dict[int, list[neo.Epoch]]]
+                                                ]:
+        r"""Returns the epoch(s) where the pathway is stimulated during the given sweep.
+
+        .. |nbsp| unicode:: 0xA0
+        :trim:
+
+        See self.getMembraneTestEpoch for details about parameters.
+
+        .. note::
+            Unlike for self.getMembraneTestEpoch or self.getBaselineEpoch, there can be more than one stimulation epoch in any given sweep.
+
+        """
+        return self.getEpochsWithRole(pathway, pab.ABFEpochRole.StimulusRole,
+                                      False, sweep, asNeoEpoch)
+
+    def getCrossTalkLayout(self) -> dict:
+        r"""Shows the layout of sweeps & pathways for cross-talk tests.
+
+        .. |nbsp| unicode:: 0xA0
+            :trim:
+
+            Returns a mapping of sweep index (int) to a PathwaysCrossTalk named tuple. |nbsp|
+            The mapping may be empty if the protocol does not test for pathway cross-talk.
+
+            """
+        return dict(filter(lambda i: self.isXTalkLayout(i[1]), self.sweeps.items()))
+
+    @staticmethod
+    def isXTalkLayout(l) -> bool:
+        return (isinstance(l, (tuple, list, collections.deque))
+                and len(l) == 2
+                and all(isinstance(l_, SweepPathCommands) for l_ in l)
+                and l[0].pathway != l[1].pathway
+                )
+
+@dataclass
+class SynapticPathway(ScipyenDataclass):
+    r"""Logical association of a SynapticStimulusChannel with a recording configuration.
+
+    Also specifies the "type" of the SynapticPathway, which represents the role
+    of the SynapticPathway in an experiment.
+
+    """
+    name: str = "pathway"
+    adc: int = 0 # physical index of the ADC channel used in recording this pathway
+    # adc: int|None = None # physical index of the ADC channel used in recording this pathway
+    dac: int = 0 # physical index of the DAC channel used in recording this pathway
+    # dac: int|None = None # physical index of the DAC channel used in recording this pathway
+    stimulus: SynapticStimulusChannel = dataclasses.field(default_factory = SynapticStimulusChannel)
+    # stimulus: SynapticStimulusChannelList = dataclasses.field(default_factory = SynapticStimulusChannelList)
+
+    # NOTE: 2024-10-16 11:57:17
+    # 'clampMode' is not needed, in a SynapticPathway, which can be recorded in
+    # either clamp mode, and the clamp mode can change during a session (i.e.,
+    # a sequence of recording trials).
+    #
+    # On the other hand it makes sense to define an electrode mode, as it cannot
+    # change during the session - once impaled, it would be tricky to also patch
+    # the cell, and vice-versa (although re-patching the cells has been reported,
+    # e.g. see Lamsa et al, Science 315:1262, 2007, for the purpose of this
+    # software one can consider a repatched cell as the same source, with same
+    # electrode mode, but undergoing different episodes).
+    #
+    # Therefore:
+    # NOTE: 2024-10-16 13:36:07
+    # add clampMode to RecordingEpisode!
+    electrode: dataclasses.InitVar[typing.Union[ephys.ElectrodeMode, int, str]] = ephys.ElectrodeMode.Null
+
+    pathType: dataclasses.InitVar[typing.Union[SynapticPathwayType, int, str]] = SynapticPathwayType.Null
+
+    schedule: RecordingSchedule = dataclasses.field(default_factory = RecordingSchedule)
+
+    # CAUTION 2024-10-17 22:31:14 FIXME
+    # these measurements MUST be mapped to the episode boundaries, so that one
+    # can easily access the measurement values during a particular episode or
+    # across several episodes of the schedule!
+    # measurements: typing.Mapping[str, typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = dataclasses.field(default_factory = dict)
+
+    # NOTE: 2026-05-13 14:52:36
+    # using DeferredSignalMeasure objects (but others, too):
+    # map the name of the measure (as it would appear in a results table) to
+    # a sequence of measures (DeferredSignalMeasure, functions, etc): each of these
+    # are to be executed in the order given in the sequence
+    #
+    measurements: dict[str, list] = dataclasses.field(default_factory = dict)
+    # source: RecordingSource = dataclasses.field(default_factory = lambda: RecordingSource())
+
+    def __post_init__(self, electrode:typing.Union[ephys.ElectrodeMode, int, str] = ephys.ElectrodeMode.Null,
+                      pathType:typing.Union[SynapticPathwayType, int, str] = SynapticPathwayType.Null):
+
+        if isinstance(electrode, (int, str)):
+            if electrode not in ephys.ElectrodeMode:
+                raise ValueError(f"Invalid electrode mode {electrode}")
+
+            electrode = ephys.ElectrodeMode.type(electrode)
+
+        if not isinstance(electrode, ephys.ElectrodeMode):
+            raise TypeError(f"Invalid electrode mode {electrode}")
+
+        self._electrodeMode_ = electrode
+        self.electrode = self._electrodeMode_
+
+        if isinstance(pathType, (int, str)):
+            if pathType not in SynapticPathwayType:
+                raise ValueError(f"Invalid synaptic pathway type {pathType}")
+
+            pathType = SynapticPathwayType.type(pathType)
+
+        if not isinstance(pathType, SynapticPathwayType):
+            raise TypeError(f"Invalid synaptic pathway type {pathType}")
+
+        self._pathwayType_ = pathType
+        self.pathType = self._pathwayType_
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.adc, self.dac, self.stimulus,
+                     self.electrodeMode, self.pathwayType,
+                     tuple(self.measurements)))
+
+    @property
+    def electrodeMode(self) -> ephys.ElectrodeMode:
+        return self._electrodeMode_
+
+    @electrodeMode.setter
+    def electrodeMode(self, val:typing.Union[int, str, ephys.ElectrodeMode]):
+        if isinstance(val, (int, str)):
+            if val not in ephys.ElectrodeMode:
+                raise ValueError(f"Invalid electrode mode {val}")
+
+            val = ephys.ElectrodeMode.type(val)
+
+        if not isinstance(val, ephys.ElectrodeMode):
+            raise TypeError(f"Invalid electrode mode {val}")
+
+        self._electrodeMode_ = val
+        self.electrode = self._electrodeMode_
+
+    @property
+    def pathwayType(self) -> SynapticPathwayType:
+        return self._pathwayType_
+
+    @pathwayType.setter
+    def pathwayType(self, val:typing.Union[SynapticPathwayType, int, str]):
+        if isinstance(val, (int, str)):
+            if val not in SynapticPathwayType:
+                raise ValueError(f"Invalid syaptic pathway type {val}")
+
+            val = SynapticPathwayType.type(val)
+
+        if not isinstance(val, SynapticPathwayType):
+            raise TypeError(f"Invalid synaptic pathway type {val}")
+
+        self._pathwayType_ = val
+        self.pathType = self._pathwayType_
+
+    def __repr__(self) -> str:
+        import dataclasses
+        all_attr_names = list(f.name for f in dataclasses.fields(self.__class__)) + [x[0] for x in inspect.getmembers_static(self, lambda x: isinstance(x, property))]
+        ret = [f"{self.__class__.__name__}"]
+        ret += ["("]
+
+        ret += ", ".join([f"{a}={getattr(self,a).name if a in ('electrodeMode', 'pathwayType') else f"'{getattr(self, a)}'" if a == "name" else getattr(self, a)}" for a in all_attr_names])
+        ret += [")"]
+
+        return "".join(ret)
+
+    def __eq__(self, other) -> bool:
+        # from dataclasses import fields
+        ret = type(self) is type(other)
+
+        if not ret:
+            return ret
+
+        return hash(self) == hash(other)
+
+        # ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in fields(type(self)) if f.name != "source")
+        #
+        # if ret:
+        #     ret &= self.pathwayType == other.pathwayType
+        #
+        # if ret:
+        #     ret &= self.electrodeMode == other.electrodeMode
+        #
+        # return ret
+
+    def toHDF5(self, group, name, oname, compression, chunks, track_order,
+                       entity_cache) -> h5py.Group:
+
+        from iolib import h5io
+        # print(f"{self.__class__.__name__}.toHDF5: {self.name}")
+        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        cached_entity = h5io.getCachedEntity(entity_cache, self)
+        if isinstance(cached_entity, h5py.Dataset):
+            group[target_name] = cached_entity
+            return cached_entity
+
+        attrs = {"name": self.name,
+                 "adc": self.adc,
+                 "dac":self.dac,
+                 "pathwayType": self.pathwayType,
+                 "electrodeMode": self.electrodeMode,
+                 }
+
+        objattrs = h5io.makeAttrDict(**attrs)
+        obj_attrs.update(objattrs)
+
+        if isinstance(name, str) and len(name.strip()):
+            target_name = name
+
+        entity = group.create_group(target_name, track_order=track_order)
+        entity.attrs.update(obj_attrs)
+
+        # h5io.toHDF5(self.source, entity, name="source", oname="source",
+        #                     compression=compression, chunks=chunks,
+        #                     track_order=track_order,
+        #                     entity_cache=entity_cache)
+
+        h5io.toHDF5(self.stimulus, entity, name="stimulus", oname="stimulus",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+
+        h5io.toHDF5(self.schedule, entity, name="schedule", oname="schedule",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+
+        h5io.toHDF5(self.measurements, entity, name="measurements", oname="measurements",
+                            compression=compression, chunks=chunks,
+                            track_order=track_order,
+                            entity_cache=entity_cache)
+
+        h5io.storeEntityInCache(entity_cache, self, entity)
+
+        return entity
+
+    @classmethod
+    def fromHDF5(cls, entity:h5py.Group,
+                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+
+        from iolib import h5io
+        if entity in cache:
+            return cache[entity]
+
+        attrs = h5io.attrs2dict(entity.attrs)
+        name = attrs["name"]
+        pathwayType = attrs["pathwayType"]
+        electrodeMode = attrs["electrodeMode"]
+        adc = attrs["adc"]
+        dac = attrs["dac"]
+        schedule = h5io.fromHDF5(entity["schedule"], cache=cache)
+        stimulus = h5io.fromHDF5(entity["stimulus"], cache=cache)
+        # source = h5io.fromHDF5(entity["source"], cache=cache)
+        measurements = h5io.fromHDF5(entity["measurements"], cache=cache)
+
+        return cls(name=name, adc=adc, dac=dac, pathType=pathwayType,
+                   stimulus=stimulus, electrode=electrodeMode,
+                   schedule=schedule, measurements=measurements)#, source=source)
+
+    @classmethod
+    def fromDict(cls, **kwargs):
+        r"""Constructs an instance of this class using 'kwargs' keys that match the class fields.
+        Keys in kwargs that are NOT valid field names for this class are silently
+        ignored.
+        """
+        field_names = tuple(f.name for f in dataclasses.fields(cls))
+
+        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
+
+        return cls(**initkwargs)
+
+
+class SynapticPathwayList(NeoObjectList): # noqa
+    allowed_contents  = (SynapticPathway, )
+
+    def __init__(self, *items, name:typing.Optional[str] = None,
+                 parent: object = None):
+
+        self.name = "" if not isinstance(name, str) else name
+        self._items = list()
+
+        if len(items):
+            if len(items) == 1 and isinstance(items[0], typing.Sequence):
+                items = items[0]
+
+            if any(
+                not isinstance(i, self.allowed_contents)
+                or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents)))
+                for i in items):
+                raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(item).__name__}")
+
+            self._items = list(items)
+
+        if parent is not None and ScipyenDataclass not in inspect.getmro(type(parent)):
+            raise TypeError(f"Parent must be a ScipyenDataclass or None; got {type(parent).__name__} instead")
+
+        self._parent = parent
+
+    @property
+    def parent(self) -> ScipyenDataclass | None:
+        return self._parent
+
+    @parent.setter
+    def parent(self, obj:typing.Optional[ScipyenDataclass] = None):
+        if isinstance(obj, ScipyenDataclass):
+            self._parent = obj
+        else:
+            self._parent = None
+
+    def __iter__(self):
+        """Implement iter(self)"""
+        for item in self._items:
+            yield item
+
+    def __delitem__(self, i: int) -> None:
+        if len(self._items) == 0:
+            return
+
+        if i < len(self._items) and i >= -len(self._items):
+            del(self._items[i])
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+    def __getitem__(self, i: int | slice) -> SynapticPathway | None:
+        """x.__getitem__(y) <==> x[y]"""
+        if len(self._items) == 0:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+        if isinstance(i, int):
+            if i < len(self._items) and i >= -len(self._items):
+                return self._items[i]
+
+            else:
+                raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+        elif isinstance(i, slice):
+            return self._items[i]
+
+    def __setitem__(self, i: int, value: SynapticPathway):
+        if not isinstance(value, self.allowed_contents):
+            raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(value).__name__}")
+
+        if len(self._items) == 0:
+            raise ValueError(f"Index {i} out of range for {len(self._items)} items")
+
+        if i < len(self._items) and i >= -len(self._items):
+            self._items[i] = value
+
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+    def __str__(self):
+        """Return str(self)"""
+        return f"<{self.__class__.__name__}> with {len(self._items)} {self.allowed_contents[0].__name__} objects"
+
+    def __repr__(self):
+        header = f"<{self.__class__.__name__}>"
+        if isinstance(self.name, str) and len(self.name.strip()):
+            header += f" '{self.name}'"
+
+        s = [f"{header} with {len(self._items)} {self.allowed_contents[0].__name__} objects",
+            ]
+
+        if len(self._items):
+            s[0]+= ":"
+            s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
+
+        return "\n".join(s)
+
+    def __len__(self):
+        """Return len(self)"""
+        return len(self._items)
+
+    def _add_items(self, other: typing.Self, in_place=False) -> typing.Self:
+        self._items = self._items + other._items
+        return self
+
+    def __add__(self, other):
+        """Return self + other"""
+        ret = self.__class__(self._items, parent=self.parent)
+        if isinstance(other, self.__class__):
+            return ret._add_items(other)
+
+        elif isinstance(other, self.allowed_contents):
+            ret._items.append(other)
+            return ret
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            ret._items.extend(list(other))
+            return ret
+
+        else:
+            return ret
+
+    def __iadd__(self, other):
+        """Return self"""
+        if isinstance(other, self.__class__):
+            return self._add_items(other, in_place=True)
+
+        elif isinstance(other, self.allowed_contents):
+            self._items.append(other)
+            return self
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            self._items.extend(list(other))
+            return self
+
+        else:
+            return self
+
+    def __radd__(self, other):
+        """Return other + self"""
+        ret = self.__class__(self._items, parent=self.parent)
+        if isinstance(other, self.__class__):
+            return other._add_items(ret)
+
+        elif isinstance(other, self.allowed_contents):
+            ret._items.append(other)
+            return ret
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            ret._items.extend(list(other))
+            return ret
+        else:
+            return ret
+
+    def append(self, obj):
+        """
+        Appends a SynapticStimulusChannel
+
+        Parameters
+        ----------
+        obj: SynapticStimulusChannel
+
+        """
+        # print(f"{self.__class__.__name__}.append({obj})")
+        if not isinstance(obj, self.allowed_contents):
+            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
+        self._items.append(obj)
+
+    def extend(self, iterable):
+        """Extends with additional SynapticStimulusChannel objects from an iterable
+
+        Parameters
+        ----------
+        iterable: iterable[SynapticStimulusChannel]
+
+        """
+        if all (isinstance(o, self.allowed_contents) for o in iterable):
+            self._items.extend(iterable)
+        else:
+            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
+
+    def insert(self, index:int, obj: object):
+        if isinstance(obj, self.allowed_contents):
+            self._items.insert(index, obj)
+        else:
+            raise TypeError(f"Can only insert {self.allowed_contents[0].__name__} objects")
+
+    def clear(self):
+        self._items.clear()
+
+    def pop(self, index: int = -1, /,) -> object:
+        return self._items.pop(index)
+
+    def remove(self, obj:object):
+        self._items.remove(obj)
+
+    def reverse(self):
+        return self.__class__(reversed(self._items))
+
+    def count(self, obj) -> int:
+        return self._items.count(obj)
+
+    def index(self, *args):
+        return self._index(*args)
+
+@dataclass
+class RecordingSource(ScipyenDataclass):
     adc: int = 0
     dac: typing.Optional[int] = None
     syn: typing.Optional[SynapticStimulusChannelList]  = dataclasses.field(default_factory=SynapticStimulusChannelList)
     auxin: typing.Optional[AuxiliaryInputList]     = dataclasses.field(default_factory=AuxiliaryInputList)
     auxout: typing.Optional[AuxiliaryOutputList]   = dataclasses.field(default_factory=AuxiliaryOutputList)
     electrodeMode: ephys.ElectrodeMode = dataclasses.field(default=ephys.ElectrodeMode.Null)
+    pathways: SynapticPathwayList = dataclasses.field(default_factory = SynapticPathwayList)
 
     def __post_init__(self):
+        # print(f"{self.__class__.__name__}.__post_init__")
+        # print(f"\tpathways = {self.pathways} with {len(self.pathways)} pathways")
         # pathways = list()
-        pathways = SynapticPathwayList(name=self.name)
-        for ksyn, syn in enumerate(self.syn):
-            # synList = SynapticStimulusChannelList(syn, name = syn.name)
-            name = f"{syn.name}_pathway"
-            pathways.append(SynapticPathway(stimulus = syn,
-                                    name = name, adc = self.adc,
-                                    dac = self.dac,
-                                    electrode = self.electrodeMode))
-        self.pathways = pathways
-        # self.pathways = tuple(pathways)
+        if len(self.pathways) == 0:
+            self.pathways.name = self.name
+            for ksyn, syn in enumerate(self.syn):
+                # synList = SynapticStimulusChannelList(syn, name = syn.name)
+                name = f"{syn.name}_pathway"
+                pathway = SynapticPathway(stimulus = syn,
+                                        name = name, adc = self.adc,
+                                        dac = self.dac,
+                                        electrode = self.electrodeMode)
+                # print(f"\tcreated synaptic pathway {pathway}")
+                self.pathways.append(pathway)
+        self.pathways.parent=self
+        # print(f"\tpathways = {self.pathways}")
+
+    # @property
+    # def pathways(self):
+    #     pathways = list()
+    #     for ksyn, syn in enumerate(self.syn):
+    #         # synList = SynapticStimulusChannelList(syn, name = syn.name)
+    #         name = f"{syn.name}_pathway"
+    #         pathways.append(SynapticPathway(stimulus = syn,
+    #                                 name = name, adc = self.adc,
+    #                                 dac = self.dac,
+    #                                 electrode = self.electrodeMode))
+    #     return SynapticPathwayList(*pathways, name = self.name,
+    #                                parent=self)
+
 
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
@@ -2404,958 +3391,6 @@ class RecordingSource():
             else:
                 ret += ",\n".join([f"'{p.name}'" for p in self.pathways])
         return "".join(ret)
-
-@dataclass
-class PathwaysCrossTalk:
-    r"""Encapsulates an ordered pair of synaptic pathways tested for crosstalk.
-
-"""
-    path0: typing.Union[SynapticPathway, str, int]
-    path1: typing.Union[SynapticPathway, str, int]
-
-@dataclass
-class SweepPathCommands:
-    r"""Encapsulates the DAC and DIG commands sent to the pathway during a given sweep.
-    """
-    pathway: SynapticPathway
-    abfEpochs: dict = dataclasses.field(default_factory = dict)
-    triggers: typing.Sequence[TriggerEvent] = dataclasses.field(default_factory = list)
-
-class PathwaysStimulationLayout():
-    r"""Represents the sequence of pathway stimulations per sweep, as defined in a protocol.
-
-    .. |nbsp| unicode:: 0xA0
-        :trim:
-
-    This function helps identifying cases where an protocol is configured to |nbsp|
-    digitally stimulate more than one synaptic pathway during the same sweep(s).
-
-    This strategy is typically used to test cross-talk, or overlap, between two synaptic |nbsp|
-    pathways based on short-term plasticity phenomena such as paired-pulse |nbsp|
-    facilitation). cases, reporting the order in which |nbsp|
-    the pathways are individually stimulated, in each sweep.
-
-
-    The layout is stored as a (possibly empty) mapping key -> value, where:
-
-        :key: index (``int``) of sweep in the protocol (0-based)
-
-        :value: a ``list`` of tuples (X, Y, Z) with
-
-            :X: SynapticPathway object (or name, or index)
-
-            :Y: Dict mapping ABFEpoch number to a tuple of ABFEpoch and its role (see parseEpochs) for this pathway & sweep combination
-
-            :Z: List of TriggerEvent objects with the time stamps for the activation of the SynapticPathway object X
-
-            This captures the case when more than one pathway is activated during the same sweep.
-
-
-    .. note::
-        The fundamental difference from the ``getPathwayStimulationSequence`` function |nbsp|
-    is that this function reports *which synaptic pathway* is stimulated during every |nbsp|
-    protocol sweep, and *when* is that pathway stimulated, relative to the start of that sweep. |nbsp|
-    In contrast, the ``getPathwayStimulationSequence`` function reports the sweep number(s) |nbsp|
-    where a given ``SynapticPathway`` is stimulated, and the stimulation times within that sweep.
-
-    Examples:
-    ---------
-
-    Example 1:
-    ==========
-
-    Consider a ``RecordingSource`` object "source" defining two SynapticPathway objects, |nbsp|
-    and an ``ABFProtocol`` object "protocol" configured to deliver a pair of stimuli |nbsp|
-    to each pathway, respectively via digital channels DIG 0 and DIG 1, on alternative sweeps. |nbsp|
-
-    ::
-
-        source = synevoke.twoPathwaysSource(0, 0, name="Two-pathways CA3-CA1 EPSCs")
-
-    The stimulus pair is delivered at 0.26562 s since the start of the sweep, with 50 ms inter-stimulus interval) , according |nbsp|
-    to the schematic below.
-
-    .. note::
-        In this example there is one epoch triggering a pathway in |nbsp|
-        all sweeps, but the epochs uses a TTL train instead of a pulse.
-
-
-    ::
-
-        sweep 0 (even sweeps):
-
-            path 0 (DIG 0)  ______|_|_________
-
-            path 1 (DIG 1)  __________________
-
-
-
-        sweep 1 (odd sweeps):
-
-            path 0 (DIG 0)  __________________
-
-            path 1 (DIG 1)  ______|_|_________
-
-
-        synevoke.getPathwaysStimulationLayout(source.pathways, protocol, reportPathNames=True)
-
-        ->
-
-        {0: [('path0', {}, [TriggerEvent 'presynaptic' (presynaptic): EPSC0@0.26562 s, EPSC1@0.31562 s])],
-        1: [('path1', {}, [TriggerEvent 'presynaptic' (presynaptic): EPSC0@0.26562 s, EPSC1@0.31562 s])]}
-
-
-    Example 2:
-    ==========
-    The same source as in Example 1, but the protocol stimulates  the pathways |nbsp|
-    according to the scheme below:
-
-
-    ::
-
-        sweep 0 (even sweeps):
-
-            path 0 (DIG 0)  ______|___________
-
-            path 1 (DIG 1)  ________|_________
-
-
-        sweep 1 (odd sweeps):
-
-            path 0 (DIG 0)  ________|_________
-
-            path 1 (DIG 1)  ______|___________
-
-
-    .. note::
-        The postsynaptic cells still receives a pair of synaptic stimuli, but each |nbsp|
-        stimulus in the pair comes via a *distinct* pathway; the *order* in which the |nbsp|
-        pathways are stimulated is *different* in subsequent sweeps. Stimulus timings |nbsp|
-        are as in Exmaple 1, above.
-
-    ::
-
-        synevoke.getPathwaysStimulationLayout(source.pathways, protocol, reportPathNames=True)
-
-        ->
-
-        {0: [('path0', {}, [TriggerEvent 'presynaptic' (presynaptic): ['EPSC0']@[0.2656] s]),
-            ('path1', {}, [TriggerEvent 'presynaptic' (presynaptic): ['EPSC0']@[0.3156] s])],
-        1: [('path1', {}, [TriggerEvent 'presynaptic' (presynaptic): ['EPSC0']@[0.2656] s]),
-            ('path0', {}, [TriggerEvent 'presynaptic' (presynaptic): ['EPSC0']@[0.3156] s])]}
-
-
-
-    """
-    # NOTE: 2026-05-04 09:02:28
-    # implementing dict API - put on hold for now...
-
-    def __init__(self, source: typing.Union[RecordingSource,
-                                            typing.Sequence[SynapticPathway]],
-                 protocol: ElectrophysiologyProtocol, /,
-                 temporalOrder: bool = True,
-                 **kwargs,
-                 ):
-        """Constructor for PathwaysStimulationLayout.
-
-        .. |nbsp| unicode:: 0xA0
-            :trim:
-
-        Parameters:
-        -----------
-
-        :pathways: sequence (tuple or list) of ``SynapticPathway`` objects
-
-        :protocol: Acquisition protocol used in the experiment. Currently, only Clampex |nbsp|
-            protocols (``ABFProtocol`` objects) are supported.
-
-        :temporalOrder: When ``True`` (default), the reported pathway stimulation sequence |nbsp|
-            reflects the temporal order of the pathway stimulations (see Examples, below) |nbsp|
-
-            When ``False`` the reported pathway stimulation sequence reflects the |nbsp|
-            order of the pathways in the pathways sequence (``pathways`` parameter).
-        """
-        # print(f"{self.__class__.__name__}.__init__: kwargs = {kwargs}")
-        if isinstance(source, RecordingSource):
-            assert len(source.pathways) and all(isinstance(p, SynapticPathway) for p in source.pathways), "'source' must be a RecordingSource with a non-empty sequence of SynapticPathway objects"
-            self._source_ = source
-            self._pathways_ = source.pathways
-
-        elif isinstance(source, typing.Sequence):
-            assert len(source) and all(isinstance(p, SynapticPathway) for p in source), "'source' must be a sequence of SynapticPathway objects"
-            adc = source[0].adc
-            dac = source[0].dac
-            assert all(p.adc == adc for p in source[1:]), "All synaptic pathways should use the same ADC channel"
-            assert all(p.dac == dac for p in source[1:]), "All synaptic pathways should use the same DAC channel"
-            electrodeMode = kwargs.pop("electrodeMode", None)
-            assert isinstance(electrodeMode, ElectrodeMode), f"The 'electrodeMode' keyword parameter must be specified with an ephys.ElectrodeMode enum value; got {type(electrodeMode).__name__} instead"
-            name = kwargs.pop("name", None)
-            assert (isinstance(name, str) and len(name.strip()) > 0), f"The 'name' keyword parameter must be specified with a non empty string; instead got {name}"
-
-            self._pathways_ = source
-            syn = tuple(map(lambda p: p.stimulus, self._pathways_))
-            self._source_ = RecordingSource(name, adc, dac, syn, electrodeMode = electrodeMode)
-
-        else:
-            raise TypeError(f"'source' must be a Recording Source or a sequence of SynapticPathway objects; instead got {type(source).__name__}")
-
-        assert isinstance(protocol, pab.ABFProtocol), f"'protocol' expected to be an ABFProtocol; instead got a  {type(protocol).__name__}"
-        self._protocol_ = protocol
-        self._layout_ = self._parseLayout_(temporalOrder)
-        # self._layout_ = self._parseLayout_(pathways, protocol, temporalOrder)
-
-    def _parseLayout_(self, temporalOrder: bool = True) -> dict:
-        stimulusLayout = dict()
-
-        stimByPaths = tuple(map(lambda p: (p, getPathwayStimulationSequence(p, self._protocol_)), self._pathways_))
-
-        for sweep in range(self._protocol_.nSweeps):
-            for path, pStim in stimByPaths:
-                if sweep in pStim:
-                    triggers = pStim[sweep]
-                    epochsDict = parseEpochs(path, self._protocol_, sweep)
-
-                    sPC = SweepPathCommands(path, epochsDict, triggers)
-
-                    if sweep in stimulusLayout:
-                        stimulusLayout[sweep].append(sPC)
-
-                    else:
-                        stimulusLayout[sweep] = [sPC]
-
-        if temporalOrder:
-            for sweep in stimulusLayout:
-                pps = sorted(stimulusLayout[sweep],
-                            key = lambda sPC: min(list(map(lambda tr: tr.times[0], sPC.triggers))))
-
-                stimulusLayout[sweep] = pps
-
-        return stimulusLayout
-
-    @property
-    def protocol(self):
-        r"""The ABFProtocol used to generate this PathwaysStimulationLayout instance"""
-        return self._protocol_
-
-    @property
-    def pathways(self):
-        r"""The SynapticPathways in this instrance of PathwaysStimulationLayout"""
-        return self._pathways_
-
-    @property
-    def source(self) -> RecordingSource:
-        return self._source_
-
-    @property
-    def electrodeMode(self) -> ephys.ElectrodeMode:
-        return self._source_.electrodeMode
-
-    @property
-    def sweeps(self) -> dict[int, list[SweepPathCommands]]:
-        r"""Underlying dictionary holding the layout.
-        .. |nbsp| unicode:: 0xA0
-            :trim:
-
-        This is a **read-only** mapping of sweep indexes (``int``) to sequences of |nbsp|
-        SweepPathCommands objects, which is populated by "parsing" an ABFProtocol.
-        """
-        return self._layout_
-
-    def getSweepsForPathway(self, pathway:SynapticPathway
-                            ) -> typing.Optional[int | tuple[int]]:
-        result = list()
-        for sweep, sPCs in self.sweeps.items():
-            if len(sPCs) == 0:
-                continue
-
-            for sPC in sPCs:
-                if sPC.pathway == pathway:
-                    result.append(sweep)
-
-        if len(result) > 1:
-            return tuple(result)
-
-        elif len(result) == 1:
-            return result[0]
-
-    def _getSweepEpochsWithRoleForPathway_(self, pathway: SynapticPathway, sweep: int,
-                            role: pab.ABFEpochRole,
-                            ensureUnique: bool = True,
-                            asNeoEpoch: bool = False) -> typing.Optional[
-                                typing.Union[pab.ABFEpoch,
-                                             typing.List[pab.ABFEpoch]
-                                             ]
-                                ]:
-        assert isinstance(pathway, SynapticPathway), f"'pathway' expected to be an SynapticPathway; instead, got a {type(pathway).__name__}"
-        assert isinstance(role, pab.ABFEpochRole), f"'role' expected to be an ABFEpochRole; instead, got a {type(role).__name__}"
-
-        # sPC is a sweep/pathway combination
-        sweepSPCs = list(filter(lambda sPC: sPC.pathway == pathway, self.sweeps[sweep]))
-
-        if len(sweepSPCs) == 0:
-            return
-
-        if len(sweepSPCs) > 1:
-            scipywarn(f"Pathway {pathway.name} has multiple SweepPathCommands entries for sweep {sweep}; will use the first one!")
-
-        sPC = sweepSPCs[0]
-
-        if len(sPC.abfEpochs) == 0:
-            return
-
-        # -> list of lists; inner lists are pairs of epoch, epoch role!
-        epochs_roles = list(filter(lambda e: e[1] == role, sPC.abfEpochs.values()))
-
-        if len(epochs_roles) == 0:
-            return
-
-        if len(epochs_roles) > 1:
-            if ensureUnique:
-                scipywarn(f"There are {len(epochs_roles)} membrane test epochs for pathway {pathway.name} in sweep {sweep}; will use the first one!")
-                e = epochs_roles[0][0]
-                return self._protocol_.getNeoEpoch(epoch=e, dac=pathway.dac, sweep=sweep) if asNeoEpoch else e
-            else:
-                return list(map(lambda e: self._protocol_.getNeoEpoch(epoch=e[0], dac=pathway.dac, sweep=sweep) if asNeoEpoch else e[0], epochs_roles))
-
-        else:
-            e = epochs_roles[0][0]
-            return self._protocol_.getNeoEpoch(epoch=e, dac=pathway.dac, sweep=sweep) if asNeoEpoch else e
-
-    def getEpochsWithRole(self, pathway:SynapticPathway, role: pab.ABFEpochRole,
-                         ensureUnique: bool = False,
-                         sweep:typing.Optional[int] = None,
-                         asNeoEpoch: bool = False) -> typing.Optional[
-                                                typing.Union[
-                                                    pab.ABFEpoch,
-                                                    neo.Epoch,
-                                                    list[pab.ABFEpoch],
-                                                    list[neo.Epoch],
-                                                    dict[int, pab.ABFEpoch],
-                                                    dict[int, neo.Epoch],
-                                                    dict[int, list[neo.Epoch]]]
-                                                ]:
-        r"""Queries the epoch(s) fulfilling a specific role.
-
-        .. |nbsp| unicode:: 0xA0
-        :trim:
-
-        Searches and returns the epochs that fulfil a specific role (see ABFEpochRole) |nbsp|
-        on a given pathway, during a given sweep.
-
-
-        Parameters:
-        -----------
-        :pathway: Must exist in the stimulation layout
-
-        :role: Specific role for the Epoch. See ABFEpochRole enumeration for details.
-
-        :ensureUnique: When True, warns if the stimulation layout for a specific pathway & sweep
-            combination has more than one ABF epoch with the specified role, and returns
-            the first epoch that was found. When False (the default) the method returns
-            a sequence of epochs or just an epoch, if there is only one fulfilling the role.
-
-        :sweep: Optional, default is None. When None, the method will query the stimulus
-            layout for all the sweeps where the specified pathway is recorded. When an int,
-            the query will be restricted to the combination of pathway and the specified sweep,
-            if it exists in the stimulus layout.
-
-        :asNeoEpoch: When True, the epochs will be returned as neo.Epoch objects with timings as output during the actual recording.
-                This is useful for further analysis of recorded data.
-
-                Optional, default is False.
-
-        Returns:
-        --------
-
-        .. note::
-            Below, an 'epoch' is either an pyabfbridge.ABFEpoch object or a neo.Epoch object, depending on the value of the 'asNeoEpoch' parameter.
-
-        * When sweep is an integer (index of sweep in the protocol), then for the combination of 'pathway' and 'sweep':
-            * if 'ensureUnique' is True, returns the single epoch fulfilling 'role', or None if no such epoch exists.
-
-            * if 'ensureUnique' is False, returns a list of epochs fulfilling this role, or None if no such epoch exists
-
-        * When 'sweep' is None, then for all the protocol sweeps where 'pathway' is recorded, returns a dictionary that
-
-                maps sweep index to an epoch or list of epochs fulfiling the 'role', for the sweep where such epochs are found
-
-                The dictionary may be empty.
-
-        If 'pathway' is not recorded in the given sweep (or in any of the protocol's sweeps) returns None.
-
-        """
-        sweeps = self.getSweepsForPathway(pathway)
-
-        if isinstance(sweeps, int):
-            sweeps = [sweeps]
-
-        elif not isinstance(sweeps, typing.Sequence) or len(sweeps) == 0 or not all(isinstance(s, int) for s in sweeps):
-            return
-
-        result = dict()
-
-        if isinstance(sweep, int):
-            if sweep not in sweeps:
-                return
-
-            return self._getSweepEpochsWithRoleForPathway_(pathway, sweep, role, ensureUnique, asNeoEpoch)
-
-        for sweep in sweeps:
-            if sweep not in self.sweeps:
-                continue
-
-            epochs = self._getSweepEpochsWithRoleForPathway_(pathway, sweep, role, ensureUnique, asNeoEpoch)
-            if isinstance(epochs, (pab.ABFEpoch, neo.Epoch)):
-                result[sweep] = epochs
-            elif isinstance(epochs, list) and len(epochs) and all(isinstance(e, (pab.ABFEpoch, neo.Epoch)) for e in epochs):
-                result[sweep] = epochs
-
-        return result
-
-
-    def getMembraneTestEpoch(self, pathway:SynapticPathway,
-                             sweep: typing.Optional[int] = None,
-                             asNeoEpoch: bool = False) -> typing.Optional[
-                                            typing.Union[pab.ABFEpoch,
-                                                        neo.Epoch,
-                                                        dict[int, pab.ABFEpoch],
-                                                        dict[int, neo.Epoch]]
-                                            ]:
-        r"""Returns the ABF epochs used for membrane test in a pathway during a given sweep.
-
-        .. |nbsp| unicode:: 0xA0
-        :trim:
-
-        Parameters:
-        -----------
-
-        :pathway: The pathway where membrane test epochs are to be queried.
-
-        :sweep: Index of the sweep (0-based) or None (default).
-
-        :asNeoEpoch: When True, all returned epochs are neo.Epoch objects; otherwise, they are pyabfbridge.ABFEpoch objects.
-
-        Returns:
-        --------
-        When ``sweep`` is None (default) returns a dictionary mapping sweep index to a possibly empty list of epochs
-
-        When ``sweep`` is specified, returns the epoch used for membrane test or None if such epoch is not found.
-
-        .. note::
-                Membrane test epochs should be unique in any given sweep
-
-        """
-        return self.getEpochsWithRole(pathway, pab.ABFEpochRole.MembraneTestRole,
-                                     True, sweep, asNeoEpoch)
-
-
-    def getBaselineEpoch(self, pathway: SynapticPathway,
-                        sweep: typing.Optional[int] = None,
-                        asNeoEpoch: bool = False) -> typing.Optional[
-                                            typing.Union[pab.ABFEpoch,
-                                                        neo.Epoch,
-                                                        dict[int, pab.ABFEpoch],
-                                                        dict[int, neo.Epoch]]
-                                            ]:
-        r"""Returns the epoch used for measuring the signal baseline.
-
-        .. |nbsp| unicode:: 0xA0
-        :trim:
-
-        See self.getMembraneTestEpoch for details about parameters and return types.
-
-        .. note::
-            There shoud be only one such epoch in any given sweep.
-
-            The notion of signal 'baseline' refers to the region of the signal |nbsp|
-        *before* any challenge applied to the recording source (membrane test, |nbsp|
-        stimulation, etc).
-
-        """
-        return self.getEpochsWithRole(pathway, pab.ABFEpochRole.BaselineRole,
-                                     True, sweep, asNeoEpoch)
-
-    def getStimulationEpochs(self, pathway: SynapticPathway,
-                             sweep: typing.Optional[int] = None,
-                             asNeoEpoch: bool = False) -> typing.Optional[
-                                                typing.Union[
-                                                    pab.ABFEpoch,
-                                                    neo.Epoch,
-                                                    list[pab.ABFEpoch],
-                                                    list[neo.Epoch],
-                                                    dict[int, pab.ABFEpoch],
-                                                    dict[int, neo.Epoch],
-                                                    dict[int, list[neo.Epoch]]]
-                                                ]:
-        r"""Returns the epoch(s) where the pathway is stimulated during the given sweep.
-
-        .. |nbsp| unicode:: 0xA0
-        :trim:
-
-        See self.getMembraneTestEpoch for details about parameters.
-
-        .. note::
-            Unlike for self.getMembraneTestEpoch or self.getBaselineEpoch, there can be more than one stimulation epoch in any given sweep.
-
-        """
-        return self.getEpochsWithRole(pathway, pab.ABFEpochRole.StimulusRole,
-                                      False, sweep, asNeoEpoch)
-
-    def getCrossTalkLayout(self) -> dict:
-        r"""Shows the layout of sweeps & pathways for cross-talk tests.
-
-        .. |nbsp| unicode:: 0xA0
-            :trim:
-
-            Returns a mapping of sweep index (int) to a PathwaysCrossTalk named tuple. |nbsp|
-            The mapping may be empty if the protocol does not test for pathway cross-talk.
-
-            """
-        return dict(filter(lambda i: self.isXTalkLayout(i[1]), self.sweeps.items()))
-
-    @staticmethod
-    def isXTalkLayout(l) -> bool:
-        return (isinstance(l, (tuple, list, collections.deque))
-                and len(l) == 2
-                and all(isinstance(l_, SweepPathCommands) for l_ in l)
-                and l[0].pathway != l[1].pathway
-                )
-
-@dataclass
-class SynapticPathway:
-    r"""Logical association of a SynapticStimulusChannel with a recording configuration.
-
-    Also specifies the "type" of the SynapticPathway, which represents the role
-    of the SynapticPathway in an experiment.
-
-    """
-    name: str = "pathway"
-    adc: int = 0 # physical index of the ADC channel used in recording this pathway
-    # adc: int|None = None # physical index of the ADC channel used in recording this pathway
-    dac: int = 0 # physical index of the DAC channel used in recording this pathway
-    # dac: int|None = None # physical index of the DAC channel used in recording this pathway
-    stimulus: SynapticStimulusChannel = dataclasses.field(default_factory = SynapticStimulusChannel)
-    # stimulus: SynapticStimulusChannelList = dataclasses.field(default_factory = SynapticStimulusChannelList)
-
-    # NOTE: 2024-10-16 11:57:17
-    # 'clampMode' is not needed, in a SynapticPathway, which can be recorded in
-    # either clamp mode, and the clamp mode can change during a session (i.e.,
-    # a sequence of recording trials).
-    #
-    # On the other hand it makes sense to define an electrode mode, as it cannot
-    # change during the session - once impaled, it would be tricky to also patch
-    # the cell, and vice-versa (although re-patching the cells has been reported,
-    # e.g. see Lamsa et al, Science 315:1262, 2007, for the purpose of this
-    # software one can consider a repatched cell as the same source, with same
-    # electrode mode, but undergoing different episodes).
-    #
-    # Therefore:
-    # NOTE: 2024-10-16 13:36:07
-    # add clampMode to RecordingEpisode!
-    electrode: dataclasses.InitVar[typing.Union[ephys.ElectrodeMode, int, str]] = ephys.ElectrodeMode.Null
-
-    pathType: dataclasses.InitVar[typing.Union[SynapticPathwayType, int, str]] = SynapticPathwayType.Null
-
-    schedule: RecordingSchedule = dataclasses.field(default_factory = RecordingSchedule)
-
-    # CAUTION 2024-10-17 22:31:14 FIXME
-    # these measurements MUST be mapped to the episode boundaries, so that one
-    # can easily access the measurement values during a particular episode or
-    # across several episodes of the schedule!
-    # measurements: typing.Mapping[str, typing.Union[neo.IrregularlySampledSignal, IrregularlySampledDataSignal]] = dataclasses.field(default_factory = dict)
-
-    # NOTE: 2026-05-13 14:52:36
-    # using DeferredSignalMeasure objects (but others, too):
-    # map the name of the measure (as it would appear in a results table) to
-    # a sequence of measures (DeferredSignalMeasure, functions, etc): each of these
-    # are to be executed in the order given in the sequence
-    #
-    measurements: dict[str, list] = dataclasses.field(default_factory = dict)
-    # source: RecordingSource = dataclasses.field(default_factory = lambda: RecordingSource())
-
-    def __post_init__(self, electrode:typing.Union[ephys.ElectrodeMode, int, str] = ephys.ElectrodeMode.Null,
-                      pathType:typing.Union[SynapticPathwayType, int, str] = SynapticPathwayType.Null):
-
-        if isinstance(electrode, (int, str)):
-            if electrode not in ephys.ElectrodeMode:
-                raise ValueError(f"Invalid electrode mode {electrode}")
-
-            electrode = ephys.ElectrodeMode.type(electrode)
-
-        if not isinstance(electrode, ephys.ElectrodeMode):
-            raise TypeError(f"Invalid electrode mode {electrode}")
-
-        self._electrodeMode_ = electrode
-        self.electrode = self._electrodeMode_
-
-        if isinstance(pathType, (int, str)):
-            if pathType not in SynapticPathwayType:
-                raise ValueError(f"Invalid synaptic pathway type {pathType}")
-
-            pathType = SynapticPathwayType.type(pathType)
-
-        if not isinstance(pathType, SynapticPathwayType):
-            raise TypeError(f"Invalid synaptic pathway type {pathType}")
-
-        self._pathwayType_ = pathType
-        self.pathType = self._pathwayType_
-
-    def __hash__(self) -> int:
-        return hash((self.name, self.adc, self.dac, self.stimulus,
-                     self.electrodeMode, self.pathwayType,
-                     tuple(self.measurements)))
-
-    @property
-    def electrodeMode(self) -> ephys.ElectrodeMode:
-        return self._electrodeMode_
-
-    @electrodeMode.setter
-    def electrodeMode(self, val:typing.Union[int, str, ephys.ElectrodeMode]):
-        if isinstance(val, (int, str)):
-            if val not in ephys.ElectrodeMode:
-                raise ValueError(f"Invalid electrode mode {val}")
-
-            val = ephys.ElectrodeMode.type(val)
-
-        if not isinstance(val, ephys.ElectrodeMode):
-            raise TypeError(f"Invalid electrode mode {val}")
-
-        self._electrodeMode_ = val
-        self.electrode = self._electrodeMode_
-
-    @property
-    def pathwayType(self) -> SynapticPathwayType:
-        return self._pathwayType_
-
-    @pathwayType.setter
-    def pathwayType(self, val:typing.Union[SynapticPathwayType, int, str]):
-        if isinstance(val, (int, str)):
-            if val not in SynapticPathwayType:
-                raise ValueError(f"Invalid syaptic pathway type {val}")
-
-            val = SynapticPathwayType.type(val)
-
-        if not isinstance(val, SynapticPathwayType):
-            raise TypeError(f"Invalid synaptic pathway type {val}")
-
-        self._pathwayType_ = val
-        self.pathType = self._pathwayType_
-
-    def __repr__(self) -> str:
-        import dataclasses
-        all_attr_names = list(f.name for f in dataclasses.fields(self.__class__)) + [x[0] for x in inspect.getmembers_static(self, lambda x: isinstance(x, property))]
-        ret = [f"{self.__class__.__name__}"]
-        ret += ["("]
-
-        ret += ", ".join([f"{a}={getattr(self,a).name if a in ('electrodeMode', 'pathwayType') else f"'{getattr(self, a)}'" if a == "name" else getattr(self, a)}" for a in all_attr_names])
-        ret += [")"]
-
-        return "".join(ret)
-
-    def __eq__(self, other) -> bool:
-        # from dataclasses import fields
-        ret = type(self) is type(other)
-
-        if not ret:
-            return ret
-
-        return hash(self) == hash(other)
-
-        # ret &= all(getattr(self, f.name) == getattr(other, f.name) for f in fields(type(self)) if f.name != "source")
-        #
-        # if ret:
-        #     ret &= self.pathwayType == other.pathwayType
-        #
-        # if ret:
-        #     ret &= self.electrodeMode == other.electrodeMode
-        #
-        # return ret
-
-    def toHDF5(self, group, name, oname, compression, chunks, track_order,
-                       entity_cache) -> h5py.Group:
-
-        from iolib import h5io
-        # print(f"{self.__class__.__name__}.toHDF5: {self.name}")
-        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
-        cached_entity = h5io.getCachedEntity(entity_cache, self)
-        if isinstance(cached_entity, h5py.Dataset):
-            group[target_name] = cached_entity
-            return cached_entity
-
-        attrs = {"name": self.name,
-                 "adc": self.adc,
-                 "dac":self.dac,
-                 "pathwayType": self.pathwayType,
-                 "electrodeMode": self.electrodeMode,
-                 }
-
-        objattrs = h5io.makeAttrDict(**attrs)
-        obj_attrs.update(objattrs)
-
-        if isinstance(name, str) and len(name.strip()):
-            target_name = name
-
-        entity = group.create_group(target_name, track_order=track_order)
-        entity.attrs.update(obj_attrs)
-
-        # h5io.toHDF5(self.source, entity, name="source", oname="source",
-        #                     compression=compression, chunks=chunks,
-        #                     track_order=track_order,
-        #                     entity_cache=entity_cache)
-
-        h5io.toHDF5(self.stimulus, entity, name="stimulus", oname="stimulus",
-                            compression=compression, chunks=chunks,
-                            track_order=track_order,
-                            entity_cache=entity_cache)
-
-        h5io.toHDF5(self.schedule, entity, name="schedule", oname="schedule",
-                            compression=compression, chunks=chunks,
-                            track_order=track_order,
-                            entity_cache=entity_cache)
-
-        h5io.toHDF5(self.measurements, entity, name="measurements", oname="measurements",
-                            compression=compression, chunks=chunks,
-                            track_order=track_order,
-                            entity_cache=entity_cache)
-
-        h5io.storeEntityInCache(entity_cache, self, entity)
-
-        return entity
-
-    @classmethod
-    def fromHDF5(cls, entity:h5py.Group,
-                             attrs:typing.Optional[dict]=None, cache:dict = {}):
-
-        from iolib import h5io
-        if entity in cache:
-            return cache[entity]
-
-        attrs = h5io.attrs2dict(entity.attrs)
-        name = attrs["name"]
-        pathwayType = attrs["pathwayType"]
-        electrodeMode = attrs["electrodeMode"]
-        adc = attrs["adc"]
-        dac = attrs["dac"]
-        schedule = h5io.fromHDF5(entity["schedule"], cache=cache)
-        stimulus = h5io.fromHDF5(entity["stimulus"], cache=cache)
-        # source = h5io.fromHDF5(entity["source"], cache=cache)
-        measurements = h5io.fromHDF5(entity["measurements"], cache=cache)
-
-        return cls(name=name, adc=adc, dac=dac, pathType=pathwayType,
-                   stimulus=stimulus, electrode=electrodeMode,
-                   schedule=schedule, measurements=measurements)#, source=source)
-
-    @classmethod
-    def fromDict(cls, **kwargs):
-        r"""Constructs an instance of this class using 'kwargs' keys that match the class fields.
-        Keys in kwargs that are NOT valid field names for this class are silently
-        ignored.
-        """
-        field_names = tuple(f.name for f in dataclasses.fields(cls))
-
-        initkwargs = dict((i, kwargs[i]) for i in field_names if i in kwargs)
-
-        return cls(**initkwargs)
-
-
-class SynapticPathwayList(NeoObjectList):
-    allowed_contents  = (SynapticPathway, )
-
-    def __init__(self, *items, name:typing.Optional[str] = None,
-                 parent: object = None):
-
-        self.name = "" if not isinstance(name, str) else name
-        self._items = list()
-
-        if len(items):
-            if len(items) == 1 and isinstance(items[0], typing.Sequence):
-                items = items[0]
-
-            if any(
-                not isinstance(i, self.allowed_contents)
-                or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents)))
-                for i in items):
-                raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(item).__name__}")
-
-            self._items = list(items)
-
-        if parent is not None and ScipyenDataclass not in inspect.getmro(type(parent)):
-            raise TypeError(f"Parent must be a ScipyenDataclass or None; got {type(parent).__name__} instead")
-
-        self._parent = parent
-
-    @property
-    def parent(self) -> ScipyenDataclass | None:
-        return self._parent
-
-    def __iter__(self):
-        """Implement iter(self)"""
-        for item in self._items:
-            yield item
-
-    def __delitem__(self, i: int) -> None:
-        if len(self._items) == 0:
-            return
-
-        if i < len(self._items) and i >= -len(self._items):
-            del(self._items[i])
-        else:
-            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
-
-    def __getitem__(self, i: int | slice) -> SynapticPathway | None:
-        """x.__getitem__(y) <==> x[y]"""
-        if len(self._items) == 0:
-            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
-
-        if isinstance(i, int):
-            if i < len(self._items) and i >= -len(self._items):
-                return self._items[i]
-
-            else:
-                raise IndexError(f"Index {i} out of range for {len(self._items)} items")
-        elif isinstance(i, slice):
-            return self._items[i]
-
-    def __setitem__(self, i: int, value: SynapticPathway):
-        if not isinstance(value, self.allowed_contents):
-            raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(value).__name__}")
-
-        if len(self._items) == 0:
-            raise ValueError(f"Index {i} out of range for {len(self._items)} items")
-
-        if i < len(self._items) and i >= -len(self._items):
-            self._items[i] = value
-
-        else:
-            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
-
-    def __str__(self):
-        """Return str(self)"""
-        return f"<{self.__class__.__name__}> with {len(self._items)} {self.allowed_contents[0].__name__} objects"
-
-    def __repr__(self):
-        header = f"<{self.__class__.__name__}>"
-        if isinstance(self.name, str) and len(self.name.strip()):
-            header += f" '{self.name}'"
-
-        s = [f"{header} with {len(self._items)} {self.allowed_contents[0].__name__} objects",
-            ]
-
-        if len(self._items):
-            s[0]+= ":"
-            s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
-
-        return "\n".join(s)
-
-    def __len__(self):
-        """Return len(self)"""
-        return len(self._items)
-
-    def _add_items(self, other: typing.Self, in_place=False) -> typing.Self:
-        self._items = self._items + other._items
-        return self
-
-    def __add__(self, other):
-        """Return self + other"""
-        ret = self.__class__(self._items, parent=self.parent)
-        if isinstance(other, self.__class__):
-            return ret._add_items(other)
-
-        elif isinstance(other, self.allowed_contents):
-            ret._items.append(other)
-            return ret
-
-        elif (isinstance(other, typing.Sequence)
-              and all(isinstance(o, self.allowed_contents) for o in other)):
-            ret._items.extend(list(other))
-            return ret
-
-        else:
-            return ret
-
-    def __iadd__(self, other):
-        """Return self"""
-        if isinstance(other, self.__class__):
-            return self._add_items(other, in_place=True)
-
-        elif isinstance(other, self.allowed_contents):
-            self._items.append(other)
-            return self
-
-        elif (isinstance(other, typing.Sequence)
-              and all(isinstance(o, self.allowed_contents) for o in other)):
-            self._items.extend(list(other))
-            return self
-
-        else:
-            return self
-
-    def __radd__(self, other):
-        """Return other + self"""
-        ret = self.__class__(self._items, parent=self.parent)
-        if isinstance(other, self.__class__):
-            return other._add_items(ret)
-
-        elif isinstance(other, self.allowed_contents):
-            ret._items.append(other)
-            return ret
-
-        elif (isinstance(other, typing.Sequence)
-              and all(isinstance(o, self.allowed_contents) for o in other)):
-            ret._items.extend(list(other))
-            return ret
-        else:
-            return ret
-
-    def append(self, obj):
-        """
-        Appends a SynapticStimulusChannel
-
-        Parameters
-        ----------
-        obj: SynapticStimulusChannel
-
-        """
-        if not isinstance(obj, self.allowed_contents):
-            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
-        self._items.append(obj)
-
-    def extend(self, iterable):
-        """Extends with additional SynapticStimulusChannel objects from an iterable
-
-        Parameters
-        ----------
-        iterable: iterable[SynapticStimulusChannel]
-
-        """
-        if all (isinstance(o, self.allowed_contents) for o in iterable):
-            self._items.extend(iterable)
-        else:
-            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
-
-    def insert(self, index:int, obj: object):
-        if isinstance(obj, self.allowed_contents):
-            self._items.insert(index, obj)
-        else:
-            raise TypeError(f"Can only insert {self.allowed_contents[0].__name__} objects")
-
-    def clear(self):
-        self._items.clear()
-
-    def pop(self, index: int = -1, /,) -> object:
-        return self._items.pop(index)
-
-    def remove(self, obj:object):
-        self._items.remove(obj)
-
-    def reverse(self):
-        return self.__class__(reversed(self._items))
-
-    def count(self, obj) -> int:
-        return self._items.count(obj)
-
-    def index(self, *args):
-        return self._index(*args)
 
 
 def infer_schedule(*args, name:typing.Optional[str] = None) -> RecordingSchedule:

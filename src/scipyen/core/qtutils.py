@@ -7,22 +7,22 @@ r"""
 See https://pyqt.riverbankcomputing.narkive.com/4Atl8IgU/how-to-detect-if-an-object-has-been-deleted
 solution by Giovanni Bajo
 """
-import sys, os, typing
+import sys, os, typing # noqa
 import datetime
-
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+# import contextlib
+import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
-    QAction = QtGui.QAction
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction # noqa
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
 else:
@@ -30,7 +30,7 @@ else:
         __has_PyQt6__ = True
         
     from qtpy import sip
-    from qtpy.uic import loadUiType
+    # from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -46,46 +46,81 @@ else:
 #     from qtpy import QtCore, QtGui, QtWidgets, QtSvg
 #     from qtpy.QtCore import Signal, Slot, Property
 
-from core.prog import safewrapper
-from core.sysutils import adapt_ui_path
+# from core.prog import safewrapper # noqa
+# from core.sysutils import adapt_ui_path
 
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 # from qt import *
-import weakref
+# import weakref
 
-class QtRef(weakref.ref):
-    __slots__ = "_callback",
+# class QtRef(weakref.ref):
+#     __slots__ = "_callback",
+#
+#     def __new__(typ, obj, callback=None):
+#         if not isinstance(obj, QtCore.QObject):
+#             wr = weakref.ref.__new__(weakref.ref, obj, callback)
+#             wr.__init__(obj, callback)
+#             return wr
+#         wr = weakref.ref.__new__(typ, obj)
+#         if callback is not None:
+#             wr._callback = lambda: callback(wr) # noqa
+#             QtCore.QObject.connect(o, SIGNAL("destroyed()"), wr._callback)
+#             return wr
+#
+#     def __call__(self, *args, **kwargs):
+#         obj = super(qtref, self).__call__(*args, **kwargs)
+#         if obj is None:
+#             return None
+#         try:
+#             obj.parent()
+#         except RuntimeError:
+#             return None
+#         return obj
+#
+#     def __repr__(self):
+#         obj = self()
+#         if obj is not None:
+#             return "<qtweakref at %08X; to '%.50s' at %08X>" % (id(self),
+#         type(obj).__name__, id(obj))
+#         return "<qtweakref at %08X; is dead>" % id(self)
 
-    def __new__(typ, o, callback=None):
-        if not isinstance(o, QObject):
-            wr = weakref.ref.__new__(weakref.ref, o, callback)
-            wr.__init__(o, callback)
-            return wr
-        wr = weakref.ref.__new__(typ, o)
-        if callback is not None:
-            wr._callback = lambda: callback(wr)
-            QObject.connect(o, SIGNAL("destroyed()"), wr._callback)
-            return wr
+class SignalBlocker():
+    def __init__(self, widgets: typing.Union[QtWidgets.QWidget,
+                                             typing.Sequence[QtWidgets.QWidget]]):
+        self._blockers_ = tuple()
+        if isinstance(widgets, QtWidgets.QWidget):
+            self._widgets_ = (widgets, )
+        else:
+            self._widgets_ = tuple(
+                filter(
+                    lambda w: isinstance(w, QtWidgets.QWidget),
+                    widgets
+                    )
+                )
 
-    def __call__(self, *args, **kwargs):
-        o = super(qtref, self).__call__(*args, **kwargs)
-        if o is None:
-            return None
-        try:
-            o.parent()
-        except RuntimeError:
-            return None
-        return o
+    def __enter__(self):
+        self._blockers_ = tuple(
+            map(
+                lambda w: QtCore.QSignalBlocker(w),
+                tuple(
+                    filter(
+                        lambda w: isQObjectAlive(w),
+                        self._widgets_
+                        )
+                    )
+                )
+            )
 
-    def __repr__(self):
-        o = self()
-        if o is not None:
-            return "<qtweakref at %08X; to '%.50s' at %08X>" % (id(self),
-        type(o).__name__, id(o))
-        return "<qtweakref at %08X; dead>" % id(self)
-    
+    def __exit__(self, exc_type, exc_value, traceback):
+        # if len(self._blockers_) and all(isinstance(b, QtCore.QSignalBlocker) for b in self._blockers_):
+        #     for b in self._blockers_:
+        #         # b.deleteLater()
+        #         b = None
+
+        self._blockers_ = tuple()
+
 def isQObjectDeleted(obj:QtCore.QObject):
     if not __has_sip__:
         return False # fallback

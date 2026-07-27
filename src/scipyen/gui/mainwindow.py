@@ -5479,7 +5479,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 self.executionCount = self.ipkernel.shell.execution_count
                 self._updateHistoryView_(
                     self.executionCount-1, self.ipkernel.shell.history_manager.input_hist_raw[-1])
-            except:
+            except:  # noqa
                 traceback.print_exc()
                 self.setCursor(currentMouseCursor)
                 raise()

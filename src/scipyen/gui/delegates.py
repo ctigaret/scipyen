@@ -28,8 +28,8 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    from qtpy import sip # noqa
+    from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -130,15 +130,15 @@ NOTE: To be used with my custom itemmodels
                                  synapticpathwaywidget,
                                  auxiliaryiowidget,
                                  recordingsourcewidget,
+                                 recordingepisodewidget,
                                  tableeditorwidget,
                                  )
         widget = None
         editorName = f"{type(self._data_).__name__} Editor"
         self.setWindowTitle(editorName)
         if isinstance(self._data_, ephys_pathways.SynapticStimulusChannel):
-            widget = synapticstimuluswidget.SynapticStimulusChannelWidget(self,
-                                                                   self._data_,
-                                                                   )
+            widget = synapticstimuluswidget.SynapticStimulusChannelWidget(
+                parent=self, obj = self._data_,)
             widget.setObjectName(f"{editorName} Widget")
 
         elif isinstance(self._data_, (ephys_pathways.AuxiliaryInput, ephys_pathways.AuxiliaryOutput)):
@@ -153,9 +153,16 @@ NOTE: To be used with my custom itemmodels
             widget.setObjectName(f"{editorName} Widget")
 
         elif isinstance(self._data_, ephys_pathways.SynapticPathway):
-            widget = synapticpathwaywidget.SynapticPathwayWidget(self,
-                                                                 self._data_,
-                                                                 )
+            widget = synapticpathwaywidget.SynapticPathwayWidget(
+                parent=self,
+                obj = self._data_,
+                )
+            widget.setObjectName(f"{editorName} Widget")
+
+        elif isinstance(self._data_, ephys_pathways.RecordingEpisode):
+            widget = recordingepisodewidget.RecordingEpisodeWidget(self,
+                                                                   self._data_
+                                                                   )
             widget.setObjectName(f"{editorName} Widget")
 
         elif isinstance(self._data_, ephys_pathways.RecordingSource):

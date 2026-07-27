@@ -7,10 +7,11 @@ r"""A collection of functions to prompt user input using GUI
 """
 import typing, collections, dataclasses, os, types # noqa
 import numpy as np
+import quantities as pq
 from tribool import Tribool
 import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
-from qtpy.QtCore import (Signal, Slot, Property,)
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
@@ -34,12 +35,12 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-from core import prog
+from core import prog # noqa
 from core.prog import scipywarn
 from core.inputspec import InputSpec
 from . import quickdialog as qd
 from .itemslistdialog import ItemsListDialog
-from gui.widgets import small_widgets as smw
+from gui.widgets import small_widgets as smw # noqa
 
 
 def selectWSData(*args, title="", single=True, asDict=False,

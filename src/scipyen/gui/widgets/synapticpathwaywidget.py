@@ -50,7 +50,9 @@ except:
 
 from ephys import (ephys, ephys_pathways)
 from core.prog import scipywarn # noqa
+from core import qtutils
 from gui import guiutils
+from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -60,14 +62,17 @@ Ui_SynapticPathwayWidget, QWidget = loadUiType(
     )
 
 
-class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
+class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
+    _objectTypes_ = (ephys_pathways.SynapticPathway, )
+    _objectType_ = ephys_pathways.SynapticPathway
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
-                 obj: typing.Optional[ephys_pathways.SynapticPathway] = None):
+                 obj: typing.Optional[ephys_pathways.SynapticPathway] = None,
+                 **kwargs):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
 
-        if isinstance(parent, ephys_pathways.SynapticPathway):
+        if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
                 parent = obj
@@ -76,27 +81,10 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
 
             obj = obj_
 
+        self._electrodeModeNames_ = list(ephys.ElectrodeMode.names())
+        self._pathwayTypeNames_ = list(ephys_pathways.SynapticPathwayType.names())
 
-        QWidget.__init__(self, parent=parent)
-
-        if not isinstance(obj, ephys_pathways.SynapticPathway):
-            self._data_ = None
-        else:
-            self._data_ = obj
-
-        # print(f"\tself._data_: {self._data_}")
-
-        if isinstance(self._data_, ephys_pathways.SynapticPathway):
-            self._name_ = self._data_.name
-            self._adc_ = self._data_.adc
-            self._dac_ = self._data_.dac
-            self._stimulus_ = self._data_.stimulus
-            self._electrode_ = self._data_.electrodeMode
-            self._pathType_ = self._data_.pathwayType
-            self._schedule_ = self._data_.schedule
-            self._measurements_ = self._data_.measurements
-
-        else:
+        if not isinstance(obj, self._objectTypes_):
             self._name_ = "pathway"
             self._adc_ = 0
             self._dac_ = 0
@@ -107,25 +95,24 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self._measurements_ = dict()
             self._make_value_()
 
-        self._electrodeModeNames_ = list(ephys.ElectrodeMode.names())
-        self._pathwayTypeNames_ = list(ephys_pathways.SynapticPathwayType.names())
+        else:
+            self._data_ = obj
+            self._name_ = self._data_.name
+            self._adc_ = self._data_.adc
+            self._dac_ = self._data_.dac
+            self._stimulus_ = self._data_.stimulus
+            self._electrode_ = self._data_.electrodeMode
+            self._pathType_ = self._data_.pathwayType
+            self._schedule_ = self._data_.schedule
+            self._measurements_ = self._data_.measurements
 
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
         self._configureUI_()
 
     def _configureUI_(self):
         self.setupUi(self)
-
-        self.nameLineEdit.undoAvailable=True
-        self.nameLineEdit.redoAvailable=True
-        self.nameLineEdit.setClearButtonEnabled(True)
-        self.nameLineEdit.setToolTip("Name of the pathway")
-        self.nameLineEdit.setWhatsThis("Name of the pathway")
-        self.nameLineEdit.setStatusTip("Name of the pathway")
-
-        if isinstance(self._name_, str) and len(self._name_.strip()):
-            self.nameLineEdit.setText(self._name_)
-        self.nameLineEdit.textChanged.connect(self._slot_nameChanged)
-
+        super()._configureUI_() # DataClassWidget!
+        self.nameDescriptionWidget.symbol="pathway"
         self.adcSpinBox.setToolTip("Input channel index")
         self.adcSpinBox.setWhatsThis("Input channel index")
         self.adcSpinBox.setStatusTip("Input channel index")
@@ -170,16 +157,6 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
 
         self.createObjectPushButton.clicked.connect(self._slot_new)
         self.createObjectPushButton.setEnabled(self._data_ is None)
-
-    @Slot(str)
-    def _slot_nameChanged(self, val:str):
-        self._name_ = val
-        if not isinstance(self._data_, ephys_pathways.SynapticPathway):
-            self._make_value_()
-        else:
-            self._data_.name = val
-
-        self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
     def _slot_adcChanged(self, val: int):
@@ -248,10 +225,12 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
         self._make_value_()
 
     def _make_value_(self):
-        self._data_ = ephys_pathways.SynapticPathway(self._name_, self._adc_, self._dac_,
-                                      self._stimulus_, self._electrode_,
-                                      self._pathType_, self._schedule_,
-                                      self._measurements_)
+        self._data_ = ephys_pathways.SynapticPathway(
+            name=self._name_, adc=self._adc_, dac=self._dac_,
+            stimulus=self._stimulus_, electrode=self._electrode_,
+            pathType=self._pathType_, schedule=self._schedule_,
+            measurements=self._measurements_
+            )
         self.createObjectPushButton.setEnabled(self._data_ is None)
 
     @Slot()
@@ -272,7 +251,6 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self._make_value_()
             self.sig_valueChanged.emit(self._data_)
 
-
     @Slot(object)
     def slot_valueChanged(self, val):
         # print(f"{self.__class__.__name__}[{self.objectName()}].slot_valueChanged({val})")
@@ -292,24 +270,20 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, QWidget):
             self._schedule_ = self._data_.schedule
             self._measurements_ = self._data_.measurements
 
-            sigBlock = list(map(
-                                lambda w: QtCore.QSignalBlocker(w),
-                                (
-                                    self.nameLineEdit,
-                                    self.adcSpinBox,
-                                    self.dacSpinBox,
-                                    self.electrodeModeComboBox,
-                                    self.pathTypeComboBox,
-                                    self.stimulusPushButton,
-                                    self.schedulePushButton,
-                                    self.measurementsPushButton,
-                                 )
-                                )
-                            )
+            with qtutils.SignalBlocker(
+                (self.nameDescriptionWidget,
+                 self.adcSpinBox,
+                 self.dacSpinBox,
+                 self.electrodeModeComboBox,
+                 self.pathTypeComboBox,
+                 self.stimulusPushButton,
+                 self.schedulePushButton,
+                 self.measurementsPushButton)
+                ):
 
-            self.nameLineEdit.setText(self._name_)
-            self.adcSpinBox.setValue(self._adc_)
-            self.dacSpinBox.setValue(self._dac_)
+                self.nameDescriptionWidget.dataName = self._name_
+                self.adcSpinBox.setValue(self._adc_)
+                self.dacSpinBox.setValue(self._dac_)
 
 
             currentElectrodeModeNdx = self._electrodeModeNames_.index(self._electrode_.name)

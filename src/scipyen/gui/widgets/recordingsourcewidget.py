@@ -11,12 +11,12 @@ import sys, os, typing, types, warnings, math, cmath # noqa
 import numbers # noqa
 import numpy as np # noqa
 import quantities as pq # noqa
-import neo
+# import neo
 from tribool import Tribool # noqa
 
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
@@ -24,8 +24,8 @@ __has_qtdbus__ = False
 
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -43,18 +43,20 @@ else:
     __has_sip__ = True
 
 try:
-    from qtpy import QtDBus# noqa
+    from qtpy import QtDBus # noqa
     __has_qtdbus__ = True
-except:
+except: # noqa
     __has_qtdbus__ = False
 
 from ephys import ephys
 from ephys import ephys_pathways
 from core import datatypes # noqa
+from core import qtutils
 from core.prog import scipywarn # noqa
-from gui import (guiutils, interact)
-from gui.workspacegui import WorkspaceGuiMixin
-from iolib import pictio as pio
+from gui import guiutils
+from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
+# from gui.workspacegui import WorkspaceGuiMixin
+# from iolib import pictio as pio
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -65,15 +67,17 @@ Ui_RecordingSourceWidget, QWidget = loadUiType(
 
 T = ephys_pathways.RecordingSource
 
-class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin):
-    sig_valueChanged = Signal(object, name="sig_valueChanged")
+class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget):
+    # sig_valueChanged = Signal(object, name="sig_valueChanged")
     _objectType_ = ephys_pathways.RecordingSource
+    _objectTypes_ = (ephys_pathways.RecordingSource, )
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
-                 obj: typing.Optional[T] = None):
+                 obj: typing.Optional[T] = None,
+                 **kwargs):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
 
-        if isinstance(parent, self._objectType_):
+        if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
                 parent = obj
@@ -82,20 +86,23 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
 
             obj = obj_
 
-
-        QWidget.__init__(self, parent=parent)
-
         self._electrodeModeNames_ = list(ephys.ElectrodeMode.names())
 
         self._pendingPathwayChange_ = None
         self._pendingStimulusChange_ = None
 
-        if not isinstance(obj, self._objectType_):
-            self._data_ = None
+        if not isinstance(obj, self._objectTypes_):
+            self._name_ = "source"
+            self._adc_ = 0
+            self._dac_ = 0
+            self._syn_ = ephys_pathways.SynapticStimulusChannelList(name=self._name_)
+            self._auxin_ = ephys_pathways.AuxiliaryInputList()
+            self._auxout_ = ephys_pathways.AuxiliaryOutputList()
+            self._electrode_ = ephys.ElectrodeMode.Null
+            self._pathways_ = ephys_pathways.SynapticPathwayList(name=self._name_)
+            self._make_value_()
         else:
             self._data_ = obj
-
-        if isinstance(self._data_, self._objectType_):
             self._name_ = self._data_.name
             self._adc_ = self._data_.adc
             self._dac_ = self._data_.dac
@@ -105,20 +112,11 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
             self._electrode_ = self._data_.electrodeMode
             self._pathways_ = self._data_.pathways
 
-        else:
-            self._name_ = "source"
-            self._adc_ = 0
-            self._dac_ = 0
-            self._syn_ = ephys_pathways.SynapticStimulusChannelList(name=self._name_)
-            self._auxin_ = ephys_pathways.AuxiliaryInputList()
-            self._auxout_ = ephys_pathways.AuxiliaryOutputList()
-            self._electrode_ = ephys.ElectrodeMode.Null
-            self._pathways_ = ephys_pathways.SynapticPathwayList(name=self._name_)
-
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
         self._configureUI_()
 
-        if not isinstance(self._data_, self._objectType_):
-            self._make_value_()
+        # if not isinstance(self._data_, self._objectTypes_):
+        #     self._make_value_()
 
     def default(self) -> T:
         self._name_ = "source"
@@ -135,18 +133,10 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
 
     def _configureUI_(self):
         self.setupUi(self)
+        super()._configureUI_() # DataClassWidget!
 
-        self.nameLineEdit.undoAvailable=True
-        self.nameLineEdit.redoAvailable=True
-        self.nameLineEdit.setClearButtonEnabled(True)
-        self.nameLineEdit.setToolTip("Name of the recording source")
-        self.nameLineEdit.setWhatsThis("Name of the recording source")
-        self.nameLineEdit.setStatusTip("Name of the recording source")
-
-        if isinstance(self._name_, str) and len(self._name_.strip()):
-            self.nameLineEdit.setText(self._name_)
-        self.nameLineEdit.textChanged.connect(self._slot_nameChanged)
-
+        self.nameDescriptionWidget.symbol="recordingSource"
+        # self.nameDescriptionWidget.sig_valueChanged.connect
         self.adcSpinBox.setToolTip("Index of ADC (input) channel used for recording")
         self.adcSpinBox.setWhatsThis("Index of ADC (input) channel used for recording")
         self.adcSpinBox.setStatusTip("Index of ADC (input) channel used for recording")
@@ -170,10 +160,8 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
         currentElectrodeModeNdx = self._electrodeModeNames_.index(self._electrode_.name)
         self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
 
-        # self.electrodeModeComboBox.currentIndexChanged.connect(self._slot_electrodeModeChanged)
         self.electrodeModeComboBox.currentTextChanged.connect(self._slot_electrodeModeChanged)
 
-        # self.stimulusPushButton.clicked.connect(self._slot_editStimulus)
         self.auxInPushButton.clicked.connect(self._slot_editAuxIn)
         self.auxOutPushButton.clicked.connect(self._slot_editAuxOut)
 
@@ -184,7 +172,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
         self.createObjectPushButton.setStatusTip("Create Recording Source")
 
         self.createObjectPushButton.clicked.connect(self._slot_new)
-        self.createObjectPushButton.setEnabled(self._data_ is None)
+        self.createObjectPushButton.setEnabled(True)
 
         self.stimulusListTable.isAutoResizeColumns = True
         self.stimulusListTable.setToolTip("Configured Stimulus Channels")
@@ -205,78 +193,6 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
         self.synapticPathwaysTable.sig_indexChanged.connect(self._slot_singleSynapticPathwayChanged)#, type=QtCore.Qt.DirectConnection)
         self.synapticPathwaysTable.sig_indexChanged[QtCore.QModelIndex].connect(self._slot_singleSynapticPathwayChanged)#, type=QtCore.Qt.DirectConnection)
         self.synapticPathwaysTable.sig_dataChanged.connect(self._slot_synapticPathwaysListChanged)
-        # self.synapticPathwaysTable.sig_indexesChanged.connect(self._slot_pathwaysListIndexesChanged)
-
-        self.importRecordingSourceToolbutton.clicked.connect(self._slot_importData)
-        self.loadRecordingSourceToolButton.clicked.connect(self._slot_loadData)
-        self.exportToWorkspaceToolButton.clicked.connect(self._slot_exportData)
-        self.saveToPickleToolButton.clicked.connect(self._slot_saveData)
-
-    @Slot()
-    def _slot_importData(self):
-        ret = self.importFromWorkSpace(dataTypes = self._objectType_,
-                                    title="Select RecordingSource Object in Workspace",
-                                    single=True,
-                                    retrieve_all = True)
-        # print(f"{self.__class__.__name__}._slot_importData -> ret = {ret}\n\t({type(ret).__name__})")
-        if isinstance(ret, typing.Sequence) and len(ret) and isinstance(ret[0], self._objectType_):
-            self.setValue(ret[0])
-
-        self.sig_valueChanged.emit(self.value())
-
-    @Slot()
-    def _slot_exportData(self):
-        obj = self.value()
-        if isinstance(obj, self._objectType_):
-            name = obj.name
-            if not isinstance(name, str) or len(name.strip()) == 0:
-                name = "source"
-
-            self.exportDataToWorkspace(obj, name)
-
-    @Slot()
-    def _slot_loadData(self):
-        fileNameFilter = "*.pkl"
-        fn, fl = self.chooseFile(caption = "Open Recording Source Pickle File",
-                                fileFilter = fileNameFilter,
-                                single=True)
-
-        if len(fn.strip()):
-            obj = pio.loadFile(fn)
-            if isinstance(obj, self._objectType_):
-                self.setValue(obj)
-            else:
-                self.errorMessage(title = "Open Recording Source Pickle File",
-                                  text = f"Expecting a RecordingSource; intead got a {type(obj).__name__}")
-        self.sig_valueChanged.emit(self.value())
-
-    @Slot()
-    def _slot_saveData(self):
-        obj = self.value()
-
-        if not isinstance(obj, self._objectType_):
-            return
-
-        fileNameFilter = "*.pkl"
-
-        fn, fl = self.chooseFile(caption = "Save Recording Source as Pickle File",
-                                fileFilter = fileNameFilter,
-                                single=True, save=True)
-
-        if len(fn.strip()):
-            pio.savePickle(obj, fn)
-
-    @Slot(str)
-    def _slot_nameChanged(self, val:str):
-        self._name_ = val
-        if not isinstance(self._data_, self._objectType_):
-            self._make_value_()
-        else:
-            self._data_.name = val
-            self._data_.syn.name = self._data_.name
-            self._data_.pathways.name = self._data_.name
-
-        self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
     def _slot_adcChanged(self, val: int):
@@ -328,15 +244,15 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
 
         if not isinstance(self._data_, self._objectType_):
             for pathway in self._pathways_:
-                p.electrodeMode = self._data_.electrodeMode
+                pathway.electrodeMode = self._data_.electrodeMode
             self._make_value_()
         else:
             self._data_.electrodeMode = self._electrode_
-            for p in self._data_.pathways:
-                p.electrodeMode = self._data_.electrodeMode
+            for pathway in self._data_.pathways:
+                pathway.electrodeMode = self._data_.electrodeMode
 
             self._pathways_ = self._data_.pathways
-            sigBlock = QtCore.QSignalBlocker(self.synapticPathwaysTable)
+            sigBlock = QtCore.QSignalBlocker(self.synapticPathwaysTable) # noqa
             self.synapticPathwaysTable.setValue(self._data_.pathways)
             self.synapticPathwaysTable.autoResizeColumns()
 
@@ -354,7 +270,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
                                             auxout=self._auxout_,
                                             electrodeMode = self._electrode_)
 
-        self.createObjectPushButton.setEnabled(self._data_ is None)
+        # self.createObjectPushButton.setEnabled(self._data_ is None)
 
     @Slot()
     def _slot_editStimulus(self):
@@ -395,7 +311,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
 
     @Slot()
     def _slot_synapticPathwaysListChanged(self):
-        blockers = list(
+        blockers = list( # noqa
             map(
                     lambda w: QtCore.QSignalBlocker(w),
                     (
@@ -446,9 +362,9 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
                             self.synapticPathwaysTable.setValue(pathways) # to reflect ALL pathway changes
                             self.synapticPathwaysTable.autoResizeColumns()
 
-                        blocker = QtCore.QSignalBlocker(self.stimulusListTable)
-                        self.stimulusListTable.setValue(self._data_.syn)
-                        self.stimulusListTable.autoResizeColumns()
+                        with qtutils.SignalBlocker(self.stimulusListTable):
+                            self.stimulusListTable.setValue(self._data_.syn)
+                            self.stimulusListTable.autoResizeColumns()
 
                 else:
                     # synchronise the stimulus list
@@ -504,17 +420,19 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
             self._pathways_ = self._data_.pathways
             self._data_.syn = ephys_pathways.SynapticStimulusChannelList(list(map(lambda p: p.stimulus, self._data_.pathways)))
             self._syn_ = self._data_.syn
-            sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), (self.electrodeModeComboBox,
-                                                                        self.synapticPathwaysTable,
-                                                                        self.stimulusListTable)))
+
             currentElectrodeModeNdx = self._electrodeModeNames_.index(eMode.name)
-            self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
 
-            self.synapticPathwaysTable.setValue(self._data_.pathways) # to reflect ALL pathway changes
-            self.synapticPathwaysTable.autoResizeColumns()
+            with qtutils.SignalBlocker((self.electrodeModeComboBox,
+                                        self.synapticPathwaysTable,
+                                        self.stimulusListTable)):
+                self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
 
-            self.stimulusListTable.setValue(self._data_.syn) # to reflect ALL stimulus changes
-            self.stimulusListTable.autoResizeColumns()
+                self.synapticPathwaysTable.setValue(self._data_.pathways) # to reflect ALL pathway changes
+                self.synapticPathwaysTable.autoResizeColumns()
+
+                self.stimulusListTable.setValue(self._data_.syn) # to reflect ALL stimulus changes
+                self.stimulusListTable.autoResizeColumns()
 
             self.sig_valueChanged.emit(self.value())
 
@@ -592,9 +510,9 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
                 self._syn_ = self._data_.syn
                 self._pathways_ = self._data_.pathways
 
-            sigBlock = QtCore.QSignalBlocker(self.synapticPathwaysTable)
-            self.synapticPathwaysTable.setValue(self._data_.pathways)
-            self.synapticPathwaysTable.autoResizeColumns()
+            with qtutils.SignalBlocker(self.synapticPathwaysTable):
+                self.synapticPathwaysTable.setValue(self._data_.pathways)
+                self.synapticPathwaysTable.autoResizeColumns()
 
             self.sig_valueChanged.emit(self._data_)
 
@@ -654,26 +572,23 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, QWidget, WorkspaceGuiMixin
             self._pathways_ = ephys_pathways.SynapticPathwayList(name=self._name_)
             self._make_value_()
 
-        sigBlock = list(map(
-                            lambda w: QtCore.QSignalBlocker(w),
-                            (
-                                self.nameLineEdit,
-                                self.adcSpinBox,
-                                self.dacSpinBox,
-                                self.electrodeModeComboBox,
-                                self.auxOutPushButton,
-                                self.auxInPushButton,
-                                self.synapticPathwaysTable,
-                                self.stimulusListTable,
-                                )
-                            )
-                        )
-
-        self.nameLineEdit.setText(self._data_.name)
-        self.adcSpinBox.setValue(self._data_.adc)
-        self.dacSpinBox.setValue(self._data_.dac)
-        currentElectrodeModeNdx = self._electrodeModeNames_.index(self._electrode_.name)
-        self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
+        with qtutils.SignalBlocker(
+            (
+                self.nameDescriptionWidget,
+                self.adcSpinBox,
+                self.dacSpinBox,
+                self.electrodeModeComboBox,
+                self.auxOutPushButton,
+                self.auxInPushButton,
+                self.synapticPathwaysTable,
+                self.stimulusListTable,
+            )
+            ):
+            self.nameDescriptionWidget.dataName = self._data_.name
+            self.adcSpinBox.setValue(self._data_.adc)
+            self.dacSpinBox.setValue(self._data_.dac)
+            currentElectrodeModeNdx = self._electrodeModeNames_.index(self._electrode_.name)
+            self.electrodeModeComboBox.setCurrentIndex(currentElectrodeModeNdx)
 
         self.stimulusListTable.setValue(self._data_.syn)
         self.stimulusListTable.autoResizeColumns()

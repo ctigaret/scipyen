@@ -258,22 +258,24 @@ class DataClassWidget(AnchoringCollapsibleWidget):
     def _slot_dataReceived(self, obj):
         if (hasattr(self, "_data_")
             and hasattr(self, "_objectTypes_")
-            and isinstance(self._data_, self._objectTypes_)):
+            and isinstance(obj, self._objectTypes_)):
             self.setValue(obj)
 
     @Slot(str)
     def _slot_dataNameChanged(self, val: str):
         if (hasattr(self, "_data_")
-            and hasattr(self, "_objectTypes_")
-            and isinstance(self._data_, self._objectTypes_)):
+            and hasattr(self, "_objectTypes_")):
+            if not isinstance(self._data_, self._objectTypes_):
+                self._make_value_()
             self._data_.name = val
             self.sig_valueChanged.emit(self._data_)
 
     @Slot(str)
     def _slot_dataDescriptionChanged(self, val:str):
         if (hasattr(self, "_data_")
-            and hasattr(self, "_objectTypes_")
-            and isinstance(self._data_, self._objectTypes_)):
+            and hasattr(self, "_objectTypes_")):
+            if not isinstance(self._data_, self._objectTypes_):
+                self._make_value_()
             self._data_.description = val
             self.sig_valueChanged.emit(self._data_)
 
@@ -525,3 +527,8 @@ class DataClassWidget(AnchoringCollapsibleWidget):
         super().closeSubWidgets()
 
         self.nameDescriptionWidget.closeSubWidgets()
+
+    def _make_value_(self):
+        r"""SHOULD override this in subclasses"""
+        if hasattr(self, "_objectTypes_"):
+            self._data_ = self._objectTypes_[0]()

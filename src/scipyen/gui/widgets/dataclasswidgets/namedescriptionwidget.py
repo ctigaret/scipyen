@@ -102,8 +102,14 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
         self.descriptionEditor = None
         self.detailsViewer = None
         self.nameLineEdit.lazy = True
+        self.nameLineEdit.undoAvailable=True
+        self.nameLineEdit.redoAvailable=True
         self.nameLineEdit.setText(self._dataName_)
         self.nameLineEdit.setClearButtonEnabled(True)
+        self.nameLineEdit.setToolTip(f"Name of the {self._objectType_.__name__} object")
+        self.nameLineEdit.setWhatsThis(f"Name of the {self._objectType_.__name__} object")
+        self.nameLineEdit.setStatusTip(f"Name of the {self._objectType_.__name__} object")
+
         self.nameLineEdit.sig_textChanged.connect(self._slot_nameChanged)
         self.descriptionToolButton.clicked.connect(self._slot_editDescription)
         self.viewDetailsToolButton.clicked.connect(self.sig_detailedViewRequest)
@@ -359,7 +365,6 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
     @symbol.setter
     def symbol(self, val:str):
         self._updateSymbol_(val)
-        # self._objSymbol_ = val
 
     @property
     def dataName(self) -> str:
@@ -368,8 +373,8 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
     @dataName.setter
     def dataName(self, val:str):
         self._dataName_ = val
-        sigBlock = QtCore.QSignalBlocker(self.nameLineEdit) # noqa
-        self.nameLineEdit.setText(self._dataName_)
+        with qtutils.SignalBlocker(self.nameLineEdit) as sb: # noqa
+            self.nameLineEdit.setText(self._dataName_)
         self.sig_nameChanged.emit(self._dataName_)
 
     @property

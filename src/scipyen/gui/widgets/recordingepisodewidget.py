@@ -62,11 +62,13 @@ from ephys import ephys_pathways
 from ephys import ephys_protocol
 from core import datatypes # noqa
 from core import strutils
+from core import qtutils
 from core.prog import scipywarn
 from core import qtutils
 from iolib import pictio as pio
 from gui import (guiutils, interact)
-from gui.workspacegui import WorkspaceGuiMixin
+from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
+# from gui.workspacegui import WorkspaceGuiMixin
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -75,13 +77,19 @@ Ui_RecordingEpisodeWidget, QWidget = loadUiType(
     os.path.join(__module_path__, "recordingepisodewidget.ui")
     )
 
-class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMixin):
-    sig_valueChanged = Signal(object, name="sig_valueChanged")
+T = ephys_pathways.RecordingEpisode
+
+class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
+    # sig_valueChanged = Signal(object, name="sig_valueChanged")
     sig_trialsChanged = Signal(name="sig_trialsChanged")
     sig_protocolChanged = Signal(name="sig_protocolChanged")
 
+    _objectType_ = ephys_pathways.RecordingEpisode
+    _objectTypes_ = (ephys_pathways.RecordingEpisode, )
+
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
-                 obj: typing.Optional[ephys_pathways.RecordingEpisode] = None):
+                 obj: typing.Optional[T] = None,
+                 **kwargs):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
 
         if isinstance(parent, (ephys_pathways.RecordingEpisode,
@@ -93,11 +101,6 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
                 parent = None
 
             obj = obj_
-
-
-        QWidget.__init__(self, parent=parent)
-
-        self._descriptionViewer_: typing.Optional[QtWidgets.QWidget] = None
 
         if isinstance(obj, ephys_pathways.RecordingEpisode):
             self._data_ = obj
@@ -113,7 +116,19 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
 
         self._recordingEpisodeNames_ = list(ephys_pathways.RecordingEpisodeType.names())
 
-        if isinstance(self._data_, ephys_pathways.RecordingEpisode):
+        if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
+            self._name_ = "Episode"
+            self._blocks_ = list()
+            self._episodeType_ = ephys_pathways.RecordingEpisodeType.Tracking
+            self._begin_ = datetime.datetime.now()
+            self._end_ = datetime.datetime.now()
+            self._beginFrame_ = 0
+            self._endFrame_ = 0
+            self._protocol_ = None
+            self._stimulusLayout_ = None
+            self._description_ = ""
+            self._make_value_()
+        else:
             self._name_ = self._data_.name
             self._blocks_ = self._data_.blocks
             self._episodeType_ = self._data_.type
@@ -125,41 +140,23 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
             self._stimulusLayout_ = self._data_.stimulusLayout
             self._description_ = self._data_.description
 
-        else:
-            self._name_ = "Episode"
-            self._blocks_ = list()
-            self._episodeType_ = ephys_pathways.RecordingEpisodeType.Tracking
-            self._begin_ = datetime.datetime.now()
-            self._end_ = datetime.datetime.now()
-            self._beginFrame_ = 0
-            self._endFrame_ = 0
-            self._protocol_ = None
-            self._stimulusLayout_ = None
-            self._description_ = ""
-
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
         self._configureUI_()
 
-        if self._data_ is None:
-            self._make_value_()
 
     def _configureUI_(self):
         self.setupUi(self)
-        self.detailsViewer = None
+        super()._configureUI_() # DataClassWidget!
 
-        self.nameLineEdit.undoAvailable=True
-        self.nameLineEdit.redoAvailable=True
-        self.nameLineEdit.setClearButtonEnabled(True)
-        self.nameLineEdit.setToolTip("Name of the recording source")
-        self.nameLineEdit.setWhatsThis("Name of the recording source")
-        self.nameLineEdit.setStatusTip("Name of the recording source")
+        # self.detailsViewer = None
+        self.protocolViewer = None
+        self.stimulusLayoutViewer = None
+        self.nameDescriptionWidget.nameLineEdit.setToolTip("Name of the recording source")
+        self.nameDescriptionWidget.nameLineEdit.setWhatsThis("Name of the recording source")
+        self.nameDescriptionWidget.nameLineEdit.setStatusTip("Name of the recording source")
+        self.nameDescriptionWidget.symbol = "recordingEpisode"
 
-        self.descriptionToolButton.clicked.connect(self._slot_editDescription)
-
-        if isinstance(self._name_, str) and len(self._name_.strip()):
-            self.nameLineEdit.setText(self._name_)
-        self.nameLineEdit.textChanged.connect(self._slot_nameChanged)
-
-        if isinstance(self._protocol_, ephys.ElectrophysiologyProtocol):
+        if isinstance(self._protocol_, ephys_protocol.ElectrophysiologyProtocol):
             self.protocolNameLabel.setText(self._protocol_.name)
         else:
             self.protocolNameLabel.setText("")
@@ -216,7 +213,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
         self.createObjectPushButton.setStatusTip("Create Recording Episode")
 
         self.createObjectPushButton.clicked.connect(self._slot_new)
-        self.createObjectPushButton.setEnabled(self._data_ is None)
+        # self.createObjectPushButton.setEnabled(self._data_ is None)
 
         self.importTrialsToolButton.clicked.connect(self._slot_importTrials)
         self.openTrialsToolButton.clicked.connect(self._slot_loadTrials)
@@ -242,17 +239,17 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
         else:
             self._data_.end = self._end_
 
-    @Slot(str)
-    def _slot_nameChanged(self, val:str):
-        if not isinstance(val, str) or len(val.strip()) == 0:
-            val = "Episode"
-        self._name_ = val
-        if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
-            self._make_value_()
-        else:
-            self._data_.name = self._name_
-
-        self.sig_valueChanged.emit(self.value())
+    # @Slot(str)
+    # def _slot_nameChanged(self, val:str):
+    #     if not isinstance(val, str) or len(val.strip()) == 0:
+    #         val = "Episode"
+    #     self._name_ = val
+    #     if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
+    #         self._make_value_()
+    #     else:
+    #         self._data_.name = self._name_
+    #
+    #     self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
     def _slot_firstFrameChanged(self, val: int):
@@ -274,43 +271,46 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
 
         self.sig_valueChanged.emit(self.value())
 
+    # @Slot()
+    # def _slot_refreshStimLayout
+
     @Slot()
     def slot_previewStimLayout(self):
         from gui import datatreeviewer
         if isinstance(self._data_, ephys_pathways.RecordingEpisode):
             if isinstance(self._data_.stimulusLayout, ephys_pathways.PathwaysStimulationLayout):
                 doc_title = self._data_.stimulusLayout.source.name
-                if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
+                if not isinstance(self.stimulusLayoutViewer, datatreeviewer.DataTreeViewer):
                     topWindow = self.getHighestAncestor()
                     if topWindow is self:
                         appWindow = None
                     else:
                         appWindow = topWindow
 
-                    self.detailsViewer = datatreeviewer.DataTreeViewer(
+                    self.stimulusLayoutViewer = datatreeviewer.DataTreeViewer(
                         parent=self,
                         doc_title=doc_title,
                         appWindow = appWindow,
                         )
 
-                    self.detailsViewer.autoRaise = False
+                    self.stimulusLayoutViewer.autoRaise = False
 
-                    self.detailsViewer.view(self._data_.stimulusLayout,
+                    self.stimulusLayoutViewer.view(self._data_.stimulusLayout,
                                             doc_title = doc_title, name=doc_title)
-                    self.detailsViewer.readOnly = True
-                    self.detailsViewer.showIntrospection = True
+                    self.stimulusLayoutViewer.readOnly = True
+                    self.stimulusLayoutViewer.showIntrospection = True
 
                 else:
                     # sigBlock = QtCore.QSignalBlocker(self.detailsViewer)
-                    self.detailsViewer.view(self._data_.stimulusLayout,
+                    self.stimulusLayoutViewer.view(self._data_.stimulusLayout,
                                             doc_title = doc_title, name=doc_title)
-                    self.detailsViewer.readOnly = True
-                    self.detailsViewer.showIntrospection = True
+                    self.stimulusLayoutViewer.readOnly = True
+                    self.stimulusLayoutViewer.showIntrospection = True
                     # self.detailsViewer.winTitle = win_title
-                    self.detailsViewer.docTitle = doc_title
-                    self.detailsViewer.slot_refreshDataDisplay()
+                    self.stimulusLayoutViewer.docTitle = doc_title
+                    self.stimulusLayoutViewer.slot_refreshDataDisplay()
 
-                self.detailsViewer.show()
+                self.stimulusLayoutViewer.show()
 
         pass
 
@@ -321,35 +321,34 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
             return
 
         doc_title = self._protocol_.name
-        if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
+        if not isinstance(self.protocolViewer, datatreeviewer.DataTreeViewer):
             topWindow = self.getHighestAncestor()
             if topWindow is self:
                 appWindow = None
             else:
                 appWindow = topWindow
 
-            self.detailsViewer = datatreeviewer.DataTreeViewer(
+            self.protocolViewer = datatreeviewer.DataTreeViewer(
                 parent=self,
                 doc_title=doc_title,
                 appWindow = appWindow,
                 )
 
-            self.detailsViewer.autoRaise = False
+            self.protocolViewer.autoRaise = False
 
-            self.detailsViewer.view(self._protocol_, doc_title = doc_title, name=doc_title)
-            self.detailsViewer.readOnly = True
-            self.detailsViewer.showIntrospection = True
+            self.protocolViewer.view(self._protocol_, doc_title = doc_title, name=doc_title)
+            self.protocolViewer.readOnly = True
+            self.protocolViewer.showIntrospection = True
             # self.detailsViewer.sig_modelDataChanged.connect(self._slot_dataChangedInDetailsViewer)
         else:
             # sigBlock = QtCore.QSignalBlocker(self.detailsViewer)
-            self.detailsViewer.view(self._protocol_, doc_title = doc_title, name=doc_title)
-            self.detailsViewer.readOnly = True
-            self.detailsViewer.showIntrospection = True
-            # self.detailsViewer.winTitle = win_title
-            self.detailsViewer.docTitle = doc_title
-            self.detailsViewer.slot_refreshDataDisplay()
+            self.protocolViewer.view(self._protocol_, doc_title = doc_title, name=doc_title)
+            self.protocolViewer.readOnly = True
+            self.protocolViewer.showIntrospection = True
+            self.protocolViewer.docTitle = doc_title
+            self.protocolViewer.slot_refreshDataDisplay()
 
-        self.detailsViewer.show()
+        self.protocolViewer.show()
 
 
     @Slot(str)
@@ -377,38 +376,39 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
     def _slot_new(self):
         self._make_value_()
 
-    @Slot()
-    def _slot_editDescription(self):
-        from gui import textviewer as tv
-        if isinstance(self._descriptionViewer_, tv.TextViewer):
-            self._descriptionViewer_.setText(self._description_)
-        else:
-            self._descriptionViewer_ = tv.TextViewer(data = self._description_, parent=self, edit=True,
-                               win_title = "Description Editor", doc_title = "Description")
+    # @Slot()
+    # def _slot_editDescription(self):
+    #     from gui import textviewer as tv
+    #     if isinstance(self._descriptionViewer_, tv.TextViewer):
+    #         self._descriptionViewer_.setText(self._description_)
+    #     else:
+    #         self._descriptionViewer_ = tv.TextViewer(data = self._description_, parent=self, edit=True,
+    #                            win_title = "Description Editor", doc_title = "Description")
+    #
+    #         self._descriptionViewer_.sig_textChanged.connect(self._slot_descriptionChanged)
+    #         self._descriptionViewer_.show()
 
-            self._descriptionViewer_.sig_textChanged.connect(self._slot_descriptionChanged)
-            self._descriptionViewer_.show()
-
-    @Slot()
-    def _slot_descriptionChanged(self):
-        from gui import textviewer as tv
-        if isinstance(self._descriptionViewer_, tv.TextViewer):
-            self._description_ = self._descriptionViewer_.text(plain = True)
-            if isinstance(self._data_, ephys_pathways.RecordingEpisode):
-                self._data_.description = self._description_
-
-            else:
-                self._make_value_()
+    # @Slot()
+    # def _slot_descriptionChanged(self):
+    #     from gui import textviewer as tv
+    #     if isinstance(self._descriptionViewer_, tv.TextViewer):
+    #         self._description_ = self._descriptionViewer_.text(plain = True)
+    #         if isinstance(self._data_, ephys_pathways.RecordingEpisode):
+    #             self._data_.description = self._description_
+    #
+    #         else:
+    #             self._make_value_()
 
     def _make_value_(self):
-        self._data_ = ephys_pathways.RecordingEpisode(blocks = self._blocks_,
-                                                protocol = self._protocol_,
-                                                name=self._name_,
-                                                episodeType = self._episodeType_,
-                                                stimulusLayout = self._stimulusLayout_,
-                                                description = self._description_
-                                                )
-        self.createObjectPushButton.setEnabled(self._data_ is None)
+        self._data_ = ephys_pathways.RecordingEpisode(
+            blocks = self._blocks_,
+            protocol = self._protocol_,
+            name=self._name_,
+            episodeType = self._episodeType_,
+            stimulusLayout = self._stimulusLayout_,
+            description = self._description_
+            )
+        # self.createObjectPushButton.setEnabled(self._data_ is None)
 
     @Slot()
     def _slot_importTrials(self):
@@ -421,11 +421,13 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
 
     def _uiImportTrials_(self):
         ret = list()
+        # self.statusBar().showMessage("Working...")
+        currentMouseCursor = self.cursor()
+        self.setCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+
         if isinstance(self._name_, str) and len(self._name_.strip()):
             ret = interact.selectWSData(f"{self._name_}_*",
-                                        title = f"Select Trial Blocks for {
-                                            self._name_
-                                            }",
+                                        title = f"Select Trial Blocks for {self._name_}",
                                         single=False,
                                         var_type = neo.Block,
                                         retrieve_all = True,
@@ -438,10 +440,12 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
                                         retrieve_all = True,
                                         ws = self.scipyenWindow.workspace,
                                         ) # noqa
+        self.setCursor(currentMouseCursor)
         self.trials = ret
 
     def _uiLoadTrials_(self):
         from gui.workspacegui import FileIOGui
+        # self.statusBar().showMessage("Working...")
         # if isinstance(self._name_, str) and len(self._name_.strip()):
         #     fileNameFilter = f"{self._name_}*.abf;{self._name_}*.pkl"
         # else:
@@ -452,6 +456,8 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
                                             single=False)
 
         ret = list()
+        currentMouseCursor = self.cursor()
+        self.setCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
         try:
             if len(fn):
                 for f in fn:
@@ -460,6 +466,8 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
                         ret.append(obj)
         except: # noqa
             traceback.print_exc()
+
+        self.setCursor(currentMouseCursor)
 
         self.trials = ret
 
@@ -521,7 +529,9 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
         self.trialsInfoLabel.setText(f"{len(self._blocks_)} Trials")
 
         # self.sig_trialsChanged.emit(self.trials)
+        self._make_value_()
         self.sig_trialsChanged.emit()
+        self.sig_valueChanged.emit(self._data_)
 
     @property
     def protocol(self) -> ephys.ElectrophysiologyProtocol | None:
@@ -633,6 +643,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
         self.lastFrameSpinBox.setValue(self._endFrame_)
 
     def setValue(self, val: typing.Optional[ephys_pathways.RecordingEpisode] = None):
+        from gui import datatreeviewer
         # print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
         if isinstance(val, ephys_pathways.RecordingEpisode):
             self._data_ = val
@@ -642,6 +653,34 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
             self._begin_ = self._data_.begin
             self._end_ = self._data_.end
             self._episodeType_ = self._data_.type
+            if isinstance(self._data_.stimulusLayout, ephys_pathways.PathwaysStimulationLayout):
+                if (isinstance(self.stimulusLayoutViewer, datatreeviewer.DataTreeViewer)
+                    and self.stimulusLayoutViewer.isVisible()
+                    and qtutils.isQObjectAlive(self.stimulusLayoutViewer)
+                    ):
+                    doc_title = self._data_.stimulusLayout.source.name
+                    self.stimulusLayoutViewer.view(self._data_.stimulusLayout,
+                                                   doc_title = doc_title,
+                                                   name=doc_title)
+
+                    self.stimulusLayoutViewer.docTitle = doc_title
+                    self.stimulusLayoutViewer.slot_refreshDataDisplay()
+            self._stimulusLayout_ = self._data_.stimulusLayout
+
+            if isinstance(self._data_.protocol, ephys_protocol.ElectrophysiologyProtocol):
+                if (isinstance(self.protocolViewer, datatreeviewer.DataTreeViewer)
+                    and self.protocolViewer.isvisible()
+                    and qtutils.isQObjectAlive(self.protocolViewer)
+                    ):
+                    doc_title = self._data_._protocol_.name
+                    self.protocolViewer.view(self._protocol_, doc_title = doc_title, name=doc_title)
+                    self.protocolViewer.docTitle = doc_title
+                    self.protocolViewer.slot_refreshDataDisplay()
+
+                self.protocolNameLabel.setText(self._data_._protocol_.name)
+            else:
+                self.protocolNameLabel.setText("")
+
             self._protocol_ = self._data_.protocol
 
         elif val is None:
@@ -654,6 +693,21 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
             self._endFrame_ = 0
             self._protocol_ = None
             self._stimulusLayout_ = None
+            if (isinstance(self.stimulusLayoutViewer, datatreeviewer.DataTreeViewer)
+                and qtutils.isQObjectAlive(self.stimulusLayoutViewer)
+                ):
+                self.stimulusLayoutViewer.close()
+                self.stimulusLayoutViewer.deleteLater()
+                self.stimulusLayoutViewer = None
+
+            if (isinstance(self.protocolViewer, datatreeviewer.DataTreeViewer)
+                and qtutils.isQObjectAlive(self.protocolViewer)
+                ):
+                self.protocolViewer.close()
+                self.protocolViewer.deleteLater()
+                self.protocolViewer = None
+
+            self.protocolNameLabel.setText("")
 
         else:
             raise TypeError(f"Expecting a RecordingEpisode or None; instead got a {type(val).__name__}")
@@ -661,7 +715,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
         sigBlock = list(map(
                             lambda w: QtCore.QSignalBlocker(w),
                             (
-                                self.nameLineEdit,
+                                # self.nameLineEdit,
                                 self.episodeBeginDateTimeEdit,
                                 self.episodeEndDateTimeEdit,
                                 self.firstFrameSpinBox,
@@ -671,7 +725,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
                             )
                         )
 
-        self.nameLineEdit.setText(self._name_)
+        # self.nameLineEdit.setText(self._name_)
         self.episodeBeginDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._begin_))
         self.episodeEndDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._end_))
         self.firstFrameSpinBox.setValue(self._beginFrame_)
@@ -683,7 +737,6 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, QWidget, WorkspaceGuiMix
         currentEpisodeTypeNdx = self._recordingEpisodeNames_.index(self._episodeType_.name)
 
         self.episodeTypeComboBox.setCurrentIndex(currentEpisodeTypeNdx)
-
 
     def value(self) -> ephys_pathways.RecordingEpisode:
         return self._data_

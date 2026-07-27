@@ -277,9 +277,15 @@ def traitlet_set(instance, obj, value):
     try:
         # print(f"{instance.__class__.__name__} set: -> old_value = {old_value}, new_value = {new_value}")
         if datatypes.is_iterable(new_value):
-            if datatypes.is_iterable(old_value) and len(old_value) != len(new_value):
-                silent = False
-                change_type = "modified"
+            if datatypes.is_iterable(old_value):
+                try:
+                    dLengths = len(old_value) != len(new_value)
+                except: # noqa
+                    dLengths = True
+
+                if dLengths:
+                    silent = False
+                    change_type = "modified"
 
         if silent:
             new_hash = gethash(new_value)

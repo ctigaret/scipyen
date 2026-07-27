@@ -2264,7 +2264,7 @@ library modules.
     return visited
 
 def get_positional_named_annotations(f:typing.Union[types.FunctionType, types.MethodType]) -> list:
-    compress_annot = lambda x: x[0] if len(x) else MISSING
+    compress_annot = lambda x: x[0] if len(x) else MISSING # noqa
     funcSignature = signature_as_dict(f)
     if not isinstance(f, (types.FunctionType, types.MethodType)):
         raise TypeError(f"Expecting a function or method; got {type(f).__name__} instead")
