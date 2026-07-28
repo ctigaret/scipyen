@@ -1739,7 +1739,17 @@ class Episode(ScipyenDataclass):
         return "\n".join(ret)
 
     def __hash__(self) -> int:
-        return hash((self.name, self.description, self.begin, self.end, self.beginFrame, self.endFrame, self.procedure))
+        return hash(
+                (
+                    self.name,
+                    self.description,
+                    self.begin,
+                    self.end,
+                    self.beginFrame,
+                    self.endFrame,
+                    self.procedure
+                )
+            )
 
 @dataclass
 class Schedule(ScipyenDataclass):

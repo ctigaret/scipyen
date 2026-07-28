@@ -1,10 +1,16 @@
+# -*- coding: utf-8 -*-
+# $Id: ephys_pathways.py $
+# SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@proton.me>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
 
 #### BEGIN core python modules
 import os
 # import sys
 import collections
 import traceback # noqa
-import datetime
+import datetime # noqa
 import numbers # noqa
 import inspect
 import itertools
@@ -12,13 +18,13 @@ import functools # noqa
 from functools import singledispatch # noqa
 import warnings # noqa
 import typing
-import types
+import types # noqa
 # import difflib
 # import re as _re
 # from enum import Enum, IntEnum
 # from abc import ABC
 import dataclasses
-from dataclasses import (dataclass, MISSING)
+from dataclasses import (dataclass, MISSING, KW_ONLY) # noqa
 #### END core python modules
 
 #### BEGIN 3rd party modules
@@ -28,15 +34,15 @@ from dataclasses import (dataclass, MISSING)
 #     print("Please install mypy first")
 #     raise
 import numpy as np
-import quantities as pq
+import quantities as pq # noqa
 import neo
 from neo.core.objectlist import ObjectList as NeoObjectList
 import h5py
-import pandas as pd
+import pandas as pd # noqa
 from tribool import Tribool
 # import pyabf
 
-from scipy import optimize
+from scipy import optimize # noqa
 
 # import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
@@ -46,7 +52,7 @@ __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
+    import PySide6 # noqa
     from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA! # noqa
@@ -70,7 +76,7 @@ import matplotlib as mpl
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-from core.basescipyen import BaseScipyenData
+from core.basescipyen import BaseScipyenData # noqa
 # from core.traitcontainers import DataBag
 from core.prog import (safewrapper, with_doc, get_func_param_types, scipywarn) # noqa
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal) # noqa
@@ -79,8 +85,8 @@ from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventTyp
 from core.triggerprotocols import TriggerProtocol, TriggerProtocolList # noqa
 from core.typeenum import TypeEnum
 from core.scipyendataclasses import (Episode, Schedule, ScipyenDataclass,
-                                     getField, getFieldOrProperty)
-from core import datatypes
+                                     getField, getFieldOrProperty) # noqa
+from core import datatypes # noqa
 from core.datatypes import (check_type, type2str) # noqa
 from core import workspacefunctions # noqa
 from core import signalprocessing as sigp # noqa
@@ -90,7 +96,7 @@ from core import strutils
 from core import curvefitting as crvf # noqa
 from core import models as models
 
-from core.utilities import (reverse_mapping_lookup,
+from core.utilities import (reverse_mapping_lookup, # noqa
                             get_index_for_seq,
                             sp_set_loc,
                             normalized_index,
@@ -99,7 +105,7 @@ from core.utilities import (reverse_mapping_lookup,
 
 from core.neoutils import (get_index_of_named_signal, concatenate_blocks) # noqa
 from core import scipyen_quantities as scq # noqa
-from core.scipyen_quantities import (unitsConvertible, checkTimeUnits,
+from core.scipyen_quantities import (unitsConvertible, checkTimeUnits, # noqa
                              checkElectricalCurrentUnits,
                              checkElectricalPotentialUnits,
                              checkRescale) # noqa
@@ -108,7 +114,7 @@ import core.pyabfbridge as pab
 
 from core.deferredmeasures import * # noqa
 
-from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes)
+from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes) # noqa
 
 from ephys import ephys
 
@@ -270,154 +276,108 @@ class RecordingEpisode(Episode):
         distinct pathways)
 
     """
+    _: KW_ONLY
+    protocol: typing.Optional[ElectrophysiologyProtocol] = None
+    episodeType: RecordingEpisodeType = dataclasses.field(default = RecordingEpisodeType.Tracking)
+    # stimulusLayout: typing.Optional[PathwaysStimulationLayout] = None
+    # NOTE: 2026-07-28 12:21:10
+    # COMPLETE REDESIGN:
+    # When synaptic pathways are used, an episode/schedule combination SHOULD BE
+    # DEFINED for a single pathway; hence the episode MUST be oblivious to the
+    # existence of more than one pathway, or for that matter, to the existence
+    # of a PathwaysStimulationLayout
+    #
+    # Also, "blocks" is not used anymore - keep it simple and lightweight
+    #
+    # To keep this backwards compatible with pickled data, I keep thes corresponding
+    # fields and methods in place, but warn about using them
+
+
     # FIXME: 2024-09-29 23:32:05 TODO:
     # conversion to mapping protocol ↦ sweep indices across all blocks in the episode
     # actually, strike that: an episode must contain blocks recorded WITH THE SAME EPISODE
     #
     # NOTE: 2024-10-01 08:34:35
     # 'pathways' removed - one can get the pathways from pathActivationBySweep
-    def __init__(self, blocks:typing.Optional[typing.Sequence[neo.Block]] = None,
-                 protocol: typing.Optional[ElectrophysiologyProtocol] = None,
-                 name: typing.Optional[str] = None,
-                 episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
-                 stimulusLayout: typing.Optional[PathwaysStimulationLayout] = None ,
-                 **kwargs):
-        r"""Constructor for RecordingEpisode.
+    # def __init__(self,
+    #              name: typing.Optional[str] = None,
+    #              protocol: typing.Optional[ElectrophysiologyProtocol] = None,
+    #              episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
+    #              stimulusLayout: typing.Optional[PathwaysStimulationLayout] = None ,
+    #              **kwargs):
+    #     r"""Constructor for RecordingEpisode.
+    #
+    #     Named parameters:
+    #     ------------------
+    #     episodeType: type of the episode (see RecordingEpisodeType);
+    #             default is Tracking or Monitoring (an alias to Tracking).
+    #
+    #     name:str - the name of this episode (optional, default is None)
+    #         When None, it is up to the user of this object to give an appropriate
+    #         name
+    #
+    #     protocol: ElectrophysiologyProtocol — the protocol used in common througout
+    #         the episode
+    #
+    #     stimulusLayout: PathwaysStimulationLayout — indicates which pathways are stimulated in
+    #         which sweep; also useful for testing pathway cross-talk, or independence
+    #
+    #         Optional, default is None.
+    #
+    #     Var-keyword parameters (kwargs)
+    #     -------------------------------
+    #     These are passed directly to the datatypes.Episode superclass (see documentation
+    #     for Episode)
+    #
+    #     See also the class documentation.
+    #     """
+    #     # self._type_ = episodeType
+    #     # if not isinstance(name, str):
+    #     #     name = self._type_.name
+    #
+    #     # self.__hash__ = None # enforce non-hashable
+    #
+    #     # self._begin_ = datetime.datetime.now()
+    #     # self._end_ = datetime.datetime.now()
+    #     # self._beginFrame_ = 0
+    #     # self._endFrame_ = 0
+    #
+    #     # self._protocol_ = None
+    #
+    #     # sequence of neo.Block objects.
+    #     # these may be references to existing Block objects, or can be owned by
+    #     # the episode
+    #     # self._blocks_ = list()
+    #     # self._pathways_ = list()
+    #
+    #     super().__init__(name, **kwargs)
 
-        Named parameters:
-        ------------------
-        episodeType: type of the episode (see RecordingEpisodeType);
-                default is Tracking or Monitoring (an alias to Tracking).
-
-        name:str - the name of this episode (optional, default is None)
-            When None, it is up to the user of this object to give an appropriate
-            name
-
-        protocol: ElectrophysiologyProtocol — the protocol used in common througout
-            the episode
-
-        stimulusLayout: PathwaysStimulationLayout — indicates which pathways are stimulated in
-            which sweep; also useful for testing pathway cross-talk, or independence
-
-            Optional, default is None.
-
-        Var-keyword parameters (kwargs)
-        -------------------------------
-        These are passed directly to the datatypes.Episode superclass (see documentation
-        for Episode)
-
-        See also the class documentation.
-        """
-        self._type_ = episodeType
-        if not isinstance(name, str):
-            name = self._type_.name
-
-        self.__hash__ = None # enforce non-hashable
-
-        self._begin_ = datetime.datetime.now()
-        self._end_ = datetime.datetime.now()
-        self._beginFrame_ = 0
-        self._endFrame_ = 0
-
-        self._protocol_ = None
-
-        # sequence of neo.Block objects.
-        # these may be references to existing Block objects, or can be owned by
-        # the episode
-        self._blocks_ = list()
-        # self._pathways_ = list()
-
-        super().__init__(name, **kwargs)
-
-        if isinstance(blocks, (tuple, list, collections.deque)) and all(isinstance(v, neo.Block) for v in blocks):
-            self._blocks_[:] = sorted(list(blocks), key = lambda x: x.rec_datetime)
-            self._setup_from_blocks_() # also sets up protocols
-
-        if isinstance(protocol, ElectrophysiologyProtocol):
-            # NOTE: 2024-09-30 08:49:45
-            # ignore (with warning) if protocol was set up from the 'blocks' argument
-            if isinstance(self._protocol_, ElectrophysiologyProtocol):
-                scipywarn("The episode's protocol was already set up by the 'blocks' argument; 'protocol' argument will be ignored")
-            else:
-                self._protocol_ = protocol
-
-        # NOTE: 2023-10-15 13:27:27
-        # crosstalk mapping: ATTENTION: in this context cross-talk represents an
-        # overlap between synapses activated by ideally distinct axonal pathways
-        # (encapsulated by SynapticStimulusChannel objects) in the same RecordingSource
-        #
-        # Testing the degree of pathway separation is based on short-term plasticity
-        # at the synapses under study: the "facilitation" or "depletion" of the synaptic
-        # responses seen when two individual stimuli are delivered to the same synapse
-        # (or group of synapses) at a short time interval ("paired-pulse ratio").
-        #
-        # When the two stimuli are delievered to distinct axonal bundles that synapse
-        # on the same cell, the lack of facilitation or depletion indicates that
-        # the two axonal pathways activate completely separated groups of synapses
-        # on the postsynaptic cell.
-        #
-        # sweep index:intᵃ or tuple of int ↦ ordered sequence of pathway
-        # indexes (int),
-        #   e.g., for two pathways, using int keys:
-        #       0 ↦ (0,1)       ⇒ sweep 0 tests cross-talk from path 0 to path 1
-        #       1 ↦ (1,0)       ⇒ sweep 1 tests cross-talk from path 1 to path 0
-        #
-        #   or, as a tuple of two int:
-        #       (0,2) ↦ (0,1)   ⇒ sweeps from 0 every 2 sweeps test cross-talk from path 0 to path 1
-        #       (1,2) ↦ (1,0)   ⇒ sweeps from 1 every 2 sweeps test cross-talk from path 1 to path 0
-        #
-        #   ᵃ NOTE: relative to the first sweep in the episode!
-        #
-        # NOTE: no checks are done on the value of the key(s) so expect errors
-        #   when trying to match an episode with data having the wrong number of
-        # sweeps
-        #
-        # if isinstance(pathActivationBySweep,dict):
-        self._pAxS = stimulusLayout
-
-        # NOTE: 2024-09-30 08:52:22
-        # parameters for the superclass (dataytypes.Episode) constructor
-        #
-        begin = kwargs.pop("begin", None)
-        end = kwargs.pop("end", None)
-        beginFrame = kwargs.pop("beginFrame", None)
-        endFrame = kwargs.pop("endFrame", None)
-
-        if isinstance(begin, datetime.datetime):
-            self.begin = begin
-
-        if isinstance(end, datetime.datetime):
-            self.end = end
-
-        if isinstance(beginFrame, int):
-            if beginFrame < 0:
-                raise ValueError(f"Invalid 'beginFrame': {beginFrame}")
-
-            if isinstance(endFrame, int):
-                if endFrame < beginFrame:
-                    raise ValueError(f"Invalid 'endFrame': {endFrame} must be larger than {beginFrame}")
-
-                if len(self._blocks_):
-                    nFrames = self.nFrames # cache that:)
-                    if endFrame >= nFrames:
-                        raise ValueError(f"Invalid 'endFrame': {endFrame} must be smaller than {nFrames}  frames")
-
-            self.beginFrame = beginFrame
-
-        if isinstance(endFrame, int):
-            self.endFrame = endFrame
+    def __hash__(self) -> int:
+        return hash(
+                (
+                    self.name,
+                    self.description,
+                    self.begin,
+                    self.end,
+                    self.beginFrame,
+                    self.endFrame,
+                    self.procedure,
+                    self.protocol,
+                    self.episodeType
+                )
+            )
 
     def __repr__(self) -> str:
         ret = list()
         ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}), with:")
-        ret.append(f"\t{len(self.blocks)} trials")
         ret.append(f"\t{self.nFrames} frames")
         ret.append(f"\tbegin={self.begin}, end={self.end}")
         ret.append(f"\tbeginFrame={self.beginFrame}, endFrame={self.endFrame}")
 
-        ret.append(f"\tStimulus Layout: {self.stimulusLayout}")
+        # ret.append(f"\tStimulus Layout: {self.stimulusLayout}")
 
-        ret.append(f"\tProtocol name: {self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else None}")
+        if isinstance(self.protocol, ElectrophysiologyProtocol):
+            ret.append(f"\tProtocol name: {self.protocol.name}")
 
         return "\n".join(ret)
 
@@ -431,39 +391,14 @@ class RecordingEpisode(Episode):
             p.breakable()
             attr_repr = [" "]
 
-            p.text("Protocol name:")
-            # attr_repr.append("Protocol:")
-            attr_repr.append(f"\t{self.protocol.name if isinstance(self.protocol, ElectrophysiologyProtocol) else ''}")
-            # attr_repr += [f"\t{s}" for s in repr(self.protocol).split("\n")]
+            if isinstance(self.protocol, ElectrophysiologyProtocol):
+                p.text("Protocol name:")
+                attr_repr.append(f"\t{self.protocol.name}")
 
-            # with p.group(q4 ,"(",")"):
             with p.group(4 ,"",""):
                 for t in attr_repr:
                     p.text(t)
                     p.breakable()
-                p.text("\n")
-
-            p.text("Pathways:")
-            p.breakable()
-            for k, v in enumerate(self.pathways):
-                p.text(f"{k} ↦ {v}\n")
-
-            if isinstance(self.stimulusLayout, PathwaysStimulationLayout):
-                link = " \u2192 " # noqa
-                txt = ["Stimulus Layout:"]
-
-                for k,v in enumerate(self.stimulusLayout.pathways):
-                    txt.append(f"\nSynaptic Pathway {k} ↦ {v}")
-
-                xTalk = self.stimulusLayout.getCrossTalkLayout()
-
-                if len(xTalk):
-                    txt.append("Cross-talk:")
-                    for k, v in xTalk.items():
-                        txt.append(f"{k} ↦ {v}")
-
-                p.text("\n".join(txt))
-                p.breakable()
                 p.text("\n")
 
             p.breakable()
@@ -474,7 +409,6 @@ class RecordingEpisode(Episode):
         r"""Overrides datatypes.Episode.toHDF5"""
 
         from iolib import h5io
-        # print(f"{self.__class__.__name__}.toHDF5: {self.name}")
         target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
@@ -490,21 +424,10 @@ class RecordingEpisode(Episode):
         if isinstance(name, str) and len(name.strip()):
             target_name = name
 
-        # entity = group.create_dataset(name, data = h5py.Empty("f"), track_order=track_order)
         entity = group.create_group(target_name, track_order=track_order)
         entity.attrs.update(obj_attrs)
 
-        h5io.toHDF5(self.blocks, entity, name="blocks", oname="blocks",
-                            compression=compression,chunks=chunks,
-                            track_order=track_order,
-                            entity_cache=entity_cache)
-
         h5io.toHDF5(self.protocol, entity, name="protocol", oname="protocol",
-                            compression=compression,chunks=chunks,
-                            track_order=track_order,
-                            entity_cache=entity_cache)
-
-        h5io.toHDF5(self.pathActivationBySweep, entity, name="pathActivationBySweep", oname="pathActivationBySweep",
                             compression=compression,chunks=chunks,
                             track_order=track_order,
                             entity_cache=entity_cache)
@@ -523,9 +446,7 @@ class RecordingEpisode(Episode):
 
         attrs = h5io.attrs2dict(entity.attrs)
 
-        blocks = h5io.fromHDF5(entity["blocks"], cache=cache)
         protocol = h5io.fromHDF5(entity["protocol"], cache=cache)
-        stimulusLayout = h5io.fromHDF5(entity["stimulusLayout"], cache=cache)
 
         name=attrs["name"]
         begin=attrs["begin"]
@@ -533,140 +454,10 @@ class RecordingEpisode(Episode):
         beginFrame=attrs["beginFrame"]
         endFrame=attrs["endFrame"]
         episodeType=attrs["type"]
-        clampMode = attrs["clampMode"]
-        electrodeMode = attrs["electrodeMode"]
 
         return cls(name=name, episodeType=episodeType, begin=begin, end=end,
                 beginframe=beginFrame,endFrame=endFrame,
-                protocol=protocol,
-                blocks = blocks,
-                stimulusLayout=stimulusLayout,
-                clampMode = clampMode,
-                electrodeMode = electrodeMode)
-
-
-    @property
-    def stimulusLayout(self) -> dict:
-        r"""Maps a correspondence between the sweep(s) that stimulate pathways and the stimulated pathways
-        """
-        return self._pAxS
-
-    @stimulusLayout.setter
-    def stimulusLayout(self, layout: typing.Optional[PathwaysStimulationLayout] = None) -> None:
-        if not isinstance(layout, PathwaysStimulationLayout):
-            scipywarn(f"Expecting a PathwaysStimulationLayout or None; instead, got a {type(layout).__name__} ")
-        self._pAxS = layout
-
-    @property
-    def isXTalk(self) -> bool:
-        return isinstance(self.stimulusLayout, PathwaysStimulationLayout) and PathwaysStimulationLayout.isXTalkLayout(self.stimulusLayout)
-
-    @property
-    def blocks(self) -> list:
-        return self._blocks_
-
-    @blocks.setter
-    def blocks(self, val:typing.Sequence[neo.Block]):
-        r"""Assign new blocks to the episode.
-        If val is an empty sequence, the blocks will be cleared.
-        """
-        if not isinstance(val, (tuple, list, collections.deque)):
-            raise TypeError(f"Expecting a sequence of neo.Block objects; instead got {type(val).__name__}")
-
-        if len(val):
-            if not all(isinstance(v, neo.Block) for v in val):
-                raise TypeError("All elements of the sequence must be neo.Block objects")
-
-            self._blocks_[:] = sorted(list(val), key = lambda x: x.rec_datetime)
-
-        else:
-            self._blocks_.clear()
-
-        self._setup_from_blocks_()
-
-    def _setup_from_blocks_(self):
-        if len(self._blocks_) == 0:
-            return
-
-        if len(self._blocks_) > 1:
-            self.begin = self._blocks_[0].rec_datetime
-            self.end = self._blocks_[-1].rec_datetime + datetime.timedelta(seconds = float(neoutils.block_duration(self._blocks_[-1])))
-
-            self.beginFrame = 0
-            self.endFrame = sum([len(b.segments) for b in self._blocks_]) - 1
-
-            protocol = ephys.getProtocol(self._blocks_[0])
-
-            if isinstance(protocol, ephys.ElectrophysiologyProtocol):
-                if not all(ephys.getProtocol(x) == protocol for x in self._blocks_):
-                    scipywarn("All trials in an episode must have been recorded with the same protocol, or be synthetic trial blocks")
-
-            self._protocol_ = protocol
-
-        else:
-            self.begin = self._blocks_[0].segments[0].rec_datetime
-            self.end = self._blocks_[0].segments[-1].rec_datetime
-            self.beginFrame = 0
-            self.endFrame = len(self._blocks_[0].segments) - 1
-            self._protocol_ = ephys.getProtocol(self._blocks_[0])
-
-        #
-        # block_protocols = list()
-        #
-        # try:
-        #     block_protocols = unique(list(filter(lambda x: isinstance(x, ElectrophysiologyProtocol), map(lambda x: ephys.getProtocol(x), self._blocks_))), idcheck=False)
-        # except:
-        #     scipywarn("Cannot parse protocols from the Block objects")
-        #     traceback.print_exc()
-        #
-        # if len(block_protocols) != 1:
-        #     raise RuntimeError("An episode can have exactly one protocol")
-        #
-        # self._protocol_ = block_protocols[0]
-
-    def addBlock(self, x:neo.Block):
-        r"""Adds a new block; blocks will be reordered by rec_datetime if necessary"""
-        if not isinstance(x, neo.Block):
-            raise TypeError(f"Expecting a neo.Block; instead, got {type().__name__}")
-
-        protocol = ephys.getProtocol(x)
-
-        if len(self._blocks_):
-            if ((self._protocol_ is None and isinstance(protocol, ephys.ElectrophysiologyProtocol))
-            or (isinstance(self._protocol_, ephys.ElectrophysiologyProtocol) and protocol is None)):
-                    scipywarn("Cannot apped a trial with a different protocol")
-                    return
-
-            blocks = self._blocks_ + [x]
-            self.blocks = blocks
-
-        else:
-            self._protocol_ = protocol
-            self.blocks = [x]
-
-        self._setup_from_blocks_() # will also update the protocols,
-
-    def removeBlock(self, index:typing.Union[int, str]):
-        r"""Removes a block by name or by its index in the episode blocks"""
-        if isinstance(index, str):
-            blocknames = [b.name for b in self._blocks_]
-            if index not in blocknames:
-                raise ValueError(f"Block name {index} not found in this episode")
-
-            x = blocknames.index(index)
-
-        elif isinstance(index, int):
-            if index>= len(self._blocks_):
-                raise ValueError(f"Invalid block index {index} for {len(self._blocks_)} blocks")
-
-        else:
-            raise TypeError("")
-
-        block = self._blocks_[index]
-
-        del self._blocks_[index]
-
-        self._setup_from_blocks_() # will also update the protocols,
+                protocol=protocol)
 
     def setFrameLimits(self, begin:int, end:int):
         if abs(end-begin) != self.nFrames-1:
@@ -676,92 +467,6 @@ class RecordingEpisode(Episode):
 
         self._beginFrame_ = begin
         self._endFrame_ = end
-
-    @property
-    def protocol(self) -> ElectrophysiologyProtocol:
-        return self._protocol_
-
-    @protocol.setter
-    def protocol(self, val:ElectrophysiologyProtocol) -> None:
-        if isinstance(val, ElectrophysiologyProtocol) or val is None:
-            self._protocol_ = val
-
-    @property
-    def begin(self) -> datetime.datetime:
-        return self._begin_
-
-    @begin.setter
-    def begin(self, val:datetime.datetime):
-        if not isinstance(val, datetime.datetime):
-            raise TypeError(f"Expecting a datetime.datetime; got {type(val).__name__} instead")
-
-        if val > self.end:
-            scipywarn(f"Setting 'begin' ({val}) to be later than 'end' ({self.end})")
-
-        self._begin_ = val
-
-    @property
-    def end(self) -> datetime.datetime:
-        return self._end_
-
-    @end.setter
-    def end(self, val:datetime.datetime):
-        if not isinstance(val, datetime.datetime):
-            raise TypeError(f"Expecting a datetime.datetime; got {type(val).__name__} instead")
-
-        if val < self.begin:
-            scipywarn(f"Setting 'end' ({val}) to be earlier than 'begin' ({self.begin})")
-
-        self._end_ = val
-
-    @property
-    def beginFrame(self) -> int:
-        return self._beginFrame_
-
-    @beginFrame.setter
-    def beginFrame(self, val:int):
-        if not isinstance(val, int):
-            raise TypeError(f"Expecting an int; got {type(val).__name__} instead")
-
-        if val < 0:
-            raise ValueError(f"Cannot set beginFrame to < 0 ({val})")
-
-        if val > self.endFrame:
-            scipywarn(f"Setting 'beginFrame' ({val}) to a value larger than 'endFrame' ({self.endFrame})")
-
-        self._beginFrame_ = val
-
-    @property
-    def endFrame(self) -> int:
-        return self._endFrame_
-
-    @endFrame.setter
-    def endFrame(self, val:int):
-        if not isinstance(val, int):
-            raise TypeError(f"Expecting an int; got {type(val).__name__} instead")
-
-        if len(self._blocks_) and val >= self.beginFrame + self.nFrames:
-            raise ValueError(f"'endFrame' ({val}) must be less than {self.nFrames} available frames")
-
-        if val < 0:
-            raise ValueError(f"'endFrame' cannot be < 0; got {val} instead")
-
-        if val < self.beginFrame:
-            scipywarn(f"Setting 'endFrame' ({val}) to a value less than 'beginFrame' ({self.beginFrame})")
-
-        self._endFrame_ = val
-
-    @property
-    def nFrames(self) -> int:
-        r"""Number of frames in this episode; """
-        if len(self._blocks_) == 0:
-            return 0
-
-        return sum([len(b.segments) for b in self._blocks_])
-
-    @property
-    def nBlocks(self) -> int:
-        return len(self._blocks_)
 
     @property
     def type(self) -> RecordingEpisodeType:
@@ -774,19 +479,15 @@ class RecordingEpisode(Episode):
         else:
             scipywarn(f"Expecting a RecordingEpisodeType, instead got {val}")
 
-    @property
-    def pathways(self) -> typing.List[SynapticPathway]:
-        if isinstance(self.stimulusLayout, PathwaysStimulationLayout):
-            return self.stimulusLayout.pathways
-        else:
-            return list()
-
 @with_doc(Schedule, use_header=True, header_str = "Inherits from:")
 class RecordingSchedule(Schedule):
     r"""Sequence of RecordingEpisode objects"""
     allowed_contents = (RecordingEpisode, )
     def __init__(self, name: typing.Optional[str] = None, **kwargs):
         super().__init__(name, **kwargs)
+
+    def __hash__(self) -> int:
+        return hash((self.episodes))
 
     def __repr__(self):
         ret = list()
@@ -802,7 +503,7 @@ class RecordingSchedule(Schedule):
             return self.__class__(name=self.name, episodes = newepisodes)
 
         elif isinstance(other, typing.Sequence):
-            if len(other) and not all(isinstance(e, RecordingEpisode)):
+            if len(other) and not all(isinstance(e, RecordingEpisode) for e in other):
                 raise TypeError("Can only add a sequence of RecordingEpisodes")
             newepisodes = self.episodes.__add__(other)
             return self.__class__(name=self.name, episodes = newepisodes)
@@ -816,7 +517,7 @@ class RecordingSchedule(Schedule):
             return self
 
         elif isinstance(other, typing.Sequence):
-            if len(other) and not all(isinstance(e, RecordingEpisode)):
+            if len(other) and not all(isinstance(e, RecordingEpisode) for e in other):
                 raise TypeError("Can only add a sequence of RecordingEpisodes")
             self.episodes.__iadd__(other)
             return self
@@ -830,7 +531,7 @@ class RecordingSchedule(Schedule):
 
         self.episodes.append(value)
 
-    def insert(self, index:int, value:RecordingEpisode):
+    def insert(self, index:int, value: RecordingEpisode):
         if not isinstance(value, RecordingEpisode):
             raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
 
@@ -854,11 +555,12 @@ class RecordingSchedule(Schedule):
                     raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
 
         else:
-            raise TypeError(f"Can only append a RecordingSchedule or a sequence of RecordingEpisodes")
+            raise TypeError("Can only append a RecordingSchedule or a sequence of RecordingEpisodes")
 
     def index(self, episode:RecordingEpisode):
         if not isinstance(episode, RecordingEpisode):
             raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+
         if episode not in self.episodes:
             raise ValueError("Episode is not contained in this RecordingSchedule")
 
@@ -875,30 +577,30 @@ class RecordingSchedule(Schedule):
 
         return len(e for e in self.episodes if e == episode)
 
-    @property
-    def nFrames(self) -> int:
-        return sum([e.nFrames for e in self.episodes])
+    # @property
+    # def nFrames(self) -> int:
+    #     return sum([e.nFrames for e in self.episodes])
+    #
+    # @property
+    # def pathways(self):
+    #     return unique(list(itertools.chain.from_iterable([e.pathways for e in self.episodes])))
+    #
+    # @property
+    # def blocks(self) -> typing.List[neo.Block]:
+    #     ret = list()
+    #
+    #     for episode in self.episodes:
+    #         ret += episode.blocks
+    #
+    #     return ret
 
-    @property
-    def pathways(self):
-        return unique(list(itertools.chain.from_iterable([e.pathways for e in self.episodes])))
-
-    @property
-    def blocks(self) -> typing.List[neo.Block]:
-        ret = list()
-
-        for episode in self.episodes:
-            ret += episode.blocks
-
-        return ret
-
-    def updateEpisodeFrames(self):
-        currentFrame = 0
-        for k, episode in enumerate(self.episodes):
-            episode.setFrameLimits(currentFrame, currentFrame + episode.nFrames - 1)
-            # episode.endFrame = currentFrame + episode.nFrames - 1
-            # episode.beginFrame = currentFrame
-            currentFrame = episode.endFrame + 1
+    # def updateEpisodeFrames(self):
+    #     currentFrame = 0
+    #     for k, episode in enumerate(self.episodes):
+    #         episode.setFrameLimits(currentFrame, currentFrame + episode.nFrames - 1)
+    #         # episode.endFrame = currentFrame + episode.nFrames - 1
+    #         # episode.beginFrame = currentFrame
+    #         currentFrame = episode.endFrame + 1
 
 
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
@@ -1904,6 +1606,9 @@ class PathwaysCrossTalk(ScipyenDataclass):
     path0: typing.Union[SynapticPathway, str, int] = dataclasses.field(default_factory=SynapticPathway)
     path1: typing.Union[SynapticPathway, str, int] = dataclasses.field(default_factory=SynapticPathway)
 
+    def __hash__(self) -> int:
+        return hash((self.path0, self.path1))
+
 @dataclass
 class SweepPathCommands(ScipyenDataclass):
     r"""Encapsulates the DAC and DIG commands sent to the pathway during a given sweep.
@@ -1912,7 +1617,10 @@ class SweepPathCommands(ScipyenDataclass):
     abfEpochs: dict = dataclasses.field(default_factory = dict)
     triggers: typing.Sequence[TriggerEvent] = dataclasses.field(default_factory = list)
 
-class PathwaysStimulationLayout():
+    def __hash__(self) -> int:
+        return hash((self.pathway, self.abfEpochs, self.triggers))
+
+class PathwaysStimulationLayout(): # noqa
     r"""Represents the sequence of pathway stimulations per sweep, as defined in a protocol.
 
     .. |nbsp| unicode:: 0xA0
@@ -2095,6 +1803,9 @@ class PathwaysStimulationLayout():
         self._layout_ = self._parseLayout_(temporalOrder)
         # self._layout_ = self._parseLayout_(pathways, protocol, temporalOrder)
 
+        self.name = kwargs.pop("name", self.__class__.__name__)
+        self.description = kwargs.pop("description", "")
+
     def _parseLayout_(self, temporalOrder: bool = True) -> dict:
         stimulusLayout = dict()
 
@@ -2212,6 +1923,18 @@ class PathwaysStimulationLayout():
         else:
             e = epochs_roles[0][0]
             return self._protocol_.getNeoEpoch(epoch=e, dac=pathway.dac, sweep=sweep) if asNeoEpoch else e
+
+    def __hash__(self) -> int:
+        return hash(
+                (
+                    self.name,
+                    self.description,
+                    self._protocol_,
+                    self._source_,
+                    self._pathways_,
+                    self._layout_
+                )
+            )
 
     def getEpochsWithRole(self, pathway:SynapticPathway, role: pab.ABFEpochRole,
                          ensureUnique: bool = False,
@@ -2493,9 +2216,13 @@ class SynapticPathway(ScipyenDataclass):
         self.pathType = self._pathwayType_
 
     def __hash__(self) -> int:
-        return hash((self.name, self.adc, self.dac, self.stimulus,
-                     self.electrodeMode, self.pathwayType,
-                     tuple(self.measurements)))
+        return hash(
+                (
+                    self.name, self.adc, self.dac, self.stimulus,
+                    self.electrodeMode, self.pathwayType,
+                    tuple(self.measurements)
+                )
+            )
 
     @property
     def electrodeMode(self) -> ephys.ElectrodeMode:
@@ -2898,18 +2625,20 @@ class RecordingSource(ScipyenDataclass):
         self.pathways.parent=self
         # print(f"\tpathways = {self.pathways}")
 
-    # @property
-    # def pathways(self):
-    #     pathways = list()
-    #     for ksyn, syn in enumerate(self.syn):
-    #         # synList = SynapticStimulusChannelList(syn, name = syn.name)
-    #         name = f"{syn.name}_pathway"
-    #         pathways.append(SynapticPathway(stimulus = syn,
-    #                                 name = name, adc = self.adc,
-    #                                 dac = self.dac,
-    #                                 electrode = self.electrodeMode))
-    #     return SynapticPathwayList(*pathways, name = self.name,
-    #                                parent=self)
+    def __hash__(self) -> int:
+        return hash(
+                (
+                    self.name,
+                    self.description,
+                    self.adc,
+                    self.dac,
+                    self.syn,
+                    self.auxin,
+                    self.auxout,
+                    self.electrodeMode,
+                    self.pathways
+                )
+            )
 
 
     def toHDF5(self, group, name, oname, compression, chunks, track_order,

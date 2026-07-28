@@ -118,26 +118,26 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
 
         if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._name_ = "Episode"
-            self._blocks_ = list()
+            # self._blocks_ = list()
             self._episodeType_ = ephys_pathways.RecordingEpisodeType.Tracking
             self._begin_ = datetime.datetime.now()
             self._end_ = datetime.datetime.now()
             self._beginFrame_ = 0
             self._endFrame_ = 0
             self._protocol_ = None
-            self._stimulusLayout_ = None
+            # self._stimulusLayout_ = None
             self._description_ = ""
             self._make_value_()
         else:
             self._name_ = self._data_.name
-            self._blocks_ = self._data_.blocks
+            # self._blocks_ = self._data_.blocks
             self._episodeType_ = self._data_.type
             self._begin_ = self._data_.begin
             self._end_ = self._data_.end
             self._beginFrame_ = self._data_.beginFrame
             self._endFrame_ = self._data_.endFrame
             self._protocol_ = self._data_.protocol
-            self._stimulusLayout_ = self._data_.stimulusLayout
+            # self._stimulusLayout_ = self._data_.stimulusLayout
             self._description_ = self._data_.description
 
         DataClassWidget.__init__(self, parent=parent, **kwargs)
@@ -150,7 +150,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
 
         # self.detailsViewer = None
         self.protocolViewer = None
-        self.stimulusLayoutViewer = None
+        # self.stimulusLayoutViewer = None
         self.nameDescriptionWidget.nameLineEdit.setToolTip("Name of the recording source")
         self.nameDescriptionWidget.nameLineEdit.setWhatsThis("Name of the recording source")
         self.nameDescriptionWidget.nameLineEdit.setStatusTip("Name of the recording source")
@@ -163,7 +163,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
 
         self.previewProtocolToolButton.clicked.connect(self.slot_viewProtocolDetails)
 
-        self.previewStimulusLayoutToolButton.clicked.connect(self.slot_previewStimLayout)
+        # self.previewStimulusLayoutToolButton.clicked.connect(self.slot_previewStimLayout)
 
         for text in self._recordingEpisodeNames_:
             self.episodeTypeComboBox.addItem(text)
@@ -215,9 +215,9 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
         self.createObjectPushButton.clicked.connect(self._slot_new)
         # self.createObjectPushButton.setEnabled(self._data_ is None)
 
-        self.importTrialsToolButton.clicked.connect(self._slot_importTrials)
-        self.openTrialsToolButton.clicked.connect(self._slot_loadTrials)
-        self.trialsInfoLabel.setText(f"{len(self._blocks_)} {strutils.pluralize('Trial', len(self._blocks_))}")
+        # self.importTrialsToolButton.clicked.connect(self._slot_importTrials)
+        # self.openTrialsToolButton.clicked.connect(self._slot_loadTrials)
+        # self.trialsInfoLabel.setText(f"{len(self._blocks_)} {strutils.pluralize('Trial', len(self._blocks_))}")
 
     @Slot(QtCore.QDateTime)
     def _slot_beginDateTimeChanged(self, val: QtCore.QDateTime):
@@ -274,45 +274,45 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
     # @Slot()
     # def _slot_refreshStimLayout
 
-    @Slot()
-    def slot_previewStimLayout(self):
-        from gui import datatreeviewer
-        if isinstance(self._data_, ephys_pathways.RecordingEpisode):
-            if isinstance(self._data_.stimulusLayout, ephys_pathways.PathwaysStimulationLayout):
-                doc_title = self._data_.stimulusLayout.source.name
-                if not isinstance(self.stimulusLayoutViewer, datatreeviewer.DataTreeViewer):
-                    topWindow = self.getHighestAncestor()
-                    if topWindow is self:
-                        appWindow = None
-                    else:
-                        appWindow = topWindow
-
-                    self.stimulusLayoutViewer = datatreeviewer.DataTreeViewer(
-                        parent=self,
-                        doc_title=doc_title,
-                        appWindow = appWindow,
-                        )
-
-                    self.stimulusLayoutViewer.autoRaise = False
-
-                    self.stimulusLayoutViewer.view(self._data_.stimulusLayout,
-                                            doc_title = doc_title, name=doc_title)
-                    self.stimulusLayoutViewer.readOnly = True
-                    self.stimulusLayoutViewer.showIntrospection = True
-
-                else:
-                    # sigBlock = QtCore.QSignalBlocker(self.detailsViewer)
-                    self.stimulusLayoutViewer.view(self._data_.stimulusLayout,
-                                            doc_title = doc_title, name=doc_title)
-                    self.stimulusLayoutViewer.readOnly = True
-                    self.stimulusLayoutViewer.showIntrospection = True
-                    # self.detailsViewer.winTitle = win_title
-                    self.stimulusLayoutViewer.docTitle = doc_title
-                    self.stimulusLayoutViewer.slot_refreshDataDisplay()
-
-                self.stimulusLayoutViewer.show()
-
-        pass
+    # @Slot()
+    # def slot_previewStimLayout(self):
+    #     from gui import datatreeviewer
+    #     if isinstance(self._data_, ephys_pathways.RecordingEpisode):
+    #         if isinstance(self._data_.stimulusLayout, ephys_pathways.PathwaysStimulationLayout):
+    #             doc_title = self._data_.stimulusLayout.source.name
+    #             if not isinstance(self.stimulusLayoutViewer, datatreeviewer.DataTreeViewer):
+    #                 topWindow = self.getHighestAncestor()
+    #                 if topWindow is self:
+    #                     appWindow = None
+    #                 else:
+    #                     appWindow = topWindow
+    #
+    #                 self.stimulusLayoutViewer = datatreeviewer.DataTreeViewer(
+    #                     parent=self,
+    #                     doc_title=doc_title,
+    #                     appWindow = appWindow,
+    #                     )
+    #
+    #                 self.stimulusLayoutViewer.autoRaise = False
+    #
+    #                 self.stimulusLayoutViewer.view(self._data_.stimulusLayout,
+    #                                         doc_title = doc_title, name=doc_title)
+    #                 self.stimulusLayoutViewer.readOnly = True
+    #                 self.stimulusLayoutViewer.showIntrospection = True
+    #
+    #             else:
+    #                 # sigBlock = QtCore.QSignalBlocker(self.detailsViewer)
+    #                 self.stimulusLayoutViewer.view(self._data_.stimulusLayout,
+    #                                         doc_title = doc_title, name=doc_title)
+    #                 self.stimulusLayoutViewer.readOnly = True
+    #                 self.stimulusLayoutViewer.showIntrospection = True
+    #                 # self.detailsViewer.winTitle = win_title
+    #                 self.stimulusLayoutViewer.docTitle = doc_title
+    #                 self.stimulusLayoutViewer.slot_refreshDataDisplay()
+    #
+    #             self.stimulusLayoutViewer.show()
+    #
+    #     pass
 
     @Slot()
     def slot_viewProtocolDetails(self):
@@ -410,128 +410,128 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
             )
         # self.createObjectPushButton.setEnabled(self._data_ is None)
 
-    @Slot()
-    def _slot_importTrials(self):
-        self._uiImportTrials_()
+    # @Slot()
+    # def _slot_importTrials(self):
+    #     self._uiImportTrials_()
+    #
+    # @Slot()
+    # def _slot_loadTrials(self):
+    #     # print(f"{self.__class__.__name__}._slot_loadTrials")
+    #     self._uiLoadTrials_()
+    #
+    # def _uiImportTrials_(self):
+    #     ret = list()
+    #     # self.statusBar().showMessage("Working...")
+    #     currentMouseCursor = self.cursor()
+    #     self.setCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+    #
+    #     if isinstance(self._name_, str) and len(self._name_.strip()):
+    #         ret = interact.selectWSData(f"{self._name_}_*",
+    #                                     title = f"Select Trial Blocks for {self._name_}",
+    #                                     single=False,
+    #                                     var_type = neo.Block,
+    #                                     retrieve_all = True,
+    #                                     ws = self.scipyenWindow.workspace,
+    #                                     ) # noqa
+    #     else:
+    #         ret = interact.selectWSData(title = "Select Trial Blocks",
+    #                                     single=False,
+    #                                     var_type = neo.Block,
+    #                                     retrieve_all = True,
+    #                                     ws = self.scipyenWindow.workspace,
+    #                                     ) # noqa
+    #     self.setCursor(currentMouseCursor)
+    #     self.trials = ret
 
-    @Slot()
-    def _slot_loadTrials(self):
-        # print(f"{self.__class__.__name__}._slot_loadTrials")
-        self._uiLoadTrials_()
+    # def _uiLoadTrials_(self):
+    #     from gui.workspacegui import FileIOGui
+    #     # self.statusBar().showMessage("Working...")
+    #     # if isinstance(self._name_, str) and len(self._name_.strip()):
+    #     #     fileNameFilter = f"{self._name_}*.abf;{self._name_}*.pkl"
+    #     # else:
+    #     #     fileNameFilter = "*.abf;*.pkl"
+    #     fileNameFilter = "*.abf *.pkl"
+    #     fn, fl = FileIOGui.chooseFile_static(caption="Open trials",
+    #                                         fileFilter = fileNameFilter,
+    #                                         single=False)
+    #
+    #     ret = list()
+    #     currentMouseCursor = self.cursor()
+    #     self.setCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
+    #     try:
+    #         if len(fn):
+    #             for f in fn:
+    #                 obj = pio.loadFile(f)
+    #                 if isinstance(obj, neo.Block):
+    #                     ret.append(obj)
+    #     except: # noqa
+    #         traceback.print_exc()
+    #
+    #     self.setCursor(currentMouseCursor)
+    #
+    #     self.trials = ret
 
-    def _uiImportTrials_(self):
-        ret = list()
-        # self.statusBar().showMessage("Working...")
-        currentMouseCursor = self.cursor()
-        self.setCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-
-        if isinstance(self._name_, str) and len(self._name_.strip()):
-            ret = interact.selectWSData(f"{self._name_}_*",
-                                        title = f"Select Trial Blocks for {self._name_}",
-                                        single=False,
-                                        var_type = neo.Block,
-                                        retrieve_all = True,
-                                        ws = self.scipyenWindow.workspace,
-                                        ) # noqa
-        else:
-            ret = interact.selectWSData(title = "Select Trial Blocks",
-                                        single=False,
-                                        var_type = neo.Block,
-                                        retrieve_all = True,
-                                        ws = self.scipyenWindow.workspace,
-                                        ) # noqa
-        self.setCursor(currentMouseCursor)
-        self.trials = ret
-
-    def _uiLoadTrials_(self):
-        from gui.workspacegui import FileIOGui
-        # self.statusBar().showMessage("Working...")
-        # if isinstance(self._name_, str) and len(self._name_.strip()):
-        #     fileNameFilter = f"{self._name_}*.abf;{self._name_}*.pkl"
-        # else:
-        #     fileNameFilter = "*.abf;*.pkl"
-        fileNameFilter = "*.abf *.pkl"
-        fn, fl = FileIOGui.chooseFile_static(caption="Open trials",
-                                            fileFilter = fileNameFilter,
-                                            single=False)
-
-        ret = list()
-        currentMouseCursor = self.cursor()
-        self.setCursor(QtGui.QCursor(QtCore.Qt.WaitCursor))
-        try:
-            if len(fn):
-                for f in fn:
-                    obj = pio.loadFile(f)
-                    if isinstance(obj, neo.Block):
-                        ret.append(obj)
-        except: # noqa
-            traceback.print_exc()
-
-        self.setCursor(currentMouseCursor)
-
-        self.trials = ret
-
-    @property
-    def trials(self) -> list:
-        return self._blocks_
-
-    @trials.setter
-    def trials(self, val: typing.Optional[typing.Sequence[neo.Block]] = None):
-        if (val is not None and not isinstance(val, typing.Sequence) and
-            (len(val) > 0 and not all(isinstance(v, neo.Block) for v in val))):
-            raise TypeError(f"Expecting a sequence of neo.Block trials or None; instead got a {type(val).__name__}")
-
-        if val is None or (isinstance(val, typing.Sequence) and len(val) == 0):
-            self._blocks_ = list()
-
-        else:
-            if len(val)  > 1:
-                val = list(sorted(val, key = lambda x: x.rec_datetime))
-
-            if self.protocol is None:
-                self.protocol = ephys.getProtocol(val[0])
-                if len(val) > 1:
-                    if isinstance(self.protocol , ephys.ElectrophysiologyProtocol):
-                        if not all(ephys.getProtocol(x) == self.protocol for x in val[1:]):
-                            scipywarn("All trials in an episode must have been recorded with the same protocol, or be synthetic trial blocks")
-
-            else:
-                protocol = ephys.getProtocol(val[0])
-                # allow changing the protocol even when it was previously set
-                if isinstance(self.protocol , ephys.ElectrophysiologyProtocol):
-                    if not all(ephys.getProtocol(x) == self.protocol for x in val[1:]):
-                        scipywarn("All trials in an episode must have been recorded with the same protocol, or be synthetic trial blocks")
-                    else:
-                        self.protocol = protocol
-
-            begin = val[0].segments[0].rec_datetime
-
-            if not isinstance(begin, datetime.datetime):
-                begin = val[0].rec_datetime
-
-            self.begin = begin
-
-            end = val[-1].segments[-1].rec_datetime
-            if not isinstance(end, datetime.datetime):
-                end = val[-1].rec_datetime
-
-            self.end = end
-
-            self.beginFrame = 0
-
-            if len(val) > 1:
-                self.lastFrame = sum(map(lambda x: len(x.segments), val))-1
-            else:
-                self.lastFrame = len(val[0].segments)-1
-
-            self._blocks_ = val
-
-        self.trialsInfoLabel.setText(f"{len(self._blocks_)} Trials")
-
-        # self.sig_trialsChanged.emit(self.trials)
-        self._make_value_()
-        self.sig_trialsChanged.emit()
-        self.sig_valueChanged.emit(self._data_)
+    # @property
+    # def trials(self) -> list:
+    #     return self._blocks_
+    #
+    # @trials.setter
+    # def trials(self, val: typing.Optional[typing.Sequence[neo.Block]] = None):
+    #     if (val is not None and not isinstance(val, typing.Sequence) and
+    #         (len(val) > 0 and not all(isinstance(v, neo.Block) for v in val))):
+    #         raise TypeError(f"Expecting a sequence of neo.Block trials or None; instead got a {type(val).__name__}")
+    #
+    #     if val is None or (isinstance(val, typing.Sequence) and len(val) == 0):
+    #         self._blocks_ = list()
+    #
+    #     else:
+    #         if len(val)  > 1:
+    #             val = list(sorted(val, key = lambda x: x.rec_datetime))
+    #
+    #         if self.protocol is None:
+    #             self.protocol = ephys.getProtocol(val[0])
+    #             if len(val) > 1:
+    #                 if isinstance(self.protocol , ephys.ElectrophysiologyProtocol):
+    #                     if not all(ephys.getProtocol(x) == self.protocol for x in val[1:]):
+    #                         scipywarn("All trials in an episode must have been recorded with the same protocol, or be synthetic trial blocks")
+    #
+    #         else:
+    #             protocol = ephys.getProtocol(val[0])
+    #             # allow changing the protocol even when it was previously set
+    #             if isinstance(self.protocol , ephys.ElectrophysiologyProtocol):
+    #                 if not all(ephys.getProtocol(x) == self.protocol for x in val[1:]):
+    #                     scipywarn("All trials in an episode must have been recorded with the same protocol, or be synthetic trial blocks")
+    #                 else:
+    #                     self.protocol = protocol
+    #
+    #         begin = val[0].segments[0].rec_datetime
+    #
+    #         if not isinstance(begin, datetime.datetime):
+    #             begin = val[0].rec_datetime
+    #
+    #         self.begin = begin
+    #
+    #         end = val[-1].segments[-1].rec_datetime
+    #         if not isinstance(end, datetime.datetime):
+    #             end = val[-1].rec_datetime
+    #
+    #         self.end = end
+    #
+    #         self.beginFrame = 0
+    #
+    #         if len(val) > 1:
+    #             self.lastFrame = sum(map(lambda x: len(x.segments), val))-1
+    #         else:
+    #             self.lastFrame = len(val[0].segments)-1
+    #
+    #         self._blocks_ = val
+    #
+    #     self.trialsInfoLabel.setText(f"{len(self._blocks_)} Trials")
+    #
+    #     # self.sig_trialsChanged.emit(self.trials)
+    #     self._make_value_()
+    #     self.sig_trialsChanged.emit()
+    #     self.sig_valueChanged.emit(self._data_)
 
     @property
     def protocol(self) -> ephys.ElectrophysiologyProtocol | None:
