@@ -130,7 +130,7 @@ from core.prog import (safewrapper, safeguiwrapper, print_styled, qVariants, # n
 
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,) # noqa
 
-from core.scipyendataclasses import (isDataclass, getField) # noqa
+from core.scipyendataclasses import (isDataclass, getField, getFieldOrProperty) # noqa
 
 # from gui.widgets.simpletablewidget import SimpleTableWidget
 # from gui.widgets.tableeditorwidget import (TableEditorWidget,
@@ -741,16 +741,19 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         if isDataclass(obj):
             datafields = dataclasses.fields(obj)
+            # all_attr_names = list(f.name for f in datafields) + [x[0] for x in inspect.getmembers_static(obj, lambda x: isinstance(x, property))]
+            # a_val = lambda a: getFieldOrProperty(obj,a).name if a in ('electrodeMode', 'pathwayType') else f"'{getFieldOrProperty(obj, a)}'" if a == 'name' else getFieldOrProperty(obj, a) # noqa
             try:
                 fieldnames = list(map(lambda f: f.name, datafields))
                 membernames = list(obj.__dict__.keys())
                 childnames = list(sorted(unique(membernames + fieldnames)))
-                pData = dict(map(lambda c: (c, getattr(obj, c)), childnames))
+                pData = dict(map(lambda c: (c, getFieldOrProperty(obj, c)), childnames))
+                # pData = dict(map(lambda c: (c, getattr(obj, c)), childnames))
             except: # noqa
-                traceback.print_exc()
-                print(
-                    f"{print_styled(f'for {type(obj).__name__} data', color='red')}"
-                )
+                # traceback.print_exc()
+                # print(
+                #     f"{print_styled(f'for {type(obj).__name__} data', color='red')}"
+                # )
                 # pData = dict(map(lambda x: (x.name, getattr(obj, x.name)), datafields))
                 pData = dict(map(lambda x: (x.name, getField(obj, x)), datafields))
 

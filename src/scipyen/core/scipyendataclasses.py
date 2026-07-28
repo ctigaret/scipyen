@@ -2322,7 +2322,7 @@ def getFieldOrProperty(obj, field:typing.Union[dataclasses.Field, str],
             raise ValueError("'field' argument cannot be an empty string")
 
         # is there a dataclasses.Field named after 'field'?
-        fields = list(filter(lambda f: f.name == field), dataclasses.fields(obj))
+        fields = list(filter(lambda f: f.name == field, dataclasses.fields(obj)))
 
         if len(fields) == 0:
             # no dataclaasses Field found -> check if it is a property

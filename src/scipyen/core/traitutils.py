@@ -198,7 +198,7 @@ def traitlet_set(instance, obj, value):
 
     from core import datatypes
     klass = getattr(instance, "klass", None)
-    check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False # noqa
+    # check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False # noqa
     check_Qt_object = lambda v: (isinstance(v, QtCore.QObject) # noqa
                                  or (__has_PySide6__ and isinstance(v, type) and
                                      (hasattr(v, "setupUi") or
@@ -245,7 +245,7 @@ def traitlet_set(instance, obj, value):
 
     klass = getattr(instance, "klass", None)
 
-    check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False
+    # check_klass = lambda v: isinstance(v, klass) if (isinstance(klass, type) or (isinstance(klass, tuple) and all(isinstance(k, type) for k in klass))) else False
 
     if klass is not type(None) and (new_value is None and old_value is None):
         return
@@ -289,7 +289,7 @@ def traitlet_set(instance, obj, value):
 
         if silent:
             new_hash = gethash(new_value)
-            old_hash = gethash(old_value)
+            # old_hash = gethash(old_value)
             silent = bool(new_hash == instance.hashed)
 
     except:

@@ -78,7 +78,8 @@ from core.datazone import (DataZone, Interval) # noqa
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, ) # noqa
 from core.triggerprotocols import TriggerProtocol, TriggerProtocolList # noqa
 from core.typeenum import TypeEnum
-from core.scipyendataclasses import (Episode, Schedule, ScipyenDataclass, getField)
+from core.scipyendataclasses import (Episode, Schedule, ScipyenDataclass,
+                                     getField, getFieldOrProperty)
 from core import datatypes
 from core.datatypes import (check_type, type2str) # noqa
 from core import workspacefunctions # noqa
@@ -2539,8 +2540,19 @@ class SynapticPathway(ScipyenDataclass):
         ret = [f"{self.__class__.__name__}"]
         ret += ["("]
 
-        # ret += ", ".join([f"{a}={getField(self,a).name if a in ('electrodeMode', 'pathwayType') else f"'{getField(self, a)}'" if a == "name" else getField(self, a)}" for a in all_attr_names])
-        ret += ", ".join([f"{a}={getattr(self,a).name if a in ('electrodeMode', 'pathwayType') else f"'{getattr(self, a)}'" if a == "name" else getattr(self, a)}" for a in all_attr_names])
+        a_val = lambda a: getFieldOrProperty(self,a).name if a in ('electrodeMode', 'pathwayType') else f"'{getFieldOrProperty(self, a)}'" if a == 'name' else getFieldOrProperty(self, a) # noqa
+
+        sub_fields = list()
+
+        for a in all_attr_names:
+            try:
+                value = a_val(a)
+                sub_fields.append(f"{a}={value}")
+            except: # noqa
+                pass
+
+        if len(sub_fields):
+            ret += ", ".join(sub_fields)
         ret += [")"]
 
         return "".join(ret)
