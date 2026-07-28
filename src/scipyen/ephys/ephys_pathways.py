@@ -276,7 +276,6 @@ class RecordingEpisode(Episode):
         distinct pathways)
 
     """
-    _: KW_ONLY
     protocol: typing.Optional[ElectrophysiologyProtocol] = None
     episodeType: RecordingEpisodeType = dataclasses.field(default = RecordingEpisodeType.Tracking)
     # stimulusLayout: typing.Optional[PathwaysStimulationLayout] = None

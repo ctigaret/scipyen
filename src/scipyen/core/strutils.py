@@ -1150,7 +1150,7 @@ Parameters:
         sep = guess_sfx_sep(x)
 
     if len(strings):
-        make_suffix = lambda c: f" ({c})" if bracketed else sep + f"{c}" if (isinstance(sep, str) and len(sep)) else f"{c}"
+        make_suffix = lambda c: f" ({c})" if bracketed else sep + f"{c}" if (isinstance(sep, str) and len(sep)) else f"{c}" # noqa
 
         base, cc = get_int_sfx(x, sep=sep, use_re=use_re, bracketed=bracketed)
 
@@ -1161,7 +1161,7 @@ Parameters:
         # print(f"counter_suffix: clashes = {clashes}")
 
         if len(clashes) == 0:
-            return None if returns_counter==True else x if returns_counter==False else (x, None)
+            return None if returns_counter is True else x if returns_counter is False else (x, None)
 
         candidate_counters = list(filter(lambda t: isinstance(t, int), map(lambda s: get_int_sfx(s, sep=sep, use_re=use_re, bracketed=bracketed)[1], clashes)))
 
@@ -1171,7 +1171,7 @@ Parameters:
             if cc is None:
                 cc = start
             new_x = base + make_suffix(cc)
-            return (new_x, cc) if returns_counter is None else cc if returns_counter == True else new_x
+            return (new_x, cc) if returns_counter is None else cc if returns_counter is True else new_x
 
         min_counter, max_counter = min(candidate_counters), max(candidate_counters)
         # print(f"counter_suffix: min_counter = {min_counter}, max_counter = {max_counter}")
@@ -1182,11 +1182,11 @@ Parameters:
 
         new_x = base + make_suffix(new_counter)
 
-        return (new_x, new_counter) if returns_counter is None else new_counter if returns_counter else new_x
+        return (new_x, new_counter) if returns_counter is None else new_counter if returns_counter is True else new_x
 
 
     else:
-        return (x, None) if returns_counter is None else None if returns_counter else x
+        return (x, None) if returns_counter is None else None if returns_counter is True else x
 
 def similar_strings(a:str, b:str) -> bool:
     r"""Similarity between two strings using difflib.SequenceMatcher./

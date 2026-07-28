@@ -45,20 +45,25 @@ else:
 # from core.prog import scipywarn
 # from core import scipyen_quantities as scq
 from core import scipyendataclasses as sdc
+from core import qtutils
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
+
+
 Ui_ProcedureWidget, _ = loadUiType(
     os.path.join(__module_path__, "procedurewidget.ui")
     )
 
-class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
-    # TODO: 2026-07-17 10:44:58 FIXME
-    # • include a field to edit the legal framework (currently this is fixed to
-    #   "ASPA 1986")
+Ui_SimpleProcedureWidget, _ = loadUiType(
+    os.path.join(__module_path__, "simpleprocedurewidget.ui")
+    )
+
+class SimpleProcedureWidget(Ui_SimpleProcedureWidget, DataClassWidget):
     _objectTypes_ = (sdc.Procedure, )
+    procedureTypeNames = list(sdc.ProcedureType.names())
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
@@ -77,8 +82,6 @@ class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
 
         self._data_ = obj
 
-        self._procedureTypeNames_ = list(sdc.ProcedureType.names())
-
         DataClassWidget.__init__(self, parent=parent, **kwargs)
 
         self._configureUI_()
@@ -88,8 +91,8 @@ class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
 
         super()._configureUI_()
 
-        ndx = self._procedureTypeNames_.index(self._data_.procedureType.name)
-        self.typeComboBox.addItems(self._procedureTypeNames_)
+        ndx = self.procedureTypeNames.index(self._data_.procedureType.name)
+        self.typeComboBox.addItems(self.procedureTypeNames)
         self.typeComboBox.setCurrentIndex(ndx)
         self.typeComboBox.currentIndexChanged.connect(self._slot_procedureTypeChanged)
 
@@ -126,76 +129,155 @@ class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
 
         self._data_ = val
 
-        sb = QtCore.QSignalBlocker(self.typeComboBox) # noqa
-        ndx = self._procedureTypeNames_.index(self._data_.procedureType.name)
-        self.typeComboBox.setCurrentIndex(ndx)
+        ndx = self.procedureTypeNames.index(self._data_.procedureType.name)
+
+        with qtutils.SignalBlocker(self.typeComboBox):
+            self.typeComboBox.setCurrentIndex(ndx)
 
     @Slot(int)
     def _slot_procedureTypeChanged(self, val: int):
-        self._data_.procedureType = sdc.ProcedureType[self._procedureTypeNames_[val]]
+        self._data_.procedureType = sdc.ProcedureType[self.procedureTypeNames[val]]
+        self.sig_valueChanged.emit(self._data_)
+
+class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
+    # TODO: 2026-07-17 10:44:58 FIXME
+    # • include a field to edit the legal framework (currently this is fixed to
+    #   "ASPA 1986")
+    _objectTypes_ = (sdc.Procedure, )
+    procedureTypeNames = list(sdc.ProcedureType.names())
+
+    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
+                 obj: typing.Optional[sdc.CellCompartment] = None,
+                 **kwargs):
+
+        if isinstance(parent, self._objectTypes_):
+            obj_ = parent
+            if isinstance(obj, QtWidgets.QWidget):
+                parent = obj
+            else:
+                parent = None
+
+            obj = obj_
+
+        if not isinstance(obj, self._objectTypes_):
+            obj = sdc.Procedure()
+
+        self._data_ = obj
+
+
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
+
+        self._configureUI_()
+
+    def _configureUI_(self):
+        self.setupUi(self)
+
+        super()._configureUI_()
+
+        ndx = self.procedureTypeNames.index(self._data_.procedureType.name)
+        self.typeComboBox.addItems(self.procedureTypeNames)
+        self.typeComboBox.setCurrentIndex(ndx)
+        self.typeComboBox.currentIndexChanged.connect(self._slot_procedureTypeChanged)
+
+        if isinstance(self._data_, sdc.PPLProcedure):
+            self.isRegulatedCheckBox.setChecked(True)
+            self.pplWidget.setValue(self._data_.procedure.ppl)
+            self.pilWidget.setValue(self._data_.procedure.pil)
+            self.protocolWidget.setValue(self._data_.procedure.protocol)
+            self.protocolStepWidget.setValue(self._data_.procedure.protocolStep)
+            self.asruTabWidget.setEnabled(True)
+
+        else:
+            self.isRegulatedCheckBox.setChecked(False)
+            self.pplWidget.setValue(sdc.PPL())
+            self.pilWidget.setValue(sdc.PIL())
+            self.protocolWidget.setValue(sdc.PPLProtocol)
+            self.protocolStepWidget.setValue(sdc.PPLProtocolStep)
+            self.asruTabWidget.setEnabled(False)
+
+        self.pplWidget.sig_valueChanged.connect(self._slot_pplChanged)
+        self.pilWidget.sig_valueChanged.connect(self._slot_pilChanged)
+        self.protocolWidget.sig_valueChanged.connect(self._slot_pplProtocolChanged)
+        self.protocolStepWidget.sig_valueChanged.connect(self._slot_pplProtocolStepChanged)
+        self.isRegulatedCheckBox.toggled.connect(self._slot_setIsRegulatedProcedure)
+
+        self.sig_uiConfigured.emit()
+
+    def value(self) -> sdc.Procedure:
+        return self._data_
+
+    def setValue(self, val: sdc.Procedure, **kwargs):
+        if not isinstance(val, sdc.Procedure):
+            val = sdc.Procedure()
+
+        self._data_ = val
+
+        ndx = self.procedureTypeNames.index(self._data_.procedureType.name)
+        with qtutils.SignalBlocker(self.typeComboBox):
+            self.typeComboBox.setCurrentIndex(ndx)
+
+    @Slot(int)
+    def _slot_procedureTypeChanged(self, val: int):
+        self._data_.procedureType = sdc.ProcedureType[self.procedureTypeNames[val]]
         self.sig_valueChanged.emit(self._data_)
 
     @Slot(bool)
     def _slot_setIsRegulatedProcedure(self, val: bool):
-        sb = list( # noqa
-            map(
-                    lambda w: QtCore.QSignalBlocker(w),
-                    (
-                        self.pilWidget,
-                        self.pplWidget,
-                        self.protocolWidget,
-                        self.protocolStepWidget,
-                        self.typeComboBox,
-                    )
+        with qtutils.SignalBlocker(
+                (
+                    self.pilWidget,
+                    self.pplWidget,
+                    self.protocolWidget,
+                    self.protocolStepWidget,
+                    self.typeComboBox,
                 )
-            )
+            ):
+            self.asruTabWidget.setEnabled(val is True)
 
-        self.asruTabWidget.setEnabled(val is True)
+            if val is True:
+                # switch to regulated procedure if current procedure is not regulated
+                if not isinstance(self._data_, sdc.PPLProcedure):
+                    pil = sdc.PIL()
+                    ppl = sdc.PPL()
+                    pplProtocol = sdc.PPLProtocol(parent=ppl)
+                    pplProtocolStep = sdc.PPLProtocolStep(parent=pplProtocol)
+                    procedure = sdc.PPLProcedure(ppl=ppl, pil=pil,
+                                                protocol=pplProtocol,
+                                                protocolStep=pplProtocolStep,
+                                                procedureType=self._data_.procedureType,
+                                                name=self._data_.name,
+                                                description=self._data_.description)
 
-        if val is True:
-            # switch to regulated procedure if current procedure is not regulated
-            if not isinstance(self._data_, sdc.PPLProcedure):
-                pil = sdc.PIL()
-                ppl = sdc.PPL()
-                pplProtocol = sdc.PPLProtocol(parent=ppl)
-                pplProtocolStep = sdc.PPLProtocolStep(parent=pplProtocol)
-                procedure = sdc.PPLProcedure(ppl=ppl, pil=pil,
-                                             protocol=pplProtocol,
-                                             protocolStep=pplProtocolStep,
-                                             procedureType=self._data_.procedureType,
-                                             name=self._data_.name,
-                                             description=self._data_.description)
+                    self._data_ = procedure
 
-                self._data_ = procedure
+                    self.pilWidget.setValue(pil)
+                    self.pplWidget.setValue(ppl)
+                    self.protocolWidget.setValue(pplProtocol)
+                    self.protocolStepWidget.setValue(pplProtocolStep)
 
-                self.pilWidget.setValue(pil)
-                self.pplWidget.setValue(ppl)
-                self.protocolWidget.setValue(pplProtocol)
-                self.protocolStepWidget.setValue(pplProtocolStep)
+                    ndx = self.procedureTypeNames.index(self._data_.procedureType.name)
+                    self.typeComboBox.setCurrentIndex(ndx)
 
-                ndx = self._procedureTypeNames_.index(self._data_.procedureType.name)
-                self.typeComboBox.setCurrentIndex(ndx)
+                    self.sig_valueChanged.emit(self._data_)
 
-                self.sig_valueChanged.emit(self._data_)
+            else:
+                # switch to non-regulated if current procedure is regulated
+                if isinstance(self._data_, sdc.PPLProcedure):
+                    procedure = sdc.Procedure(name=self._data_.name,
+                                            description=self._data_.description,
+                                            procedureType=self._data_.procedureType)
 
-        else:
-            # switch to non-regulated if current procedure is regulated
-            if isinstance(self._data_, sdc.PPLProcedure):
-                procedure = sdc.Procedure(name=self._data_.name,
-                                          description=self._data_.description,
-                                          procedureType=self._data_.procedureType)
+                    self._data_ = procedure
 
-                self._data_ = procedure
+                    self.pplWidget.setValue(sdc.PPL())
+                    self.pilWidget.setValue(sdc.PIL())
+                    self.protocolWidget.setValue(sdc.PPLProtocol)
+                    self.protocolStepWidget.setValue(sdc.PPLProtocolStep)
 
-                self.pplWidget.setValue(sdc.PPL())
-                self.pilWidget.setValue(sdc.PIL())
-                self.protocolWidget.setValue(sdc.PPLProtocol)
-                self.protocolStepWidget.setValue(sdc.PPLProtocolStep)
+                    ndx = self.procedureTypeNames.index(self._data_.procedureType.name)
+                    self.typeComboBox.setCurrentIndex(ndx)
 
-                ndx = self._procedureTypeNames_.index(self._data_.procedureType.name)
-                self.typeComboBox.setCurrentIndex(ndx)
-
-                self.sig_valueChanged.emit(self._data_)
+                    self.sig_valueChanged.emit(self._data_)
 
     @Slot(object)
     def _slot_pplChanged(self, value: sdc.PPL):
@@ -261,9 +343,10 @@ class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
                 self._data_.protocol = value
                 self._data_.ppl = value.parent
                 self._data_.protocolStep.parent=value
-                sb = list(map(lambda w: QtCore.QSignalBlocker(w), (self.pplWidget, self.protocolStepWidget)))
-                self.pplWidget.setValue(self._data_.ppl)
-                self.protocolStepWidget.setValue(self._data_.protocolStep)
+
+                with qtutils.SignalBlocker((self.pplWidget, self.protocolStepWidget)):
+                    self.pplWidget.setValue(self._data_.ppl)
+                    self.protocolStepWidget.setValue(self._data_.protocolStep)
 
                 self.sig_valueChanged.emit(self._data_)
         else:
@@ -290,9 +373,10 @@ class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
             self._data_.protocol = value
             self._data_.ppl = value.parent
             self._data_.protocolStep.parent=value
-            sb = list(map(lambda w: QtCore.QSignalBlocker(w), (self.pplWidget, self.protocolStepWidget))) # noqa
-            self.pplWidget.setValue(self._data_.ppl)
-            self.protocolStepWidget.setValue(self._data_.protocolStep)
+
+            with qtutils.SignalBlocker((self.pplWidget, self.protocolStepWidget)):
+                self.pplWidget.setValue(self._data_.ppl)
+                self.protocolStepWidget.setValue(self._data_.protocolStep)
 
             self.sig_valueChanged.emit(self._data_)
 
@@ -326,9 +410,11 @@ class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
                         self._data_.protocol.steps.append(value)
                     else:
                         return
+
             self._data_.protocolStep = value
-            sb = list(map(lambda w: QtCore.QSignalBlocker(w), (self.pplWidget, self.protocolStepWidget))) # noqa
-            self.protocolStepWidget.setValue(value)
+
+            with qtutils.SignalBlocker((self.pplWidget, self.protocolStepWidget)):
+                self.protocolStepWidget.setValue(value)
 
             self.sig_valueChanged.emit(self._data_)
 
@@ -342,8 +428,9 @@ class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
                     return
 
             self._data_.protocolStep = value
-            sb = list(map(lambda w: QtCore.QSignalBlocker(w), (self.pplWidget, self.protocolStepWidget))) # noqa
-            self.protocolStepWidget.setValue(value)
+
+            with qtutils.SignalBlocker((self.pplWidget, self.protocolStepWidget)):
+                self.protocolStepWidget.setValue(value)
 
             self.sig_valueChanged.emit(self._data_)
 

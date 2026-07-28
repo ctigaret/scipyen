@@ -67,12 +67,8 @@ Ui_MetaDataWidget, QWidget = loadUiType(os.path.join(__module_path__, "metadataw
 
 class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
     r"""Widget for displaying BaseScipyenData objectx.
-    Where implemented, it also supports editing.
-    NOTE/WARNING: Under development
     """
     sig_valueChanged = Signal(object, name="sig_valueChanged")
-    # default_brain_atlas_name =  'whs_sd_rat_39um'
-    # default_species = "Rattus norvegicus"
 
     _objectTypes_ = (bsc.BaseScipyenData, )
 
@@ -99,14 +95,10 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
         DataClassWidget.__init__(self, parent=parent, **kwargs)
 
-
         self._configureUI_()
-        # self.nameDescriptionWidget.symbol="metadata"
 
         self.biologicalSourceEditor = None
-        # self._collapsibleChildren_["biologicalSourceEditor"] = self.biologicalSourceEditor
         self.procedureEditor = None
-        # self._collapsibleChildren_["procedureEditor"] = self.procedureEditor
 
     def _configureUI_(self):
         self.setupUi(self)
@@ -183,8 +175,8 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
         super().setValue(self._data_, **kwargs)
 
         if isinstance(self.biologicalSourceEditor, DataClassWidget):
-            sb = QtCore.QSignalBlocker(self.biologicalSourceEditor) # noqa
-            self.biologicalSourceEditor.setValue(self._data_.source, objSymbol="source")
+            with qtutils.SignalBlocker(self.biologicalSourceEditor):
+                self.biologicalSourceEditor.setValue(self._data_.source, objSymbol="source")
 
     @Slot()
     def _slot_editBiologicalSource(self):
@@ -230,8 +222,8 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
             self._slot_editBiologicalSource()
         else:
             if isinstance(self.biologicalSourceEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor):
-                sb = QtCore.QSignalBlocker(self.biologicalSourceEditor) # noqa
-                self.biologicalSourceEditor.collapse(False)
+                with qtutils.SignalBlocker(self.biologicalSourceEditor):
+                    self.biologicalSourceEditor.collapse(False)
 
     @Slot(bool)
     def _slot_toggleProcedureEditor(self, val: bool):
@@ -287,7 +279,6 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
     @field.setter
     def field(self, value:typing.Union[str, type(pd.NA)]):
-        signalBlocker = QtCore.QSignalBlocker(self.fieldIDLineEdit) # noqa
         if isinstance(value, str) and len(value.strip()):
             self._field = value
             if self._field in ("NA", "<NA>"):
@@ -295,7 +286,8 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
         else:
             self._field = pd.NA
 
-        self.fieldIDLineEdit.setText(f"{self._field}")
+        with qtutils.SignalBlocker(self.fieldIDLineEdit):
+            self.fieldIDLineEdit.setText(f"{self._field}")
 
         self.sig_valueChanged.emit()
 
