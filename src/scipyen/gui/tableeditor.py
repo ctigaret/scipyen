@@ -141,6 +141,7 @@ class TableEditor(ScipyenViewer):
                         ephys_pathways.AuxiliaryInputList: 0,
                         ephys_pathways.AuxiliaryOutputList: 0,
                         ephys_pathways.SynapticStimulusChannelList: 0,
+                        ephys_pathways.RecordingSchedule: 0,
                         list:0,
                         tuple:0,
                         deque:0}

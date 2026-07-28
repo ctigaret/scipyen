@@ -78,7 +78,7 @@ from core.datazone import (DataZone, Interval) # noqa
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, ) # noqa
 from core.triggerprotocols import TriggerProtocol, TriggerProtocolList # noqa
 from core.typeenum import TypeEnum
-from core.scipyendataclasses import (Episode, Schedule, ScipyenDataclass)
+from core.scipyendataclasses import (Episode, Schedule, ScipyenDataclass, getField)
 from core import datatypes
 from core.datatypes import (check_type, type2str) # noqa
 from core import workspacefunctions # noqa
@@ -783,6 +783,7 @@ class RecordingEpisode(Episode):
 @with_doc(Schedule, use_header=True, header_str = "Inherits from:")
 class RecordingSchedule(Schedule):
     r"""Sequence of RecordingEpisode objects"""
+    allowed_contents = (RecordingEpisode, )
     def __init__(self, name: typing.Optional[str] = None, **kwargs):
         super().__init__(name, **kwargs)
 
@@ -2533,10 +2534,12 @@ class SynapticPathway(ScipyenDataclass):
 
     def __repr__(self) -> str:
         import dataclasses
-        all_attr_names = list(f.name for f in dataclasses.fields(self.__class__)) + [x[0] for x in inspect.getmembers_static(self, lambda x: isinstance(x, property))]
+        fields  = dataclasses.fields(self.__class__)
+        all_attr_names = list(f.name for f in fields) + [x[0] for x in inspect.getmembers_static(self, lambda x: isinstance(x, property))]
         ret = [f"{self.__class__.__name__}"]
         ret += ["("]
 
+        # ret += ", ".join([f"{a}={getField(self,a).name if a in ('electrodeMode', 'pathwayType') else f"'{getField(self, a)}'" if a == "name" else getField(self, a)}" for a in all_attr_names])
         ret += ", ".join([f"{a}={getattr(self,a).name if a in ('electrodeMode', 'pathwayType') else f"'{getattr(self, a)}'" if a == "name" else getattr(self, a)}" for a in all_attr_names])
         ret += [")"]
 

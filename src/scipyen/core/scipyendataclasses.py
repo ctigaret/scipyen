@@ -13,7 +13,7 @@ from functools import singledispatchmethod
 import itertools
 import datetime
 from enum import (Enum, IntEnum, EnumMeta, Flag, auto) #noqa
-# import inspect
+import inspect
 # import numbers
 # import math
 import dataclasses
@@ -2271,3 +2271,89 @@ def repr_attr(x):
         return f": {type(x).__name__} →  '{x.name}' ({x})"
     else:
         return f": {type(x).__name__} → {x}"
+
+def getField(obj, field: dataclasses.Field) -> typing.Any:
+    r"""Returns the value of a field of a dataclass instance.
+
+    If the dataclass instance lacks an attribute named after the field, returns
+    the default value defined in the field signature.
+
+    When 'field' is a name, it is looked up in the fields of the dataclass; if
+    not found, it is looked up among the properties of the object 'obj'.
+
+    WARNING: This function makes field access insensitive to API change (i.e.
+    to changes where the definition of a dataclass type would make it impossible
+    to use data created with the old API)
+    """
+    if not isDataclass(obj):
+        raise TypeError(f"'obj' expected to be a dataclass; instead, got a {type(obj).__name__}")
+
+    if not isinstance(field, dataclasses.Field):
+        raise TypeError(f"'field' expected to be a dataclass Field; instead, got a {type(field).__name__}")
+
+    # finally, return the field value taking account its default
+    return getattr(obj, field.name, field.default_factory() if field.default is dataclasses.MISSING else field.default)
+
+
+def getFieldOrProperty(obj, field:typing.Union[dataclasses.Field, str],
+             default: typing.Any = dataclasses.MISSING) -> typing.Any:
+    r"""Returns the value of a field of a dataclass instance.
+
+    If the dataclass instance lacks an attribute named after the field, returns
+    the default value defined in the field signature.
+
+    When 'field' is a name, it is looked up in the fields of the dataclass; if
+    not found, it is looked up among the properties of the object 'obj'.
+
+    WARNING: This function makes field access insensitive to API change (i.e.
+    to changes where the definition of a dataclass type would make it impossible
+    to use data created with the old API)
+
+    CAUTION: When 'field' is a string it MAY return the value of a property;
+    when 'field' resolves to a dynamic property of 'obj' this WILL result in
+    code execution .
+    """
+    if not isDataclass(obj):
+        raise TypeError(f"'obj' expected to be a dataclass; instead, got a {type(obj).__name__}")
+
+    if isinstance(field, str):
+        # resolve field by name
+        if len(field.strip()) == 0:
+            raise ValueError("'field' argument cannot be an empty string")
+
+        # is there a dataclasses.Field named after 'field'?
+        fields = list(filter(lambda f: f.name == field), dataclasses.fields(obj))
+
+        if len(fields) == 0:
+            # no dataclaasses Field found -> check if it is a property
+            properties = list(
+                filter(
+                        lambda x: x[0] == field,
+                        inspect.getmembers_static(obj,
+                                                  lambda x: isinstance(x, property))
+                      )
+                )
+            if len(properties):
+                field = properties[0][0]
+                if default is dataclasses.MISSING:
+                    # default MISSING signals we don't want to shoehorn it if
+                    # field not found
+                    if not hasattr(obj, field):
+                        raise AttributeError(f"The {type(obj).__name__} object does not have a '{field}' attribute or property")
+                    return getattr(obj, field)
+
+                else:
+                    # retrieve the field if found, else return the default
+                    return getattr(obj, field, default)
+            else:
+                raise ValueError(f"The {type(obj).__name__} object does not have a field or property named '{field}'")
+
+        else:
+            # a dataclasses.Field with nme after field argument WAS found
+            field = fields[0]
+
+    if not isinstance(field, dataclasses.Field):
+        raise TypeError(f"'field' expected to be a dataclass Field or str; instead, got a {type(field).__name__}")
+
+    # finally, return the field value taking account its default
+    return getattr(obj, field.name, field.default_factory() if field.default is dataclasses.MISSING else field.default)

@@ -28,15 +28,15 @@ from dataclasses import MISSING
 import weakref
 import math # noqa
 import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -46,8 +46,8 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    from qtpy import sip # noqa
+    from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -62,75 +62,75 @@ HAS_MESHIO = False
 try:
     import meshio
     HAS_MESHIO = True
-except:
+except: # noqa
     pass
 
 # from pyqtgraph import (DataTreeWidget, TableWidget, )
 
-import neo
+import neo # noqa
 if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList
-import quantities as pq
-import numpy as np
-import scipy
-import pandas as pd
-import vigra
-import meshio
+import quantities as pq # noqa
+import numpy as np # noqa
+import scipy # noqa
+import pandas as pd # noqa
+import vigra # noqa
+import meshio # noqa
 # ### END 3rd party modules
 
-import core.datatypes as datatypes
+import core.datatypes as datatypes # noqa
 from core.datatypes import (is_namedtuple, TypeEnum) # noqa
-from core.prog import (scipywarn, timefunc, processtimefunc)
-from core import taxonbridge
-from core import bgbridge
+from core.prog import (scipywarn, timefunc, processtimefunc) # noqa
+from core import taxonbridge # noqa
+from core import bgbridge # noqa
 
 # print(f"has brain globe: {bgbridge.hasBrainGlobe}")
 
 # NOTE: 2026-02-07 09:14:19 FIXME/TODO
 # to break cycling dependencies in systems.PrairieView, which needs this for the
 # importer gui, MOVE the latter to a separate module
-from systems.PrairieView import *
+from systems.PrairieView import * # noqa
 
-from imaging import vigrautils
+from imaging import vigrautils # noqa
 
-import imaging.axiscalibration
+import imaging.axiscalibration # noqa
 
-from imaging.axiscalibration import (
+from imaging.axiscalibration import ( # noqa
     AxesCalibration,
     AxisCalibrationData,
     ChannelCalibrationData,
 )
 
-from imaging.axisutils import (axisTypeStrings,
+from imaging.axisutils import (axisTypeStrings, # noqa
                                getValueForAxisType,
                                getNameForAxisType)
 
-import imaging.scandata
-from imaging.scandata import (ScanData, AnalysisUnit)
+import imaging.scandata # noqa
+from imaging.scandata import (ScanData, AnalysisUnit) # noqa
 
-from core.triggerprotocols import TriggerProtocol
-from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType)
+from core.triggerprotocols import TriggerProtocol # noqa
+from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType) # noqa
 
-import core.datasignal as datasignal
-from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
+import core.datasignal as datasignal # noqa
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal) # noqa
 
-import core.datazone as datazone
-from core.datazone import (DataZone, Interval)
+import core.datazone as datazone # noqa
+from core.datazone import (DataZone, Interval) # noqa
 
-from core import xmlutils, strutils
+from core import xmlutils, strutils # noqa
 
-from core import scipyen_quantities as scq
+from core import scipyen_quantities as scq # noqa
 
 # from core.workspacefunctions import (validate_varname, user_workspace)
 
-from core.utilities import unique
+from core.utilities import unique # noqa
 
-from core.prog import (safewrapper, safeguiwrapper, print_styled, qVariants,
+from core.prog import (safewrapper, safeguiwrapper, print_styled, qVariants, # noqa
                        is_hashable)
 
-from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
+from core.traitcontainers import (DataBag, DataBagTraitsObserver,) # noqa
 
-from core.scipyendataclasses import isDataclass
+from core.scipyendataclasses import (isDataclass, getField) # noqa
 
 # from gui.widgets.simpletablewidget import SimpleTableWidget
 # from gui.widgets.tableeditorwidget import (TableEditorWidget,
@@ -139,9 +139,9 @@ from core.scipyendataclasses import isDataclass
 # from gui.widgets.small_widgets import QuantitySpinBox, ComplexSpinBox
 # from gui.delegates import PythonItemDelegate
 # from gui.workspacegui import GuiMessages, WorkspaceGuiMixin
-from gui.itemmodels.roles import *
+from gui.itemmodels.roles import * # noqa
 
-from core.datatypes import PODS
+from core.datatypes import PODS # noqa
 
 NOTMEMOIZED = (
     tuple,
@@ -746,12 +746,13 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 membernames = list(obj.__dict__.keys())
                 childnames = list(sorted(unique(membernames + fieldnames)))
                 pData = dict(map(lambda c: (c, getattr(obj, c)), childnames))
-            except:
+            except: # noqa
                 traceback.print_exc()
                 print(
                     f"{print_styled(f'for {type(obj).__name__} data', color='red')}"
                 )
-                pData = dict(map(lambda x: (x.name, getattr(obj, x.name)), datafields))
+                # pData = dict(map(lambda x: (x.name, getattr(obj, x.name)), datafields))
+                pData = dict(map(lambda x: (x.name, getField(obj, x)), datafields))
 
             if not includePrivateMembers:
                 pData = dict(
