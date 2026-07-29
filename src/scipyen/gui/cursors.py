@@ -45,6 +45,7 @@ import numpy as np
 import quantities as pq
 import neo
 
+from core import qtutils
 from core.prog import (safewrapper, with_doc)
 from core.scipyen_quantities import (checkTimeUnits, unitSymbol)
 
@@ -483,7 +484,11 @@ class SignalCursor(QtCore.QObject):
 
         scene = self.hostScene
 
-        labelOpts = {"movable": self._movable_label_, "position": self._label_pos_}
+        labelOpts = {
+            "movable": self._movable_label_,
+            "position": self._label_pos_,
+            # "anchors":
+            }
 
         if h:
             # set up the horizontal InfiniteLine
@@ -816,29 +821,28 @@ class SignalCursor(QtCore.QObject):
 
 
     def update(self):
-        for l in (self._hl_, self._vl_):
-            if isinstance(l, pg.InfiniteLine):
-                l.update()
-                if isinstance(getattr(l, "label", None), pg.InfLineLabel):
-                    l.label.update()
+        for line in (self._hl_, self._vl_):
+            if isinstance(line, pg.InfiniteLine):
+                line.update()
+                if isinstance(getattr(line, "label", None), pg.InfLineLabel):
+                    line.label.update()
 
     def setMovableLabels(self, value):
-        for l in (self._hl_, self._vl_):
-            if isinstance(l, pg.InfiniteLine):
-                if isinstance(getattr(l, "label", None), pg.InfLineLabel):
-                    l.label.setMovable(value==True)
-                    # l.label.setmovable(value==True)
+        for line in (self._hl_, self._vl_):
+            if isinstance(line, pg.InfiniteLine):
+                if isinstance(getattr(line, "label", None), pg.InfLineLabel):
+                    line.label.setMovable(value is True)
 
     def setLabelPosition(self, value:float):
         r"""Set label's position along its corresponding line.
-        The position is a float (0 ⋯ 1) representin the fraction from the
+        The position is a float (0 ⋯ 1) representing the fraction from the
         start of the line to its end
         """
         value = 0. if value < 0 else 1. if value > 1. else value
-        for l in (self._hl_, self._vl_):
-            if isinstance(l, pg.InfiniteLine):
-                if isinstance(getattr(l, "label", None), pg.InfLineLabel):
-                    l.label.setPosition(value==True)
+        for line in (self._hl_, self._vl_):
+            if isinstance(line, pg.InfiniteLine):
+                if isinstance(getattr(line, "label", None), pg.InfLineLabel):
+                    line.label.setPosition(value is True)
 
     def setShowValue(self, val:bool, precision:typing.Optional[int]=None):
         if isinstance(precision, int):
@@ -850,7 +854,7 @@ class SignalCursor(QtCore.QObject):
         elif precision is not None:
             raise TypeError("Precision must be an int >= 0 or None; got %s instead" % precision)
 
-        self._show_value_ = val==True
+        self._show_value_ = val is True
         self._update_labels_()
 
     def setPrecision(self, val):
@@ -876,7 +880,7 @@ class SignalCursor(QtCore.QObject):
 
     @showsValue.setter
     def showsValue(self, value:bool):
-        self._show_value_ = value == True
+        self._show_value_ = value is True
         self._update_labels_()
 
     @Slot()
@@ -903,9 +907,10 @@ class SignalCursor(QtCore.QObject):
     @Slot(tuple)
     @safewrapper
     def slot_linkedPositionChanged(self, pos):
-        signalBlockers = [QtCore.QSignalBlocker(c) for c in self._linked_cursors_]
-        self.x = pos[0]
-        self.y = pos[1]
+        # signalBlockers = [QtCore.QSignalBlocker(c) for c in self._linked_cursors_]
+        with qtutils.SignalBlocker(tuple(self._linked_cursors_)):
+            self.x = pos[0]
+            self.y = pos[1]
 
     @Slot()
     @safewrapper

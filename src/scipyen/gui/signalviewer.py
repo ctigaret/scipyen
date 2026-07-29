@@ -11626,6 +11626,8 @@ Var-keyword parameters ("name=value" pairs):
 
         # remove all PlotItems references
         self._signal_axes_.clear()
+
+        self._n_signal_axes_ = len(self.signalAxes)
         self._events_axis_ = None
         self._spiketrains_axis_ = None
 
