@@ -156,6 +156,7 @@ class RecordingEpisodeType(TypeEnum):
                         # the induction protocol)
 
 @with_doc(Episode, use_header=True, header_str = "Inherits from:")
+@dataclass
 class RecordingEpisode(Episode):
     r"""
     Specification of an electrophysiology recording episode.

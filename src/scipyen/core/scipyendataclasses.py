@@ -1721,13 +1721,13 @@ class Episode(ScipyenDataclass):
         without affecting the identity of an Episode
     """
     # name:str = ""
-    _: KW_ONLY
+    # _: KW_ONLY
     begin:datetime.datetime = datetime.datetime.now()
     end:datetime.datetime = datetime.datetime.now()
     beginFrame:int = 0
     endFrame:int = 0
     description:str = ""
-    procedure:typing.Optional[Procedure] = dataclasses.field(default = None)
+    procedure:typing.Optional[Procedure] = dataclasses.field(default_factory = Procedure)
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)

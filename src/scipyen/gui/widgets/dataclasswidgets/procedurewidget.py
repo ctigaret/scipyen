@@ -96,28 +96,6 @@ class SimpleProcedureWidget(Ui_SimpleProcedureWidget, DataClassWidget):
         self.typeComboBox.setCurrentIndex(ndx)
         self.typeComboBox.currentIndexChanged.connect(self._slot_procedureTypeChanged)
 
-        if isinstance(self._data_, sdc.PPLProcedure):
-            self.isRegulatedCheckBox.setChecked(True)
-            self.pplWidget.setValue(self._data_.procedure.ppl)
-            self.pilWidget.setValue(self._data_.procedure.pil)
-            self.protocolWidget.setValue(self._data_.procedure.protocol)
-            self.protocolStepWidget.setValue(self._data_.procedure.protocolStep)
-            self.asruTabWidget.setEnabled(True)
-
-        else:
-            self.isRegulatedCheckBox.setChecked(False)
-            self.pplWidget.setValue(sdc.PPL())
-            self.pilWidget.setValue(sdc.PIL())
-            self.protocolWidget.setValue(sdc.PPLProtocol)
-            self.protocolStepWidget.setValue(sdc.PPLProtocolStep)
-            self.asruTabWidget.setEnabled(False)
-
-        self.pplWidget.sig_valueChanged.connect(self._slot_pplChanged)
-        self.pilWidget.sig_valueChanged.connect(self._slot_pilChanged)
-        self.protocolWidget.sig_valueChanged.connect(self._slot_pplProtocolChanged)
-        self.protocolStepWidget.sig_valueChanged.connect(self._slot_pplProtocolStepChanged)
-        self.isRegulatedCheckBox.toggled.connect(self._slot_setIsRegulatedProcedure)
-
         self.sig_uiConfigured.emit()
 
     def value(self) -> sdc.Procedure:

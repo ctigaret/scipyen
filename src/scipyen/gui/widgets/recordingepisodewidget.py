@@ -112,7 +112,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
             self._beginFrame_ = 0
             self._endFrame_ = 0
             self._protocol_ = None
-            self._procedure_ = sdc.Procedure
+            self._procedure_ = sdc.Procedure()
             self._description_ = ""
             self._make_value_()
         else:
@@ -221,6 +221,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
             if isinstance(self.procedureEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.procedureEditor):
                 self._removeAnchoringCollapsibleWidget_(self.procedureEditor)
 
+            # print(f"{self.__class__.__name__}.)_slot_showProcedureWidget self._data_.procedure -> {self._data_.procedure}")
             self.procedureEditor = self._setupCollapsibleChild_(
                 SimpleProcedureWidget,
                 "procedureEditor",
@@ -340,7 +341,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
         self.sig_valueChanged.emit(self.value())
 
     @Slot(object)
-    def _slot_procedurechanged(self, value: sdc.Procedure):
+    def _slot_procedureChanged(self, value: sdc.Procedure):
         if not isinstance(value, sdc.Procedure):
             value = sdc.Procedure()
         self._procedure_ = value
