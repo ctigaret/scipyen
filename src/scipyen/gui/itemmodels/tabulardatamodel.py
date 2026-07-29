@@ -975,6 +975,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
                     lbl = f"{section}"
                     if orientation == QtCore.Qt.Horizontal:
+                        # print(f"{self.__class__.__name__}._getHeaderData horizontal:")
+                        # print(f"\t section = {lbl}")
                         if (isinstance(self._modelDataColumnHeaders_, dict)
                             and len(self._modelDataColumnHeaders_)
                             and section in self._modelDataColumnHeaders_
@@ -1466,16 +1468,16 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                 domain = getattr(data, "times", None)
                 domain_name = getattr(data, "domain_name", scq.getUnitFamily(domain))
+                domain_units_symbol = "" if domain.units == pq.Dimensionless else f"{scq.unitSymbol(domain)}"
                 if len(domain_name) == 0:
-                    # domain_name = f"{domain.dimensionality}"
-                    domain_name = f"{scq.unitSymbol(domain)}"
+                    domain_name = "Dimensionless" if len(domain_units_symbol) == 0 else domain_units_symbol
                 else:
-                    # domain_name += f" ({domain.dimensionality})"
-                    domain_name += f" ({scq.unitSymbol(domain)})"
+                    if len(domain_units_symbol):
+                        domain_name += f" ({domain_units_symbol})"
 
                 if data.ndim > 1:
                     # include domain as the first column
-                    self._modelDataColumns_ = data.shape[1] + 1 # this shows data.times as column 0
+                    self._modelDataColumns_ = data.shape[1] + 1 # to include domain as column 0
 
                     channel_names = None
                     if len(data.array_annotations):
@@ -1497,19 +1499,38 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     if channel_names is None:
                         channel_names = list(map(lambda i: f"Channel {i}", range(data.shape[1])))
 
-                    channel_names = list(map(lambda kc: f"{channel_names[kc]} ({data[:,kc].dimensionality})",
-                                                range(len(channel_names))))
-                    headers = [domain_name, ] + channel_names
-
-                    self._modelDataColumnHeaders_ = dict(
-                            (
-                                tuple(map(lambda x: (x[0]+1, x),
-                                            enumerate(headers))
-                                    )
+                    # print(f"{self.__class__.__name__}._makeModelData_({type(data).__name__})")
+                    channel_names = list(
+                        map(
+                            lambda kc: f"{channel_names[kc]} ({data[:,kc].dimensionality})",
+                            range(len(channel_names))
                             )
                         )
+                    # print(f"\t channel_names = {channel_names}")
+                    headers = [domain_name, ] + channel_names
+                    # print(f"\t headers = {headers}\n")
 
-                    self._modelDataRowIndexName_ = domain_name
+                    self._modelDataColumnHeaders_ = dict(
+                                tuple(enumerate(headers))
+                            )
+                    # self._modelDataColumnHeaders_ = dict(
+                    #         (
+                    #             tuple(
+                    #                     map(
+                    #                         lambda x: (x[0], x),
+                    #                         enumerate(headers)
+                    #                        )
+                    #                  )
+                    #         )
+                    #     )
+
+                    # if isinstance(data, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
+                    #     self._modelDataRowIndexName_ = "Index"
+                    # else:
+                    #     self._modelDataRowIndexName_ = domain_name
+                    self._modelDataRowIndexName_ = "Index"
+                    # print(f"\t _modelDataRowIndexName_ = {self._modelDataRowIndexName_}")
+                    # print(f"\t _modelDataColumnHeaders_ = {self._modelDataColumnHeaders_}\n")
 
                     if isinstance(data, (neo.AnalogSignal, DataSignal)):
                         # NOTE: 2025-09-27 11:05:05 see NOTE: 2025-09-27 10:38:00

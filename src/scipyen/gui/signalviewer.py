@@ -11417,7 +11417,7 @@ Var-keyword parameters ("name=value" pairs):
 
     @safewrapper
     def _reportMouseCoordinatesInAxis_(self, pos, plotitem):
-        if isinstance(plotitem, pg.PlotItem):
+        if isinstance(plotitem, pg.PlotItem) and qtutils.isQObjectAlive(plotitem):
             if plotitem.sceneBoundingRect().contains(pos):
                 plot_name = plotitem.vb.name
 
@@ -11498,7 +11498,7 @@ Var-keyword parameters ("name=value" pairs):
         if len(self.axes) == 0:
             return
 
-        if isinstance(focusItem, pg.ViewBox):
+        if isinstance(focusItem, pg.ViewBox) and qtutils.isQObjectAlive(focusItem):
             plotitems, rc = zip(*self.axesWithLayoutPositions)
 
             focusedPlotItems = [i for i in plotitems if i.vb is focusItem]
