@@ -165,192 +165,22 @@ class RecordingEpisode(Episode):
     of experimental conditions -- typically, a subset of a larger
     experiment where distinct sets of conditions are applied in sequence.
 
-    All sweeps in the episode must have been recorded using the same recording
-    protocol (an ElectrophysiologyProtocol object) and, implicitly, from the
-    same RecordingSource.
-
-    The sweeps in an episode may belong to either:
-
-    1) a single neo.Block — in this case the attributes 'beginFrame' and 'endFrame'
-    indicate the limits of the segment sub-range in the Block) - this allows for
-    the possibility that subsets of segments in the Block have been recorded under
-    different conditions (and hence they would belong to distinct episodes),
-    even if data was acquired using the same electrophysiology protocol.
-
-    Normally, the segments of a Block are — by definition — recorded during the
-    same experimental conditions (protocol, drug, etc). However, during some
-    analyses, several of these blocks may be concatenated into a larger one —
-    subject to being recorded using the same electrophysiology protocol — which
-    leads to the situation where contiguous subsets of segments (or sweeps)
-    recorded under distinct conditions are stored in the same Block object, a
-    possibility covered by this contigency.
-
-    2) a collection of neo.Block objects — in this case, the 'beginFrame' and 'endFrame'
-    attributes cover the entire collection of segments ranges across the blocks.
-    This is because several blocks are supposed to have been recorded during the SAME
-    experimental conditions, such that an "episode" can be greaded as a standalone
-    data "unit" (unlike the contigency described above).
-
-    In this contigency, all the data Blocks must have been acquired using the
-    same electrophysiology protocol.
-
-
-    Examples:
-    =========
-
-    1) A sequence of three distinct episodes:
-    • synaptic response recorded without drug
-    ↓
-    • recording in the presence of a drug
-    ↓
-    • recording after drug wash-out
-
-    In each of the three episodes the synaptic respones are recorded with the
-    SAME electrophysiology recording protocol.
-
-    2) Segments recorded while testing for cross-talk between synaptic pathways,
-    (and therefore, where the paired pulses are crossed between pathways) is a
-    distinct episode from the one where each segment contains responses from the
-    same synaptic pathway
-
-    The sweeps in RecordingEpisode are a sequence of neo.Segment objects, where
-    objects where each synaptic pathway has contributed data for a neo.Segment
-    inside the Block.
-
-    3) No segments are included in the episode - the episode is just a light-weight
-    data grouping by protocol.
+    However, the episode contains NO segment (or sweep) data: it only defines the
+    temporal boundaries and the number of sweeps (``nFrames``) that correspond
+    to the actual experimental episode.
 
     Fields (constructor parameters):
     ================================
 
-    • protocols: sequence of ElectrophysiologyProtocol objects
-        Currently, only pyabfbridge.ABFProtocol objects are supported. The ABFProtocol
-        is a subclass of ElectrophysiologyProtocol defined in this module.
+    • protocol: An ElectrophysiologyProtocol object.
+        Currently, only pyabfbridge.ABFProtocol objects are supported.
 
     • episodeType: RecordingEpisodeType
 
-    • pathways: optional, a list of SynapticPathways or None (default); can also
-        be an empty list (same as if it was None).
-
-        Indicates the SynapticPathways where this episode applies. Typically,
-        an episode involves a single pathway. However, there are situations where
-        an episode involving more pathways is meaningful, e.g., where additional
-        pathways are stimulated and recorded simultaneously (e.g., in a cross-talk
-        test, or during conditioning in order to test for 'associativity')
-
-        The pathways define their own clamping modes and recording source.
-
-    • pathActivationBySweep: a dict with key ↦ value mapping where:
-        key: int (sweep indices) or tuples (start:int,step:int)
-        value: tuples of SynapticPathway objects
-
-        Optional, default is an empty dict.
-
-        E.g., for two pathways, using int keys:
-            0 ↦ (0,1)       ⇒ sweep 0 tests cross-talk from path 0 to path 1
-            1 ↦ (1,0)       ⇒ sweep 1 tests cross-talk from path 1 to path 0
-
-        or, as a tuple of two int:
-            (0,2) ↦ (0,1)   ⇒ sweeps from 0 every 2 sweeps test cross-talk from
-                                path 0 to path 1
-
-            (1,2) ↦ (1,0)   ⇒ sweeps from 1 every 2 sweeps test cross-talk from
-                                path 1 to path 0
-
-        The keys should resolve to valid sweep indices in the data; then the keys are
-        pairs (2-tuples) they contain the 'start' and 'step' values for constructing
-        range objects indicating the sweeps where the test apples to the pathways
-        given in the value mapped to the key, once the data is fully available.
-
-        The order of the pathway indices in the values is the order in which each
-        pathway was stimulated during the paired-pulse.
-
-        WARNING: the pathways attribute must be a list of SynapticPathways.
-    ---
-
-    ¹Exceptions are possible:
-        ∘ 'repatching' the cell (e.g. in order to dialyse with a drug, etc) see, e.g.
-            Oren et al, (2009) J. Neurosci 29(4):939
-            Maier et al, (2011) Neuron, DOI 10.1016/j.neuron.2011.08.016
-        ∘ switch between field recording and patch clamp or sharp electrode recordings
-        (theoretically possible, but then one may also think of this as being two
-        distinct pathways)
-
     """
+    _: KW_ONLY
     protocol: typing.Optional[ElectrophysiologyProtocol] = None
     episodeType: RecordingEpisodeType = dataclasses.field(default = RecordingEpisodeType.Tracking)
-    # stimulusLayout: typing.Optional[PathwaysStimulationLayout] = None
-    # NOTE: 2026-07-28 12:21:10
-    # COMPLETE REDESIGN:
-    # When synaptic pathways are used, an episode/schedule combination SHOULD BE
-    # DEFINED for a single pathway; hence the episode MUST be oblivious to the
-    # existence of more than one pathway, or for that matter, to the existence
-    # of a PathwaysStimulationLayout
-    #
-    # Also, "blocks" is not used anymore - keep it simple and lightweight
-    #
-    # To keep this backwards compatible with pickled data, I keep thes corresponding
-    # fields and methods in place, but warn about using them
-
-
-    # FIXME: 2024-09-29 23:32:05 TODO:
-    # conversion to mapping protocol ↦ sweep indices across all blocks in the episode
-    # actually, strike that: an episode must contain blocks recorded WITH THE SAME EPISODE
-    #
-    # NOTE: 2024-10-01 08:34:35
-    # 'pathways' removed - one can get the pathways from pathActivationBySweep
-    # def __init__(self,
-    #              name: typing.Optional[str] = None,
-    #              protocol: typing.Optional[ElectrophysiologyProtocol] = None,
-    #              episodeType: RecordingEpisodeType = RecordingEpisodeType.Tracking,
-    #              stimulusLayout: typing.Optional[PathwaysStimulationLayout] = None ,
-    #              **kwargs):
-    #     r"""Constructor for RecordingEpisode.
-    #
-    #     Named parameters:
-    #     ------------------
-    #     episodeType: type of the episode (see RecordingEpisodeType);
-    #             default is Tracking or Monitoring (an alias to Tracking).
-    #
-    #     name:str - the name of this episode (optional, default is None)
-    #         When None, it is up to the user of this object to give an appropriate
-    #         name
-    #
-    #     protocol: ElectrophysiologyProtocol — the protocol used in common througout
-    #         the episode
-    #
-    #     stimulusLayout: PathwaysStimulationLayout — indicates which pathways are stimulated in
-    #         which sweep; also useful for testing pathway cross-talk, or independence
-    #
-    #         Optional, default is None.
-    #
-    #     Var-keyword parameters (kwargs)
-    #     -------------------------------
-    #     These are passed directly to the datatypes.Episode superclass (see documentation
-    #     for Episode)
-    #
-    #     See also the class documentation.
-    #     """
-    #     # self._type_ = episodeType
-    #     # if not isinstance(name, str):
-    #     #     name = self._type_.name
-    #
-    #     # self.__hash__ = None # enforce non-hashable
-    #
-    #     # self._begin_ = datetime.datetime.now()
-    #     # self._end_ = datetime.datetime.now()
-    #     # self._beginFrame_ = 0
-    #     # self._endFrame_ = 0
-    #
-    #     # self._protocol_ = None
-    #
-    #     # sequence of neo.Block objects.
-    #     # these may be references to existing Block objects, or can be owned by
-    #     # the episode
-    #     # self._blocks_ = list()
-    #     # self._pathways_ = list()
-    #
-    #     super().__init__(name, **kwargs)
 
     def __hash__(self) -> int:
         return hash(
@@ -360,7 +190,7 @@ class RecordingEpisode(Episode):
                     self.begin,
                     self.end,
                     self.beginFrame,
-                    self.endFrame,
+                    self.nFrames,
                     self.procedure,
                     self.protocol,
                     self.episodeType
@@ -372,7 +202,7 @@ class RecordingEpisode(Episode):
         ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}), with:")
         ret.append(f"\t{self.nFrames} frames")
         ret.append(f"\tbegin={self.begin}, end={self.end}")
-        ret.append(f"\tbeginFrame={self.beginFrame}, endFrame={self.endFrame}")
+        ret.append(f"\tbeginFrame={self.beginFrame}, nFrames={self.nFrames}")
 
         # ret.append(f"\tStimulus Layout: {self.stimulusLayout}")
 
@@ -415,8 +245,13 @@ class RecordingEpisode(Episode):
             group[target_name] = cached_entity
             return cached_entity
 
-        attrs = dict((x, getattr(self, x)) for x in ("name", "begin", "end", "beginFrame", "endFrame", "type",
-                                                     "clampMode", "electrodeMode"))
+        attrs = dict((x, getattr(self, x)) for x in (
+                        "name", "description",
+                        "begin", "end",
+                        "beginFrame", "nFrames",
+                        "episodeType", "procedure",
+                        )
+                    )
 
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
@@ -449,24 +284,17 @@ class RecordingEpisode(Episode):
         protocol = h5io.fromHDF5(entity["protocol"], cache=cache)
 
         name=attrs["name"]
+        description=attrs["description"]
         begin=attrs["begin"]
         end=attrs["end"]
         beginFrame=attrs["beginFrame"]
-        endFrame=attrs["endFrame"]
-        episodeType=attrs["type"]
+        nFrames=attrs["nFrames"]
+        episodeType=attrs["episodeType"]
+        procedure=attrs["procedure"]
 
-        return cls(name=name, episodeType=episodeType, begin=begin, end=end,
-                beginframe=beginFrame,endFrame=endFrame,
-                protocol=protocol)
-
-    def setFrameLimits(self, begin:int, end:int):
-        if abs(end-begin) != self.nFrames-1:
-            raise ValueError(f"Mismatch between number of frames {self.nFrames} and begin / end ({begin} / {end})")
-
-        begin, end = min(begin, end), max(begin, end)
-
-        self._beginFrame_ = begin
-        self._endFrame_ = end
+        return cls(name=name, description=description, begin=begin, end=end,
+                   beginframe=beginFrame, nFrames=nFrames, protocol=protocol,
+                   episodeType=episodeType,procedure=procedure)
 
     @property
     def type(self) -> RecordingEpisodeType:
@@ -480,6 +308,7 @@ class RecordingEpisode(Episode):
             scipywarn(f"Expecting a RecordingEpisodeType, instead got {val}")
 
 @with_doc(Schedule, use_header=True, header_str = "Inherits from:")
+@dataclass
 class RecordingSchedule(Schedule):
     r"""Sequence of RecordingEpisode objects"""
     allowed_contents = (RecordingEpisode, )
@@ -598,9 +427,9 @@ class RecordingSchedule(Schedule):
     #     currentFrame = 0
     #     for k, episode in enumerate(self.episodes):
     #         episode.setFrameLimits(currentFrame, currentFrame + episode.nFrames - 1)
-    #         # episode.endFrame = currentFrame + episode.nFrames - 1
+    #         # episode.nFrames = currentFrame + episode.nFrames - 1
     #         # episode.beginFrame = currentFrame
-    #         currentFrame = episode.endFrame + 1
+    #         currentFrame = episode.nFrames + 1
 
 
     def toHDF5(self, group, name, oname, compression, chunks, track_order,

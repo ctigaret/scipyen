@@ -110,7 +110,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
             self._begin_ = datetime.datetime.now()
             self._end_ = datetime.datetime.now()
             self._beginFrame_ = 0
-            self._endFrame_ = 0
+            self._nFrames_ = 0
             self._protocol_ = None
             self._procedure_ = sdc.Procedure()
             self._description_ = ""
@@ -122,7 +122,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
             self._begin_ = self._data_.begin
             self._end_ = self._data_.end
             self._beginFrame_ = self._data_.beginFrame
-            self._endFrame_ = self._data_.endFrame
+            self._nFrames_ = self._data_.nFrames
             self._protocol_ = self._data_.protocol
             self._procedure_ = self._data_.procedure
             self._description_ = self._data_.description
@@ -186,17 +186,15 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
 
         self.firstFrameSpinBox.valueChanged.connect(self._slot_firstFrameChanged)
 
-        self.lastFrameSpinBox.setToolTip("Input channel index")
-        self.lastFrameSpinBox.setWhatsThis("Input channel index")
-        self.lastFrameSpinBox.setStatusTip("Input channel index")
-        self.lastFrameSpinBox.setMinimum(0)
+        self.nFramesSpinBox.setMinimum(0)
 
-        if isinstance(self._endFrame_, int) and self._endFrame_ >= 0:
-            self.lastFrameSpinBox.setValue(self._endFrame_)
+        if isinstance(self._nFrames_, int) and self._nFrames_ >= 0:
+            self.nFramesSpinBox.setValue(self._nFrames_)
 
-        self.lastFrameSpinBox.valueChanged.connect(self._slot_lastFrameChanged)
+        self.nFramesSpinBox.valueChanged.connect(self._slot_nFramesChanged)
 
         self.toggleProcedureEditor.toggled.connect(self._slot_toggleProcedureEditor)
+
         self.createObjectPushButton.setText("")
         self.createObjectPushButton.setIcon(guiutils.getIcon("list-add"))
         self.createObjectPushButton.setToolTip("Create Recording Episode")
@@ -274,12 +272,12 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
         self.sig_valueChanged.emit(self.value())
 
     @Slot(int)
-    def _slot_lastFrameChanged(self, val: int):
-        self._endFrame_ = val
+    def _slot_nFramesChanged(self, val: int):
+        self._nFrames_ = val
         if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._make_value_()
         else:
-            self._data_.endFrame = self._endFrame_
+            self._data_.nFrames = self._nFrames_
 
         self.sig_valueChanged.emit(self.value())
 
@@ -452,7 +450,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
 
     @property
     def lastFrame(self) -> int:
-        return self._endFrame_
+        return self._nFrames_
 
     @lastFrame.setter
     def lastFrame(self, val: int):
@@ -461,15 +459,15 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
         if val < 0:
             raise ValueError(f"Expecting a positive value; got {val} instead")
 
-        self._endFrame_ = val
+        self._nFrames_ = val
 
         if not isinstance(self._data_, ephys_pathways.RecordingEpisode):
             self._make_value_()
         else:
-            self._data_.endFrame = self._endFrame_
+            self._data_.nFrames = self._nFrames_
 
-        with qtutils.SignalBlocker(self.lastFrameSpinBox):
-            self.lastFrameSpinBox.setValue(self._endFrame_)
+        with qtutils.SignalBlocker(self.nFramesSpinBox):
+            self.nFramesSpinBox.setValue(self._nFrames_)
 
     def setValue(self, val: typing.Optional[ephys_pathways.RecordingEpisode] = None):
         from gui import datatreeviewer
@@ -478,7 +476,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
             self._data_ = val
             self._name_ = self._data_.name
             self._beginFrame_ = self._data_.beginFrame
-            self._endFrame_ = self._data_.endFrame
+            self._nFrames_ = self._data_.nFrames
             self._begin_ = self._data_.begin
             self._end_ = self._data_.end
             self._episodeType_ = self._data_.type
@@ -519,7 +517,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
             self._begin_ = datetime.datetime.now()
             self._end_ = datetime.datetime.now()
             self._beginFrame_ = 0
-            self._endFrame_ = 0
+            self._nFrames_ = 0
             self._protocol_ = None
             self._stimulusLayout_ = None
             if (isinstance(self.stimulusLayoutViewer, datatreeviewer.DataTreeViewer)
@@ -547,7 +545,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
                                         self.episodeBeginDateTimeEdit,
                                         self.episodeEndDateTimeEdit,
                                         self.firstFrameSpinBox,
-                                        self.lastFrameSpinBox,
+                                        self.nFramesSpinBox,
                                         self.episodeTypeComboBox,
                                     )
                                 ):
@@ -555,7 +553,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
             self.episodeBeginDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._begin_))
             self.episodeEndDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._end_))
             self.firstFrameSpinBox.setValue(self._beginFrame_)
-            self.lastFrameSpinBox.setValue(self._endFrame_)
+            self.nFramesSpinBox.setValue(self._nFrames_)
             self.protocolNameLabel.setText(self._protocol_.name if isinstance(self._protocol_, ephys.ElectrophysiologyProtocol) else "")
             self.trialsInfoLabel.setText(f"{len(self._blocks_)} {strutils.pluralize('Trial', len(self._blocks_))}")
 

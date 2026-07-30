@@ -97,7 +97,7 @@
      <item row="0" column="2">
       <widget class="QLabel" name="label_6">
        <property name="text">
-        <string>First Frame:</string>
+        <string>First Frame: </string>
        </property>
        <property name="buddy">
         <cstring>firstFrameSpinBox</cstring>
@@ -105,7 +105,17 @@
       </widget>
      </item>
      <item row="0" column="3">
-      <widget class="QSpinBox" name="firstFrameSpinBox"/>
+      <widget class="QSpinBox" name="firstFrameSpinBox">
+       <property name="toolTip">
+        <string>Index of first frame</string>
+       </property>
+       <property name="statusTip">
+        <string>Index of first frame</string>
+       </property>
+       <property name="whatsThis">
+        <string>Index of first frame</string>
+       </property>
+      </widget>
      </item>
      <item row="1" column="0">
       <widget class="QLabel" name="label_5">
@@ -123,15 +133,25 @@
      <item row="1" column="2">
       <widget class="QLabel" name="label_7">
        <property name="text">
-        <string>Last Frame:</string>
+        <string>Frames: </string>
        </property>
        <property name="buddy">
-        <cstring>lastFrameSpinBox</cstring>
+        <cstring>nFramesSpinBox</cstring>
        </property>
       </widget>
      </item>
      <item row="1" column="3">
-      <widget class="QSpinBox" name="lastFrameSpinBox"/>
+      <widget class="QSpinBox" name="nFramesSpinBox">
+       <property name="toolTip">
+        <string>Number of frames in the episode</string>
+       </property>
+       <property name="statusTip">
+        <string>Number of frames in the episode</string>
+       </property>
+       <property name="whatsThis">
+        <string>Number of frames in the episode</string>
+       </property>
+      </widget>
      </item>
     </layout>
    </item>

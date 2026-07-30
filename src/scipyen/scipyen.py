@@ -11,17 +11,17 @@
 
 #### BEGIN core python modules
 
-import sys, os, platform, pathlib, subprocess, traceback
+import sys, os, platform, pathlib, subprocess, traceback # noqa
 
-import atexit, re, inspect, gc, io, time
-import faulthandler, warnings
-import xdg
+import atexit, re, inspect, gc, io, time # noqa
+import faulthandler, warnings # noqa
+import xdg # noqa
 from xdg import IconTheme
 
 #### BEGIN Scipyen modules
 #
 from core.prog import scipywarn, print_styled
-from core import sysutils, prog
+from core import sysutils, prog # noqa
 from core import scipyen_config
 #
 #### END Scipyen modules
@@ -126,16 +126,16 @@ else:
 #### END core python modules
 
 #### BEGIN 3rd party modules
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -145,8 +145,8 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
         
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    from qtpy import sip # noqa
+    from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -216,24 +216,6 @@ if sys.platform.startswith("win32"):
     # print(f"windowColor HSV: {v} -> themeName: {themeName}")
 
     QtGui.QIcon.setThemeName(themeName)
-    # if hasQDarkTheme:
-    #     # qdarktheme.setup_theme("auto") # NOTE: 2025-03-02 20:52:51
-    #                                      # this MUST be called after the initlization of the QApplication
-    #                                      # see NOTE: 2025-03-02 20:53:09 below
-    #     qdarktheme.enable_hi_dpi()
-    #     QtGui.QIcon.setThemeName("breeze-dark")
-    # else:
-    #     windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
-    #     _,_,v,_ = windowColor.getHsv()
-    #     themeName="breeze" if v > 128 else "breeze-dark"
-    #     # print(f"windowColor HSV: {v} -> themeName: {themeName}")
-    #
-    #     QtGui.QIcon.setThemeName(themeName)
-
-        # if v > 128:
-        #     QtGui.QIcon.setThemeName("breeze")
-        # else:
-        #     QtGui.QIcon.setThemeName("breeze-dark")
 
         # FIXME 2023-09-28 23:22:31 BUG
         # github merry-go-round replaces svg symbolic links (linux) with
@@ -307,6 +289,8 @@ def main():
     # see also WARNING: 2025-01-22 08:55:40 in gui.mainwindow
     # import gui.mainwindow as mainwindow
     # print(f"Using {os.environ['QT_API']} for GUI and {os.environ['PYQTGRAPH_QT_LIB']} for PyQtGraph\n")
+
+
     faulthandler.enable()
     
     # NOTE: 2021-08-17 10:02:20

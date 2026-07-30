@@ -90,7 +90,8 @@ class SignalBlocker():
     def __init__(self, widgets: typing.Union[QtWidgets.QWidget,
                                              typing.Sequence[QtWidgets.QWidget]]):
         self._blockers_ = tuple()
-        if isinstance(widgets, QtWidgets.QWidget):
+        # if isinstance(widgets, QtWidgets.QWidget):
+        if isinstance(widgets, QtCore.QObject):
             self._widgets_ = (widgets, )
         else:
             self._widgets_ = tuple(

@@ -27,8 +27,8 @@ import inspect
 import io
 import warnings
 import numbers
-import decimal
-import fractions
+import decimal # noqa
+import fractions # noqa
 # import faulthandler
 import importlib
 # NOTE: 2024-09-26 12:16:28
@@ -37,24 +37,24 @@ import importlib
 import subprocess
 import platform
 import traceback
-import keyword
-import inspect
-import weakref
+import keyword # noqa
+import inspect # noqa
+import weakref # noqa
 import itertools
-import more_itertools # NOTE: 2024-09-26 12:44:08 this is not a core python but might as well be!
+import more_itertools # NOTE: 2024-09-26 12:44:08 this is not a core python but might as well be! # noqa
 import typing
-import functools
-import operator
-import json
+import functools # noqa
+import operator # noqa
+import json # noqa
 import pathlib
-from pprint import pprint
-from copy import copy
+from pprint import pprint # noqa
+from copy import copy # noqa
 from copy import deepcopy
 import collections
 # from collections import deque
 # from collections import ChainMap
-import cmath
-from tribool import Tribool
+import cmath # noqa
+from tribool import Tribool # noqa
 import datetime
 
 # END core python modules
@@ -63,14 +63,14 @@ import datetime
 
 # BEGIN PyQtxxx
 import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ =False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
     import PySide6
-    from PySide6 import Shiboken
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -88,7 +88,7 @@ __has_qtdbus__ = False
 try:
     from qtpy import QtDBus
     __has_qtdbus__ = True
-except:
+except: # noqa
     __has_qtdbus__ = False
 
 # BEGIN About QStyle plugins
@@ -137,7 +137,7 @@ from traitlets.utils.bunch import Bunch
 # vigra is imported via my own vigra_patches module
 import numpy as np
 import numpy.ma as ma # noqa
-import pywt  # wavelets
+import pywt  # wavelets # noqa
 import scipy # noqa
 from scipy import io as sio # noqa
 from scipy import stats # noqa
@@ -174,9 +174,9 @@ import pingouin as pn  # noqa
 import mpmath as mpm # noqa
 
 #import researchpy as rp  # for use with DataFrames & stats -- not here ?!?
-import joblib as jl  # to use functions as pipelines: lightweight pipelining in Python
+import joblib as jl  # to use functions as pipelines: lightweight pipelining in Python # noqa
 # import sklearn as sk  # machine learning, also nice plot_* functionality
-import seaborn as sb  # statistical data visualization
+import seaborn as sb  # statistical data visualization # noqa
 # print("mainwindow.py __name__ =", __name__)
 
 # BEGIN matplotlib modules
@@ -185,8 +185,9 @@ if __has_PyQt6__ or __has_PySide6__: # still doesn't seem to work properly? see 
     mpl.use("qtagg")
 else:
     mpl.use("qt5agg")
-from matplotlib._pylab_helpers import Gcf as Gcf
-import matplotlib.mlab as mlb
+
+from matplotlib._pylab_helpers import Gcf as Gcf # noqa
+import matplotlib.mlab as mlb # noqa
 import matplotlib.pyplot as plt
 
 # BEGIN configure matplotlib
@@ -220,7 +221,7 @@ import colorama  # noqa
 # END 3rd party modules
 
 # BEGIN scipyen modules
-from core import qtutils
+from core import qtutils # noqa
 from core import datazone # noqa
 from core import datatypes # noqa
 from core import basescipyen # noqa
@@ -229,12 +230,13 @@ from core import prog # noqa
 from core import pyabfbridge as pab # noqa
 from core import scipyen_plugin_loader # noqa
 from core import scipyen_config as scipyenconf # noqa
+from core import scipyendataclasses as sdc # noqa
 from core import utilities # noqa
 from core import svgutils # noqa
 from core import models # noqa
 from core import (bgbridge, taxonbridge) # noqa
 from core import deferredmeasures as dms # noqa
-from core.deferredmeasures import *
+from core.deferredmeasures import * # noqa
 
 from core.basescipyen import BaseScipyenData # noqa
 
@@ -327,10 +329,10 @@ from . import scipyenviewer # noqa
 from . import quickdialog as qd # noqa
 # from .resources import resources_rc #as resources_rc
 # from .resources import icons_rc
-from .resources import breeze_icons_rc
-from .resources import breeze_dark_icons_rc
-from .resources import extra_icons_rc
-from .resources import images_rc
+from .resources import breeze_icons_rc # noqa
+from .resources import breeze_dark_icons_rc # noqa
+from .resources import extra_icons_rc # noqa
+from .resources import images_rc # noqa
 from . import pictgui as pgui # noqa
 from . import xmlviewer as xv # noqa
 from . import textviewer as tv # noqa
@@ -452,7 +454,7 @@ def checkVersion():
             if sysutils.checkGitRepo(repoDir, "Scipyen"):
                 verstr = sysutils.getUnbuiltVersion(p)
 
-        except:
+        except: # noqa
             traceback.print_exc()
 
     if verstr is None:
@@ -464,7 +466,7 @@ def checkVersion():
 
             if version_file.exists():
                 verstr = version_file.read_text(encoding="utf-8").strip("\n").strip()
-        except:
+        except: # noqa
             traceback.print_exc()
 
     return verstr
@@ -547,7 +549,7 @@ def console_info():
 # in scipyen.py by importing this module AFTER the QApplication is initialized
 # see NOTE: 2025-01-22 08:56:42
 # QWidget: Must construct a QApplication before a QWidget
-from iolib.navigation import navigator
+from iolib.navigation import navigator # noqa
 
 _mainwindow_ui_file = "mainwindow.ui"
 
@@ -620,7 +622,7 @@ class WorkspaceViewer(QtWidgets.QTableView):
                     mimeData = QtCore.QMimeData()
                     mimeData.setText(varName)
                     drag.setMimeData(mimeData)
-                    dropAction = drag.exec(QtCore.Qt.CopyAction)
+                    dropAction = drag.exec(QtCore.Qt.CopyAction) # noqa
 
 # NOTE 2016-03-27 16:53:16
 # the way multiple inheritance works in pyqt dictates that additional signals are
@@ -1080,7 +1082,7 @@ class AboutDialog(QtWidgets.QDialog, __UI_AboutLicense__):
             if inspect.ismethod(method):
                 try:
                     method.__call__()
-                except:
+                except: # noqa
                     traceback.print_exc()
         elif not link.isRelative():
             QtGui.QDesktopServices.openUrl(link)
@@ -1197,10 +1199,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                         def interpret_str(varstr):
                             try:
                                 ret = int(varstr)
-                            except:
+                            except: # noqa
                                 try:
                                     ret = float(varstr)
-                                except:
+                                except: # noqa
                                     ret = varstr
 
                             print(ret)
@@ -1211,7 +1213,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                             dictargs = [[interpret_str(j.strip()) for j in i.split(
                                 '=')] for i in varstr.split(',')]
                             print(len(dictargs))
-                            dct = dict()
+                            # dct = dict()
 
                             for k, e in enumerate(dictargs):
                                 if len(e) == 2:
@@ -1420,7 +1422,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
                 return inner_f
 
-            except Exception as e:
+            except: # noqa
                 traceback.print_exc()
 
         return prompt_f
@@ -1794,8 +1796,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 m.__dict__["workspace"] = self.workspace
 
 
-        sigBlock = QtCore.QSignalBlocker(self.actionUse_system_default_font)
-        self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
+        with qtutils.SignalBlocker(self.actionUse_system_default_font):
+            # sigBlock = QtCore.QSignalBlocker(self.actionUse_system_default_font)
+            self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
         self.sig_splashMessage.emit("Initializing Scipyen Console...")
 
         self._init_QtConsole_() # also instantiates self.shell, etc
@@ -1898,7 +1901,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     self._systemDBusConnection_.connect(uDisks_service, uDisks_path, uDisks_iFace, "InterfacesAdded", self._slot_uDisk_changes)
                     self._systemDBusConnection_.connect(uDisks_service, uDisks_path, uDisks_iFace, "InterfacesRemoved", self._slot_uDisk_changes)
 
-                except:
+                except: # noqa
                     traceback.print_exc()
                 # TODO 2025-06-30 23:47:57 finalize me !!!
 #                 if isinstance(self._dbusUniqueName_, str) and len(self._dbusUniqueName_.strip()):
@@ -1954,10 +1957,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @navigateToRecentFileDirectory.setter
     def navigateToRecentFileDirectory(self, val:bool):
         self._navigateToRecentFileDir_ = val is True
-        sigBlock = QtCore.QSignalBlocker(self.actionOpeningARecentFileNavigatesToItsDirectory)
-        self.actionOpeningARecentFileNavigatesToItsDirectory.setChecked(self._navigateToRecentFileDir_ is True)
+
+        with qtutils.SignalBlocker(self.actionOpeningARecentFileNavigatesToItsDirectory):
+            # sigBlock = QtCore.QSignalBlocker(self.actionOpeningARecentFileNavigatesToItsDirectory)
+            self.actionOpeningARecentFileNavigatesToItsDirectory.setChecked(self._navigateToRecentFileDir_ is True)
+
         if self._navigateToRecentFileDir_:
             self.tbOpen.setToolTip("Open (click on arrow to the right to reveal recently opened files; hold SHIFT to ALSO change to directory of the opened recent file)")
+
         else:
             self.tbOpen.setToolTip("Open (click on arrow to the right to reveal recently opened files; hold SHIFT to PREVENT changing to the directory of the opened recent file)")
 
@@ -1969,8 +1976,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @navigateToDroppedFileDirectory.setter
     def navigateToDroppedFileDirectory(self, val:bool):
         self._navigateToDroppedFileDir_ = val is True
-        sigBlock = QtCore.QSignalBlocker(self.actionSynchronize_working_directory_when_opening_a_dropped_file)
-        self.actionSynchronize_working_directory_when_opening_a_dropped_file.setChecked(self._navigateToDroppedFileDir_ is True)
+        with qtutils.SignalBlocker(self.actionSynchronize_working_directory_when_opening_a_dropped_file):
+            # sigBlock = QtCore.QSignalBlocker(self.actionSynchronize_working_directory_when_opening_a_dropped_file)
+            self.actionSynchronize_working_directory_when_opening_a_dropped_file.setChecked(self._navigateToDroppedFileDir_ is True)
 
     @property
     def shellAutomagic(self) -> bool:
@@ -1979,16 +1987,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @markConfigurable("ShellAutomagic")
     @shellAutomagic.setter
     def shellAutomagic(self, val:bool):
-        self._shell_automagics = val == True
+        self._shell_automagics = val is True
         if self.console:
             self.console.shellAutomagic = self._shell_automagics
 
-        signalBlock = QtCore.QSignalBlocker(self.actionUseShellAutomagic)
-        self.actionUseShellAutomagic.setChecked(self.console.shellAutomagic)
+        with qtutils.SignalBlocker(self.actionUseShellAutomagic):
+            # signalBlock = QtCore.QSignalBlocker(self.actionUseShellAutomagic)
+            self.actionUseShellAutomagic.setChecked(self.console.shellAutomagic)
 
     @Slot(bool)
     def _slot_UseShellAutomagic(self, val:bool):
-        self.shellAutomagic = val == True
+        self.shellAutomagic = val is True
 
     @property
     def hideFilesWhenFiltering(self) -> bool:
@@ -1997,15 +2006,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @markConfigurable("HideFilteredFileNames", "Qt")
     @hideFilesWhenFiltering.setter
     def hideFilesWhenFiltering(self, val:bool):
-        self._fileNamesFiltersHides_ = val==True
+        self._fileNamesFiltersHides_ = val is True
         self.fileSystemModel.setNameFilterDisables(not self._fileNamesFiltersHides_)
-        sigBlock = [QtCore.QSignalBlocker(w) for w in (self.actionHide_Filtered_out_File_Names, self.hideFilteredOutnamesToolButton)]
-        self.actionHide_Filtered_out_File_Names.setChecked(self._fileNamesFiltersHides_)
-        self.hideFilteredOutnamesToolButton.setChecked(self._fileNamesFiltersHides_)
+
+        with qtutils.SignalBlocker((self.actionHide_Filtered_out_File_Names, self.hideFilteredOutnamesToolButton)):
+            # sigBlock = [QtCore.QSignalBlocker(w) for w in (self.actionHide_Filtered_out_File_Names, self.hideFilteredOutnamesToolButton)]
+            self.actionHide_Filtered_out_File_Names.setChecked(self._fileNamesFiltersHides_)
+            self.hideFilteredOutnamesToolButton.setChecked(self._fileNamesFiltersHides_)
 
     @Slot(bool)
     def _slot_hideFilteredFileNames(self, val:bool):
-        self.hideFilesWhenFiltering = val==True
+        self.hideFilesWhenFiltering = val is True
 
     @property
     def useNewNavigatorLook(self) -> bool:
@@ -2014,14 +2025,16 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @markConfigurable("UseNewNavigatorLook", "Qt")
     @useNewNavigatorLook.setter
     def useNewNavigatorLook(self, val:bool):
-        self._newNavigatorLook_ = val == True
+        self._newNavigatorLook_ = val is True
         self.navigator.newLook = self._newNavigatorLook_
-        signalBlocker = QtCore.QSignalBlocker(self.actionUse_New_Navigator_Look)
-        self.actionUse_New_Navigator_Look.setChecked(self.navigator.newLook)
+
+        with qtutils.SignalBlocker(self.actionUse_New_Navigator_Look):
+            # signalBlocker = QtCore.QSignalBlocker(self.actionUse_New_Navigator_Look)
+            self.actionUse_New_Navigator_Look.setChecked(self.navigator.newLook)
 
     @Slot(bool)
     def _slot_newNavigatorLook(self, val:bool) -> None:
-        self.useNewNavigatorLook = val == True
+        self.useNewNavigatorLook = val is True
 
     @property
     def useNativeMenuBar(self) -> bool:
@@ -2030,14 +2043,16 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @markConfigurable("UseNativeMenuBar", "Qt")
     @useNativeMenuBar.setter
     def useNativeMenuBar(self, val:bool) -> None:
-        self._useNativeMenuBar = val == True
-        signalBlocker = QtCore.QSignalBlocker(self.actionUse_Native_Menu_Bar)
-        self.actionUse_Native_Menu_Bar.setChecked(self._useNativeMenuBar == True)
+        self._useNativeMenuBar = val is True
+
+        with qtutils.SignalBlocker(self.actionUse_Native_Menu_Bar):
+            self.actionUse_Native_Menu_Bar.setChecked(self._useNativeMenuBar is True)
+
         self.menuBar().setNativeMenuBar(self._useNativeMenuBar)
 
     @Slot(bool)
     def _slot_useNativeMenuBar(self, val:bool) -> None:
-        self.useNativeMenuBar = val == True
+        self.useNativeMenuBar = val is True
 
     @property
     def desktopScreen(self) -> QtGui.QScreen:
@@ -2169,7 +2184,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         • UIPluginNames
         • getMenusForUIPlugin
         """
-        return dict((k.__name__, dict((self._crawl_plugin_UI_menu(act), l.__name__) for l,act in v.items())) for k,v in  self._ui_plugins_.items())
+        return dict((k.__name__, dict((self._crawl_plugin_UI_menu(act), lobj.__name__) for lobj, act in v.items())) for k, v in self._ui_plugins_.items())
 
 #     @property
 #     def externalHDF5Viewer(self) -> str:
@@ -2193,7 +2208,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @userPluginsDirectory.setter
     def userPluginsDirectory(self, val:typing.Union[str, pathlib.Path]):
         if isinstance(val, pathlib.Path):
-            val = str(a)
+            val = str(val)
 
         elif not isinstance(val, str) or len(val.strip()) == 0:
             val = self._default_scipyen_user_plugins_dir
@@ -2226,8 +2241,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @toolBarLocked.setter
     def toolBarLocked(self, val:bool):
         self._lockedToolBar = val is True
-        signalBlocker = QtCore.QSignalBlocker(self.lockToolBarAction)
-        self.lockToolBarAction.setChecked(self._lockedToolBar)
+        with qtutils.SignalBlocker(self.lockToolBarAction):
+            self.lockToolBarAction.setChecked(self._lockedToolBar)
         self.toolBar.setMovable(not self._lockedToolBar)
 
     @Slot(bool)
@@ -2245,22 +2260,24 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # print(f"{self.__class__.__name__}.toolBarIconSize.setter(val = {val})")
         self._tbIconSize = val
         self.toolBar.setIconSize(val)
-        signalBlocker = QtCore.QSignalBlocker(self.toolBarIconSizeActionGroup)
-        if self._tbIconSize == self._defaultTbIconSize:
-            self.defaultToolBarIconSizeAction.setChecked(True)
-        elif self._tbIconSize == QtCore.QSize(16,16):
-            self.smallToolBarIconSizeAction.setChecked(True)
-        elif self._tbIconSize == QtCore.QSize(22,22):
-            self.mediumToolBarIconSizeAction.setChecked(True)
-        elif self._tbIconSize == QtCore.QSize(32,32):
-            self.largeToolBarIconSizeAction.setChecked(True)
-        elif self._tbIconSize == QtCore.QSize(48, 48):
-            self.hugeToolBarIconSizeAction.setChecked(True)
-        else:
-            for action in [self.defaultToolBarIconSizeAction, self.smallToolBarIconSizeAction,
-                            self.mediumToolBarIconSizeAction, self.largeToolBarIconSizeAction,
-                            self.hugeToolBarIconSizeAction]:
-                action.setChecked(False)
+
+        with qtutils.SignalBlocker(self.toolBarIconSizeActionGroup):
+            if self._tbIconSize == self._defaultTbIconSize:
+                self.defaultToolBarIconSizeAction.setChecked(True)
+            elif self._tbIconSize == QtCore.QSize(16,16):
+                self.smallToolBarIconSizeAction.setChecked(True)
+            elif self._tbIconSize == QtCore.QSize(22,22):
+                self.mediumToolBarIconSizeAction.setChecked(True)
+            elif self._tbIconSize == QtCore.QSize(32,32):
+                self.largeToolBarIconSizeAction.setChecked(True)
+            elif self._tbIconSize == QtCore.QSize(48, 48):
+                self.hugeToolBarIconSizeAction.setChecked(True)
+            else:
+                for action in [self.defaultToolBarIconSizeAction, self.smallToolBarIconSizeAction,
+                                self.mediumToolBarIconSizeAction, self.largeToolBarIconSizeAction,
+                                self.hugeToolBarIconSizeAction]:
+                    action.setChecked(False)
+
         ww = list(filter(lambda w: isinstance(w, QtWidgets.QMainWindow), self.app.allWidgets()))
         for w in ww:
             toolbars = w.findChildren(QtWidgets.QToolBar)
@@ -2287,11 +2304,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         return self.toolBar.toolButtonStyle()
 
     def _update_tbBtnStyleActions(self):
-        signalBlocker = QtCore.QSignalBlocker(self.toolBarIconSizeActionGroup)
-        self.defaultToolBarToolButtonStyleAction.setChecked(self._tbButtonStyle == self._defaultTbButtonStyle)
-        self.iconsOnlyToolBarToolButtonStyleAction.setChecked(self._tbButtonStyle == QtCore.Qt.ToolButtonIconOnly)
-        self.textOnlyToolBarToolButtonStyleAction.setChecked(self._tbButtonStyle == QtCore.Qt.ToolButtonTextOnly)
-        self.textUnderIconsToolBarToolButtonStyleAction.setChecked(self._tbButtonStyle == QtCore.Qt.ToolButtonTextBesideIcon)
+        with qtutils.SignalBlocker(self.toolBarIconSizeActionGroup):
+            self.defaultToolBarToolButtonStyleAction.setChecked(self._tbButtonStyle == self._defaultTbButtonStyle)
+            self.iconsOnlyToolBarToolButtonStyleAction.setChecked(self._tbButtonStyle == QtCore.Qt.ToolButtonIconOnly)
+            self.textOnlyToolBarToolButtonStyleAction.setChecked(self._tbButtonStyle == QtCore.Qt.ToolButtonTextOnly)
+            self.textUnderIconsToolBarToolButtonStyleAction.setChecked(self._tbButtonStyle == QtCore.Qt.ToolButtonTextBesideIcon)
 
     @markConfigurable("ToolBarButtonStyle", "Qt")
     @toolBarButtonStyle.setter
@@ -2356,6 +2373,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 currentIS = 32
             else:
                 currentIS = 48
+
         selected = list(icon_sizes.values()).index(currentIS)
 
         cb.setCurrentIndex(selected)
@@ -2394,6 +2412,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 val = 32
             else:
                 val = 48
+
         self._workspaceIconSize_ = val
         self._set_workspace_icon_Size(val)
 
@@ -2405,6 +2424,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         cb = qd.QuickDialogComboBox(dlg, "Icon Size:")
         dlg.addWidget(cb)
         cb.setItems(texts)
+
         if self.fileSystemViewMode == "Icons":
             currentIS = self.fileSystemIconModeIconSize
         else:
@@ -2419,6 +2439,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 currentIS = 32
             else:
                 currentIS = 48
+
         selected = list(icon_sizes.values()).index(currentIS)
 
         cb.setCurrentIndex(selected)
@@ -2448,8 +2469,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         iconSize = QtCore.QSize(val, val)
         self.fileSystemTreeView.setIconSize(iconSize)
         self.fileSystemColumnView.setIconSize(iconSize)
+
         if self.fileSystemViewMode == "List":
             self.fileSystemListView.setIconSize(iconSize)
+
         else:
             self.fileSystemListView.setIconSize(QtCore.QSize(self._fileSystemIconModeIconSize_,
                                                              self._fileSystemIconModeIconSize_))
@@ -2467,6 +2490,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 val = 32
             else:
                 val = 48
+
         self._fileSystemListTreeColumnModeIconSize_ = val
         self._set_filesystem_icon_size(val)
 
@@ -2492,13 +2516,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         if self.fileSystemViewMode == "Icon":
             self.fileSystemListView.setIconSize(self._fileSystemIconModeIconSize_)
-        # else:
-        #     self.fileSystemListView.setIconSize(self._fileSystemIconModeIconSize_)
 
     @Slot()
     def _slot_configureIconSize(self):
-        # icon_sizes = [16, 22, 32, 48]
-        # texts = [f"{k}x{k}" for k in icon_sizes]
         icon_sizes = {"Small":16, "Medium":22, "Large":32, "Huge":48}
         texts = list(map(lambda i: f"{i[0]} ({i[1]}×{i[1]})", icon_sizes.items()))
         dlg = qd.QuickDialog(self, "Set Icon Size", True, False)
@@ -2516,8 +2536,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 currentIS = 32
             else:
                 currentIS = 48
-        # print(f"currentIS = {currentIS}")
-        # print(f"ndx = {icon_sizes.index(currentIS)}")
+
         selected = list(icon_sizes.values()).index(currentIS)
 
         cb.setCurrentIndex(selected)
@@ -2552,8 +2571,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # print(f"{self.__class__.__name__}._set_toolButtonStyle({val}:{type(val)})")
         if isinstance(val, QtCore.Qt.ToolButtonStyle):
             val = val.value
+
         if isinstance(val, str):
             stylesDict = dict((i.name, i) for i in QtCore.Qt.ToolButtonStyle)
+
             if val not in stylesDict:
                 scipywarn(f"invalid argument: {val} ({type(val)})")
                 return
@@ -2565,6 +2586,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 scipywarn(f"invalid argument: {val} ({type(val)})")
                 return
             val = stylesDict[val]
+
         elif not isinstance(val, QtCore.Qt.ToolButtonStyle):
             scipywarn(f"invalid argument: {val} ({type(val)})")
             return
@@ -2575,24 +2597,20 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if isinstance(w, QtWidgets.QMainWindow):
                 w.setToolButtonStyle(val)
 
-        # self.toolBarButtonStyle = val
-
     @Slot()
     def _slot_configureToolButtonStyle(self):
         dlg = qd.QuickDialog(self, "Set tool button style across Scipyen")
         styleChoice = qd.Choice(dlg, "Select style", vertical=True)
         dlg.adjustSize()
         styleDict = dict()
+
         for item in QtCore.Qt.ToolButtonStyle:
             styleChoice.addButton(item.name, item.value)
             styleDict[item.value] = item.name
         styleChoice.selectButton(self._toolButtonStyle_)
+
         if dlg.exec():
             self._set_toolButtonStyle(styleChoice.selection())
-            # self._toolButtonStyle_ = styleChoice.selection()
-            # self._set_toolButtonStyle(self._toolButtonStyle_)
-
-
 
     @property
     def guiIconSize(self) -> int:
@@ -2604,10 +2622,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         for w in ww:
             if isinstance(w, QtWidgets.QMainWindow):
                 w.setIconSize(iconSize)
+
             if __has_PySide6__:
                 btns = w.findChildren(QtWidgets.QToolButton) + w.findChildren(QtWidgets.QPushButton)
+
             else:
                 btns = w.findChildren((QtWidgets.QToolButton, QtWidgets.QPushButton))
+
             for b in btns:
                 b.setIconSize(iconSize)
 
@@ -2625,6 +2646,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 val = 32
             else:
                 val = 48
+
         self._guiIconSize_ = val
 
         self._set_icon_Size(val)
@@ -2659,8 +2681,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self._auto_remove_viewers_ = value
 
-        sigBlock = QtCore.QSignalBlocker(self.actionAuto_delete_viewer)
-        self.actionAuto_delete_viewer.setChecked(self._auto_remove_viewers_)
+        with qtutils.SignalBlocker(self.actionAuto_delete_viewer):
+            self.actionAuto_delete_viewer.setChecked(self._auto_remove_viewers_)
 
     @property
     def maxRecentFiles(self):
@@ -2760,15 +2782,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         _,_,v,_ = windowColor.getHsv()
         themeName="breeze" if v > 128 else "breeze-dark"
         QtGui.QIcon.setThemeName(themeName)
-        # if v > 128:
-        #     QtGui.QIcon.setThemeName("breeze")
-        # else:
-        #     QtGui.QIcon.setThemeName("breeze-dark")
-
-
-        # if sys.platform.startswith("win32"):
-        #     if hasQDarkTheme:
-        #         QtGui.QIcon.setThemeName("breeze-dark")
 
     @property
     def scriptManagerAutoLaunch(self):
@@ -2782,12 +2795,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             val = True if val.lower() == "true" else False
 
         self._script_manager_autolaunch = True
-        sigblock = QtCore.QSignalBlocker(self.actionAuto_launch_Script_Manager)
-        self.actionAuto_launch_Script_Manager.setChecked(val)
+        with qtutils.SignalBlocker(self.actionAuto_launch_Script_Manager):
+            self.actionAuto_launch_Script_Manager.setChecked(val)
 
         if not val is True:
-        #     self._showScriptsManagerWindow()
-        # else:
             self._scriptManager_.close()
 
     @property
@@ -2802,53 +2813,51 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self._fileSystemViewMode_ = val
 
-        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), # noqa
-                                  (self.actionTreeView, self.actionListView,
+        with qtutils.SignalBlocker((self.actionTreeView, self.actionListView,
                                    self.actionIconView, self.actionColumnView,
                                    self.fileSystemViewToolButton,
-                                   self.fileSystemViewStackedWidget)))
+                                   self.fileSystemViewStackedWidget)):
+            if self._fileSystemViewMode_ == "Tree":
+                self.fileSystemViewToolButton.setIcon(guiutils.getIcon("view-list-tree"))
+                self.actionTreeView.setChecked(True)
+                for a in (self.actionListView,self.actionIconView, self.actionColumnView):
+                    a.setChecked(False)
+                self.fileSystemTreeView.setIconSize(QtCore.QSize(self._fileSystemListTreeColumnModeIconSize_,
+                                                                self._fileSystemListTreeColumnModeIconSize_))
+                ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemTreeViewPage)
+                self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
 
-        if self._fileSystemViewMode_ == "Tree":
-            self.fileSystemViewToolButton.setIcon(guiutils.getIcon("view-list-tree"))
-            self.actionTreeView.setChecked(True)
-            for a in (self.actionListView,self.actionIconView, self.actionColumnView):
-                a.setChecked(False)
-            self.fileSystemTreeView.setIconSize(QtCore.QSize(self._fileSystemListTreeColumnModeIconSize_,
-                                                               self._fileSystemListTreeColumnModeIconSize_))
-            ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemTreeViewPage)
-            self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
+            elif self._fileSystemViewMode_ == "List":
+                self.fileSystemViewToolButton.setIcon(guiutils.getIcon("view-list-details"))
+                self.actionListView.setChecked(True)
+                for a in (self.actionTreeView,self.actionIconView, self.actionColumnView):
+                    a.setChecked(False)
+                self.fileSystemListView.setViewMode(QtWidgets.QListView.ListMode)
+                self.fileSystemListView.setIconSize(QtCore.QSize(self._fileSystemListTreeColumnModeIconSize_,
+                                                                self._fileSystemListTreeColumnModeIconSize_))
+                ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemListViewPage)
+                self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
 
-        elif self._fileSystemViewMode_ == "List":
-            self.fileSystemViewToolButton.setIcon(guiutils.getIcon("view-list-details"))
-            self.actionListView.setChecked(True)
-            for a in (self.actionTreeView,self.actionIconView, self.actionColumnView):
-                a.setChecked(False)
-            self.fileSystemListView.setViewMode(QtWidgets.QListView.ListMode)
-            self.fileSystemListView.setIconSize(QtCore.QSize(self._fileSystemListTreeColumnModeIconSize_,
-                                                             self._fileSystemListTreeColumnModeIconSize_))
-            ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemListViewPage)
-            self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
+            elif self._fileSystemViewMode_ == "Icon":
+                self.fileSystemViewToolButton.setIcon(guiutils.getIcon("view-list-icons"))
+                self.actionIconView.setChecked(True)
+                for a in (self.actionTreeView,self.actionListView, self.actionColumnView):
+                    a.setChecked(False)
+                self.fileSystemListView.setViewMode(QtWidgets.QListView.IconMode)
+                self.fileSystemListView.setIconSize(QtCore.QSize(self._fileSystemIconModeIconSize_,
+                                                                self._fileSystemIconModeIconSize_))
+                ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemListViewPage)
+                self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
 
-        elif self._fileSystemViewMode_ == "Icon":
-            self.fileSystemViewToolButton.setIcon(guiutils.getIcon("view-list-icons"))
-            self.actionIconView.setChecked(True)
-            for a in (self.actionTreeView,self.actionListView, self.actionColumnView):
-                a.setChecked(False)
-            self.fileSystemListView.setViewMode(QtWidgets.QListView.IconMode)
-            self.fileSystemListView.setIconSize(QtCore.QSize(self._fileSystemIconModeIconSize_,
-                                                             self._fileSystemIconModeIconSize_))
-            ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemListViewPage)
-            self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
-
-        elif self._fileSystemViewMode_ == "Column":
-            self.fileSystemViewToolButton.setIcon(guiutils.getIcon("object-columns"))
-            self.actionColumnView.setChecked(True)
-            for a in (self.actionTreeView,self.actionListView, self.actionIconView):
-                a.setChecked(False)
-            self.fileSystemColumnView.setIconSize(QtCore.QSize(self._fileSystemListTreeColumnModeIconSize_,
-                                                               self._fileSystemListTreeColumnModeIconSize_))
-            ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemColumnViewPage)
-            self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
+            elif self._fileSystemViewMode_ == "Column":
+                self.fileSystemViewToolButton.setIcon(guiutils.getIcon("object-columns"))
+                self.actionColumnView.setChecked(True)
+                for a in (self.actionTreeView,self.actionListView, self.actionIconView):
+                    a.setChecked(False)
+                self.fileSystemColumnView.setIconSize(QtCore.QSize(self._fileSystemListTreeColumnModeIconSize_,
+                                                                self._fileSystemListTreeColumnModeIconSize_))
+                ndx = self.fileSystemViewStackedWidget.indexOf(self.fileSystemColumnViewPage)
+                self.fileSystemViewStackedWidget.setCurrentIndex(ndx)
 
     @Slot(bool)
     def _slot_fileViewTreeMode(self, val:bool):
@@ -2886,7 +2895,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self._recentDirectories.clear()
             self._recentDirectories.extend(keep)
             self._refreshRecentDirectoriesMenu_()
-            # self._refreshRecentDirsComboBox_()
 
 
     @property
@@ -2902,9 +2910,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             items = tuple(filter(lambda v: pathlib.Path(v[0]).exists(), sorted(val.items(), key = lambda x: x[1]["timestamp"], reverse=True)))
 
             self._recentFiles = val.__class__(items)
-        # elif isinstance(val, (tuple, list)):
-        #     self._recentFiles = collections.OrderedDict(
-        #         zip(val, ["vigra"] * len(val)))
+
         else:
             self._recentFiles = collections.OrderedDict()
 
@@ -2931,16 +2937,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         url = QtCore.QUrl(path.as_uri())
         self.navigator.setLocationUrl(url)
         self.navigator.urlChanged.emit(url)
-        # if isinstance(self.navigator, navigator.UrlNavigator):
-        #     path = pathlib.Path(self._recentDirectories[0])
-        #     if not path.is_dir():
-        #         path = pathlib.Path(self._user_home_)
-        #     url = QtCore.QUrl(path.as_uri())
-        #     self.navigator.setLocationUrl(url)
-        #     self.navigator.urlChanged.emit(url)
-        # else: # NOTE: 2025-03-31 15:15:12 DEPRECATED branch TODO REMOVE
-        #     self.slot_changeDirectory(self._recentDirectories[0])  # alse refreshes gui
-
 
     @property
     def fileSystemFilterHistory(self):
@@ -2999,10 +2995,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.filesFilterFrame.setVisible(self._showFilesFilter)
 
-        # signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.toggleFilesFilterToolBtn, self.hideFilesFilterToolBtn)]
-        signalBlocker = QtCore.QSignalBlocker(self.toggleFilesFilterToolBtn)
-
-        self.toggleFilesFilterToolBtn.setChecked(self._showFilesFilter)
+        with qtutils.SignalBlocker(self.toggleFilesFilterToolBtn):
+            self.toggleFilesFilterToolBtn.setChecked(self._showFilesFilter)
 
     @property
     def fileSystemTimeFormat(self) -> str:
@@ -3014,11 +3008,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if isinstance(val, str) and val in ("LongFormat", "ShortFormat", "NarrowFormat", "Fancy Short", "Fancy Narrow"):
             self._fileSystemTimeDisplayFormat_ = val
             self.fileSystemModel.timeFormat = self._fileSystemTimeDisplayFormat_
-            # if self._fileSystemTimeDisplayFormat_.startswith("Fancy"):
-            #     short = self._fileSystemTimeDisplayFormat_.endswith("Short")
-            #     tFormat = QtCore.QLocale.ShortFormat if short else QtCore.QLocale.LongFormat
-            # self.fileSystemModel.timeFormat = getattr(QtCore.QLocale.FormatType,
-            #                                           self._fileSystemTimeDisplayFormat_)
+
         else:
             self._fileSystemTimeDisplayFormat_ = "Standard"
             self.fileSystemModel.timeFormat = None
@@ -3184,7 +3174,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @markConfigurable("UseSystemFont", "Qt")
     @useSystemFont.setter
     def useSystemFont(self, val:bool):
-        self._useSystemDefaultFont = val == True
+        self._useSystemDefaultFont = val is True
         self._updateWorkspaceItemsFont()
         self._updateHistoryViewFont()
 
@@ -3309,7 +3299,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def variableSearches(self, val: typing.Optional[typing.Union[collections.deque, list, tuple]] = None):
         if isinstance(val, (collections.deque, list, tuple)):
             self._recentVariablesList = collections.deque(val)
-            # self._recentVariablesList = collections.deque(sorted((s for s in val)))
 
         else:
             self._recentVariablesList = collections.deque()
@@ -3340,14 +3329,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @markConfigurable("UseLastHistoryCommandSearch", "Qt")
     @useLastHistoryCommandSearch.setter
     def useLastHistoryCommandSearch(self, val:bool):
-        self._useLastHistoryCommandSearch_ = val == True
-        signalBlocker = QtCore.QSignalBlocker(self.useLastHistoryCommandSearchAction)
-        self.useLastHistoryCommandSearchAction.setChecked(self._useLastHistoryCommandSearch_)
+        self._useLastHistoryCommandSearch_ = val is True
+        with qtutils.SignalBlocker(self.useLastHistoryCommandSearchAction):
+            self.useLastHistoryCommandSearchAction.setChecked(self._useLastHistoryCommandSearch_)
 
     @Slot(bool)
     def _slot_toggleUseLastHistoryCommandSearch(self, val:bool):
         oldVal = self._useLastHistoryCommandSearch_
-        self.useLastHistoryCommandSearch = val == True
+        self.useLastHistoryCommandSearch = val is True
 
         if oldVal == val:
             return
@@ -3359,6 +3348,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             topLevelItem = self.historyTreeWidget.topLevelItem(self.historyTreeWidget.topLevelItemCount()-1)
             self.historyTreeWidget.setSelectionMode(original_selection_mode)
             self.historyTreeWidget.scrollToItem(topLevelItem)
+
         else:
             self.commandHistoryFinderComboBox.setCurrentIndex(0)
 
@@ -3372,7 +3362,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def commandSearches(self, val: typing.Optional[typing.Union[collections.deque, list, tuple]] = None):
         if isinstance(val, (collections.deque, list, tuple)):
             self._commandHistoryFinderList = collections.deque(val)
-            # self._commandHistoryFinderList = collections.deque(sorted((s for s in val)))
 
         else:
             self._commandHistoryFinderList = collections.deque()
@@ -3424,10 +3413,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     @overrideSystemEditor.setter
     def overrideSystemEditor(self, val: bool = False):
         self._overrideSystemEditor = val is True
-        sigBlock = QtCore.QSignalBlocker(
-            self.actionUse_system_s_default_code_editor)
-        self.actionUse_system_s_default_code_editor.setChecked(
-            not self._overrideSystemEditor)
+        with qtutils.SignalBlocker(self.actionUse_system_s_default_code_editor):
+            self.actionUse_system_s_default_code_editor.setChecked(
+                not self._overrideSystemEditor)
 
         self._updateConsolesEditor()
 
@@ -3453,22 +3441,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # print(f"ScipyenWindow.recentScripts.setter {val}")
         if isinstance(val, (collections.deque, list, tuple)):
             self._recentScripts = collections.deque((s for s in val if os.path.isfile(s)))
-            # self._recentScripts = list((s for s in val if os.path.isfile(s)))
 
         else:
-            # self._recentScripts = list()
             self._recentScripts = collections.deque()
-
-        # NOTE:2022-01-28 23:16:57
-        # obsolete; this is added to configurable_traits at __init__, AFTER
-        # WorkspaceGuiMixin (ScipyenConfigurable) initialization
-        # albeit this mechanism it NOT currently used until I figure out a nice
-        # way to notify changes in the contents of list, deque, dict via the
-        # DataBag & traitlets.TraitType framework.
-        #
-
-        # if isinstance(getattr(self, "configurable_traits", None), DataBag):
-            # self.configurable_traits["RecentScripts"] = self._recentScripts
 
         self._refreshRecentScriptsMenu_()
 
@@ -3514,11 +3489,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # BUG 2025-07-01 23:17:12 FIXME
         # this returns None whe using a QSPlashScreen!
         if self.menuBar().isNativeMenuBar() and self._globalMenuServiceName_ == "com.canonical.AppMenu.Registrar":
-            # dbusinterface = QtDBus.QDBusInterface(self._globalMenuServiceName_, "/" +  self._globalMenuServiceName_.replace(".", "/") + self._globalMenuServiceName_.replace(".", "/"),
-            #                                       self._globalMenuServiceName_)
-            # dbusinterface.setTimeout(100)
+
             if __has_PyQt6__ or __has_PySide6__:
                 v = int(self.winId())
+
             else:
                 v = QtCore.QVariant(int(self.winId()))
 
@@ -3542,23 +3516,24 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             print(f"{self.__class__.__name__}.getAppMenu: result -> {result}")
             if len(result) == 1: # oops!
-                # warnings.warn(result[0])
                 return
 
-                # address, objpath = result
-
             return result
+
         else:
             return self.menuBar()
 
     def _deregister_menuBar_(self):
         if not self.menuBar().isNativeMenuBar() :
             return
-        if self._app_menu_ is not None and self._globalMenuServiceName_ == "com.canonical.AppMenu.Registrar" and isintance(self._dbusAppMenuInterface_, QtDBus.QDBusInterface):
+        if (self._app_menu_ is not None
+            and self._globalMenuServiceName_ == "com.canonical.AppMenu.Registrar"
+            and isinstance(self._dbusAppMenuInterface_, QtDBus.QDBusInterface)):
             self._dbusAppMenuInterface_.setTimeout(100)
 
             if __has_PyQt6__ or __has_PySide6__:
                 old_v = int(self._wm_id_)
+
             else:
                 old_v = QtCore.QVariant(self._wm_id_)
                 if not old_v.convert(QtCore.QVariant.UInt):
@@ -3583,12 +3558,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             return
 
         if currentAppMenu is None:
-            if self._globalMenuServiceName_ == "com.canonical.AppMenu.Registrar" and isintance(self._dbusAppMenuInterface_, QtDBus.QDBusInterface):
-                # service_name = self._globalMenuServiceName_
-                # service_path = "/com/canonical/AppMenu/Registrar"
-                # interface = "com.canonical.AppMenu.Registrar"
-                # dbusinterface = QtDBus.QDBusInterface(service_name, service_path,
-                #                                     interface)
+            if (self._globalMenuServiceName_ == "com.canonical.AppMenu.Registrar"
+                and isinstance(self._dbusAppMenuInterface_, QtDBus.QDBusInterface)):
                 self._dbusAppMenuInterface_.setTimeout(100)
 
                 old_v = QtCore.QVariant(self._wm_id_)
@@ -3597,12 +3568,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 if old_v.convert(QtCore.QVariant.UInt) and new_v.convert(QtCore.QVariant.UInt):
                     # deregister old WM window ID, then register the new one
                     # to the same DBus object path (i.e. dbusmenu instance)
-                    dereg_reply = self._dbusAppMenuInterface_.call("UnregisterWindow", old_v)
-                    newreg_reply = self._dbusAppMenuInterface_.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self.menubar[1]))
+                    dereg_reply = self._dbusAppMenuInterface_.call(
+                        "UnregisterWindow", old_v)
+                    newreg_reply = self._dbusAppMenuInterface_.call(
+                        "RegisterWindow", new_v,
+                        QtDBus.QDBusObjectPath(self.menubar[1])
+                        )
 
     @Slot(QtGui.QWindow.Visibility)
     def _slot_visibility_changed(self, val):
-        if self.menuBar().isNativeMenuBar() and hasattr(self, "_wm_id_") and self._wm_id_ != int(self.winId()):
+        if (self.menuBar().isNativeMenuBar()
+            and hasattr(self, "_wm_id_")
+            and self._wm_id_ != int(self.winId())):
             if self._globalMenuServiceName_ == "com.canonical.AppMenu.Registrar":
                 self._restore_menuBar_()
 
@@ -3612,6 +3589,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def changeEvent(self, event):
         if event.type() == QtCore.QEvent.LanguageChange:
             self.retranslateUi(self)
+
         super(ScipyenWindow, self).changeEvent(event)
 
     @safewrapper
@@ -3714,6 +3692,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             # looks like I still need to to this, here...
             if __has_PyQt6__ or __has_PySide6__:
                 mpl.use("qtagg")
+
             else:
                 mpl.use("qt5agg") # this seems to be the default...
 

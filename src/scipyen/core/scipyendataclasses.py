@@ -28,7 +28,7 @@ import types
 import h5py
 import treelib # noqa
 import pathlib
-# from copy import (deepcopy, copy,)
+from copy import (deepcopy, copy,) # noqa
 
 #### END core python modules
 
@@ -80,6 +80,7 @@ import quantities as pq
 #### END 3rd party modules
 
 #### BEGIN pict.core.modules
+# from core import utilities
 from core import scipyen_quantities as scq
 # from core import xmlutils
 # from core import strutils
@@ -91,8 +92,8 @@ from core.prog import (ImmutableDescriptor, scipywarn)
 # from core import taxonbridge
 from core.taxonbridge import TaxonDescriptor
 from core.typeenum import TypeEnum
-from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE,
-                            EQUAL_NAN, GENOTYPES)
+from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, # noqa
+                            EQUAL_NAN, GENOTYPES) # noqa
 
 #### END pict.core.modules
 
@@ -187,7 +188,6 @@ class ScipyenDataclass:
         if other.__class__ != self.__class__:
             raise TypeError(f"Expecting an object of type {self.__class__.__name__}; instead, got {type(other).__name__}")
 
-
         fields = tuple(map(lambda f: (f.name, getattr(self, f.name), getattr(other, f.name)), dataclasses.fields(self.__class__)))
 
         diff_fields = tuple(filter(lambda f: type(f[1]) is not type(f[2]) or not safe_identity_test(f[1], f[2]), fields))
@@ -219,25 +219,25 @@ class ScipyenDataclass:
     """
         return val in map(lambda f: f.name, dataclasses.fields(self))
 
-    def merge(self, *others) -> typing.Self:
-        if len(others) == 0:
-            return self
-
-        if not all(isDataclass(o) for o in others):
-            raise TypeError("Expecting instances of ScipyenDataclass")
-
-        of = tuple(itertools.chain.from_iterable(tuple(map(lambda o: tuple(map(lambda f: (o, f.name), dataclasses.fields(o))),
-                                                        (parameters, *extra_params)))))
-
-        invalid_field_names = tuple(filter(lambda x: x[1] not in self))
-
-        if len(invalid_field_names):
-            raise TypeError(f"Arguments contain the following fields which are invalid for this {type(self).__name__} instance: {invalid_field_names}")
-
-        for (o, fname) in of:
-            setattr(self, fname, getattr(o, fname))
-
-        return self
+    # def merge(self, *others) -> typing.Self:
+    #     if len(others) == 0:
+    #         return self
+    #
+    #     if not all(isDataclass(o) for o in others):
+    #         raise TypeError("Expecting instances of ScipyenDataclass")
+    #
+    #     of = tuple(itertools.chain.from_iterable(tuple(map(lambda o: tuple(map(lambda f: (o, f.name), dataclasses.fields(o))),
+    #                                                     (parameters, *extra_params)))))
+    #
+    #     invalid_field_names = tuple(filter(lambda x: x[1] not in self))
+    #
+    #     if len(invalid_field_names):
+    #         raise TypeError(f"Arguments contain the following fields which are invalid for this {type(self).__name__} instance: {invalid_field_names}")
+    #
+    #     for (o, fname) in of:
+    #         setattr(self, fname, getattr(o, fname))
+    #
+    #     return self
 
     def toHDF5(self, group:h5py.Group, name:str, oname:str,
                        compression:str, chunks:bool, track_order:bool,
@@ -1535,8 +1535,8 @@ class BiologicalSource(ScipyenDataclass):
 
 # ------------------------------------------------------------------------------
 
-class PPLProtocol: pass
-class PPLProtocolStep: pass
+class PPLProtocol: pass # noqa
+class PPLProtocolStep: pass # noqa
 
 @dataclass
 class PPL(ScipyenDataclass):
@@ -1707,26 +1707,21 @@ class Treatment(Procedure):
 @dataclass
 class Episode(ScipyenDataclass):
     r"""Generic episode for frame-based data.
-        NOTE: The `beginFrame` and `endFrame` fields are inclusive indices.
-        To use them in indexing a sequence (or frames), add 1 (one) to the
-        `endFrame` field, e.g.:
-        range(data.beginFrame, data.endFrame +1)
-        An Episode is an elementary part of a Schedule, and is logically associated
-        with a Procedure.
+        An Episode is an elementary part of a Schedule, and is logically
+        associated with a Procedure.
 
-        The defining attributes are: `name`, `begin`, `end`, `beginFrame`, `endFrame`
-        and `procedure`.
+        The defining attributes are: `name`, `begin`, `end`,
+        `beginFrame`, `nFrames`, and `procedure`.
 
         In addition, the `description` attribute (a str) has an informative role
         without affecting the identity of an Episode
     """
-    # name:str = ""
-    # _: KW_ONLY
+    _: KW_ONLY
     begin:datetime.datetime = datetime.datetime.now()
     end:datetime.datetime = datetime.datetime.now()
     beginFrame:int = 0
-    endFrame:int = 0
-    description:str = ""
+    nFrames:int = 0
+    # description:str = ""
     procedure:typing.Optional[Procedure] = dataclasses.field(default_factory = Procedure)
 
     def __eq__(self, other) -> bool:
@@ -1746,16 +1741,34 @@ class Episode(ScipyenDataclass):
                     self.begin,
                     self.end,
                     self.beginFrame,
-                    self.endFrame,
+                    self.nFrames,
                     self.procedure
                 )
             )
 
 @dataclass
 class Schedule(ScipyenDataclass):
-    r"""Logical grouping of a sequence of episodes.
-        A Schedule can be logically considered a "protocol", where any of its
-        constituent episodes may associate a Procedure.
+    r"""Logical grouping of a sequence of non-overlapping, episodes.
+        The episodes are contiguous from the point of view of their data "frames"
+        (sweeps, image "slices", etc).
+        A Schedule is logically equivalent to an experimental "protocol",
+        consisting of the sequence of procedures associated with its episodes.
+
+    When changing the episodes inside the schedule (adding, removing, or modifying
+    an episode's number of frames), the "beginFrame" attribute of the episodes
+    MIGHT be adjusted to enforce contiguity (depending on the position of the
+    added/removed/modified episode) in the schedule.
+
+    CAUTION: Episodes are stored by reference. This means that the adjustments
+    described above WILL be reflected in the episodes contained by other sequences
+    or schedules.
+
+    If this is NOT intended, then pass DEEP COPIES of the episodes/sequence of episodes/
+    schedule to methods like __add__, __iadd__, append, extend
+
+    Deep copies can be obtained through the ``deepcopy`` function in the standard
+    library module ``copy``.
+
     """
     # name:str = ""
     _:KW_ONLY
@@ -1817,71 +1830,108 @@ class Schedule(ScipyenDataclass):
         else:
             raise TypeError(f"Invalid indexing key type {type(key).__name__}")
 
-    def __setitem__(self, key:typing.Union[int, slice, range, tuple, list, collections.deque],
+    def __setitem__(self, key:typing.Union[int, slice, range, tuple,
+                                           list, collections.deque],
                     value:typing.Union[Episode, typing.Iterable[Episode]]):
+        from core.utilities import unique
+
         if isinstance(key, int):
             if key >= len(self.episodes) or key < -1 * len(self.episodes):
                 raise IndexError(f"Index {key} out of range for {len(self.episodes)} episodes")
+
             if not isinstance(value, Episode):
                 raise TypeError(f"Expecting an Episode; instead, got {type(value).__name__}")
+
+            if key < len(self.episodes)-1:
+                nFramesBefore = sum([e.nFrames for e in self.episodes[:key]])
+                self.__adjustEpisodeBeginFrame__(value, nFramesBefore)
+
+                if self.episodes[key].nFrames != value.nFrames:
+                    delta = value.nFrames - self.episodes[key].nFrames
+                    for episode in self.episodes[key+1:]:
+                        episode.beginFrame += delta
 
             self.episodes[key] = value
 
         elif isinstance(key, slice):
             if not isinstance(value, typing.Iterable):
                 raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
+
             if not all(isinstance(v, Episode) for v in value):
                 raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique((type(v).__name__ for v in value))}")
+
             l_indices = len(range(*key.indices(len(self.episodes))))
+
             if l_indices < len(value):
                 raise ValueError(f"Too many RHS elements ({l_indices}); expecting {len(key)}")
+
             if l_indices > len(value):
                 raise ValueError(f"Too few RHS elements ({l_indices}); expecting {len(key)}")
 
-            self.episodes[key] = value
+            for k, index in enumerate(l_indices):
+                self.__setitem__(index, value[k])
+
+            # self.episodes[key] = value
 
         elif isinstance(key, range):
             if not isinstance(value, typing.Iterable):
                 raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
+
             if not all(isinstance(v, Episode) for v in value):
                 raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique((type(v).__name__ for v in value))}")
+
             if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
                 raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
+
             if len(key) < len(value):
                 raise ValueError(f"Too many RHS elements ({l_indices}); expecting {len(key)}")
+
             if len(key) > len(value):
                 raise ValueError(f"Too few RHS elements ({l_indices}); expecting {len(key)}")
 
             for k in key:
-                self.episodes[k] = value[k]
+                self.__setitem__(k, value[k])
 
         elif isinstance(key, (tuple, list, collections.deque)):
             if len(key) == 0:
                 return
+
             elif all(isinstance(k, int) for k in key):
                 if not isinstance(value, typing.Iterable):
                     raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
+
                 if not all(isinstance(v, Episode) for v in value):
                     raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique((type(v).__name__ for v in value))}")
+
                 if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
-                    raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
-                if len(values) > len(key):
+                    raise IndexError(f"Index {k} out of range for {len(self.episodes)} episodes")
+
+                if len(value) > len(key):
                     raise ValueError(f"Too many RHS elements ({l_indices}); expecting {len(key)}")
-                if len(values) < len(key):
+
+                if len(value) < len(key):
                     raise ValueError(f"Too few RHS elements ({l_indices}); expecting {len(key)}")
 
                 for k in key:
-                    self.episodes[k] = value[k]
+                    self.__setitem__(k, value[k])
+
             else:
                 raise KeyError("All indices must be int")
 
         else:
             raise TypeError(f"Invalid indexing key type {type(key).__name__}")
 
-    def __delitem__(self, key:typing.Union[int, slice, range, tuple, list, collections.deque, str]):
+    def __delitem__(self, key:typing.Union[int, slice, range,
+                                           tuple, list, collections.deque,
+                                           str]):
         if isinstance(key, int):
             if key >= len(self.episodes) or key < -1 * len(self.episodes):
                 raise IndexError(f"Index {key} out of range for {len(self.episodes)} episodes")
+
+            if key < len(self.episodes)-1:
+                nFramesBefore = sum([e.nFrames for e in self.episodes[:key]])
+                for episode in self.episodes[key+1:]:
+                    self.__adjustEpisodeBeginFrame__(episode, nFramesBefore)
 
             del self.episodes[key]
 
@@ -1896,6 +1946,16 @@ class Schedule(ScipyenDataclass):
 
             elif len(ret) > 1:
                 scipywarn(f"Duplicate episode name ({key}) found")
+
+            episode = ret[0]
+
+            ndx = self.episodes.index(episode)
+
+            if ndx < len(self.episodes)-1:
+                nFramesBefore = sum([e.nFrames for e in self.episodes[:ndx]])
+
+                for ep in self.episodes[ndx+1:]:
+                    self.__adjustEpisodeBeginFrame__(ep, nFramesBefore)
 
             keep  = [e for e in self.episodes if e.name != key]
 
@@ -1919,35 +1979,48 @@ class Schedule(ScipyenDataclass):
                 if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
                     raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
 
-                keep  = [self.episodes[k] for k in range(len(self.episodes)) if k not in key]
-                self.episodes[:] = keep
-
-            # elif all(isinstance(k, str) for k in key):
-            #     keep  = [self.episodes[k] for k in range(len(self.episodes)) if k not in key]
-            #     self.episodes[:] = keep
-
-            else:
+            elif not all(isinstance(k, str) for k in key):
                 raise KeyError("All indices must be int or str")
+
+            for k in key:
+                try:
+                    self.__delitem__(k)
+
+                except: # noqa
+                    continue
 
         else:
             raise TypeError(f"Invalid indexing key type {type(key).__name__}")
 
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator:
         return self.episodes.__iter__()
 
-    def __reversed__(self):
+    def __reversed__(self) -> typing.Iterator:
+        r"""CAUTION: iterates episodes in reversed order WITHOUT adjustments to their beginFrame"""
         return self.episodes.__reversed__()
 
     def __add__(self, other):
         if isinstance(other, self.__class__):
+
             newepisodes = self.episodes.__add__(other.episodes)
-            return self.__class__(name=self.name, episodes = newepisodes)
+            ret = self.__class__(name=self.name, description=self.description,
+                                  episodes=newepisodes)
+
+            ret.__adjustBeginFrameAllEpisodes__()
+
+            return ret
 
         elif isinstance(other, typing.Sequence):
-            if len(other) and not all(isinstance(e, Episode)):
+            if len(other) and not all(isinstance(e, Episode) for e in other):
                 raise TypeError("Can only add a sequence of Episodes")
+
             newepisodes = self.episodes.__add__(other)
-            return self.__class__(name=self.name, episodes = newepisodes)
+            ret = self.__class__(name=self.name, description=self.description,
+                                  episodes=newepisodes)
+
+            ret.__adjustBeginFrameAllEpisodes__()
+
+            return ret
 
         else:
             raise TypeError(f"Invalid argument type ({type(other).__name__})")
@@ -1955,71 +2028,140 @@ class Schedule(ScipyenDataclass):
     def __iadd__(self, other):
         if isinstance(other, self.__class__):
             self.episodes.__iadd__(other.episodes)
-            return self
 
         elif isinstance(other, typing.Sequence):
-            if len(other) and not all(isinstance(e, Episode)):
+            if len(other) and not all(isinstance(e, Episode) for e in other):
                 raise TypeError("Can only add a sequence of Episodes")
             self.episodes.__iadd__(other)
-            return self
 
         else:
             raise TypeError(f"Invalid argument type ({type(other).__name__})")
 
+        self.__adjustBeginFrameAllEpisodes__()
+
+        return self
+
     def __mul__(self, value:int):
-        return self.__class__(name=self.name, episodes = self.episodes.__mul__(value))
+        ret = self.__class__(name=self.name, description=self.description,
+                             episodes = self.episodes.__mul__(value))
+        ret.__adjustBeginFrameAllEpisodes__()
+        return ret
 
     def __imul__(self, value:int):
         self.episodes.__imul__(value)
+        self.__adjustBeginFrameAllEpisodes__()
         return self
 
     def __contains__(self, value:Episode):
         return value in self.episodes
 
-    def append(self, value:Episode):
+    @property
+    def nFrames(self) -> int:
+        return sum([e.nFrames for e in self.episodes])
+
+    def append(self, value: Episode):
         if not isinstance(value, Episode):
             raise TypeError("A Schedule can only contain Episodes")
+
+        value=deepcopy(value)
+
+        if len(self.episodes):
+            frameOffset=self.nFrames
+            value.beginFrame = frameOffset
 
         self.episodes.append(value)
 
-    def insert(self, index:int, value:Episode):
+    def insert(self, index: int, value: Episode):
         if not isinstance(value, Episode):
             raise TypeError("A Schedule can only contain Episodes")
 
-        self.episodes.insert(index, value)
+        if len(self.episodes) == 0:
+            self.episodes.append(value) # will adapt value.beginFrame
+
+        else:
+            if index >= len(self.episodes):
+                self.episodes.append(value)# will adapt value.beginFrame
+
+            else:
+                # list.insert(index, obj) -> inserts object BEFORE index
+                if index == 0 or index <= -len(self.episodes):
+                    value.beginFrame = 0 # this becomes the first episode
+
+                else:
+                    episodesBefore = self.episodes[:index] # up to and EXCLUDING episode at index
+                    value.beginFrame = sum([e.nFrames for e in episodesBefore])
+
+                self.episodes.insert(index, value)
+                # how many frames, now, up to and INCUDING index (where the new episode sits)?
+                nFramesBefore = sum([e.nFrames for e in self.episodes[:index+1]])
+                # now, adapt beginFrames for ALL Episode after this new one
+                for episode in self.episodes[index+1:]:
+                    episode.beginFrame += nFramesBefore
 
     def pop(self, index:int=-1) -> Episode:
+        # adjust the episodes AFTER the one to be removed
+        obj = self.episodes[index]
+        for episode in self.episodes[index+1:]:
+            episode.beginFrame -= obj.nFrames
+        # now remove the one at index and return it
         return self.episodes.pop(index)
 
     def remove(self, value:Episode):
-        if not isinstance(value, Episode):
-            raise TypeError("A Schedule can only contain Episodes")
+        if value not in self.episodes:
+            return
+        ndx = self.episodes.index(value)
+        for episodes in self.episodes[ndx+1:]:
+            episodes.beginFrame -= value.nFrames
 
         self.episodes.remove(value)
 
     def reverse(self):
         self.episodes.reverse()
 
+        nFrames = 0
+        for k, episode in enumerate(self.episodes):
+            if k == 0:
+                if episode.beginFrame != 0:
+                    episode.beginFrame=0
+            else:
+                if episode.beginFrame != nFrames:
+                    episode.beginFrame = nFrames
+
+            nFrames += episode.nFrames
+
     def sort(self, *args, **kwargs):
-        self.episodes.sort(*argsm **kwargs)
+        self.episodes.sort(*args, **kwargs)
+        nFrames = 0
+        for k, episode in self.episodes:
+            if k == 0:
+                episode.beginFrame=0
+            else:
+                episode.beginFrame += nFrames
+
+            nFrames += episode.nFrames
 
     def extend(self, value):
         if isinstance(value, self.__class__):
-            self.episodes.append(value.episodes)
+            self.episodes.extend(list(map(deepcopy, value.episodes)))
+
+            self.__adjustBeginFrameAllEpisodes__()
 
         elif isinstance(value, typing.Sequence):
             if len(value):
                 if all(isinstance(v, Episode) for v in value):
-                    self.episodes.append(value)
+                    self.episodes.append(deepcopy(value))
+                    self.__adjustBeginFrameAllEpisodes__()
+
                 else:
                     raise TypeError("A Schedule can only contain Episodes")
 
         else:
-            raise TypeError(f"Can only append a Schedule or a sequence of Episodes")
+            raise TypeError("Can only append a Schedule or a sequence of Episodes")
 
     def index(self, episode:Episode):
         if not isinstance(episode, Episode):
             raise TypeError("A Schedule can only contain Episodes")
+
         if episode not in self.episodes:
             raise ValueError("Episode is not contained in this Schedule")
 
@@ -2027,7 +2169,10 @@ class Schedule(ScipyenDataclass):
 
         return ndx[0]
 
-    def count(self, episode:Episode):
+    def clear(self):
+        self.episodes.clear()
+
+    def count(self, episode: Episode):
         if not isinstance(episode, Episode):
             raise TypeError("A Schedule can only contain Episodes")
 
@@ -2035,7 +2180,6 @@ class Schedule(ScipyenDataclass):
             return 0
 
         return len(e for e in self.episodes if e == episode)
-
 
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
@@ -2085,19 +2229,41 @@ class Schedule(ScipyenDataclass):
         raise NotImplementedError(f"Wrong index type: {type(ndx).__name__}")
 
     @episode.register(int)
-    def _(self, ndx:int) -> Episode:
+    def __episode__(self, ndx:int) -> Episode:
         if ndx >= len(self.episodes) or ndx < -1 * len(self.episodes):
             raise IndexError(f"Invalid episode index {ndx} for {len(self.episodes)}")
 
         return self.episodes[ndx]
 
     @episode.register(str)
-    def _(self, name:str) -> Episode:
+    def __episode__(self, name:str) -> Episode: # noqa
         episodes = [e for e in self.episodes if e.name == name]
         if len(episodes):
             return episodes[0]
         else:
             raise IndexError(f"Episode name {name} does not exist")
+
+    def __adjustBeginFrameAllEpisodes__(self):
+        nFrames = 0
+
+        for k, episode in enumerate(self.episodes):
+            if k == 0:
+                if episode.beginFrame != 0:
+                    episode.beginFrame = 0
+
+            else:
+                if episode.beginFrame != nFrames:
+                    episode.beginFrame = nFrames
+
+            nFrames += episode.nFrames
+
+    def __adjustEpisodeBeginFrame__(self, episode: Episode, nFramesBefore: int):
+        if episode.beginFrame < nFramesBefore:
+            newBeginFrame = nFramesBefore - episode.beginFrame
+            episode.beginFrame = newBeginFrame
+
+        elif episode.beginFrame > nFramesBefore:
+            episode.beginFrame = nFramesBefore
 
     def episodeNames(self) -> list[str]:
         return [e.name for e in self.episodes]
@@ -2205,7 +2371,7 @@ def mergeDataclasses(typename:str, *args, **kwargs) -> type:
     of 'args'.
 
     """
-    from copy import deepcopy
+    # from copy import deepcopy
     from core.utilities import unique
 
     if not isinstance(typename, str):
