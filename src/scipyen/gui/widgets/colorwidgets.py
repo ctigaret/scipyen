@@ -37,11 +37,11 @@ from itertools import (cycle, repeat)
 from traitlets import Bunch
 
 from enum import IntEnum
-from functools import partial
+# from functools import partial
+#
+# import numpy as np
 
-import numpy as np
-
-import qtpy
+import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
@@ -60,18 +60,17 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
         
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    from qtpy import sip # noqa
+    from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
     
-
-    
-
 from core.prog import safewrapper
 from core.utilities import reverse_mapping_lookup
+from core.qtutils import qVariant #, QVariantType, fromQVariant)
+
 from gui.painting_shared import (standardPalette, standardPaletteDict, svgPalette,
                               getPalette, paletteQColor, qcolor,
                               standardQColor, svgQColor, mplColors, qtGlobalColors, 

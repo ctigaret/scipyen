@@ -27,7 +27,8 @@ from collections import deque, UserDict, OrderedDict
 from dataclasses import MISSING
 import weakref
 import math # noqa
-import qtpy
+
+import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
@@ -78,11 +79,26 @@ import vigra # noqa
 import meshio # noqa
 # ### END 3rd party modules
 
+from core.qtutils import qVariant #, QVariantType #, qVariants, fromQVariant, isQObjectAlive)
 import core.datatypes as datatypes # noqa
 from core.datatypes import (is_namedtuple, TypeEnum) # noqa
 from core.prog import (scipywarn, timefunc, processtimefunc) # noqa
 from core import taxonbridge # noqa
 from core import bgbridge # noqa
+from core.triggerprotocols import TriggerProtocol # noqa
+from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType) # noqa
+import core.datasignal as datasignal # noqa
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal) # noqa
+import core.datazone as datazone # noqa
+from core.datazone import (DataZone, Interval) # noqa
+from core import xmlutils, strutils # noqa
+from core import scipyen_quantities as scq # noqa
+from core.utilities import unique # noqa
+from core.prog import (safewrapper, safeguiwrapper, print_styled, # noqa
+                       is_hashable)
+from core.traitcontainers import (DataBag, DataBagTraitsObserver,) # noqa
+from core.scipyendataclasses import (isDataclass, getField, getFieldOrProperty) # noqa
+from core.datatypes import PODS # noqa
 
 # print(f"has brain globe: {bgbridge.hasBrainGlobe}")
 
@@ -92,56 +108,20 @@ from core import bgbridge # noqa
 from systems.PrairieView import * # noqa
 
 from imaging import vigrautils # noqa
-
 import imaging.axiscalibration # noqa
-
 from imaging.axiscalibration import ( # noqa
     AxesCalibration,
     AxisCalibrationData,
     ChannelCalibrationData,
 )
-
 from imaging.axisutils import (axisTypeStrings, # noqa
                                getValueForAxisType,
                                getNameForAxisType)
-
 import imaging.scandata # noqa
 from imaging.scandata import (ScanData, AnalysisUnit) # noqa
 
-from core.triggerprotocols import TriggerProtocol # noqa
-from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType) # noqa
-
-import core.datasignal as datasignal # noqa
-from core.datasignal import (DataSignal, IrregularlySampledDataSignal) # noqa
-
-import core.datazone as datazone # noqa
-from core.datazone import (DataZone, Interval) # noqa
-
-from core import xmlutils, strutils # noqa
-
-from core import scipyen_quantities as scq # noqa
-
-# from core.workspacefunctions import (validate_varname, user_workspace)
-
-from core.utilities import unique # noqa
-
-from core.prog import (safewrapper, safeguiwrapper, print_styled, qVariants, # noqa
-                       is_hashable)
-
-from core.traitcontainers import (DataBag, DataBagTraitsObserver,) # noqa
-
-from core.scipyendataclasses import (isDataclass, getField, getFieldOrProperty) # noqa
-
-# from gui.widgets.simpletablewidget import SimpleTableWidget
-# from gui.widgets.tableeditorwidget import (TableEditorWidget,
-#                                            TabularDataModel,)
-# from gui.pictgui import WorkerThread
-# from gui.widgets.small_widgets import QuantitySpinBox, ComplexSpinBox
-# from gui.delegates import PythonItemDelegate
-# from gui.workspacegui import GuiMessages, WorkspaceGuiMixin
 from gui.itemmodels.roles import * # noqa
 
-from core.datatypes import PODS # noqa
 
 NOTMEMOIZED = (
     tuple,
@@ -157,19 +137,6 @@ NOTMEMOIZED = (
     np.ufunc,
     functools.partial
 )
-
-# PODS = (
-#     bool,
-#     int,
-#     float,
-#     complex,
-#     bytes,
-#     bytearray,
-#     str,
-#     np.integer,
-#     np.floating,
-#     np.complexfloating,
-# )
 
 # NOTE 2026-02-05 17:48:51 TODO/FIXME
 # look at:
@@ -308,16 +275,16 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         # NOTE: 2026-02-09 21:47:10
         # used to construct the acess path to the object for this item
-        item0.setData(QtCore.QVariant(memberAccess), ObjectDataAccessRole) # noqa
+        item0.setData(qVariant(memberAccess), ObjectDataAccessRole) # noqa
 
         # NOTE: 2026-02-09 21:47:38
         # reference to the actual Python object
-        item0.setData(QtCore.QVariant(obj), ObjectDataRole) # noqa
+        item0.setData(qVariant(obj), ObjectDataRole) # noqa
 
         # NOTE: 2026-02-09 21:47:57
         # reference to the object's binding in its parent: e.g. symbol of an
         # attribute or field, index (for sequences), key (for mappings)
-        item0.setData(QtCore.QVariant(objKey), ObjectKeyRole) # noqa
+        item0.setData(qVariant(objKey), ObjectKeyRole) # noqa
 
         # NOTE: 2026-02-09 21:49:05
         # object "bindings" are are int for sequences, any hashable object type
@@ -328,9 +295,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # "lazy" evaluation of the collection's contents - in itself for a good
         # reason) ; therefore, I apply the same philosophy here
         #
-        item0.setData(QtCore.QVariant(objKeyType), ObjectKeyTypeRole) # noqa
+        item0.setData(qVariant(objKeyType), ObjectKeyTypeRole) # noqa
 
-        editExternally = objDict["objDataAsChild"] and QtCore.QVariant(not self._inlineTables_)
+        editExternally = objDict["objDataAsChild"] and qVariant(not self._inlineTables_)
         item0.setData(editExternally, ObjectDataEditExternallyRole)
 
         if visited:
@@ -499,16 +466,16 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         if objDict["objDataAsChild"] and self._inlineTables_:
             dataItem = QtGui.QStandardItem("")
-            dataItem.setData(QtCore.QVariant(True), StandaloneEditorWidgetRole) # noqa
+            dataItem.setData(qVariant(True), StandaloneEditorWidgetRole) # noqa
             objItem.insertRow(0, [dataItem])
         else:
             dataItem = rowItems[-1]
             if len(visited) == 0:
-                dataItem.setData(QtCore.QVariant(obj), ObjectDataRole) # noqa
+                dataItem.setData(qVariant(obj), ObjectDataRole) # noqa
 
         accessType = objDict.get("accessType", None)
 
-        objItem.setData(QtCore.QVariant(accessType), ObjectDataAccessTypeRole) # noqa
+        objItem.setData(qVariant(accessType), ObjectDataAccessTypeRole) # noqa
 
         if not parentItem:
             parentItem = self.invisibleRootItem()
@@ -560,7 +527,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         else:
             accessType = objDict.get("accessType", None)
 
-            pItem.setData(QtCore.QVariant(accessType), ObjectDataAccessTypeRole) # noqa
+            pItem.setData(qVariant(accessType), ObjectDataAccessTypeRole) # noqa
 
             if parentItem:
                 parentItem.insertRow(row, rowItems)
@@ -2295,7 +2262,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 return False
             objItem = parentItem.child(item.row(), 0)
 
-        objItem.setData(QtCore.QVariant(value), ObjectDataRole) # noqa
+        objItem.setData(qVariant(value), ObjectDataRole) # noqa
 
         path = self._getPathForItemOrIndex_(objItem)
         # print(f"\taccess to objItem: {path}")
@@ -2325,11 +2292,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
             if item != objItem:
                 if isinstance(newVal, (enum.Enum, enum.IntEnum, enum.Flag, TypeEnum)):
-                    item.setData(QtCore.QVariant(newVal.name), QtCore.Qt.DisplayRole)
+                    item.setData(qVariant(newVal.name), QtCore.Qt.DisplayRole)
                 elif isinstance(newVal, bool):
-                    item.setData(QtCore.QVariant(str(newVal)), QtCore.Qt.DisplayRole)
+                    item.setData(qVariant(str(newVal)), QtCore.Qt.DisplayRole)
                 else:
-                    item.setData(QtCore.QVariant(newVal), QtCore.Qt.DisplayRole)
+                    item.setData(qVariant(newVal), QtCore.Qt.DisplayRole)
                 item.setData(newVal, ObjectDataRole) # noqa
 
             self.dataChanged.emit(modelIndex, modelIndex)

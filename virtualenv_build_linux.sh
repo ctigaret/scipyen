@@ -240,6 +240,7 @@ function makevirtenv ()
             echo -e "$virtual_env does not have a readable 'pyvenv.cfg' file. Goodbye!\n"
             exit 1
         fi
+
     else
         # putative virtual environment directory not found => need to generate one
         if [ -z ${uv_exec} ] ; then
@@ -536,9 +537,6 @@ function dopyqt6 ()
             
             # NOTE: 2025-06-22 14:57:15
             # DON'T WORK AS ROOT !
-            # NOTE: 2023-06-25 10:56:34 
-            # when we are root, make sure to use the virtual environment's python 
-            # executable here
             py_exec="$VIRTUAL_ENV/bin/${python_exec}"
             sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
             if [[ `id -u` -eq 0 ]] ; then
@@ -674,7 +672,8 @@ function dopyside6 ()
             base_build_dir=${VIRTUAL_ENV}/src/pyside6-build
             cd ${VIRTUAL_ENV}/src
             git clone https://code.qt.io/pyside/pyside-setup
-            cd pyside-setup && git checkout 6.9
+            cd pyside-setup && git checkout 6.11
+            # cd pyside-setup && git checkout 6.9
 #             cd pyside-setup && git checkout 6.8
             if [ -z ${uv_exec} ] ; then
                 pip install -r requirements.txt
@@ -1082,8 +1081,10 @@ if [[ $with_pyside6 -eq 1 ]] ; then
 elif [[ $with_pyqt5 -eq 1 ]] ; then
     if [[ $build_pyqt5 -eq 1 ]] ; then
         rcfile=${HOME}/.scipyen_pyqt5_build_rc
+        qtenvpath=${VIRTUAL_ENV}/lib64/python$major.$minor/site-packages/PySide6/Qt/libexec
     else 
         rcfile=${HOME}/.scipyen_pyqt5_pypi_rc
+        qtenvpath=""
     fi
 else
     rcfile=${HOME}/.scipyenrc
@@ -1106,6 +1107,7 @@ cat<<END > ${rcfile}
 scipyact () {
 source ${VIRTUAL_ENV}/bin/activate
 export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
+export PATH=${qtenvpath}:${PATH}
 echo -e "The Python virtual environment in ${VIRTUAL_ENV} is now active.\nTo exit this environment call 'deactivate'"
 }
 END
@@ -1117,11 +1119,13 @@ function update_bashrc ()
 if [[ $with_pyside6 -eq 1 ]] ; then
     if [[ $build_pyside6 -eq 1 ]] ; then
         rcfile=${HOME}/.scipyen_pyside6_build_rc
-    else 
+        qtenvpath=${VIRTUAL_ENV}/lib64/python$major.$minor/site-packages/PySide6/Qt/libexec
+    else
         rcfile=${HOME}/.scipyen_pyside6_pypi_rc
+        qtenvpath=""
     fi
     
-elif [[ $with_pyqt5 -eq 1 ]] ; then
+elif [[ $with_pyqt6 -eq 1 ]] ; then
     if [[ $build_pyqt6 -eq 1 ]] ; then
         rcfile=${HOME}/.scipyen_pyqt6_build_rc
     else
@@ -1151,7 +1155,7 @@ if [ -z "${source_set}" ]; then
 # source .scipyenrc in there
 echo "Copying ${HOME}/.bashrc to ${HOME}/.bashrc.$dt"
 cp ${HOME}/.bashrc ${HOME}/.bashrc.$dt
-echo "source ${rcfile}/" >> ${HOME}/.bashrc
+echo "source ${rcfile}" >> ${HOME}/.bashrc
 echo ".bashrc has been modified in ${HOME}"
 echo "Sourcing ${HOME}/.bashrc"
 source ${HOME}/.bashrc
@@ -1210,19 +1214,23 @@ target_dir=${HOME}/bin
 if [[ $with_pyside6 -eq 1 ]] ; then
     if [[ $build_pyside6 -eq 1 ]] ; then
         scriptfile=${target_dir}/scipyen-pyside6-build
+        qtenvpath=${VIRTUAL_ENV}/lib/python${major}.${minor}/PySide6/Qt/libexec
 #         launchcmd="${scipyensrcdir}/scipyen.py pyside6"
-        
-    else 
+
+    else
         scriptfile=${target_dir}/scipyen-pyside6-pypi
+        qtenvpath=""
 #         launchcmd="${scipyensrcdir}/scipyen.py pyside6"
     fi
 
 elif [[ $with_pyqt5 -eq 1 ]] ; then
     if [[ $build_pyqt5 -eq 1 ]] ; then
         scriptfile=${target_dir}/scipyen-pyqt5-build
+        qtenvpath=""
 #         launchcmd="${scipyensrcdir}/scipyen.py pyqt6"
     else
         scriptfile=${target_dir}/scipyen-pyqt5-pypi
+        qtenvpath=""
 #         launchcmd="${scipyensrcdir}/scipyen.py pyqt6"
     fi
 
@@ -1254,6 +1262,7 @@ source \$VIRTUAL_ENV/bin/browser
 fi
 fi
 export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:\${LD_LIBRARY_PATH}
+export PATH=${qtenvpath}:\${PATH}
 export OUTDATED_IGNORE=1
 a=\`which xrdb\` # do we have xrdb to read the X11 resources? (on Unix almost surely yes)
 if [ \$0 == 0 ] ; then
@@ -1287,6 +1296,8 @@ END
 fi
 cat <<END >> ${scriptfile} 
 run_in_debugger=0
+verbosity="" # "-v" or "-vv"
+frozenmodules=on
 
 for i in "$@" ; do
     case $i in
@@ -1294,13 +1305,25 @@ for i in "$@" ; do
         run_in_debugger=1
         shift
         ;;
+        --no-frozen-modules)
+        frozenmodules=off
+        shift
+        ;;
+        --v)
+        verbosity="-v"
+        shift
+        ;;
+        --vv)
+        verbosity="-vv"
+        shift
+        ;;
     esac
 done
 
-if [[ $run_in_debugger -eq 1 ]] then
-    ${python_executable} -Xfrozen_modules=off -m pdb ${launchcmd} "\$*"
+if [[ \$run_in_debugger -eq 1 ]] then
+    ${python_executable} \$verbosity -Xfrozen_modules=\$frozenmodules -m pdb ${launchcmd} "\$*"
 else
-    ${python_executable} -Xfrozen_modules=off ${launchcmd} "\$*"
+    ${python_executable} \$verbosity -Xfrozen_modules=\$frozenmodules ${launchcmd} "\$*"
 fi
 END
 shopt -u lastpipe
@@ -1599,11 +1622,14 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     # see changelog above)
     
     if  [[ ( $with_pyside6 -eq 1 ) || ( $build_pyside6 -eq 1 ) ]]  ; then
+
         dopyside6
     elif [[ ( $with_pyqt5 -eq 1 ) || ( $build_pyqt5 -eq 1 ) ]] ; then
         dopyqt5 
+
     else
         dopyqt6
+
     fi
     
     installpipreqs_part2

@@ -47,6 +47,7 @@ from core.workspacefunctions import (user_workspace, validate_varname, get_symbo
 from core.scipyen_config import (ScipyenConfigurable, saveWindowSettings, loadWindowSettings) # noqa
 
 from core import strutils, sysutils # , qtutils
+from core.qtutils import (qVariant, QVariantType, fromQVariant)
 from core.strutils import InflectEngine # noqa
 from core.prog import (print_styled, scipywarn) # noqa
 import gui.quickdialog as qd
@@ -1692,8 +1693,9 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
     def widgetWidth(self, value: int):
         self.setFixedWidth(value)
 
-    @Slot(QtCore.QVariant)
-    def _slot_setWidgetWidth(self, val: int | QtCore.QVariant):
+    # @Slot(QtCore.QVariant)
+    @Slot(QVariantType)
+    def _slot_setWidgetWidth(self, val: int | QVariantType):
         if not isinstance(val, int):
             val = val.value()
         self.setFixedWidth(val)

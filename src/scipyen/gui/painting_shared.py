@@ -15,8 +15,9 @@ import numpy as np
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
+
 if os.environ["QT_API"] == "pyside6":
-    import PySide6
+    import PySide6 # noqa
     from PySide6 import QtCore, QtGui, QtWidgets, QtXml, QtSvg
     from PySide6.QtCore import Signal, Slot, Property
     __has_sip__ = False
@@ -46,6 +47,7 @@ else:
 # from qtpy import sip as sip
 # import sip # for sip.cast
 
+from core.qtutils import (qVariant, QVariantType, fromQVariant)
 from core.prog import safewrapper
 from core.traitcontainers import DataBag
 
@@ -234,10 +236,18 @@ def fromMimeData(mimeData:QtCore.QMimeData) -> QtGui.QColor:
         return sip_compat.fromMimeData(mimeData)
 
     if mimeData.hasColor():
-        return mimeData.colorData().value() # This is a python-wrapped QVariant<QColor>
-        # return ret
+        # NOTE: 2026-07-31 16:05:08
+        # In PyQt*, this is a python-wrapped QVariant<QColor>
+        # In PySide6 this is a QColor object
+        if __has_PySide6__:
+            return mimeData.colorData()
+
+        else:
+            return mimeData.colorData().value()
+
     if canDecode(mimeData):
         return QtGui.QColor(mimeData.text())
+
     return QtGui.QColor()
 
 @safewrapper
@@ -736,12 +746,18 @@ def comboDelegateBrush(index:QtCore.QModelIndex, role:int) -> QtGui.QBrush:
         return sip_compat.comboDelegateBrush(index, role)
 
     brush = QtGui.QBrush()
-    v = QtCore.QVariant(index.data(role))
-    if v.type() == QtCore.QVariant.Brush:
-        brush = v.value()
+    v = qVariant(index.data(role))
 
-    elif v.type() == QtCore.QVariant.Color:
-        brush = QtGui.QBrush(v.value())
+    if __has_PySide6__:
+        brush  = QtGui.QBrush(v) if isinstance(v, QtGui.QColor) else v
+
+    else:
+        if v.type() == QtCore.QVariant.Brush:
+            brush = v.value()
+
+        elif v.type() == QtCore.QVariant.Color:
+            brush = QtGui.QBrush(v.value())
+
     return brush
 
 def y_less_than(p1:QtCore.QPointF, p2:QtCore.QPointF) -> bool:

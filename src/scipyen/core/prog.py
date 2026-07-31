@@ -13,26 +13,26 @@ descriptor validators.
 
 # print("{}: {}".format(__file__, __name__))
 
-import pprint
+# import pprint
 
 from abc import ABC, abstractmethod
-import importlib, inspect, pathlib, warnings, operator, functools
+import importlib, inspect, pathlib, warnings, operator, functools # noqa
 from importlib import abc as importlib_abc
 import pkgutil
-import enum, io, os, re, itertools, sys, time, traceback, types, typing
-from types import SimpleNamespace
+import enum, io, os, re, itertools, sys, time, traceback, types, typing # noqa
+# from types import SimpleNamespace
 import collections
 from collections import (deque, namedtuple)
 from warnings import WarningMessage
 from inspect import Parameter, Signature
 from IPython.core.interactiveshell import InteractiveShell
-from IPython.core import magic, oinspect, page, prefilter, ultratb
-from IPython.core.oinspect import (UnformattedBundle, Bundle, InfoDict)
+from IPython.core import oinspect #,  magic, page, prefilter, ultratb
+# from IPython.core.oinspect import (UnformattedBundle, Bundle, InfoDict)
 
 from functools import (
     singledispatch,
-    singledispatchmethod,
-    update_wrapper,
+    # singledispatchmethod,
+    # update_wrapper,
     wraps,
 )
 from contextlib import (
@@ -51,42 +51,34 @@ import pandas as pd
 
 import colorama
 
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+import qtpy # noqa
+from qtpy import (QtGui, QtWidgets)#, QtCore) #, QtXml, QtSvg, QtNetwork, )
+# from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
+
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    from qtpy import sip # noqa
+    from qtpy.uic import loadUiType # noqa
+
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-
-
-# try:
-#     import mypy
-# except:
-#     print("Please install mypy first")
-#     raise
-
-# from . import workspacefunctions
-# from .workspacefunctions import debug_scipyen
 from .strutils import InflectEngine
 
 CALLABLE_TYPES = (
@@ -99,19 +91,20 @@ CALLABLE_TYPES = (
     types.MethodDescriptorType,
     types.ClassMethodDescriptorType,
 )
+
 TYPING_TYPES = (typing._GenericAlias,
                 typing._SpecialGenericAlias,
                 typing._UnionGenericAlias,
                 types.UnionType, types.GenericAlias)
 
-class Versiontuple3: pass  # to be picked up in Kate editor's symbolviewer plugin
+class Versiontuple3: pass  # to be picked up in Kate editor's symbolviewer plugin # noqa
 VersionTuple3 = namedtuple("VersionTuple3", ["major", "minor", "micro"])
-class Versiontuple4: pass  # to be picked up in Kate editor's symbolviewer plugin
+class Versiontuple4: pass  # to be picked up in Kate editor's symbolviewer plugin # noqa
 VersionTuple4 = namedtuple("VersionTuple4", ["major", "minor", "micro","dot"])
 
 
-class ModSpec: pass # to be picked up in Kate editor's symbolviewer plugin
-ModSpec = importlib.machinery.ModuleSpec  # saves me some typing
+class ModSpec: pass # to be picked up in Kate editor's symbolviewer plugin # noqa
+ModSpec = importlib.machinery.ModuleSpec  # saves me some typing # noqa
 
 # class UnwindTypeResult(typing.NamedTuple):
 #     object_types: set
@@ -445,6 +438,7 @@ class BaseDescriptorValidator(DescriptorValidatorABC):
 
     def validate(self, value:typing.Any):
         r"""Generic validation: anything is valid"""
+        # return value
         pass  # validates everything
 
 
@@ -521,13 +515,14 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
     def __init__(self, name: str, defval: typing.Any, /, *args, **kwargs):
         r"""Generic validator for descriptors
 
-Parameters:
-=========
-    name: `public` name of the descriptor
+    Parameters:
+    ===========
 
-    defval: default value (may be None if allow_none)
+    :name: `public` name of the descriptor
 
-    args: tuple of types or unary predicates;
+    :defval: default value (may be None if allow_none)
+
+    :args: tuple of types or unary predicates;
 
         NOTE: unary predicates are functions that expect a Python object as
             the first (only) argument and return a bool.
@@ -542,7 +537,7 @@ Parameters:
 
     kwargs: currently two keywords are supported:
         "allow_none": bool (default True) ↦ allow None as a descriptor value
-        "dcriteria": dict (default empty) ↦ specified additional criteria for
+        "dcriteria": dict (default empty) ↦ specifies additional criteria for
             descriptor values that are collection-like or array-like
             Use with CAUTION.
 
@@ -560,9 +555,9 @@ Parameters:
     container of a nested data structure.
 
     Table with type-related properties in the dcriteria dict:
-    key         value is always a nested dict — an empty dict here mean no
-    (a type)        criteria are defined and the descriptor value is validated
-                    based on 'name' and types or predicates in 'args'
+    key         ↦  value is always a nested dict; an empty dict here means no
+    (a type)       criteria are defined and the descriptor value is validated
+                   based on 'name' and types or predicates in 'args'
 
     ========================================================================
                 Nested dict key:str ↦ value;
@@ -3835,6 +3830,3 @@ def walk_packages(path:typing.Optional[typing.Union[str, pathlib.Path,typing.Seq
             path = [p for p in path if not seen(p)]
             yield from walk_packages(path, info.name+".")
 
-def qVariants(*args) -> typing.List[QtCore.QVariant]:
-    r"""Creates ans returns a list of QVariant objects wrapping each element in args"""
-    return list(map(lambda o: o if isinstance(o, QtCore.QVariant) else QtCore.QVariant(o), args))

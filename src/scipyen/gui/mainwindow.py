@@ -222,6 +222,7 @@ import colorama  # noqa
 
 # BEGIN scipyen modules
 from core import qtutils # noqa
+from core.qtutils import (qVariant, QVariantType, fromQVariant)
 from core import datazone # noqa
 from core import datatypes # noqa
 from core import basescipyen # noqa
@@ -329,10 +330,17 @@ from . import scipyenviewer # noqa
 from . import quickdialog as qd # noqa
 # from .resources import resources_rc #as resources_rc
 # from .resources import icons_rc
-from .resources import breeze_icons_rc # noqa
-from .resources import breeze_dark_icons_rc # noqa
-from .resources import extra_icons_rc # noqa
-from .resources import images_rc # noqa
+if __has_PySide6__:
+    from .resources.pyside6 import breeze_icons_rc # noqa
+    from .resources.pyside6 import breeze_dark_icons_rc # noqa
+    from .resources.pyside6 import extra_icons_rc # noqa
+    from .resources.pyside6 import images_rc # noqa
+else:
+    from .resources.pyqt6 import breeze_icons_rc # noqa
+    from .resources.pyqt6 import breeze_dark_icons_rc # noqa
+    from .resources.pyqt6 import extra_icons_rc # noqa
+    from .resources.pyqt6 import images_rc # noqa
+
 from . import pictgui as pgui # noqa
 from . import xmlviewer as xv # noqa
 from . import textviewer as tv # noqa
@@ -1903,6 +1911,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
                 except: # noqa
                     traceback.print_exc()
+
+
                 # TODO 2025-06-30 23:47:57 finalize me !!!
 #                 if isinstance(self._dbusUniqueName_, str) and len(self._dbusUniqueName_.strip()):
 #
@@ -1928,9 +1938,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 #                     if __has_PyQt6__ or __has_PySide6__:
 #                         v = int(self.winId())
 #                     else:
-#                         v = QtCore.QVariant(int(self.winId()))
+#                         v = qVariant(int(self.winId()))
 #
-#                         if not v.convert(QtCore.QVariant.UInt): # NOTE: 2023-01-08 23:10:14 MUST convert to UInt
+#                         if not v.convert(qVariant.UInt): # NOTE: 2023-01-08 23:10:14 MUST convert to UInt
 #                             return
 #
 #                     result = self._dbusAppMenuInterface_.call("RegisterWindow", v, QtDBus.QDBusObjectPath(f"/{self.applicationName}/{self.__class__.__name__}/MenuBar")).arguments()
@@ -3494,10 +3504,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 v = int(self.winId())
 
             else:
-                v = QtCore.QVariant(int(self.winId()))
+                v = qVariant(int(self.winId()))
 
-                if not v.convert(QtCore.QVariant.UInt): # NOTE: 2023-01-08 23:10:14 MUST convert to UInt
+                if not v.convert(QVariantType.UInt): # NOTE: 2023-01-08 23:10:14 MUST convert to UInt
                     return
+
             # NOTE: 2023-01-08 22:58:38
             # When all OK, result should be a list with:
             # • str: address of the connection on DBus (e.g.: ':1.383')
@@ -3535,8 +3546,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 old_v = int(self._wm_id_)
 
             else:
-                old_v = QtCore.QVariant(self._wm_id_)
-                if not old_v.convert(QtCore.QVariant.UInt):
+                old_v = qVariant(self._wm_id_)
+                if not old_v.convert(QVariantType.UInt):
                     return
 
             reply = self._dbusAppMenuInterface_.call("UnregisterWindow", old_v)
@@ -3562,18 +3573,28 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 and isinstance(self._dbusAppMenuInterface_, QtDBus.QDBusInterface)):
                 self._dbusAppMenuInterface_.setTimeout(100)
 
-                old_v = QtCore.QVariant(self._wm_id_)
-                new_v = QtCore.QVariant(int(self.winId()))
+                old_v = qVariant(self._wm_id_)
+                new_v = qVariant(int(self.winId()))
 
-                if old_v.convert(QtCore.QVariant.UInt) and new_v.convert(QtCore.QVariant.UInt):
-                    # deregister old WM window ID, then register the new one
-                    # to the same DBus object path (i.e. dbusmenu instance)
+                if __has_PySide6__:
                     dereg_reply = self._dbusAppMenuInterface_.call(
                         "UnregisterWindow", old_v)
                     newreg_reply = self._dbusAppMenuInterface_.call(
                         "RegisterWindow", new_v,
                         QtDBus.QDBusObjectPath(self.menubar[1])
                         )
+
+                else:
+                    if old_v.convert(QtCore.QVariant.UInt) and new_v.convert(QtCore.QVariant.UInt):
+                        # deregister old WM window ID, then register the new one
+                        # to the same DBus object path (i.e. dbusmenu instance)
+                        dereg_reply = self._dbusAppMenuInterface_.call(
+                            "UnregisterWindow", old_v)
+                        newreg_reply = self._dbusAppMenuInterface_.call(
+                            "RegisterWindow", new_v,
+                            QtDBus.QDBusObjectPath(self.menubar[1])
+                            )
+
 
     @Slot(QtGui.QWindow.Visibility)
     def _slot_visibility_changed(self, val):

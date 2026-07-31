@@ -34,6 +34,7 @@ else:
     __has_sip__ = True
     
 
+from core.qtutils import qVariant #, QVariantType, fromQVariant)
 from core.prog import safewrapper
 from core.utilities import reverse_mapping_lookup
 

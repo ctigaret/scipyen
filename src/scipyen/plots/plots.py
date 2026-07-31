@@ -61,7 +61,10 @@ mpl_plot_functions = dict()
 mpl_plot_functions["plot"]                  = Axes.plot
 mpl_plot_functions["errorbar"]              = Axes.errorbar
 mpl_plot_functions["scatter"]               = Axes.scatter
-mpl_plot_functions["plot_date"]             = Axes.plot_date
+try:
+    mpl_plot_functions["plot_date"]             = Axes.plot_date
+except:
+    pass
 mpl_plot_functions["step"]                  = Axes.step
 mpl_plot_functions["loglog"]                = Axes.loglog
 mpl_plot_functions["semilogx"]              = Axes.semilogx

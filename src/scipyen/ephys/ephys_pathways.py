@@ -13,12 +13,13 @@ import traceback # noqa
 import datetime # noqa
 import numbers # noqa
 import inspect
-import itertools
+import itertools # noqa
 import functools # noqa
 from functools import singledispatch # noqa
 import warnings # noqa
 import typing
 import types # noqa
+# from copy import deepcopy
 # import difflib
 # import re as _re
 # from enum import Enum, IntEnum
@@ -71,14 +72,16 @@ else:
     __has_sip__ = True
 
 
-import matplotlib as mpl
+# import matplotlib as mpl # noqa
 # from core.pyqtgraph_patch import pyqtgraph as pg
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
 from core.basescipyen import BaseScipyenData # noqa
 # from core.traitcontainers import DataBag
-from core.prog import (safewrapper, with_doc, get_func_param_types, scipywarn) # noqa
+from core.prog import (safewrapper, with_doc,
+                       get_func_param_types, scipywarn,
+                       DescriptorGenericValidator) # noqa
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal) # noqa
 from core.datazone import (DataZone, Interval) # noqa
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, ) # noqa
@@ -180,7 +183,11 @@ class RecordingEpisode(Episode):
     """
     _: KW_ONLY
     protocol: typing.Optional[ElectrophysiologyProtocol] = None
-    episodeType: RecordingEpisodeType = dataclasses.field(default = RecordingEpisodeType.Tracking)
+    episodeType: DescriptorGenericValidator = DescriptorGenericValidator(
+            "episodeType", RecordingEpisodeType.Tracking,
+            RecordingEpisodeType)
+
+    # episodeType: RecordingEpisodeType = dataclasses.field(default = RecordingEpisodeType.Tracking)
 
     def __hash__(self) -> int:
         return hash(
@@ -294,16 +301,16 @@ class RecordingEpisode(Episode):
 
         return cls(name=name, description=description, begin=begin, end=end,
                    beginframe=beginFrame, nFrames=nFrames, protocol=protocol,
-                   episodeType=episodeType,procedure=procedure)
+                   episodeType=episodeType, procedure=procedure)
 
     @property
     def type(self) -> RecordingEpisodeType:
-        return self._type_
+        return self.episodeType
 
     @type.setter
     def type(self, val:RecordingEpisodeType):
         if isinstance(val, RecordingEpisodeType):
-            self._type_ = val
+            self.episodeType = val
         else:
             scipywarn(f"Expecting a RecordingEpisodeType, instead got {val}")
 
@@ -311,100 +318,113 @@ class RecordingEpisode(Episode):
 @dataclass
 class RecordingSchedule(Schedule):
     r"""Sequence of RecordingEpisode objects"""
-    allowed_contents = (RecordingEpisode, )
-    def __init__(self, name: typing.Optional[str] = None, **kwargs):
-        super().__init__(name, **kwargs)
+    allowed_contents: typing.ClassVar = (RecordingEpisode, )
 
-    def __hash__(self) -> int:
-        return hash((self.episodes))
+    # def __init__(self, name: typing.Optional[str] = None, **kwargs):
+    #     super().__init__(name, **kwargs)
 
-    def __repr__(self):
-        ret = list()
-        ret.append(f"{self.__class__.__name__}(name='{self.name}'), with {len(self.episodes)} episodes:")
-        for k,e in enumerate(self.episodes):
-            ret.append(f"{k}: {e}")
-
-        return "\n".join(ret)
-
-    def __add__(self, other):
-        if isinstance(other, self.__class__):
-            newepisodes = self.episodes.__add__(other.episodes)
-            return self.__class__(name=self.name, episodes = newepisodes)
-
-        elif isinstance(other, typing.Sequence):
-            if len(other) and not all(isinstance(e, RecordingEpisode) for e in other):
-                raise TypeError("Can only add a sequence of RecordingEpisodes")
-            newepisodes = self.episodes.__add__(other)
-            return self.__class__(name=self.name, episodes = newepisodes)
-
-        else:
-            raise TypeError(f"Invalid argument type ({type(other).__name__})")
-
-    def __iadd__(self, other):
-        if isinstance(other, self.__class__):
-            self.episodes.__iadd__(other.episodes)
-            return self
-
-        elif isinstance(other, typing.Sequence):
-            if len(other) and not all(isinstance(e, RecordingEpisode) for e in other):
-                raise TypeError("Can only add a sequence of RecordingEpisodes")
-            self.episodes.__iadd__(other)
-            return self
-
-        else:
-            raise TypeError(f"Invalid argument type ({type(other).__name__})")
-
-    def append(self, value:RecordingEpisode):
-        if not isinstance(value, RecordingEpisode):
-            raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
-
-        self.episodes.append(value)
-
-    def insert(self, index:int, value: RecordingEpisode):
-        if not isinstance(value, RecordingEpisode):
-            raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
-
-        self.episodes.insert(index, value)
-
-    def remove(self, value:RecordingEpisode):
-        if not isinstance(value, RecordingEpisode):
-            raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
-
-        self.episodes.remove(value)
-
-    def extend(self, value):
-        if isinstance(value, self.__class__):
-            self.episodes.append(value.episodes)
-
-        elif isinstance(value, typing.Sequence):
-            if len(value):
-                if all(isinstance(v, RecordingEpisode) for v in value):
-                    self.episodes.append(value)
-                else:
-                    raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
-
-        else:
-            raise TypeError("Can only append a RecordingSchedule or a sequence of RecordingEpisodes")
-
-    def index(self, episode:RecordingEpisode):
-        if not isinstance(episode, RecordingEpisode):
-            raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
-
-        if episode not in self.episodes:
-            raise ValueError("Episode is not contained in this RecordingSchedule")
-
-        ndx = [k for k in range(len(self.episodes)) if self.episodes[k] == episode]
-
-        return ndx[0]
-
-    def count(self, episode:RecordingEpisode):
-        if not isinstance(episode, RecordingEpisode):
-            raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
-
-        if episode not in self.episodes:
-            return 0
-
-        return len(e for e in self.episodes if e == episode)
+#     def __hash__(self) -> int:
+#         return hash((self.name, self.description, self.episodes))
+#
+#     def __repr__(self):
+#         ret = list()
+#         ret.append(f"{self.__class__.__name__}(name='{self.name}'), with {len(self.episodes)} episodes:")
+#         for k,e in enumerate(self.episodes):
+#             ret.append(f"{k}: {e}")
+#
+#         return "\n".join(ret)
+#
+#     def __add__(self, other):
+#         if isinstance(other, self.__class__):
+#             newepisodes = self.episodes.__add__(list(map(deepcopy, other.episodes)))
+#
+#             ret = self.__class__(name=self.name, description=self.description,
+#                                   episodes = newepisodes)
+#
+#         elif isinstance(other, typing.Sequence):
+#             if len(other) and not all(isinstance(e, RecordingEpisode) for e in other):
+#                 raise TypeError("Can only add a sequence of RecordingEpisodes")
+#             newepisodes = self.episodes.__add__(list(map(deepcopy, other)))
+#
+#             ret = self.__class__(name=self.name, description=self.description,
+#                                   episodes=newepisodes)
+#
+#         else:
+#             raise TypeError(f"Invalid argument type ({type(other).__name__})")
+#
+#         ret.__adjustBeginFrameAllEpisodes__()
+#
+#         return ret
+#
+#     def __iadd__(self, other):
+#         if isinstance(other, self.__class__):
+#             self.episodes.__iadd__(list(map(deepcopy, other.episodes)))
+#
+#         elif isinstance(other, typing.Sequence):
+#             if len(other) and not all(isinstance(e, RecordingEpisode) for e in other):
+#                 raise TypeError("Can only add a sequence of RecordingEpisodes")
+#             self.episodes.__iadd__(list(map(deepcopy, other)))
+#
+#         else:
+#             raise TypeError(f"Invalid argument type ({type(other).__name__})")
+#
+#         self.__adjustBeginFrameAllEpisodes__()
+#
+#         return self
+#
+#     def append(self, value:RecordingEpisode):
+#         if not isinstance(value, RecordingEpisode):
+#             raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+#
+#         value = deepcopy(value)
+#
+#         self.episodes.append(value)
+#
+#     def insert(self, index:int, value: RecordingEpisode):
+#         if not isinstance(value, RecordingEpisode):
+#             raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+#
+#         self.episodes.insert(index, value)
+#
+#     def remove(self, value:RecordingEpisode):
+#         if not isinstance(value, RecordingEpisode):
+#             raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+#
+#         self.episodes.remove(value)
+#
+#     def extend(self, value):
+#         if isinstance(value, self.__class__):
+#             self.episodes.append(value.episodes)
+#
+#         elif isinstance(value, typing.Sequence):
+#             if len(value):
+#                 if all(isinstance(v, RecordingEpisode) for v in value):
+#                     self.episodes.append(value)
+#                 else:
+#                     raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+#
+#         else:
+#             raise TypeError("Can only append a RecordingSchedule or a sequence of RecordingEpisodes")
+#
+#     def index(self, episode:RecordingEpisode):
+#         if not isinstance(episode, RecordingEpisode):
+#             raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+#
+#         if episode not in self.episodes:
+#             raise ValueError("Episode is not contained in this RecordingSchedule")
+#
+#         ndx = [k for k in range(len(self.episodes)) if self.episodes[k] == episode]
+#
+#         return ndx[0]
+#
+#     def count(self, episode:RecordingEpisode):
+#         if not isinstance(episode, RecordingEpisode):
+#             raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
+#
+#         if episode not in self.episodes:
+#             return 0
+#
+#         return len(e for e in self.episodes if e == episode)
 
     # @property
     # def nFrames(self) -> int:
@@ -446,7 +466,8 @@ class RecordingSchedule(Schedule):
             group[target_name] = cached_entity
             return cached_entity
 
-        attrs = {"name": getattr(self, "name")}
+        attrs = {"name": getattr(self, "name", ""),
+                 "description": getattr(self, "description", "")}
 
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
@@ -477,10 +498,11 @@ class RecordingSchedule(Schedule):
         attrs = h5io.attrs2dict(entity.attrs)
 
         name = attrs["name"]
+        description = attrsget("description", "")
 
         episodes = h5io.fromHDF5(entity["episodes"], cache)
 
-        return cls(name, episodes=episodes)
+        return cls(name=name, description=description, episodes=episodes)
 
 class SynapticPathwayType(TypeEnum):
     r"""

@@ -25,32 +25,52 @@ if os.environ["QT_API"] == "pyside6":
     QAction = QtGui.QAction # noqa
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
+    QVariantType = object
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
+
     from qtpy import sip
-    # from qtpy.uic import loadUiType # noqa
+    from qtpy.uic import loadUiType # noqa
+    from QtCore import QVariant
+    QVariantType = QVariant
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-# import qtpy
-# qtpy.API = os.environ["QT_API"]
-# if os.environ["QT_API"] == "pyside6":
-#     import PySide6
-#     from PySide6 import QtCore, QtGui, QtWidgets, QtSvg
-#     from PySide6.QtCore import Signal, Slot, Property
-# else:
-#     from qtpy import QtCore, QtGui, QtWidgets, QtSvg
-#     from qtpy.QtCore import Signal, Slot, Property
-
-# from core.prog import safewrapper # noqa
-# from core.sysutils import adapt_ui_path
-
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
+
+# NOTE: 2026-07-31 15:10:43
+# QVariant does NOT exist in PySide6
+# In PyQt* QVariant is a bona fide QtCore class i.e. a type (QVariant)
+# with a constructor (``QVariant(...)``)
+
+# I am introducing these "placeholders"  to avoid messing about with
+# the entire Scipyen codebase forever
+
+def qVariants(*args) -> typing.List:
+    r"""In PyQt*, Creates and returns a list of QVariant objects wrapping each element in args.
+    In PySide6 just returns the list of objects in *args"""
+
+    if __has_PySide6__:
+        return list(args)
+    else:
+        return list(map(lambda o: o if isinstance(o, QVariantType) else QVariantType(o), args))
+
+def qVariant(obj: typing.Optional = None):
+    if __has_PySide6__:
+        return obj
+
+    else:
+        return obj if isinstance(obj, QVariantType) else QVariantType(obj)
+
+def fromQVariant(obj):
+    if __has_PySide6__:
+        return obj
+    else:
+        return obj.value() if isinstance(obj, QVariantType) else obj
 
 # from qt import *
 # import weakref

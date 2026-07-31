@@ -300,8 +300,10 @@ def main():
         #import subprocess
         #compl = subprocess.run(["xrdb", "-merge", os.path.join(__module_path__, "neuron_python",  "app-defaults", "nrniv")])
         #print("xrdb: ", compl.returncode)
-    #sip.setdestroyonexit(True)
-    
+
+    # if __has_sip__:
+    #     sip.setdestroyonexit(True)
+
     if __has_PySide6__:
         appName = "Scipyen-PySide6"
     elif __has_PyQt6__:

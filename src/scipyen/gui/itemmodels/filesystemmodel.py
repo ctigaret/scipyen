@@ -36,6 +36,8 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
+from core.qtutils import qVariant
+
 from gui import guiutils
 
 class FileSystemModel(QtGui.QFileSystemModel):
@@ -45,13 +47,13 @@ class FileSystemModel(QtGui.QFileSystemModel):
         self._cutIndexes_:typing.Sequence[QtCore.QModelIndex] = list()
         self._modifiedTimeFormat_: typing.Optional[QtCore.Locale.FormatType] = None
 
-    def headerData(self, section: int, orientation: QtCore.Qt.Orientation, role: int) -> QtCore.QVariant:
+    def headerData(self, section: int, orientation: QtCore.Qt.Orientation, role: int) -> qVariant:
         if orientation == QtCore.Qt.Horizontal and section == 3 and role == QtCore.Qt.DisplayRole:
-            return QtCore.QVariant("Modified")
+            return qVariant("Modified")
 
         return super().headerData(section, orientation, role)
 
-    def data(self, index:QtCore.QModelIndex, role:QtCore.Qt.ItemDataRole=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
+    def data(self, index:QtCore.QModelIndex, role:QtCore.Qt.ItemDataRole=QtCore.Qt.DisplayRole) -> qVariant:
         from gui import guiutils
         # NOTE: 2026-01-25 21:20:01
         # not sure this does anything meaningful...
@@ -67,10 +69,10 @@ class FileSystemModel(QtGui.QFileSystemModel):
             if role == QtCore.Qt.DisplayRole and index.column() == 3:
                 lastMod = index.data(self.FileInfoRole).lastModified() # a QDateTime
                 if isinstance(self.timeFormat, QtCore.QLocale.FormatType):
-                    return QtCore.QVariant(guiutils.formatRelativeDateTime(lastMod, self.timeFormat))
+                    return qVariant(guiutils.formatRelativeDateTime(lastMod, self.timeFormat))
                 elif isinstance(self.timeFormat, str) and self.timeFormat in ("Fancy Short", "Fancy Narrow"):
                     tFormat = QtCore.QLocale.ShortFormat if self.timeFormat == "Fancy Short" else QtCore.QLocale.NarrowFormat
-                    return QtCore.QVariant(guiutils.formatRelativeDateTime(lastMod, tFormat, fancy=True))
+                    return qVariant(guiutils.formatRelativeDateTime(lastMod, tFormat, fancy=True))
 
         return super().data(index, role)
 

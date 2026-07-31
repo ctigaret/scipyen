@@ -46,6 +46,8 @@ except: # noqa
 
 
 from core.utilities import safewrapper
+from core import desktoputils
+from core.qtutils import qVariant #, QVariantType, fromQVariant)
 # from core import workspacefunctions as wfunc
 # from .workspacegui import (WorkspaceGuiMixin, _X11WMBridge_,
 #                            saveWindowSettings, loadWindowSettings)
@@ -53,7 +55,6 @@ from gui.workspacegui import WorkspaceGuiMixin #, saveWindowSettings, loadWindow
 from gui.widgets.spinboxslider import SpinBoxSlider
 # from gui.itemmodels.workspacemodel import WorkspaceModel
 from gui.pictgui import WorkerThread
-from core import desktoputils
 # from iolib import pictio as pio
 from pandas import NA
 
@@ -429,6 +430,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             if __has_PyQt6__ or __has_PySide6__:
                 v = int(self.winId())
                 result = dbusinterface.call("GetMenuForWindow", v).arguments()
+
             else:
                 v = QtCore.QVariant(int(self.winId()))
 
@@ -449,13 +451,13 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                     #
                     result = dbusinterface.call("GetMenuForWindow", v).arguments()
 
-                    if len(result) == 1: # oops!
-                        # warnings.warn(result[0])
-                        return
+            if len(result) == 1: # oops!
+                # warnings.warn(result[0])
+                return
 
-                        # address, objpath = result
+                # address, objpath = result
 
-                    return result
+            return result
 
     def update_title(self, doc_title: typing.Optional[str] = None,
                      win_title: typing.Optional[str] = None,
@@ -875,10 +877,14 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                                                 interface)
             dbusinterface.setTimeout(100)
 
-            old_v = QtCore.QVariant(self._wm_id_)
+            old_v = qVariant(self._wm_id_)
 
-            if old_v.convert(QtCore.QVariant.UInt):
+            if __has_PySide6__:
                 reply = dbusinterface.call("UnregisterWindow", old_v) # noqa
+
+            else:
+                if old_v.convert(QtCore.QVariant.UInt):
+                    reply = dbusinterface.call("UnregisterWindow", old_v) # noqa
 
     def _restore_menuBar_(self):
         r"""Hack to restore the window's menubar in the desktop's global menu.
@@ -902,14 +908,19 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                                                     interface)
                 dbusinterface.setTimeout(100)
 
-                old_v = QtCore.QVariant(self._wm_id_)
-                new_v = QtCore.QVariant(int(self.winId()))
+                old_v = qVariant(self._wm_id_)
+                new_v = qVariant(int(self.winId()))
 
-                if old_v.convert(QtCore.QVariant.UInt) and new_v.convert(QtCore.QVariant.UInt):
-                    # deregister old WM window ID, then register the new one
-                    # to the same DBus object path (i.e. dbusmenu instance)
+                if __has_PySide6__:
                     dereg_reply = dbusinterface.call("UnregisterWindow", old_v) # noqa
                     newreg_reply = dbusinterface.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self._app_menu_[1])) # noqa
+
+                else:
+                    if old_v.convert(QtCore.QVariant.UInt) and new_v.convert(QtCore.QVariant.UInt):
+                        # deregister old WM window ID, then register the new one
+                        # to the same DBus object path (i.e. dbusmenu instance)
+                        dereg_reply = dbusinterface.call("UnregisterWindow", old_v) # noqa
+                        newreg_reply = dbusinterface.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self._app_menu_[1])) # noqa
 
     @Slot()
     @safewrapper

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>594</width>
-    <height>476</height>
+    <width>581</width>
+    <height>459</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -291,8 +291,8 @@
             <rect>
              <x>0</x>
              <y>0</y>
-             <width>340</width>
-             <height>145</height>
+             <width>332</width>
+             <height>128</height>
             </rect>
            </property>
            <property name="sizePolicy">
@@ -339,7 +339,7 @@
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="layoutWidget">
+      <widget class="QWidget" name="layoutWidget1">
        <layout class="QVBoxLayout" name="coefficientsTableVerticalLayout">
         <item>
          <widget class="TableEditorWidget" name="modelCoefficientsTable" native="true">

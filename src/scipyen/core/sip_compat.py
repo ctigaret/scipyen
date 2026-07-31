@@ -27,27 +27,16 @@ else:
         __has_PyQt6__ = True
 
     from qtpy import sip
-    from qtpy.uic import loadUiType
+    from qtpy.uic import loadUiType # noqa
+
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
 
-# import qtpy
-# qtpy.API = os.environ["QT_API"]
-# if os.environ["QT_API"] == "pyside6":
-#     import PySide6
-#     from PySide6 import QtCore, QtGui, QtWidgets, QtXml, QtSvg
-#     from PySide6.QtCore import Signal, Slot, Property
-#     # from qtpy.QtCore import Signal, Slot, QEnum, Property
-#     __has_sip__ = False
-# else:
-#     from qtpy import QtCore, QtGui, QtWidgets, QtXml, QtSvg
-#     from qtpy.QtCore import Signal, Slot, Property
-#     # from qtpy.QtCore import Signal, Slot, QEnum, Property
-#     from qtpy import sip as sip
-#     __has_sip__ = True
+if __has_PySide6__:
+    raise ImportError("Cannot import this module under PySide6")
 
 def no_sip_autoconversion(klass):
     r"""Decorator for classes to suppresses sip autoconversion of Qt to Python
@@ -76,9 +65,10 @@ def no_sip_autoconversion(klass):
         return wrapper
     return decorator
 
-@no_sip_autoconversion(QtCore.QVariant)
+@no_sip_autoconversion(QVariant)
 def fromMimeData(mimeData:QtCore.QMimeData) -> QtGui.QColor:
     r"""Only works with PyQt5/6; PySide2/6 does not implement sip"""
+    from gui.painting_shared import canDecode
     if mimeData.hasColor():
         # NOTE: 2021-05-14 21:26:16 ATTENTION
         # sip "autoconverts" QVariant<QColor> to an int, therefore constructing
@@ -92,12 +82,12 @@ def fromMimeData(mimeData:QtCore.QMimeData) -> QtGui.QColor:
         return ret
     if canDecode(mimeData):
         return QtGui.QColor(mimeData.text())
+
     return QtGui.QColor()
 
-# @no_sip_autoconversion(QtCore.QVariant)
 def comboDelegateBrush(index:QtCore.QModelIndex, role:int) -> QtGui.QBrush:
     brush = QtGui.QBrush()
-    v = QtCore.QVariant(index.data(role))
+    v = QVariant(index.data(role))
     # return v.value()
     value = v.value()
     if isinstance(value, QtGui.QBrush):

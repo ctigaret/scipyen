@@ -1774,13 +1774,16 @@ class Schedule(ScipyenDataclass):
     _:KW_ONLY
     episodes:typing.Sequence[Episode] = dataclasses.field(default_factory = lambda : list())
 
-    # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("episodes",)))
+    allowed_contents: typing.ClassVar = (Episode, )
 
     def __repr__(self):
         # indent = lambda x: x.replace("\n", "\n\t")
         # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.episodes))
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
@@ -1792,18 +1795,20 @@ class Schedule(ScipyenDataclass):
         if isinstance(key, int):
             if key >= len(self.episodes) or key < -1 * len(self.episodes):
                 raise IndexError(f"Index {key} out of range for {len(self.episodes)} episodes")
+
             return self.episodes[key]
 
         elif isinstance(key, str):
             if len(self.episodes) == 0:
-                raise KeyError(f"Episode named {key} not found")
+                raise KeyError(f"{self.allowed_contents[0].__name__} named {key} not found")
 
             ret = list(filter(lambda x:x.name == key, self.episodes))
 
             if len(ret) == 0:
-                raise KeyError(f"Episode named {key} not found")
+                raise KeyError(f"{self.allowed_contents[0].__name__} named {key} not found")
+
             elif len(ret) > 1:
-                scipywarn(f"Duplicate episode name ({key}) found")
+                scipywarn(f"Duplicate {self.allowed_contents[0].__name__} name ({key}) found")
 
             return ret
 
@@ -1839,8 +1844,10 @@ class Schedule(ScipyenDataclass):
             if key >= len(self.episodes) or key < -1 * len(self.episodes):
                 raise IndexError(f"Index {key} out of range for {len(self.episodes)} episodes")
 
-            if not isinstance(value, Episode):
-                raise TypeError(f"Expecting an Episode; instead, got {type(value).__name__}")
+            if not isinstance(value, self.allowed_contents):
+                raise TypeError(f"Expecting an {self.allowed_contents[0].__name__} object; instead, got {type(value).__name__}")
+
+            value = deepcopy(value)
 
             if key < len(self.episodes)-1:
                 nFramesBefore = sum([e.nFrames for e in self.episodes[:key]])
@@ -1857,8 +1864,10 @@ class Schedule(ScipyenDataclass):
             if not isinstance(value, typing.Iterable):
                 raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
 
-            if not all(isinstance(v, Episode) for v in value):
-                raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique((type(v).__name__ for v in value))}")
+            if not all(isinstance(v, self.allowed_contents) for v in value):
+                raise TypeError(f"The RHS iterable must contain only {self.allowed_contents[0].__name__} objects; instead got {unique((type(v).__name__ for v in value))}")
+
+            value = list(map(deepcopy, value))
 
             l_indices = len(range(*key.indices(len(self.episodes))))
 
@@ -1870,8 +1879,6 @@ class Schedule(ScipyenDataclass):
 
             for k, index in enumerate(l_indices):
                 self.__setitem__(index, value[k])
-
-            # self.episodes[key] = value
 
         elif isinstance(key, range):
             if not isinstance(value, typing.Iterable):
@@ -1900,8 +1907,8 @@ class Schedule(ScipyenDataclass):
                 if not isinstance(value, typing.Iterable):
                     raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
 
-                if not all(isinstance(v, Episode) for v in value):
-                    raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique((type(v).__name__ for v in value))}")
+                if not all(isinstance(v, self.allowd_contents) for v in value):
+                    raise TypeError(f"The RHS iterable must contain only {self.allowed_contents[0].__name__} objects; instead got {unique((type(v).__name__ for v in value))}")
 
                 if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
                     raise IndexError(f"Index {k} out of range for {len(self.episodes)} episodes")
@@ -1911,6 +1918,8 @@ class Schedule(ScipyenDataclass):
 
                 if len(value) < len(key):
                     raise ValueError(f"Too few RHS elements ({l_indices}); expecting {len(key)}")
+
+                value = list(map(deepcopy, value))
 
                 for k in key:
                     self.__setitem__(k, value[k])
@@ -1937,15 +1946,15 @@ class Schedule(ScipyenDataclass):
 
         elif isinstance(key, str):
             if len(self.episodes) == 0:
-                raise KeyError(f"Episode named {key} not found")
+                raise KeyError(f"{self.allowed_contents[0].__name__} named {key} not found")
 
             ret = list(filter(lambda x:x.name == key, self.episodes))
 
             if len(ret) == 0:
-                raise KeyError(f"Episode named {key} not found")
+                raise KeyError(f"{self.allowed_contents[0].__name__} named {key} not found")
 
             elif len(ret) > 1:
-                scipywarn(f"Duplicate episode name ({key}) found")
+                scipywarn(f"Duplicate {self.allowed_contents[0].__name__} name ({key}) found")
 
             episode = ret[0]
 
@@ -2001,38 +2010,35 @@ class Schedule(ScipyenDataclass):
 
     def __add__(self, other):
         if isinstance(other, self.__class__):
+            newepisodes = self.episodes.__add__(list(map(deepcopy, other.episodes)))
 
-            newepisodes = self.episodes.__add__(other.episodes)
             ret = self.__class__(name=self.name, description=self.description,
                                   episodes=newepisodes)
-
-            ret.__adjustBeginFrameAllEpisodes__()
-
-            return ret
 
         elif isinstance(other, typing.Sequence):
-            if len(other) and not all(isinstance(e, Episode) for e in other):
-                raise TypeError("Can only add a sequence of Episodes")
+            if len(other) and not all(isinstance(e, self.allowed_contents) for e in other):
+                raise TypeError(f"Can only add a sequence of {self.allowed_contents[0].__name__} objects")
 
-            newepisodes = self.episodes.__add__(other)
+            newepisodes = self.episodes.__add__(list(map(deepcopy, other)))
+
             ret = self.__class__(name=self.name, description=self.description,
                                   episodes=newepisodes)
-
-            ret.__adjustBeginFrameAllEpisodes__()
-
-            return ret
 
         else:
             raise TypeError(f"Invalid argument type ({type(other).__name__})")
 
+        ret.__adjustBeginFrameAllEpisodes__()
+
+        return ret
+
     def __iadd__(self, other):
         if isinstance(other, self.__class__):
-            self.episodes.__iadd__(other.episodes)
+            self.episodes.__iadd__(list(map(deepcopy, other.episodes)))
 
         elif isinstance(other, typing.Sequence):
-            if len(other) and not all(isinstance(e, Episode) for e in other):
-                raise TypeError("Can only add a sequence of Episodes")
-            self.episodes.__iadd__(other)
+            if len(other) and not all(isinstance(e, self.allowed_contents) for e in other):
+                raise TypeError(f"Can only add a sequence of {self.allowed_contents[0].__name__} objects")
+            self.episodes.__iadd__(list(map(deepcopy, other)))
 
         else:
             raise TypeError(f"Invalid argument type ({type(other).__name__})")
@@ -2060,8 +2066,8 @@ class Schedule(ScipyenDataclass):
         return sum([e.nFrames for e in self.episodes])
 
     def append(self, value: Episode):
-        if not isinstance(value, Episode):
-            raise TypeError("A Schedule can only contain Episodes")
+        if not isinstance(value, self.allowed_contents):
+            raise TypeError(f"A {self.__class__.__name__} can only contain {self.allowed_contents[0].__name__} objects")
 
         value=deepcopy(value)
 
@@ -2072,8 +2078,10 @@ class Schedule(ScipyenDataclass):
         self.episodes.append(value)
 
     def insert(self, index: int, value: Episode):
-        if not isinstance(value, Episode):
-            raise TypeError("A Schedule can only contain Episodes")
+        if not isinstance(value, self.allowed_contents):
+            raise TypeError(f"A {self.__class__.__name__} can only contain {self.allowed_contents[0].__name__} objects")
+
+        value = deepcopy(value)
 
         if len(self.episodes) == 0:
             self.episodes.append(value) # will adapt value.beginFrame
@@ -2093,10 +2101,12 @@ class Schedule(ScipyenDataclass):
 
                 self.episodes.insert(index, value)
                 # how many frames, now, up to and INCUDING index (where the new episode sits)?
-                nFramesBefore = sum([e.nFrames for e in self.episodes[:index+1]])
+                # nFramesBefore = sum([e.nFrames for e in self.episodes[:index+1]])
                 # now, adapt beginFrames for ALL Episode after this new one
-                for episode in self.episodes[index+1:]:
-                    episode.beginFrame += nFramesBefore
+                # for episode in self.episodes[index+1:]:
+                    # episode.beginFrame += nFramesBefore
+
+        self.__adjustBeginFrameAllEpisodes__()
 
     def pop(self, index:int=-1) -> Episode:
         # adjust the episodes AFTER the one to be removed
@@ -2118,52 +2128,35 @@ class Schedule(ScipyenDataclass):
     def reverse(self):
         self.episodes.reverse()
 
-        nFrames = 0
-        for k, episode in enumerate(self.episodes):
-            if k == 0:
-                if episode.beginFrame != 0:
-                    episode.beginFrame=0
-            else:
-                if episode.beginFrame != nFrames:
-                    episode.beginFrame = nFrames
-
-            nFrames += episode.nFrames
+        self.__adjustBeginFrameAllEpisodes__()
 
     def sort(self, *args, **kwargs):
         self.episodes.sort(*args, **kwargs)
-        nFrames = 0
-        for k, episode in self.episodes:
-            if k == 0:
-                episode.beginFrame=0
-            else:
-                episode.beginFrame += nFrames
-
-            nFrames += episode.nFrames
+        self.__adjustBeginFrameAllEpisodes__()
 
     def extend(self, value):
         if isinstance(value, self.__class__):
             self.episodes.extend(list(map(deepcopy, value.episodes)))
 
-            self.__adjustBeginFrameAllEpisodes__()
-
         elif isinstance(value, typing.Sequence):
             if len(value):
-                if all(isinstance(v, Episode) for v in value):
-                    self.episodes.append(deepcopy(value))
-                    self.__adjustBeginFrameAllEpisodes__()
+                if all(isinstance(v, self.allowed_contents) for v in value):
+                    self.episodes.extend(list(map(deepcopy, value)))
 
                 else:
-                    raise TypeError("A Schedule can only contain Episodes")
+                    raise TypeError(f"A {self.__class__.__name__} object can only contain {self.allowed_contents[0].__name__} objects")
 
         else:
-            raise TypeError("Can only append a Schedule or a sequence of Episodes")
+            raise TypeError(f"Can only append a {self.__class__.__name__} or a sequence of {self.allowed_contents[0].__name__} objects")
+
+        self.__adjustBeginFrameAllEpisodes__()
 
     def index(self, episode:Episode):
-        if not isinstance(episode, Episode):
-            raise TypeError("A Schedule can only contain Episodes")
+        if not isinstance(episode, self.allowed_contents):
+            raise TypeError(f"A {self.__class__.__name__} object can only contain {self.allowed_contents[0].__name__} objects")
 
         if episode not in self.episodes:
-            raise ValueError("Episode is not contained in this Schedule")
+            raise ValueError(f"The specified {self.allowed_contents[0].__name__} object is not contained in this {self.__class__.__name__}")
 
         ndx = [k for k in range(len(self.episodes)) if self.episodes[k] == episode]
 
@@ -2173,8 +2166,8 @@ class Schedule(ScipyenDataclass):
         self.episodes.clear()
 
     def count(self, episode: Episode):
-        if not isinstance(episode, Episode):
-            raise TypeError("A Schedule can only contain Episodes")
+        if not isinstance(episode, self.allowed_contents):
+            raise TypeError(f"A {self.__class__.__name__} object can only contain {self.allowed_contents[0].__name__} objects")
 
         if episode not in self.episodes:
             return 0
@@ -2191,7 +2184,7 @@ class Schedule(ScipyenDataclass):
             group[target_name] = cached_entity
             return cached_entity
 
-        attrs = {"name": getattr(self, "name")}
+        attrs = {"name": getattr(self, "name", ""), "description": getattr(self, "description", "")}
 
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
@@ -2219,10 +2212,11 @@ class Schedule(ScipyenDataclass):
         attrs = h5io.attrs2dict(entity.attrs)
 
         name = attrs["name"]
+        description = attrs.get("description", "")
 
         episodes = h5io.fromHDF5(entity["episodes"], cache)
 
-        return cls(name, episodes=episodes)
+        return cls(name=name, description=description, episodes=episodes)
 
     @singledispatchmethod
     def episode(self, ndx) -> Episode:
@@ -2268,19 +2262,19 @@ class Schedule(ScipyenDataclass):
     def episodeNames(self) -> list[str]:
         return [e.name for e in self.episodes]
 
-    def epsodeIndex(self, name:str) -> int:
+    def episodeIndex(self, name:str) -> int:
         return self.episodeNames.index(name)
 
-    def addEpisode(self, episode:Episode):
-        if episode not in self.episodes:
-            self.episodes.append(episode)
-
-    def addEpisodes(self, episodes:typing.Sequence[Episode]):
-        self.episodes.extend([e for e in episodes if e not in self.episodes])
-
-    def removeEpisode(self, episode):
-        if episode in self.episodes:
-            self.episodes.remove(episode)
+    # def addEpisode(self, episode:Episode):
+    #     if episode not in self.episodes:
+    #         self.episodes.append(deepcopy(episode))
+    #
+    # def addEpisodes(self, episodes:typing.Sequence[Episode]):
+    #     self.episodes.extend([e for e in episodes if e not in self.episodes])
+    #
+    # def removeEpisode(self, episode):
+    #     if episode in self.episodes:
+    #         self.episodes.remove(episode)
 
     @property
     def procedures(self):

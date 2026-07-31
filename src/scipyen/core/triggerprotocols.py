@@ -270,7 +270,8 @@ stimulation, etc).
     # and IT IS NOT a TriggerEvent object. For this reason, the imagingDelay
     # will not have a corresponding event in a data segment's "events" list.
     #
-    imagingDelay:QuantityDescriptorValidator = QuantityDescriptorValidator("imagingDelay", validator=checkTimeUnits) # 0*pq.s by default
+    imagingDelay:QuantityDescriptorValidator = QuantityDescriptorValidator("imagingDelay",
+                                                                           validator=checkTimeUnits) # 0*pq.s by default
 
     # TODO: a validator to check type and contents
     segments:typing.Union[int, list[int], tuple[int], range, slice] = dataclasses.field(default_factory = list)

@@ -19,7 +19,7 @@ from collections import deque
 #### END core python modules
 
 #### BEGIN 3rd party modules
-import qtpy
+import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
@@ -27,8 +27,8 @@ __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -67,14 +67,11 @@ import core.datatypes
 import core.utilities as utilities
 import core.strutils as strutils
 from core.strutils import str2float
-
 from core.prog import (safewrapper, scipywarn)
-
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType)
 from core.marktrain import MarkTrain
 from core.triggerprotocols import (TriggerProtocol, TriggerProtocolList)
 from core.datazone import DataZone
-
 import core.datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 import core.datatypes as dt
@@ -82,9 +79,12 @@ from core.datatypes import array_slice
 from core.sysutils import adapt_ui_path
 from core import scipyen_quantities as scq
 from core import neoutils
-from ephys import ephys
+from core.qtutils import qVariant
 
 #### END pict.core modules
+
+from ephys import ephys
+
 
 #### BEGIN pict.gui modules
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
@@ -112,7 +112,7 @@ class DIGTriggersTableModel(QtCore.QAbstractTableModel):
         super().__init__(parent)
 
         for k, col in enumerate(self.model_columns):
-            self.setHeaderData(k, QtCore.Qt.Horizontal, QtCore.QVariant(col))
+            self.setHeaderData(k, QtCore.Qt.Horizontal, qVariant(col))
 
         # self.headerDataChanged.emit()
         self.immutability = {"columns": [0, 4], "joint": False}
@@ -128,38 +128,38 @@ class DIGTriggersTableModel(QtCore.QAbstractTableModel):
         return len(self.model_columns)
 
     def headerData(self, section:int, orientation:QtCore.Qt.Orientation,
-                   role:QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole) -> QtCore.QVariant:
+                   role:QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole) -> qVariant:
 
         if len(self._data_) == 0:
-            return QtCore.QVariant()
+            return qVariant()
 
         if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
-            return QtCore.QVariant()
+            return qVariant()
 
         if orientation == QtCore.Qt.Horizontal: # column header
-            return QtCore.QVariant(self.model_columns[section])
+            return qVariant(self.model_columns[section])
 
         else: # vertical (rows) header
-            return QtCore.QVariant("%d" % section)
+            return qVariant("%d" % section)
 
     def data(self, index:QtCore.QModelIndex, role:QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole):
         if self._data_ is None:
-            return QtCore.QVariant()
+            return qVariant()
 
         if not index.isValid():
-            return QtCore.QVariant()
+            return qVariant()
 
         if len(self._data_) == 0 or not all ((isinstance(p, typing.Sequence) for p in self._data_)):
-            return QtCore.QVariant()
+            return qVariant()
 
         if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole, QtCore.Qt.AccessibleDescriptionRole):
-            return QtCore.QVariant()
+            return qVariant()
 
         # rows: one for each defined protocol
         row = index.row()
 
         if row >= len(self._data_) or row < 0:
-            return QtCore.QVariant()
+            return qVariant()
 
         # columns:                                  editor proxy widget
         # 0: int = DIG channel index                None
@@ -172,7 +172,7 @@ class DIGTriggersTableModel(QtCore.QAbstractTableModel):
         col = index.column()
 
         if col < 0 or col >= len(self.model_columns):
-            return QtCore.QVariant()
+            return qVariant()
 
         trigger_data = self._data_[row]
 
@@ -183,39 +183,39 @@ class DIGTriggersTableModel(QtCore.QAbstractTableModel):
 
         if col == 0: # digital channel
             val = dig
-            tip = QtCore.QVariant(f"DIG Channel {val}")
+            tip = qVariant(f"DIG Channel {val}")
 
         elif col == 1: # trigger event type name
             val = event.type.name
-            tip = QtCore.QVariant(f"Type: {val}")
+            tip = qVariant(f"Type: {val}")
 
         elif col == 2: # name
             val = event.name
-            tip = QtCore.QVariant(f"Name: {val}")
+            tip = qVariant(f"Name: {val}")
 
         elif col == 3: # labels
             val = ", ".join(list(map(lambda x: str(x), event.labels)))
-            tip = QtCore.QVariant(f"Labels: {val}")
+            tip = qVariant(f"Labels: {val}")
 
         elif col == 4: # sweeps where it occurs
             val = ", ".join(list(map(lambda x: str(x), sweeps)))
-            tip = QtCore.QVariant(f"Sweeps where emitted: {val}")
+            tip = qVariant(f"Sweeps where emitted: {val}")
 
         elif col == 5: # use this trigger event
             val = used
-            tip = QtCore.QVariant("Used" if val else "Not used")
+            tip = qVariant("Used" if val else "Not used")
         else:
             val = None
-            tip = QtCore.QVariant()
+            tip = qVariant()
 
         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.UserRole):
-            return QtCore.QVariant() if val is None else QtCore.QVariant(val)
+            return qVariant() if val is None else qVariant(val)
 
         elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
             return tip
 
         elif role in (QtCore.Qt.UserRole, ):
-            return QtCore.QVariant(val)
+            return qVariant(val)
 
         elif role == QtCore.Qt.EditRole:
             return val
@@ -237,7 +237,7 @@ class DIGTriggersTableModel(QtCore.QAbstractTableModel):
             return False
 
         try:
-            if isinstance(value, QtCore.QVariant) or hasattr(value, "value"):
+            if isinstance(value, qVariant) or hasattr(value, "value"):
                 pyvalue = value.value()
 
             else:
