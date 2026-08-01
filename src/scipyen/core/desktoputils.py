@@ -66,7 +66,7 @@ from dataclasses import dataclass
 import core.xmlutils as xmlutils
 import iolib.pictio as pio
 from enum import Enum, IntEnum
-from functools import singledispatch, singledispatchmethod
+from functools import singledispatch, singledispatchmethod, partial
 from traitlets.utils.bunch import Bunch
 
 # import xml.etree.ElementTree as ET
@@ -111,6 +111,7 @@ except:
 import quantities as pq
 import numpy as np
 
+from core.prog import timefunc
 from iolib.navigation import filesystems
 from iolib.navigation.filesystems import pathStrLen, pathLen, pathToQUrl, urlToPath
 
@@ -176,8 +177,14 @@ def testFilesystemMountUnmountOperation(x:object) -> bool:
             )
 
 def parseUDIsksFSMountOperationJobs(msg: object) -> list:
-    if __has_qtdbus__ and isinstance(msg, QtDBus.QDBusMessage):
-        msg_args = msg.arguments()
+    if __has_qtdbus__:
+        if isinstance(msg, QtDBus.QDBusMessage):
+            msg_args = msg.arguments()
+        elif isinstance(msg, str):
+            msg_args = msg
+
+        print(f"desktoputils.parseUDIsksJob -> {msg}")
+
         # print(f'desktoputils.parseUDIsksJob -> \n\tsignature: {msg.signature()!r},\n\targuments: {msg_args!r}')
 
         # testFilesystemMountUnmountOperation = lambda x: (
@@ -190,6 +197,13 @@ def parseUDIsksFSMountOperationJobs(msg: object) -> list:
 
     return list()
 
+def _partitionPredicate_(x, devices, drivePlaces):
+    return (
+        "boot" not in x.mountpoint
+        and "subvol" not in x.opts
+        and x.device in list(map(lambda d: d.get("DEVNAME"), devices))
+        and x.device.replace("/dev/", "") not in list(map(lambda p: p.name, drivePlaces))
+        )
 
 
 def isUnixHiddenLocation(p: typing.Union[pathlib.Path, QtCore.QUrl, str]) -> bool:
@@ -581,25 +595,33 @@ def is_gnome():
         get_desktop("session").lower() in ("x11", "wayland") and get_desktop() == "GNOME"
     )
 
+def _fileSystemPlacePredicate_(x):
+    if isinstance(x, str):
+        return not x.startswith("file")
+    elif isinstance(x, QtCore.QUrl):
+        return not x.scheme.startswith("file")
+    else:
+        return False
 
 def get_local_filesystem_places(placesDict: typing.Optional[dict] = None) -> dict:
     r"""
     Get special directories (KDE Plasma5/6 specific)
     """
     if not isinstance(placesDict, dict):
+        print("desktoputils.get_local_filesystem_places calls get_desktop_places")
         placesDict = get_desktop_places()
 
-    filterFunc = (
-        lambda x: not x.startswith("file")
-        if isinstance(x, str)
-        else not x.scheme().startswith("file")
-        if isinstance(x, QtCore.QUrl)
-        else False
-    )
+    # filterFunc = (
+    #     lambda x: not x.startswith("file")
+    #     if isinstance(x, str)
+    #     else not x.scheme().startswith("file")
+    #     if isinstance(x, QtCore.QUrl)
+    #     else False
+    # )
 
     if len(placesDict):
         # result = dict((k,v) for k,v in ret.items() if not k.startswith("file:///"))
-        result = dict((k, v) for k, v in placesDict.items() if not filterFunc(k))
+        result = dict((k, v) for k, v in placesDict.items() if not _fileSystemPlacePredicate_(k))
 
         return result
 
@@ -716,7 +738,7 @@ def get_standard_desktop_places(all_folder_icons: bool = False) -> PlacesMap:
 
     return ret
 
-
+@timefunc
 def get_desktop_places(schema: typing.Optional[str] = None,
                        all_folder_icons: bool = False,
                        include_hidden: bool = False,
@@ -744,6 +766,8 @@ def get_desktop_places(schema: typing.Optional[str] = None,
 
 
     """
+    from gui.guiutils import getIcon
+
     # NOTE: 2025-02-08 10:07:51 TODO:
     # This is static: whenever a place, or the places repository, is altered
     # this won't be captured until a new Scipyen session is launched.
@@ -789,11 +813,6 @@ def get_desktop_places(schema: typing.Optional[str] = None,
     # </bookmark>
     # </xbel>
 
-    getIcon = (
-        lambda x: "folder-remote-symbolic"
-        if "remote" in x.opts
-        else "drive-harddisk-symbolic"
-    )
 
     # ### BEGIN Resolve disk partitions
     #
@@ -922,7 +941,8 @@ def get_desktop_places(schema: typing.Optional[str] = None,
                     lambda x: DEPlace(
                         x.device.replace("/dev/", ""),
                         QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
-                        icon=getIcon(x),
+                        icon=getIcon("device-notifier-symbolic"),
+                        # icon=getIcon(x.icon),
                         separator=False,
                     ),
                     list(filter(lambda x: "/run/media/" in x.mountpoint, partitions)),
@@ -951,13 +971,16 @@ def get_desktop_places(schema: typing.Optional[str] = None,
         # we will search for the parition among the mountpoint in 'disks' to capture
         # any inserted oprical disc
 
-        partitionPredicate = (
-            lambda x: x.device in list(map(lambda d: d.get("DEVNAME"), devices))
-            and x.device.replace("/dev/", "")
-            not in list(map(lambda p: p.name, drivePlaces))
-            and "subvol" not in x.opts
-            and "boot" not in x.mountpoint
-        )
+        # partitionPredicate = (
+        #     lambda x: x.device in list(map(lambda d: d.get("DEVNAME"), devices))
+        #     and x.device.replace("/dev/", "")
+        #     not in list(map(lambda p: p.name, drivePlaces))
+        #     and "subvol" not in x.opts
+        #     and "boot" not in x.mountpoint
+        # )
+
+        partitionPredicate = partial(_partitionPredicate_, devices=devices,
+                                     drivePlaces=drivePlaces)
 
         # non-standard partitions - typically user-defined
         # NOTE: 2025-03-03 22:25:12
@@ -975,7 +998,7 @@ def get_desktop_places(schema: typing.Optional[str] = None,
                         lambda x: DEPlace(
                             x.device.replace("/dev/", ""),
                             QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
-                            icon=getIcon(x),
+                            icon=getIcon("drive"),
                             separator=False,
                         ),
                         fixedPartitions,
@@ -1113,7 +1136,7 @@ def get_desktop_places(schema: typing.Optional[str] = None,
                     lambda x: DEPlace(
                         x.mountpoint.replace("\\", ""),
                         QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
-                        icon=getIcon(x),
+                        icon=getIcon("drive"),
                     ),
                     partitions,
                 )
@@ -1549,6 +1572,8 @@ def get_editor() -> str:
 
     return editor
 
+def _pathForUrlPredicate_(u0: DEPlace, u1):
+    return u1 == u0.urlPath() or u1.is_relative_to(u0.urlPath())
 
 def closestPlace(
     url: QtCore.QUrl, places: typing.Optional[PlacesMap] = None
@@ -1560,7 +1585,7 @@ def closestPlace(
     if not isinstance(places, PlacesMap):
         places = get_desktop_places(schema)  # , True)
 
-    # fallback = DEPlace(str(), url, icon = iconNameForUrl(url))#, app=None)
+    fallback = DEPlace(str(), url, icon = iconNameForUrl(url))#, app=None)
 
     if len(places) == 0:
         return fallback
@@ -1568,9 +1593,12 @@ def closestPlace(
     pathForUrl = urlToPath(url)
 
     # predicate1 = lambda x: pathForUrl == x.urlPath()
-    predicate = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(
-        x.urlPath()
-    )
+    # predicate = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(
+    #     x.urlPath()
+    # )
+
+    predicate = partial(_pathForUrlPredicate_, u1 = pathForUrl)
+
     # if sys.platform.startswith("win32"):
     #     predicate = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(x.urlPath()) or len(pathForUrl.parts) == len*()
 

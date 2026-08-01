@@ -304,12 +304,13 @@ def main():
     # if __has_sip__:
     #     sip.setdestroyonexit(True)
 
-    if __has_PySide6__:
-        appName = "Scipyen-PySide6"
-    elif __has_PyQt6__:
-        appName = "Scipyen"
-    else:
-        appName = "Scipyen-PyQt5"
+    # appName = "Scipyen"
+    # if __has_PySide6__:
+    #     appName = "Scipyen-PySide6"
+    # elif __has_PyQt6__:
+    #     appName = "Scipyen"
+    # else:
+    #     appName = "Scipyen-PyQt5"
 
     try:
         start = time.perf_counter()
@@ -328,7 +329,7 @@ def main():
             translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.location(QtCore.QLibraryInfo.TranslationsPath))
         app.installTranslator(translator)
 
-        app.setDesktopFileName(appName)
+        app.setDesktopFileName(scipyen_config.application_name)
 
         app.setApplicationName(scipyen_config.application_name)
         app.setOrganizationName(scipyen_config.organization_name)

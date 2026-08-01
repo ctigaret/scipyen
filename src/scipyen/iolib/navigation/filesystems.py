@@ -36,7 +36,7 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-from gui.itemmodels.filesystemmodel import FileSystemModel
+# from gui.itemmodels.filesystemmodel import FileSystemModel
 # from . import networkmounts
 # from iolib.navigation.networkmounts import (NetworkMounts, NetworkMountsType)
 

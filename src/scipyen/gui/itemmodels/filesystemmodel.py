@@ -67,7 +67,10 @@ class FileSystemModel(QtGui.QFileSystemModel):
 
         if isinstance(self.timeFormat, (QtCore.QLocale.FormatType, str)):
             if role == QtCore.Qt.DisplayRole and index.column() == 3:
-                lastMod = index.data(self.FileInfoRole).lastModified() # a QDateTime
+                if __has_PySide6__:
+                    lastMod = index.data(QtGui.QFileSystemModel.Roles.FileInfoRole).lastModified() # a QDateTime
+                else:
+                    lastMod = index.data(self.FileInfoRole).lastModified() # a QDateTime
                 if isinstance(self.timeFormat, QtCore.QLocale.FormatType):
                     return qVariant(guiutils.formatRelativeDateTime(lastMod, self.timeFormat))
                 elif isinstance(self.timeFormat, str) and self.timeFormat in ("Fancy Short", "Fancy Narrow"):

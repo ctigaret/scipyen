@@ -1906,7 +1906,7 @@ class PlacesButton(UrlNavigatorButtonBase):
     def setIcon(self, icon:QtGui.QIcon):
         self._icon_ = icon
 
-    def keyPressEvent(evt:QtGui.QKeyEvent):
+    def keyPressEvent(self, evt:QtGui.QKeyEvent):
         if evt.key() == QtCore.Qt.Key_Down:
             self.clicked.emit()
 
@@ -1949,7 +1949,26 @@ class PlacesButton(UrlNavigatorButtonBase):
 
         # NOTE: 2026-05-01 09:26:55
         # I only use file:// locations, for now, but see below
-        places = dict(filter(lambda x: x[1].name not in ignored, dutils.get_desktop_places("file").items()))
+        if (
+            hasattr(self.parent(), "desktopPlaces")
+            and isinstance(self.parent().desktopPlaces, dutils.PlacesMap)
+            ):
+            places = dict(
+                            filter(
+                                    lambda x: (
+                                                x[0].startswith("file")
+                                                and x[1].name not in ignored
+                                              ),
+                                    self.parent().desktopPlaces.items()
+                                  )
+                )
+        else:
+            places = dict(
+                            filter(
+                                    lambda x: x[1].name not in ignored,
+                                    dutils.get_desktop_places("file").items()
+                                  )
+                         )
 
         # NOTE: 2026-05-01 09:28:54
         # includes icon name as well, so this becomes place.name ↦ (place.url, place.icon)
@@ -2126,8 +2145,10 @@ class CoreUrlNavigator(QtCore.QObject):
         if newUrl == self.locationUrl():
             return
 
-        if os.environ["QT_API"] == "pyside6":
+        if __has_PySide6__:
             url = QtCore.QUrl(newUrl.adjusted(QtCore.QUrl.FullyDecoded))
+            # print(f"{self.__class__.__name__}.setCurrentLocationUrl({newUrl}) -> url = {url}")
+
         else:
             url = QtCore.QUrl(newUrl.adjusted(QtCore.QUrl.NormalizePathSegments))
 
@@ -2161,6 +2182,7 @@ class CoreUrlNavigator(QtCore.QObject):
                             break
                         prevUrl = parentUrl
                         parentUrl = upUrl(parentUrl)
+
                 if not insideCompressedPath:
                     url.setScheme("file")
                     firstUrlChild.setScheme("file")
@@ -2182,11 +2204,15 @@ class CoreUrlNavigator(QtCore.QObject):
             self._history_[0:self._historyIndex_] = []
             self._historyIndex_ = 0
 
+
+
         assert self._historyIndex_ == 0
         if os.environ["QT_API"] == "pyside6":
-            self._history_.insert(0, LocationData(url.adjusted(QtCore.QUrl.FullyDecoded), None)) # CAUTION: is it OK for state to be None ?!?
+            adjustedUrl = url.adjusted(QtCore.QUrl.FullyDecoded)
+            self._history_.insert(0, LocationData(adjustedUrl, None)) # CAUTION: is it OK for state to be None ?!?
         else:
-            self._history_.insert(0, LocationData(url.adjusted(QtCore.QUrl.StripTrailingSlash), None)) # CAUTION: is it OK for state to be None ?!?
+            adjustedUrl = url.adjusted(QtCore.QUrl.StripTrailingSlash)
+            self._history_.insert(0, LocationData(adjustedUrl, None)) # CAUTION: is it OK for state to be None ?!?
 
         historyMax = 100 # TODO make configurable -> link with mainWindow !!!
 
@@ -2271,10 +2297,16 @@ class CoreUrlNavigator(QtCore.QObject):
             return QtCore.QUrl()
 
         upUrl_ = upUrl(currentUrl)
+        print(f"{self.__class__.__name__}.goUp() upUrl_ -> {upUrl_}")
 
-        if not currentUrl.matches(upUrl_, QtCore.QUrl.StripTrailingSlash):
-            self.setCurrentLocationUrl(upUrl_)
-            return True
+        if __has_PySide6__:
+            if not currentUrl.matches(upUrl_, QtCore.QUrl.ComponentFormattingOption.PrettyDecoded):
+                self.setCurrentLocationUrl(upUrl_)
+                return True
+        else:
+            if not currentUrl.matches(upUrl_, QtCore.QUrl.StripTrailingSlash):
+                self.setCurrentLocationUrl(upUrl_)
+                return True
 
         return False
 
@@ -2311,6 +2343,7 @@ class _UrlNavigator_(QtCore.QObject):
         self._editable_:bool = False
         self._active_:bool = True
         self._showFullPath_:bool = False
+        self._desktopPlacesMap_ = dutils.get_desktop_places()
 
         # NOTE: 2025-01-24 21:21:11 CMT
         self._closestPlace_:typing.Optional[DEPlace] = None
@@ -2441,6 +2474,11 @@ class _UrlNavigator_(QtCore.QObject):
 
 
     # ### BEGIN KUrlNavigatorPrivate API
+
+    @property
+    def desktopPlaces(self) -> dutils.PlacesMap | None:
+        # part of new effort to cache calls to dutils.get_desktop_places
+        return self._desktopPlacesMap_ if isinstance(self._desktopPlacesMap_, dutils.PlacesMap) else None
 
     @Slot(QtCore.QUrl)
     def slotApplyUrl(self, url:QtCore.QUrl):
@@ -2899,12 +2937,18 @@ class _UrlNavigator_(QtCore.QObject):
 
         self._navButtons_.clear()
 
+    def updateDesktopPlaces(self):
+        print(f"{self.__class__.__name__}.updateDesktopPlaces()")
+        self._desktopPlacesMap_ = dutils.get_desktop_places()
+
     def updateContent(self):
+        print(f"{self.__class__.__name__}.updateContent()")
         # KUrlNavigatorPrivate
         currentUrl = self._nav_.locationUrl()
 
         # NOTE: 2025-01-24 21:22:27 CMT
-        self._closestPlace_ = dutils.closestPlace(currentUrl)
+        self._closestPlace_ = dutils.closestPlace(currentUrl,
+                                                  self._desktopPlacesMap_)
         # print(f"\tself._placesSelector_ {self._placesSelector_}")
         # WARNING: 2025-01-20 22:32:18 temporary -- FIXME
         # TODO: Implement places selector
@@ -2983,8 +3027,6 @@ class _UrlNavigator_(QtCore.QObject):
 
             startIndex = placePathStr.count('/')
 
-            # NOTE: 2025-02-05 15:06:38
-            # RE BUG 2025-02-05 14:50:50 FIXME:
             # the following forces redraw of all buttons when full path must be
             # shown
             if self._showFullPath_ or not isinstance(self._closestPlace_, dutils.DEPlace):
@@ -3251,14 +3293,6 @@ class UrlNavigator(QtWidgets.QWidget):
     # ### BEGIN __init__ UrlNavigator c'tor
     def __init__(self, url:typing.Optional[QtCore.QUrl]=None,
                  parent:typing.Optional[QtWidgets.QWidget] = None):
-    # def __init__(self, placesModel:typing.Optional[PlacesModel]=None,
-    #              url:typing.Optional[QtCore.QUrl]=None,
-    #              parent:typing.Optional[QtWidgets.QWidget] = None):
-        # if isinstance(placesModel, QtCore.QUrl):
-        #     if isinstance(url, QtWidgets.QWidget):
-        #         parent = url
-        #     url = placesModel
-        #     placesModel = None
 
         super().__init__(parent=parent)
         self._newLook_ = False
@@ -3324,6 +3358,15 @@ class UrlNavigator(QtWidgets.QWidget):
     def locationUrl(self, historyIndex:int = -1) -> QtCore.QUrl:
         return self._nav_p_._coreUrlNavigator_.locationUrl(historyIndex)
 
+    def updateDesktopPlaces(self):
+        print(f"{self.__class__.__name__}.updateDesktopPlaces()")
+        self._nav_p_.updateDesktopPlaces()
+
+    @property
+    def desktopPlaces(self) -> dutils.PlacesMap | None:
+        # part of new effort to cache calls to dutils.get_desktop_places
+        return self._nav_p_.desktopPlaces
+
     @safewrapper
     def saveLocationState(self, state:QtCore.QByteArray):
         # print(f"{self.__class__.__name__}.saveLocationState({state})")
@@ -3368,6 +3411,7 @@ class UrlNavigator(QtWidgets.QWidget):
         return self._nav_p_._editable_
 
     def setShowFullPath(self, show:bool):
+        print(f"{self.__class__.__name__}.setShowFullPath({show})")
         if self._nav_p_._showFullPath_ != show:
             self._nav_p_._showFullPath_ = show
             self._nav_p_.updateContent()
@@ -3413,7 +3457,7 @@ class UrlNavigator(QtWidgets.QWidget):
     def setLocationUrl(self, url:QtCore.QUrl):
         # print(f"{self.__class__.__name__}.setLocationUrl({url})")
         if url != self.locationUrl():
-            # print(f"Slot {self.__class__.__name__}.setLocationUrl({url})")
+            print(f"Slot {self.__class__.__name__}.setLocationUrl({url})")
             self._nav_p_._coreUrlNavigator_.setCurrentLocationUrl(url)
             # WARNING 2025-01-20 22:44:08 temporary FIXME
             # TODO implement places selector
@@ -3618,7 +3662,8 @@ class UrlNavigator(QtWidgets.QWidget):
 
     @Slot()
     def slot_coreUrlNavigatorUrlChanged(self):
-        self._nav_p_.updateContent() # !
+        print(f"{self.__class__.__name__}.slot_coreUrlNavigatorUrlChanged")
+        self._nav_p_.updateContent()
         self.urlChanged.emit(self._nav_p_._coreUrlNavigator_.currentLocationUrl())
         # self.urlChanged.emit(self._nav_p_._coreUrlNavigator_.currentLocationUrl(), True)
 

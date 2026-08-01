@@ -59,9 +59,9 @@ from gui.widgets.small_widgets import QuantitySpinBox
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-print(f"__module_path__ = {__module_path__}")
-uifile = os.path.join(__module_path__, "ModelFittingWidget.ui")
-print(f"uifile = {uifile}")
+# print(f"__module_path__ = {__module_path__}")
+# uifile = os.path.join(__module_path__, "ModelFittingWidget.ui")
+# print(f"uifile = {uifile}")
 Ui_ModelFittingWidget, QWidget = loadUiType(os.path.join(__module_path__, "ModelFittingWidget.ui"))
 
 class _ModelFunctionExpressionSVGGenerator_(QtCore.QThread):

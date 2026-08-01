@@ -1072,22 +1072,26 @@ fi
 
 dt=`date '+%Y-%m-%d_%H-%M-%s'`
 
+rcfile=${HOME}/.scipyenrc
+qtenvpath=""
+
 if [[ $with_pyside6 -eq 1 ]] ; then
     if [[ $build_pyside6 -eq 1 ]] ; then
-        rcfile=${HOME}/.scipyen_pyside6_build_rc
-    else 
-        rcfile=${HOME}/.scipyen_pyside6_pypi_rc
-    fi
-elif [[ $with_pyqt5 -eq 1 ]] ; then
-    if [[ $build_pyqt5 -eq 1 ]] ; then
-        rcfile=${HOME}/.scipyen_pyqt5_build_rc
+        # rcfile=${HOME}/.scipyen_pyside6_build_rc
         qtenvpath=${VIRTUAL_ENV}/lib64/python$major.$minor/site-packages/PySide6/Qt/libexec
-    else 
-        rcfile=${HOME}/.scipyen_pyqt5_pypi_rc
-        qtenvpath=""
+    # else
+        # rcfile=${HOME}/.scipyen_pyside6_pypi_rc
     fi
-else
-    rcfile=${HOME}/.scipyenrc
+# elif [[ $with_pyqt5 -eq 1 ]] ; then
+#     if [[ $build_pyqt5 -eq 1 ]] ; then
+#         # rcfile=${HOME}/.scipyen_pyqt5_build_rc
+#         qtenvpath=""
+#     else
+#         # rcfile=${HOME}/.scipyen_pyqt5_pypi_rc
+#         qtenvpath=""
+#     fi
+# else
+    # rcfile=${HOME}/.scipyenrc
 fi
 
 echo -e "\nCreating ${rcfile}\n"
@@ -1106,8 +1110,14 @@ fi
 cat<<END > ${rcfile}
 scipyact () {
 source ${VIRTUAL_ENV}/bin/activate
-export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:$LD_LIBRARY_PATH
-export PATH=${qtenvpath}:${PATH}
+export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:\$LD_LIBRARY_PATH
+END
+if [[ ( $build_pyside6 -eq 1 ) ]] ; then
+cat <<END >> ${rcfile}
+export PATH=${qtenvpath}:\${PATH}
+END
+fi
+cat <<END >> ${rcfile}
 echo -e "The Python virtual environment in ${VIRTUAL_ENV} is now active.\nTo exit this environment call 'deactivate'"
 }
 END
@@ -1116,23 +1126,25 @@ shopt -u lastpipe
 
 function update_bashrc () 
 {
+rcfile=${HOME}/.scipyenrc
+qtenvpath=""
 if [[ $with_pyside6 -eq 1 ]] ; then
     if [[ $build_pyside6 -eq 1 ]] ; then
-        rcfile=${HOME}/.scipyen_pyside6_build_rc
+        # rcfile=${HOME}/.scipyen_pyside6_build_rc
         qtenvpath=${VIRTUAL_ENV}/lib64/python$major.$minor/site-packages/PySide6/Qt/libexec
-    else
-        rcfile=${HOME}/.scipyen_pyside6_pypi_rc
-        qtenvpath=""
+    # else
+    #     # rcfile=${HOME}/.scipyen_pyside6_pypi_rc
+    #     qtenvpath=""
     fi
     
-elif [[ $with_pyqt6 -eq 1 ]] ; then
-    if [[ $build_pyqt6 -eq 1 ]] ; then
-        rcfile=${HOME}/.scipyen_pyqt6_build_rc
-    else
-        rcfile=${HOME}/.scipyen_pyqt6_pypi_rc
-    fi
-else
-    rcfile=${HOME}/.scipyenrc
+# elif [[ $with_pyqt6 -eq 1 ]] ; then
+#     if [[ $build_pyqt6 -eq 1 ]] ; then
+#         rcfile=${HOME}/.scipyen_pyqt6_build_rc
+#     else
+#         rcfile=${HOME}/.scipyen_pyqt6_pypi_rc
+#     fi
+# else
+#     rcfile=${HOME}/.scipyenrc
 fi
 
 dt=`date '+%Y-%m-%d_%H-%M-%s'`
@@ -1211,31 +1223,33 @@ function make_launch_script ()
 {
 target_dir=${HOME}/bin
 
+scriptfile=${target_dir}/scipyen
+
 if [[ $with_pyside6 -eq 1 ]] ; then
     if [[ $build_pyside6 -eq 1 ]] ; then
-        scriptfile=${target_dir}/scipyen-pyside6-build
+        # scriptfile=${target_dir}/scipyen-pyside6-build
         qtenvpath=${VIRTUAL_ENV}/lib/python${major}.${minor}/PySide6/Qt/libexec
 #         launchcmd="${scipyensrcdir}/scipyen.py pyside6"
 
     else
-        scriptfile=${target_dir}/scipyen-pyside6-pypi
+        # scriptfile=${target_dir}/scipyen-pyside6-pypi
         qtenvpath=""
 #         launchcmd="${scipyensrcdir}/scipyen.py pyside6"
     fi
 
 elif [[ $with_pyqt5 -eq 1 ]] ; then
     if [[ $build_pyqt5 -eq 1 ]] ; then
-        scriptfile=${target_dir}/scipyen-pyqt5-build
+        # scriptfile=${target_dir}/scipyen-pyqt5-build
         qtenvpath=""
 #         launchcmd="${scipyensrcdir}/scipyen.py pyqt6"
     else
         scriptfile=${target_dir}/scipyen-pyqt5-pypi
-        qtenvpath=""
+        # qtenvpath=""
 #         launchcmd="${scipyensrcdir}/scipyen.py pyqt6"
     fi
 
-else
-    scriptfile=${target_dir}/scipyen
+# else
+#     scriptfile=${target_dir}/scipyen
 #     launchcmd=${scipyensrcdir}/scipyen.py
 fi
 launchcmd=${scipyensrcdir}/scipyen.py
@@ -1262,7 +1276,6 @@ source \$VIRTUAL_ENV/bin/browser
 fi
 fi
 export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:\${LD_LIBRARY_PATH}
-export PATH=${qtenvpath}:\${PATH}
 export OUTDATED_IGNORE=1
 a=\`which xrdb\` # do we have xrdb to read the X11 resources? (on Unix almost surely yes)
 if [ \$0 == 0 ] ; then
@@ -1272,10 +1285,11 @@ fi
 fi
 END
 if [[ ( $with_pyside6 -eq 1 ) || ( $build_pyside6 -eq 1 ) ]] ; then
-cat <<END >> ${scriptfile} 
+cat <<END >> ${scriptfile}
 export QT_API="pyside6"
 export PYQTGRAPH_QT_LIB="PySide6"
 export FORCE_QT_API="1"
+export PATH=${qtenvpath}:\${PATH}
 
 END
 elif [[ ( $with_pyqt6 -eq 1 ) || ( $build_pyqt6 -eq 1 ) ]] ; then
@@ -1297,16 +1311,16 @@ fi
 cat <<END >> ${scriptfile} 
 run_in_debugger=0
 verbosity="" # "-v" or "-vv"
-frozenmodules=on
+frozenmodules=off
 
-for i in "$@" ; do
-    case $i in
+for i in "\$@" ; do
+    case \$i in
         --debug)
         run_in_debugger=1
         shift
         ;;
-        --no-frozen-modules)
-        frozenmodules=off
+        --frozen-modules)
+        frozenmodules=on
         shift
         ;;
         --v)
@@ -1544,20 +1558,20 @@ fi
 
 echo -e "Will install in ${install_dir}" 
 
-# NOTE: 2025-10-04 09:25:06 create environment with local PyQt6 build by default
-if  [[ $with_pyside6 -eq 1 ]] ; then
-    if [[  $build_pyside6 -eq 1 ]] ; then
-        virtual_env_pfx=${virtual_env_pfx}_pyside6_build
-    else
-        virtual_env_pfx=${virtual_env_pfx}_pyside6_pypi
-    fi
-elif [[ $with_pyqt5 -eq 1 ]] ; then
-    if [[ $build_pyqt5 -eq 1 ]] ; then
-        virtual_env_pfx=${virtual_env_pfx}_pyqt5_build
-    else
-        virtual_env_pfx=${virtual_env_pfx}_pyqt5_pypi
-    fi
-fi
+# # NOTE: 2025-10-04 09:25:06 create environment with local PyQt6 build by default
+# if  [[ $with_pyside6 -eq 1 ]] ; then
+#     if [[  $build_pyside6 -eq 1 ]] ; then
+#         virtual_env_pfx=${virtual_env_pfx}_pyside6_build
+#     else
+#         virtual_env_pfx=${virtual_env_pfx}_pyside6_pypi
+#     fi
+# elif [[ $with_pyqt5 -eq 1 ]] ; then
+#     if [[ $build_pyqt5 -eq 1 ]] ; then
+#         virtual_env_pfx=${virtual_env_pfx}_pyqt5_build
+#     else
+#         virtual_env_pfx=${virtual_env_pfx}_pyqt5_pypi
+#     fi
+# fi
 
 if ! [ -v VIRTUAL_ENV ] ; then
     virtual_env=${install_dir}/${virtual_env_pfx}

@@ -363,6 +363,7 @@ from .widgets import stylewidgets # noqa
 from .widgets import colorwidgets # noqa
 from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver) # noqa
 from gui.itemmodels.workspacemodel import WorkspaceModel # noqa
+from gui.itemmodels.filesystemmodel import FileSystemModel # noqa
 
 
 from iolib import h5io, jsonio, network, navigation # noqa
@@ -1711,7 +1712,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # NOTE: 2026-01-25 21:27:43
         # this below does nothing of significance at the moment, but I used it as
         # a stub for future customizations
-        self.fileSystemModel = filesystems.FileSystemModel(parent=self)
+        self.fileSystemModel = FileSystemModel(parent=self)
+        # self.fileSystemModel = filesystems.FileSystemModel(parent=self)
 
         # self.fileSystemModel.setReadOnly(False)
         self.fileSystemModel.setNameFilterDisables(False)
@@ -1739,6 +1741,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._toolButtonStyle_:int = QtCore.Qt.ToolButtonFollowStyle.value
 
         self._configureUI_()
+
         self.adaptToRCIcons()
 
         self._scriptManager_ = ScriptManager(parent=myparent)
@@ -1893,21 +1896,40 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if desktoputils.is_kde() or desktoputils.is_gnome() and __has_qtdbus__:
                 self._systemDBusConnection_ = QtDBus.QDBusConnection.systemBus()
                 self._dbusSessionBus_ = QtDBus.QDBusConnection.sessionBus() # also a QDBusConnection
-                self._dbusUniqueName_ = self._dbusSessionBus_.baseService() # a str, empty if NOT connected to dbus dameon
-                appMenuServiceNames = list(name for name in self._dbusSessionBus_.interface().registeredServiceNames().value() if "AppMenu" in name)
-                if len(appMenuServiceNames):
-                    self._globalMenuServiceName_ = appMenuServiceNames[0]
-                    self._dbusAppMenuInterface_ = QtDBus.QDBusInterface(self._globalMenuServiceName_, "/" + self._globalMenuServiceName_.replace(".", "/"),
-                                                  self._globalMenuServiceName_, QtDBus.QDBusConnection.sessionBus(), self)
-                    self._dbusAppMenuInterface_.setTimeout(100)
+                # self._dbusUniqueName_ = self._dbusSessionBus_.baseService() # a str, empty if NOT connected to dbus dameon
+                # if not __has_PySide6__:
+                try:
+                    appMenuServiceNames = list(name for name in self._dbusSessionBus_.interface().registeredServiceNames().value() if "AppMenu" in name)
+                    if len(appMenuServiceNames):
+                        self._globalMenuServiceName_ = appMenuServiceNames[0]
+                        self._dbusAppMenuInterface_ = QtDBus.QDBusInterface(
+                            self._globalMenuServiceName_, "/" + self._globalMenuServiceName_.replace(".", "/"),
+                            self._globalMenuServiceName_,
+                            QtDBus.QDBusConnection.sessionBus(),
+                            self)
+
+                        self._dbusAppMenuInterface_.setTimeout(100)
+                        # result = self._dbusAppMenuInterface_.call("RegisterWindow", self._wm_id_, QtDBus.QDBusObjectPath(f"/{self.applicationName}/{self.__class__.__name__}/MenuBar")).arguments()
+                        # print(f"{self.__class__.__name__}.__init__ registering with DBus App Menu Interface => {result}")
+                        self._app_menu_ = self.getAppMenu()
+                except: # noqa
+                    traceback.print_exc()
 
                 try:
                     uDisks_service = "org.freedesktop.UDisks2"
                     uDisks_path = "/org/freedesktop/UDisks2"
                     uDisks_iFace = "org.freedesktop.DBus.ObjectManager"
                     self._systemDBusConnection_.registerObject("/Scipyen", self)
-                    self._systemDBusConnection_.connect(uDisks_service, uDisks_path, uDisks_iFace, "InterfacesAdded", self._slot_uDisk_changes)
-                    self._systemDBusConnection_.connect(uDisks_service, uDisks_path, uDisks_iFace, "InterfacesRemoved", self._slot_uDisk_changes)
+                    if __has_PySide6__:
+                        self._systemDBusConnection_.connect(
+                            uDisks_service, uDisks_path, uDisks_iFace, "InterfacesAdded",
+                            self, QtCore.SLOT("_slot_uDisk_changes(QString)"))
+                        self._systemDBusConnection_.connect(
+                            uDisks_service, uDisks_path, uDisks_iFace, "InterfacesRemoved",
+                            self, QtCore.SLOT("_slot_uDisk_changes(QString)"))
+                    else:
+                        self._systemDBusConnection_.connect(uDisks_service, uDisks_path, uDisks_iFace, "InterfacesAdded", self._slot_uDisk_changes)
+                        self._systemDBusConnection_.connect(uDisks_service, uDisks_path, uDisks_iFace, "InterfacesRemoved", self._slot_uDisk_changes)
 
                 except: # noqa
                     traceback.print_exc()
@@ -1943,7 +1965,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 #                         if not v.convert(qVariant.UInt): # NOTE: 2023-01-08 23:10:14 MUST convert to UInt
 #                             return
 #
-#                     result = self._dbusAppMenuInterface_.call("RegisterWindow", v, QtDBus.QDBusObjectPath(f"/{self.applicationName}/{self.__class__.__name__}/MenuBar")).arguments()
+
+                # result = self._dbusAppMenuInterface_.call("RegisterWindow", v, QtDBus.QDBusObjectPath(f"/{self.applicationName}/{self.__class__.__name__}/MenuBar")).arguments()
 #                     print(f"{self.__class__.__name__}._init__ DBus register window: result -> {result}")
 
             # BUG 2025-07-01 23:17:12 FIXME
@@ -3499,7 +3522,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # BUG 2025-07-01 23:17:12 FIXME
         # this returns None whe using a QSPlashScreen!
         if self.menuBar().isNativeMenuBar() and self._globalMenuServiceName_ == "com.canonical.AppMenu.Registrar":
-
             if __has_PyQt6__ or __has_PySide6__:
                 v = int(self.winId())
 
@@ -3537,6 +3559,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def _deregister_menuBar_(self):
         if not self.menuBar().isNativeMenuBar() :
             return
+
         if (self._app_menu_ is not None
             and self._globalMenuServiceName_ == "com.canonical.AppMenu.Registrar"
             and isinstance(self._dbusAppMenuInterface_, QtDBus.QDBusInterface)):
@@ -6519,7 +6542,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.actionPython_help.triggered.connect(self._slot_PythonHelp)
 
         self.whatsThisAction = QtWidgets.QWhatsThis.createAction(self)
-        # self.whatsThisAction.setIcon(QtGui.QIcon.fromTheme("help-whatsthis"))
         self.whatsThisAction.setIcon(guiutils.getIcon("help-whatsthis"))
         self.menuHelp.addSeparator()
         self.menuHelp.addAction(self.whatsThisAction)
@@ -7681,7 +7703,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                         action.setEnabled(False)
                     else:
                         action.setEnabled(True)
-            except:
+            except: # noqa
                 traceback.print_exc()
 
             if self._maxRecentFiles <= 10:
@@ -7694,6 +7716,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     if __has_qtdbus__:
         @Slot(QtDBus.QDBusMessage)
+        @Slot(str)
         def _slot_uDisk_changes(self, msg):
             m_um_Ops = desktoputils.parseUDIsksFSMountOperationJobs(msg)
             # print(f'{self.__class__.__name__}._slot_uDisk_changes: {m_um_Ops}')
@@ -7702,9 +7725,16 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     self.fileSystemModel.setOption(QtGui.QFileSystemModel.DontWatchForChanges, True)
                 timer = QtCore.QTimer(self)
                 timer.setSingleShot(True)
-                timer.timeout.connect(self._slot_refreshrecentDirsAndFileMenus_)
+                timer.timeout.connect(self._slot_FilesystemMountChanged)
                 timer.start(1000)
 
+            else:
+                self.fileSystemModel.setOption(QtGui.QFileSystemModel.DontWatchForChanges, False)
+
+    @Slot()
+    def _slot_FilesystemMountChanged(self):
+        self.navigator.updateDesktopPlaces()
+        self._slot_refreshrecentDirsAndFileMenus_()
 
     @Slot()
     def _slot_refreshrecentDirsAndFileMenus_(self):
@@ -7713,7 +7743,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         try:
             if not pathlib.Path(self.currentDirectory).exists():
                 self.slot_changeDirectory(self.userHome)
-        except:
+        except: # noqa
             traceback.print_exc()
 
         if self.fileSystemModel.testOption(QtGui.QFileSystemModel.DontWatchForChanges):

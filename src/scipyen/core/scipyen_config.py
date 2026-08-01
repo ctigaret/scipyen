@@ -130,18 +130,20 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-if __has_PySide6__:
-    application_name = "Scipyen-PySide6"
-    organization_name = "Scipyen-PySide6"
-# elif __has_PyQt6__:
-#     application_name = "Scipyen-PyQt6"
-#     organization_name = "Scipyen-PyQt6"
-elif __has_PyQt5__:
-    application_name = "Scipyen-PyQt5"
-    organization_name = "Scipyen-PyQt5"
-else:
-    application_name = "Scipyen"
-    organization_name = "Scipyen"
+application_name = "Scipyen"
+organization_name = "Scipyen"
+# if __has_PySide6__:
+#     application_name = "Scipyen-PySide6"
+#     organization_name = "Scipyen-PySide6"
+# # elif __has_PyQt6__:
+# #     application_name = "Scipyen-PyQt6"
+# #     organization_name = "Scipyen-PyQt6"
+# elif __has_PyQt5__:
+#     application_name = "Scipyen-PyQt5"
+#     organization_name = "Scipyen-PyQt5"
+# else:
+#     application_name = "Scipyen"
+#     organization_name = "Scipyen"
 
 from IPython.lib.pretty import pprint
 
