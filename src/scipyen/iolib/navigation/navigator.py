@@ -183,6 +183,7 @@ from core import qtutils
 from core.prog import (safewrapper, print_styled)
 from gui.guiutils import (DisplayHint, getDesktopHeight, csqueeze)
 from iolib import pictio
+from iolib.navigation.filesystems import urlToPath
 
 # TODO finalize this
 # TODO/FIXME: 2023-05-06 23:12:19
@@ -422,13 +423,11 @@ def upUrl(url:QtCore.QUrl):
     if url.hasFragment():
         u.setFragment("")
 
-    if os.environ["QT_API"] == "pyside6":
-        # url = QtCore.QUrl(newUrl.adjusted(QtCore.QUrl.FullyDecoded))
-        # adjustedLastUrl = lastUrl.adjusted(QtCore.QUrl.FullyDecoded)
-        # adjustedCurrentUrl = currentUrl.adjusted(QtCore.QUrl.FullyDecoded)
-        # parentDir = pathlib.Path(u.adjusted(QtCore.QUrl.FullyDecoded)).parent
+    if __has_PySide6__:
         parentDir = pathlib.Path(u.toLocalFile()).parent
-        return QtCore.QUrl(parentDir.as_posix())
+        ret = QtCore.QUrl(parentDir.as_posix())
+        ret.setScheme("file")
+        return ret
 
     return u.adjusted(QtCore.QUrl.StripTrailingSlash).adjusted(QtCore.QUrl.RemoveFilename)
 
@@ -1623,7 +1622,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         url = upUrl(self._url_) if self._replaceButton_ else self._url_
 
         navigator = self.parent()
-        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        assert qtutils.isQObjectAlive(navigator), "Parent object was deleted"
 
         self._subDirsJob_ = ListDirsJob(url, self)
         self._subDirs_.clear()
@@ -2293,11 +2292,12 @@ class CoreUrlNavigator(QtCore.QObject):
 
     def goUp(self):
         currentUrl = self.locationUrl()
+        # print(f"{self.__class__.__name__}.goUp -> currenUrl = {currentUrl}")
         if not currentUrl.isValid() or currentUrl.isRelative():
             return QtCore.QUrl()
 
         upUrl_ = upUrl(currentUrl)
-        print(f"{self.__class__.__name__}.goUp() upUrl_ -> {upUrl_}")
+        # print(f"{self.__class__.__name__}.goUp() upUrl_ -> {upUrl_}")
 
         if __has_PySide6__:
             if not currentUrl.matches(upUrl_, QtCore.QUrl.ComponentFormattingOption.PrettyDecoded):
@@ -2938,13 +2938,17 @@ class _UrlNavigator_(QtCore.QObject):
         self._navButtons_.clear()
 
     def updateDesktopPlaces(self):
-        print(f"{self.__class__.__name__}.updateDesktopPlaces()")
+        # print(f"{self.__class__.__name__}.updateDesktopPlaces()")
         self._desktopPlacesMap_ = dutils.get_desktop_places()
 
     def updateContent(self):
-        print(f"{self.__class__.__name__}.updateContent()")
+        # print(f"{self.__class__.__name__}.updateContent()")
         # KUrlNavigatorPrivate
         currentUrl = self._nav_.locationUrl()
+        # print(f"\n\t currentUrl -> {currentUrl}")
+
+        if urlToPath(currentUrl) is None:
+            return
 
         # NOTE: 2025-01-24 21:22:27 CMT
         self._closestPlace_ = dutils.closestPlace(currentUrl,
@@ -3015,7 +3019,8 @@ class _UrlNavigator_(QtCore.QObject):
             if not placeUrl.isValid():
                 placeUrl = self.retrievePlaceUrl()
 
-            placePath = dutils.urlToPath(placeUrl)
+            placePath = urlToPath(placeUrl)
+
             placePathStr = trailingSlashRemoved(placePath.as_posix())
 
             if sys.platform.startswith("win32"):
@@ -3041,7 +3046,7 @@ class _UrlNavigator_(QtCore.QObject):
         if not currentUrl.isValid():
             return
 
-        path = dutils.urlToPath(currentUrl)
+        path = urlToPath(currentUrl)
 
         pathStr = trailingSlashRemoved(path.as_posix())
 
@@ -3236,7 +3241,7 @@ class _UrlNavigator_(QtCore.QObject):
         if len(text) == 0:
             if currentUrl.isLocalFile():
                 if sys.platform.startswith("win32"):
-                    urlPath = dutils.urlToPath(currentUrl)
+                    urlPath = urlToPath(currentUrl)
                     drive = urlPath.drive
                     text = drive if len(drive) else QtCore.QDir.rootPath()
                     # text = currentUrl.path()[:2] if len(currentUrl.path()) > 1 else QtCore.QDir.rootPath()
@@ -3411,7 +3416,7 @@ class UrlNavigator(QtWidgets.QWidget):
         return self._nav_p_._editable_
 
     def setShowFullPath(self, show:bool):
-        print(f"{self.__class__.__name__}.setShowFullPath({show})")
+        # print(f"{self.__class__.__name__}.setShowFullPath({show})")
         if self._nav_p_._showFullPath_ != show:
             self._nav_p_._showFullPath_ = show
             self._nav_p_.updateContent()
@@ -3457,7 +3462,7 @@ class UrlNavigator(QtWidgets.QWidget):
     def setLocationUrl(self, url:QtCore.QUrl):
         # print(f"{self.__class__.__name__}.setLocationUrl({url})")
         if url != self.locationUrl():
-            print(f"Slot {self.__class__.__name__}.setLocationUrl({url})")
+            # print(f"Slot {self.__class__.__name__}.setLocationUrl({url})")
             self._nav_p_._coreUrlNavigator_.setCurrentLocationUrl(url)
             # WARNING 2025-01-20 22:44:08 temporary FIXME
             # TODO implement places selector
@@ -3567,7 +3572,7 @@ class UrlNavigator(QtWidgets.QWidget):
         return self._nav_p_._subfolderOptions_.sortHiddenLast
 
     def setSortHiddenFoldersLast(self, sortHiddenFoldersLast:bool):
-        self._nav_p_._subfolderOptions_.sortHiddenLast = showHidden
+        self._nav_p_._subfolderOptions_.sortHiddenLast = sortHiddenFoldersLast
 
     def sortHiddenFoldersLast(self) -> bool:
         return self._nav_p_._subfolderOptions_.sortHiddenLast
@@ -3662,7 +3667,7 @@ class UrlNavigator(QtWidgets.QWidget):
 
     @Slot()
     def slot_coreUrlNavigatorUrlChanged(self):
-        print(f"{self.__class__.__name__}.slot_coreUrlNavigatorUrlChanged")
+        # print(f"{self.__class__.__name__}.slot_coreUrlNavigatorUrlChanged")
         self._nav_p_.updateContent()
         self.urlChanged.emit(self._nav_p_._coreUrlNavigator_.currentLocationUrl())
         # self.urlChanged.emit(self._nav_p_._coreUrlNavigator_.currentLocationUrl(), True)

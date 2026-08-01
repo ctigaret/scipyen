@@ -349,13 +349,14 @@ def determineFileSystemType(path:str) -> FsType:
     pass
 
 def fileSystemType(path:str) -> FsType:
-    netMounts = NetworkMounts.instance()
-    if netMounts.isSlowPath(path, NetworkMountsType.SmbPaths):
-        return FsType.Smb
-    elif netMounts.isSlowPath(path, NetworkMountsType.NfsPaths):
-        return FsType.Nfs
-    else:
-        return determineFileSystemType(path)
+    # netMounts = NetworkMounts.instance()
+    # if netMounts.isSlowPath(path, NetworkMountsType.SmbPaths):
+    #     return FsType.Smb
+    # elif netMounts.isSlowPath(path, NetworkMountsType.NfsPaths):
+    #     return FsType.Nfs
+    # else:
+    #     return determineFileSystemType(path)
+    return determineFileSystemType(path)
 
 def fileSystemName(ftype:FsType) -> str:
     # TODO 2025-01-07 19:03:57
@@ -412,18 +413,26 @@ def _(x:QtCore.QUrl) -> int:
     return len(x.path())
 
 @singledispatch
-def urlToPath(x:typing.Any) -> pathlib.Path:
+def urlToPath(x:typing.Any) -> pathlib.Path | None:
     raise NotImplementedError(f"Method is not implemented for objects of type {type(x).__name__}")
 
 @urlToPath.register(str)
-def _(x:str) -> pathlib.Path:
+def _(x:str) -> pathlib.Path | None:
     if "://" in x:
         s = x[x.index("://")+3:] # remove schema
     return pathlib.Path(x).absolute()
 
 @urlToPath.register(QtCore.QUrl)
-def _(x:QtCore.QUrl) -> pathlib.Path:
+def _(x:QtCore.QUrl) -> pathlib.Path | None:
+    # print(f"filesystems.urlToPath({x})\n\t scheme: {x.scheme()},\n\t path: {x.path()}")
+    if x.scheme() != "file":
+        return
+
     pathStr = x.path()
+
+    if len(pathStr.strip()) == 0:
+        return
+
     if sys.platform.startswith("win32"):
         if pathStr.startswith("/"):
             pathStr = pathStr[1:]

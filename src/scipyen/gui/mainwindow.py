@@ -8469,6 +8469,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def slot_chDirUrl(self, val:QtCore.QUrl):
         # print(f"{self.__class__.__name__}.slot_chDirUrl({val})")
         path = desktoputils.urlToPath(val)
+        if not isinstance(path, pathlib.Path):
+            return
         s = path.as_posix()
         # print(f"\n\t-> path = {path} -> {s}")
         self.slot_chDirString(s)

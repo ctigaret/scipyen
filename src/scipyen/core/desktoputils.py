@@ -113,7 +113,8 @@ import numpy as np
 
 from core.prog import timefunc
 from iolib.navigation import filesystems
-from iolib.navigation.filesystems import pathStrLen, pathLen, pathToQUrl, urlToPath
+from iolib.navigation.filesystems import (urlToPath, pathToQUrl,
+                                          pathStrLen, pathLen)
 
 SCHEMAS = ("file", "recentlyused", "remote", "search", "tags", "timeline", "trash")
 
@@ -284,7 +285,7 @@ class DEPlace:
     app: typing.Optional[str] = dataclasses.field(default_factory=str)
     separator: bool = dataclasses.field(default=False)
 
-    def urlPath(self) -> pathlib.Path:
+    def urlPath(self) -> pathlib.Path | None:
         return urlToPath(self.url)
 
     @classmethod
@@ -603,11 +604,11 @@ def _fileSystemPlacePredicate_(x):
     else:
         return False
 
-def get_local_filesystem_places(placesDict: typing.Optional[dict] = None) -> dict:
+def get_local_filesystem_places(placesDict: typing.Optional[PlacesMap] = None) -> dict:
     r"""
     Get special directories (KDE Plasma5/6 specific)
     """
-    if not isinstance(placesDict, dict):
+    if not isinstance(placesDict, PlacesMap):
         print("desktoputils.get_local_filesystem_places calls get_desktop_places")
         placesDict = get_desktop_places()
 
@@ -1572,8 +1573,24 @@ def get_editor() -> str:
 
     return editor
 
-def _pathForUrlPredicate_(u0: DEPlace, u1):
-    return u1 == u0.urlPath() or u1.is_relative_to(u0.urlPath())
+def _pathForUrlPredicate_(u0: DEPlace, u1: pathlib.Path):
+    # print(f"_pathForUrlPredicate_(\nu0 = {u0},\nu1={u1})")
+    # print(f"\n\t -> u0 path: {u0.urlPath()}\n\t u1.path: {u1}")
+    # print(f"\n\t -> u1 is u0 url path: {u1 == u0.urlPath()}")
+    if not isinstance(u0.urlPath(), pathlib.Path):
+        return False
+
+    if not isinstance(u1, pathlib.Path):
+        return False
+
+    if u1 == u0.urlPath():
+        return True
+
+    # print(f"\n\t -> u1 is relative to u0 url path: {u1.is_relative_to(u0.urlPath())}")
+    if u1.is_relative_to(u0.urlPath()):
+        return True
+    # print(f"\n\t -> predicate returns {False}")
+    return False
 
 def closestPlace(
     url: QtCore.QUrl, places: typing.Optional[PlacesMap] = None
