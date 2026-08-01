@@ -1748,19 +1748,27 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self._scriptManager_.signal_executeScript[str].connect(
             self._slot_runPythonScriptFromManager)
+
         self._scriptManager_.signal_importScript[str].connect(
             self._slot_importPythonScriptFromManager)
+
         self._scriptManager_.signal_pasteScript[str].connect(
             self._slot_pastePythonScriptFromManager)
+
         self._scriptManager_.signal_forgetScripts[object].connect(
             self._slot_forgetScripts_)
+
         self._scriptManager_.signal_editScript[str].connect(
             self.slot_systemEditScript)
+
         self._scriptManager_.signal_openScriptFolder[str].connect(
             self.slot_systemOpenParentFolder)
+
         self._scriptManager_.signal_pythonFileReceived[str, QtCore.QPoint].connect(
             self.slot_handlePythonTextFile)
+
         self._scriptManager_.signal_pythonFileAdded[str].connect(self._slot_scriptFileAddedInManager)
+
         self._scriptManager_.signal_scriptManagerClosed.connect(self._slot_scriptManagerClosed)
 
         # NOTE: 2023-06-04 10:49:56
@@ -1893,7 +1901,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._dbusSessionBus_ = None
         self._dbusUniqueName_ = None
         if not QtWidgets.QApplication.instance().testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
-            if desktoputils.is_kde() or desktoputils.is_gnome() and __has_qtdbus__:
+            if (
+                    (
+                        desktoputils.is_kde()
+                        or desktoputils.is_gnome()
+                    )
+                    and __has_qtdbus__
+                ):
                 self._systemDBusConnection_ = QtDBus.QDBusConnection.systemBus()
                 self._dbusSessionBus_ = QtDBus.QDBusConnection.sessionBus() # also a QDBusConnection
                 # self._dbusUniqueName_ = self._dbusSessionBus_.baseService() # a str, empty if NOT connected to dbus dameon
@@ -1908,9 +1922,22 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                             QtDBus.QDBusConnection.sessionBus(),
                             self)
 
+                        # if __has_PySide6__:
+                        #     self._dbusAppMenuInterface_ = QtDBus.QDBusInterface(
+                        #         self._globalMenuServiceName_, "/" + self._globalMenuServiceName_.replace(".", "/"),
+                        #         self._globalMenuServiceName_,
+                        #         QtDBus.QDBusConnection.sessionBus(),
+                        #         self)
+                        # else:
+                        #     self._dbusAppMenuInterface_ = QtDBus.QDBusInterface(
+                        #         self._globalMenuServiceName_, "/" + self._globalMenuServiceName_.replace(".", "/"),
+                        #         self._globalMenuServiceName_,
+                        #         QtDBus.QDBusConnection.sessionBus(),
+                        #         self)
+
                         self._dbusAppMenuInterface_.setTimeout(100)
-                        # result = self._dbusAppMenuInterface_.call("RegisterWindow", self._wm_id_, QtDBus.QDBusObjectPath(f"/{self.applicationName}/{self.__class__.__name__}/MenuBar")).arguments()
-                        # print(f"{self.__class__.__name__}.__init__ registering with DBus App Menu Interface => {result}")
+                        result = self._dbusAppMenuInterface_.call("RegisterWindow", self._wm_id_, QtDBus.QDBusObjectPath(f"/{self.applicationName}/{self.__class__.__name__}/MenuBar")).arguments()
+                        print(f"{self.__class__.__name__}.__init__ registering with DBus App Menu Interface => {result}")
                         self._app_menu_ = self.getAppMenu()
                 except: # noqa
                     traceback.print_exc()
@@ -4413,6 +4440,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         """
 
+        # ### BEGIN Comments
+        #
         # NOTE: 2025-06-24 21:43:22
         # Here, user's workspace is shell.user_ns, shell.kernel.user_ns,
         # which is None
@@ -4456,6 +4485,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # * shell.run_cell(str) does the same as console.execute with hidden=False
         #   (the extression in str is always echoed; there is no "hidden" parameter
         #   to run_cell(...))
+        #
+        # ### END   Comments
 
         if not isinstance(self.console, consoles.ScipyenConsole):
             self.console = consoles.ScipyenConsole(scipyenWindow=self, banner=_scipyen_console_banner_)
