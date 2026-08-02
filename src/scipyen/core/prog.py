@@ -2818,7 +2818,7 @@ def get_loaded_module(m):
 
 
 @get_loaded_module.register(types.ModuleType)
-def _(m: types.ModuleType):
+def __get_loaded_module__(m: types.ModuleType):
     r"""Returns a reference to module `m` in sys.modules.
 
     If `m` has not been loaded at all (even as an alias) returns None.
@@ -2846,7 +2846,7 @@ def _(m: types.ModuleType):
     sysmodules = [v for v in sys.modules.values()]  # saves me some typing
     modname = m.__name__
     modspec = getattr(m, "__spec__", None)
-    modfile = getattr(m, "__file__", None)
+    # modfile = getattr(m, "__file__", None)
 
     if not isinstance(modspec, ModSpec):
         modules = list(filter(lambda x: x == m, [v for v in sysmodules]))
@@ -2880,13 +2880,13 @@ def _(m: types.ModuleType):
 
 
 @get_loaded_module.register(importlib.machinery.ModuleSpec)
-def _(spec: importlib.machinery.ModuleSpec):
+def __get_loaded_module__(spec: importlib.machinery.ModuleSpec): # noqa
     ModSpec = importlib.machinery.ModuleSpec  # saves me some typing
     sysmodules = [v for v in sys.modules.values()]  # saves me some typing
     modname = spec.name
     modorigin = spec.origin
 
-    # print(f"get_loaded_module(spec) modname {modname} spec {spec} origin {spec.origin}")
+    # print(f"\nprog.get_loaded_module(spec={spec}) modname -> {modname} origin -> {spec.origin}")
 
     if modname in sys.modules:
         module = sys.modules[modname]
@@ -2911,7 +2911,7 @@ def _(spec: importlib.machinery.ModuleSpec):
 
 
 @get_loaded_module.register(str)
-def _(modname: str):
+def __get_loaded_module__(modname: str): # noqa
     if not isinstance(modname, str) or len(modname.strip()) == 0:
         return
 
@@ -2936,7 +2936,8 @@ def is_class_defined_in_module(x: typing.Any, m: types.ModuleType):
         x = type(x)
 
     if not inspect.ismodule(m):
-        warnings.warn(f"Expecting a module; got {type(m).__name__} instead")
+        # warnings.warn(f"Expecting a module; got {type(m).__name__} instead")
+        scipywarn(f"Expecting a module; got {type(m).__name__} instead")
         return False
 
     x_module = get_loaded_module(x.__module__)
@@ -3270,7 +3271,7 @@ def locate_obj_by_identifier(where:object, n:str) -> object:
 #         n = p.rpartition('.')[-1]
 
 @locate_obj_by_identifier.register(types.NoneType)
-def _(where:types.NoneType, n:str) -> object:
+def __locate_obj_by_identifier__(where:types.NoneType, n:str) -> object:
     if not (isinstance(value, str) and all(isidentifier(a) for a in value.split("."))):
         raise ValueError("A valid identifier string or dotted path was expected")
 
@@ -3300,7 +3301,7 @@ def _(where:types.NoneType, n:str) -> object:
                     spec.loader.exec_module(m)
                     if m:
                         nl_modules.append(m)
-                except:
+                except: # noqa
                     traceback.print_exc()
 
         else:
@@ -3312,7 +3313,7 @@ def _(where:types.NoneType, n:str) -> object:
                     o = locate_obj_by_identifier(m, n)
                     if o:
                         in_nlmodules.append(o)
-                except:
+                except: # noqa
                     traceback.print_exc()
 
 

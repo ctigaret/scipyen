@@ -6,27 +6,31 @@
 # nuitka-project: --standalone
 # nuitka-project: --enable-plugin=pyqt5
 
-'''Main module for the Scipyen application '''
+r'''Main module for the Scipyen application '''
 
 
-#### BEGIN core python modules
-
+# ### BEGIN core python modules
+#
 import sys, os, platform, pathlib, subprocess, traceback # noqa
 
 import atexit, re, inspect, gc, io, time # noqa
 import faulthandler, warnings # noqa
 import xdg # noqa
 from xdg import IconTheme
+#
+# ### END core python modules
 
-#### BEGIN Scipyen modules
+# ### BEGIN Scipyen modules
 #
 from core.prog import scipywarn, print_styled
 from core import sysutils, prog # noqa
 from core import scipyen_config
+# from core import qtutils
 #
-#### END Scipyen modules
+# ### END Scipyen modules
 
-
+# ### BEGIN Figure out the Python environment under which this is executed
+#
 my_conda_env = os.environ.get("CONDA_DEFAULT_ENV", None)
 conda_env_prefix = os.environ.get("CONDA_PREFIX", None)
 
@@ -39,10 +43,10 @@ if isinstance(my_conda_env, str) and len(my_conda_env.strip()):
         print(f"Scipyen is running in the conda environment {print_styled(my_conda_env, color='yellow')}\n")
     else:
         print(f"Scipyen is running in the conda environment {print_styled(my_conda_env, color='yellow')} (located at {print_styled(conda_env_prefix, color='green')})\n")
-    
+
     if my_conda_env == "base":
         scipywarn("Scipyen should be run in its own conda environment.\n")
-        
+
 elif isinstance(my_virtualenv, str) and len(my_virtualenv.strip()):
     # pass # OK
     print(f"Scipyen is running in the virtualenv environment {print_styled(my_virtualenv, color='yellow')}\n")
@@ -52,44 +56,12 @@ elif getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
 else:
     raise RuntimeError("Scipyen must be run in a virtualenv virtual Python environment, a conda environment, or a PyInstaller bundle\n")
 
-os.environ["FORCE_COLOR"] = "1"
+#
+# ### END   Figure out the Python environment under which this is executed
 
-if sys.platform.startswith("linux"):
-    # NOTE: 2024-05-04 10:14:08
-    # forcing xcb platform when running on Wayland, in Linux, because we want to
-    # restore window sizes and positions from Scipyen.conf (Wayland does not allow
-    # an application 'client' to control window position)
-    # NOTE: 2024-11-09 21:03:16
-    # code below introuced to allow positioning of windows based on saved geometry(ies)
-    # which doesn't work on wayland
-    if os.getenv("XDG_SESSION_TYPE", None) == "wayland":
-        os.environ["QT_QPA_PLATFORM"]="xcb"
+os.environ["FORCE_COLOR"] = "1" # for the python interpreter interface
+__QT_USE_NATIVE_MENUBAR__ = os.getenv("QT_USE_NATIVE_MENUBAR", 1)
 
-    new_xdg_data_dirs = [os.path.join(os.environ["HOME"], ".local", "share")]
-
-    # conda_env_prefix was defined above
-    if isinstance(conda_env_prefix, str) and len(conda_env_prefix.strip()):
-        conda_env_xdg_data_dir = os.path.join(conda_env_prefix, "share")
-        conda_env_icons_dir = os.path.join(conda_env_xdg_data_dir, "icons")
-        if os.path.isdir(conda_env_xdg_data_dir):
-            new_xdg_data_dirs.append(conda_env_xdg_data_dir)
-
-        if os.path.isdir(conda_env_icons_dir):
-            IconTheme.icondirs.append(conda_env_icons_dir)
-
-    env_xdg_data_dirs = os.environ.get("XDG_DATA_DIRS", None)
-
-    if isinstance(env_xdg_data_dirs, str):
-        xdg_data_dirs = env_xdg_data_dirs.split(":")
-    else:
-        xdg_data_dirs = list()
-
-    xdg_data_dirs.extend(new_xdg_data_dirs)
-
-    os.environ["XDG_DATA_DIRS"] = ":".join(xdg_data_dirs)
-        
-    # os.environ["QT_QPA_PLATFORM"]="xcb"
-    
 # TODO 2024-09-11 23:56:17 - NO! see NOTE: 2025-07-01 09:42:46
 # use qtpaths or qtpaths6 to figure out where the platform QT5/6 is installed
 # if at all
@@ -97,7 +69,7 @@ if sys.platform.startswith("linux"):
 # so we won't have to build qt locally anymore, by the installer
 #
 # NOTE: 2025-07-01 09:42:46 -> the platform libraries likely to have different
-# hence different build from what is installed from PyPI, thus crashing the 
+# hence different build from what is installed from PyPI, thus crashing the
 # application
 
 __version__ = "0.0.1"
@@ -107,6 +79,12 @@ __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 __bundled__ = False
 
+# ### BEGIN NOTE: 2026-08-02 11:42:07 - am I a PyInstaller app?
+#
+# Needed (?) before importing Qt module as this depends on whether this is a
+# PyInstaller application or is run direct from the local git repository source
+# tree
+#
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     # print(f'\nScipyen is running in a PyInstaller bundle with frozen modules: {sys.frozen}; _MEIPASS: {sys._MEIPASS}; __file__: {__file__}\n\n')
     # print("WARNING: External consoles (including NEURON) are currently NOT supported\n\n")
@@ -115,7 +93,7 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
             for line in origin_file:
                 print(line, end="")
     __bundled__ = True
-    
+
 else:
     # NOTE: 2024-05-02 10:24:48
     # running from a locally built environment under Windows
@@ -123,9 +101,11 @@ else:
         if "CONDA_DEFAULT_ENV" not in os.environ:
             raise OSError("On windows platform, unbundled Scipyen must be run inside a conda environment")
 
-#### END core python modules
+#
+# ### END   NOTE: 2026-08-02 11:42:07 - am I a PyInstaller app?
 
-#### BEGIN 3rd party modules
+# ### BEGIN Qt modules
+#
 import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,) # noqa
@@ -153,19 +133,16 @@ else:
     __has_sip__ = True
     
 try:
-    from qtpy import QtDBus
+    from qtpy import QtDBus # noqa
     __has_qtdbus__ = True
-except:
+except: # noqa
     __has_qtdbus__ = False
-# # print(f"scipyen.py: qtpy.API is {qtpy.API}")
 
-# hasQDarkTheme = False
-# try:
-#     import qdarktheme
-#     hasQDarkTheme = True
-# except:
-#     pass
+#
+# ### END Qt modules
 
+# ### BEGIN Set up GUI and icons theme
+#
 
 # NOTE: 2023-09-28 22:12:25 
 # this does the trick on windows -  now my local breeze icons are available
@@ -173,16 +150,11 @@ except:
 #
 # works in conjunction with code at NOTE: 2023-09-28 22:06:54
 #
-#
 # on linux, we rely on platform-level modules, which get packed by pyinstaller
 # when building the bundle
 #
 mpath = pathlib.Path(__module_path__)
 
-# iconsdir = mpath / "gui" / "resources" / "icons"
-# iconsdir = mpath / "gui" / "resources" 
-
-    
 # NOTE: 2024-09-26 13:09:00
 # this should extend the availability for Qt icons globally, in this Scipyen session
 themePaths = QtGui.QIcon.themeSearchPaths()
@@ -192,23 +164,17 @@ if sys.platform.startswith("linux"):
     fbPaths.extend(IconTheme.icondirs)
     
     
-# NOTE: 2023-09-30 15:49:27 
-# this below is ALWAYS added by default in the Qt resource system
-# themePaths.append(":/icons") 
-
-# if iconsdir.is_dir():
-#     themePaths.append(str(iconsdir))
-#     fbPaths.append(str(iconsdir))
-    
 QtGui.QIcon.setThemeSearchPaths(themePaths)
 QtGui.QIcon.setFallbackSearchPaths(fbPaths)
     
+
 # NOTE: 2023-09-28 22:06:54
 # this should be necessary only on windows platform
 # see also NOTE: 2023-09-28 22:12:25
 #
 # On linux we rely on platform plugins (which also get bundled when
 # building a pyinstaller bundle, as per scipyen.spec)
+#
 if sys.platform.startswith("win32"):
     windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
     _,_,v,_ = windowColor.getHsv()
@@ -247,8 +213,65 @@ elif sys.platform.startswith("darwin"):
 
     QtGui.QIcon.setThemeName(themeName)
     
-        
-#### END 3rd party modules
+#
+# ### END   Set up GUI and icons theme
+
+
+# ### BEGIN Figure out window manager and desktop environment, on Linux
+#
+# NOTE: 2026-08-02 11:17:09
+# moved here because I need __has_PyQt6__
+if sys.platform.startswith("linux"):
+    # NOTE: 2024-05-04 10:14:08
+    # forcing xcb platform when running on Wayland, in Linux, because we want to
+    # restore window sizes and positions from Scipyen.conf (Wayland does not allow
+    # an application 'client' to control window position)
+    # NOTE: 2024-11-09 21:03:16
+    # code below introuced to allow positioning of windows based on saved geometry(ies)
+    # which doesn't work on wayland
+    #
+    # NOTE: 2026-08-02 11:09:59 FIXME
+    # The problem with this is that when the enviornment variable QT_QPA_PLATFORM
+    # is set to "xcb" the global menu DOES NOT WORK anymore in PySide6
+    # ... or, at least, I'm not capable to figure out how to make it work...
+    #
+    # Therefore, when using PySide6 on Wayland platforms I have to trade off
+    # the ability to programmatically place windows to their last saved position
+    # for the ability to use a global menu
+    #
+    # This means I need to import Qt libraries, first, hence why this snipped
+    # is now executed here
+    if not __has_PySide6__:
+        if os.getenv("XDG_SESSION_TYPE", None) == "wayland":
+            os.environ["QT_QPA_PLATFORM"]="xcb"
+
+    # ATTENTION 2026-08-02 11:22:01 FIXME
+    # as stated above, the downside of sticking with walyand is that I cannot
+    # restore window sizes from the configuration file - I;m sure there's a way
+    # to do that'
+    new_xdg_data_dirs = [os.path.join(os.environ["HOME"], ".local", "share")]
+
+    # conda_env_prefix was defined above
+    if isinstance(conda_env_prefix, str) and len(conda_env_prefix.strip()):
+        conda_env_xdg_data_dir = os.path.join(conda_env_prefix, "share")
+        conda_env_icons_dir = os.path.join(conda_env_xdg_data_dir, "icons")
+        if os.path.isdir(conda_env_xdg_data_dir):
+            new_xdg_data_dirs.append(conda_env_xdg_data_dir)
+
+        if os.path.isdir(conda_env_icons_dir):
+            IconTheme.icondirs.append(conda_env_icons_dir)
+
+    env_xdg_data_dirs = os.environ.get("XDG_DATA_DIRS", None)
+
+    if isinstance(env_xdg_data_dirs, str):
+        xdg_data_dirs = env_xdg_data_dirs.split(":")
+    else:
+        xdg_data_dirs = list()
+
+    xdg_data_dirs.extend(new_xdg_data_dirs)
+
+    os.environ["XDG_DATA_DIRS"] = ":".join(xdg_data_dirs)
+
 
 # NOTE: 2021-01-10 13:19:20
 # the same Configuration object holds/merges both the user options and the 
@@ -257,6 +280,9 @@ elif sys.platform.startswith("darwin"):
 
 if hasattr(QtCore, "QLoggingCategory"):
     QtCore.QLoggingCategory.setFilterRules("qt.qpa.xcb=false")
+
+#
+# ### END   Figure out window manager and desktop environment, on Linux
 
 
 class MyProxyStyle(QtWidgets.QProxyStyle):
@@ -304,34 +330,37 @@ def main():
     # if __has_sip__:
     #     sip.setdestroyonexit(True)
 
-    # appName = "Scipyen"
-    # if __has_PySide6__:
-    #     appName = "Scipyen-PySide6"
-    # elif __has_PyQt6__:
-    #     appName = "Scipyen"
-    # else:
-    #     appName = "Scipyen-PyQt5"
-
     try:
         start = time.perf_counter()
         print("Scipyen is initializing, please wait...\n")
         # BEGIN 
         # 1. create the app
         app = QtWidgets.QApplication(sys.argv)
-        # NOTE: 2025-07-01 14:45:39
-        # this MUST be imported AFTER, and NOT BEFORE creating the app in the 
-        # line above
-        import gui.mainwindow as mainwindow
+        if __QT_USE_NATIVE_MENUBAR__ == 0:
+            app.setAttribute(QtCore.Qt.AA_DontUseNativeMenuBar, True)
         translator = QtCore.QTranslator(app)
+
+        # NOTE: 2025-07-01 14:45:39
+        # This MUST be imported AFTER, and NOT BEFORE creating the app in the
+        # line above, because the gui.mainwindow module in turn imports various
+        # other modules that rely on a QApplication instance being alive
+        #
+        # FIXME 2026-08-02 11:06:19 BAD DESIGN ?!?
+        #
+        import gui.mainwindow as mainwindow
+
         if os.environ["QT_API"] == "pyside6":
             translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.path(QtCore.QLibraryInfo.TranslationsPath))
+
         else:
             translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.location(QtCore.QLibraryInfo.TranslationsPath))
+
         app.installTranslator(translator)
 
         app.setDesktopFileName(scipyen_config.application_name)
 
         app.setApplicationName(scipyen_config.application_name)
+
         app.setOrganizationName(scipyen_config.organization_name)
         
         gc.enable()
@@ -340,11 +369,15 @@ def main():
         splash=None
         import gui.splash as guisplash
         
+        # NOTE: 2026-08-02 11:07:01
+        # initialize the main application window (ScipyenWindow)
+        #
         if __has_PyQt6__ or __has_PySide6__ or sys.platform.startswith("win32"):
             # BUG 2025-07-02 01:05:08 FIXME/TODO
             # splash shows as a black rectangle, so set aside for now, in PyQt6/PySide6
-            # until I fire out the problem
+            # until I figure out the problem
             mainWindow = mainwindow.ScipyenWindow()
+
         else:
             icon = QtGui.QIcon.fromTheme("pythonbackend")
             pixmap = icon.pixmap(QtCore.QSize(256,256), state=QtGui.QIcon.On)
@@ -381,25 +414,19 @@ def main():
             else:
                 mainWindow = mainwindow.ScipyenWindow()
                 
-        # mainWindow.show()
-        
         # ### END   Splash screen shenanigans
     
-        # mainWindow = mainwindow.ScipyenWindow()
-        
         # NOTE: 2021-08-17 10:06:24 FIXME / TODO
         # come up with a nice icon?
         # see also NOTE: 2021-08-17 12:36:49 in gui.mainwindow
-        #mainWindow.setWindowIcon(app.icon)
-        
-        # 3. show the main window
-        # mainWindow.show()
+        # mainWindow.setWindowIcon(app.icon)
         
         end = time.perf_counter()
         print(f"Scipyen initialized in {end - start} s")
-        # 4. start the main GUI app (pyqt5) event loop
+        # 4. start the main GUI app (Qt) event loop
         app.exec()
-    except Exception as e:
+
+    except Exception as e: # noqa
         #faulthandler.dump_traceback()
         traceback.print_exc()
         

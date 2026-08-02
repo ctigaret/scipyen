@@ -42,6 +42,7 @@ else:
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
+    QVariant = QtCore.QVariant
     __has_sip__ = True
 
 
@@ -157,7 +158,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     sig_rowsPopulated = Signal(int, int, int, name="sig_rowsPopulated")
     sig_columnsPopulated = Signal(int, int, int, name="sig_columnsPopulated")
     sig_modelPopulated = Signal(name="sig_modelPopulated")
-    sig_indexChanged = Signal([int, int], [QtCore.QModelIndex], name="sig_indexChanged")
+    sig_indexChanged = Signal(QtCore.QModelIndex, name="sig_indexChanged")
+    sig_indexRowColChanged = Signal(int, int, name="sig_indexRowColChanged")
 
     def __init__(self, data=None, parent=None):
         super(TabularDataModel, self).__init__(parent=parent)
@@ -324,7 +326,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             # 'atomic' data changes in arrays, etc)
             # CAUTION/WARNING this only works for my own custom item models!
             self.sig_modelDataChanged.emit()
-            self.sig_indexChanged[QtCore.QModelIndex].emit(modelIndex)
+            self.sig_indexChanged.emit(modelIndex)
             return True
 
         return False
@@ -1226,15 +1228,19 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             return False
 
         try:
-            if isinstance(value, qVariant) or hasattr(value, "value"):
-                try:
-                    pyvalue = value.value()
-                except: # noqa
-                    # traceback.print_exc()
-                    pyvalue = value.value # for PODS this "comes out" directly !?
-
+            if __has_PySide6__:
+                pyvalue=value
             else:
-                pyvalue = value
+                if isinstance(value, QVariant) or hasattr(value, "value"):
+                    try:
+                        pyvalue = value.value()
+
+                    except: # noqa
+                        # traceback.print_exc()
+                        pyvalue = value.value # for PODS this "comes out" directly !?
+
+                else:
+                    pyvalue = value
 
             return self._setValueInModelData_(self._modelData_, pyvalue, row, col)
 

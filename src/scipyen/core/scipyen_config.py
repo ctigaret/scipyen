@@ -724,6 +724,9 @@ def syncQtSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QMainW
      "WindowState":      {"getter":"saveState",   "setter":"restoreState"}
     }
 
+    ATTENTION: "WindowPosition" setting has NO EFFECT when Scipyen runs in a
+    Wayland session.
+
     This mechanism ensures that the following keys are always synchronized with
     the Scipyen.conf file contents for the standard QMainWindow and QWidget
     settings.
@@ -1007,7 +1010,7 @@ def syncQtSettings(qsettings:QtCore.QSettings, win:typing.Union[QtWidgets.QMainW
                     elif value_type is not None:
                         newval = value_type(newval)
 
-                except:
+                except: # noqa
                     newval = default
 
                 setattr(win, settername, newval)
@@ -1039,8 +1042,8 @@ def collect_configurables(cls):
     ret = Bunch({"qt": Bunch(), "conf": Bunch()})
 
     for name, fn in inspect.getmembers(cls):
-        getterdict = Bunch()
-        setterdict = Bunch()
+        # getterdict = Bunch()
+        # setterdict = Bunch()
         confdict = Bunch()
         if isinstance(fn, property):
             if inspect.isfunction(fn.fget) or isinstance(fn.fget, partial):
@@ -1189,6 +1192,7 @@ class ScipyenConfigurable(object):
 
         if hasattr(self, "appWindow"):
             parent = self.appWindow
+
         elif hasattr(self, "scipyenWindow"):
             parent = self.scipyenWindow
 
@@ -1208,6 +1212,7 @@ class ScipyenConfigurable(object):
         tag = self.configTag
 
         cfg = self._make_confuse_config_data_(change, isTop, parent, tag)
+
         #### BEGIN debug - comment out when done
 #         if self.__class__.__name__ == "TwoPathwaysOnlineLTP":
 #             print(f"ScipyenConfigurable<{self.__class__.__name__}>._observe_configurables_():")
@@ -1382,7 +1387,7 @@ class ScipyenConfigurable(object):
         """
         # print(f"ScipyenConfigurable<{self.__class__.__name__}>.saveWindowSettings")
         if isinstance(self, Figure):# this presupposes self is an instance that also inherits from matplotlib Figure
-            if issubclass(self.canvas, (mpl.backend_bases.FigureCanvasBase, win, QtWidgets.QWidget)):
+            if issubclass(self.canvas, (mpl.backend_bases.FigureCanvasBase, QtWidgets.QWidget)):
                 saveWindowSettings(ScipyenConfigurable.qsettings, self.canvas, group_name = self.canvas.__class__.__name__, prefix="")
             return
 
@@ -1410,7 +1415,8 @@ class ScipyenConfigurable(object):
             # with the result...
             try:
                 val = json.loads(val)
-            except:
+
+            except: # noqa
                 val = strutils.str2sequence(val)
 
         # FIXME BUG 2022-11-27 12:33:35
@@ -1447,13 +1453,17 @@ class ScipyenConfigurable(object):
             isTop = hasattr(self, "isTopLevel") and self.isTopLevel
             if isTop:
                 parent = getattr(self, "scipyenWindow", None)
+
             else:
                 if hasattr(self, "appWindow"):
                     parent = self.appWindow
+
                 if parent is None:
                     parent = self._get_parent_()
+
             # parent = self._get_parent_()
             tag = self.configTag if isinstance(self.configTag, str) and len(self.configTag.strip()) else None
+
             user_conf = self._get_config_view_(isTop, parent, tag)
 
             # #### BEGIN debug - comment out when done
@@ -1467,7 +1477,8 @@ class ScipyenConfigurable(object):
                     if k in cfg:
                         try:
                             self.set_configurable_attribute(k, v.get(), cfg)
-                        except Exception as e:
+
+                        except Exception as e: # noqa
                             traceback.print_exc()
                             continue
 
@@ -1526,7 +1537,8 @@ class ScipyenConfigurable(object):
                 for k, v in user_conf.items():
                     try:
                         val = self.get_configurable_attribute(k, cfg)
-                    except Exception as e:
+
+                    except Exception as e: # noqa
                         traceback.print_exc()
                         continue
 

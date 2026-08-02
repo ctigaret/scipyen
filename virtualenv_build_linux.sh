@@ -1252,6 +1252,7 @@ elif [[ $with_pyqt5 -eq 1 ]] ; then
 #     scriptfile=${target_dir}/scipyen
 #     launchcmd=${scipyensrcdir}/scipyen.py
 fi
+
 launchcmd=${scipyensrcdir}/scipyen.py
 
 
@@ -1312,9 +1313,26 @@ cat <<END >> ${scriptfile}
 run_in_debugger=0
 verbosity="" # "-v" or "-vv"
 frozenmodules=off
+nativemenubar=1
+show_help=0
+noop=0
 
-for i in "\$@" ; do
-    case \$i in
+function help ()
+{
+echo -e "Scipyen launch script\n***"
+echo -e "\n"
+echo -e "Options:"
+echo -e "========\n"
+echo -e "\n --debug: run within python debugger (pdb)."
+echo -e "\n --frozen-modules: pass '-Xfrozen_modules=on' to the Python interpreter; the default is 'off'."
+echo -e "\n -v | --v: run the Python interpreter with 'verbosity -v' ; default is no verbosity."
+echo -e "\n -vv | --vv: run the Python interpreter with 'verbosity -vv' ; default is no verbosity."
+echo -e "\n --nonativemenubar: Attach all menu bars to their corresponding top-level windows in Scipyen GUI; by default, top-level Scipyen windows use the global menu, if available in the desktop platform. NOTE: This only works on some Linux desktops."
+echo -e "\n -h | -? | --h | --help: Shows this help message and quit.\n\n"
+}
+
+for i in "$@" ; do
+    case $i in
         --debug)
         run_in_debugger=1
         shift
@@ -1323,16 +1341,43 @@ for i in "\$@" ; do
         frozenmodules=on
         shift
         ;;
-        --v)
+        -v|--v)
         verbosity="-v"
         shift
         ;;
-        --vv)
+        -vv|--vv)
         verbosity="-vv"
         shift
         ;;
+        --nonativemenubar)
+        nativemenubar=0
+        shift
+        ;;
+        -h|-\\\?|--h|--help)
+        show_help=1
+        shift
+        ;;
+        -*|--*)
+        echo -e "Unkown option \$i; please run \$0 -h for help"
+        noop=1
+        shift
+        ;;
+        *)
+        ;;
     esac
 done
+
+if [[ ( \$noop -eq 1 ) ]] ; then
+exit -1
+fi
+
+if [[ ( \$show_help -eq 1 ) ]] ; then
+help
+exit 0
+fi
+
+export QT_USE_NATIVE_MENUBAR=\$nativemenubar
+
 
 if [[ \$run_in_debugger -eq 1 ]] then
     ${python_executable} \$verbosity -Xfrozen_modules=\$frozenmodules -m pdb ${launchcmd} "\$*"
@@ -1519,7 +1564,7 @@ for i in "$@" ; do
         make_dist=1
         shift
         ;;
-        -h|-?|--help)
+        -h|-\?|--help)
         show_help
         exit 0
         shift
@@ -1527,8 +1572,8 @@ for i in "$@" ; do
         -*|--*)
         echo -e "Unknown option $i"
         show_help
-        shift
         exit 0
+        shift
         ;;
         *)
         ;;

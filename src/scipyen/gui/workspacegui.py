@@ -1572,8 +1572,10 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
         if isinstance(fileName,str) and len(fileName.strip()):
             if "JSON" in fileFilter:
                 configData = pio.loadJSON(fileName)
+
             elif "HDF5" in fileFilter:
                 configData = pio.loadHDF5File(fileName)
+
             else:
                 configData = pio.loadPickleFile(fileName)
 

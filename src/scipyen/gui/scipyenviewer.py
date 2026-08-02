@@ -408,6 +408,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         r"""workaround wayland"""
         if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
             return
+
         super().requestActivate()
 
 
@@ -856,7 +857,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """
         evt.accept()
 
-        if evt.type() in (QtCore.QEvent.FocusIn, QtCore.QEvent.WindowActivate):
+        if not __has_PySide6__ and evt.type() in (QtCore.QEvent.FocusIn, QtCore.QEvent.WindowActivate):
             self.sig_activated.emit(self.ID)
             return True
 

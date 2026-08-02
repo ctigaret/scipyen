@@ -121,7 +121,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
     sig_selectionChanged = Signal(name="sig_selectionChanged")
     sig_dataChanged = Signal(name="sig_dataChanged")
     sig_valueChanged = sig_dataChanged
-    sig_indexChanged = Signal([int, int], [QtCore.QModelIndex], name="sig_indexChanged")
+    sig_indexRowColChanged = Signal(int, int, name="sig_indexRowColChanged")
+    sig_indexChanged = Signal(QtCore.QModelIndex, name="sig_indexChanged")
     sig_indexesChanged = Signal(QtCore.QModelIndex, QtCore.QModelIndex, list, name="sig_indexesChanged")
     sig_requestDataRow = Signal(name="sig_requestDataRow")
 
@@ -157,8 +158,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
 
         self._defaultItemDelegate_ = self.tableView.itemDelegate()
         self._editItemDelegate_ = PythonItemDelegate(parent=self, enforceFloat = self._enforceFloat_)
+        self._editItemDelegate_.sig_indexRowColChanged.connect(self.sig_indexRowColChanged)
         self._editItemDelegate_.sig_indexChanged.connect(self.sig_indexChanged)
-        self._editItemDelegate_.sig_indexChanged[QtCore.QModelIndex].connect(self.sig_indexChanged[QtCore.QModelIndex])
         # NOTE: 2021-08-16 17:22:20
         # By default, this is defined in the .ui file as:
         # QtWidgets.QAbstractItemView.DoubleClicked |
@@ -184,8 +185,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             self._dataModel_.sig_modelDataChanged.connect(self.sig_dataChanged) # connect signal to signal directly
 
         if hasattr(self._dataModel_, "sig_indexChanged") and isinstance(type(self._dataModel_).sig_indexChanged, Signal):
+            self._dataModel_.sig_indexRowColChanged.connect(self.sig_indexRowColChanged) # connect signal to signal directly
             self._dataModel_.sig_indexChanged.connect(self.sig_indexChanged) # connect signal to signal directly
-            self._dataModel_.sig_indexChanged[QtCore.QModelIndex].connect(self.sig_indexChanged[QtCore.QModelIndex]) # connect signal to signal directly
 
         self._dataModel_.dataChanged.connect(self._slot_modelDataChanged_)
 
@@ -200,8 +201,8 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                                 bottomRight: QtCore.QModelIndex,
                                 roles: list):
         if topLeft == bottomRight:
-            self.sig_indexChanged[QtCore.QModelIndex].emit(topLeft)
-            # self.sig_indexChanged.emit(topLeft.row(), topLeft.column())
+            self.sig_indexChanged.emit(topLeft)
+            # self.sig_indexRowColChanged.emit(topLeft.row(), topLeft.column())
 
         else:
             self.sig_indexesChanged.emit(topLeft, bottomRight, roles)

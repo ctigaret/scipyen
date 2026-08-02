@@ -111,7 +111,7 @@ except:
 import quantities as pq
 import numpy as np
 
-from core.prog import timefunc
+from core.prog import timefunc, scipywarn
 from iolib.navigation import filesystems
 from iolib.navigation.filesystems import (urlToPath, pathToQUrl,
                                           pathStrLen, pathLen)
@@ -181,10 +181,11 @@ def parseUDIsksFSMountOperationJobs(msg: object) -> list:
     if __has_qtdbus__:
         if isinstance(msg, QtDBus.QDBusMessage):
             msg_args = msg.arguments()
+
         elif isinstance(msg, str):
             msg_args = msg
 
-        print(f"desktoputils.parseUDIsksJob -> {msg}")
+        # print(f"desktoputils.parseUDIsksJob -> {msg}")
 
         # print(f'desktoputils.parseUDIsksJob -> \n\tsignature: {msg.signature()!r},\n\targuments: {msg_args!r}')
 
@@ -197,6 +198,7 @@ def parseUDIsksFSMountOperationJobs(msg: object) -> list:
         return list(filter(lambda a: testFilesystemMountUnmountOperation(a), msg_args))
 
     return list()
+
 
 def _partitionPredicate_(x, devices, drivePlaces):
     return (
@@ -223,7 +225,7 @@ def isUnixHiddenLocation(p: typing.Union[pathlib.Path, QtCore.QUrl, str]) -> boo
         p = pathlib.Path(p.path()).resolve
 
     elif not isinstance(p, pathlib.Path):
-        raise TypeError(f"Expecting a path string, Url or ")
+        raise TypeError(f"Expecting a path string, Url or pathlib.Path; instead, got {p}")
 
     return any(v.startswith(".") for v in p.parts)
 
@@ -596,11 +598,13 @@ def is_gnome():
         get_desktop("session").lower() in ("x11", "wayland") and get_desktop() == "GNOME"
     )
 
-def _fileSystemPlacePredicate_(x):
+def _fileSystemPlaceRejectPredicate_(x):
     if isinstance(x, str):
         return not x.startswith("file")
+
     elif isinstance(x, QtCore.QUrl):
         return not x.scheme.startswith("file")
+
     else:
         return False
 
@@ -612,17 +616,8 @@ def get_local_filesystem_places(placesDict: typing.Optional[PlacesMap] = None) -
         print("desktoputils.get_local_filesystem_places calls get_desktop_places")
         placesDict = get_desktop_places()
 
-    # filterFunc = (
-    #     lambda x: not x.startswith("file")
-    #     if isinstance(x, str)
-    #     else not x.scheme().startswith("file")
-    #     if isinstance(x, QtCore.QUrl)
-    #     else False
-    # )
-
     if len(placesDict):
-        # result = dict((k,v) for k,v in ret.items() if not k.startswith("file:///"))
-        result = dict((k, v) for k, v in placesDict.items() if not _fileSystemPlacePredicate_(k))
+        result = dict((k, v) for k, v in placesDict.items() if not _fileSystemPlaceRejectPredicate_(k))
 
         return result
 
@@ -656,7 +651,8 @@ def get_trash_icon_name():
             )
 
             return trashstat.get("ICON_NAME", "user-trash")
-        except:
+
+        except: # noqa
             # traceback.print_exc()
             return "user-trash"
 
@@ -679,15 +675,19 @@ def get_system_terminal_executable():
     #   on linux:   xterm, konsole, gnome-terminal, qterminal, lxterminal, rxvt, rxvt-unicode.
     if sys.platform.startswith("win32"):
         return "cmd"
+
     elif sys.platform.startswith("linux"):
         if os.getenv("XDG_SESSION_DESKTOP").startswith("KDE"):
             return "konsole"  # MY OWN default, for now
+
         else:
             return "xterm"
+
     elif sys.platform.startswith("darwin"):
         return "/System/Applications/Utilities/Terminal.app"
+
     else:
-        warnings.warn(f"{sys.platform} platform is not yet supported")
+        scipywarn(f"{sys.platform} platform is not yet supported")
 
 
 def get_standard_desktop_places(all_folder_icons: bool = False) -> PlacesMap:
@@ -718,10 +718,6 @@ def get_standard_desktop_places(all_folder_icons: bool = False) -> PlacesMap:
             else list()
         )
 
-        # if asQUrl:
-        #     key = QtCore.QUrl(place_uri)
-        # else:
-        #     key = place_uri
         key = place_uri
 
         if key in ret:
@@ -739,7 +735,8 @@ def get_standard_desktop_places(all_folder_icons: bool = False) -> PlacesMap:
 
     return ret
 
-@timefunc
+
+# @timefunc
 def get_desktop_places(schema: typing.Optional[str] = None,
                        all_folder_icons: bool = False,
                        include_hidden: bool = False,

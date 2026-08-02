@@ -223,26 +223,26 @@ Key:                                Mapped to:          Result:
 from __future__ import print_function
 
 # FIXME 2016-04-03 00:35:17
-# if the plugin advertises itself on an already used menu item and with a similar callback function
-# the previosuly loaded plugin will be overwritten !!!
+# if the plugin advertises itself on an already used menu item and with a
+# similar callback function the previosuly loaded plugin will be overwritten !!!
 
-import os, inspect, importlib, sys, traceback
-import types, typing, pathlib
-import collections, functools, itertools 
-from pprint import pprint
+import os, inspect, importlib, sys, traceback # noqa
+import types, typing, pathlib # noqa
+import collections, functools, itertools # noqa
+from pprint import pprint # noqa
 # import os, inspect, imp, sys, collections
 from core import prog, sysutils
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-loaded_plugins = collections.OrderedDict()
+LOADED_PLUGINS = collections.OrderedDict()
 
 pluginsSpecFinder = prog.SpecFinder({})
 # sys.meta_path.append(pluginsSpecFinder)
 
-plugin_source_files = list()
-user_plugin_source_files = list()
+PLUGIN_SOURCE_FILES = list()
+USER_PLUGIN_SOURCE_FILES = list()
 
 # __avoid_modules__ = ("scipyen_start", "scipyen_plugin_loader")
 
@@ -263,76 +263,84 @@ def check_plugin_module(file_name) -> bool:
 #     for module in plugin_modules:
 #         if isinstance(module, types.ModuleType): # this is guaranteed, no?
 #             reloaded_module = importlib.reload(module)
-#             loaded_plugins[module.__name__] = module
+#             LOADED_PLUGINS[module.__name__] = module
 
-def find_bytecode_plugins(path:typing.Union[str, pathlib.Path], scipyendir:typing.Union[str,pathlib.Path]):
-    r"""Intended to collect bytecode plugins by pyinstaller
-    """
-    import dis, marshal
-    if isinstance(path, pathlib.Path) and path.is_dir() and path.exists():
-        path = str(path.absolute())
-        
-    elif not isinstance(path, str) or len(path.strip()) == 0 or not os.path.isdir(path) or not os.path.exists(path):
-        prog.scipywarn(f"Expecting a string or a pathlib.Path for an absolute pathway to an existing directory; instead got {path} ")
-        return
-    
-    if isinstance(scipyendir, pathlib.Path) and scipyendir.is_dir() and scipyendir.exists():
-        scipyendir = scipyendir.absolue()
-        
-    elif isinstance(scipyendir, str) and len(scipyendir.strip()) and os.path.isdir(scipyendir) and os.path.exists(scipyendir):
-        scipyendir = pathlib.Path(scipyendir)
-        
-    else:
-        prog.scipywarn(f"Invalid scipyendir parameter: {scipyendir} ")
-        return
-    
-    topdir = pathlib.Path(path)
-    
-    plugin_bytecode_files = list(map(lambda x: pathlib.Path(x), list(filter(lambda x: os.path.splitext(x)[-1] in importlib.machinery.BYTECODE_SUFFIXES and check_plugin_module(x), list(itertools.chain.from_iterable( (os.path.join(e[0], i) for i in e[2]) for e in os.walk(path)))))))
+# def find_bytecode_plugins(path:typing.Union[str, pathlib.Path],
+#                           scipyendir:typing.Union[str,pathlib.Path]):
+#     r"""Intended to collect bytecode plugins by pyinstaller
+#     """
+#     import dis, marshal # noqa
+#     if isinstance(path, pathlib.Path) and path.is_dir() and path.exists():
+#         path = str(path.absolute())
+#
+#     elif not isinstance(path, str) or len(path.strip()) == 0 or not os.path.isdir(path) or not os.path.exists(path):
+#         prog.scipywarn(f"Expecting a string or a pathlib.Path for an absolute pathway to an existing directory; instead got {path} ")
+#         return
+#
+#     if isinstance(scipyendir, pathlib.Path) and scipyendir.is_dir() and scipyendir.exists():
+#         scipyendir = scipyendir.absolue()
+#
+#     elif isinstance(scipyendir, str) and len(scipyendir.strip()) and os.path.isdir(scipyendir) and os.path.exists(scipyendir):
+#         scipyendir = pathlib.Path(scipyendir)
+#
+#     else:
+#         prog.scipywarn(f"Invalid scipyendir parameter: {scipyendir} ")
+#         return
+#
+#     topdir = pathlib.Path(path)
+#
+#     plugin_bytecode_files = list(map(lambda x: pathlib.Path(x), list(filter(lambda x: os.path.splitext(x)[-1] in importlib.machinery.BYTECODE_SUFFIXES and check_plugin_module(x), list(itertools.chain.from_iterable( (os.path.join(e[0], i) for i in e[2]) for e in os.walk(path)))))))
+#
+#     # these are modules, by definition?
+#
+#     for file_name in plugin_bytecode_files:
+#         verb=False
+#         # see https://mathspp.com/blog/til/read-bytecode-from-a-pyc-file
+#         with open(file_name, "rb") as pycfile:
+#             _ = pycfile.read(16) # Header is 16 bytes in 3.6+, 8 bytes on < 3.6
+#             loaded = marshal.load(pycfile)
+#
+#         code_info = list(filter(lambda x: any(v in x for v in ("__scipyen_plugin__",  "init_scipyen_plugin")), dis.code_info(loaded).split("\n")))
+#         if len(code_info) == 0:
+#             continue
+#
+#         module_name = file_name.split('.')[0] # heuristic - is that OK? # FIXME 2024-05-31 16:14:34
+#         pluginsSpecFinder.path_map[module_name] = file_name
+#         file_directory = file_name.parent.relative_to(topdir)
+#         if len(file_directory.parts):
+#             package_name = '.'.join(file_directory.parts)
+#
+#             submodules_paths = list()
+#             p = file_name.relative_to(topdir)
+#             while len(p.parts):
+#                 p = p.parent
+#                 if len(p.parts):
+#                     submodules_paths.append(topdir.joinpath(p))
+#             if file_name.name == "__init__.py":
+#                 module_name = package_name
+#             else:
+#                 module_name = f"{package_name_path}.{module_name}" # NOTE: 2024-05-30 13:09:48 this is CRUCIAL
+#
+#             module_spec = importlib.util.spec_from_file_location(module_name, file_name,
+#                                                                     submodule_search_locations = submodules_paths)
+#         else:
+#             module_spec = importlib.util.spec_from_file_location(module_name, file_name)
+#
+#     check_load_module(module_spec, verb)
 
-    # these are modules, by definition?
-    
-    for file_name in plugin_bytecode_files:
-        verb=False
-        # see https://mathspp.com/blog/til/read-bytecode-from-a-pyc-file
-        with open(file_name, "rb") as pycfile:
-            _ = pycfile.read(16) # Header is 16 bytes in 3.6+, 8 bytes on < 3.6
-            loaded = marshal.load(pycfile)
-            
-        code_info = list(filter(lambda x: any(v in x for v in ("__scipyen_plugin__",  "init_scipyen_plugin")), dis.code_info(loaded).split("\n")))
-        if len(code_info) == 0:
-            continue
-        
-        module_name = file_name.split('.')[0] # heuristic - is that OK? # FIXME 2024-05-31 16:14:34
-        pluginsSpecFinder.path_map[module_name] = file_name
-        file_directory = file_name.parent.relative_to(topdir)
-        if len(file_directory.parts):
-            package_name = '.'.join(file_directory.parts)
-            
-            submodules_paths = list()
-            p = file_name.relative_to(topdir)
-            while len(p.parts):
-                p = p.parent
-                if len(p.parts):
-                    submodules_paths.append(topdir.joinpath(p))
-            if file_name.name == "__init__.py":
-                module_name = package_name
-            else:
-                module_name = f"{package_name_path}.{module_name}" # NOTE: 2024-05-30 13:09:48 this is CRUCIAL
-            
-            module_spec = importlib.util.spec_from_file_location(module_name, file_name, 
-                                                                    submodule_search_locations = submodules_paths)
-        else:               
-            module_spec = importlib.util.spec_from_file_location(module_name, file_name)
-            
-    check_load_module(module_spec, verb)
-
+# @prog.timefunc
 def find_plugins(path:typing.Union[str, pathlib.Path], 
-                 scipyendir:typing.Union[str,pathlib.Path], 
+                 scipyendir:typing.Union[str,pathlib.Path],
+                 /,
+                 mainWindow = None,
+                 # workspace = None,
                  checkgit:bool=False):
     r"""Loads and located plugins in a directory tree rooted at `path`
     """
+    # print(f"scipyen_plugin_loader.find_plugins(checkgit={checkgit})")
+
     # ### BEGIN check call parameters
+    #
     if isinstance(path, pathlib.Path):
         if not path.is_dir() or path.exists():
             prog.scipywarn(f"Plugins directory {str(path)} does not exist ")
@@ -357,32 +365,57 @@ def find_plugins(path:typing.Union[str, pathlib.Path],
     else:
         prog.scipywarn(f"Invalid scipyendir parameter: {scipyendir} ")
         return
+    #
     # ### END   check call parameters
     
     # NOTE: 2024-05-30 11:33:28
     # a better? version of the code after NOTE: 2023-06-28 21:13:30
     
     topdir = pathlib.Path(path).absolute()
+
+    # print(f"scipyen_plugin_loader.find_plugins: topdir -> {topdir}")
     
     if topdir.as_posix() not in sys.path:
         sys.path.append(topdir.as_posix())
     
     if checkgit:
         sysutils.checkGitRepo(topdir, "Scipyen plugins", "Using plugins in the")
-    # print(f"scipyen_plugin_loader.find_plugins: topdir = {topdir}")
-    
-    plugin_source_files[:] = list(map(lambda x: pathlib.Path(x).absolute(), list(filter(lambda x: os.path.splitext(x)[-1] in importlib.machinery.SOURCE_SUFFIXES and check_plugin_module(x), list(itertools.chain.from_iterable( (os.path.join(e[0], i) for i in e[2]) for e in os.walk(topdir)))))))
-    
-    # print(f"find_plugins: plugin_source_files = {plugin_source_files}\n")
-    
-    user_plugin_source_files[:] = list(filter(lambda x: not x.is_relative_to(scipyendir), plugin_source_files))
-    # print(f"find_plugins: user_plugin_source_files = {user_plugin_source_files}\n")
-    
+
+    # PLUGIN_SOURCE_FILES[:] = list(
+    PLUGIN_SOURCE_FILES.clear()
+    PLUGIN_SOURCE_FILES.extend(
+            list(
+                map(
+                        lambda x: pathlib.Path(x).absolute(),
+                        list(
+                                filter(
+                                        lambda x: (
+                                                    os.path.splitext(x)[-1] in importlib.machinery.SOURCE_SUFFIXES
+                                                    and check_plugin_module(x)
+                                                ),
+                                        list(itertools.chain.from_iterable( (os.path.join(e[0], i) for i in e[2]) for e in os.walk(topdir)))
+                                    )
+                            )
+                    )
+            )
+        )
+
+    # USER_PLUGIN_SOURCE_FILES[:] = list(
+    USER_PLUGIN_SOURCE_FILES.clear()
+    USER_PLUGIN_SOURCE_FILES.extend(
+            list(
+                filter(
+                        lambda x: not x.is_relative_to(scipyendir),
+                        PLUGIN_SOURCE_FILES
+                    )
+            )
+        )
+
     modules = list()
     
-    for file_name in plugin_source_files:
-        if file_name in user_plugin_source_files:
-            assert file_name.is_relative_to(topdir), f"The plugin source file {file_name} is not present in {topdir} or any of its subdirectories"
+    for file_name in PLUGIN_SOURCE_FILES:
+        if file_name in USER_PLUGIN_SOURCE_FILES:
+            # assert file_name.is_relative_to(topdir), f"The plugin source file {file_name} is not present in {topdir} or any of its subdirectories"
             ndx = file_name.parents.index(topdir)
             package_dotted_path = '.'.join(tuple(map(lambda p: p.stem, reversed(file_name.parents[:ndx]))))
             module = import_module(file_name, package_dotted_path)
@@ -391,29 +424,47 @@ def find_plugins(path:typing.Union[str, pathlib.Path],
             
         modules.append(module)
         
-        for m in modules:
-            load_module(m)
+    for m in modules:
+        load_module(m)
 
+        if mainWindow is not None:
+            if not hasattr(module, "mainWindow"):
+                module.__dict__["mainWindow"] = mainWindow
+
+        # if workspace is not None:
+        #     if not hasattr(module, "workspace"):
+        #         module.__dict__["workspace"] = workspace
+
+
+# @prog.timefunc
 def import_module(file_name: pathlib.Path, package:typing.Optional[str] = None):
+    # print(f"\nscipyen_plugin_loader.import_module(file_name = {file_name}), package = {package}")
     module_name = file_name.stem
     parent_path_str = file_name.parent.as_posix()
-    if parent_path_str not in sys.path:
+
+    if parent_path_str not in sys.path  or module_name not in sys.path:
         sys.path.append(parent_path_str)
+
     module = importlib.import_module(module_name, package)
+
     return check_load_module(module.__spec__)
     
+# @prog.timefunc
 def load_module(module:[types.ModuleType, prog.ModSpec], alias:typing.Optional[str] = None):
+    # print(f"\nscipyen_plugin_loader.load_module(module = {module}, alias = {alias})")
     loadedmodule = prog.get_loaded_module(module)
     if inspect.ismodule(loadedmodule): # alternative: if isinstance(loadedmodule, types.ModuleType):
         if inspect.ismodule(module):
             assert loadedmodule == module, f"Mismatch between {loadedmodule} and {module}"
             
         try:
-            reloaded_module = importlib.reload(loadedmodule) # CAUTION ``module`` may in fact be a spec
-        except:
+            importlib.reload(loadedmodule) # CAUTION ``module`` may in fact be a spec
+            # reloaded_module = importlib.reload(loadedmodule) # CAUTION ``module`` may in fact be a spec - DO NOT DELETE
+
+        except: # noqa
             traceback.print_exc()
             
-        loaded_plugins[module.__name__] = module
+        LOADED_PLUGINS[module.__name__] = module
             
     else:
         try:
@@ -433,27 +484,28 @@ def load_module(module:[types.ModuleType, prog.ModSpec], alias:typing.Optional[s
             
             spec.loader.exec_module(module)
             sys.modules[spec.name] = module
-            loaded_plugins[spec.name] = module
+            LOADED_PLUGINS[spec.name] = module
             if isinstance(alias, str) and len(alias.strip()) and alias.isidentifier():
                 sys.modules[alias] = module
-                loaded_plugins[alias] = module
+                LOADED_PLUGINS[alias] = module
                 
-        except:
+        except: # noqa
             traceback.print_exc()
         
 
+# @prog.timefunc
 def get_module(file_name:pathlib.Path, topdir: typing.Optional[pathlib.Path]=None,
                is_user_plugin:bool=True, alias:typing.Optional[str] = None) -> types.ModuleType:
     r"""DEPRECATED """
-    if is_user_plugin:
-        print(f"scipyen_plugin_loader.get_module for user plugin(\n\tfile_name = {file_name},\n\ttopdir = {topdir},\n\talias = {alias})")
+    # if is_user_plugin:
+        # print(f"scipyen_plugin_loader.get_module for user plugin(\n\tfile_name = {file_name},\n\ttopdir = {topdir},\n\talias = {alias})")
     module_name = inspect.getmodulename(file_name)
     if module_name is not None: # this will never be None, would it?
-        if is_user_plugin:
-            print(f"\tmodule_name: {module_name}\n")
+        # if is_user_plugin:
+            # print(f"\tmodule_name: {module_name}\n")
         verb = False
         pluginsSpecFinder.path_map[module_name] = file_name.as_posix()
-        # if file_name in user_plugin_source_files:
+        # if file_name in USER_PLUGIN_SOURCE_FILES:
         if is_user_plugin:
             assert(file_name.is_relative_to(topdir)), f"Plugin file {file_name} is not located in {topdir}"
             package_module_path = module_name.split('.')
@@ -464,7 +516,7 @@ def get_module(file_name:pathlib.Path, topdir: typing.Optional[pathlib.Path]=Non
                 file_directory = pathlib.Path(*parents)#.relative_to(topdir)
             else:
                 file_directory = file_name.parent
-            print(f"\tfile_directory: {file_directory}\n")
+            # print(f"\tfile_directory: {file_directory}\n")
             submodules_paths = list()
             if isinstance(file_directory, pathlib.Path) and file_directory.exists() and file_directory.is_dir() and len(file_directory.parts):
                 parent_package_names = list()
@@ -499,11 +551,12 @@ def get_module(file_name:pathlib.Path, topdir: typing.Optional[pathlib.Path]=Non
         return check_load_module(module_spec, verb, alias, True)
     
 
+# @prog.timefunc
 def check_load_module(spec, verb:bool=False, 
                       alias:typing.Optional[str] = None, 
                       register:bool=True) -> types.ModuleType:
-    if verb:
-        print(f"check_load_module: spec = {spec}")
+    # if verb:
+        # print(f"check_load_module: spec = {spec}")
         
     module = prog.get_loaded_module(spec)
     
@@ -511,10 +564,12 @@ def check_load_module(spec, verb:bool=False,
     if isinstance(module, types.ModuleType): # module found, no beef here
         try:
             reloaded_module = importlib.reload(module) # reload plugin to reflect changes
-        except:
+
+        except: # noqa
             traceback.print_exc()
+
         if register:
-            loaded_plugins[module.__name__] = module
+            LOADED_PLUGINS[module.__name__] = module
             
         return module
         
@@ -524,22 +579,30 @@ def check_load_module(spec, verb:bool=False,
             name = spec.name
             parent_name = name.rpartition('.')[0]
             sys.modules[spec.name] = module
+
             if isinstance(alias, str) and len(alias.strip()) and alias.isidentifier():
                 sys.modules[alias] = module
+
             # else:
             #     sys.modules[spec.name] = module
+
             spec.loader.exec_module(module)
+
             if register:
                 if isinstance(alias, str) and len(alias.strip() and alias.isidentifier()):
-                    loaded_plugins[alias] = module
+                    LOADED_PLUGINS[alias] = module
+
                 else:
-                    loaded_plugins[spec.name] = module
+                    LOADED_PLUGINS[spec.name] = module
+
             setattr(module, "__spec__", spec)
+
             # NOTE: 2025-03-18 23:00:46 see NOTE: 2025-03-18 22:59:47
             setattr(module, "__pluginspec__", spec)
             
             return module
-        except:
+
+        except: # noqa
             traceback.print_exc()
             
 
@@ -553,7 +616,8 @@ def reload_plugin(obj:types.ModuleType) -> types.ModuleType:
     try:
         spec = importlib.util.find_spec(obj.__name__)
         # print(f"reload_plugin: spec found by importlib = {spec}")
-    except:
+
+    except: # noqa
         # NOTE: 2025-03-18 22:59:47
         # I dont't quite understand why __spec__ is re-set to None; compensating
         # by using the cached __pluginspec__ attribute
@@ -568,15 +632,15 @@ def reload_plugin(obj:types.ModuleType) -> types.ModuleType:
     # print(f"reload_plugin: spec = {spec}")
     spec.loader.exec_module(obj) # I think this is the culprit, but there has to be a way to spot differences between old & new versions and replace only what has changed
     sys.modules[spec.name] = obj
-    loaded_plugins[spec.name] = obj
+    LOADED_PLUGINS[spec.name] = obj
     return obj
 
 
 def reload(obj:types.ModuleType) -> types.ModuleType:
-    r""" DEPRECATED """
     try:
         return importlib.reload(obj)
-    except:
+
+    except: # noqa
         return reload_plugin(obj)
     
     

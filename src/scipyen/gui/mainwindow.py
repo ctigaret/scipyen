@@ -1485,6 +1485,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             return cls._instance
 
     # @processtimefunc
+    # @timefunc
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs):
         r"""Scipyen's main window initializer (constructor).
 
@@ -1657,6 +1658,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # The above rule applies to code run inside the GUI (i.e., NOT executed
         # in the console), where this interception is not implemented.
         # ### END   long comment
+
         self.workspace = dict()
 
         self._nonInteractiveVars_ = dict()
@@ -1740,10 +1742,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._fileNamesFiltersHides_:bool = False
         self._toolButtonStyle_:int = QtCore.Qt.ToolButtonFollowStyle.value
 
+        # ### BEGIN NOTE: Instantiates Qt UI elements and sets up signal-slot connections
         self._configureUI_()
+        # ### END   NOTE: Instantiates Qt UI elements and sets up signal-slot connections
 
+        # overrides icons set in the ui file in order to use what's available
+        # given the concrete resource files (I know I could've set these resources
+        # in the designer ui file)
         self.adaptToRCIcons()
 
+        # ### BEGIN Set up script manager
+        #
         self._scriptManager_ = ScriptManager(parent=myparent)
 
         self._scriptManager_.signal_executeScript[str].connect(
@@ -1770,18 +1779,21 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._scriptManager_.signal_pythonFileAdded[str].connect(self._slot_scriptFileAddedInManager)
 
         self._scriptManager_.signal_scriptManagerClosed.connect(self._slot_scriptManagerClosed)
+        #
+        # ### END   Set up script manager
 
         # NOTE: 2023-06-04 10:49:56
         # for debugging only; comment out for relese
         # self.shell.events.register("pre_run_cell", self.workspaceModel.preRunCell)
 
 
-        # NOTE:2022-01-28 23:16:57
+        # ### BEGIN NOTE:2022-01-28 23:16:57
+        #
         # when collections are modified directly (instead of setting via
         # property setter, see  NOTE:FIXME:2022-01-28 23:11:59) the
         # configurable_traits are NOT populated/notified!
         # Hence I need to force this here
-
+        #
         self._defaultTbIconSize = self.toolBar.iconSize()
         self._defaultTbButtonStyle = self.toolBar.toolButtonStyle() # a Qt.ToolButtonStyle
 
@@ -1791,12 +1803,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._tbButtonStyle: QtCore.Qt.ToolButtonStyle = self.toolBar.toolButtonStyle()
 
         self._update_tbBtnStyleActions()
+        #
+        # ### END   NOTE:2022-01-28 23:16:57
 
         # -----------------
         # connect widget actions through signal/slot mechanism
         # NOTE: 2017-07-04 16:28:52
         # do not delete: this is the first code where self.cwd is defined & initiated!
         self.cwd = os.getcwd()
+
+        # NOTE: 2016-05-02 12:22:21 -- refactoring plugin codes
+        self.startPluginLoad.connect(self.slot_loadPlugins)
 
         # finally, inject references to self and the workspace into relevant
         # NOTE: 2024-05-29 14:04:11
@@ -1814,16 +1831,21 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             if not hasattr(m, "workspace"):
                 m.__dict__["workspace"] = self.workspace
 
-
         with qtutils.SignalBlocker(self.actionUse_system_default_font):
-            # sigBlock = QtCore.QSignalBlocker(self.actionUse_system_default_font)
             self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
+
         self.sig_splashMessage.emit("Initializing Scipyen Console...")
 
+        # ### BEGIN NOTE: 2026-08-02 13:32:44 initialize Scipyen's own console
+        #
         self._init_QtConsole_() # also instantiates self.shell, etc
+        #
+        # ### END   NOTE: 2026-08-02 13:32:44 initialize Scipyen's own console
 
         self.sig_splashMessage.emit("Initializing User Workspace...")
 
+        # ### BEGIN NOTE: 2026-08-02 13:34:04 Populates the workspace model
+        #
         # NOTE: 2025-06-24 21:49:54
         # update this NOW, see NOTE: 2025-06-24 21:49:03
         self._nonInteractiveVars_.update([i for i in self.workspace.items()])
@@ -1857,6 +1879,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.workspaceView.selectionModel().selectionChanged[QtCore.QItemSelection, QtCore.QItemSelection].connect(self.slot_selectionChanged)
         self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
         self.workspaceModel.modelContentsChanged.connect(self.slot_updateWorkspaceView)
+        #
+        # ### END   NOTE: 2026-08-02 13:34:04 Populates the workspace model
 
         self._shell_automagics:bool = True
 
@@ -1870,10 +1894,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.sig_splashMessage.emit("Loading User Plugins...")
 
-        # NOTE: 2024-05-29 13:04:00
-        # Asynchronously launch the plugin loading mechanism
-        self.startPluginLoad.emit()
-
         self._updateConsolesEditor()
 
         # self.helpWidget = None
@@ -1884,105 +1904,135 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # The following must be called when console has become visible!
         self.console.consoleWidget.set_pygment(self.console.consoleWidget._console_pygment)
 
+        self._wm_id_ = int(self.winId())
+
         if self._script_manager_autolaunch:
             self._showScriptsManagerWindow()
 
-        self.sig_splashMessage.emit("Done!")
+        if self._connectDBus_():
+            self._configureDBusUDisk_()
 
+            # NOTE: 2026-08-02 11:49:50
+            # call _configureDBusForGlobalMenu_ ONLY IF:
+            # A) QApplication property 'AA_DontUseNativeMenuBar' is False
+            #   (i.e., use of a native menu bar is prohibited)
+            # OR:
+            # B) we're NOT running under a Walyand window manager
+            # OR:
+            # C) we're NOT using PySide6
+            if (
+                (
+                    os.getenv("XDG_SESSION_TYPE", None) != "wayland"
+                    and not QtWidgets.QApplication.instance().testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar)
+                )
+                or not __has_PySide6__
+                ):
+                self._configureDBusForGlobalMenu_()
+
+        self.sig_splashMessage.emit("Done!")
+        self.windowHandle().visibilityChanged.connect(self._slot_visibility_changed)
         self.show()
 
-        # ### BEGIN global menu stuff -- see also self._deregister_menuBar_, self._restore_menuBar_, self.getAppMenu and self._slot_visibility_changed
+        # ### BEGIN NOTE: 2024-05-29 13:04:00
+        #
+        # Asynchronously launch the plugin loading mechanism
+        self.startPluginLoad.emit()
+        #
+        # ### END   NOTE: 2024-05-29 13:04:00
+
+
+    def _connectDBus_(self) -> bool:
+        self._dbusSystemBus_ = None
+        self._dbusSessionBus_ = None
+        self._dbusInterface_ = None
+        self._dbusSessionServiceNames_ = None
         self._app_menu_ = None
-        self._wm_id_ = int(self.winId())
         self._globalMenuServiceName_ = None
         self._dbusAppMenuInterface_ = None
-        self._systemDBusConnection_ = None
-        self._dbusInterface_ = None
-        self._dbusSessionBus_ = None
         self._dbusUniqueName_ = None
-        if not QtWidgets.QApplication.instance().testAttribute(QtCore.Qt.AA_DontUseNativeMenuBar):
-            if (
-                    (
-                        desktoputils.is_kde()
-                        or desktoputils.is_gnome()
-                    )
-                    and __has_qtdbus__
-                ):
-                self._systemDBusConnection_ = QtDBus.QDBusConnection.systemBus()
-                self._dbusSessionBus_ = QtDBus.QDBusConnection.sessionBus() # also a QDBusConnection
-                # self._dbusUniqueName_ = self._dbusSessionBus_.baseService() # a str, empty if NOT connected to dbus dameon
-                # if not __has_PySide6__:
-                try:
-                    appMenuServiceNames = list(name for name in self._dbusSessionBus_.interface().registeredServiceNames().value() if "AppMenu" in name)
-                    if len(appMenuServiceNames):
-                        self._globalMenuServiceName_ = appMenuServiceNames[0]
-                        self._dbusAppMenuInterface_ = QtDBus.QDBusInterface(
-                            self._globalMenuServiceName_, "/" + self._globalMenuServiceName_.replace(".", "/"),
-                            self._globalMenuServiceName_,
-                            QtDBus.QDBusConnection.sessionBus(),
-                            self)
 
-                        # if __has_PySide6__:
-                        #     self._dbusAppMenuInterface_ = QtDBus.QDBusInterface(
-                        #         self._globalMenuServiceName_, "/" + self._globalMenuServiceName_.replace(".", "/"),
-                        #         self._globalMenuServiceName_,
-                        #         QtDBus.QDBusConnection.sessionBus(),
-                        #         self)
-                        # else:
-                        #     self._dbusAppMenuInterface_ = QtDBus.QDBusInterface(
-                        #         self._globalMenuServiceName_, "/" + self._globalMenuServiceName_.replace(".", "/"),
-                        #         self._globalMenuServiceName_,
-                        #         QtDBus.QDBusConnection.sessionBus(),
-                        #         self)
+        if not __has_qtdbus__:
+            return False
 
-                        self._dbusAppMenuInterface_.setTimeout(100)
-                        result = self._dbusAppMenuInterface_.call("RegisterWindow", self._wm_id_, QtDBus.QDBusObjectPath(f"/{self.applicationName}/{self.__class__.__name__}/MenuBar")).arguments()
-                        print(f"{self.__class__.__name__}.__init__ registering with DBus App Menu Interface => {result}")
-                        self._app_menu_ = self.getAppMenu()
-                except: # noqa
-                    traceback.print_exc()
+        self._dbusSessionBus_ = QtDBus.QDBusConnection.sessionBus() # also a QDBusConnection
+        self._dbusInterface_ = QtDBus.QDBusInterface(
+            "org.freedesktop.DBus",     # Service name
+            "/org/freedesktop/DBus",    # Object path
+            "org.freedesktop.DBus",     # Interface name
+            self._dbusSessionBus_       # Session bus
+            )
 
-                try:
-                    uDisks_service = "org.freedesktop.UDisks2"
-                    uDisks_path = "/org/freedesktop/UDisks2"
-                    uDisks_iFace = "org.freedesktop.DBus.ObjectManager"
-                    self._systemDBusConnection_.registerObject("/Scipyen", self)
-                    if __has_PySide6__:
-                        self._systemDBusConnection_.connect(
-                            uDisks_service, uDisks_path, uDisks_iFace, "InterfacesAdded",
-                            self, QtCore.SLOT("_slot_uDisk_changes(QString)"))
-                        self._systemDBusConnection_.connect(
-                            uDisks_service, uDisks_path, uDisks_iFace, "InterfacesRemoved",
-                            self, QtCore.SLOT("_slot_uDisk_changes(QString)"))
-                    else:
-                        self._systemDBusConnection_.connect(uDisks_service, uDisks_path, uDisks_iFace, "InterfacesAdded", self._slot_uDisk_changes)
-                        self._systemDBusConnection_.connect(uDisks_service, uDisks_path, uDisks_iFace, "InterfacesRemoved", self._slot_uDisk_changes)
+        self._dbusSessionServiceNames_ = self._getDBusSessionServiceNames_()
 
-                except: # noqa
-                    traceback.print_exc()
+        return True
+
+    # @timefunc
+    def _getDBusSessionServiceNames_(self) -> list[str] | None:
+        if self._dbusInterface_:
+            msg = self._dbusInterface_.call("ListNames") # a QDBusMessage
+            reply = QtDBus.QDBusReply(msg)
+
+            if not reply.isValid():
+                return
+
+            return reply.value()
+
+        elif self._dbusSessionBus_:
+            return self._dbusSessionBus_.interface().registeredServiceNames().value()
+
+    # @timefunc
+    def _configureDBusForGlobalMenu_(self):
+
+        # ### BEGIN global menu stuff -- see also self._deregister_menuBar_, self._restore_menuBar_, self.getAppMenu and self._slot_visibility_changed
+        if (
+                (
+                    desktoputils.is_kde()
+                    or desktoputils.is_gnome()
+                )
+                and __has_qtdbus__
+            ):
+
+            self._dbusUniqueName_ = self._dbusSessionBus_.baseService() # a str, empty if NOT connected to dbus dameon
+            try:
+                appMenuServiceNames = list(name for name in self._dbusSessionBus_.interface().registeredServiceNames().value() if "AppMenu" in name)
+                if len(appMenuServiceNames):
+                    self._globalMenuServiceName_ = appMenuServiceNames[0]
+                    self._dbusAppMenuInterface_ = QtDBus.QDBusInterface(
+                        self._globalMenuServiceName_, "/" + self._globalMenuServiceName_.replace(".", "/"),
+                        self._globalMenuServiceName_,
+                        QtDBus.QDBusConnection.sessionBus(),
+                        self)
+
+                    self._dbusAppMenuInterface_.setTimeout(100)
+                    result = self._dbusAppMenuInterface_.call("RegisterWindow", self._wm_id_, QtDBus.QDBusObjectPath(f"/{self.applicationName}/{self.__class__.__name__}/MenuBar")).arguments()
+                    print(f"{self.__class__.__name__}._configureDBusForGlobalMenu_ registering with DBus App Menu Interface => {result}")
+                    self._app_menu_ = self.getAppMenu()
+            except: # noqa
+                traceback.print_exc()
 
 
-                # TODO 2025-06-30 23:47:57 finalize me !!!
+
+            # TODO 2025-06-30 23:47:57 finalize me !!!
 #                 if isinstance(self._dbusUniqueName_, str) and len(self._dbusUniqueName_.strip()):
 #
 #                     self._dbusInterface_ = QtDBus.QDBusInterface()
 
 
 
-                    # NOTE: 2025-06-30 22:56:02
-                    # self._dbusSessionBus_.interface() -> QDBusConnectionInterface
-                    # self._dbusSessionBus_.name() -> str: 'qt_default_session_bus'
-                    # self._dbusAppMenuInterface_.interface() -> 'com.canonical.AppMenu.Registrar'
-                    # self._dbusAppMenuInterface_.connection() -> QDBusconnection
-                    # self._dbusAppMenuInterface_.connection().baseService() -> str: "unique connection name"
-                    #    = the name of the session bus where the MenuBar is registered
-                    #   in Qt D-bus viewer this looks like:
-                    #   :1.134 and in its methods tree there is a MenuBar/2/ 4/ 5/ etc...
-                    #   --> Same as self._dbusSessionBus_.baseService()
-                    # self._dbusAppMenuInterface_.children()[0] -> QDBusServiceWatcher:
-                    #   serviceWatcher.watchedServices() -> ['com.canonical.AppMenu.Registrar'] -- A-HA...
-                    # dbusinterface.baseService() -> str: 'qt_default_session_bus' (ALWAYS this?)
-                    # dbusinterface.interface() is the QtDBus.QDBusConnection.sessionBus().interface()
+                # NOTE: 2025-06-30 22:56:02
+                # self._dbusSessionBus_.interface() -> QDBusConnectionInterface
+                # self._dbusSessionBus_.name() -> str: 'qt_default_session_bus'
+                # self._dbusAppMenuInterface_.interface() -> 'com.canonical.AppMenu.Registrar'
+                # self._dbusAppMenuInterface_.connection() -> QDBusconnection
+                # self._dbusAppMenuInterface_.connection().baseService() -> str: "unique connection name"
+                #    = the name of the session bus where the MenuBar is registered
+                #   in Qt D-bus viewer this looks like:
+                #   :1.134 and in its methods tree there is a MenuBar/2/ 4/ 5/ etc...
+                #   --> Same as self._dbusSessionBus_.baseService()
+                # self._dbusAppMenuInterface_.children()[0] -> QDBusServiceWatcher:
+                #   serviceWatcher.watchedServices() -> ['com.canonical.AppMenu.Registrar'] -- A-HA...
+                # dbusinterface.baseService() -> str: 'qt_default_session_bus' (ALWAYS this?)
+                # dbusinterface.interface() is the QtDBus.QDBusConnection.sessionBus().interface()
 #                     self._dbusAppMenuInterface_.setTimeout(1000)
 #                     if __has_PyQt6__ or __has_PySide6__:
 #                         v = int(self.winId())
@@ -1993,13 +2043,36 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 #                             return
 #
 
-                # result = self._dbusAppMenuInterface_.call("RegisterWindow", v, QtDBus.QDBusObjectPath(f"/{self.applicationName}/{self.__class__.__name__}/MenuBar")).arguments()
+            # result = self._dbusAppMenuInterface_.call("RegisterWindow", v, QtDBus.QDBusObjectPath(f"/{self.applicationName}/{self.__class__.__name__}/MenuBar")).arguments()
 #                     print(f"{self.__class__.__name__}._init__ DBus register window: result -> {result}")
 
-            # BUG 2025-07-01 23:17:12 FIXME
-            # this returns None whe using a QSPlashScreen!
-            # self._app_menu_ = self.getAppMenu()
+        # BUG 2025-07-01 23:17:12 FIXME
+        # this returns None whe using a QSPlashScreen!
+        # self._app_menu_ = self.getAppMenu()
 
+    # @timefunc
+    def _configureDBusUDisk_(self):
+        try:
+            uDisks_service = "org.freedesktop.UDisks2"
+            uDisks_path = "/org/freedesktop/UDisks2"
+            uDisks_iFace = "org.freedesktop.DBus.ObjectManager"
+            self._dbusSystemBus_ = QtDBus.QDBusConnection.systemBus()
+            self._dbusSystemBus_.registerObject("/Scipyen", self)
+            if __has_PySide6__:
+                self._dbusSystemBus_.connect(
+                    uDisks_service, uDisks_path, uDisks_iFace, "InterfacesAdded",
+                    self, QtCore.SLOT("_slot_uDisk_changes(QString)"))
+                self._dbusSystemBus_.connect(
+                    uDisks_service, uDisks_path, uDisks_iFace, "InterfacesRemoved",
+                    self, QtCore.SLOT("_slot_uDisk_changes(QString)"))
+            else:
+                self._dbusSystemBus_.connect(uDisks_service, uDisks_path, uDisks_iFace, "InterfacesAdded", self._slot_uDisk_changes)
+                self._dbusSystemBus_.connect(uDisks_service, uDisks_path, uDisks_iFace, "InterfacesRemoved", self._slot_uDisk_changes)
+
+        except: # noqa
+            traceback.print_exc()
+
+#
         self.windowHandle().visibilityChanged.connect(self._slot_visibility_changed)
         # ### END   global menu stuff -- see also self._deregister_menuBar_, self._restore_menuBar_, self.getAppMenu and self._slot_visibility_changed
 
@@ -2167,7 +2240,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         • UIPluginNames
         • getMenusForUIPlugin
         """
-        return tuple(scipyen_plugin_loader.loaded_plugins.keys())
+        return tuple(scipyen_plugin_loader.LOADED_PLUGINS.keys())
 
     @property
     def pluginModules(self) -> tuple:
@@ -2183,7 +2256,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         • UIPluginNames
         • getMenusForUIPlugin
         """
-        return tuple(scipyen_plugin_loader.loaded_plugins.values())
+        return tuple(scipyen_plugin_loader.LOADED_PLUGINS.values())
 
     @property
     def plugins(self) -> dict:
@@ -2199,7 +2272,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         • UIPluginNames
         • getMenusForUIPlugin
         """
-        return scipyen_plugin_loader.loaded_plugins
+        return scipyen_plugin_loader.LOADED_PLUGINS
 
     @property
     def UIPlugins(self) -> dict:
@@ -3463,7 +3536,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self._scipyenEditor = ""
 
         self._updateConsolesEditor()
-        # self._updateConsolesEditor(False)
+
 
     @property
     def overrideSystemEditor(self):
@@ -3531,16 +3604,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         r"""workaround wayland"""
         if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
             return
+
         super().requestActivate()
 
     def activateWindow(self):
-        # print(f"{self.__class__.__name__}.activateWindow")
-        #super().activateWindow()
         if sys.platform== "win32":
             self.windowHandle().raise_()
+
         else:
             if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
                 return
+
             super().activateWindow()
 
     # ### BEGIN Global menu stuff - see also BEGIN  global menu stuff - END  global menu stuff block in __init__
@@ -3807,11 +3881,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         return win
 
     def _updateConsolesEditor(self, target:typing.Optional[str]=None):
+        r"""Sets the editor to be used when callign appropriate magics in the console"""
         if isinstance(target, str):
             if target.lower() == "internal":
                 console_objects = [self.console]
+
             elif target.lower() == "external":
                 console_objects = [self.external_console]
+
             else:
                 console_objects = [self.console, self.external_console]
         else:
@@ -3824,6 +3901,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     # for the %edit magic:
                     if self.overrideSystemEditor and isinstance(self.scipyenEditor, str): # allow empty string to wipe out the editor
                         console.active_frontend.editor = self.scipyenEditor
+
                     else:
                         # normally this might set up in jupyer configuration files,
                         # so do not override it
@@ -4053,9 +4131,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             # Kernel Version: 6.19.12-1-default (64-bit)
             # Graphics Platform: Wayland
 
-            # if os.getenv("XDG_SESSION_TYPE").lower() != "wayland":
-            #     obj.activateWindow()
-            #     obj.raise_()
             obj.activateWindow()
             obj.raise_()
             obj.setVisible(True)
@@ -4361,7 +4436,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     self.external_console.window.setVisible(True)
                     ns = self.external_console.window.find_tab_title(self.external_console.window.active_frontend)
                     self.external_console.execute(cmd_foreign_shell_ns_hidden_listing(namespace=ns))
-                    if isinstance(new, str) and str == "neuron_ext":
+                    if isinstance(new, str) and new == "neuron_ext":
                         self.external_console.window.start_neuron_in_current_tab()
 
         self._updateConsolesEditor("external")
@@ -4369,6 +4444,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     # END   Methods
 
     @safewrapper
+    # @timefunc
     def _init_QtConsole_(self):
         r"""Starts an interactive IPython shell with a QtConsole frontend.
 
@@ -6492,6 +6568,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.qsettings, self, group_name=self.__class__.__name__)
 
     # @processtimefunc
+    # @timefunc
     def loadSettings(self):
         r"""Overrides ScipyenConfigurable.loadSettings()"""
         super(WorkspaceGuiMixin, self).loadSettings()  # inherited from ScipyenConfigurable
@@ -6502,6 +6579,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.qsettings, self, group_name=self.__class__.__name__)
 
     # @processtimefunc
+    # @timefunc
     def _configureUI_(self):
         ''' Collect file menu actions & submenus that are built in the UI file. This should be
             done before loading the plugins.
@@ -6533,6 +6611,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.actionTimeDisplayFormat.triggered.connect(self._slot_setFilesystemTimeDisplayFormat)
 
         # ### BEGIN scripts menu
+        #
         # NOTE: 2024-09-21 14:55:07
         # menuScripts is now def'ed in the ui file
         # self.menuScripts = QtWidgets.QMenu("Scripts", self)
@@ -6556,6 +6635,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.actionManageScripts = QAction(guiutils.getIcon("scriptnew", "dialog-scripts"), "Script Manager", self)
         self.actionManageScripts.triggered.connect(self.slot_showScriptsManagerWindow)
         self.menuScripts.addAction(self.actionManageScripts)
+        #
         # ### END scripts menu
 
         # ### BEGIN Applications menu
@@ -6682,8 +6762,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.actionAbout_Qt.triggered.connect(self._slot_about_qt)
         self.actionLicense.triggered.connect(self._slot_showLicense)
 
-        # NOTE: 2016-05-02 12:22:21 -- refactoring plugin codes
-        self.startPluginLoad.connect(self.slot_loadPlugins)
+        # # NOTE: 2016-05-02 12:22:21 -- refactoring plugin codes
+        # self.startPluginLoad.connect(self.slot_loadPlugins)
 
         self.sig_refreshRecentFilesMenu.connect(self._slot_refreshRecentFilesMenu_)
 
@@ -11278,14 +11358,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     def slot_loop_process_result(self, obj, name=""):
         if isinstance(name, str) and len(name.strip()):
             self.workspaceModel.bindObjectInNamespace(name, obj)
-            # self.workspace[name] = obj
 
         else:
             self.workspaceModel.bindObjectInNamespace("result", obj)
-            # self.workspace["result"] = obj
-
-        # self.workspaceModel.update()
-        # self.workspaceModel.update(from_console=False)
 
         self.workspaceChanged.emit()
 
@@ -11299,7 +11374,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @Slot()
     @safewrapper
-    # do we "unload", "offload", or simply "forget" them?
+    @timefunc
     def slot_offloadPlugins(self):
         '''
         Removes the (sub)menus and menu items created by loading plugins.
@@ -11307,6 +11382,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         The plugin code itself is recompiled (and reloaded) by the scipyen_plugin_loader
         if necessary.
         '''
+        # do we "unload", "offload", or simply "forget" them?
+
         # NOTE: 2022-12-25 10:52:58
         # this does NOT remove the module from sys.modules!
         if len(self._ui_plugins_):
@@ -11325,10 +11402,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 self._removeMenu_(p)
 
             self._ui_plugins_.clear()
-            scipyen_plugin_loader.loaded_plugins.clear()  # need to clear this, too
+            scipyen_plugin_loader.LOADED_PLUGINS.clear()  # need to clear this, too
 
     @Slot()
     @safewrapper
+    # @timefunc
     def slot_reloadPlugins(self):
         self.slot_offloadPlugins()
         self.slot_loadPlugins()
@@ -11337,8 +11415,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     # make forceRecompile a configuration variable !!!
     @Slot()
     @safewrapper
+    # @timefunc
     def slot_loadPlugins(self):
-        ''' Asynchronously search and load of Scipyen 'plugins'
+        r''' Asynchronously search and load of Scipyen 'plugins'
         Scipyen 'plugins' are modules in Scipyen package tree that advertise
         module-level functions callable through for graphical user interface
         (i.e., menus in the Scipyen Main Window).
@@ -11352,36 +11431,61 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         #     scipyen_plugin_loader.find_bytecode_plugins()
         # else:
         #     scipyen_plugin_loader.find_plugins(self._scipyendir_, self._scipyendir_)  # calls os.walk
-        scipyen_plugin_loader.find_plugins(self._scipyendir_, self._scipyendir_)  # calls os.walk
-        scipyen_plugin_loader.find_plugins(self.userPluginsDirectory, self._scipyendir_, True)  # calls os.walk
+
+        scipyen_plugin_loader.find_plugins(self._scipyendir_, self._scipyendir_,
+                                           mainWindow = self,
+                                           # workspace = self.workspace
+                                           )  # calls os.walk
+        scipyen_plugin_loader.find_plugins(self.userPluginsDirectory, self._scipyendir_,
+                                           checkgit = True,
+                                           mainWindow = self,
+                                           # workspace = self.workspace
+                                           )  # calls os.walk
 
 
         # NOTE: 2016-04-15 11:53:08
         # let the plugin loader just load plugin module code
         # and do the plugin initialization here
 
-        if len(scipyen_plugin_loader.loaded_plugins) > 0:
+        if len(scipyen_plugin_loader.LOADED_PLUGINS) > 0:
             viewers = list()  # list of (name, class) tuples
-            for module_name, module in scipyen_plugin_loader.loaded_plugins.items():
+            for module_name, module in scipyen_plugin_loader.LOADED_PLUGINS.items():
                 # print(f"{self.__class__.__name__}.slot_loadPlugins: {module_name}, {module}")
                 # maps module name to the tuple (module file, menu dict)
                 # menu dict in turn maps a menu tree structure (a '|'-separated string) to a function defined in the plugin
-                # NOTE: 2022-12-23 09:06:36
-                # inject references to self and the workspace into the module,
-                # as module attributes; see also NOTE: 2022-12-23 10:47:39
-                # see also NOTE: 2024-05-29 14:04:11 gui/mainwindow.py
+
+
+
+                # NOTE: 2026-08-02 18:12:52 this below now done in
+                # scipyen_plugin_loader.find_plugins
+                # # NOTE: 2022-12-23 09:06:36
+                # # inject references to self and the workspace into the module,
+                # # as module attributes; see also NOTE: 2022-12-23 10:47:39
+                # # see also NOTE: 2024-05-29 14:04:11 gui/mainwindow.py
+                # #
                 if not hasattr(module, "mainWindow"):
                     module.__dict__["mainWindow"] = self
 
-                if not hasattr(module, "workspace"):
-                    module.__dict__["workspace"] = self.workspace
+                # if not hasattr(module, "workspace"):
+                #     module.__dict__["workspace"] = self.workspace
 
                 # NOTE 2022-12-25 21:10:52
                 # inspect the module for any Viewer classes and register them
                 # Do this independently of installing self advertised menus (see
                 # below)
-                viewerClasses = list(filter(lambda x: inspect.isclass(x[1]) and prog.is_class_defined_in_module(
-                    x[1], module) and self._isScipyenViewerClass_(x[1]), inspect.getmembers(module)))
+                viewerClasses = list(
+                        filter(
+                                lambda x: (
+                                            inspect.isclass(x[1])
+                                            and prog.is_class_defined_in_module(
+                                                x[1],
+                                                module
+                                                )
+                                            and self._isScipyenViewerClass_(x[1])),
+                                inspect.getmembers(module)
+                            )
+                    )
+
                 # print(f"viewer classes {viewerClasses} in module {module}")
                 for viewerClass in viewerClasses:
                     self._register_viewer_class_(*viewerClass)
@@ -11396,7 +11500,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 if inspect.isfunction(getattr(module, "init_scipyen_plugin", None)):
                     # NOTE: 2022-12-25 21:10:19
                     # create/update the menus as provided by the plugin module
-                    menudict = collections.OrderedDict([(module.__name__, (module.__file__, module.init_scipyen_plugin()))])
+                    menudict = collections.OrderedDict(
+                            [
+                                (
+                                    module.__name__,
+                                    (
+                                        module.__file__,
+                                        module.init_scipyen_plugin()
+                                    )
+                                )
+                            ]
+                        )
+
                     if len(menudict) > 0:
                         # if __has_PySide6__:
                         #     print(f"slot_loadPlugins menus for {module.__name__}, menu dict: {menudict}")
@@ -11405,7 +11520,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                             # we restrict to regular plugin files, by REQUIRING that
                             # this is a file TODO: 2024-05-29 17:15:26 check it exists !
                             if (isinstance(k, str) and len(k) > 0):
-                                pluginMenuActions = self.installPluginMenuPySide6(k, v) if __has_PySide6__ else self.installPluginMenu(k, v)
+                                # pluginMenuActions = self.installPluginMenuPySide6(k, v) if __has_PySide6__ else self.installPluginMenu(k, v)
+                                pluginMenuActions = self.installPluginMenu(k, v)
                                 # print(f"{self.__class__.__name__}.slot_loadPlugins pluginMenuActions = {pluginMenuActions}")
                                 if len(pluginMenuActions):
                                     self._cachePluginActions_(module, pluginMenuActions)
@@ -11462,7 +11578,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # dw = os.walk(path)
 
     def _locateMenuByItemText_(self, parent, itemText):
-        '''
+        r'''
         Looks for (and returns) a QMenu labeled with itemText,
         in the parent widget which can be (typically) another QMenu or the
         QMenuBar.
@@ -11605,18 +11721,22 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         return newAction
 
-    def installPluginMenuPySide6(self, pname, v):
-        '''Installs a GUI menu for the plugin named pname.
+
+    def installPluginMenuPySide6(self, pname:str, menuPath: tuple):
+        r'''Installs a GUI menu for the plugin named pname.
 
         Parameters:
         ===========
 
-        pname: the plugin's module name
+        :pname: the plugin's module name
 
-        v: a tuple (module file, pluign menu dict), where:
-            module file (v[0]) — string wih the absolute pathname of the plugin module source file
-            plugin menu dict (v[1]) — mapping of key ↦ value:, a module-level function or a
-            tuple of functions.
+        :v: a tuple (module file, plugin menu dict), where:
+
+            module file (v[0]) — string wih the absolute pathname of the plugin
+            module source file
+
+            plugin menu dict (v[1]) — mapping of key ↦ value:, a module-level
+            function or a tuple of functions.
 
             When v[1] is a mapping (i.e., dict-like) the key ↦ value are as
             follows:
@@ -11675,14 +11795,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             be accessible via menu items in the main window's menu bar.
 
         '''
-        from gui import guiutils
+        # from gui import guiutils
         pluginMenuActions = list()
-
-        if isinstance(v[1], dict) and len(v[1]) > 0:  # the nested dict
+        # print(f"{self.__class__.__name__}.installPluginMenuPySide6(\n\t pname = {pname},\n\t v = {v})")
+        if isinstance(menuPath[1], dict) and len(menuPath[1]) > 0:  # the nested dict
             # the plugin's init_scipyen_plugin function outputs a mapping
             # of a str or sequence of str, to a function or sequence of functions
             # there can be more than one such mappings
-            for mp, ff in v[1].items():
+            for mp, ff in menuPath[1].items():
                 menuPathList = list()
                 # iterate over keys #print(mp)
                 if isinstance(mp, str) and len(mp.strip()) > 0:
@@ -11691,9 +11811,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                     continue
 
                 pMenu = self.menuBar()
+                currentMenu = None
 
-                for k, p in enumerate(menuPathList):
-                    action = self._findAction_(pMenu, p)
+
+                for k, pth in enumerate(menuPathList):
+                    action = self._findAction_(pMenu, pth)
+                    # print(f"\n\t action for menuitem {pth} -> {action}")
                     if action: # action found pMenu[0]
                         if action.menu(): # action has menu
                             # if p is the last in menuPath, then create action directly
@@ -11705,12 +11828,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         return pluginMenuActions
 
-    def _findAction_(self, w:QtWidgets.QWidget, name:str):
-        actions = w.actions()
+    def _findAction_(self, menuWidget:QtWidgets.QWidget, name:str):
+        actions = menuWidget.actions()
+
         if len(actions) == 0:
             return
 
         actionNames = list(map(lambda a: a.text().replace("&",""), actions))
+
         if name in actionNames:
             return(actions[actionNames.index(name)])
 
@@ -12006,10 +12131,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     def _isScipyenViewerClass_(self, x: typing.Type):
         if not inspect.isclass(x):
-            warnings.warn(f"Expecting a class; got {type(x).__name__} instead")
+            scipywarn(f"Expecting a class; got {type(x).__name__} instead")
             return False
         return scipyenviewer.ScipyenViewer in inspect.getmro(x)
 
+    # @timefunc
     def _register_viewer_class_(self, name: str, x: typing.Type):
         if not inspect.isclass(x):
             warnings.warn(f"Expecting a class; got {type(x).__name__} instead")

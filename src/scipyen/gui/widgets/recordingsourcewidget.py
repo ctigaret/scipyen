@@ -179,8 +179,8 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget):
         self.stimulusListTable.setValue(self._syn_)
         self.stimulusListTable.autoResizeColumns()
 
+        self.stimulusListTable.sig_indexRowColChanged.connect(self._slot_singleStimulusChannelChanged)#, type=QtCore.Qt.DirectConnection)
         self.stimulusListTable.sig_indexChanged.connect(self._slot_singleStimulusChannelChanged)#, type=QtCore.Qt.DirectConnection)
-        self.stimulusListTable.sig_indexChanged[QtCore.QModelIndex].connect(self._slot_singleStimulusChannelChanged)#, type=QtCore.Qt.DirectConnection)
         self.stimulusListTable.sig_dataChanged.connect(self._slot_stimulusListChanged)
         self.stimulusListTable.sig_indexesChanged.connect(self._slot_stimulusListIndexesChanged)
 
@@ -190,8 +190,8 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget):
         self.synapticPathwaysTable.setValue(self._pathways_)
         self.synapticPathwaysTable.autoResizeColumns()
 
+        self.synapticPathwaysTable.sig_indexRowColChanged.connect(self._slot_singleSynapticPathwayChanged)#, type=QtCore.Qt.DirectConnection)
         self.synapticPathwaysTable.sig_indexChanged.connect(self._slot_singleSynapticPathwayChanged)#, type=QtCore.Qt.DirectConnection)
-        self.synapticPathwaysTable.sig_indexChanged[QtCore.QModelIndex].connect(self._slot_singleSynapticPathwayChanged)#, type=QtCore.Qt.DirectConnection)
         self.synapticPathwaysTable.sig_dataChanged.connect(self._slot_synapticPathwaysListChanged)
 
     @Slot(int)

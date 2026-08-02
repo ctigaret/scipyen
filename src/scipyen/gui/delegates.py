@@ -77,7 +77,8 @@ NOTE: To be used with my custom itemmodels
 """
     sig_valueChanged            = Signal(object)
     sig_closing                 = Signal()
-    sig_indexChanged            = Signal([int, int], [QtCore.QModelIndex], name="sig_indexChanged")
+    sig_indexChanged            = Signal(QtCore.QModelIndex, name="sig_indexChanged")
+    sig_indexRowColChanged      = Signal(int, int, name="sig_indexRowColChanged")
 
     def __init__(self, data: object = None,
                  parent = None,
@@ -272,7 +273,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     sig_dataChanged = Signal(QtWidgets.QWidget, name = "sig_dataChanged")
     sig_contentsChanged = Signal(name="sig_contentsChanged")
     sig_editExternally = Signal(QtWidgets.QWidget, QtCore.QModelIndex, name = "sig_editExternally")
-    sig_indexChanged = Signal([int, int], [QtCore.QModelIndex], name="sig_indexChanged")
+    sig_indexRowColChanged = Signal(int, int, name="sig_indexRowColChanged")
+    sig_indexChanged = Signal(QtCore.QModelIndex, name="sig_indexChanged")
     # TODO/FIXME: 2025-10-28 12:57:09
     # decide how to handle the case where the combo box is editable (and its
     # currentText() is not among the combo box items)
@@ -284,35 +286,35 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                  enforceFloat: bool = False):
         r"""Instantiates a PythonItemDelegate.
 
-    Parameters:
-    ===========
-    parent: parent QWidget; optional, default is None
+        Parameters:
+        ===========
+        parent: parent QWidget; optional, default is None
 
-    columnChoices: dict; sets up the delegate editor to be a QComboBox for specific
-        table columns:
+        columnChoices: dict; sets up the delegate editor to be a QComboBox for specific
+            table columns:
 
-        column index:int ↦ data:dict with key:str ↦ sequence or bool as below:
-                            — "choices": typing.Sequence[str]
-                            — "editable": bool; when True, the combo box is editable
-                              WARNING: this is not currently supported, and by default
-                                this is False
+            column index:int ↦ data:dict with key:str ↦ sequence or bool as below:
+                                — "choices": typing.Sequence[str]
+                                — "editable": bool; when True, the combo box is editable
+                                WARNING: this is not currently supported, and by default
+                                    this is False
 
-        NOTE: The choices are always strings, and the data assocated with the EditRole
-        of a model index MUST be a string that is present among the choices
+            NOTE: The choices are always strings, and the data assocated with the EditRole
+            of a model index MUST be a string that is present among the choices
 
 
-        Example (setting choices for columns 0 and 3):
+            Example (setting choices for columns 0 and 3):
 
-        {0: {   "choices": ["1","2","3"],
-                "editable": False},
-         3: {   "choices": ["test", "me", "now"],
-                "editable": True}}
+            {0: {   "choices": ["1","2","3"],
+                    "editable": False},
+            3: {   "choices": ["test", "me", "now"],
+                    "editable": True}}
 
-        NOTE: the "choices" field in the column sub-dictionary cannot be empty!
+            NOTE: the "choices" field in the column sub-dictionary cannot be empty!
 
-    immutableColumns, immutableRows: columns/rows of model indexes that are uneditable
-    jointImmutability:
-    """
+        immutableColumns, immutableRows: columns/rows of model indexes that are uneditable
+        jointImmutability:
+        """
         super().__init__(parent=parent)
         # self._model_ = None
         self._useObjectDataRole_: bool = False
@@ -714,8 +716,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
                         widget.sig_dataChanged.connect(self.slot_dataChanged)
                         widget.sig_indexChanged.connect(self.sig_indexChanged) # connect signal 2 signal directly
-                        # widget.sig_indexChanged[Qt].connect(self.sig_indexChanged) # connect signal 2 signal directly
-                        # widget.sig_indexChanged
+                        widget.sig_indexRowColChanged.connect(self.sig_indexRowColChanged) # connect signal 2 signal directly
 
         elif isinstance(data, np.ndarray):
             if data.ndim == 0 or (data.ndim ==1 and data.size == 1):
@@ -776,6 +777,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
                 widget.sig_dataChanged.connect(self.slot_dataChanged)
                 widget.sig_indexChanged.connect(self.sig_indexChanged)
+                widget.sig_indexRowColChanged.connect(self.sig_indexRowColChanged)
 
         elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
             widget = TableEditorWidget(parent, readOnly=False)
@@ -785,6 +787,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
             widget.sig_dataChanged.connect(self.slot_dataChanged)
             widget.sig_indexChanged.connect(self.sig_indexChanged)
+            widget.sig_indexRowColChanged.connect(self.sig_indexRowColChanged)
 
         elif isinstance(data, pathlib.Path):
             if data.is_dir():
@@ -878,6 +881,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
             widget.sig_dataChanged.connect(self.slot_dataChanged)
             widget.sig_indexChanged.connect(self.sig_indexChanged)
+            widget.sig_indexRowColChanged.connect(self.sig_indexRowColChanged)
 
         else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
             return
@@ -957,8 +961,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 bottomRight = model.index(row, model.columnCount()-1)
                 model.dataChanged.emit(topLeft, bottomRight)
 
-            self.sig_indexChanged[QtCore.QModelIndex].emit(self._currentModelIndex_)
-            # self.sig_indexChanged.emit(self._currentModelIndex_.row(), self._currentModelIndex_.column())
+            self.sig_indexChanged.emit(self._currentModelIndex_)
+            # self.sig_indexRowColChanged.emit(self._currentModelIndex_.row(), self._currentModelIndex_.column())
 
     @Slot()
     def slot_commitAndCloseEditor(self):
@@ -995,8 +999,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             )
             and isinstance(self._currentModelIndex_, QtCore.QModelIndex)
             ):
-            self.sig_indexChanged[QtCore.QModelIndex].emit(self._currentModelIndex_)
-            # self.sig_indexChanged.emit(self._currentModelIndex_.row(), self._currentModelIndex_.column())
+            self.sig_indexChanged.emit(self._currentModelIndex_)
+            # self.sig_indexRowColChanged.emit(self._currentModelIndex_.row(), self._currentModelIndex_.column())
 
         self.sig_dataChanged.emit(self.sender())
         self.sig_contentsChanged.emit()

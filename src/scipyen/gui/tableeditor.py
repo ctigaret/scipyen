@@ -356,7 +356,7 @@ class TableEditor(ScipyenViewer):
 
         self._viewData_()
 
-        if kwargs.get("show", True): # ??? won't work in wayland anyway
+        if kwargs.get("show", True) and os.getenv("XDG_SESSION_TYPE").lower() != "wayland":
             self.activateWindow()
 
     def _viewData_(self):
