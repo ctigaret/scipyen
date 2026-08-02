@@ -2059,20 +2059,30 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self._dbusSystemBus_ = QtDBus.QDBusConnection.systemBus()
             self._dbusSystemBus_.registerObject("/Scipyen", self)
             if __has_PySide6__:
+                # print(f"{self.__class__.__name__}._configureDBusUDisk_")
                 self._dbusSystemBus_.connect(
                     uDisks_service, uDisks_path, uDisks_iFace, "InterfacesAdded",
-                    self, QtCore.SLOT("_slot_uDisk_changes(QString)"))
+                    self,
+                    QtCore.SLOT("_slot_uDisk_changes_dbus_message(QDBusMessage)")
+                    )
+
                 self._dbusSystemBus_.connect(
                     uDisks_service, uDisks_path, uDisks_iFace, "InterfacesRemoved",
-                    self, QtCore.SLOT("_slot_uDisk_changes(QString)"))
+                    self,
+                    QtCore.SLOT("_slot_uDisk_changes_dbus_message(QDBusMessage)")
+                    )
+
             else:
-                self._dbusSystemBus_.connect(uDisks_service, uDisks_path, uDisks_iFace, "InterfacesAdded", self._slot_uDisk_changes)
-                self._dbusSystemBus_.connect(uDisks_service, uDisks_path, uDisks_iFace, "InterfacesRemoved", self._slot_uDisk_changes)
+                self._dbusSystemBus_.connect(
+                    uDisks_service, uDisks_path, uDisks_iFace, "InterfacesAdded",
+                    self._slot_uDisk_changes_dbus_message)
+                self._dbusSystemBus_.connect(
+                    uDisks_service, uDisks_path, uDisks_iFace, "InterfacesRemoved",
+                    self._slot_uDisk_changes_dbus_message)
 
         except: # noqa
             traceback.print_exc()
 
-#
         self.windowHandle().visibilityChanged.connect(self._slot_visibility_changed)
         # ### END   global menu stuff -- see also self._deregister_menuBar_, self._restore_menuBar_, self.getAppMenu and self._slot_visibility_changed
 
@@ -7826,11 +7836,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 clearAction.triggered.connect(self._clearRecentFiles_)
 
     if __has_qtdbus__:
+        # @Slot("QString")
+        # def _slot_uDisk_changes(self, msg):
+        #     self._dbus_UDisk_changes(msg)
+
         @Slot(QtDBus.QDBusMessage)
-        @Slot(str)
-        def _slot_uDisk_changes(self, msg):
+        def _slot_uDisk_changes_dbus_message(self, msg):
+            self._dbus_UDisk_changes(msg)
+
+        def _dbus_UDisk_changes(self, msg):
             m_um_Ops = desktoputils.parseUDIsksFSMountOperationJobs(msg)
-            # print(f'{self.__class__.__name__}._slot_uDisk_changes: {m_um_Ops}')
+            # print(f'{self.__class__.__name__}._dbus_UDisk_changes: {m_um_Ops}')
             if len(m_um_Ops):
                 if not self.fileSystemModel.testOption(QtGui.QFileSystemModel.DontWatchForChanges):
                     self.fileSystemModel.setOption(QtGui.QFileSystemModel.DontWatchForChanges, True)
@@ -7841,6 +7857,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             else:
                 self.fileSystemModel.setOption(QtGui.QFileSystemModel.DontWatchForChanges, False)
+
 
     @Slot()
     def _slot_FilesystemMountChanged(self):
