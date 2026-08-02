@@ -6564,14 +6564,15 @@ Var-keyword parameters ("name=value" pairs):
 
                 current_seg_start = segment_start(segments[self.currentFrame])
 
-                rel_starts = [c.x * current_seg_start.units - current_seg_start for c in cursors]
+                # rel_starts = [c.x * current_seg_start.units - current_seg_start for c in cursors]
+                rel_starts = [c.x - current_seg_start for c in cursors]
 
                 # print(f"SignalViewer.cursorsToEpoch: rel_starts: {rel_starts}")
                 for k, seg in enumerate(segments):
                     # NOTE: 2024-09-17 15:31:30
                     # see datazone cursors2epochs for logic
-                    tdls = [(seg_starts[k] + rel_starts[i] - 0.5 * cursors[i].xwindow * seg_starts[k].units,
-                             cursors[i].xwindow * seg_starts[k].units,
+                    tdls = [(seg_starts[k] + rel_starts[i] - 0.5 * cursors[i].xwindow,# * seg_starts[k].units,
+                             cursors[i].xwindow,# * seg_starts[k].units,
                              seg_starts[k].units,
                              cursors[i].name,
                              False) for i in range(len(cursors))]

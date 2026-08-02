@@ -796,13 +796,15 @@ class DataBag(Bunch):
         try:
             obs = object.__getattribute__(self, "__observer__")
             if key not in obs.traits():
-                raise KeyError(key)
+                return
+                # raise KeyError(key)
 
             val = obs._trait_values.get(key, Undefined)
             # if isinstance(val, QtCore.QObject):
             #     delattr(obs, key)
             if hasattr(val, "__delete__"): # let the trait remove itself
                 delattr(obs, key) # notifies only if the trait's implementation of __delete__ does it
+
             else:
                 trait_to_remove = obs.traits()[key]
 
