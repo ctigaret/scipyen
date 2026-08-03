@@ -670,7 +670,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole,
                             QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole,
                             QtCore.Qt.AccessibleDescriptionRole):
-                return qVariant()
+                if __has_PySide6__:
+                    return
+                else:
+                    return QtCore.QVariant()
 
             if isinstance(self._modelData_, pd.DataFrame):
                 if orientation == QtCore.Qt.Horizontal: # column header

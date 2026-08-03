@@ -237,11 +237,14 @@ class DIGTriggersTableModel(QtCore.QAbstractTableModel):
             return False
 
         try:
-            if isinstance(value, qVariant) or hasattr(value, "value"):
-                pyvalue = value.value()
-
-            else:
+            if __has_PySide6__:
                 pyvalue = value
+            else:
+                if isinstance(value, qVariant) or hasattr(value, "value"):
+                    pyvalue = value.value()
+
+                else:
+                    pyvalue = value
 
             te_data = list(self._data_[row])
 

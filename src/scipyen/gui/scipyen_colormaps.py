@@ -619,7 +619,7 @@ class ColorPalette(object):
     def color_collections(self):
         r"""Iterates through the color collections used in this ColorPalette
         """
-        yield from self._mappings_.value()
+        yield from self._mappings_.values()
 
     def color_collection(self, name):
         r"""Returns a color collection in this ColorPalette palette by its name

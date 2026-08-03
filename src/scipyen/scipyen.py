@@ -309,6 +309,7 @@ class MyProxyStyle(QtWidgets.QProxyStyle):
         return super().styleHint(hint, *args, **kwargs)
 
 def main():
+    # from gui import desktoputils # for is_kde or is_gnome
     # NOTE: 2025-01-22 08:57:15 
     # this must be executed AFTER the QApplication is initialized.
     # See NOTE: 2025-01-22 08:56:42
@@ -336,7 +337,7 @@ def main():
         # BEGIN 
         # 1. create the app
         app = QtWidgets.QApplication(sys.argv)
-        if __QT_USE_NATIVE_MENUBAR__ == 0:
+        if __QT_USE_NATIVE_MENUBAR__ == 0:# or (desktoputils.is_x11() and not desktoputils.is_kde() and not desktoputils.is_gnome()):
             app.setAttribute(QtCore.Qt.AA_DontUseNativeMenuBar, True)
         translator = QtCore.QTranslator(app)
 

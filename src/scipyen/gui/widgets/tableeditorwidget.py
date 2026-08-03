@@ -586,19 +586,13 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         ret = ""
         if len(self.selectedColumnIndexes):
             ret = self.getColumnNames(self.selectedColumnIndexes, quoted=quote)
-            # values = [self.tableView.model().headerData(ndx, QtCore.Qt.Horizontal).value() for ndx in self.selectedColumnIndexes]
-            # link = ", "
-            # colNames = link.join([f"'{v}'" for v in values]) if quote else link.join(values)
-            # QtWidgets.QApplication.instance().clipboard().setText(colNames)
 
         elif isinstance(self.selectedColumnIndex, int):
             ret = self.getColumnNames(self.selectedColumnIndex, quoted=quote)
-            # colName = self.tableView.model().headerData(self.selectedColumnIndex, QtCore.Qt.Horizontal).value()
-            # if quote:
-            #     colName = f"'{colName}'"
-            # QtWidgets.QApplication.instance().clipboard().setText(colName)
+
         else:
             return
+
         QtWidgets.QApplication.instance().clipboard().setText(ret)
 
     @Slot()
@@ -608,19 +602,13 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         ret = ""
         if len(self.selectedRowIndexes):
             ret = self.getRowNames(self.selectedRowIndexes, quoted = quote)
-            # values = [self.tableView.model().headerData(ndx, QtCore.Qt.Vertical).value() for ndx in self.selectedRowIndexes]
-            # link = ", "
-            # rowNames = link.join([f"'{v}'" for v in values]) if quote else link.join(values)
-            # QtWidgets.QApplication.instance().clipboard().setText(rowNames)
 
         elif isinstance(self.selectedRowIndex, int):
             ret = self.getRowNames(self.selectedRowIndex, quoted = quote)
-            # rowName = self.tableView.model().headerData(self.selectedRowIndex, QtCore.Qt.Vertical).value()
-            # if quote:
-            #     rowName = f"'{rowName}'"
+
         else:
             return
-            # QtWidgets.QApplication.instance().clipboard().setText(rowName)
+
         QtWidgets.QApplication.instance().clipboard().setText(ret)
 
     def getRowNames(self, ndx:typing.Optional[typing.Union[int, typing.Sequence[int]]] = None,
@@ -639,7 +627,11 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         else:
             raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
 
-        values = [self.tableView.model().headerData(k, QtCore.Qt.Vertical).value() for k in ndx]
+        if __has_PySide6__:
+            values = [self.tableView.model().headerData(k, QtCore.Qt.Vertical) for k in ndx]
+        else:
+            values = [self.tableView.model().headerData(k, QtCore.Qt.Vertical).value() for k in ndx]
+
         # link = ", "
         if len(values) == 1:
             ret = f"'{values[0]}'" if quoted else values[0]
@@ -671,7 +663,10 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         else:
             raise TypeError(f"Invalid row indices specified. Expecting int, sequence of int or None; instead, got {ndx}")
 
-        values = [self.tableView.model().headerData(k, QtCore.Qt.Horizontal).value() for k in ndx]
+        if __has_PySide6__:
+            values = [self.tableView.model().headerData(k, QtCore.Qt.Horizontal) for k in ndx]
+        else:
+            values = [self.tableView.model().headerData(k, QtCore.Qt.Horizontal).value() for k in ndx]
         # link = ", "
         if len(values) == 1:
             ret = f"'{values[0]}'" if quoted else values[0]
@@ -887,7 +882,11 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
         previous = modelIndexes[0]
         #selected_text.append(self._dataModel_.data(previous).toString())
 
-        data = str(self._dataModel_.data(previous, QtCore.Qt.EditRole).value())
+        if __has_PySide6__:
+            data = str(self._dataModel_.data(previous, QtCore.Qt.EditRole))
+        else:
+            data = str(self._dataModel_.data(previous, QtCore.Qt.EditRole).value())
+
         if quote:
             data = f"'{data}'"
 
@@ -914,9 +913,14 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             rowTexts[rowNdx,colNdx] = data
 
             for modelIndex in modelIndexes[1:]:
-                data = str(self._dataModel_.data(modelIndex, QtCore.Qt.EditRole).value())
+                if __has_PySide6__:
+                    data = str(self._dataModel_.data(modelIndex, QtCore.Qt.EditRole))
+                else:
+                    data = str(self._dataModel_.data(modelIndex, QtCore.Qt.EditRole).value())
+
                 if quote:
                     data = f"'{data}'"
+
                 row = modelIndex.row()
                 rowNdx = row-minRow+1
                 col = modelIndex.column()
@@ -940,11 +944,17 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
             selected_text.append(data)
 
             for modelIndex in modelIndexes[1:]:
-                data = str(self._dataModel_.data(modelIndex, QtCore.Qt.EditRole).value())
+                if __has_PySide6__:
+                    data = str(self._dataModel_.data(modelIndex, QtCore.Qt.EditRole))
+                else:
+                    data = str(self._dataModel_.data(modelIndex, QtCore.Qt.EditRole).value())
+
                 if quote:
                     data = f"'{data}'"
+
                 row = modelIndex.row()
                 col = modelIndex.column()
+
                 if row != previous.row():
                     selected_text.append("\n")
 
@@ -976,6 +986,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                             rowEntity = f"{model._modelData_.allowed_contents[0].__name__ if isinstance (model._modelData_.allowed_contents[0], type) else type(model._modelData_.allowed_contents[0]).__name__} object"
                         elif len(model._modelData_.allowed_contents) > 1:
                             rowEntity = f"object ({', '.join(list(map(lambda c: c.__name__ if isinstance(c, type) else type(c).__name__)))})"
+
                 selectedIndexes = self.tableView.selectedIndexes()
 
                 if len(model._modelData_) == 0:

@@ -26,6 +26,7 @@ if os.environ["QT_API"] == "pyside6":
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
+    QWIDGETSIZE_MAX = 16777215
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
@@ -33,8 +34,10 @@ else:
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
+    QWIDGETSIZE_MAX = QtWidgets.QWIDGETSIZE_MAX
 
 from core import qtutils
+from core import desktoputils
 from gui.workspacegui import WorkspaceGuiMixin
 
 class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
@@ -50,6 +53,7 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         self._useOpacityEffect_: bool = kwargs.pop("useOpacityEffect", False)
         self._windowFlags_ = kwargs.pop("windowFlags", None)
 
+        # NOTE: does not work on Wayland!
         self._positionHint_: typing.Optional[QtCore.QPoint] = None
 
         self._closeRequested_: bool = False
@@ -155,10 +159,19 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             instance have been initialized by calling self._configureUI_.
         """
         if self.anchoringWidget:
-            if isinstance(self._windowFlags_, QtCore.Qt.WindowType):
-                self.setWindowFlags(self._windowFlags_)
+            if desktoputils.is_wayland():
+                # self.setWindowFlag(QtCore.Qt.Popup, True)
+                # self.setWindowFlag(QtCore.Qt.Dialog, True)
+    #             self.setWindowFlags(
+    # QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowStaysOnTopHint
+    #                 )
+                self.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, True)
+                self.setWindowFlag(QtCore.Qt.ExpandedClientAreaHint, True)
             else:
-                self.setWindowFlags(QtCore.Qt.Tool)
+                if isinstance(self._windowFlags_, QtCore.Qt.WindowType):
+                    self.setWindowFlags(self._windowFlags_)
+                else:
+                    self.setWindowFlags(QtCore.Qt.Tool)
 
             geometry = self.geometry()
             heightHint = self.sizeHint().height()
@@ -406,7 +419,7 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             else:
                 # re-allow manual resizing
                 self.setMinimumSize(QtCore.QSize(0,0))
-                self.setMaximumSize(QtCore.QSize(QtWidgets.QWIDGETSIZE_MAX, QtWidgets.QWIDGETSIZE_MAX))
+                self.setMaximumSize(QtCore.QSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX))
 
     def show(self):
         # if self.isVisible():
@@ -420,13 +433,14 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             # print(f"height hint: {heightHint} -> height: {height}")
             self._sizeAnimation_.setEndValue(self.sizeHint().width())
             topRight = self._anchoringWidget_.geometry().topRight()
+            geometry.setHeight(heightHint)
             if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
                 self._positionHint_ = self._anchoringWidget_.parent().mapToGlobal(topRight)
             else:
                 self._positionHint_ = topRight
-            geometry.setX(self._positionHint_.x())
-            geometry.setY(self._positionHint_.y())
-            geometry.setHeight(heightHint)
+            if not desktoputils.is_wayland():
+                geometry.setX(self._positionHint_.x())
+                geometry.setY(self._positionHint_.y())
             self.setGeometry(geometry)
             self._animationGroup_.start()
             super().show()

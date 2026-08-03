@@ -346,7 +346,10 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget):
                         self._pendingPathwayChange_ = None
 
                     if all(isinstance(v, int) for v in (lastChangedPathwayNdx, changedAttrNdx)):
-                        changedAttrName = widget.tableView.model().headerData(changedAttrNdx, QtCore.Qt.Horizontal).value()
+                        if __has_PySide6__:
+                            changedAttrName = widget.tableView.model().headerData(changedAttrNdx, QtCore.Qt.Horizontal)
+                        else:
+                            changedAttrName = widget.tableView.model().headerData(changedAttrNdx, QtCore.Qt.Horizontal).value()
                         # print(f"\n\tchangedAttrName -> {changedAttrName}")
                         if changedAttrName == "electrodeMode":
                             eMode = pathways[lastChangedPathwayNdx].electrodeMode
