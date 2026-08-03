@@ -279,7 +279,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     @Slot()
     @safewrapper
     def slot_resizeFitColumns(self):
-        for col in range(self.model.columnCount()):
+        for col in range(self.model().columnCount()):
             self.resizeColumnToContents(col)
 
     @Slot(QtCore.QModelIndex)
@@ -522,11 +522,11 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             if dlg.exec() == QtWidgets.QDialog.Accepted:
                 newVarName = namePrompt.text()
 
-                self._scipyenMainWindow_.assignToWorkspace(newVarName, objects[0], check_name=False)
+                self._scipyenMainWindow_.assignToWorkspace(newVarName, objects[0], False)
 
         else:
             for name, obj in zip(names, objects):
-                self._scipyenMainWindow_.assignToWorkspace(name, obj, check_name=False)
+                self._scipyenMainWindow_.assignToWorkspace(name, obj, False)
 
     @Slot()
     @safewrapper

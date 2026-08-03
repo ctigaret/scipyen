@@ -2526,4 +2526,15 @@ def getFieldOrProperty(obj, field:typing.Union[dataclasses.Field, str],
         raise TypeError(f"'field' expected to be a dataclass Field or str; instead, got a {type(field).__name__}")
 
     # finally, return the field value taking account its default
-    return getattr(obj, field.name, field.default_factory() if field.default is dataclasses.MISSING else field.default)
+    ret = getattr(obj, field.name, dataclasses.MISSING)
+    if ret is dataclasses.MISSING:
+        if field.default_factory is not dataclasses.MISSING:
+            return field.default_factory()
+        elif field.default is not dataclasses.MISSING:
+            return field.default
+        else:
+            return None
+    else:
+        return ret
+
+    # ret = getattr(obj, field.name, field.default_factory if field.default is dataclasses.MISSING else field.default)

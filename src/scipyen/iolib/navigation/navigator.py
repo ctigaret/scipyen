@@ -132,23 +132,23 @@ b) use KDE framework - this would "tie" Scipyen into KDE too much:
 # Completion -> UrlCompletion
 
 
-import typing, pathlib, functools, os, itertools, sys, traceback
+import typing, pathlib, functools, os, itertools, sys, traceback # noqa
 from functools import singledispatch, singledispatchmethod
-from urllib.parse import urlparse, urlsplit
-from collections import namedtuple, deque
+from urllib.parse import urlparse, urlsplit # noqa
+from collections import namedtuple, deque # noqa
 from dataclasses import MISSING
-from enum import Enum, IntEnum
+from enum import Enum, IntEnum # noqa
 
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
-from qtpy.QtCore import (Signal, Slot, Property,)
+import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__  = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     # QtType = typing.TypeVar("QtType", bound = "Shiboken.Object")
     QAction = QtGui.QAction
@@ -158,10 +158,10 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-    from qtpy import sip
+    from qtpy import sip # noqa
     ____has_sip____ = True
     # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
-    from qtpy.uic import loadUiType
+    from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -169,10 +169,10 @@ else:
 
 __has_qtdbus__ = False
 try:
-    from qtpy import QtDBus
+    from qtpy import QtDBus # noqa
 
     __has_qtdbus__ = True
-except:
+except: # noqa
     pass
 
 from traitlets.utils.bunch import Bunch
@@ -180,7 +180,7 @@ from traitlets.utils.bunch import Bunch
 from core import desktoputils as dutils
 from core import qtutils
 
-from core.prog import (safewrapper, print_styled)
+from core.prog import (safewrapper, print_styled) # noqa
 from gui.guiutils import (DisplayHint, getDesktopHeight, csqueeze)
 from iolib import pictio
 from iolib.navigation.filesystems import urlToPath
@@ -263,7 +263,7 @@ class ApplyUrlMethod(IntEnum):
     ActiveTab = 4
     NewWindow = 8
 
-class UrlNavigator: pass # fwd decl
+class UrlNavigator: pass # fwd decl # noqa
 
 class LocationData:
     r"""
@@ -345,7 +345,7 @@ def pathToLocation(o:typing.Any, state:typing.Optional[QtCore.QByteArray]=None):
     raise NotImplementedError
 
 @pathToLocation.register(str)
-def _(o:str, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
+def __pathToLocation__(o:str, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
     path = pathlib.Path(o)
     return LocationData(QtCore.QUrl(path.as_uri()), state)
     # if path.is_dir() and path.is_absolute():
@@ -354,11 +354,11 @@ def _(o:str, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
     #     raise ValueError(f"{o} is not an absolute path to existing directory")
 
 @pathToLocation.register(pathlib.Path)
-def _(o:pathlib.Path, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
-    return LocationData(QtCore.QUrl(path.as_uri()), state)
+def __pathToLocation__(o:pathlib.Path, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData: # noqa
+    return LocationData(QtCore.QUrl(o.as_uri()), state)
 
 @pathToLocation.register(QtCore.QUrl)
-def _(o:QtCore.QUrl, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
+def __pathToLocation__(o:QtCore.QUrl, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData: # noqa
     return LocationData(o, state)
 
 def findProtocol(protocol:str):
@@ -492,7 +492,7 @@ class UrlComboBox(QtWidgets.QComboBox):
         self._completer_.setModelSorting(QtWidgets.QCompleter.CaseSensitivelySortedModel)
         self._completer_.setCaseSensitivity(QtCore.Qt.CaseSensitive)
 
-        self.setEditable(rw==True)
+        self.setEditable(rw is True)
         self.lineEdit().setCompleter(self._completer_)
         self.lineEdit().setClearButtonEnabled(True)
         self.lineEdit().undoAvailable=True
@@ -577,12 +577,12 @@ class UrlComboBox(QtWidgets.QComboBox):
                 if checkDefaultURLs:
                     self.defaultList[:] = lst
 
-        signalBlocker = QtCore.QSignalBlocker(self)
+        with qtutils.SignalBlocker(self):
+            self.setDefaults()
 
-        self.setDefaults()
+            for item in self.itemList:
+                self.insertUrlItem(item)
 
-        for item in self.itemList:
-            self.insertUrlItem(item)
 
     def urls(self):
         ulist = list()
@@ -658,61 +658,61 @@ class UrlComboBox(QtWidgets.QComboBox):
         if url.isEmpty():
             return
 
-        signalBlocker = QtCore.QSignalBlocker(self)
-
-        if os.environ["QT_API"] == "pyside6":
-            urlToInsert = url.toString(QtCore.QUrl.PrettyDecoded)
-        else:
-            urlToInsert = url.toString(QtCore.QUrl.StripTrailingSlash)
-
-        # checks for duplicates
-        for k, v in self.itemMapper.items():
-            # if urlToInsert == v.toString(QtCore.QUrl.StripTrailingSlash):
-            # WARNING: 2025-01-19 20:20:46
-            # v is a UrlComboItem which here is a namedtuple
+        with qtutils.SignalBlocker(self):
             if os.environ["QT_API"] == "pyside6":
-                v_str = v.url.toString(QtCore.QUrl.PrettyDecoded)
+                urlToInsert = url.toString(QtCore.QUrl.PrettyDecoded)
             else:
-                v_str = v.url.toString(QtCore.QUrl.StripTrailingSlash)
-            if urlToInsert == v_str:
-                self.setCurrentIndex(k) # NOTE: 2025-01-19 20:22:50 self inherits QComboBox !!!
+                urlToInsert = url.toString(QtCore.QUrl.StripTrailingSlash)
 
-                if self._mode_ == UrlComboMode.Directories:
-                    self.updateItem(v, k, self._opendirIcon_)
+            # checks for duplicates
+            for k, v in self.itemMapper.items():
+                # if urlToInsert == v.toString(QtCore.QUrl.StripTrailingSlash):
+                # WARNING: 2025-01-19 20:20:46
+                # v is a UrlComboItem which here is a namedtuple
+                if os.environ["QT_API"] == "pyside6":
+                    v_str = v.url.toString(QtCore.QUrl.PrettyDecoded)
+                else:
+                    v_str = v.url.toString(QtCore.QUrl.StripTrailingSlash)
 
-                return
+                if urlToInsert == v_str:
+                    self.setCurrentIndex(k) # NOTE: 2025-01-19 20:22:50 self inherits QComboBox !!!
 
-        if self._urlAdded_:
+                    if self._mode_ == UrlComboMode.Directories:
+                        self.updateItem(v, k, self._opendirIcon_)
+
+                    return
+
+            if self._urlAdded_:
+                if len(self.itemList):
+                    self.itemList = self.itemList[:-1]
+                    self._urlAdded_ = False
+
+            self.setDefaults()
+
+            offset = max(0, len(self.itemList) + len(self.defaultList) - self._maximum_)
+
+            for k in range(offset, len(self.itemList)):
+                self.insertUrlItem(self.itemList[k])
+
+            icon = self.getIcon(url)
+            item = UrlComboItem(url, icon)
+
+            ndx = self.count()
+            text = self.textForItem(item)
+
+            if self._mode_ == UrlComboMode.Directories:
+                self.insertItem(ndx, self._opendirIcon_, text)
+            else:
+                self.insertItem(ndx, item.icon, text)
+
+            self.itemMapper[ndx] = item
+
+            self.itemList.append(item)
+
+            self.setCurrentIndex(ndx)
+
             if len(self.itemList):
-                self.itemList = self.itemList[:-1]
-                self._urlAdded_ = False
-
-        self.setDefaults()
-
-        offset = max(0, len(self.itemList) + len(self.defaultList) - self._maximum_)
-
-        for k in range(offset, len(self.itemList)):
-            self.insertUrlItem(self.itemList[k])
-
-        icon = self.getIcon(url)
-        item = UrlComboItem(url, icon)
-
-        ndx = self.count()
-        text = self.textForItem(item)
-
-        if self._mode_ == UrlComboMode.Directories:
-            self.insertItem(ndx, self._opendirIcon_, text)
-        else:
-            self.insertItem(ndx, item.icon, text)
-
-        self.itemMapper[ndx] = item
-
-        self.itemList.append(item)
-
-        self.setCurrentIndex(ndx)
-
-        if len(self.itemList):
-            self._urlAdded_ = True
+                self._urlAdded_ = True
 
     @Slot(int)
     def slot_activated(self, ndx:int):
@@ -1716,7 +1716,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         currentIndex = self._subDirs_.index(path)
 
         navigator = self.parent()
-        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        assert qtutils.isQObjectAlive(navigator), "Parent object was deleted"
         targetIndex = currentIndex - self._wheelSteps_
         if targetIndex < 0:
             targetIndex = 0
@@ -1747,7 +1747,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         if len(self._subDirs_) == 0:
             return
         navigator = self.parent()
-        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        assert qtutils.isQObjectAlive(navigator), "Parent object was deleted"
 
         # updates the button looks
         self.setDisplayHintEnabled(DisplayHint.PopupActiveHint, True)
@@ -1944,10 +1944,14 @@ class PlacesButton(UrlNavigatorButtonBase):
                     'Configuration',
                     'Shared Cache',
                     'Application Configuration'
+                    "Shared State",
+                    "State",
+                    "Templates"
                     ]
 
         # NOTE: 2026-05-01 09:26:55
         # I only use file:// locations, for now, but see below
+        # print(f"{self.__class__.__name__}.slot_openPlacesMenu: parent -> {self.parent()}")
         if (
             hasattr(self.parent(), "desktopPlaces")
             and isinstance(self.parent().desktopPlaces, dutils.PlacesMap)
@@ -1981,7 +1985,7 @@ class PlacesButton(UrlNavigatorButtonBase):
                 actionsDataMap[text] = (place.url, place.icon)
 
         navigator = self.parent()
-        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        assert qtutils.isQObjectAlive(navigator), "Parent object was deleted"
 
         # updates the button looks
         self.setDisplayHintEnabled(DisplayHint.PopupActiveHint, True)
@@ -2012,14 +2016,14 @@ class PlacesButton(UrlNavigatorButtonBase):
 
     def initMenu(self, menu:QtWidgets.QMenu, actionsMap:dict, startIndex:int, nItems:int):
         navigator = self.parent()
-        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        assert qtutils.isQObjectAlive(navigator), "Parent object was deleted"
         menu.mouseButtonClicked.connect(self.slot_menuActionClicked) # mouse activation of menu entry
         menu.triggered.connect(self.slot_menuActionTriggered) # keyboard activation of menu entry
         menu.setLayoutDirection(QtCore.Qt.LeftToRight)
 
         maxIndex = startIndex + nItems # (max 10 places shown in the menu)
         nAvailableItems = len(actionsMap)
-        lastIndex = min(nAvailableItems, maxIndex)
+        # lastIndex = min(nAvailableItems, maxIndex)
 
         for k, (key, val) in enumerate(actionsMap.items()):
             if k >= maxIndex or k < startIndex:
@@ -2030,7 +2034,7 @@ class PlacesButton(UrlNavigatorButtonBase):
                 if isinstance(val[1], str) and len(val[1].strip()):
                     try:
                         action.setIcon(QtGui.QIcon.fromTheme(val[1]))
-                    except:
+                    except: # noqa
                         pass
 
                 if val == navigator.locationUrl():
@@ -2051,14 +2055,14 @@ class PlacesButton(UrlNavigatorButtonBase):
     @Slot(QAction, QtCore.Qt.MouseButton)
     def slot_menuActionClicked(self, action:QAction, button:QtCore.Qt.MouseButton):
         navigator = self.parent()
-        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        assert qtutils.isQObjectAlive(navigator), "Parent object was deleted"
         url = QtCore.QUrl(action.data())
         navigator.setLocationUrl(url)
 
     @Slot(QAction)
     def slot_menuActionTriggered(self, action:QAction):
         navigator = self.parent()
-        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        assert qtutils.isQObjectAlive(navigator), "Parent object was deleted"
         url = QtCore.QUrl(action.data())
         navigator.setLocationUrl(url)
 
@@ -2072,7 +2076,7 @@ class UrlNavigatorDropDownButton(UrlNavigatorButtonBase):
         size.setWidth(int(size.height() / 2))
         return size
 
-    def keyPressEvent(evt:QtGui.QKeyEvent):
+    def keyPressEvent(self, evt:QtGui.QKeyEvent):
         if evt.key() == QtCore.Qt.Key_Down:
             self.clicked.emit()
 
@@ -2346,7 +2350,7 @@ class _UrlNavigator_(QtCore.QObject):
         self._desktopPlacesMap_ = dutils.get_desktop_places()
 
         # NOTE: 2025-01-24 21:21:11 CMT
-        self._closestPlace_:typing.Optional[DEPlace] = None
+        self._closestPlace_:typing.Optional[dutils.DEPlace] = None
         # self._placePathStr_:str = str()
 
         # self._sig_switchToBreadCrumbMode.connect(self.switchToBreadcrumbMode)
@@ -2624,9 +2628,9 @@ class _UrlNavigator_(QtCore.QObject):
 
         firstVisibleUrl = self._navButtons_[0].url()
 
-        spacer = ""
+        # spacer = ""
 
-        dirName = ""
+        # dirName = ""
 
         drive = ""
 
@@ -2865,9 +2869,9 @@ class _UrlNavigator_(QtCore.QObject):
             # editing tool buttons for example, to remove current text from
             # navigation history - in this case we DO NOT want to restore
             # current url, but the next available one in the history.
-            signalBlocker = QtCore.QSignalBlocker(self._pathBox_)
-            url = QtCore.QUrl(pathlib.Path.cwd().as_uri())
-            self._nav_.setLocationUrl(url)
+            with qtutils.SignalBlocker(self._pathBox_):
+                url = QtCore.QUrl(pathlib.Path.cwd().as_uri())
+                self._nav_.setLocationUrl(url)
             return
 
     def appendWidget(self, widget:QtWidgets.QWidget, stretch:int=0):
@@ -3141,9 +3145,9 @@ class _UrlNavigator_(QtCore.QObject):
             self._nav_.setTabOrder(self._navButtons_[-1], self._toggleEditableMode_)
 
         if os.environ["QT_API"] == "pyside6":
-            ptxt = currentUrl.toDisplayString().replace("///", "/");
+            ptxt = currentUrl.toDisplayString().replace("///", "/")
         else:
-            ptxt = currentUrl.toDisplayString(QtCore.QUrl.RemoveScheme | QtCore.QUrl.NormalizePathSegments | QtCore.QUrl.RemoveAuthority).replace("///", "/");
+            ptxt = currentUrl.toDisplayString(QtCore.QUrl.RemoveScheme | QtCore.QUrl.NormalizePathSegments | QtCore.QUrl.RemoveAuthority).replace("///", "/")
 
         self._dropDownButton_.setToolTip(f"Go to any location on the path {ptxt}")
         self.updateButtonVisibility()
@@ -3715,7 +3719,7 @@ class UrlNavigator(QtWidgets.QWidget):
         try:
             locations = list(filter(lambda x: x not in self._nav_p_._coreUrlNavigator_._oldSessionsHistory_, map(lambda x: pathToLocation(x), loc)))
             self._nav_p_._coreUrlNavigator_._oldSessionsHistory_.extend(locations)
-        except:
+        except: #noqa
             traceback.print_exc()
 
     # ### END   New methods by CMT

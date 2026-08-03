@@ -1448,7 +1448,7 @@ def isnumber(s: str) -> bool:
     try:
         v = eval(s)
         return isinstance(v, numbers.Number)
-    except:
+    except: # noqa
         return False
 
 def is_svg(s:str) -> bool:
@@ -1461,7 +1461,7 @@ def is_svg(s:str) -> bool:
         root = etree.fromstring(s)
         if root.tag == '{http://www.w3.org/2000/svg}svg':
             ret = True
-    except:
+    except: # noqa
         ret = False
     if not ret:
         pattern = r'<svg[^>]*>(.*?)<\/svg>'
@@ -1470,23 +1470,41 @@ def is_svg(s:str) -> bool:
 
     return ret
 
+# def qdbusmessage_str_to_dict(s: str) -> dict:
+#     # Captures tokens like: "service='com.foo'" or 'path=/bar' or "member=SomeMethod"
+#     # Handles values with quotes or without quotes, non-space chars.
+#     pattern = _re.compile(r"(?P<key>[A-Za-z_][A-Za-z0-9_]*)=(?P<val>'[^']*'|\"[^\"]*\"|\S+)")
+#     out = {}
+#     for m in pattern.finditer(s):
+#         key = m.group("key")
+#         val = m.group("val")
+#         print(f"key {key} -> val = {val}")
+#
+#         # Strip surrounding quotes if present
+#         if (len(val) >= 2) and ((val[0] == val[-1]) and val[0] in ("'", '"')):
+#             val = val[1:-1]
+#         out[key] = val
+#
+#     return out
+
+
 def is_html(s:str) -> bool:
     from lxml import html
     if not isinstance(s, str) or len(s.strip()) == 0:
         return False
     try:
-        test = html.fromstring(s)
+        test = html.fromstring(s) # noqa
         return True
-    except:
+    except: # noqa
         return False
     # return all(v in s for v in ("<html>", "</html>"))
 
 def is_xml(s:str) -> bool:
     from lxml import etree
     try:
-        test = etree.fromstring(s)
+        test = etree.fromstring(s) # noqa
         return True
-    except:
+    except: # noqa
         return False
     if not isinstance(s, str) or len(s.strip()) == 0:
         return False

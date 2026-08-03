@@ -57,25 +57,25 @@ for factory methods.
 
 """
 
-import numbers, operator, math, dataclasses
+import numbers, operator, math, dataclasses # noqa
 from dataclasses import (dataclass, MISSING, field)
 import xml.etree.ElementTree as ET
-import inspect, functools, itertools, traceback, typing, warnings
-from functools import (singledispatch, singledispatchmethod)
-from collections import (deque, namedtuple)
-from collections.abc import Sequence
-from pprint import (pprint, pformat)
+import inspect, functools, itertools, traceback, typing, warnings # noqa
+from functools import (singledispatch, singledispatchmethod) # noqa
+from collections import (deque, namedtuple) # noqa
+from collections.abc import Sequence # noqa
+from pprint import (pprint, pformat) # noqa
 import h5py
 from core.vigra_patches import vigra
 import numpy as np
-import pandas as pd
-import quantities as pq
-from traitlets import Bunch
+import pandas as pd # noqa
+import quantities as pq # noqa
+from traitlets import Bunch # noqa
 
-from core import datatypes, xmlutils
+from core import datatypes, xmlutils # noqa
 from core.xmlutils import getChildren as getXMLChildren
 from core import scipyen_quantities as scq
-from core.scipyen_quantities import (arbitrary_unit,
+from core.scipyen_quantities import (arbitrary_unit, # noqa
                             space_frequency_unit,
                             angle_frequency_unit,
                             channel_unit,
@@ -85,18 +85,18 @@ from core.scipyen_quantities import (arbitrary_unit,
                             unitsConvertible,
                             )
 
-from core.datatypes import (is_numeric, is_numeric_string, MissingType)
+from core.datatypes import (is_numeric, is_numeric_string, MissingType) # noqa
 from core.constants import ( RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN)
 
-from core.utilities import (reverse_mapping_lookup, unique,
+from core.utilities import (reverse_mapping_lookup, unique, # noqa
                             isclose, all_or_all_not)
-from core.strutils import counter_suffix
+from core.strutils import counter_suffix # noqa
 
-from core.traitcontainers import DataBag
+from core.traitcontainers import DataBag # noqa
 
-from core.prog import (ArgumentError, scipywarn, print_styled)
+from core.prog import (ArgumentError, scipywarn, print_styled) # noqa
 
-from .axisutils import (axisTypeName,
+from .axisutils import (axisTypeName, # noqa
                         axisTypeSymbol,
                         axisTypeUnits,
                         axisTypeFromString,
@@ -111,8 +111,8 @@ from .axisutils import (axisTypeName,
                         )
 
 # forward declaration needed for the descriptor classes below.
-class AxisCalibrationData: pass
-class ChannelCalibrationData: pass
+class AxisCalibrationData: pass # noqa
+class ChannelCalibrationData: pass # noqa
 
 class CalSpec(typing.NamedTuple):
     origin: typing.Optional[typing.Union[numbers.Number, pq.Quantity, MissingType]] = None
@@ -167,6 +167,8 @@ class CalibrationData:
     fc_template:bool = "{:.16f}"
     r'''String format template for loating point and complex scalars.
     see str.format() for details'''
+
+    description: str = dataclasses.field(default_factory=str)
 
     @classmethod
     def isCalibration(cls, x):
@@ -363,7 +365,7 @@ class CalibrationData:
                         # ret &= unitstest
                         # if not unitstest:
                         #     print(f"\n{self.__class__.__name__}.isclose: convertible units: {unitstest}")
-                    except:
+                    except: # noqa
                         traceback.print_exc()
                         print(f"self.units: {self.units}, other.units: {other.units}")
 
@@ -441,7 +443,7 @@ class CalibrationUnitsDescriptor:
 
         obj_axtype = getattr(obj, "type", None)
         if obj_axtype is None:
-            scipywarn(f"Undetermined axis type flag")
+            scipywarn("Undetermined axis type flag")
             return
         if not obj_axtype & vigra.AxisType.AllAxes:
             return
@@ -539,7 +541,7 @@ class CalibrationScalarDescriptor:
 
         obj_axtype = getattr(obj, "type", None)
         if obj_axtype is None:
-            scipywarn(f"Undetermined axis type flag")
+            scipywarn("Undetermined axis type flag")
             return
         if not obj_axtype & vigra.AxisType.AllAxes:
             scipywarn(f"The owner (a {type(obj).__name__}) has an invalid type attribute: {obj_axtype}")
@@ -617,7 +619,8 @@ class CalibrationChannelsDescriptor:
                 ret = list()
                 # ret = dataclasses.MISSING
 
-            else: ret = getattr(obj, self._name_, self._default_)
+            else:
+                ret = getattr(obj, self._name_, self._default_)
 
         return ret
 
@@ -665,7 +668,7 @@ class CalibrationChannelsDescriptor:
 
 # Don't use slots=True because it messes up the Descriptor functionality
 @dataclass(eq=False)
-class ChannelCalibrationData(CalibrationData):
+class ChannelCalibrationData(CalibrationData): # noqa
     r""" Calibration for a channel in a Channels axis
 
     Fields inherited from CalibrationData:
@@ -1333,7 +1336,7 @@ class AxisCalibrationData(CalibrationData):
             # bounce these to ChannelCalibrationData if needed , and set them to
             # MISSING at the top level
             u = self.units if isinstance(self.units, pq.Quantity) else pq.arbitrary_unit
-            o = self.origin if isinstance(self.origin, numbers.Number) else 0.0
+            # o = self.origin if isinstance(self.origin, numbers.Number) else 0.0
 
             # NOTE: 2025-04-16 17:37:15
             # the line below adapts to ChannelCalibrationData using NaN unless a
@@ -1523,12 +1526,12 @@ class AxisCalibrationData(CalibrationData):
 
             # make sure we're OK
             if cal_xml_element.tag != "axis_calibration":
-                raise ValueError("Wrong element tag; was expecting 'axis_calibration', instead got %s" % element.tag)
+                raise ValueError(f"Wrong element tag; was expecting 'axis_calibration', instead got {cal_xml_element.tag}")
 
             # first, get the type of the axis:
             type_nodes = tuple(getXMLChildren(cal_xml_element, tagName = "type"))
             if len(type_nodes) == 0:
-                raise ValueError(f"Missing 'type' child element")
+                raise ValueError("Missing 'type' child element")
 
             cal["type"] = cls._from_xml_text_("type", type_nodes[0].text)
 
@@ -2193,7 +2196,8 @@ class AxesCalibration(object):
                     elif isinstance(arg, str):
                         try:
                             cal = AxisCalibrationData.new(arg)
-                        except:
+
+                        except: # noqa
                             cal = AxisCalibrationData() #  create default UnknownAxisType
 
                         self._axescalibrations_.append(cal)
@@ -2339,8 +2343,8 @@ class AxesCalibration(object):
             if not isinstance(obj, AxisCalibrationData):
                 raise TypeError(f"Expecting an AxisCalibrationData object; got {type(obj).__name__} instead")
 
-            self._axescalibrations_[item] = obj # raises corresponding exception for list API
-            self._axistags_[item] = obj.axisInfo
+            self._axescalibrations_[index] = obj # raises corresponding exception for list API
+            self._axistags_[index] = obj.axisInfo
 
         else:
             raise TypeError(f"Index must eb an int; got {type(index).__name} instead")
@@ -2468,7 +2472,7 @@ class AxesCalibration(object):
 
                 if self_dim != other_dim:
                     try:
-                        cf = pq.quantity.get_conversion_factor(other_dim, self_dim)
+                        _ = pq.quantity.get_conversion_factor(other_dim, self_dim)
                         units_compatible = True
 
                     except AssertionError:
@@ -2501,7 +2505,7 @@ class AxesCalibration(object):
 
                                 if self_dim != other_dim:
                                     try:
-                                        cf = pq.quantity.get_conversion_factor(other_dim, self_dim)
+                                        _ = pq.quantity.get_conversion_factor(other_dim, self_dim)
                                         channel_units_compatible = True
 
                                     except AssertionError:
@@ -2525,7 +2529,7 @@ class AxesCalibration(object):
         return result
 
     def __str__(self):
-        repr_str = self.__repr__().split()
+        # repr_str = self.__repr__().split()
         return "\n".join([f"{self.__repr__()} with {len(self._axescalibrations_)} axes:"] + [f"{k}.\t" + cal.__str__()+"\n" for k, cal in enumerate(self._axescalibrations_)])
 
     def _repr_pretty_(self, p, cycle):
@@ -2631,8 +2635,8 @@ class AxesCalibration(object):
         if not isinstance(axisInfo, vigra.AxisInfo):
             raise TypeError("Expecting an AxisInfo object; got %s instead" % type(axisInfo).__name__)
 
-        cal = AxisCalibrationData(axInfo)
-        axInfo = cal.calibrateAxis(axInfo)
+        cal = AxisCalibrationData(axisInfo)
+        axInfo = cal.calibrateAxis(axisInfo)
 
         if index is None:
             self._axistags_.append(axInfo)

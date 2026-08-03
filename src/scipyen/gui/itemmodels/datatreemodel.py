@@ -79,7 +79,7 @@ import vigra # noqa
 import meshio # noqa
 # ### END 3rd party modules
 
-from core.qtutils import qVariant #, QVariantType #, qVariants, fromQVariant, isQObjectAlive)
+from core.qtutils import qVariant #, QVariantType #, qVariants, fromQVariant, isQObjectAlive) # noqa
 import core.datatypes as datatypes # noqa
 from core.datatypes import (is_namedtuple, TypeEnum) # noqa
 from core.prog import (scipywarn, timefunc, processtimefunc) # noqa
@@ -275,11 +275,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         # NOTE: 2026-02-09 21:47:10
         # used to construct the acess path to the object for this item
-        item0.setData(qVariant(memberAccess), ObjectDataAccessRole) # noqa
+        item0.setData(qVariant(memberAccess), ObjectDataAccessRole) # noqa star import from gui.itemmodels.roles
 
         # NOTE: 2026-02-09 21:47:38
         # reference to the actual Python object
-        item0.setData(qVariant(obj), ObjectDataRole) # noqa
+        item0.setData(qVariant(obj), ObjectDataRole) # noqa star import from gui.itemmodels.roles
 
         # NOTE: 2026-02-09 21:47:57
         # reference to the object's binding in its parent: e.g. symbol of an
@@ -298,7 +298,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         item0.setData(qVariant(objKeyType), ObjectKeyTypeRole) # noqa
 
         editExternally = objDict["objDataAsChild"] and qVariant(not self._inlineTables_)
-        item0.setData(editExternally, ObjectDataEditExternallyRole)
+        item0.setData(editExternally, ObjectDataEditExternallyRole) # noqa star import from gui.itemmodels.roles
 
         if visited:
             typeName = visited[-1].__name__
@@ -350,8 +350,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
         readOnlyBrush = palette.brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
 
         for k, item in enumerate((item0, item1, item2)):
-            item.setData(readOnly, ReadOnlyRole)
-            item.setData(readOnlyChildren, ReadOnlyChildrenRole)
+            item.setData(readOnly, ReadOnlyRole) # noqa star import from gui.itemmodels.roles
+            item.setData(readOnlyChildren, ReadOnlyChildrenRole) # noqa star import from gui.itemmodels.roles
             if k == 2:
                 if readOnly or (
                                     (
@@ -852,7 +852,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "objDataAsChild": objDataAsChild,
             "objInfo": info,
             "memberAccess": memberAccess,
-            "accessType": None,
+            "accessType": accessType,
             "objTip": tip,
             "objType": objType,
             "choices": choices,
@@ -866,7 +866,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(datetime.time)
     @_parseObject_.register(datetime.timedelta)
     @_parseObject_.register(datetime.timezone)
-    def __parseObject_(self: typing.Self, obj: typing.Union[datetime.datetime,
+    def __parseObject_(self: typing.Self, obj: typing.Union[datetime.datetime, # noqa
                                                datetime.date,
                                                datetime.time,
                                                datetime.timedelta,
@@ -891,7 +891,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "indirect": False,
             "objDataAsChild": objDataAsChild,
             "objInfo": info,
-            "objType": type(obj).__name__,
             "memberAccess": memberAccess,
             "accessType": accessType,
             "objTip": tip,
@@ -905,7 +904,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(types.BuiltinFunctionType)
     @_parseObject_.register(types.MethodType)
     @_parseObject_.register(types.BuiltinMethodType)
-    def __parseObject_(self: typing.Self, obj: typing.Union[types.FunctionType,
+    def __parseObject_(self: typing.Self, obj: typing.Union[types.FunctionType,  # noqa
                                                types.BuiltinFunctionType,
                                                types.MethodType,
                                                types.BuiltinMethodType],
@@ -923,7 +922,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             # NOTE: 2026-05-01 09:24:50
             # because signature of builtin functions e.g. on PyQt side) cannot be inspected
             signature = f"{inspect.signature(obj)}"
-        except:
+        except: # noqa
             signature = ""
         info = f"{word} {obj.__qualname__}{signature} from module {obj.__module__}"
 
@@ -946,7 +945,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(enum.IntEnum)
     @_parseObject_.register(enum.Flag)
     @_parseObject_.register(TypeEnum)
-    def __parseObject_(self: typing.Self, obj: typing.Union[type, enum.EnumType, enum.Enum,
+    def __parseObject_(self: typing.Self, obj: typing.Union[type, enum.EnumType, enum.Enum, # noqa
                                                enum.Flag, TypeEnum],
           choices: dict = dict(),
           includePrivateMembers: bool = False) -> tuple:
@@ -956,7 +955,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         objId = id(obj)
         info = obj
         tip = str(obj)
-        pData = obj
+        # pData = obj
         if not isinstance(choices, dict):
             if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
                 choices = dict()
@@ -981,7 +980,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                     # this only works for TypeEnum
                     #
                     choices = dict(zip(obj.names(), obj.values()))
-                except:
+                except: # noqa
                     scipywarn(f"Cannot access enumeration values for {type(obj).__name__}")
                     choices = dict()
                 # readOnly = True
@@ -1001,10 +1000,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
             }
 
     @_parseObject_.register(pkgutil.ModuleInfo)
-    def __parseObject_(self: typing.Self, obj: pkgutil.ModuleInfo,
+    def __parseObject_(self: typing.Self, obj: pkgutil.ModuleInfo, # noqa
                 choices: dict = dict(),
                 includePrivateMembers: bool = False) -> tuple:
         objType = type(obj)
+        tip = f"{objType}.__name__"
         objId = id(obj)
         if not isinstance(choices, dict):
             if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
@@ -1120,7 +1120,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(types.MappingProxyType)
     @_parseObject_.register(UserDict)
     @_parseObject_.register(OrderedDict)
-    def __parseObject_(self: typing.Self, obj: typing.Union[dict, types.MappingProxyType,
+    def __parseObject_(self: typing.Self, obj: typing.Union[dict, types.MappingProxyType, # noqa
                                                UserDict],
             choices: dict = dict(),
             includePrivateMembers: bool = False) -> tuple:
@@ -1196,7 +1196,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(NeoObjectList)
     @_parseObject_.register(set)
     @_parseObject_.register(frozenset)
-    def __parseObject_(self: typing.Self, obj: typing.Union[list, tuple, deque, set,
+    def __parseObject_(self: typing.Self, obj: typing.Union[list, tuple, deque, set, # noqa
                                                NeoObjectList, frozenset],
             choices: dict = dict(),
             includePrivateMembers: bool = False) -> tuple:
@@ -1268,7 +1268,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(str)
     @_parseObject_.register(bytes)
     @_parseObject_.register(bytearray)
-    def __parseObject_(self: typing.Self, obj: typing.Union[str, bytes, bytearray],
+    def __parseObject_(self: typing.Self, obj: typing.Union[str, bytes, bytearray], # noqa
           choices: dict = dict(),
           _: bool = True) -> tuple:
         objId = id(obj)
@@ -1309,7 +1309,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             }
 
     @_parseObject_.register(pathlib.Path)
-    def __parseObject_(self: typing.Self, obj: pathlib.Path,
+    def __parseObject_(self: typing.Self, obj: pathlib.Path, # noqa
           choices: dict = dict(),
           _: bool = True) -> tuple:
         objId = id(obj)
@@ -1347,7 +1347,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(np.integer)
     @_parseObject_.register(np.floating)
     @_parseObject_.register(np.complexfloating)
-    def __parseObject_(self: typing.Self, obj: typing.Union[bool, int, float, complex,
+    def __parseObject_(self: typing.Self, obj: typing.Union[bool, int, float, complex, # noqa
                                                fractions.Fraction,
                                                decimal.Decimal,
                                                numbers.Number,
@@ -1374,7 +1374,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             }
 
     @_parseObject_.register(types.SimpleNamespace)
-    def __parseObject_(self: typing.Self, obj: types.SimpleNamespace,
+    def __parseObject_(self: typing.Self, obj: types.SimpleNamespace, # noqa
                 choices: dict = dict(),
                 includePrivateMembers: bool = False) -> tuple:
         objId = id(obj)
@@ -1411,7 +1411,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             }
 
     @_parseObject_.register(types.ModuleType)
-    def __parseObject_(self: typing.Self, obj: types.ModuleType,
+    def __parseObject_(self: typing.Self, obj: types.ModuleType, # noqa
           choices: dict = dict(),
           includePrivateMembers: bool = False) -> tuple:
         objId = id(obj)
@@ -1462,7 +1462,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
     @_parseObject_.register(vigra.filters.Kernel1D)
     @_parseObject_.register(vigra.filters.Kernel2D)
-    def __parseObject_(self: typing.Self, obj: typing.Union[vigra.filters.Kernel1D,
+    def __parseObject_(self: typing.Self, obj: typing.Union[vigra.filters.Kernel1D, # noqa
                                                vigra.filters.Kernel2D],
            choices: dict = dict(),
            _: bool = True) -> tuple:
@@ -1590,7 +1590,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(pd.DataFrame)
     @_parseObject_.register(pd.Series)
     @_parseObject_.register(pd.Index)
-    def __parseObject_(self: typing.Self, obj: typing.Union[pd.DataFrame, pd.Series,
+    def __parseObject_(self: typing.Self, obj: typing.Union[pd.DataFrame, pd.Series, # noqa
                                                pd.Index],
           choices: dict = dict(),
           _: bool = True) -> tuple:
@@ -1644,7 +1644,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
 
     @_parseObject_.register(Interval)
-    def __parseObject_(self: typing.Self, obj: Interval,
+    def __parseObject_(self: typing.Self, obj: Interval, # noqa
           choices: dict = dict(),
           _: bool = True) -> tuple:
         pData = {
@@ -1681,7 +1681,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
     @_parseObject_.register(neo.Epoch)
     @_parseObject_.register(DataZone)
-    def __parseObject_(self: typing.Self, obj: typing.Union[neo.Epoch, DataZone],
+    def __parseObject_(self: typing.Self, obj: typing.Union[neo.Epoch, DataZone], # noqa
           choices: dict = dict(),
           _: bool = True) -> tuple:
         objId = id(obj)
@@ -1720,8 +1720,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(neo.Event)
     @_parseObject_.register(DataMark)
     @_parseObject_.register(TriggerEvent)
-    def __parseObject_(self: typing.Self, obj: typing.Union[neo.Event, DataMark,
-                                               TriggerEvent],
+    def __parseObject_(self: typing.Self, obj: typing.Union[neo.Event, DataMark, # noqa
+        TriggerEvent],
           choices: dict = dict(),
           _: bool = True) -> tuple:
         objId = id(obj)
@@ -1759,7 +1759,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             }
 
     @_parseObject_.register(pq.Quantity)
-    def __parseObject_(self: typing.Self, obj: pq.Quantity,
+    def __parseObject_(self: typing.Self, obj: pq.Quantity, # noqa
           choices: dict = dict(),
           _: bool=True) -> tuple:
         # print(f"{self.__class__.__name__}._parseObject_({type(obj).__name__})")
@@ -1803,7 +1803,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         return obj, objDict
 
     @_parseObject_.register(vigra.VigraArray)
-    def __parseObject_(self: typing.Self, obj:vigra.VigraArray,
+    def __parseObject_(self: typing.Self, obj:vigra.VigraArray, # noqa
           choices: dict = dict(),
           _: bool = True) -> tuple:
         objId = id(obj)
@@ -1847,7 +1847,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
 
     @_parseObject_.register(np.ndarray)
-    def __parseObject_(self: typing.Self, obj: np.ndarray,
+    def __parseObject_(self: typing.Self, obj: np.ndarray, # noqa
           choices: dict = dict(),
           _: bool = False) -> tuple:
         objId = id(obj)
@@ -1859,7 +1859,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # TableEditorWidget gives read-write access to array data
         tip = type(obj).__name__
         n = obj.size
-        shape = obj.shape
+        # shape = obj.shape
         s = f"{obj.shape}"
         samples = strutils.pluralize('sample', n)
         objDataAsChild = False
@@ -1883,7 +1883,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             }
 
     @_parseObject_.register(vigra.AxisInfo)
-    def __parseObject_(self: typing.Self, obj: vigra.AxisInfo,
+    def __parseObject_(self: typing.Self, obj: vigra.AxisInfo, # noqa
           choices: dict = dict(),
           _: bool = False) -> tuple:
         objId = id(obj)
@@ -1911,7 +1911,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             }
 
     @_parseObject_.register(vigra.AxisType)
-    def __parseObject_(self: typing.Self, obj: vigra.AxisType,
+    def __parseObject_(self: typing.Self, obj: vigra.AxisType, # noqa
           choices: dict = dict(),
           _: bool = False) -> tuple:
         # NOTE: 2026-02-08 22:54:09 TODO
@@ -1935,7 +1935,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             }
 
     @_parseObject_.register(AxesCalibration)
-    def __parseObject_(self: typing.Self, obj: AxesCalibration,
+    def __parseObject_(self: typing.Self, obj: AxesCalibration, # noqa
           choices: dict = dict(),
           _:bool=True) -> tuple:
         objId = id(obj)
@@ -1963,7 +1963,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             }
 
     @_parseObject_.register(AxisCalibrationData)
-    def __parseObject_(self: typing.Self, obj: AxisCalibrationData,
+    def __parseObject_(self: typing.Self, obj: AxisCalibrationData, # noqa
           choices: dict = dict(),
           _: bool = False) -> tuple:
         objId = id(obj)
@@ -1975,14 +1975,14 @@ class DataTreeModel(QtGui.QStandardItemModel):
         tip = type(obj).__name__
         indirect = True
         objDataAsChild = False
-        fields = dataclasses.fields(obj)
+        datafields = dataclasses.fields(obj)
         fieldnames = list(map(lambda f: f.name, datafields))
-        pData = dict(map(lambda c: (c, getattr(data, c)), filter(lambda f: f != "channel", fieldnames)))
+        pData = dict(map(lambda c: (c, getattr(obj, c)), filter(lambda f: f != "channel", fieldnames)))
         if not obj.isChannels:
-            pData = dict(map(lambda c: (c, getattr(data, c)), filter(lambda f: f != "channel", fieldnames)))
+            pData = dict(map(lambda c: (c, getattr(obj, c)), filter(lambda f: f != "channel", fieldnames)))
             info = f"Axis calibration for axis {obj.index} (type {obj.type}; key {obj.key}); size {obj.size}"
         else:
-            pData = dict(map(lambda c: (c, getattr(data, c)), fieldnames))
+            pData = dict(map(lambda c: (c, getattr(obj, c)), fieldnames))
             c = len(obj.channels)
             info = f"Channel axis calibration with {c} {strutils.pluralize('channel', c)}"
 
@@ -2000,7 +2000,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             }
 
     @_parseObject_.register(ChannelCalibrationData)
-    def __parseObject_(self: typing.Self, obj: ChannelCalibrationData,
+    def __parseObject_(self: typing.Self, obj: ChannelCalibrationData, # noqa
           choices: dict = dict(),
           _: bool = False) -> tuple:
         objId =  id(obj)
@@ -2010,25 +2010,25 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 choices = dict()
 
         tip = f"{type(obj).__name__}"
-        fields = dataclasses.fields(obj)
+        datafields = dataclasses.fields(obj)
         fieldnames = list(map(lambda f: f.name, datafields))
-        pData = dict(map(lambda c: (c, getattr(data, c)), fieldnames))
+        pData = dict(map(lambda c: (c, getattr(obj, c)), fieldnames))
 
         return pData, {
             "indirect": True,
             "objDataAsChild": False,
-            "objInfo": info,
+            "objInfo": obj.description,
             "objType": objType,
             "objTip": tip,
             "memberAccess": (".", ),
             "accessType": "attribute",
-            "choices": choces,
+            "choices": choices,
             "readOnly": False,
             "objId": objId
             }
 
-    @_parseObject_.register(PVObject)
-    def __parseObject_(self: typing.Self, obj: PVObject,
+    @_parseObject_.register(PVObject) # noqa star imports from systems.PrairieView
+    def __parseObject_(self: typing.Self, obj: PVObject, # noqa star imports from systems.PrairieView
           choices: dict = dict(),
           _: bool = False) -> tuple:
         objId = id(obj)
@@ -2039,23 +2039,23 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         tip = type(obj).__name__
         info = tip
-        if isinstance(obj, PVScan):
+        if isinstance(obj, PVScan): # noqa # star imports from systems.PrairieView
             info = f"{obj.attributes}"
 
-        elif isinstance(obj, PVSequence):
+        elif isinstance(obj, PVSequence): # noqa # star imports from systems.PrairieView
             nframes = len(obj.frames)
             info = f"{obj.attributes['sequencetypename']} with {nframes} {strutils.pluralize('frame', nframes)}"
 
-        elif isinstance(obj, PVFrame):
+        elif isinstance(obj, PVFrame): # noqa # star imports from systems.PrairieView
             info = f"Channels: {obj.channels}"
 
-        elif isinstance(obj, (PVSystemConfiguration, PVIndexedValue, PVSubIndexedValue)):
+        elif isinstance(obj, (PVSystemConfiguration, PVIndexedValue, PVSubIndexedValue)): # noqa # star imports from systems.PrairieView
             if (
                 hasattr(obj, "description")
                 and isinstance(obj.description, str)
                 and len(obj.description.strip())
                 ):
-                info = data.description
+                info = obj.description
 
         return obj.as_dict(), {
             "indirect": True,
@@ -2071,7 +2071,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             }
 
     @_parseObject_.register(scipy.optimize.Bounds)
-    def __parseObject_(self: typing.Self, obj: scipy.optimize.Bounds,
+    def __parseObject_(self: typing.Self, obj: scipy.optimize.Bounds, # noqa
           choices: dict = dict(),
           _:bool = True) -> tuple:
         objId = id(obj)
@@ -2205,7 +2205,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                         else:
                             try:
                                 iB = bindingType(itemBinding) # hedging my bets...
-                            except:
+                            except: # noqa
                                 iB = itemBinding
 
 
@@ -2278,7 +2278,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             exec(setexpr)
             newVal = eval(accexpr)
             OK = True
-        except:
+        except: # noqa
             traceback.print_exc()
             pass
 

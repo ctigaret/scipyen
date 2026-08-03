@@ -863,13 +863,15 @@ def validate_varname(arg, ws:typing.Optional[dict]=None,
         .. attention::
             Python restricts the number of characters that can be used in a symbol
 
-    returns_counter:bool, default is False;
-            When True, returns the valid symbol _AND_ the integer counter for
+    returns_counter:bool, default is None;
+        When None, returns the valid symbol _AND_ the integer counter for
+        the suffix (which MAY be None)
 
-            the suffix.
+        When False, only returns the suggested new name
 
+        When True, returns the integer counter (which may be None)
 
-            See also ``strutils.counter_suffix``
+        See also ``strutils.counter_suffix``
 
     Returns:
 
@@ -889,7 +891,7 @@ def validate_varname(arg, ws:typing.Optional[dict]=None,
             3.a) If a counter suffix already exists, it will be incremented as
                 necessary.
 
-    • When returns_counter is True, returns a two-elements tuple containing the
+    • When returns_counter is None, returns a two-elements tuple containing the
         modified `arg` as above, AND the counter suffix as an int or None (when
         a suffix was not appended to the modified `arg`)
 

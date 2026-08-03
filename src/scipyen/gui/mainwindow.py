@@ -2063,22 +2063,22 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 self._dbusSystemBus_.connect(
                     uDisks_service, uDisks_path, uDisks_iFace, "InterfacesAdded",
                     self,
-                    QtCore.SLOT("_slot_uDisk_changes_dbus_message(QDBusMessage)")
+                    QtCore.SLOT("_slot_uDisk_dbus_message_received(QDBusMessage)")
                     )
 
                 self._dbusSystemBus_.connect(
                     uDisks_service, uDisks_path, uDisks_iFace, "InterfacesRemoved",
                     self,
-                    QtCore.SLOT("_slot_uDisk_changes_dbus_message(QDBusMessage)")
+                    QtCore.SLOT("_slot_uDisk_dbus_message_received(QDBusMessage)")
                     )
 
             else:
                 self._dbusSystemBus_.connect(
                     uDisks_service, uDisks_path, uDisks_iFace, "InterfacesAdded",
-                    self._slot_uDisk_changes_dbus_message)
+                    self._slot_uDisk_dbus_message_received)
                 self._dbusSystemBus_.connect(
                     uDisks_service, uDisks_path, uDisks_iFace, "InterfacesRemoved",
-                    self._slot_uDisk_changes_dbus_message)
+                    self._slot_uDisk_dbus_message_received)
 
         except: # noqa
             traceback.print_exc()
@@ -5015,43 +5015,54 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @safewrapper
     def getCurrentVarName(self):
-        signalBlockers = [QtCore.QSignalBlocker(self.workspaceView),
-                          QtCore.QSignalBlocker(self.workspaceModel),
-                          QtCore.QSignalBlocker(self.workspaceView.selectionModel())]
-
         varname = getattr(self, "currentVarItemName", None)
+        with qtutils.SignalBlocker((self.workspaceView,
+                                    self.workspaceModel,
+                                    self.workspaceModel.selectionModel)):
+            # signalBlockers = [QtCore.QSignalBlocker(self.workspaceView),
+            #                 QtCore.QSignalBlocker(self.workspaceModel),
+            #                 QtCore.QSignalBlocker(self.workspaceView.selectionModel())]
 
-        if varname is None:
-            indexList = self.workspaceView.selectedIndexes()
 
-            if len(indexList) != 1:
-                return
+            if varname is None:
+                indexList = self.workspaceView.selectedIndexes()
 
-            item, varname = self._getWorkspaceVarItemAndName_(indexList[0])
+                if len(indexList) != 1:
+                    return
 
-            if varname is None or isinstance(varname, str) and len(varname.strip()) == 0:
-                return
+                item, varname = self._getWorkspaceVarItemAndName_(indexList[0])
 
-            if varname not in self.workspace.keys():
-                return
+                if varname is None or isinstance(varname, str) and len(varname.strip()) == 0:
+                    return
+
+                if varname not in self.workspace.keys():
+                    return
 
         return varname
 
-    def assignToWorkspace(self, name: str, val: object, check_name:bool = True) -> bool:
+    def assignToWorkspace(self, name: str, val: object, check_name:bool = True,
+                          /,
+                          auto_name:bool = False) -> bool:
         r"""Binds a Python object to a symbol in the user workspace.
 
         Parameters:
-        ----------
+        -----------
         name (str): the symbol whch will be bound to the object
 
         val (object): the object which will be bound to the symbol given by `name`
 
         check_name (bool): optional, default is True; checks if the symbol in
             `name` already exists in the workspace, AND is bound to a user¹
-            variable. If `name` is found, the function prompts the user to choose
-            to rename, overwrite, or cancel.
+            variable. If `name` is found, and `auto_name` is False (see below)
+            the function prompts the user to choose to rename, overwrite, or cancel.
 
             WARNING This does NOT apply to system (hidden) symbols, see below.
+
+        Keyword-only parameters:
+        ------------------------
+        auto_name (bool): optional, default is False
+            When True, and `check_name` is also True, then if `name` was found in
+            the workspace, then name will bt suffixed with a running counter.
 
         Returns:
         -------
@@ -5085,50 +5096,56 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         if check_name is True:
             # validate name against existing user (visible) variables
-            newVarNameOK, ctr = validate_varname(name, self.workspace)
+            newVarNameOK, ctr = validate_varname(name, self.workspace, # noqa validate_varname "star" imported from workspacefunctions
+                                                 returns_counter=None) # noqa validate_varname "star" imported from workspacefunctions
 
+            # print(f"newVarNameOK = {newVarNameOK}")
             # if len(newVarNameOK) == 0:
             #     return
 
             if newVarNameOK != name:
-                if __has_PyQt6__ or __has_PySide6__:
-                    qbox = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Question,
-                                                "Assign object in workspace",
-                                                f"An object named '{name}' exists in the workspace.\nDo you wish to rename, overwrite or cancel?",
-                                                # QtWidgets.QMessageBox.StandardButton(QtWidgets.QMessageBox.Cancel),
-                                                QtWidgets.QMessageBox.Cancel,
-                                                parent = self)
-                else:
-                    qbox = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Question,
-                                                "Assign object in workspace",
-                                                f"An object named '{name}' exists in the workspace.\nDo you wish to rename, overwrite or cancel?",
-                                                QtWidgets.QMessageBox.StandardButtons(QtWidgets.QMessageBox.Cancel),
-                                                parent = self)
-                qbox.addButton("Rename", QtWidgets.QMessageBox.YesRole) # → returns 2
-                qbox.addButton("Overwrite", QtWidgets.QMessageBox.AcceptRole) # → returns 3
-                qbox.setDefaultButton(QtWidgets.QMessageBox.Cancel)
-
-                btn = qbox.exec()
-
-                # print(f"{self.__class__.__name__}.assignToWorkspace: btn -> {btn}")
-
-                if btn == 2: # ⇒ should rename
-                    dlg = qd.QuickDialog(self, "Rename object")
-                    dlg.addLabel(f"Rename {name}")
-                    pw = qd.StringInput(dlg, "To :")
-                    pw.variable.undoAvailable = True
-                    pw.variable.redoAvailable = True
-                    pw.variable.setClearButtonEnabled(True)
-                    pw.setText(newVarNameOK)
-                    dlg.addWidget(pw)
-
-                    if dlg.exec() == 0: # this is rejection ; we were asked to rename the object; if dlg is rejected then goodbyeif it d
-                        return False
+                if not auto_name:
+                    if __has_PyQt6__ or __has_PySide6__:
+                        qbox = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Question,
+                                                    "Assign object in workspace",
+                                                    f"An object named '{name}' exists in the workspace.\nDo you wish to rename, overwrite or cancel?",
+                                                    # QtWidgets.QMessageBox.StandardButton(QtWidgets.QMessageBox.Cancel),
+                                                    QtWidgets.QMessageBox.Cancel,
+                                                    parent = self)
                     else:
-                        name = pw.text()
+                        qbox = QtWidgets.QMessageBox(QtWidgets.QMessageBox.Question,
+                                                    "Assign object in workspace",
+                                                    f"An object named '{name}' exists in the workspace.\nDo you wish to rename, overwrite or cancel?",
+                                                    QtWidgets.QMessageBox.StandardButtons(QtWidgets.QMessageBox.Cancel),
+                                                    parent = self)
+                    qbox.addButton("Rename", QtWidgets.QMessageBox.YesRole) # → returns 2
+                    qbox.addButton("Overwrite", QtWidgets.QMessageBox.AcceptRole) # → returns 3
+                    qbox.setDefaultButton(QtWidgets.QMessageBox.Cancel)
 
-                elif btn != 3: # → 1 is OK to overwrite, anything else returns
-                    return False
+                    btn = qbox.exec()
+
+                    # print(f"{self.__class__.__name__}.assignToWorkspace: btn -> {btn}")
+
+                    if btn == 2: # ⇒ should rename
+                        dlg = qd.QuickDialog(self, "Rename object")
+                        dlg.addLabel(f"Rename {name}")
+                        pw = qd.StringInput(dlg, "To :")
+                        pw.variable.undoAvailable = True
+                        pw.variable.redoAvailable = True
+                        pw.variable.setClearButtonEnabled(True)
+                        pw.setText(newVarNameOK)
+                        dlg.addWidget(pw)
+
+                        if dlg.exec() == 0: # this is rejection ; we were asked to rename the object; if dlg is rejected then goodbyeif it d
+                            return False
+                        else:
+                            name = pw.text()
+
+                    elif btn != 3: # → 1 is OK to overwrite, anything else returns
+                        return False
+
+                else:
+                    name=newVarNameOK
 
         self.workspaceModel.bindObjectInNamespace(name, val)
 
@@ -7841,26 +7858,28 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         #     self._dbus_UDisk_changes(msg)
 
         @Slot(QtDBus.QDBusMessage)
-        def _slot_uDisk_changes_dbus_message(self, msg):
-            self._dbus_UDisk_changes(msg)
-
-        def _dbus_UDisk_changes(self, msg):
-            m_um_Ops = desktoputils.parseUDIsksFSMountOperationJobs(msg)
+        def _slot_uDisk_dbus_message_received(self, msg):
+        #     self._dbus_UDisk_changes(msg)
+        #
+        # def _dbus_UDisk_changes(self, msg):
+            # m_um_Ops = desktoputils.parseUDIsksFSMountOperationJobs(msg)
             # print(f'{self.__class__.__name__}._dbus_UDisk_changes: {m_um_Ops}')
-            if len(m_um_Ops):
+            # if len(m_um_Ops):
+            # self.assignToWorkspace("msg", msg, True, auto_name=True)
+            if desktoputils.isUDIsksFSMountOperationJobs(msg):
                 if not self.fileSystemModel.testOption(QtGui.QFileSystemModel.DontWatchForChanges):
                     self.fileSystemModel.setOption(QtGui.QFileSystemModel.DontWatchForChanges, True)
                 timer = QtCore.QTimer(self)
                 timer.setSingleShot(True)
-                timer.timeout.connect(self._slot_FilesystemMountChanged)
-                timer.start(1000)
+                timer.timeout.connect(self._slot_filesystemMountChanged)
+                timer.start(500)
 
             else:
                 self.fileSystemModel.setOption(QtGui.QFileSystemModel.DontWatchForChanges, False)
 
 
     @Slot()
-    def _slot_FilesystemMountChanged(self):
+    def _slot_filesystemMountChanged(self):
         self.navigator.updateDesktopPlaces()
         self._slot_refreshrecentDirsAndFileMenus_()
 

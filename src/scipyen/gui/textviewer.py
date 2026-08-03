@@ -142,7 +142,7 @@ class TextViewer(ScipyenViewer):
                 
                 parser.close()
                 
-                if parser.get_starttag_text() is None:
+                if parser.get_starttag_text() is None or not any(s in data for s in ("html", "xml")):
                     self._docViewer_.document().setPlainText(data)
                     
                 else:
@@ -150,8 +150,10 @@ class TextViewer(ScipyenViewer):
                 
                 if data.find("<?xml version=") >= 0:
                     self._highlighter_ = xmlutils.XmlSyntaxHighlighter(self._docViewer_.document())
+
                 else:
                     self._highlighter_ = None
+
         else:
             raise TypeError("Expecting a QTextDdocument or a str; got %s instead" % type(data).__name__)
         
