@@ -1961,6 +1961,7 @@ class PlacesButton(UrlNavigatorButtonBase):
                                     lambda x: (
                                                 x[0].startswith("file")
                                                 and x[1].name not in ignored
+                                                and not x[1].hidden
                                               ),
                                     self.parent().desktopPlaces.items()
                                   )
@@ -3368,7 +3369,7 @@ class UrlNavigator(QtWidgets.QWidget):
         return self._nav_p_._coreUrlNavigator_.locationUrl(historyIndex)
 
     def updateDesktopPlaces(self):
-        print(f"{self.__class__.__name__}.updateDesktopPlaces()")
+        # print(f"{self.__class__.__name__}.updateDesktopPlaces()")
         self._nav_p_.updateDesktopPlaces()
 
     @property

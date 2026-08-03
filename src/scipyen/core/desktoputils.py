@@ -144,6 +144,8 @@ HIDDEN_LOCATIONS = [
     "RuntimeLocation",
 ]
 
+SYSTEM_LOCATIONS = ["FontsLocation", "RuntimeLocation", "TempLocation"]
+
 if __has_PySide6__:
     HIDDEN_LOCATIONS.extend(
         [
@@ -164,7 +166,16 @@ if __has_PySide6__:
         ]
         )
 
-SYSTEM_LOCATIONS = ["FontsLocation", "RuntimeLocation", "TempLocation"]
+    SYSTEM_LOCATIONS.extend(
+        [
+            QtCore.QStandardPaths.StandardLocation.FontsLocation,
+            QtCore.QStandardPaths.StandardLocation.RuntimeLocation,
+            QtCore.QStandardPaths.StandardLocation.GenericConfigLocation,
+            QtCore.QStandardPaths.StandardLocation.GenericDataLocation,
+        ]
+        )
+
+
 
 # STANDARD_PLACES_ICONS = {
 #     "desktop+": "folder-destkop",
@@ -411,7 +422,6 @@ class PlacesMap(dict):
 class BookmarksMap(dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
 
 
 class StandardLocationInfo:
@@ -812,7 +822,7 @@ def get_system_terminal_executable():
     else:
         scipywarn(f"{sys.platform} platform is not yet supported")
 
-@timefunc
+# @timefunc
 def get_standard_desktop_places(all_folder_icons: bool = False) -> PlacesMap:
     r"""Platform-independent Desktop places.
     These are defined in the Qt toolkit
@@ -1198,7 +1208,7 @@ def get_standard_desktop_places(all_folder_icons: bool = False) -> PlacesMap:
 #
 #     return ret
 
-@timefunc
+# @timefunc
 def get_desktop_places(schema: typing.Optional[str] = None,
                        all_folder_icons: bool = False,
                        include_hidden: bool = False,
