@@ -76,10 +76,10 @@ function show_help ()
     echo -e "--with_neuron\t\tInstall binary neuron python distribution from PyPI\n"
     echo -e "--build_neuron\t\tBuild neuron python locally\n"
     echo -e "--with_coreneuron\twhen '--build_neuron' is passed, build local neuron with coreneuron; by default coreneuron is not used.\n"
-    echo -e "--build_pyqt6\t\tBuild PyQt6 locally instead of getting it from PyPI\n"
-    echo -e "--with_pyqt5\t\tInstall PyQt5 from PyPI\n"
-    echo -e "--build_pyqt5\t\tBuild a PyQt5 wheel locally and install it\n"
-    echo -e "--with_pyside6\t\tInstall PySide6 and Shiboken from PyPI\n"
+    # echo -e "--build_pyqt6\t\tBuild PyQt6 locally instead of getting it from PyPI\n"
+    # echo -e "--with_pyqt5\t\tInstall PyQt5 from PyPI\n"
+    # echo -e "--build_pyqt5\t\tBuild a PyQt5 wheel locally and install it\n"
+    # echo -e "--with_pyside6\t\tInstall PySide6 and Shiboken from PyPI\n"
     echo -e "--build_pyside6\t\tBuild a PySide6 and Shiboken wheels locally and install them \n"
     echo -e "--refresh_repos\t When '--refresh_repos' is passed, local repository clones will be refreshed before rebuilding\n"
     echo -e "\tNOTE: This applies to vigra and to local neuron build only\n"
@@ -89,54 +89,54 @@ function show_help ()
     echo -e "-h | -? | --help \tShow this help message and quit\n"
     echo -e "\nFor details, execute $0 --about\n"
     echo -e "\n"
-   
+
 }
 
-function findqmake ()
-{
-    # Identifes which qmake is there available on the platform.
-    # 
-    # Since Linux dsitributions currently provide both Qt5 and Qt6, their respective
-    # qmake tools bear different names.
-    #
-    # Not sure this is as generic as possible across the Linux distributions...
-    #
-    
-    qmake_binary=`which qmake`
-    if [ -z "$qmake_binary" ] ; then
-        qmake_binary=`which qmake-qt5`
-    fi
-    
-    if [ -z "$qmake_binary" ] ; then
-        read -e -p "Enter a full path to qmake (or qmake-qt5): " qmake_binary
-    fi
-    
-    if [ -z "$qmake_binary" ] ; then
-        echo -e "Cannot build Pyqt5 without qmake. Goodbye!\n"
-        exit 1
-    fi
-    
-    echo "using qmake: ${qmake_binary}"
-}
+# function findqmake ()
+# {
+#     # Identifes which qmake is there available on the platform.
+#     #
+#     # Since Linux dsitributions currently provide both Qt5 and Qt6, their respective
+#     # qmake tools bear different names.
+#     #
+#     # Not sure this is as generic as possible across the Linux distributions...
+#     #
+#
+#     qmake_binary=`which qmake`
+#     if [ -z "$qmake_binary" ] ; then
+#         qmake_binary=`which qmake-qt5`
+#     fi
+#
+#     if [ -z "$qmake_binary" ] ; then
+#         read -e -p "Enter a full path to qmake (or qmake-qt5): " qmake_binary
+#     fi
+#
+#     if [ -z "$qmake_binary" ] ; then
+#         echo -e "Cannot build Pyqt5 without qmake. Goodbye!\n"
+#         exit 1
+#     fi
+#
+#     echo "using qmake: ${qmake_binary}"
+# }
 
-function findqmake6 ()
-{
-    qmake6_binary=`which qmake6`
-    if [ -z "$qmake6_binary" ] ; then
-        qmake6_binary=`which qmake-qt6`
-    fi
-    
-    if [ -z "$qmake6_binary" ] ; then
-        read -e -p "Enter a full path to qmake6 (or qmake-qt6): " qmake6_binary
-    fi
-    
-    if [ -z "$qmake6_binary" ] ; then
-        echo -e "Cannot build PyQt6 without qmake6. Goodbye!\n"
-        exit 1
-    fi
-    
-    echo "using qmake: ${qmake6_binary}"
-}
+# function findqmake6 ()
+# {
+#     qmake6_binary=`which qmake6`
+#     if [ -z "$qmake6_binary" ] ; then
+#         qmake6_binary=`which qmake-qt6`
+#     fi
+#
+#     if [ -z "$qmake6_binary" ] ; then
+#         read -e -p "Enter a full path to qmake6 (or qmake-qt6): " qmake6_binary
+#     fi
+#
+#     if [ -z "$qmake6_binary" ] ; then
+#         echo -e "Cannot build PyQt6 without qmake6. Goodbye!\n"
+#         exit 1
+#     fi
+#
+#     echo "using qmake: ${qmake6_binary}"
+# }
 
 function findcmake ()
 {
@@ -373,279 +373,279 @@ function installpipreqs_part2 ()
     fi
 }
 
-function dopyqt5 ()
-{
-    # Builds, then installs a pyqt5 wheel locally - I chose this approach because
-    # on Linux, ready-made wheels (e.g. from PyPI) do not integrate well with the
-    # native platform look and feel (for example, they notoriously miss the Breeze
-    # style plugins). This approach also offers the possibility to opt-in/out 
-    # installation of various Qt modules.
-    #
-    # Obviously this depends on having installed the appropriate build toolchain
-    # and Qt5 development package on the platform, and adds some extra lead time
-    # for having a ready environment — a small price to pay, IMHO.
-    #
-    if [[ -z "$VIRTUAL_ENV" ]] ; then
-        echo -e "Not in an active environment! Goodbye!\n"
-        exit 1
-    fi
-    
-    if [ ! -r ${VIRTUAL_ENV}/.pyqt5build_done ] || [[ $reinstall_pyqt5 -gt 0 ]] ; then
-        if [[ $build_pyqt5 -gt 0 ]] ; then
-            mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
-            
-            # figure out which qmake there is on the host platform
-            findqmake
-            
-            if [ `pwd` != "$VIRTUAL_ENV"/src ]; then
-                echo -e "Not inside $VIRTUAL_ENV/src - goodbye\n"
-                exit 1
-            fi
-            
-            # NOTE: 2025-06-22 14:57:15
-            # DON'T WORK AS ROOT !
-            py_exec="$VIRTUAL_ENV/bin/${python_exec}"
-            sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
-            # NOTE: 2023-06-25 10:56:34 
-            # when we are root, make sure to use the virtual environment's python 
-            # executable here
-            if [[ `id -u` -eq 0 ]] ; then
-                echo -e "\n****\nCannot run as administrator!\n****\n"
-                exit 1
-            fi
-            
-#             echo "Using ${py_exec} as user `whoami` to build PyQt5"
-            
-            pyqt5_src_url=`${py_exec} $installscriptdir/locate_pyqt5_src.py`
-            pyqt5_src=`basename $pyqt5_src_url`
-            
-            pyqt5_src_dir=${pyqt5_src%.tar.gz}
-            
-            echo "PyQt5 source is in "${pyqt5_src_dir}
-            
-            # NOTE: the sdist might have been downloaded alreay - so check this first
-            # before actually downloading
-            if [ ! -r ${pyqt5_src} ] ; then
-                wget ${pyqt5_src_url} && tar xzf ${pyqt5_src} 
+# function dopyqt5 ()
+# {
+#     # Builds, then installs a pyqt5 wheel locally - I chose this approach because
+#     # on Linux, ready-made wheels (e.g. from PyPI) do not integrate well with the
+#     # native platform look and feel (for example, they notoriously miss the Breeze
+#     # style plugins). This approach also offers the possibility to opt-in/out
+#     # installation of various Qt modules.
+#     #
+#     # Obviously this depends on having installed the appropriate build toolchain
+#     # and Qt5 development package on the platform, and adds some extra lead time
+#     # for having a ready environment — a small price to pay, IMHO.
+#     #
+#     if [[ -z "$VIRTUAL_ENV" ]] ; then
+#         echo -e "Not in an active environment! Goodbye!\n"
+#         exit 1
+#     fi
+#
+#     if [ ! -r ${VIRTUAL_ENV}/.pyqt5build_done ] || [[ $reinstall_pyqt5 -gt 0 ]] ; then
+#         if [[ $build_pyqt5 -gt 0 ]] ; then
+#             mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
+#
+#             # figure out which qmake there is on the host platform
+#             findqmake
+#
+#             if [ `pwd` != "$VIRTUAL_ENV"/src ]; then
+#                 echo -e "Not inside $VIRTUAL_ENV/src - goodbye\n"
+#                 exit 1
+#             fi
+#
+#             # NOTE: 2025-06-22 14:57:15
+#             # DON'T WORK AS ROOT !
+#             py_exec="$VIRTUAL_ENV/bin/${python_exec}"
+#             sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
+#             # NOTE: 2023-06-25 10:56:34
+#             # when we are root, make sure to use the virtual environment's python
+#             # executable here
+#             if [[ `id -u` -eq 0 ]] ; then
+#                 echo -e "\n****\nCannot run as administrator!\n****\n"
+#                 exit 1
+#             fi
+#
+# #             echo "Using ${py_exec} as user `whoami` to build PyQt5"
+#
+#             pyqt5_src_url=`${py_exec} $installscriptdir/locate_pyqt5_src.py`
+#             pyqt5_src=`basename $pyqt5_src_url`
+#
+#             pyqt5_src_dir=${pyqt5_src%.tar.gz}
+#
+#             echo "PyQt5 source is in "${pyqt5_src_dir}
+#
+#             # NOTE: the sdist might have been downloaded alreay - so check this first
+#             # before actually downloading
+#             if [ ! -r ${pyqt5_src} ] ; then
+#                 wget ${pyqt5_src_url} && tar xzf ${pyqt5_src}
+#
+#                 if [[ $? -ne 0 ]] ; then
+#                 echo -e "Cannot obtain the PyQt5 source. Bailing out. Goodbye!\n"
+#                 exit 1
+#                 fi
+#             else
+#                 if [ -d ${pyqt5_src_dir} ] ; then
+#                     rm -fr ${pyqt5_src_dir}
+#                 fi
+#                 tar xzf ${pyqt5_src}
+#             fi
+#
+#             # NOTE: good practice is to create an out-of-source build tree, » ...
+#             pyqt5_build_dir="PyQt5-build"
+#
+#             # NOTE: clear build dir if it exists -- best to start fresh
+#             if [ -d ${pyqt5_build_dir} ] ; then
+#                 rm -fr ${pyqt5_build_dir}
+#             fi
+#             mkdir -p ${pyqt5_build_dir}
+#
+#             # NOTE: » ... but run the build process INSIDE the expanded sdist dir
+#             # this is because sip-wheel will get extra options from there :)
+#             cd ${pyqt5_src_dir}
+#
+#             echo "Generating PyQt5 wheel in "$(pwd)"..."
+#
+#             # NOTE: 2023-03-23 14:03:48 - enable parallel jobs - to change, either:
+#             # • change the value of the --jobs option (e.g. half the number of
+#             # cores in your system seems to be a good choice), or
+#             # • remove the --jobs option altogether
+#             if [[ $njobs -gt 0 ]] ; then
+#                 ${sip_wheel_exec} --qmake=${qmake_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+#             else
+#                 ${sip_wheel_exec} --qmake=${qmake_binary} --confirm-license --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
+#             fi
+#
+#             if [[ $? -ne 0 ]] ; then
+#                 echo -e "sip Cannot build a PyQt5 wheel. Bailing out. Goodbye!\n"
+#                 echo -e "You might want to upgrade sip and Pyqt5-sip in this environment\n"
+#                 echo -e " by calling \n\n"
+#                 echo -e "pip install --upgrade sip\n"
+#                 echo -e "pip install --upgrade PyQt5-sip\n\n"
+#                 echo -e "Then run this script again"
+#                 exit 1
+#             fi
+#
+#             # NOTE: check is a wheel file has been produced; the filename typically
+#             # ends in .whl and nis located in the source tree, NOT in the build tree!
+#             # » if found then call pip to install it inside the
+#             # environment ⟶ IT WORKS!
+#             wheel_file=`ls | grep whl`
+#             if [ -z ${wheel_file} ] ; then
+#                 echo -e "No wheel file found in "$(pwd)" - goodbye!\n"
+#                 exit 1
+#             else
+#                 if [ -z ${uv_exec} ] ; then
+#                     pip install --force-reinstall ${wheel_file}
+#                 else
+#                     ${uv_exec} pip install --force-reinstall ${wheel_file}
+#                 fi
+#
+#                 if [[ $? -ne 0 ]] ; then
+#                     echo -e "Cannot install the PyQt5 wheel; check console output. Goodbye!\n"
+#                     exit 1
+#                 else
+#                     echo "PyQt5 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt5build_done
+#                     echo "PyQt5" > ${VIRTUAL_ENV}/.python_qt
+#                     echo -e "\n\n=====================\n# Pyqt5 installed!\n=====================\n\n"
+#                 fi
+#             fi
+#
+#         else
+#             if [ -z ${uv_exec} ] ; then
+#                 pip install pyqt5
+#             else
+#                 ${uv_exec} pip install pyqt5
+#             fi
+#             if [[ $? -ne 0 ]] ; then
+#                 echo -e "Cannot install PyQt5 from PyPi; check console output. Goodbye!\n"
+#                 exit 1
+#             else
+#                 echo "PyQt5 pip package installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt6done
+#                 echo "PyQt5" > ${VIRTUAL_ENV}/.python_qt
+#             fi
+#         fi
+#     fi
+# }
 
-                if [[ $? -ne 0 ]] ; then
-                echo -e "Cannot obtain the PyQt5 source. Bailing out. Goodbye!\n"
-                exit 1
-                fi
-            else
-                if [ -d ${pyqt5_src_dir} ] ; then
-                    rm -fr ${pyqt5_src_dir}
-                fi
-                tar xzf ${pyqt5_src}
-            fi
-            
-            # NOTE: good practice is to create an out-of-source build tree, » ...
-            pyqt5_build_dir="PyQt5-build"
-            
-            # NOTE: clear build dir if it exists -- best to start fresh
-            if [ -d ${pyqt5_build_dir} ] ; then
-                rm -fr ${pyqt5_build_dir}
-            fi
-            mkdir -p ${pyqt5_build_dir}
-            
-            # NOTE: » ... but run the build process INSIDE the expanded sdist dir
-            # this is because sip-wheel will get extra options from there :)
-            cd ${pyqt5_src_dir}
-            
-            echo "Generating PyQt5 wheel in "$(pwd)"..."
-            
-            # NOTE: 2023-03-23 14:03:48 - enable parallel jobs - to change, either:
-            # • change the value of the --jobs option (e.g. half the number of 
-            # cores in your system seems to be a good choice), or
-            # • remove the --jobs option altogether
-            if [[ $njobs -gt 0 ]] ; then
-                ${sip_wheel_exec} --qmake=${qmake_binary} --confirm-license --jobs $njobs --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
-            else
-                ${sip_wheel_exec} --qmake=${qmake_binary} --confirm-license --qt-shared --verbose --build-dir ../PyQt5-build --disable QtQuick3D --disable QtRemoteObjects --disable QtBluetooth --pep484-pyi
-            fi
-
-            if [[ $? -ne 0 ]] ; then
-                echo -e "sip Cannot build a PyQt5 wheel. Bailing out. Goodbye!\n"
-                echo -e "You might want to upgrade sip and Pyqt5-sip in this environment\n"
-                echo -e " by calling \n\n"
-                echo -e "pip install --upgrade sip\n"
-                echo -e "pip install --upgrade PyQt5-sip\n\n"
-                echo -e "Then run this script again"
-                exit 1
-            fi
-            
-            # NOTE: check is a wheel file has been produced; the filename typically
-            # ends in .whl and nis located in the source tree, NOT in the build tree!
-            # » if found then call pip to install it inside the 
-            # environment ⟶ IT WORKS!
-            wheel_file=`ls | grep whl`
-            if [ -z ${wheel_file} ] ; then
-                echo -e "No wheel file found in "$(pwd)" - goodbye!\n"
-                exit 1
-            else
-                if [ -z ${uv_exec} ] ; then
-                    pip install --force-reinstall ${wheel_file}
-                else
-                    ${uv_exec} pip install --force-reinstall ${wheel_file} 
-                fi
-                
-                if [[ $? -ne 0 ]] ; then
-                    echo -e "Cannot install the PyQt5 wheel; check console output. Goodbye!\n"
-                    exit 1
-                else
-                    echo "PyQt5 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt5build_done
-                    echo "PyQt5" > ${VIRTUAL_ENV}/.python_qt
-                    echo -e "\n\n=====================\n# Pyqt5 installed!\n=====================\n\n"
-                fi
-            fi
-        
-        else 
-            if [ -z ${uv_exec} ] ; then
-                pip install pyqt5
-            else
-                ${uv_exec} pip install pyqt5
-            fi
-            if [[ $? -ne 0 ]] ; then
-                echo -e "Cannot install PyQt5 from PyPi; check console output. Goodbye!\n"
-                exit 1
-            else
-                echo "PyQt5 pip package installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt6done
-                echo "PyQt5" > ${VIRTUAL_ENV}/.python_qt
-            fi
-        fi
-    fi
-}
-
-function dopyqt6 ()
-{
-    if [[ -z "$VIRTUAL_ENV" ]] ; then
-        echo -e "Not in an active environment! Goodbye!\n"
-        exit 1
-    fi
-    
-    if [ ! -r ${VIRTUAL_ENV}/.pyqt6done ] || [[ $reinstall_pyqt6 -gt 0 ]]; then
-        if [[ $build_pyqt6 -eq 1 ]] ; then
-            
-            findqmake6
-            
-            mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
-            
-            if [ `pwd` != "$VIRTUAL_ENV"/src ]; then
-                echo -e "Not inside $VIRTUAL_ENV/src - goodbye\n"
-                exit 1
-            fi
-            
-            # NOTE: 2025-06-22 14:57:15
-            # DON'T WORK AS ROOT !
-            py_exec="$VIRTUAL_ENV/bin/${python_exec}"
-            sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
-            if [[ `id -u` -eq 0 ]] ; then
-                echo -e "\n****\nCannot run as administrator!\n****\n"
-                exit 1
-            fi
-            
-#             echo "Using ${py_exec} as `whoami` to build PyQt6"
-            
-            # NOTE: locate_pyqt6_src.py uses distlib to locate the (latest) source 
-            # archive (i.e., the sdist) of PyQt6 - its file name typically ends with
-            # .tar.gz
-            pyqt6_src_url=`${py_exec} $installscriptdir/locate_pyqt6_src.py`
-            pyqt6_src=`basename $pyqt6_src_url`
-            
-            pyqt6_src_dir=${VIRTUAL_ENV}/src/${pyqt6_src%.tar.gz}
-            
-            echo "PyQt6 source is in "${pyqt6_src_dir}
-            
-            # NOTE: the sdist might have been downloaded alreay - so check this first
-            # before actually downloading
-            if [ ! -r ${pyqt6_src} ] ; then
-                wget ${pyqt6_src_url} && tar xzf ${pyqt6_src} 
-
-                if [[ $? -ne 0 ]] ; then
-                echo -e "Cannot obtain the PyQt6 source. Bailing out. Goodbye!\n"
-                exit 1
-                fi
-            else
-                if [ -d ${pyqt6_src_dir} ] ; then
-                    rm -fr ${pyqt6_src_dir}
-                fi
-                tar xzf ${pyqt6_src}
-            fi
-            
-            # NOTE: good practice is to create an out-of-source build tree, » ...
-            pyqt6_build_dir=${VIRTUAL_ENV}/src/"PyQt6-build"
-            
-            # NOTE: clear build dir if it exists -- best to start fresh
-            if [ -d ${pyqt6_build_dir} ] ; then
-                rm -fr ${pyqt6_build_dir}
-            fi
-            mkdir -p ${pyqt6_build_dir}
-            
-            # NOTE: » ... but run the build process INSIDE the expanded sdist dir
-            # this is because sip-wheel will get extra options from there :)
-            cd ${pyqt6_src_dir}
-            
-            echo "Generating PyQt6 wheel in "$(pwd)"..."
-            
-            # NOTE: 2023-03-23 14:03:48 - enable parallel jobs - to change, either:
-            # • change the value of the --jobs option (e.g. half the number of 
-            # cores in your system seems to be a good choice), or
-            # • remove the --jobs option altogether
-            if [[ $njobs -gt 0 ]] ; then
-                ${sip_wheel_exec} --verbose --build-dir ${pyqt6_build_dir} --qmake ${qmake6_binary} --confirm-license --license-dir ${pyqt6_src_dir}/sip --jobs $njobs
-            else
-                ${sip_wheel_exec} --verbose --build-dir ${pyqt6_build_dir} --qmake ${qmake6_binary} --confirm-license --license-dir ${pyqt6_src_dir}/sip
-            fi
-            
-            if [[ $? -ne 0 ]] ; then
-                echo -e "sip Cannot build a PyQt6 wheel. Bailing out. Goodbye!\n"
-                echo -e "You might want to upgrade sip and PyQt6-sip in this environment\n"
-                echo -e " by calling \n\n"
-                echo -e "pip install --upgrade sip\n"
-                echo -e "pip install --upgrade PyQt6-sip\n\n"
-                echo -e "Then run this script again"
-                exit 1
-            fi
-            
-            # NOTE: check is a wheel file has been produced; the filename typically
-            # ends in .whl » if found then call pip to install it inside the 
-            # environment ⟶ IT WORKS!
-            wheel_file=`ls | grep whl`
-            if [ -z ${wheel_file} ] ; then
-                echo -e "No wheel file found in "$(pwd)" - goodbye!\n"
-                exit 1
-            else
-                if [ -z ${uv_exec} ] ; then
-                    pip install --force-reinstall ${wheel_file}
-                else
-                    ${uv_exec} pip install --force-reinstall ${wheel_file} 
-                fi
-                
-                if [[ $? -ne 0 ]] ; then
-                    echo -e "Cannot install the PyQt6 wheel; check console output. Goodbye!\n"
-                    exit 1
-                else
-                    echo "PyQt6 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt6done
-                    echo "PyQt6" > ${VIRTUAL_ENV}/.python_qt
-                    echo -e "\n\n=====================\n# Pyqt6 installed!\n=====================\n\n"
-                fi
-            fi
-        else
-            if [ -z ${uv_exec} ] ; then
-                pip install pyqt6
-            else
-                ${uv_exec} pip install pyqt6
-            fi
-            if [[ $? -ne 0 ]] ; then
-                echo -e "Cannot install PyQt6 from PyPi; check console output. Goodbye!\n"
-                exit 1
-            else
-                echo "PyQt6 pip package installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt6done
-                echo "PyQt6" > ${VIRTUAL_ENV}/.python_qt
-            fi
-        fi
-    fi
-}
+# function dopyqt6 ()
+# {
+#     if [[ -z "$VIRTUAL_ENV" ]] ; then
+#         echo -e "Not in an active environment! Goodbye!\n"
+#         exit 1
+#     fi
+#
+#     if [ ! -r ${VIRTUAL_ENV}/.pyqt6done ] || [[ $reinstall_pyqt6 -gt 0 ]]; then
+#         if [[ $build_pyqt6 -eq 1 ]] ; then
+#
+#             findqmake6
+#
+#             mkdir -p ${VIRTUAL_ENV}/src && cd ${VIRTUAL_ENV}/src
+#
+#             if [ `pwd` != "$VIRTUAL_ENV"/src ]; then
+#                 echo -e "Not inside $VIRTUAL_ENV/src - goodbye\n"
+#                 exit 1
+#             fi
+#
+#             # NOTE: 2025-06-22 14:57:15
+#             # DON'T WORK AS ROOT !
+#             py_exec="$VIRTUAL_ENV/bin/${python_exec}"
+#             sip_wheel_exec="$VIRTUAL_ENV/bin/sip-wheel"
+#             if [[ `id -u` -eq 0 ]] ; then
+#                 echo -e "\n****\nCannot run as administrator!\n****\n"
+#                 exit 1
+#             fi
+#
+# #             echo "Using ${py_exec} as `whoami` to build PyQt6"
+#
+#             # NOTE: locate_pyqt6_src.py uses distlib to locate the (latest) source
+#             # archive (i.e., the sdist) of PyQt6 - its file name typically ends with
+#             # .tar.gz
+#             pyqt6_src_url=`${py_exec} $installscriptdir/locate_pyqt6_src.py`
+#             pyqt6_src=`basename $pyqt6_src_url`
+#
+#             pyqt6_src_dir=${VIRTUAL_ENV}/src/${pyqt6_src%.tar.gz}
+#
+#             echo "PyQt6 source is in "${pyqt6_src_dir}
+#
+#             # NOTE: the sdist might have been downloaded alreay - so check this first
+#             # before actually downloading
+#             if [ ! -r ${pyqt6_src} ] ; then
+#                 wget ${pyqt6_src_url} && tar xzf ${pyqt6_src}
+#
+#                 if [[ $? -ne 0 ]] ; then
+#                 echo -e "Cannot obtain the PyQt6 source. Bailing out. Goodbye!\n"
+#                 exit 1
+#                 fi
+#             else
+#                 if [ -d ${pyqt6_src_dir} ] ; then
+#                     rm -fr ${pyqt6_src_dir}
+#                 fi
+#                 tar xzf ${pyqt6_src}
+#             fi
+#
+#             # NOTE: good practice is to create an out-of-source build tree, » ...
+#             pyqt6_build_dir=${VIRTUAL_ENV}/src/"PyQt6-build"
+#
+#             # NOTE: clear build dir if it exists -- best to start fresh
+#             if [ -d ${pyqt6_build_dir} ] ; then
+#                 rm -fr ${pyqt6_build_dir}
+#             fi
+#             mkdir -p ${pyqt6_build_dir}
+#
+#             # NOTE: » ... but run the build process INSIDE the expanded sdist dir
+#             # this is because sip-wheel will get extra options from there :)
+#             cd ${pyqt6_src_dir}
+#
+#             echo "Generating PyQt6 wheel in "$(pwd)"..."
+#
+#             # NOTE: 2023-03-23 14:03:48 - enable parallel jobs - to change, either:
+#             # • change the value of the --jobs option (e.g. half the number of
+#             # cores in your system seems to be a good choice), or
+#             # • remove the --jobs option altogether
+#             if [[ $njobs -gt 0 ]] ; then
+#                 ${sip_wheel_exec} --verbose --build-dir ${pyqt6_build_dir} --qmake ${qmake6_binary} --confirm-license --license-dir ${pyqt6_src_dir}/sip --jobs $njobs
+#             else
+#                 ${sip_wheel_exec} --verbose --build-dir ${pyqt6_build_dir} --qmake ${qmake6_binary} --confirm-license --license-dir ${pyqt6_src_dir}/sip
+#             fi
+#
+#             if [[ $? -ne 0 ]] ; then
+#                 echo -e "sip Cannot build a PyQt6 wheel. Bailing out. Goodbye!\n"
+#                 echo -e "You might want to upgrade sip and PyQt6-sip in this environment\n"
+#                 echo -e " by calling \n\n"
+#                 echo -e "pip install --upgrade sip\n"
+#                 echo -e "pip install --upgrade PyQt6-sip\n\n"
+#                 echo -e "Then run this script again"
+#                 exit 1
+#             fi
+#
+#             # NOTE: check is a wheel file has been produced; the filename typically
+#             # ends in .whl » if found then call pip to install it inside the
+#             # environment ⟶ IT WORKS!
+#             wheel_file=`ls | grep whl`
+#             if [ -z ${wheel_file} ] ; then
+#                 echo -e "No wheel file found in "$(pwd)" - goodbye!\n"
+#                 exit 1
+#             else
+#                 if [ -z ${uv_exec} ] ; then
+#                     pip install --force-reinstall ${wheel_file}
+#                 else
+#                     ${uv_exec} pip install --force-reinstall ${wheel_file}
+#                 fi
+#
+#                 if [[ $? -ne 0 ]] ; then
+#                     echo -e "Cannot install the PyQt6 wheel; check console output. Goodbye!\n"
+#                     exit 1
+#                 else
+#                     echo "PyQt6 built and installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt6done
+#                     echo "PyQt6" > ${VIRTUAL_ENV}/.python_qt
+#                     echo -e "\n\n=====================\n# Pyqt6 installed!\n=====================\n\n"
+#                 fi
+#             fi
+#         else
+#             if [ -z ${uv_exec} ] ; then
+#                 pip install pyqt6
+#             else
+#                 ${uv_exec} pip install pyqt6
+#             fi
+#             if [[ $? -ne 0 ]] ; then
+#                 echo -e "Cannot install PyQt6 from PyPi; check console output. Goodbye!\n"
+#                 exit 1
+#             else
+#                 echo "PyQt6 pip package installed "$(date '+%Y-%m-%d_%H-%M-%s') > ${VIRTUAL_ENV}/.pyqt6done
+#                 echo "PyQt6" > ${VIRTUAL_ENV}/.python_qt
+#             fi
+#         fi
+#     fi
+# }
 
 function dopyside6 ()
 {
@@ -815,26 +815,28 @@ function dovigra ()
 function make_desktop_entry ()
 {
 target_dir=${HOME}/bin
-if [[ $with_pyside6 -eq 1 ]] ; then
-    if [[ $build_pyside6 -eq 1 ]] ; then
-        desktopfile=Scipyen-pyside6-build.desktop
-        scriptfile=${target_dir}/scipyen-pyside6-build
-    else 
-        desktopfile=Scipyen-pyside6-pypi.desktop
-        scriptfile=${target_dir}/scipyen-pyside6-pypi
-    fi
-elif [[ $with_pyqt5 -eq 1 ]] ; then
-    if [[ $build_pyqt5 -eq 1 ]] ; then
-        desktopfile=Scipyen-pyqt5-build.desktop
-        scriptfile=${target_dir}/scipyen-pyqt5-build
-    else 
-        desktopfile=Scipyen-pyqt5-pypi.desktop
-        scriptfile=${target_dir}/scipyen-pyqt5-pypi
-    fi
-else
-    desktopfile=Scipyen.desktop
-    scriptfile=${target_dir}/scipyen
-fi
+desktopfile=Scipyen.desktop
+scriptfile=${target_dir}/scipyen
+# if [[ $with_pyside6 -eq 1 ]] ; then
+#     if [[ $build_pyside6 -eq 1 ]] ; then
+#         desktopfile=Scipyen-pyside6-build.desktop
+#         scriptfile=${target_dir}/scipyen-pyside6-build
+#     else
+#         desktopfile=Scipyen-pyside6-pypi.desktop
+#         scriptfile=${target_dir}/scipyen-pyside6-pypi
+#     fi
+# elif [[ $with_pyqt5 -eq 1 ]] ; then
+#     if [[ $build_pyqt5 -eq 1 ]] ; then
+#         desktopfile=Scipyen-pyqt5-build.desktop
+#         scriptfile=${target_dir}/scipyen-pyqt5-build
+#     else
+#         desktopfile=Scipyen-pyqt5-pypi.desktop
+#         scriptfile=${target_dir}/scipyen-pyqt5-pypi
+#     fi
+# else
+#     desktopfile=Scipyen.desktop
+#     scriptfile=${target_dir}/scipyen
+# fi
 
 if [ ! -r ${VIRTUAL_ENV}/.desktop_done ] || [[ $reinstall_desktop -gt 0 ]] ; then
 # if [[ `id -u` -eq 0 ]] ; then
@@ -843,9 +845,6 @@ if [ ! -r ${VIRTUAL_ENV}/.desktop_done ] || [[ $reinstall_desktop -gt 0 ]] ; the
 # fi
 tmpfiledir=$(mktemp -d)
 tmpfile=${tmpfiledir}/${desktopfile}
-# script=${target_dir}/${scriptfile}
-# script=${scriptfile}
-# echo -e "Script to execute: ${script}"
 echo -e "Script to execute: ${scriptfile}"
 cat<<END > ${tmpfile}
 [Desktop Entry]
@@ -1227,30 +1226,13 @@ scriptfile=${target_dir}/scipyen
 
 if [[ $with_pyside6 -eq 1 ]] ; then
     if [[ $build_pyside6 -eq 1 ]] ; then
-        # scriptfile=${target_dir}/scipyen-pyside6-build
         qtenvpath=${VIRTUAL_ENV}/lib/python${major}.${minor}/PySide6/Qt/libexec
-#         launchcmd="${scipyensrcdir}/scipyen.py pyside6"
 
     else
-        # scriptfile=${target_dir}/scipyen-pyside6-pypi
         qtenvpath=""
-#         launchcmd="${scipyensrcdir}/scipyen.py pyside6"
+
     fi
 
-elif [[ $with_pyqt5 -eq 1 ]] ; then
-    if [[ $build_pyqt5 -eq 1 ]] ; then
-        # scriptfile=${target_dir}/scipyen-pyqt5-build
-        qtenvpath=""
-#         launchcmd="${scipyensrcdir}/scipyen.py pyqt6"
-    else
-        scriptfile=${target_dir}/scipyen-pyqt5-pypi
-        # qtenvpath=""
-#         launchcmd="${scipyensrcdir}/scipyen.py pyqt6"
-    fi
-
-# else
-#     scriptfile=${target_dir}/scipyen
-#     launchcmd=${scipyensrcdir}/scipyen.py
 fi
 
 launchcmd=${scipyensrcdir}/scipyen.py
@@ -1265,51 +1247,34 @@ if [ -r ${scriptfile} ] ; then
 fi
 shopt -s lastpipe
 
-# cat <<END > ${target_dir}/scipyen 
 cat <<END > ${scriptfile} 
 #! /bin/sh
+
 if [ -z \${VIRTUAL_ENV} ]; then
 source ${virtual_env}/bin/activate
 fi
+
 if [ -z \$BROWSER ]; then
 if [ -a \$VIRTUAL_ENV/bin/browser ]; then
 source \$VIRTUAL_ENV/bin/browser
 fi
 fi
+
 export LD_LIBRARY_PATH=${VIRTUAL_ENV}/lib:${VIRTUAL_ENV}/lib64:\${LD_LIBRARY_PATH}
 export OUTDATED_IGNORE=1
+
 a=\`which xrdb\` # do we have xrdb to read the X11 resources? (on Unix almost surely yes)
 if [ \$0 == 0 ] ; then
 if [ -r $scipyensrcdir/neuron_python/app-defaults/nrniv ] ; then
 xrdb -merge $scipyensrcdir/neuron_python/app-defaults/nrniv
 fi
 fi
-END
-if [[ ( $with_pyside6 -eq 1 ) || ( $build_pyside6 -eq 1 ) ]] ; then
-cat <<END >> ${scriptfile}
+
 export QT_API="pyside6"
 export PYQTGRAPH_QT_LIB="PySide6"
 export FORCE_QT_API="1"
 export PATH=${qtenvpath}:\${PATH}
 
-END
-elif [[ ( $with_pyqt6 -eq 1 ) || ( $build_pyqt6 -eq 1 ) ]] ; then
-cat <<END >> ${scriptfile} 
-export QT_API="pyqt6"
-export PYQTGRAPH_QT_LIB="PyQt6"
-export FORCE_QT_API="1"
-
-END
-elif [[ ( $with_pyqt5 -eq 1 ) || ( $build_pyqt5 -eq 1 ) ]] ; then
-cat <<END >> ${scriptfile} 
-export QT_API="pyqt5"
-export PYQTGRAPH_QT_LIB="PyQt5"
-export FORCE_QT_API="1"
-
-END
-
-fi
-cat <<END >> ${scriptfile} 
 run_in_debugger=0
 verbosity="" # "-v" or "-vv"
 frozenmodules=off
@@ -1331,8 +1296,8 @@ echo -e "\n --nonativemenubar: Attach all menu bars to their corresponding top-l
 echo -e "\n -h | -? | --h | --help: Shows this help message and quit.\n\n"
 }
 
-for i in "$@" ; do
-    case $i in
+for i in "\$@" ; do
+    case \$i in
         --debug)
         run_in_debugger=1
         shift
@@ -1381,10 +1346,14 @@ export QT_USE_NATIVE_MENUBAR=\$nativemenubar
 
 if [[ \$run_in_debugger -eq 1 ]] then
     ${python_executable} \$verbosity -Xfrozen_modules=\$frozenmodules -m pdb ${launchcmd} "\$*"
+
 else
     ${python_executable} \$verbosity -Xfrozen_modules=\$frozenmodules ${launchcmd} "\$*"
+
 fi
+
 END
+
 shopt -u lastpipe
 # chmod +x ${target_dir}/scipyen 
 chmod +x ${scriptfile}
@@ -1422,12 +1391,12 @@ using_python=""
 install_neuron=0
 use_pypi_neuron=1
 use_core_neuron=0
-with_pyqt6=1
-build_pyqt6=0
-with_pyqt5=0
-build_pyqt5=0
-with_pyside6=0
-build_pyside6=0
+# with_pyside6=1 # this is now the default 2026-08-04 10:30:35
+build_pyside6=1
+# with_pyqt6=0
+# build_pyqt6=0
+# with_pyqt5=0
+# build_pyqt5=0
 install_fenicsx=0
 njobs=`nproc --all`
 reinstall_desktop=0
@@ -1457,51 +1426,51 @@ for i in "$@" ; do
         use_pypi_neuron=0
         shift
         ;;
-        --build_pyqt6)
-        with_pyqt6=1
-        build_pyqt6=1
-        with_pyqt5=0
-        build_pyqt5=0
-        with_pyside6=0
-        build_pyside6=0
-        shift
-        ;;
-        --with_pyside6)
-        with_pyqt6=0
-        build_pyqt6=0 
-        with_pyqt5=0
-        build_pyqt5=0 
-        with_pyside6=1
-        build_pyside6=0
-        shift
-        ;;
+        # --build_pyqt6)
+        # with_pyqt6=1
+        # build_pyqt6=1
+        # with_pyqt5=0
+        # build_pyqt5=0
+        # with_pyside6=0
+        # build_pyside6=0
+        # shift
+        # ;;
+        # --with_pyside6)
+        # with_pyside6=1
+        # build_pyside6=0
+        # with_pyqt6=0
+        # build_pyqt6=0
+        # with_pyqt5=0
+        # build_pyqt5=0
+        # shift
+        # ;;
         --build_pyside6)
-        with_pyqt6=0
-        build_pyqt6=0
-        with_pyqt5=0
-        build_pyqt5=0 
-        with_pyside6=1
         build_pyside6=1
+        # with_pyside6=1
+        # with_pyqt6=0
+        # build_pyqt6=0
+        # with_pyqt5=0
+        # build_pyqt5=0
         shift
         ;;
-        --with_pyqt5)
-        with_pyqt5=1
-        build_pyqt5=0 
-        with_pyqt6=0
-        build_pyqt6=0
-        with_pyside6=0
-        build_pyside6=0
-        shift
-        ;;
-        --build_pyqt5)
-        with_pyqt5=1
-        build_pyqt5=1
-        with_pyqt6=0
-        build_pyqt6=0
-        with_pyside6=0
-        build_pyside6=0
-        shift
-        ;;
+        # --with_pyqt5)
+        # with_pyqt5=1
+        # build_pyqt5=0
+        # with_pyqt6=0
+        # build_pyqt6=0
+        # with_pyside6=0
+        # build_pyside6=0
+        # shift
+        # ;;
+        # --build_pyqt5)
+        # with_pyqt5=1
+        # build_pyqt5=1
+        # with_pyqt6=0
+        # build_pyqt6=0
+        # with_pyside6=0
+        # build_pyside6=0
+        # shift
+        # ;;
         --with_coreneuron)
         use_core_neuron=1
         shift
@@ -1576,6 +1545,7 @@ for i in "$@" ; do
         shift
         ;;
         *)
+        shift
         ;;
     esac
 done
@@ -1681,13 +1651,17 @@ if [[ ( -n "$VIRTUAL_ENV" ) && ( -d "$VIRTUAL_ENV" ) ]] ; then
     # see changelog above)
     
     if  [[ ( $with_pyside6 -eq 1 ) || ( $build_pyside6 -eq 1 ) ]]  ; then
-
         dopyside6
+
     elif [[ ( $with_pyqt5 -eq 1 ) || ( $build_pyqt5 -eq 1 ) ]] ; then
-        dopyqt5 
+        echo -e "PyQt5 is no longer supported"
+        exit -1
+        # dopyqt5
 
     else
-        dopyqt6
+        echo -e "PyQt6 is no longer supported"
+        exit -1
+        # dopyqt6
 
     fi
     
