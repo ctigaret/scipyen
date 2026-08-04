@@ -5026,12 +5026,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
                 if len(indexList) != 1:
                     return
 
-                item, varname = self._getWorkspaceVarItemAndName_(indexList[0])
+                _, varname = self._getWorkspaceVarItemAndName_(indexList[0])
 
                 if varname is None or isinstance(varname, str) and len(varname.strip()) == 0:
                     return
 
-                if varname not in self.workspace.keys():
+                if varname not in self.workspace:#.keys():
                     return
 
         return varname
