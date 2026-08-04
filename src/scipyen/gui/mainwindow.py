@@ -5018,11 +5018,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         varname = getattr(self, "currentVarItemName", None)
         with qtutils.SignalBlocker((self.workspaceView,
                                     self.workspaceModel,
-                                    self.workspaceModel.selectionModel)):
-            # signalBlockers = [QtCore.QSignalBlocker(self.workspaceView),
-            #                 QtCore.QSignalBlocker(self.workspaceModel),
-            #                 QtCore.QSignalBlocker(self.workspaceView.selectionModel())]
-
+                                    self.workspaceView.selectionModel())):
 
             if varname is None:
                 indexList = self.workspaceView.selectedIndexes()

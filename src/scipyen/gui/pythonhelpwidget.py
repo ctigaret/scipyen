@@ -79,7 +79,7 @@ else:
     
 from IPython.core.interactiveshell import InteractiveShell
 import pygments
-from core import prog
+from core import prog, qtutils
 from core.prog import safewrapper, safeguiwrapper, scipywarn
 from core.sysutils import adapt_ui_path
 from core import strutils
@@ -213,22 +213,22 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                 
             return cls._instance
         
-    _scipyen_specific_ = "\n".join(["Scipyen-specific NOTES:",
+    _scipyen_specific_ = "\n".join(["Scipyen-specific NOTES:", # noqa
                                 "------------------------ ",
                                 "Enter a query to access the help system of IPython (e.g. one of `thing`, `?thing`, `thing?`, `??thing`, `thing??`, `?`, or `??`) or Python (e.g., `help(thing)`)",
                                 "Supports help-related IPython tools: `?`, `??`, and the line magics `quickref` and `psearch`",
                                 "Enter the magic name without the `%` prefix, followed by arguments, to execute it (e.g. `psearch <pattern…>`), or the magic name WITH the `%` prefix to read its documentation (e.g. `%psearch`)",
                                 "NOTE: This does not substitute the Python 'help' command or IPython's help system ('?<object>') at the console, but it does help to 'free' up the console during such queries."])
     
-    def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow] = None,
-                 shell:typing.Optional[InteractiveShell]=None,
+    def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow] = None, # noqa
+                 shell: typing.Optional[InteractiveShell]=None, # noqa
                  **kwargs):
         if __has_PySide6__:# or __has_PyQt6__:
             super().__init__(parent)
         else:
             super(QtWidgets.QWidget, self).__init__(parent)
             
-        self._cache_ = dict()
+        self._cache_ = {}
         
         if not isinstance(shell, InteractiveShell):
             shell = guiutils.getScipyenConsoleShell()
@@ -244,7 +244,7 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                 helper = pydoc.Helper(output = bf)
                 helper.intro()
                 msg = bf.getvalue()
-                parts = list(map(lambda s: s.replace("\n", " "), msg.split("\n\n")))
+                parts = list(map(lambda s: s.replace("\n", " "), msg.split("\n\n"))) # noqa
                 parts = parts[:-1]
                 parts += (self._scipyen_specific_.splitlines())
                 # parts.append("\n".join(["Scipyen-specific NOTES:",
@@ -255,7 +255,7 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
                 self.intro_msg = "\n\n".join(parts)
                 # print(f"{self.__class__.__name__}.__init__: placeHolder_msg = {self.placeHolder_msg}")
             
-        except:
+        except: # noqa
             traceback.print_exc()
             self.intro_msg = ""
         
@@ -428,9 +428,9 @@ class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.loadSettings()
         
     def help(self, cmd:str):
-        signalBlockers = QtCore.QSignalBlocker(self.helpWidget.queryComboBox)
-        self.helpWidget.queryComboBox.lineEdit().setText(cmd)
-        self.helpWidget._slot_processQuery()
+        with qtutils.SignalBlocker(self.helpWidget.queryComboBox):
+            self.helpWidget.queryComboBox.lineEdit().setText(cmd)
+            self.helpWidget._slot_processQuery()
 
     def closeEvent(self, evt):
         self.saveSettings()
