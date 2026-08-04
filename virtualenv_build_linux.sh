@@ -1714,7 +1714,9 @@ seconds=$(( t ))
 echo "Execution time was $days days, $hours hours, $minutes minutes and $seconds seconds"
 echo "Before using Scipyen, either restart the terminal, or call 'source ${rcfile}'"
 echo "Scipyen can be launched by calling ${scriptfile} or via the ${dfile} application in your Applications launcher or in your Desktop folder"
-
+echo ""
+echo "If you have previously run Scipyen uner a PyQt* environment please remove"
+echo "your confuguration files manually before launching Scipyen."
 #
 #### END   Main script action happens here ###
 
