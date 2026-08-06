@@ -75,8 +75,11 @@ class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
     sig_pathChanged = Signal(pathlib.Path, name = "sig_pathChanged")
     sig_dataChanged = Signal(name = "sig_dataChanged")
     _sig_newPath_ = Signal(pathlib.Path, name = "_sig_newPath_")
-    sig_dispatchAction = Signal([partial], [types.FunctionType],
-                                name="sig_dispatchAction")
+    if __has_PySide6__:
+        sig_dispatchAction = Signal(object, name="sig_dispatchAction")
+    else:
+        sig_dispatchAction = Signal([partial], [types.FunctionType],
+                                    name="sig_dispatchAction")
 
     def __init__(self,
                  initial: typing.Optional[pathlib.Path] = None,
@@ -140,7 +143,10 @@ class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
                          # fileName = suggestedName,
                          save=False, single=True, asPath=True)
 
-        self.sig_dispatchAction.emit(fn)
+        if __has_PySide6__:
+            self.sig_dispatchAction.emit(fn)
+        else:
+            self.sig_dispatchAction[partial].emit(fn)
 
     @Slot()
     def _slot_launchAction_(self):

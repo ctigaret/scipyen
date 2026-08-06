@@ -1,3 +1,4 @@
+# __scipyen_plugin__
 # -*- coding: utf-8 -*-
 # $Id: svgviewer.py $
 # SPDX-FileCopyrightText: 2025 Cezar M. Tigaret <cezar.tigaret@gmail.com>
@@ -32,14 +33,14 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
+
     from qtpy import sip
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
-    
+
 
 #### END 3rd party modules
 
@@ -62,7 +63,6 @@ from gui.widgets import svgwidgets
 
 # NOTE: 2022-12-25 23:08:51
 # needed for the new plugins framework
-__scipyen_plugin__ = None
 
 class SVGViewer(ScipyenViewer):
     viewer_for_types = {strutils.is_svg:100,

@@ -451,12 +451,13 @@ def getQt6Plugins(path):
 def check_plugin_module(file_name) -> bool:
     with open(file_name, "rt", encoding="utf-8") as module_file:
         for line in module_file:
-            if line.startswith('__scipyen_plugin__') or line.startswith("def init_scipyen_plugin"):
+            if '__scipyen_plugin__' in line or line.startswith("def init_scipyen_plugin"):
                 return True
             
     return False
 
 def check_bytecode_plugin(file_name) -> bool:
+    import marshal
     with open(file_name, "rb") as pycfile:
         _ = pycfile.read(16) # Header is 16 bytes in 3.6+, 8 bytes on < 3.6
         loaded = marshal.load(pycfile)

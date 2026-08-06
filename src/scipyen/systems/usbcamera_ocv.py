@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# __scipyen_plugin__
 # SPDX-FileCopyrightText: 2025 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later

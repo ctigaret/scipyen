@@ -1,11 +1,11 @@
-# -*- coding: utf-8 -*-
+# __scipyen_plugin__
 # $Id: ${curvefittingtool} $
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 
-r"""
+r""" Curve fitting plugin
 """
 
 # TODO: 2026-02-09 12:45:17 FIXME
@@ -142,8 +142,6 @@ if "darwin" in sys.platform:
 else:
     altKeyDescr = "<ALT>"
     ctrlKeyDescr = "<CTRL>"
-
-__scipyen_plugin__ = None
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]

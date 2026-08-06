@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
-# SPDX-License-Identifier: GPL-3.0-or-later
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -47,9 +43,9 @@ from core.workspacefunctions import (user_workspace, validate_varname, get_symbo
 from core.scipyen_config import (ScipyenConfigurable, saveWindowSettings, loadWindowSettings) # noqa
 
 from core import strutils, sysutils # , qtutils
-from core.qtutils import (qVariant, QVariantType, fromQVariant)
+from core.qtutils import (qVariant, QVariantType, fromQVariant) # noqa
 from core.strutils import InflectEngine # noqa
-from core.prog import (print_styled, scipywarn) # noqa
+from core.prog import (print_styled, scipywarn, timefunc) # noqa
 import gui.quickdialog as qd
 from gui.itemslistdialog import ItemsListDialog
 import gui.pictgui as pgui
@@ -91,12 +87,12 @@ class DirectoryFileWatcher(QtCore.QObject):
                           "filesChanged", )
 
     def __init__(self, parent=None, emitter = None,
-                 directory:typing.Optional[typing.Union[str, pathlib.Path]] = None,
-                 observer:typing.Optional[object] = None):
+                 directory: typing.Optional[typing.Union[str, pathlib.Path]] = None, # noqa
+                 observer: object | None = None):
         super().__init__(parent=parent)
-        self._newFiles_     = list()
-        self._removedFiles_ = list()
-        self._changedFiles_ = list()
+        self._newFiles_     = []
+        self._removedFiles_ = []
+        self._changedFiles_ = []
         self._source_       = None
         self._observer_     = None
         self._watchedDir_   = None
@@ -115,28 +111,6 @@ class DirectoryFileWatcher(QtCore.QObject):
         self._source_.sig_itemsChangedInMonitoredDir.connect(self.slot_filesChanged, type=QtCore.Qt.QueuedConnection)
 
         self.directory = directory
-
-        # if isinstance(emitter, QtCore.QObject):
-        #     if all(hasattr(emitter, x) and isinstance(inspect.getattr_static(emitter, x), QtCore.Signal) for x in self.emitter_sigs):
-        #         self._source_ = emitter
-        #         self._source_.sig_newItemsInMonitoredDir.connect(self.slot_newFiles, type=QtCore.Qt.QueuedConnection)
-        #         self._source_.sig_itemsRemovedFromMonitoredDir.connect(self.slot_filesRemoved, type=QtCore.Qt.QueuedConnection)
-        #         self._source_.sig_itemsChangedInMonitoredDir.connect(self.slot_filesChanged, type=QtCore.Qt.QueuedConnection)
-
-
-        # if directory is None:
-        #     if isinstance(self._source_, QtCore.QObject) and hasattr(self._source_, "currentDir"):
-        #         if isinstance(self._source_.currentDir, str) and pathlib.Path(self._source_.currentDir).absolute().is_dir():
-        #             self._watchedDir_ = pathlib.Path(self._source_.currentDir).absolute()
-        #
-        # elif isinstance(directory, str):
-        #     self._watchedDir_ = pathlib.Path(directory)
-        #
-        # elif isinstance(directory, pathlib.Path):
-        #     self._watchedDir_ = directory
-        #
-        # else:
-        #     raise TypeError(f"'directory' expected to be a str, a pathlib.Path, or None; instead, got {type(directory).__name__}")
 
     def _check_emitter_(self, obj:QtCore.QObject) -> bool:
         # print(f"{self.__class__.__name__}._check_emitter_(obj):")
@@ -157,11 +131,11 @@ class DirectoryFileWatcher(QtCore.QObject):
         return ret
 
     @property
-    def directory(self) -> typing.Optional[pathlib.Path]:
+    def directory(self) -> pathlib.Path | None:
         return self._watchedDir_
 
     @directory.setter
-    def directory(self, val:typing.Optional[typing.Union[str, pathlib.Path]]):
+    def directory(self, val:typing.Optional[typing.Union[str, pathlib.Path]]): # noqa
         # if not (isinstance(self._source_, QtCore.QObject) and all(hasattr(self._source_, v) for v in ("currentDir", "enableDirectoryMonitor", "monitoredDirectories"))):
         #     scipywarn("Cannot monitor directories as we don't have a valid signal emitter")
         #     return
@@ -1644,7 +1618,8 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             except: # noqa
                 traceback.print_exc()
 
-    def adaptToRCIcons(self, obj: typing.Optional[
+    # @timefunc
+    def adaptToRCIcons(self, obj: typing.Optional[ # noqa
         QtWidgets.QWidget | QAction
         ] = None):
         from gui import guiutils

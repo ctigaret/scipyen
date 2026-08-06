@@ -318,7 +318,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             parent = parent.parent()
 
         # print(f"{self.__class__.__name__}._slot_indexCollapsed -> depth = {depth}")
-        if depth-1 > self._currentExpansionDepth_:
+        if depth-1 > self._currentExpansionDepth_: # noqa
             self._currentExpansionDepth_ = depth-1
 
 
@@ -481,7 +481,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         if self._obj_to_view_[0] is dataclasses.MISSING or len(self._obj_to_view_[1].strip()) == 0:
             return
 
-        variable, varname = self._obj_to_view_[:2]
+        variable, _ = self._obj_to_view_[:2]
         self._showInConsole_(variable)
         self._obj_to_view_ = (dataclasses.MISSING, "")
 
@@ -567,8 +567,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                                     askForParams=askForParams):
                 self._showInConsole_(variable)
         else:
-            if isinstance(variable, tuple(self.viewer_for_types.keys())):
-                if isinstance(self.parent(), DataTreeViewer):
+            if isinstance(self.parent(), DataTreeViewer):
+                if isinstance(variable, tuple(self.parent().viewer_for_types.keys())):
                     self.parent().view(variable, doc_title = varname)
                 else:
                     self._showInConsole_(variable)
@@ -808,7 +808,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         ) -> tuple:
 
         names, objects = zip(
-            *list(
+            *list( # noqa
                     map(
                         lambda i: (
                                     i.data(QtCore.Qt.DisplayRole),
@@ -831,7 +831,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         return names, objects
 
     def exportDataForItems(self: typing.Self,
-                           items: typing.Sequence[QtGui.QStandardItem] = list(),
+                           items: typing.Sequence[QtGui.QStandardItem] = [],
                            fullPathAsName: bool = False,
                            pathOnly: bool = False) -> tuple:
 
@@ -844,7 +844,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         # l_getName = lambda i: self.model().getPathForLeaf(i) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
         # l_getName = lambda i: self.sourceModel.getPathForLeaf(self.proxyModel.mapToSource(i)) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
 
-        selection = list(
+        selection = list( # noqa
                         map(
                             lambda i: (
                                         l_getName(i),
@@ -868,8 +868,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         if len(selection):
             names, objects = zip(*selection)
         else:
-            names = list()
-            objects = list()
+            names = []
+            objects = []
 
         if pathOnly:
             return names
@@ -879,7 +879,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     def getSelectedPaths(self: typing.Self) -> typing.Sequence:
         items = self.selectedItems()
         if len(items) == 0:
-            return list()
+            return []
 
         return self.exportDataForItems(items, pathOnly = True)
 

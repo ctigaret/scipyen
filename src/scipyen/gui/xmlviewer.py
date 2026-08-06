@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# __scipyen_plugin__
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -25,7 +25,7 @@ import xml.dom.minidom
 #### END core python modules
 
 #### BEGIN 3rd party modules
-# 2016-09-25 21:28:37 
+# 2016-09-25 21:28:37
 # add XMl text viewer, schema viewer and xquery editor
 
 # 2016-08-16 09:30:07
@@ -48,14 +48,14 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
+
     from qtpy import sip
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
-    
+
 
 
 #### END 3rd party modules
@@ -71,9 +71,6 @@ from gui import quickdialog
 #### END pict.gui modules
 
 
-# NOTE: 2022-12-25 23:08:51
-# needed for the new plugins framework
-__scipyen_plugin__ = None
 
 # 2016-08-16 23:55:53
 class DomItem(object):

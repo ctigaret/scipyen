@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-# -*- coding: utf-8 -*-
 # $Id: filesystemmodel.py $
 # SPDX-FileCopyrightText: 2025 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
-r"""
+r""" Custom file system model
 """
 import os, sys, pathlib, traceback, typing, types, stat, datetime # noqa
 import dataclasses

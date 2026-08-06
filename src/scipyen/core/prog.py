@@ -52,7 +52,7 @@ import pandas as pd
 import colorama
 
 import qtpy # noqa
-from qtpy import (QtGui, QtWidgets)#, QtCore) #, QtXml, QtSvg, QtNetwork, )
+from qtpy import (QtCore, QtGui, QtWidgets) # noqa, QtCore) #, QtXml, QtSvg, QtNetwork, )
 # from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
@@ -1053,10 +1053,10 @@ class SpecFinder(importlib_abc.MetaPathFinder):
 
 def signature_as_dict(
     sig,
-    name: typing.Optional[str] = None,
-    qualname: typing.Optional[str] = None,
-    module: typing.Optional[str] = None,
-    allstr: typing.Optional[bool] = False,
+    name: str | None = None,
+    qualname: str | None = None,
+    module: str | None = None,
+    allstr: bool | None = False,
 ) -> Bunch:
     r"""A dictionary-like presentation of an inspect.Signature object.
 
@@ -1275,7 +1275,7 @@ def signature_as_dict(
 
 
 def makeSignature(dct: Bunch) -> Signature:
-    parameters = list()
+    parameters = []
     for p, val in dct.positional.items():
         # no default value for these ones
         parameters.append(Parameter(p, Parameter.POSITIONAL_ONLY, annotation=val))
@@ -2331,7 +2331,7 @@ def safewrapper(f, *args, **kwargs):
         try:
             return f(*args, **kwargs)
 
-        except Exception as e:
+        except Exception as e: # noqa
             stars = "".join(["*"] * len(f.__name__))
             print("\n%s\nIn function %s:\n%s" % (stars, f.__name__, stars))
             traceback.print_exc()
@@ -2345,12 +2345,12 @@ def safeguiwrapper(f, *args, **kwargs):
         try:
             return f(*args, **kwargs)
 
-        except Exception as e:
+        except Exception as e: # noqa
             s = io.StringIO()
             sei = sys.exc_info()
             traceback.print_exception(file=s, *sei)
-            msgbox = QMessageBox()
-            msgbox.setIcon(QMessageBox.Critical)
+            msgbox = QtWidgets.QMessageBox()
+            msgbox.setIcon(QtWidgets.QMessageBox.Critical)
             msgbox.setWindowTitle(sei[0].__class__.__name__)
             msgbox.setText(sei[0].__class__.__name__)
             msgbox.setDetailedText(s.getvalue())
@@ -2370,11 +2370,29 @@ def timefunc(func):
         start = time.perf_counter()
         r = func(*args, **kwargs)
         end = time.perf_counter()
-        print("{}.{} : {} s".format(func.__module__, func.__name__, end - start))
+        print(f"{func.__module__}.{func.__name__} : {end-start} s") #.format(func.__module__, func.__name__, end - start))
         return r
 
     return wrapper
 
+def timemethod(func):
+    r"""Decorator for timing function execution
+    Recipe 14.13 "Profiling and Timing Your Programs"
+    From Python Cookbook 3rd Ed. 2013
+    """
+
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        start = time.perf_counter()
+        r = func(self, *args, **kwargs)
+        end = time.perf_counter()
+        selfName = ""
+        if isinstance(self, QtCore.QObject) and hasattr(self, "objectName"):
+            selfName = f"<{self.objectName()}>"
+        print(f"{self.__class__.__module__}{self.__class__.__name__}{selfName}.{func.__name__} : {end-start} s") #.format(func.__module__, func.__name__, end - start))
+        return r
+
+    return wrapper
 
 def processtimefunc(func):
     r"""Recipe 14.13 "Profiling and Timing Your Programs"

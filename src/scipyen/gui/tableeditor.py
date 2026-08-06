@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# __scipyen_plugin__
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -99,7 +99,6 @@ from ephys import (ephys, ephys_pathways)
 
 # NOTE: 2022-12-25 23:08:51
 # needed for the new plugins framework
-__scipyen_plugin__ = None
 
 class TableEditor(ScipyenViewer):
     r"""Viewer/Editor for tabular data

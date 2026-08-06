@@ -1,3 +1,4 @@
+# __scipyen_plugin__
 # -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -118,7 +119,6 @@ mpldatacursor (for python 3)
 
 # NOTE: 2022-12-25 23:08:51
 # needed for the new plugins framework
-__scipyen_plugin__ = None
 
 # from pprint import pprint
 

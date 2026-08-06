@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# __scipyen_plugin__
 # $Id: ${datatreeviewer} $
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -6,10 +6,10 @@
 
 
 r"""
+Views the structure of an object.
 Qt-based viewer window for dict and subclasses.
-
-Replaces DataViewer
 """
+
 
 # TODO: 2026-02-09 12:45:17 FIXME
 # CLEAR UP THE IMPORTS AND OTHER STUFF COPIED OVER FROM DATAVIEWER
@@ -113,15 +113,6 @@ if "darwin" in sys.platform:
 else:
     altKeyDescr = "<ALT>"
     ctrlKeyDescr = "<CTRL>"
-
-
-
-# NOTE: 2022-12-25 23:08:51
-# needed for the new plugins framework
-# This plugins does not install a custom menu, but DOES provide a viewer type
-# hence we flag it using __scipyen_plugin__ (we could have defined
-# init_scipyen_plugin instead, to return an empty dict)
-__scipyen_plugin__ = None
 
 class DataTreeViewer(ScipyenViewer):
     r"""Replacement for DataViewer.

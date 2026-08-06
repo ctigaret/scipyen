@@ -128,14 +128,14 @@ def check_independent_variable(x:typing.Union[Real, np.ndarray], ndim:typing.Opt
 @decorator
 def modelfunction(f:typing.Callable, /,
                   nvars:int=1,
-                  title:typing.Optional[str] = None ,
-                  coefficients:typing.Optional[typing.Sequence[str]] = None,
-                  coefficient_units:typing.Optional[dict] = None,
-                  expression:typing.Optional[typing.Union[sympy.Basic, str]] = None,
-                  fitting:typing.Optional[FittingCoefficientsDict] = None,
+                  title:typing.Optional[str] = None , # noqa
+                  coefficients:typing.Optional[typing.Sequence[str]] = None, # noqa
+                  coefficient_units:typing.Optional[dict] = None, # noqa
+                  expression:typing.Optional[typing.Union[sympy.Basic, str]] = None, # noqa
+                  fitting: FittingCoefficientsDict | None = None,
                   displaySVG:bool = False,
-                  domainUnits:typing.Optional[pq.Quantity] = None,
-                  units:typing.Optional[pq.Quantity] = None,
+                  domainUnits: pq.Quantity | None = None,
+                  units: pq.Quantity | None = None,
                   **kwargs):
     r"""Decorator to tag a function as a mathematical model function.
 

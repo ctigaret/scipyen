@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-r"""
+r"""Delegates for Scipyen's item viewers
 """
 import os, sys, typing, types, math, pathlib, enum, datetime # noqa
 from functools import partial
@@ -17,7 +17,7 @@ __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
+    import PySide6 # noqa
     from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
@@ -40,7 +40,7 @@ __has_qtdbus__ = False
 try:
     from qtpy import QtDBus # noqa
     __has_qtdbus__ = True
-except:
+except: # noqa
     __has_qtdbus__ = False
 
 from core.datatypes import (is_namedtuple, TypeEnum) # noqa
@@ -127,7 +127,7 @@ NOTE: To be used with my custom itemmodels
 
     def chooseEditor(self) -> QtWidgets.QWidget:
         # print(f"{self.__class__.__name__}.chooseEditor for {type(self._data_).__name__}")
-        from gui.widgets import (synapticstimuluswidget,
+        from gui.widgets import (synapticstimuluswidget, # noqa
                                  synapticpathwaywidget,
                                  auxiliaryiowidget,
                                  recordingsourcewidget,
@@ -896,6 +896,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
     @Slot(partial)
     @Slot(types.FunctionType)
+    @Slot(object)
     def _slot_dispatchedAction_(self,
                                 fn: typing.Union[partial, types.FunctionType]):
         sender = self.sender()
@@ -1059,7 +1060,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         # CAUTION: Standard item model and standard items treat DisplayRole and
         # DisplayRole as being the same; in such case I need a custom role
         dataChoices = index.data(DataChoicesRole) # noqa
-        if isinstance(data, enum.Enum):
+        if isinstance(data, enum.Enum): # noqa
             if dataChoices is None:
                 dataChoices = dict(map(lambda x: (x.name, x.value), type(data)))
 

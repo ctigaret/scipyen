@@ -244,7 +244,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
     def _makeObjectRow_(self: typing.Self, obj: object, /,
                        objDict: dict, objKey: object,
-                       objKeyType: type, visited:tuple=tuple()) -> tuple:
+                       objKeyType: type, visited:tuple=()) -> tuple:
 
         typeName = objDict["objType"].__name__
 
@@ -327,12 +327,17 @@ class DataTreeModel(QtGui.QStandardItemModel):
             item2 = QtGui.QStandardItem(f"<reference to {targetPath}>")
         else:
             item2 = QtGui.QStandardItem(f"{info}")
+
             if isinstance(obj, pathlib.Path):
-                item2.setData(obj, QtCore.Qt.EditRole)
+                if __has_PySide6__:
+                    item2.setData(obj, ObjectDataRole)
+                    item2.setData(info, QtCore.Qt.EditRole)
+                else:
+                    item2.setData(obj, QtCore.Qt.EditRole)
             else:
                 item2.setData(info, QtCore.Qt.EditRole)
 
-            choices = objDict.get("choices", dict())
+            choices = objDict.get("choices", {})
             item2.setData(choices, DataChoicesRole) # noqa
 
 
@@ -1269,13 +1274,12 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(bytes)
     @_parseObject_.register(bytearray)
     def __parseObject_(self: typing.Self, obj: typing.Union[str, bytes, bytearray], # noqa
-          choices: dict = dict(),
-          _: bool = True) -> tuple:
+          choices: dict = {}, _: bool = True) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        if not isinstance(choices, dict):
+        if not isinstance(choices, dict): # noqa
             if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
-                choices = dict()
+                choices = {}
         readOnly = False
         readOnlyChildren = False
         objDataAsChild = False
@@ -1300,7 +1304,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "objInfo": info,
             "objType": objType,
             "objTip": tip,
-            "memberAccess": tuple(),
+            "memberAccess": (),
             "accessType": None,
             "choices": choices,
             "readOnly": readOnly,
@@ -1310,13 +1314,12 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
     @_parseObject_.register(pathlib.Path)
     def __parseObject_(self: typing.Self, obj: pathlib.Path, # noqa
-          choices: dict = dict(),
-          _: bool = True) -> tuple:
+          choices: dict = {}, _: bool = True) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        if not isinstance(choices, dict):
+        if not isinstance(choices, dict): # noqa
             if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
-                choices = dict()
+                choices = {}
         # info = f"{obj}"
         info = obj.as_posix()
         tip = objType.__name__
@@ -2101,15 +2104,15 @@ class DataTreeModel(QtGui.QStandardItemModel):
             }
 
     def itemChildren(self: typing.Self,
-                     item: QtGui.QStandardItem) -> typing.List:
+                     item: QtGui.QStandardItem) -> list:
         if not item.hasChildren():
-            return list()
+            return []
 
-        return list(map(lambda k: item.child(k, 0), range(item.rowCount())))
+        return [item.child(k, 0) for k in range(item.rowCount())]
+        # return list(map(lambda k: item.child(k, 0), range(item.rowCount())))
 
     def getDataObjectForLeaf(self: typing.Self,
-                             leaf: typing.Union[QtCore.QModelIndex,
-                                                QtGui.QStandardItem],
+                             leaf: QtCore.QModelIndex | QtGui.QStandardItem,
                              byPath: bool = True,
                              ) -> object:
 
@@ -2128,8 +2131,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             return leaf.data(ObjectDataRole) # noqa
 
     def getPathForLeaf(self: typing.Self,
-                       leaf: typing.Union[QtCore.QModelIndex,
-                                          QtGui.QStandardItem],
+                       leaf: QtCore.QModelIndex | QtGui.QStandardItem,
                        pathOnly: bool = False,
                        # includeRoot:bool = False
                        ) -> str:
@@ -2142,15 +2144,14 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
     def _getPathForItemOrIndex_(
         self: typing.Self,
-        indexOrItem: typing.Union[QtCore.QModelIndex,
-                            QtGui.QStandardItem]
+        indexOrItem: QtCore.QModelIndex | QtGui.QStandardItem
         ) -> typing.Sequence:
         if isinstance(indexOrItem, QtCore.QModelIndex):
             item = self.itemFromIndex(indexOrItem)
         else:
             item = indexOrItem
 
-        path = list()
+        path = []
 
         if not item:
             # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: invalid item {item}")

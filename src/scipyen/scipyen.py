@@ -29,6 +29,12 @@ from core import scipyen_config
 #
 # ### END Scipyen modules
 
+# ### BEGIN suppress annoying jedi UserWarnings about PySide6 mmodules not importable
+#
+warnings.filterwarnings("ignore", message="^.*not importable.*$")
+#
+# ### END   suppress annoying jedi UserWarnings about PySide6 mmodules not importable
+
 # ### BEGIN Figure out the Python environment under which this is executed
 #
 my_conda_env = os.environ.get("CONDA_DEFAULT_ENV", None)

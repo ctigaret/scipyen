@@ -252,7 +252,7 @@ import core.datatypes as datatypes # noqa
 from core.prog import (safewrapper, deprecation, iter_attribute, # noqa
                        filter_type, filterfalse_type, # noqa
                        filter_attribute, filterfalse_attribute, # noqa
-                       timefunc, timeblock, processtimefunc, # noqa
+                       timefunc, timemethod, timeblock, processtimefunc, # noqa
                        processtimeblock, Timer, scipywarn, warn_with_traceback, # noqa
                        get_properties, print_styled) # noqa
 
@@ -657,8 +657,9 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
     # or the internal console to script execution and adding of script file to
     # the internal scripts list  here.
 
+    @timemethod
     def __init__(self, parent=None, scipyenWindow=None):
-        super(ScriptManager, self).__init__(parent)
+        super(ScriptManager, self).__init__(parent) # noqa
         self.setupUi(self)
         WorkspaceGuiMixin.__init__(self, parent=parent,scipyenWindow=scipyenWindow)
         self._configureUI_()
@@ -667,6 +668,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
 
         self.loadSettings()
 
+    @timemethod
     def _configureUI_(self):
         addScript = self.menuScripts.addAction("Add scripts...")
         addScript.triggered.connect(self.slot_addScripts)
@@ -1460,7 +1462,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         sw_f.__dict__.update(f.__dict__)
 
         if hasattr(f, '__annotations__'):
-            sw_f.__setattr__('__annotations__', getattr(f, '__annotations__'))
+            sw_f.__setattr__('__annotations__', f.__annotations__)
 
         # print(f"slot_wrapPluginFunction in @self._inputPrompter_ {f.__module__}.{f.__name__} arg_types {arg_types} kw_args {kw_args}")
         return sw_f
@@ -1473,20 +1475,22 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     # NOTE: 2025-06-20 23:27:26 WARNING
     # this crashes in PyQt6!
     if not __has_PyQt6__:
-        def __new__(cls:typing.Self, parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs) -> typing.Self:
+        def __new__(cls:typing.Self, parent: QtWidgets.QWidget | None = None,
+                    *args, **kwargs) -> typing.Self:
             if not hasattr(cls, "_instance") or not isinstance(cls._instance, cls):
                 if __has_PyQt6__:
-                    cls._instance = super(ScipyenWindow, cls).__new__(cls, parent)
+                    cls._instance = super(ScipyenWindow, cls).__new__(cls, parent) # noqa
                 else:
-                    cls._instance = super(ScipyenWindow, cls).__new__(cls, parent, *args, **kwargs)
+                    cls._instance = super(ScipyenWindow, cls).__new__(cls, parent,
+                                                                      *args, **kwargs) # noqa
 
             # print(f"\t{cls.__name__}._instance = {cls._instance}")
 
             return cls._instance
 
     # @processtimefunc
-    # @timefunc
-    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None, *args, **kwargs):
+    @timemethod
+    def __init__(self, parent: QtWidgets.QWidget | None = None, *args, **kwargs):
         r"""Scipyen's main window initializer (constructor).
 
         Parameters:
@@ -1542,6 +1546,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # self.app.processEvents()
 
         splash = kwargs.get("splash", None)
+
         if isinstance(splash, ScipyenSplashWidget):
             self.sig_splashMessage[str].connect(splash._slot_showMessage, QtCore.Qt.QueuedConnection)
 
@@ -1552,7 +1557,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         # NOTE: 2024-05-31 13:12:31
         # This is a dictionary mapping viewer class (key) ↦ list of instances of viewr class in the workspace
-        self.viewers = {mpl.figure.Figure: list()}
+        self.viewers = {mpl.figure.Figure: []}
 
         # self.currentViewers = dict(map(lambda x: (x, None), gui_viewers))
         # self.currentViewers[mpl.figure.Figure] = None
@@ -1564,7 +1569,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         # NOTE: 2022-12-25 10:41:12
         # a mapping of plugin_module ↦ {plugin_module_function ↦ QAction}
-        self._ui_plugins_ = dict()
+        self._ui_plugins_ = {}
 
         self._userenv_varname_ = "USERPROFILE" if sys.platform.startswith("win32") else "HOME"
         self._user_home_ = os.getenv(self._userenv_varname_)
@@ -1572,7 +1577,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # NOTE: 2024-05-29 13:07:37
         # additional top plugin directory, where users can place their own plugins
         # (in addition to self._scipyendir_)
-        self._default_scipyen_user_plugins_dir = os.path.join(self._user_home_, "scipyen_plugins")
+        self._default_scipyen_user_plugins_dir = os.path.join(
+            self._user_home_, "scipyen_plugins"
+            )
 
         self._user_plugins_dir = self._default_scipyen_user_plugins_dir
         # self._external_HDF5_viewer: str = str()         # NOTE: 2025-03-24 21:35:03 NOT USED
@@ -1589,14 +1596,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self._recentFiles = collections.OrderedDict()
         self._recentDirectories = collections.deque()
         self._fileSystemFilterHistory = collections.deque()
-        self._lastFileSystemFilter = str()
+        self._lastFileSystemFilter = ""
         self._recentVariablesList = collections.deque()
-        self._lastVariableFind = str()
+        self._lastVariableFind = ""
         self._commandHistoryFinderList = collections.deque()
-        self._lastCommandFind = str()
+        self._lastCommandFind = ""
         # self._recentScripts = list()
         self._recentScripts = collections.deque()
-        self._recent_scripts_dict_ = dict()
+        self._recent_scripts_dict_ = {}
         self._showFilesFilter = False
         self._console_docked_ = False
         self._script_manager_autolaunch = False
@@ -1618,16 +1625,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self.navPrevDir = collections.deque()
         self.navNextDir = collections.deque()
-        self.fileTransferJob:typing.Optional[str] = None
+        self.fileTransferJob: str | None = None
         self._currentDir_ = None
         self._nMaxWatchedDirectories_ = 1
         self._nMaxWatchedFiles_= 1
         # self._isDirWatching_ = False
         self._fileSystemChanged_ = False
         self._changesInWatchedDir_ = False
-        self._monitoredDirsCache_ = dict()
+        self._monitoredDirsCache_ = {}
 
-        self.sig_splashMessage.emit("Scipyen is initializing, please wait...")
+        if isinstance(splash, ScipyenSplashWidget):
+            self.sig_splashMessage.emit("Scipyen is initializing, please wait...")
 
         # self.__version__ = checkVersion()
 
@@ -1659,9 +1667,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # in the console), where this interception is not implemented.
         # ### END   long comment
 
-        self.workspace = dict()
+        self.workspace = {}
 
-        self._nonInteractiveVars_ = dict()
+        self._nonInteractiveVars_ = {}
         self.console = None
         self.ipkernel = None
         self.shell = None
@@ -1697,7 +1705,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # the global appmenu from registering properly with the dbus service
         # (or messes it up so that the global menu doesn't show)
         # QtGui.QGuiApplication.processEvents()
-        self.sig_splashMessage.emit("Initializing the user interface...")
+
+        # already emitted before if splash was supplied to __init__
+        # self.sig_splashMessage.emit("Initializing the user interface...")
 
         # NOTE: 2021-08-17 12:38:41 see also NOTE: 2021-08-17 10:05:20 in scipyen.py
         # self._default_GUI_style = self.app.style()
@@ -1709,15 +1719,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # current session, in the command history tree widget
         self.currentSessionTreeWidgetItem = None
 
-        # self.fileSystemModel = QtWidgets.QFileSystemModel(parent=self)
-
-        # NOTE: 2026-01-25 21:27:43
-        # this below does nothing of significance at the moment, but I used it as
-        # a stub for future customizations
         self.fileSystemModel = FileSystemModel(parent=self)
-        # self.fileSystemModel = filesystems.FileSystemModel(parent=self)
-
-        # self.fileSystemModel.setReadOnly(False)
         self.fileSystemModel.setNameFilterDisables(False)
 
         self.currentVarItem = None
@@ -1834,7 +1836,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         with qtutils.SignalBlocker(self.actionUse_system_default_font):
             self.actionUse_system_default_font.setChecked(self._useSystemDefaultFont)
 
-        self.sig_splashMessage.emit("Initializing Scipyen Console...")
+        if isinstance(splash, ScipyenSplashWidget):
+            self.sig_splashMessage.emit("Initializing Scipyen Console...")
 
         # ### BEGIN NOTE: 2026-08-02 13:32:44 initialize Scipyen's own console
         #
@@ -1842,7 +1845,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         #
         # ### END   NOTE: 2026-08-02 13:32:44 initialize Scipyen's own console
 
-        self.sig_splashMessage.emit("Initializing User Workspace...")
+        if isinstance(splash, ScipyenSplashWidget):
+            self.sig_splashMessage.emit("Initializing User Workspace...")
 
         # ### BEGIN NOTE: 2026-08-02 13:34:04 Populates the workspace model
         #
@@ -1884,7 +1888,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         self._shell_automagics:bool = True
 
-        self.sig_splashMessage.emit("Loading Saved Settings...")
+        if isinstance(splash, ScipyenSplashWidget):
+            self.sig_splashMessage.emit("Loading Saved Settings...")
 
         # With all UI elements and their signal-slot connections in place we can
         # now apply stored settings, including the 'state' of the ScipyenWindow
@@ -6586,8 +6591,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         evt.accept()
 
-    def saveWindowSettings(self):
-        gname, pfx = saveWindowSettings(
+    # def saveWindowSettings(self):
+        # gname, pfx = saveWindowSettings(
+        saveWindowSettings(
             self.qsettings, self, group_name=self.__class__.__name__)
 
     # @processtimefunc
@@ -6598,11 +6604,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     def loadWindowSettings(self):
         # print("%s.loadWindowSettings" % self.__class__.__name__)
-        gname, prefix = loadWindowSettings(
+        # gname, prefix = loadWindowSettings(
+        loadWindowSettings(
             self.qsettings, self, group_name=self.__class__.__name__)
 
     # @processtimefunc
-    # @timefunc
+    @timemethod
     def _configureUI_(self):
         ''' Collect file menu actions & submenus that are built in the UI file. This should be
             done before loading the plugins.
@@ -6613,8 +6620,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         # list of available syle names
         # NOTE: 2023-03-29 14:08:58 CT - selecting bb10 bright & dark styles crashes the GUI - not sure why
+
         self._available_Qt_style_names_ = [
-            s for s in QtWidgets.QStyleFactory.keys() if not s.startswith("bb10")]
+            s for s in QtWidgets.QStyleFactory.keys() if not s.startswith("bb10") # noqa because QtWidgets.QStyleFactory is not iterable
+            ]
 
         # ### BEGIN Menus and actions
         #
@@ -11419,7 +11428,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # NOTE: 2022-12-25 10:52:58
         # this does NOT remove the module from sys.modules!
         if len(self._ui_plugins_):
-            parents = list()
+            parents = []
             for module, moduleDict in self._ui_plugins_.items():
                 if isinstance(moduleDict, dict) and len(moduleDict) > 0:
                     for func, action in moduleDict.items():
@@ -11447,32 +11456,33 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     # make forceRecompile a configuration variable !!!
     @Slot()
     @safewrapper
-    # @timefunc
+    @timemethod
     def slot_loadPlugins(self):
-        r''' Asynchronously search and load of Scipyen 'plugins'
+        r''' Search and load Scipyen 'plugins'
         Scipyen 'plugins' are modules in Scipyen package tree that advertise
         module-level functions callable through for graphical user interface
         (i.e., menus in the Scipyen Main Window).
         For details, see the documentation of the core.scipyen_plugin_loader
         module.
         '''
-        # scipywarn("plugin loading has been temporarily disabled")
-        # return
-        # print(f"{self.__class__.__name__}.slot_loadPlugins")
-        # if self._pyinstaller_bundled_:
-        #     scipyen_plugin_loader.find_bytecode_plugins()
-        # else:
-        #     scipyen_plugin_loader.find_plugins(self._scipyendir_, self._scipyendir_)  # calls os.walk
-
-        scipyen_plugin_loader.find_plugins(self._scipyendir_, self._scipyendir_,
+        scipyen_plugin_loader.find_plugins(self._scipyendir_,
                                            mainWindow = self,
-                                           # workspace = self.workspace
-                                           )  # calls os.walk
-        scipyen_plugin_loader.find_plugins(self.userPluginsDirectory, self._scipyendir_,
+                                           )
+
+        scipyen_plugin_loader.find_plugins(self.userPluginsDirectory,
                                            checkgit = True,
                                            mainWindow = self,
-                                           # workspace = self.workspace
-                                           )  # calls os.walk
+                                           )
+        # scipyen_plugin_loader.find_plugins(self._scipyendir_, self._scipyendir_,
+        #                                    mainWindow = self,
+        #                                    # workspace = self.workspace
+        #                                    )  # calls os.walk
+        #
+        # scipyen_plugin_loader.find_plugins(self.userPluginsDirectory, self._scipyendir_,
+        #                                    checkgit = True,
+        #                                    mainWindow = self,
+        #                                    # workspace = self.workspace
+        #                                    )  # calls os.walk
 
 
         # NOTE: 2016-04-15 11:53:08
@@ -11480,7 +11490,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # and do the plugin initialization here
 
         if len(scipyen_plugin_loader.LOADED_PLUGINS) > 0:
-            viewers = list()  # list of (name, class) tuples
+            viewers = []  # list of (name, class) tuples
             for module_name, module in scipyen_plugin_loader.LOADED_PLUGINS.items():
                 # print(f"{self.__class__.__name__}.slot_loadPlugins: {module_name}, {module}")
                 # maps module name to the tuple (module file, menu dict)
