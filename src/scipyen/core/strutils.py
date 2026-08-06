@@ -1487,6 +1487,9 @@ def is_svg(s:str) -> bool:
 #
 #     return out
 
+def un_html(s: str) -> str:
+    pattern = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
+    return re.sub(pattern, '', s)
 
 def is_html(s:str) -> bool:
     from lxml import html

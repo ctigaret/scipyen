@@ -2664,7 +2664,9 @@ def PassiveMembranePropertiesAnalysis(block:neo.Block,
 
     return ret
 
-def ap_waveform_roots(w, value, interpolate=False):
+def ap_waveform_roots(w, value, interpolate=False,/,
+                      w_index: int | None = None,
+                      s_index: int | None = None):
     r"""Times where `value` occurs on the rising and decaying phases of the waveform w
 
     Parameters:
@@ -2704,6 +2706,15 @@ def ap_waveform_roots(w, value, interpolate=False):
     decay_y         = np.nan
     decay_cslope    = np.nan # chord slope of decay phase around value
 
+    if isinstance(w_index, int):
+        wave_index = f" {w_index}"
+    else:
+        wave_index = ""
+
+    if isinstance(s_index, int):
+        segment_index = f" in segment {s_index}"
+    else:
+        segment_index = ""
 
     #print("ap_waveform_roots value", value)
 
@@ -2718,7 +2729,7 @@ def ap_waveform_roots(w, value, interpolate=False):
         # no sample is >= value
         # bail out gracefully
         # warnings.warn(f"ap_waveform_roots: no part of the signal is >= {value}", RuntimeWarning)
-        scipywarn(f"ap_waveform_roots: no part of the signal is >= {value}", RuntimeWarning)
+        scipywarn(f"ap_waveform_roots: no part of the waveform{wave_index}{segment_index} is >= {value}", RuntimeWarning)
 
         return rise_x, rise_y, rise_cslope, decay_x, decay_y, decay_cslope
 
@@ -2747,7 +2758,7 @@ def ap_waveform_roots(w, value, interpolate=False):
     if len(ge_value_starts) == 0:
         # bail out gracefully
         # warnings.warn(f"ap_waveform_roots: cannot find where signal becomes >= {value}", RuntimeWarning)
-        scipywarn(f"ap_waveform_roots: cannot find where signal becomes >= {value}", RuntimeWarning)
+        scipywarn(f"ap_waveform_roots: cannot find where the waveform{wave_index}{segment_index} becomes >= {value}", RuntimeWarning)
         return rise_x, rise_y, rise_cslope, decay_x, decay_y, decay_cslope
 
 
@@ -2755,7 +2766,7 @@ def ap_waveform_roots(w, value, interpolate=False):
 
 
     # not sure we really need this
-    w_ = w[first_index_ge_value]
+    # w_ = w[first_index_ge_value]
     # print(f"first_index_ge_value = {first_index_ge_value} -> w_ = {w_}")
     first_sample_ge_value = float(w[first_index_ge_value][0])
     time_of_first_sample_ge_value = float(w.times[first_index_ge_value])
@@ -3574,7 +3585,8 @@ def get_AP_analysis_parameter(data:typing.Union[dict, tuple, list], parameter=st
     return list(map(lambda x: x * parameter_units, ret))
 
 
-def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_isi=False):
+def extract_AP_waveforms(sig, iinj, times, before_AP = None, after_AP = None,
+                         use_min_isi=False):
     r"""Extracts the AP waveforms from a Vm signal.
 
     Parameters:
@@ -3603,7 +3615,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
 
 
 
-    before: None (default), or time value(s) to add BEFORE the waveform START times
+    before_AP: None (default), or time value(s) to add BEFORE the waveform START times
             specified as:
                 a float scalar:
 
@@ -3612,13 +3624,13 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
                 a 1D numpy or Quantity array (either ndim == 1 OR ndim == 2 and shape[1] == 1)
                     size must equal the number of waveform START times in "times"
 
-    after: None (default), or as "before", but specifies the time interval to add to
+    after_AP: None (default), or as "before", but specifies the time interval to add to
             "times" in case "times" only specifies the waveform START times
 
             Required when "times" specifies only waveform START times and use_min_isi is False (see below)
 
             NOTE: when not None and "times" also specifies waveform STOP or DURATIONS,
-            the values in "after" will be added to the STOP/DURATION values effectively
+            the values in "after_AP" will be added to the STOP/DURATION values effectively
             resulting in longer waveforms
 
     use_min_isi: boolean, default False
@@ -3626,11 +3638,18 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
                 waveforms as duration for the waveforms.
                 NOTE: this will override any waveform stops specified in 'times'
 
-            Used instead of specifying 'after', only when 'times' has more than one waveform START time
+            Used instead of specifying 'after_AP', only when 'times' has more than one waveform START time
     """
 
     if not isinstance(sig, neo.AnalogSignal):
         raise TypeError("Expecting an analog signal, got %s instead" % type(sig).__name__)
+
+    if isinstance(iinj, neo.AnalogSignal):
+        inj_end = iinj.t_stop
+    elif isinstance(iinj, typing.Sequence):
+        inj_end = iinj[1]
+    else:
+        raise ValueError(f"iinj = {iinj}")
 
     if isinstance(times, neo.SpikeTrain):
         times = times.times
@@ -3649,10 +3668,9 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
             times = times.rescale(sig.times.units)
 
         if times.ndim == 1 or (times.ndim == 2 and times.shape[1] == 1):
-
             starts = times.flatten()
-
-            stops = None
+            stops = starts + np.ediff1d(starts, to_end = inj_end - starts[-1])
+            # stops = None
 
         else:
             starts = times[:,0].flatten()
@@ -3665,93 +3683,87 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
     else:
         raise TypeError("times expected to be a Quantity array, numpy array, neo.SpikeTrain or neo.Epoch; got %s instead" % type(times).__name__)
 
+    # print(f"starts:\n{starts}\n\nstops:\n{stops}\n\n")
+
     if starts is None or len(starts) == 0:
         return [], None, None, None
 
     intervals = np.ediff1d(starts)
 
-    if use_min_isi:
-        # print(f"extract_AP_waveforms: use_min_isi: {use_min_isi}, iinj = {iinj}")
-        if len(intervals):
-            after = intervals.min()
+    # print(f"after_AP = {after_AP}")
+
+    if after_AP is None:
+        if use_min_isi and len(intervals):
+            # print(f"extract_AP_waveforms: use_min_isi: {use_min_isi}, iinj = {iinj}")
+            after_AP = intervals.min()
 
         else:
             if isinstance(iinj, (tuple, list)):
-                after = iinj[1] - starts[0]
+                after_AP = iinj[1] - starts[-1]
             else:
-                after = iinj.t_stop - starts[0]
-            #raise ValueError("Cannot calculate minimum ISI for a single waveform")
+                after_AP = iinj.t_stop - starts[-1]
+        #raise ValueError("Cannot calculate minimum ISI for a single waveform")
 
-    if after is None:
-        if stops is None:
-            raise TypeError("When times is a vector, after must be specified, or set 'use_min_isi' to True")
+        # if stops is None:
+        #     raise TypeError("When times is a vector, after_AP must be specified, or set 'use_min_isi' to True")
 
-    if isinstance(after, numbers.Real):
-        after = after * sig.times.units
+    if isinstance(after_AP, numbers.Real):
+        after_AP = after_AP * sig.times.units
 
-        if stops is None or use_min_isi:
-            stops = starts + after
+    elif isinstance(after_AP, np.ndarray):
+        after_AP = after_AP.flatten()
 
-        else:
-            stops = stops + after
+        if len(after_AP) > 1 and after_AP.shape != times.shape:
+            raise ValueError("when a vector, 'after_AP' must have the same length as times")
 
-    elif isinstance(after, np.ndarray):
-        after = after.flatten()
-
-        if len(after) > 1 and after.shape != times.shape:
-            raise ValueError("when a vector, 'after' must have the same length as times")
-
-        if isinstance(after, pq.Quantity):
-            if not unitsConvertible(after, sig.times.units):
-                raise TypeError("units of after are incompatible with signal's times units")
+        if isinstance(after_AP, pq.Quantity):
+            if not unitsConvertible(after_AP, sig.times.units):
+                raise TypeError("units of after_AP are incompatible with signal's times units")
 
         else:
-            after = after * sig.times.units
+            after_AP = after_AP * sig.times.units
 
-        if stops is None or use_min_isi:
-            stops = starts + after
-
-        else:
-            stops = stops + after
 
     else:
-        raise TypeError("'after' has unexpected type: %s" % type(after).__name__)
+        raise TypeError("'after_AP' has unexpected type: %s" % type(after_AP).__name__)
 
-    if before is not None:
-        if isinstance(before, numbers.Real):
-            before = before + sig.times.units
+    stops = stops + after_AP
+
+    if before_AP is not None:
+        if isinstance(before_AP, numbers.Real):
+            before_AP = before_AP + sig.times.units
 
             delay_0 = starts[0] - sig.t_start
 
-            if before > delay_0:
-                before = delay_0
+            if before_AP > delay_0:
+                before_AP = delay_0
 
-        elif isinstance(before, np.ndarray):
-            before = before.flatten()
+        elif isinstance(before_AP, np.ndarray):
+            before_AP = before_AP.flatten()
 
-            if len(before) > 1 and len(before) != len(starts):
-                raise ValueError("'before' had incompatible size" )
+            if len(before_AP) > 1 and len(before_AP) != len(starts):
+                raise ValueError("'before_AP' had incompatible size" )
 
-            if isinstance(before, pq.Quantity):
-                if not unitsConvertible(before, sig.times.units):
-                    raise TypeError("'before' has incompatible units")
+            if isinstance(before_AP, pq.Quantity):
+                if not unitsConvertible(before_AP, sig.times.units):
+                    raise TypeError("'before_AP' has incompatible units")
 
-                before = before.rescale(sig.times.units)
+                before_AP = before_AP.rescale(sig.times.units)
 
             else:
-                before = before * sig.times.units
+                before_AP = before_AP * sig.times.units
 
             delay_0 = starts[0] - sig.t_start
 
-            if before[0] > delay_0:
-                before[0] = delay_0
+            if before_AP[0] > delay_0:
+                before_AP[0] = delay_0
 
         else:
-            raise TypeError("'before' has unexpected type %s" % type(before).__name__)
+            raise TypeError("'before_AP' has unexpected type %s" % type(before_AP).__name__)
 
-        starts = starts - before
+        starts = starts - before_AP
 
-        intervals = np.ediff1d(starts) # this will have changed if 'before' is a vector with different values
+        intervals = np.ediff1d(starts) # this will have changed if 'before_AP' is a vector with different values
 
     if starts[0] < sig.t_start:
         starts[0] = sig.t_start
@@ -3759,7 +3771,7 @@ def extract_AP_waveforms(sig, iinj, times, before = None, after = None, use_min_
     if stops[-1] >= sig.t_stop:
         stops[-1] = sig.t_stop
 
-    waves = [sig.time_slice(t0, t1) for (t0, t1) in zip(starts, stops)]
+    waves = [sig.time_slice(t0, min(t1, inj_end)) for (t0, t1) in zip(starts, stops)]
 
     return waves, intervals, starts, stops
 
@@ -4041,8 +4053,7 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0,
     return fast_rise_start_times, fast_rise_stop_times, peak_times#, waves, dwaves
 
 
-def extract_AP_train(
-    vm:neo.AnalogSignal,im:typing.Union[neo.AnalogSignal, tuple],
+def extract_AP_train( vm: neo.AnalogSignal, im: neo.AnalogSignal | tuple,
     tail:pq.Quantity=0.5*pq.s,
     method:sigp.BoxcarDetectionMethod = sigp.BoxcarDetectionMethod.state_levels,
     box_size:numbers.Number=0,
@@ -4483,9 +4494,11 @@ def detect_AP_waveform_times(sig, thr=10, smooth_window=5,
 #     ap_roots = ap_waveform_roots(w, ref_value, )
 
 def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
-                              onset: pq.Quantity, onset_time: pq.Quantity,
-                              peak: pq.Quantity, peak_time: pq.Quantity,
-                              **kwargs):
+                              onset: pq.Quantity,
+                              onset_time: pq.Quantity,
+                              peak: pq.Quantity,
+                              peak_time: pq.Quantity,
+                              **kwargs) -> dict:
     wave_index = kwargs.get("wave_index", None)
     step_index = kwargs.get("step_index", None)
 
@@ -4499,14 +4512,23 @@ def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
 
     peak_index = w.time_index(peak_time)
 
-    nadir = w[peak_index:].min()
+    # print(f"peak_index = {peak_index}")
 
-    if nadir > onset:
-        w_corr = polyfit_adjust_AP_waveform(w, onset, onset_time, peak_time)
-        result["corr"] = w_corr
+    sub_w = w[peak_index:]
 
-    else:
+    if sub_w.size == 0:
         w_corr = None
+        # return result
+    else:
+        nadir = sub_w.min()
+        # nadir = w[peak_index:].min()
+
+        if nadir > onset:
+            w_corr = polyfit_adjust_AP_waveform(w, onset, onset_time, peak_time)
+            result["corr"] = w_corr
+
+        else:
+            w_corr = None
 
     for ref_name, ref_value in references.items():
         if ref_value is None:
@@ -4526,12 +4548,8 @@ def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
 
             result[ref_name] = (np.nan, np.nan)
 
-        rise_x, rise_y, rise_slope, decay_x, decay_y, decay_slope = ap_waveform_roots(w, ref_value)
-
-        # if rise_x is np.nan:
-        #     # warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses {ref_name} ({ref_value})", RuntimeWarning)
-        #     scipywarn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses {ref_name} ({ref_value})", RuntimeWarning)
-        #     # print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the rising phase crosses the reference {ref_name} ({ref_value})")
+        rise_x, rise_y, rise_slope, decay_x, decay_y, decay_slope = ap_waveform_roots(
+            w, ref_value, w_index = wave_index, s_index = step_index)
 
         if isinstance(rise_x, (tuple, list, np.ndarray)):
             rise_x = rise_x[0]
@@ -4539,15 +4557,10 @@ def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
         if decay_x is np.nan:
             if w_corr is not None:
                 # scipywarn(f"\x1b[1;36mUsing waveform with a polynomially interpolated envelope for decay crossing of {ref_name} ({ref_value})\x1b[0m in wave {wave_index} of step {step_index}", RuntimeWarning)
-                roots_corr = ap_waveform_roots(w_corr, ref_value)
+                roots_corr = ap_waveform_roots(
+                    w_corr, ref_value, w_index = wave_index, s_index = step_index)
+
                 raise_x_corr, raise_y_corr, raise_slope_corr, decay_x, decay_y, decay_slope = roots_corr
-
-            # if decay_x is np.nan:
-            #     scipywarn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses {ref_name} ({ref_value})", RuntimeWarning)
-
-            # warnings.warn(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses {ref_name} ({ref_value})", RuntimeWarning)
-
-            # print(f"get_AP_waveform_crossings for wave {wave_index} in step {step_index}: cannot determine where the decay phase crosses the reference {ref_name} ({ref_value})")
 
         if isinstance(decay_x, (tuple, list, np.ndarray)):
             decay_x = decay_x[0]
@@ -4560,18 +4573,23 @@ def polyfit_adjust_AP_waveform(wave, onset, onset_time, peak_time,
                                plot: bool=False):
     # NOTE: 2024-01-28 10:57:21
     # while it is possible to determine the onset value and time
-    # from `wave` itself (see ap_waveform_times), bny the time this function
-    # is called (used) these data have already been determined therefore
+    # from `wave` itself (see ap_waveform_times), by the time this function
+    # is called these data have already been determined therefore
     # simplest thing is to pass them to this function as parameters.
     wave_start_time = wave.times[0]
     onset_index = wave.time_index(onset_time)
+    print(f"polyfit_adjust_AP_waveform: onset_index -> {onset_index}")
     peak_index = wave.time_index(peak_time)
+    print(f"polyfit_adjust_AP_waveform: peak_index -> {peak_index}")
     wave_decay_phase = wave[peak_index:]
     nadir = wave_decay_phase.min()
     nadir_index = np.argmin([wave_decay_phase]) + peak_index
+    print(f"polyfit_adjust_AP_waveform: nadir_index -> {nadir_index}")
     nadir_time = wave.times[nadir_index]
     t_to_nadir = wave.times[:nadir_index]
     wt = wave.times
+
+    print(f"polyfit_adjust_AP_waveform:\nwave_start_time = {wave_start_time}\nonset_time = {onset_time},\npeak_time = {peak_time}\nnadir_time={nadir_time}")
 
     x = np.append(wave.times[0:onset_index-1], wave.times[nadir_index:])
     y = np.append(wave[:onset_index-1], wave[nadir_index:])
@@ -4624,8 +4642,8 @@ def polyfit_adjust_AP_waveform(wave, onset, onset_time, peak_time,
 
 def detect_AP_waveforms_in_train(sig, iinj,
                                  thr = 10,
-                                 before = 0.001,
-                                 after = None,
+                                 before_AP = None,
+                                 after_AP = None,
                                  min_fast_rise_duration = None,
                                  min_ap_isi = 6e-3*pq.s, #
                                  rtol = 1e-5, atol = 1e-8,
@@ -4656,14 +4674,14 @@ def detect_AP_waveforms_in_train(sig, iinj,
                 the rate of Vm rise threshold for AP detection (in V/s)
                 (optional, default is 10)
 
-    before :    scalar, or Quantity;
+    before_AP :    scalar, or Quantity;
 
                 The number of ms to include in the AP waveform BEFORE its threshold)
                 (optional, default = 0.001 s)
 
                 When a Quantity, it is expected to have units of "s"
 
-    after :     scalar, Quantity or None (default);
+    after_AP :     scalar, Quantity or None (default);
 
                 The number of ms to include in the AP waveform AFTER its threshold)
                 (optional, default = None)
@@ -4678,7 +4696,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
                     AP waveform.
 
                 NOTE 2: to generate waveforms of the AP only, set
-                    "before" and "after" to zero.
+                    "before_AP" and "after_AP" to zero.
 
     min_fast_rise_duration : None (default), scalar or Quantity;
 
@@ -4721,7 +4739,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
 
     use_min_detected_isi: boolean, default True
 
-        Used when "after" is None.
+        Used when "after_AP" is None.
 
         When True, individual AP waveforms cropped from the Vm signal "sig" will
             have the duration equal to the minimum detected inter-AP interval.
@@ -4915,26 +4933,27 @@ def detect_AP_waveforms_in_train(sig, iinj,
     from scipy.signal.windows import boxcar
 
     #### BEGIN parse parameters
-    # make sure before & after are quantities with compatible time units
+    # make sure before_AP & after are quantities with compatible time units
 
-    if isinstance(before, numbers.Real):
-        before *= pq.s
+    if isinstance(before_AP, numbers.Real):
+        before_AP *= pq.s
 
-    elif isinstance(before, pq.Quantity):
-            raise TypeError("units of 'before' (%s) are not compatible with those of the signal's time domain (%s)" % (before.units, sig.time.units))
+    elif isinstance(before_AP, pq.Quantity):
+        if not unitsConvertible(before_AP, sig.times):
+            raise TypeError("units of 'before_AP' (%s) are not compatible with those of the signal's time domain (%s)" % (before_AP.units, sig.times.units))
 
     else:
-        raise TypeError("'before' expected to be a scalar or a Quantity; got %s instead" % type(before).__name__)
+        raise TypeError("'before_AP' expected to be a scalar or a Quantity; got %s instead" % type(before_AP).__name__)
 
-    if isinstance(after, numbers.Real):
-        after *= pq.s
+    if isinstance(after_AP, numbers.Real):
+        after_AP *= pq.s
 
-    elif isinstance(after, pq.Quantity):
-        if not unitsConvertible(after, sig.times):
-            raise TypeError("units of 'after' (%s) are not compatible with those of the signal's time domain (%s)" % (after.units, sig.times.units))
+    elif isinstance(after_AP, pq.Quantity):
+        if not unitsConvertible(after_AP, sig.times):
+            raise TypeError("units of 'after_AP' (%s) are not compatible with those of the signal's time domain (%s)" % (after_AP.units, sig.times.units))
 
-    elif after is not None:
-        raise TypeError("'after' expected to be a scalar, a Quantity, or None; got %s instead" % type(after).__name__)
+    elif after_AP is not None:
+        raise TypeError("'after_AP' expected to be a scalar, a Quantity, or None; got %s instead" % type(after_AP).__name__)
 
     if not isinstance(sig, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal; got %s instead" % type(sig).__name__)
@@ -5109,10 +5128,14 @@ def detect_AP_waveforms_in_train(sig, iinj,
     # ### BEGIN Collect the AP waveforms
     #
     # print(f"detect_AP_waveforms_in_train: iinj = {iinj}")
-    ap_waves = extract_AP_waveforms(sig, iinj, ap_fast_rise_start_times, before=before, after=after, use_min_isi=use_min_detected_isi)
+    ap_waves = extract_AP_waveforms(sig, iinj, ap_fast_rise_start_times,
+                                    before_AP=before_AP, after_AP=after_AP,
+                                    use_min_isi=use_min_detected_isi)
 
     ## ap_waveform_signals is a list of neo.AnalogSignals!
     ap_waveform_signals, inter_AP_intervals, wave_starts, wave_stops = ap_waves
+
+    print(f"found {len(ap_waveform_signals)} waveforms")
 
     #
     # ### END Collect the AP waveforms
@@ -5251,46 +5274,92 @@ def detect_AP_waveforms_in_train(sig, iinj,
                                                       ap_fast_rise_start_times[k], # onset time
                                                       ap_peak_values[k], # peak value
                                                       ap_peak_times[k], # peak time
-                                                      step_index = step_index, wave_index = k)
+                                                      wave_index = k,
+                                                      step_index = step_index,
+                                                      )
 
-            w_corr = ref_crossings.get("corr", None)
-            if isinstance(w_corr, neo.AnalogSignal):
-                corrected_AP_waveforms[k] = w_corr
+            if len(ref_crossings) == 0:
+                scipywarn(f"Cannot determine crossings for the {k}th AP waveform")
 
-            rise_onset_Vm_x, decay_onset_Vm_x = ref_crossings["AP_durations_V_onset"]
+                rise_onset_Vm_x = np.nan
+                decay_onset_Vm_x = np.nan
 
-            hm_rise_x, hm_decay_x = ref_crossings["AP_durations_V_half_max"]
+                hm_rise_x = np.nan
+                hm_decay_x = np.nan
 
-            qm_rise_x, qm_decay_x = ref_crossings["AP_durations_V_quart_max"]
+                qm_rise_x = np.nan
+                qm_decay_x = np.nan
 
-            tm_rise_x, tm_decay_x = ref_crossings["AP_durations_V_third_max"]
+                tm_rise_x = np.nan
+                tm_decay_x = np.nan
 
-            rise_0mV_x, decay_0mV_x = ref_crossings["AP_durations_V_0"]
+                rise_0mV_x = np.nan
+                decay_0mV_x = np.nan
 
-            rise_refVm_x, decay_refVm_x = ref_crossings["AP_durations_at_Ref_Vm"]
+                rise_refVm_x = np.nan
+                decay_refVm_x = np.nan
 
-            times_of_refVm_on_rise.append(rise_refVm_x)
-            times_of_refVm_on_decay.append(decay_refVm_x)
+                times_of_refVm_on_rise.append(rise_refVm_x)
+                times_of_refVm_on_decay.append(decay_refVm_x)
 
-            times_of_half_max_on_rise.append(hm_rise_x)
-            times_of_half_max_on_decay.append(hm_decay_x)
+                times_of_half_max_on_rise.append(hm_rise_x)
+                times_of_half_max_on_decay.append(hm_decay_x)
 
-            times_of_quart_max_on_rise.append(qm_rise_x)
-            times_of_quart_max_on_decay.append(qm_decay_x)
+                times_of_quart_max_on_rise.append(qm_rise_x)
+                times_of_quart_max_on_decay.append(qm_decay_x)
 
-            times_of_third_max_on_rise.append(tm_rise_x)
-            times_of_third_max_on_decay.append(tm_decay_x)
+                times_of_third_max_on_rise.append(tm_rise_x)
+                times_of_third_max_on_decay.append(tm_decay_x)
 
-            times_of_0_vm_on_rise.append(rise_0mV_x)
-            times_of_0_vm_on_decay.append(decay_0mV_x)
+                times_of_0_vm_on_rise.append(rise_0mV_x)
+                times_of_0_vm_on_decay.append(decay_0mV_x)
 
-            times_of_onset_vm_on_rise.append(rise_onset_Vm_x)
-            times_of_onset_vm_on_decay.append(decay_onset_Vm_x)
+                times_of_onset_vm_on_rise.append(rise_onset_Vm_x)
+                times_of_onset_vm_on_decay.append(decay_onset_Vm_x)
+
+            else:
+                w_corr = ref_crossings.get("corr", None)
+
+                if isinstance(w_corr, neo.AnalogSignal):
+                    corrected_AP_waveforms[k] = w_corr
+
+                rise_onset_Vm_x, decay_onset_Vm_x = ref_crossings["AP_durations_V_onset"]
+
+                hm_rise_x, hm_decay_x = ref_crossings["AP_durations_V_half_max"]
+
+                qm_rise_x, qm_decay_x = ref_crossings["AP_durations_V_quart_max"]
+
+                tm_rise_x, tm_decay_x = ref_crossings["AP_durations_V_third_max"]
+
+                rise_0mV_x, decay_0mV_x = ref_crossings["AP_durations_V_0"]
+
+                rise_refVm_x, decay_refVm_x = ref_crossings["AP_durations_at_Ref_Vm"]
+
+                times_of_refVm_on_rise.append(rise_refVm_x)
+                times_of_refVm_on_decay.append(decay_refVm_x)
+
+                times_of_half_max_on_rise.append(hm_rise_x)
+                times_of_half_max_on_decay.append(hm_decay_x)
+
+                times_of_quart_max_on_rise.append(qm_rise_x)
+                times_of_quart_max_on_decay.append(qm_decay_x)
+
+                times_of_third_max_on_rise.append(tm_rise_x)
+                times_of_third_max_on_decay.append(tm_decay_x)
+
+                times_of_0_vm_on_rise.append(rise_0mV_x)
+                times_of_0_vm_on_decay.append(decay_0mV_x)
+
+                times_of_onset_vm_on_rise.append(rise_onset_Vm_x)
+                times_of_onset_vm_on_decay.append(decay_onset_Vm_x)
+
+
 
         except Exception as e:
             print("in waveform %d:" % k)
             traceback.print_exc()
             raise e
+
 
     time_array_half_max_rise = np.array(times_of_half_max_on_rise).flatten() * sig.times.units
     time_array_half_max_decay  = np.array(times_of_half_max_on_decay).flatten() * sig.times.units
@@ -5457,9 +5526,9 @@ def detect_AP_waveforms_in_train(sig, iinj,
     # "CONTAINING" a single AP
     #
     # NOTE: CAUTION: these times MAY be the beginning of the AP waveform
-    # itself if the "before" argument is set to 0; else, they PRECEDE the
+    # itself if the "before_AP" argument is set to 0; else, they PRECEDE the
     # the beginning of the actual AP waveform by an interval equal to
-    # before (in s)
+    # before_AP (in s)
     #
     if len(ap_fast_rise_start_times):
         ap_train = neo.SpikeTrain(ap_fast_rise_start_times,
@@ -6095,7 +6164,12 @@ def getCurrentInjectionParameters(data:neo.Block,
 
     return Iinj, Istart, Istop
 
-def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, tuple, list],
+def analyse_AP_step_injection_series(data: typing.Union[
+                                                    neo.Block,
+                                                    neo.Segment,
+                                                    tuple,
+                                                    list
+                                                    ],
                                      **kwargs):
     r""" Action potential (AP) detection and analysis in I-clamp experiment.
 
@@ -6283,14 +6357,14 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
 
         Used only when method is "state_levels"
 
-    before, after: floating point scalars, or Python Quantity objects in time
+    before_AP, after_AP: floating point scalars, or Python Quantity objects in time
         units convertible to the time units used by VmSignal.
         interval of the VmSignal data, respectively, before and after the actual
         AP in the returned AP waveforms -- parameters are passed to detect_AP_waveforms_in_train()
 
         defaults are:
-        before: 1e-3
-        after: None
+        before_AP: 1e-3
+        after_AP: None
 
     min_fast_rise_duration : None, scalar or Quantity (units "s");
 
@@ -6311,6 +6385,8 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
 
                 see Bean, B. P. (2007) The action potential in mammalian central neurons.
                 Nat.Rev.Neurosci (8), 451-465
+
+    use_min_detected_isi: bool, default is True
 
     rtol, atol: float scalars;
         the relative and absolute tolerance, respectively, used in value
@@ -6732,7 +6808,7 @@ def analyse_AP_step_injection_series(data:typing.Union[neo.Block, neo.Segment, t
                     step_result, vstep = sweep_result
                     passive_result = None
 
-            except:
+            except: # noqa
                 # NOTE: 2023-08-14 17:45:52
                 # this usually happens when no current injection is detected in Im
                 # exc = print_traceback(sys.exception())
@@ -7651,15 +7727,15 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
         be considered an action potential (default is 10) -- parameter is passed
         to detect_AP_waveforms_in_train()
 
-    before, after: floating point scalars, or Python Quantity objects in time
+    before_AP, after_AP: floating point scalars, or Python Quantity objects in time
         units convertible to the time units used by VmSignal.
         interval of the VmSignal data, respectively, before and after the actual
         AP in the returned AP waveforms -- parameters are passed to
         detect_AP_waveforms_in_train()
 
         defaults are:
-        before: 1e-3
-        after: None
+        before_AP: 1e-3
+        after_AP: None
 
     min_fast_rise_duration : None, scalar or Quantity (units "s");
 
@@ -7800,6 +7876,7 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     fAHP_window             = kwargs.pop("fAHP_window", 3 * pq.ms)
     ADP_window              = kwargs.pop("ADP_window", 6 * pq.ms)
     baselineRegion          = kwargs.pop("baselineRegion", None)
+    # after_AP                = kwargs.pop("after_AP", 0*pq.s)
 
 
     print(f"analyse_AP_step_injection_sweep: {segment.index}")
@@ -7831,7 +7908,10 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
         raise TypeError(f"ImSignal expected a str (signal name) int signal index) or a triplet (amplitude, start & stop times); got {ImSignal} instad")
 
 
-    passive_measure_names = ["BaselineVm", "SteadyStateVm", "VSag", "VRebound", "Rin", "Rss", "Capacitance", "Tau", "VmFit", "VmFiltered"]
+    passive_measure_names = [
+        "BaselineVm", "SteadyStateVm", "VSag", "VRebound",
+        "Rin", "Rss", "Capacitance", "Tau", "VmFit", "VmFiltered"
+        ]
 
     # print(f"\nanalyse_AP_step_injection_sweep box_size = {box_size}")
     vstep, Ihold, Iinj, istep, i_timings = extract_AP_train(vm,im,
@@ -7856,10 +7936,11 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
                 # print(f"\tvm = {vm}")
                 # print(f"\tim = {im}")
 
-                vbase, vss, vsag, vrebound, Rin, Rss, Cm, τm, vfit, v_flt = passive_Iclamp(vm, im, baselineRegion,
-                                                                                                        steadyStateDuration = steadyStateDuration,
-                                                                                                        tail = tail,
-                                                                                                        box_size = box_size)
+                vbase, vss, vsag, vrebound, Rin, Rss, Cm, τm, vfit, v_flt = passive_Iclamp(
+                    vm, im, baselineRegion,
+                    steadyStateDuration = steadyStateDuration,
+                    tail = tail,
+                    box_size = box_size)
 
                 # # represent vsag and vrebound relative to their bases (vss and vbase, respectively)
                 # vsag -= vss
@@ -7911,7 +7992,8 @@ def analyse_AP_step_injection_sweep(segment, VmSignal:typing.Union[int, str] = "
     # print(f"analyse_AP_step_injection_sweep kwargs thr {kwargs['thr']}")
     # print(f"analyse_AP_step_injection_sweep kwargs t_start {kwargs['t_start']}, t_stop {kwargs['t_stop']}")
 
-    ap_train, ap_results, ap_waveform_signals = detect_AP_waveforms_in_train(vstep, i_timings, **kwargs)
+    ap_train, ap_results, ap_waveform_signals = detect_AP_waveforms_in_train(
+        vstep, i_timings, **kwargs)
     # print(f"analyse_AP_step_injection_sweep ap_train t_start = {ap_train.t_start}, t_stop = {ap_train.t_stop}")
 
     result = collections.OrderedDict() #dict()
