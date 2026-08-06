@@ -590,12 +590,14 @@ def check_load_module(spec, verb:bool=False,
             
 
 def reload_plugin(obj:types.ModuleType) -> types.ModuleType:
-    r""" DEPRECATED """
     # BUG: 2025-05-02 23:40:19 FIXME
     # upon reloading, class definitions get re-executed and places at memory
     # address distinct from their original (ie they get new ID) which makes 
     # statements line isinstance(x, Y) fail after reloading even though successful
     # after the first import of the module and Y.__name__ is the same!
+    if not isinstance(obj, types.ModuleType):
+        return
+
     try:
         spec = importlib.util.find_spec(obj.__name__)
         # print(f"reload_plugin: spec found by importlib = {spec}")

@@ -4524,7 +4524,7 @@ def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
         # nadir = w[peak_index:].min()
 
         if nadir > onset:
-            w_corr = polyfit_adjust_AP_waveform(w, onset, onset_time, peak_time)
+            w_corr = polyfit_adjust_AP_waveform(w, onset, onset_time, peak, peak_time, **kwargs)
             result["corr"] = w_corr
 
         else:
@@ -4569,34 +4569,41 @@ def get_AP_waveform_crossings(w: neo.AnalogSignal, references: dict,
 
     return result
 
-def polyfit_adjust_AP_waveform(wave, onset, onset_time, peak_time,
-                               plot: bool=False):
+def polyfit_adjust_AP_waveform(wave, onset, onset_time, peak, peak_time,
+                               plot: bool=False, **kwargs):
+    from scipy.interpolate import (CubicSpline, PchipInterpolator, # noqa
+                                   Akima1DInterpolator, make_interp_spline)
     # NOTE: 2024-01-28 10:57:21
     # while it is possible to determine the onset value and time
     # from `wave` itself (see ap_waveform_times), by the time this function
     # is called these data have already been determined therefore
     # simplest thing is to pass them to this function as parameters.
-    wave_start_time = wave.times[0]
-    onset_index = wave.time_index(onset_time)
-    print(f"polyfit_adjust_AP_waveform: onset_index -> {onset_index}")
+    wave_index = kwargs.get("wave_index", None)
+    step_index = kwargs.get("step_index", None)
+
+    if isinstance(wave_index, int):
+        wave_index = f" {wave_index}"
+    else:
+        wave_index = ""
+
+    if isinstance(step_index, int):
+        segment_index = f" in segment {step_index}"
+    else:
+        segment_index = ""
+
     peak_index = wave.time_index(peak_time)
-    print(f"polyfit_adjust_AP_waveform: peak_index -> {peak_index}")
     wave_decay_phase = wave[peak_index:]
     nadir = wave_decay_phase.min()
-    nadir_index = np.argmin([wave_decay_phase]) + peak_index
-    print(f"polyfit_adjust_AP_waveform: nadir_index -> {nadir_index}")
-    nadir_time = wave.times[nadir_index]
-    t_to_nadir = wave.times[:nadir_index]
-    wt = wave.times
 
-    print(f"polyfit_adjust_AP_waveform:\nwave_start_time = {wave_start_time}\nonset_time = {onset_time},\npeak_time = {peak_time}\nnadir_time={nadir_time}")
 
-    x = np.append(wave.times[0:onset_index-1], wave.times[nadir_index:])
-    y = np.append(wave[:onset_index-1], wave[nadir_index:])
 
     # NOTE: 2024-01-28 14:43:17
     #  no need to do anything
     # if nadir <= onset:
+
+    onset = onset.flatten()
+    nadir = nadir.flatten()
+
     if nadir < onset:
         if plot:
             plt.clf()
@@ -4604,21 +4611,43 @@ def polyfit_adjust_AP_waveform(wave, onset, onset_time, peak_time,
             plt.legend()
         return wave
 
-    from scipy.interpolate import (CubicSpline, PchipInterpolator, Akima1DInterpolator,
-                                   make_interp_spline)
 
-    ak1d_full = Akima1DInterpolator(x,y)
-    ak1d_interpolated_full = ak1d_full(wt)
+    wt = wave.times
+    wave_start_time = wave.times[0]
+    onset_index = wave.time_index(onset_time)
+    nadir_index = np.argmin([wave_decay_phase]) + peak_index
+    nadir_time = wt[nadir_index]
+    # t_to_nadir = wt[:nadir_index]
+    x = np.append(wt[0:onset_index-1], wt[nadir_index:])
+    y = np.append(wave[:onset_index-1].as_array(), wave[nadir_index:].as_array())
+    try:
+        ak1d_full = Akima1DInterpolator(x,y)
+        ak1d_interpolated_full = ak1d_full(wt)
 
-    # NOTE: 2024-01-26 10:55:20
-    # bring back to same onset
-    ret =  wave - neo.AnalogSignal(ak1d_interpolated_full, units = wave.units,
-                                   t_start = wave.t_start, sampling_rate = wave.sampling_rate,
-                                   name=f"{wave.name} DC corrected") + onset
+        # NOTE: 2024-01-26 10:55:20
+        # bring back to same onset
+        ret =  wave - neo.AnalogSignal(ak1d_interpolated_full, units = wave.units,
+                                    t_start = wave.t_start, sampling_rate = wave.sampling_rate,
+                                    name=f"{wave.name} DC corrected") + onset
+        # NOTE: 2024-01-26 10:55:41
+        # reconstitute the wave up to onset
+        ret[0:onset_index-1] = wave[0:onset_index-1]
 
-    # NOTE: 2024-01-26 10:55:41
-    # reconstitute the wave up to onset
-    ret[0:onset_index-1] = wave[0:onset_index-1]
+    except: # noqa
+        print(f"\n***\npolyfit_adjust_AP_waveform For wave{wave_index}{segment_index}:")
+        print(f"\twave shape -> {wave.shape}")
+        print(f"\twave_start_time = {wave_start_time}")
+        print(f"\twave_stop_time = {wave.t_stop}")
+        print(f"\tonset -> {onset} at time {onset_time}, onset_index -> {onset_index}")
+        print(f"\tpeak -> {peak} at time {peak_time}, peak_index -> {peak_index}")
+        print(f"\tnadir -> {nadir} at time {nadir_time}, nadir_index -> {nadir_index}")
+        traceback.print_exc()
+        ret = wave
+        mainWindow.assignToWorkspace("wave", wave, True, auto_name=True)
+        mainWindow.assignToWorkspace("x", x, True, auto_name=True)
+        mainWindow.assignToWorkspace("y", y, True, auto_name=True)
+
+
 
     if plot:
         plt.clf()
