@@ -354,7 +354,7 @@ def main():
         #
         # FIXME 2026-08-02 11:06:19 BAD DESIGN ?!?
         #
-        import gui.mainwindow as mainwindow
+        from gui import mainwindow
 
         if os.environ["QT_API"] == "pyside6":
             translator.load(QtCore.QLocale.system(), "qtbase", "_", QtCore.QLibraryInfo.path(QtCore.QLibraryInfo.TranslationsPath))
@@ -372,56 +372,55 @@ def main():
         
         gc.enable()
         
-        # ### BEGIN Splash screen shenanigans
-        splash=None
-        import gui.splash as guisplash
-        
-        # NOTE: 2026-08-02 11:07:01
-        # initialize the main application window (ScipyenWindow)
-        #
-        if __has_PyQt6__ or __has_PySide6__ or sys.platform.startswith("win32"):
-            # BUG 2025-07-02 01:05:08 FIXME/TODO
-            # splash shows as a black rectangle, so set aside for now, in PyQt6/PySide6
-            # until I figure out the problem
-            mainWindow = mainwindow.ScipyenWindow()
+        mainwindow.ScipyenWindow()
+        # mainWindow = mainwindow.ScipyenWindow()
 
-        else:
-            icon = QtGui.QIcon.fromTheme("pythonbackend")
-            pixmap = icon.pixmap(QtCore.QSize(256,256), state=QtGui.QIcon.On)
-            
-            splash = guisplash.ScipyenSplash(pixmap)
-            # app.processEvents()
-            # splash.setAttribute(QtCore.Qt.WA_StyledBackground)
-            # splash.setAttribute(QtCore.Qt.WA_TranslucentBackground + QtCore.Qt.WA_StyledBackground + QtCore.Qt.WA_FramlessWindowHint)
-            
-            if splash:
-                # app.processEvents()
-                # splash.show()
-                # NOTE: 2025-07-02 01:06:30
-                # this WILL show, but signals from the mainwindow won't take effect due to queued connection;
-                # on the other hand, if using direct connection or autoconnection (which resolves to direct connection
-                # on account of both being in the same, main, thread) the menubar won't register with the dbus
-                # through the Qt's default (built-in) mechanism.
-                # Perhaps designing its own dbus interface might help, but need to learn moe about dbus and
-                # then how to register with the AppMenu dbus service manually .. brrrr....
-                
-                
-                splash.splashWidget.showMessage("Scipyen is initializing, please wait...",
-                                QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
-                                QtGui.QColor("yellow"))
-                QtGui.QGuiApplication.processEvents() # app.processEvents()
-            
-                mainWindow = mainwindow.ScipyenWindow(splash=splash.splashWidget)
-                # app.setActiveWindow(mainWindow)
-                # app.processEvents()
-                # mainWindow.menuBar().setNativeMenuBar(mainWindow.useNativeMenuBar)
-                # splash.splashWidget.finish(mainWindow)
-                # if mainWindow.isVisible():
-                #     splash.close()
-            else:
-                mainWindow = mainwindow.ScipyenWindow()
-                
-        # ### END   Splash screen shenanigans
+#         # ### BEGIN Splash screen shenanigans
+#         splash=None
+#         import gui.splash as guisplash
+#
+#         # NOTE: 2026-08-02 11:07:01
+#         # initialize the main application window (ScipyenWindow)
+#         #
+#         if __has_PyQt6__ or __has_PySide6__ or sys.platform.startswith("win32"):
+#             # BUG 2025-07-02 01:05:08 FIXME/TODO
+#             # splash shows as a black rectangle, so set aside for now, in PyQt6/PySide6
+#             # until I figure out the problem
+#             mainWindow = mainwindow.ScipyenWindow()
+#
+#         else:
+#             icon = QtGui.QIcon.fromTheme("pythonbackend")
+#             pixmap = icon.pixmap(QtCore.QSize(256,256), state=QtGui.QIcon.On)
+#
+#             splash = guisplash.ScipyenSplash(pixmap)
+#             # app.processEvents()
+#             # splash.setAttribute(QtCore.Qt.WA_StyledBackground)
+#             # splash.setAttribute(QtCore.Qt.WA_TranslucentBackground + QtCore.Qt.WA_StyledBackground + QtCore.Qt.WA_FramlessWindowHint)
+#
+#             if splash:
+#                 # app.processEvents()
+#                 # splash.show()
+#                 # NOTE: 2025-07-02 01:06:30
+#                 # this WILL show, but signals from the mainwindow won't take effect due to queued connection;
+#                 # on the other hand, if using direct connection or autoconnection (which resolves to direct connection
+#                 # on account of both being in the same, main, thread) the menubar won't register with the dbus
+#                 # through the Qt's default (built-in) mechanism.
+#                 # Perhaps designing its own dbus interface might help, but need to learn moe about dbus and
+#                 # then how to register with the AppMenu dbus service manually .. brrrr....
+#
+#
+#                 splash.splashWidget.showMessage("Scipyen is initializing, please wait...",
+#                                 QtCore.Qt.AlignBottom | QtCore.Qt.AlignHCenter,
+#                                 QtGui.QColor("yellow"))
+#                 QtGui.QGuiApplication.processEvents() # app.processEvents()
+#
+#                 mainWindow = mainwindow.ScipyenWindow(splash=splash.splashWidget)
+#
+#             else:
+#
+#                 mainWindow = mainwindow.ScipyenWindow()
+#
+#         # ### END   Splash screen shenanigans
     
         # NOTE: 2021-08-17 10:06:24 FIXME / TODO
         # come up with a nice icon?

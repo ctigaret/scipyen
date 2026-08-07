@@ -50,7 +50,8 @@ from core.utilities import (summarize_object_properties,
                             )
 from core.strutils import (is_cached_output_varname, is_cached_input_varname)
 
-from core.prog import (safewrapper, timefunc, processtimefunc, timeblock, print_styled)
+from core.prog import (safewrapper, timefunc, timemethod,
+                       processtimefunc, timeblock, print_styled)
 from core.typeenum import TypeEnum
 from core import qtutils
 # from jupyter_core.paths import jupyter_runtime_dir
@@ -117,6 +118,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
     # sig_varRemoved = Signal(dict, str,     str,     name="sig_varRemoved")
     # sig_varModified = Signal(dict, str,     str,     name="sig_varModified")
 
+    # @timemethod
     def __init__(self, shell, user_ns_hidden=dict(),
                  parent=None,
                  mpl_figure_close_callback=None,
@@ -985,7 +987,7 @@ class WorkspaceModel(QtGui.QStandardItemModel):
         except:
             traceback.print_exc()
 
-    # @timefunc
+    # @timemethod
     # def post_execute(self):
     #     r"""Updates workspace model AFTER kernel execution.
     #     Also takes into account:

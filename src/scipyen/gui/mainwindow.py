@@ -221,7 +221,7 @@ import colorama  # noqa
 
 # BEGIN scipyen modules
 from core import qtutils # noqa
-from core.qtutils import (qVariant, QVariantType, fromQVariant)
+from core.qtutils import (qVariant, QVariantType) #, fromQVariant)
 from core import datazone # noqa
 from core import datatypes # noqa
 from core import basescipyen # noqa
@@ -656,7 +656,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
     # or the internal console to script execution and adding of script file to
     # the internal scripts list  here.
 
-    @timemethod
+    # @timemethod
     def __init__(self, parent=None, scipyenWindow=None):
         super(ScriptManager, self).__init__(parent) # noqa
         self.setupUi(self)
@@ -667,7 +667,7 @@ class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, Workspace
 
         self.loadSettings()
 
-    @timemethod
+    # @timemethod
     def _configureUI_(self):
         addScript = self.menuScripts.addAction("Add scripts...")
         addScript.triggered.connect(self.slot_addScripts)
@@ -1488,7 +1488,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             return cls._instance
 
     # @processtimefunc
-    @timemethod
+    # @timemethod
     def __init__(self, parent: QtWidgets.QWidget | None = None, *args, **kwargs):
         r"""Scipyen's main window initializer (constructor).
 
@@ -1970,7 +1970,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         return True
 
-    # @timefunc
+    # @timemethod
     def _getDBusSessionServiceNames_(self) -> list[str] | None:
         if self._dbusInterface_:
             msg = self._dbusInterface_.call("ListNames") # a QDBusMessage
@@ -1984,7 +1984,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         elif self._dbusSessionBus_:
             return self._dbusSessionBus_.interface().registeredServiceNames().value()
 
-    # @timefunc
+    # @timemethod
     def _configureDBusForGlobalMenu_(self):
 
         # ### BEGIN global menu stuff -- see also self._deregister_menuBar_, self._restore_menuBar_, self.getAppMenu and self._slot_visibility_changed
@@ -2054,7 +2054,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # this returns None whe using a QSPlashScreen!
         # self._app_menu_ = self.getAppMenu()
 
-    # @timefunc
+    # @timemethod
     def _configureDBusUDisk_(self):
         try:
             uDisks_service = "org.freedesktop.UDisks2"
@@ -4458,7 +4458,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     # END   Methods
 
     @safewrapper
-    # @timefunc
+    # @timemethod
     def _init_QtConsole_(self):
         r"""Starts an interactive IPython shell with a QtConsole frontend.
 
@@ -6596,7 +6596,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.qsettings, self, group_name=self.__class__.__name__)
 
     # @processtimefunc
-    # @timefunc
+    # @timemethod
     def loadSettings(self):
         r"""Overrides ScipyenConfigurable.loadSettings()"""
         super(WorkspaceGuiMixin, self).loadSettings()  # inherited from ScipyenConfigurable
@@ -6608,7 +6608,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.qsettings, self, group_name=self.__class__.__name__)
 
     # @processtimefunc
-    @timemethod
+    # @timemethod
     def _configureUI_(self):
         ''' Collect file menu actions & submenus that are built in the UI file. This should be
             done before loading the plugins.
@@ -11414,7 +11414,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @Slot()
     @safewrapper
-    @timefunc
+    # @timemethod
     def slot_offloadPlugins(self):
         '''
         Removes the (sub)menus and menu items created by loading plugins.
@@ -11446,7 +11446,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @Slot()
     @safewrapper
-    # @timefunc
+    # @timemethod
     def slot_reloadPlugins(self):
         self.slot_offloadPlugins()
         self.slot_loadPlugins()
@@ -11455,7 +11455,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
     # make forceRecompile a configuration variable !!!
     @Slot()
     @safewrapper
-    @timemethod
+    # @timemethod
     def slot_loadPlugins(self):
         r''' Search and load Scipyen 'plugins'
         Scipyen 'plugins' are modules in Scipyen package tree that advertise
@@ -11464,25 +11464,16 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         For details, see the documentation of the core.scipyen_plugin_loader
         module.
         '''
-        scipyen_plugin_loader.find_plugins(self._scipyendir_,
-                                           mainWindow = self,
-                                           )
+        scipyen_plugins = scipyen_plugin_loader.find_plugins(self._scipyendir_)
 
-        scipyen_plugin_loader.find_plugins(self.userPluginsDirectory,
-                                           checkgit = True,
-                                           mainWindow = self,
-                                           )
-        # scipyen_plugin_loader.find_plugins(self._scipyendir_, self._scipyendir_,
-        #                                    mainWindow = self,
-        #                                    # workspace = self.workspace
-        #                                    )  # calls os.walk
-        #
-        # scipyen_plugin_loader.find_plugins(self.userPluginsDirectory, self._scipyendir_,
-        #                                    checkgit = True,
-        #                                    mainWindow = self,
-        #                                    # workspace = self.workspace
-        #                                    )  # calls os.walk
+        if len(scipyen_plugins):
+            scipyen_plugin_loader.load_plugins(scipyen_plugins, mainWindow = self)
 
+        user_plugins = scipyen_plugin_loader.find_plugins(self.userPluginsDirectory,
+                                           checkgit = True)
+
+        if len(user_plugins):
+            scipyen_plugin_loader.load_plugins(user_plugins, mainWindow = self)
 
         # NOTE: 2016-04-15 11:53:08
         # let the plugin loader just load plugin module code
@@ -12176,7 +12167,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             return False
         return scipyenviewer.ScipyenViewer in inspect.getmro(x)
 
-    # @timefunc
+    # @timemethod
     def _register_viewer_class_(self, name: str, x: typing.Type):
         if not inspect.isclass(x):
             warnings.warn(f"Expecting a class; got {type(x).__name__} instead")

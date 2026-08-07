@@ -45,7 +45,7 @@ from core.scipyen_config import (ScipyenConfigurable, saveWindowSettings, loadWi
 from core import strutils, sysutils # , qtutils
 from core.qtutils import (qVariant, QVariantType, fromQVariant) # noqa
 from core.strutils import InflectEngine # noqa
-from core.prog import (print_styled, scipywarn, timefunc) # noqa
+from core.prog import (print_styled, scipywarn, timefunc, timemethod) # noqa
 import gui.quickdialog as qd
 from gui.itemslistdialog import ItemsListDialog
 import gui.pictgui as pgui
@@ -1618,7 +1618,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
             except: # noqa
                 traceback.print_exc()
 
-    # @timefunc
+    # @timemethod
     def adaptToRCIcons(self, obj: typing.Optional[ # noqa
         QtWidgets.QWidget | QAction
         ] = None):

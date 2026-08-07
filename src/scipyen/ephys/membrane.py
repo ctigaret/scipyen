@@ -3860,6 +3860,8 @@ def extract_pulse_triggered_APs(sig, times, tail = None):
 
 def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0,
                     rtol = 1e-5, atol = 1e-8, return_all=False):
+
+    # ### BEGIN
     # NOTE: 2019-11-29 16:49:14
     # use a Vm threshold to discard "aberrant" events
 
@@ -3899,6 +3901,7 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0,
     # this algorithm may also detect "aborted" APs that fall on the repolarizing
     # phase when Im injection has stopped
     #
+    # ### END
 
     # ### BEGIN NOTE: 2019-04-25 09:22:13 DEPRECATED by NOTE: 2019-11-29 16:40:34
     # select start of the fast (initial) rising phase
@@ -3978,6 +3981,7 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0,
     # but do not use any condition d2v/dt2 as it is too wobbly
     # print(f"detect_AP_rises dsdt_thr = {dsdt_thr}")
     fast_rise_starts = (dsdt.magnitude[:,] >= dsdt_thr)
+
     # 2) as in NOTE: 2019-04-25 09:22:13 get the logical flags for the starts of
     # the regions of dv/dt >= threshold
     fast_rise_start_flags = np.ediff1d(asfarray(fast_rise_starts), to_begin = 0) == 1
@@ -3993,6 +3997,7 @@ def detect_AP_rises(s, dsdt, d2sdt2, dsdt_thr, minisi, vm_thr=0,
     # we retain thse start times which begin a segment of the signal that overshoots
     # the vm threshold (vm_thr, which is 0 by default)
     accept_flags = [False] * len(fast_rise_start_times)
+
     accept_flags[:-1] = [s.time_slice(t, fast_rise_start_times[k+1]).max().magnitude > vm_thr for k, t in enumerate(fast_rise_start_times[:-1])]
 
     # the following _DROPS_ signal.t_stop at the end of the array
@@ -4688,8 +4693,8 @@ def polyfit_adjust_AP_waveform(wave, onset, onset_time, peak, peak_time,
 
 def detect_AP_waveforms_in_train(sig, iinj,
                                  thr = 10,
-                                 before_AP = None,
-                                 after_AP = None,
+                                 before_AP = 0*pq.s,
+                                 after_AP = 0*pq.s,
                                  min_fast_rise_duration = None,
                                  min_ap_isi = 6e-3*pq.s, #
                                  rtol = 1e-5, atol = 1e-8,
@@ -4973,7 +4978,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
 
     """
     import scipy.interpolate
-    from scipy.interpolate import PchipInterpolator as pchip
+    # from scipy.interpolate import PchipInterpolator as pchip
     # from scipy.signal import boxcar, convolve
     from scipy.signal import convolve
     from scipy.signal.windows import boxcar
@@ -4998,8 +5003,8 @@ def detect_AP_waveforms_in_train(sig, iinj,
         if not unitsConvertible(after_AP, sig.times):
             raise TypeError("units of 'after_AP' (%s) are not compatible with those of the signal's time domain (%s)" % (after_AP.units, sig.times.units))
 
-    elif after_AP is not None:
-        raise TypeError("'after_AP' expected to be a scalar, a Quantity, or None; got %s instead" % type(after_AP).__name__)
+    else:
+        raise TypeError("'after_AP' expected to be a scalar, or a Quantity; got %s instead" % type(after_AP).__name__)
 
     if not isinstance(sig, neo.AnalogSignal):
         raise TypeError("Expecting a neo.AnalogSignal; got %s instead" % type(sig).__name__)
@@ -5055,7 +5060,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
 
     elif isinstance(decay_ref, pq.Quantity):
         if not unitsConvertible(decay_ref, sig):
-            raise TypeError("'decay_ref' units (%s) are incompatible with the signal's units (%s)" % (decay_ref.units, sig.units))
+            raise TypeError(f"'decay_ref' units ({decay_ref.units}) are incompatible with the signal's units ({sig.units})")
 
         if decay_ref.units != sig.units:
             decay_ref.rescale(sig.units)
@@ -5102,7 +5107,7 @@ def detect_AP_waveforms_in_train(sig, iinj,
                                                  rtol=rtol, atol=atol,
                                                  vm_thr=vm_thr)
 
-    ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_fast_rise_durations, ap_peak_times, dv_dt, d2v_dt2 = ap_waveform_times
+    ap_fast_rise_start_times, ap_fast_rise_stop_times, ap_fast_rise_durations, ap_peak_times, dv_dt, d2v_dt2 = ap_waveform_times # noqa
 
     # print(f"detect_AP_waveforms_in_train: sig.units = {sig.units}")
     #
@@ -8453,7 +8458,7 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
         test_start, test_stop, test_levels = sigp.detect_boxcar(testVm, return_levels=True)
 
         if any(v is None for v in (test_start, test_stop, test_levels)):
-            raise ValueError(f"The testVm signal does not seem to contain an appropriate test command. Please enter the paarmeters for the membrane test manually")
+            raise ValueError("The testVm signal does not seem to contain an appropriate test command. Please enter the paarmeters for the membrane test manually")
 
         Vbase, Vss = (test_levels*testVm.units).flatten()
 
@@ -8488,7 +8493,7 @@ def measure_membrane_RsRin(im_signal:neo.AnalogSignal,
         else:
             intervals = tuple(v.rescale(domain_units) if v.units != domain_units else v for v in intervals)
 
-    if any(v < im_signal.t_start or v >= im_signal.t-stop for v in intervals):
+    if any(v < im_signal.t_start or v >= im_signal.t_stop for v in intervals):
         raise ValueError(f"All values in the interval must fall within the im_signal domain (t_start = {im_signal.t_start}, t_stop = {im_signal.t-stop})")
 
     dc_start, dc_stop, rs_start, rs_stop, rin_start, rin_stop = intervals

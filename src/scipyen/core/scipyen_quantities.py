@@ -1495,13 +1495,13 @@ def unitFamilyName(u, as_key:bool=False):
         else:
             return f"Compound Quantity {u.dimensionality.string}" if not as_key else "?"
 
-def checkQuantity(x:typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence[numbers.Number]],
-                  name:str,
-                  units:pq.Quantity,
-                  shape:typing.Optional[tuple[int]] = None,
-                  size:typing.Optional[int] = None,
-                  ndim:typing.Optional[int] = None,
-                  dtype:typing.Union[np.dtype, dataclasses.MISSING]=dataclasses.MISSING) -> pq.Quantity:
+def checkQuantity(x: typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence[numbers.Number]],
+                  name: str,
+                  units: pq.Quantity,
+                  shape: tuple[int] | None = None,
+                  size: int | None = None,
+                  ndim: int | None = None,
+                  dtype: typing.Union[np.dtype, dataclasses.MISSING]=dataclasses.MISSING) -> pq.Quantity:
     r"""Check validity of an object as a Quantity, or convertibility to a Quantity
 
     Parameters:
