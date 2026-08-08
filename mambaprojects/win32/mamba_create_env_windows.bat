@@ -14,7 +14,7 @@ rem Leave THIS LINE HERE; jus comment out or change the goto label
 rem  goto make_desktop_shortcut
 rem  set pip_reqs=%mydir%\setup_env\pip_requirements_win.txt
 :create_env
-set default_env_path="c:\scipyenv"
+set default_env_path="e:\scipyenv"
 set /P env_path="Enter the full path name of the new environment (no spaces, please, default is: %default_env_path%): "
 if [%env_path%] equ [] set env_path=%default_env_path%
 echo Creating mamba environment %env_path%
@@ -30,6 +30,12 @@ echo Installing conda-forge packages
 call mamba -vvv install --yes --use-uv --file mambaprojects\win32\mamba-conda-forge-packages.txt || goto eof
 :install_pip_pkg
 echo Installing pip packages
+rem requires uv installed as below:
+rem powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+rem powershell -c "irm https://astral.sh/uv/install.ps1 | more"
+rem or, in the activated environment, with pip install uv (and it be only availbale
+rem to the activated environment) - NOTE this last variant is executed here
+call pip installl uv || goto eof
 call uv pip install -r mambaprojects\win32\mamba-pip-packages.txt || goto eof
 
 REM manually (follow commented lines in mambaprojects\win32\scipyenv.yml)
@@ -45,11 +51,11 @@ cd %mydir%  || goto eof
 :make_scripts
 echo:
 echo Creating batch scripts
-powershell -ExecutionPolicy Bypass -File %mydir%\setup_env\make_scipyen_batch_scripts.ps1 || goto eof
+powershell -ExecutionPolicy Bypass -File %mydir%\mambaprojects\win32\\make_scipyen_batch_scripts.ps1 || goto eof
 :make_desktop_shortcut
 echo:
 echo Creating desktop link
-powershell -ExecutionPolicy Bypass -File %mydir%\setup_env\make_link.ps1 %mydir%  || goto eof
+powershell -ExecutionPolicy Bypass -File %mydir%\mambaprojects\win32\\make_link.ps1 %mydir%  || goto eof
 echo:
 echo Scipyen can now be launched from the desktop icon
 
