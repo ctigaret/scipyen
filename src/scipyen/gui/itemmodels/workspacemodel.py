@@ -65,7 +65,7 @@ __has_PyQt6__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
     # import PySide6
-    # from PySide6 import Shiboken
+    from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
     # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
