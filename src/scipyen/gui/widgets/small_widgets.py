@@ -60,6 +60,16 @@ from iolib.navigation.navigator import UrlNavigatorButtonBase
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
+try:
+    from gui.widgets.quantitychooserwidget_ui import Ui_QuantityChooserWidget
+
+except:
+    Ui_QuantityChooserWidget, _ = loadUiType(
+        os.path.join(__module_path__,
+                    "quantitychooserwidget.ui")
+        )
+
+
 class ElidedPushButton(UrlNavigatorButtonBase):
     def __init__(self, parent = None, text: str = "", elideText: bool = True):
         txt_ = None
@@ -259,12 +269,7 @@ class ElidedPushButton(UrlNavigatorButtonBase):
         if oldMinWidth != minWidth:
             self.setMinimumWidth(minWidth)
 
-Ui_QuantityChooserWidget, QWidget = loadUiType(
-    os.path.join(__module_path__,
-                 "quantitychooserwidget.ui")
-    )
-
-class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
+class QuantityChooserWidget(Ui_QuantityChooserWidget, QtWidgets.QWidget):
     r"""Compound widget allowing the user to choose a physical dimensionality.
     Convenience UI elements to attach quantities to various numeric variables.
 
@@ -295,6 +300,8 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
             parent_ = parent
         else:
             parent_ = None
+
+        super(Ui_QuantityChooserWidget, self).__init__()
 
         QWidget.__init__(self, parent=parent_)
 

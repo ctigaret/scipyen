@@ -63,9 +63,13 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_NervousSystemWidget, _ = loadUiType(
-    os.path.join(__module_path__, "nervoussystemwidget.ui")
-    )
+try:
+    from gui.widgets.dataclasswidgets.nervoussystemwidget_ui import Ui_NervousSystemWidget
+
+except:
+    Ui_NervousSystemWidget, _ = loadUiType(
+        os.path.join(__module_path__, "nervoussystemwidget.ui")
+        )
 
 class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget):
     r"""NOTE: This relates to ALL organs in a BrainGlobeAtlas, not just the brain!"""
@@ -73,6 +77,7 @@ class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.BiologicalSource] = None,
                  **kwargs):
+        super(Ui_NervousSystemWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):

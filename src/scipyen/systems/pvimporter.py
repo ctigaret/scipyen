@@ -73,14 +73,20 @@ from imaging.axiscalibration import (AxesCalibration,
 
 import ephys.ephys as ephys
 
-__ui_path__ = adapt_ui_path(__module_path__, "PrairieImporter.ui")
+try:
+    from systems.PrairieImporter_ui import Ui_PrairieImporterDialog
 
-if os.environ["QT_API"] in ("pyqt5", "pyside2"):
-    __UI_PrairieImporter, __QDialog__ = loadUiType(__ui_path__, from_imports=True, import_from="gui")
-else:
-    __UI_PrairieImporter, __QDialog__ = loadUiType(__ui_path__)
+except:
+    __ui_path__ = adapt_ui_path(__module_path__, "PrairieImporter.ui")
 
-class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiMixin):
+    if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+        Ui_PrairieImporterDialog, _ = loadUiType(__ui_path__, from_imports=True, import_from="gui")
+    else:
+        Ui_PrairieImporterDialog, _ = loadUiType(__ui_path__)
+
+
+
+class PrairieViewImporter(QtWidgets.QDialog, Ui_PrairieImporterDialog, WorkspaceGuiMixin):
     sig_protocolRemoved = Signal(int, name="sig_protocolRemoved")
 
     def __init__(self, parent=None,
@@ -136,6 +142,7 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
         #
         # see also scipyen gui.mainwindow.ScipyenWindow.slot_importPrairieView()
         super().__init__(parent)
+        super(Ui_PrairieImporterDialog, self).__init__()
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         #super(WorkspaceGuiMixin, self).__init__(parent, **kwargs)
 

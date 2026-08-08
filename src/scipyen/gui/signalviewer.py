@@ -296,10 +296,13 @@ DEPRECATED here, but keep for reference
 """
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__,'signalviewer.ui')
 
-# Ui_SignalViewerWindow, QMainWindow = loadUiType(os.path.join(__module_path__,'signalviewer.ui'))
-Ui_SignalViewerWindow, QMainWindow = loadUiType(__ui_path__)
+try:
+    from gui.signalviewer_ui import Ui_SignalViewerWindow
+
+except:
+    __ui_path__ = adapt_ui_path(__module_path__,'signalviewer.ui')
+    Ui_SignalViewerWindow, QMainWindow = loadUiType(__ui_path__)
 
 class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     r""" A plotter for multi-sweep signals ("frames" or "segments"), with cursors.
@@ -536,7 +539,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         # print(f"{self.__class__.__name__}.__init__: parent is {type(parent)}")
         # super(QtWidgets.QMainWindow, self).__init__(parent=parent)
-
+        super(Ui_SignalViewerWindow, self).__init__()
         self.threadpool = QtCore.QThreadPool()
 
         self._axesColumn_ = 0

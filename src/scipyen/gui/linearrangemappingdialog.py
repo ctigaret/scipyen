@@ -33,8 +33,12 @@ else:
 from core.sysutils import adapt_ui_path
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__, "linearrangemappingwidget.ui")
 
-Ui_LinearRangeMappingWidget, QWidget = loadUiType(__ui_path__)
+try:
+    from gui.linearrangemappingwidget_ui import Ui_LinearRangeMappingWidget
+except:
+    __ui_path__ = adapt_ui_path(__module_path__, "linearrangemappingwidget.ui")
+    Ui_LinearRangeMappingWidget, QWidget = loadUiType(__ui_path__)
+
 
 # TODO

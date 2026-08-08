@@ -16,12 +16,12 @@ from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot)#, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
-__has_sip__ = False
+# __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6 # noqa
-    from PySide6 import Shiboken # noqa
-    from PySide6.QtCore import (Signal, Slot, Property,)
+    # import PySide6 # noqa
+    # from PySide6 import Shiboken # noqa
+    # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
@@ -30,12 +30,12 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
+    # from qtpy import sip
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
-    __has_sip__ = True
+    # __has_sip__ = True
 
 
 # from core.prog import scipywarn
@@ -46,16 +46,21 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_PPLProtocolStepWidget, _ = loadUiType(
-    os.path.join(__module_path__, "pplprotocolstepwidget.ui")
-    )
+try:
+    from gui.widgets.dataclasswidgets.asruwidgets.pplprotocolstepwidget_ui import Ui_PPLProtocolStepWidget
+
+except:
+    Ui_PPLProtocolStepWidget, _ = loadUiType(
+        os.path.join(__module_path__, "pplprotocolstepwidget.ui")
+        )
+
 
 class PPLProtocolStepWidget(Ui_PPLProtocolStepWidget, DataClassWidget):
     _objectTypes_ = (sdc.PPLProtocol, sdc.PPLProtocolStep)
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
-
+        super(Ui_PPLProtocolStepWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):

@@ -64,9 +64,14 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_BGAtlasStructureLookupWidget, _ = loadUiType(
-    os.path.join(__module_path__, "brainglobeatlasstructurelookup.ui")
-    )
+try:
+    from gui.widgets.brainglobeatlasstructurelookup_ui import Ui_BGAtlasStructureLookupWidget
+
+except:
+    Ui_BGAtlasStructureLookupWidget, _ = loadUiType(
+        os.path.join(__module_path__, "brainglobeatlasstructurelookup.ui")
+        )
+
 
 class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QWidget):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
@@ -76,6 +81,7 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
                  structure: typing.Optional[bgbridge.Structure] = None,
                  **kwargs):
         super().__init__(parent=parent)
+        super(Ui_BGAtlasStructureLookupWidget, self).__init__()
 
         containerWidget: typing.Optional[QtWidgets.QWidget] = kwargs.pop("containerWidget", None)
 

@@ -63,7 +63,12 @@ from dataclasses import (dataclass, asdict) # noqa
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget # noqa
 from gui.widgets.small_widgets import QuantitySpinBox, QuantityChooserWidget # noqa
 
-Ui_MetaDataWidget, QWidget = loadUiType(os.path.join(__module_path__, "metadatawidget.ui"))
+try:
+    from gui.widgets.dataclasswidgets.metadatawidget_ui import Ui_MetaDataWidget
+
+except:
+    Ui_MetaDataWidget, _ = loadUiType(os.path.join(__module_path__, "metadatawidget.ui"))
+
 
 class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
     r"""Widget for displaying BaseScipyenData objectx.
@@ -75,6 +80,7 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget]=None,
                  obj: typing.Optional[bsc.BaseScipyenData] = None,
                  **kwargs):
+        super(Ui_MetaDataWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):

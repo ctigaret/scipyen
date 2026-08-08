@@ -62,24 +62,20 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_OrganTissueWidget, _ = loadUiType(
-    os.path.join(__module_path__, "organtissuewidget.ui")
-    )
+try:
+    from gui.widgets.dataclasswidgets.organtissuewidget_ui import Ui_OrganTissueWidget
 
-# Ui_OrganWidget, _ = loadUiType(
-#     os.path.join(__module_path__, "organwidget.ui")
-#     )
-#
-# Ui_TissueWidget, _ = loadUiType(
-#     os.path.join(__module_path__, "tissuewidget.ui")
-#     )
-
+except:
+    Ui_OrganTissueWidget, _ = loadUiType(
+        os.path.join(__module_path__, "organtissuewidget.ui")
+        )
 
 class OrganWidget(Ui_OrganTissueWidget, DataClassWidget):
     _objectTypes_ = (sdc.Organ, )
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.BiologicalSource] = None,
                  **kwargs):
+        super(Ui_OrganTissueWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):

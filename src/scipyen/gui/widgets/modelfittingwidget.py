@@ -58,11 +58,11 @@ import gui.quickdialog as qd
 from gui.widgets.small_widgets import QuantitySpinBox
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
+try:
+    from gui.widgets.modelfittingwidget_ui import Ui_ModelFittingWidget
 
-# print(f"__module_path__ = {__module_path__}")
-# uifile = os.path.join(__module_path__, "ModelFittingWidget.ui")
-# print(f"uifile = {uifile}")
-Ui_ModelFittingWidget, QWidget = loadUiType(os.path.join(__module_path__, "ModelFittingWidget.ui"))
+except:
+    Ui_ModelFittingWidget, _ = loadUiType(os.path.join(__module_path__, "ModelFittingWidget.ui"))
 
 class _ModelFunctionExpressionSVGGenerator_(QtCore.QThread):
     ready = Signal(str, name="ready")
@@ -81,7 +81,7 @@ class _ModelFunctionExpressionSVGGenerator_(QtCore.QThread):
             self.ready.emit("")
 
 
-class ModelFittingWidget(Ui_ModelFittingWidget, QWidget, workspacegui.GuiMessages):
+class ModelFittingWidget(Ui_ModelFittingWidget, QtWidgets.QWidget, workspacegui.GuiMessages):
     # NOTE: 2026-01-21 10:44:11 TODO URGENT
     # Currently inserting rows for starred coefficients is implemented by means
     # of redefining the coefficients data frame
@@ -132,7 +132,8 @@ Named Parameters:
 
 
 """
-        QWidget.__init__(self, parent=parent)
+        QtWidgets.QWidget.__init__(self, parent=parent)
+        # super(Ui_ModelFittingWidget, self).__init__()
 
         self._nStarredCoeffs_:int = 0
         self._nStarredGroups_:int = 0

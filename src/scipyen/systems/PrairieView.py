@@ -116,12 +116,8 @@ import ephys.ephys as ephys
 #### END scipyen modules
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-# __ui_path__ = adapt_ui_path(__module_path__, "PrairieImporter.ui")
-#
-# if os.environ["QT_API"] in ("pyqt5", "pyside2"):
-#     __UI_PrairieImporter, __QDialog__ = loadUiType(__ui_path__, from_imports=True, import_from="gui")
-# else:
-#     __UI_PrairieImporter, __QDialog__ = loadUiType(__ui_path__)
+
+
 
 
 r""" NOTE: 2017-09-22 09:28:23

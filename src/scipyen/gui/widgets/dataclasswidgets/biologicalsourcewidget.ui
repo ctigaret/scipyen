@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>BiologialSourceWidget</class>
- <widget class="QWidget" name="BiologialSourceWidget">
+ <class>BiologicalSourceWidget</class>
+ <widget class="QWidget" name="BiologicalSourceWidget">
   <property name="geometry">
    <rect>
     <x>0</x>

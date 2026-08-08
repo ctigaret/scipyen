@@ -45,9 +45,13 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_ASRUWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "asruwidget.ui")
-    )
+try:
+    from gui.widgets.dataclasswidgets.asruwidgets.asruwidget_ui import Ui_ASRUWidget
+
+except:
+    Ui_ASRUWidget, QWidget = loadUiType(
+        os.path.join(__module_path__, "asruwidget.ui")
+        )
 
 class ASRUWidget(Ui_ASRUWidget, DataClassWidget):
     _objectTypes_ = (sdc.PPL, sdc.PIL)
@@ -55,6 +59,8 @@ class ASRUWidget(Ui_ASRUWidget, DataClassWidget):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
+
+        super(Ui_ASRUWidget, self).__init__()
 
         if isinstance(parent, self._objectTypes_):
             obj_ = parent

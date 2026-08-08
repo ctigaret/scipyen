@@ -139,17 +139,17 @@ from collections import namedtuple, deque # noqa
 from dataclasses import MISSING
 from enum import Enum, IntEnum # noqa
 
-import qtpy # noqa
+# import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__  = False
-__has_sip__ = False
+# __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6 # noqa
-    from PySide6 import Shiboken # noqa
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # import PySide6 # noqa
+    # from PySide6 import Shiboken # noqa
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     # QtType = typing.TypeVar("QtType", bound = "Shiboken.Object")
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
@@ -158,22 +158,23 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-    from qtpy import sip # noqa
-    ____has_sip____ = True
+    # from qtpy import sip # noqa
+    # ____has_sip____ = True
     # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
-    from qtpy.uic import loadUiType # noqa
+    # from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     QKeyboardModifiers = QtCore.Qt.KeyboardModifier
 
 __has_qtdbus__ = False
-try:
-    from qtpy import QtDBus # noqa
+if sys.platform == "linux":
+    try:
+        from qtpy import QtDBus # noqa
 
-    __has_qtdbus__ = True
-except: # noqa
-    pass
+        __has_qtdbus__ = True
+    except: # noqa
+        pass
 
 from traitlets.utils.bunch import Bunch
 

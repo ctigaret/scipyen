@@ -49,9 +49,13 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_ChemicalSynapseWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "chemicalsynapsewidget.ui")
-    )
+try:
+    from gui.widgets.dataclasswidgets.chemicalsynapsewidget_ui import Ui_ChemicalSynapseWidget
+
+except:
+    Ui_ChemicalSynapseWidget, _ = loadUiType(
+        os.path.join(__module_path__, "chemicalsynapsewidget.ui")
+        )
 
 class ChemicalSynapseWidget(Ui_ChemicalSynapseWidget, DataClassWidget):
     _objectTypes_ = (sdc.ChemicalSynapse, )
@@ -59,7 +63,7 @@ class ChemicalSynapseWidget(Ui_ChemicalSynapseWidget, DataClassWidget):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
-
+        super(Ui_ChemicalSynapseWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):

@@ -69,9 +69,14 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_CellCompartmentWidget, _ = loadUiType(
-    os.path.join(__module_path__, "cellcompartmentwidget.ui")
-    )
+try:
+    from gui.widgets.dataclasswidgets.cellcompartmentwidget_ui import Ui_CellCompartmentWidget
+
+except:
+    Ui_CellCompartmentWidget, _ = loadUiType(
+        os.path.join(__module_path__, "cellcompartmentwidget.ui")
+        )
+
 
 class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
     _objectTypes_ = (sdc.CellCompartment, sdc.UltrastructureElement)
@@ -79,7 +84,7 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
-
+        super(Ui_CellCompartmentWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):

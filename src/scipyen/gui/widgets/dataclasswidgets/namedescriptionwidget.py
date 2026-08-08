@@ -54,9 +54,13 @@ from gui.widgets.anchoringcollapsiblewidget import AnchoringCollapsibleWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_NameDescriptionWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "namedescriptionwidget.ui")
-    )
+try:
+    from gui.widgets.dataclasswidgets.namedescriptionwidget_ui import Ui_NameDescriptionWidget
+
+except:
+    Ui_NameDescriptionWidget, _ = loadUiType(
+        os.path.join(__module_path__, "namedescriptionwidget.ui")
+        )
 
 class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
@@ -72,6 +76,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[typing.Any] = None,
                  **kwargs):
+        super(Ui_NameDescriptionWidget, self).__init__()
         if not isinstance(parent, QtWidgets.QWidget):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):

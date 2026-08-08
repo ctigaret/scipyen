@@ -42,11 +42,12 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-try:
-    from qtpy import QtDBus # noqa
-    __has_qtdbus__ = True
-except:
-    __has_qtdbus__ = False
+if sys.platform == "linux":
+    try:
+        from qtpy import QtDBus # noqa
+        __has_qtdbus__ = True
+    except:
+        __has_qtdbus__ = False
 
 from ephys import (ephys, ephys_pathways)
 from core.prog import scipywarn # noqa
@@ -57,9 +58,13 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_SynapticPathwayWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "synapticpathwaywidget.ui")
-    )
+try:
+    from gui.widgets.synapticpathwaywidget_ui import Ui_SynapticPathwayWidget
+
+except:
+    Ui_SynapticPathwayWidget, _ = loadUiType(
+        os.path.join(__module_path__, "synapticpathwaywidget.ui")
+        )
 
 
 class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget):
@@ -71,7 +76,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget):
                  obj: typing.Optional[ephys_pathways.SynapticPathway] = None,
                  **kwargs):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
-
+        super(Ui_SynapticPathwayWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):

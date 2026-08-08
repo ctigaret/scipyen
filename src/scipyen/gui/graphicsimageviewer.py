@@ -46,14 +46,10 @@ from collections import ChainMap, namedtuple, defaultdict
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-if __has_PyQt6__:
-    # why is this working with PyQt6 ...
-    uifile = 'graphicsimageviewer_qt6.ui'
-else:
-    # while this is NOT, yet it works with PySide6?
-    uifile = 'graphicsimageviewer.ui'
-    
-Ui_GraphicsImageViewerWidget, QWidget = loadUiType(adapt_ui_path(__module_path__, uifile))
+try:
+    from gui.graphicsimageviewer_ui import Ui_GraphicsImageViewerWidget
+except:
+    Ui_GraphicsImageViewerWidget, _ = loadUiType(adapt_ui_path(__module_path__, uifile))
 
 class GraphicsImageViewerScene(QtWidgets.QGraphicsScene):
     signalMouseAt = Signal(int,int,name="signalMouseAt")
@@ -152,7 +148,7 @@ class GraphicsImageViewerScene(QtWidgets.QGraphicsScene):
     def wheelEvent(self, evt):
         evt.ignore()
         
-class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
+class GraphicsImageViewerWidget(QtWidgets.QWidget, Ui_GraphicsImageViewerWidget):
     r"""
     A simple image view widget based on Qt5 graphics view framework
     
@@ -196,7 +192,8 @@ class GraphicsImageViewerWidget(QWidget, Ui_GraphicsImageViewerWidget):
     ####
     
     def __init__(self, img=None, parent=None, imageViewer=None):
-        super(GraphicsImageViewerWidget, self).__init__(parent=parent)
+        super().__init__(parent=parent)
+        super(Ui_GraphicsImageViewerWidget, self).__init__()
         
         # NOTE: 2021-05-08 10:46:01 NEW API
         self._planargraphics_ = list()

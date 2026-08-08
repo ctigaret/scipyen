@@ -319,15 +319,17 @@ import ephys.ephys as ephys
 # from ..scandata import (ScanData, AnalysisUnit, check_apiversion, scanDataOptions)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__,"LSCaTWindow.ui")
 
-# print(f"CaTanalysis.py __ui_path__ {__ui_path__}")
+try:
+    from imaging.LSCaTWindow_ui import Ui_LSCaTWindow
 
-# Form class,        Base class                                                                               package with the resources.qrc file
-if os.environ["QT_API"] in ("pyqt5", "pyside2"):
-    __UI_LSCaTWindow__, __QMainWindow__ = loadUiType(__ui_path__, from_imports=True, import_from="gui")
-else:
-    __UI_LSCaTWindow__, __QMainWindow__ = loadUiType(__ui_path__)#, import_from="gui")
+except:
+    __ui_path__ = adapt_ui_path(__module_path__,"LSCaTWindow.ui")
+
+    # print(f"CaTanalysis.py __ui_path__ {__ui_path__}")
+
+    # Form class,        Base class                                                                               package with the resources.qrc file
+    Ui_LSCaTWindow, _ = loadUiType(__ui_path__)#, import_from="gui")
 
 def vCursor2ScanlineProjection(v, path, span=None):
     r"""Maps the x coordinate for a vertical cursor in linescans space (x,y) coordinates on scanline path, in scene space.
@@ -3487,7 +3489,7 @@ def removeMirrorCursor(data, vc):
     data.sceneCursors.pop(vc.name, None)
     
     
-class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
+class LSCaTWindow(ScipyenFrameViewer, Ui_LSCaTWindow):
     # NOTE: 2021-09-23 10:43:12
     # ScipyenFrameViewer <- ScipyenViewer <- WorkspaceGuiMixin
     # NOTE: 2021-07-08 10:04:42 About configuration/settings
@@ -3584,6 +3586,7 @@ class LSCaTWindow(ScipyenFrameViewer, __UI_LSCaTWindow__):
     defaultBinomialFilterOptions.scans.ind.radius = 10
 
     def __init__(self, *args, parent:(QtWidgets.QMainWindow, type(None)) = None, win_title="LSCaT", **kwargs): # TODO 2025-07-08 21:50:45 migrate to a future ScanDataViewer
+        super(Ui_LSCaTWindow, self).__init__()
         self.threadpool = QtCore.QThreadPool()
         
         # guard variables for filtering

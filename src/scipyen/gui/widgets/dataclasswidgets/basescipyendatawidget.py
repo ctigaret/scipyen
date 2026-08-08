@@ -44,9 +44,13 @@ from gui.textviewer import TextViewer
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-Ui_BaseScipyenDataWidget, QWidget = loadUiType(os.path.join(__module_path__, "basescipyendatawidget.ui"))
+try:
+    from gui.widgets.dataclasswidgets.basescipyendatawidget_ui import Ui_BaseScipyenDataWidget
 
-class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
+except:
+    Ui_BaseScipyenDataWidget, _ = loadUiType(os.path.join(__module_path__, "basescipyendatawidget.ui"))
+
+class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QtWidgets.QWidget):
     r"""Widget for displaying the most commonly used data attributes in Scipyen.
     Where implemented, it also supports editing.
     NOTE/WARNING: Under development
@@ -56,6 +60,7 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QWidget):
     sig_valueChanged = Signal(name="sig_valueChanged")
 
     def __init__(self, parent=None, **kwargs):
+        super(Ui_BaseScipyenDataWidget, self).__init__()
         # super().__init__(self, parent=parent)
 
         self._dataVarName = kwargs.pop("varname", "")

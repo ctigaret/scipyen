@@ -35,11 +35,16 @@ import typing, os
 from core.sysutils import adapt_ui_path
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__, "cancellableqprogressbar.ui")
 
-Ui_CancellableQProgressBar, QWidget = loadUiType(__ui_path__)
+try:
+    from gui.widgets.cancellableqprogressbar_ui import Ui_CancellableQProgressBar
 
-class CancellableQProgressBar(QWidget, Ui_CancellableQProgressBar):
+except:
+    __ui_path__ = adapt_ui_path(__module_path__, "cancellableqprogressbar.ui")
+    Ui_CancellableQProgressBar, QWidget = loadUiType(__ui_path__)
+
+
+class CancellableQProgressBar(QtWidgets.QWidget, Ui_CancellableQProgressBar):
     r"""No frills; just adds a cancel button.
     Minimal funcitonality; additional code to be implemented (currently, the
     following properties are as per QProgressBar default, and those markes with
@@ -61,6 +66,7 @@ class CancellableQProgressBar(QWidget, Ui_CancellableQProgressBar):
     
     def __init__(self, parent = None, **kwargs):
         super().__init__(parent=parent)
+        super(Ui_CancellableQProgressBar, self).__init__()
         self._configureUI_()
         
     def _configureUI_(self):

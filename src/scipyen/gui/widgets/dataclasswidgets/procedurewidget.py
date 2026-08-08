@@ -51,15 +51,21 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
+try:
+    from gui.widgets.dataclasswidgets.procedurewidget_ui import Ui_ProcedureWidget
 
+except:
+    Ui_ProcedureWidget, _ = loadUiType(
+        os.path.join(__module_path__, "procedurewidget.ui")
+        )
 
-Ui_ProcedureWidget, _ = loadUiType(
-    os.path.join(__module_path__, "procedurewidget.ui")
-    )
+try:
+    from gui.widgets.dataclasswidgets.simpleprocedurewidget_ui import Ui_SimpleProcedureWidget
 
-Ui_SimpleProcedureWidget, _ = loadUiType(
-    os.path.join(__module_path__, "simpleprocedurewidget.ui")
-    )
+except:
+    Ui_SimpleProcedureWidget, _ = loadUiType(
+        os.path.join(__module_path__, "simpleprocedurewidget.ui")
+        )
 
 class SimpleProcedureWidget(Ui_SimpleProcedureWidget, DataClassWidget):
     _objectTypes_ = (sdc.Procedure, )
@@ -67,7 +73,7 @@ class SimpleProcedureWidget(Ui_SimpleProcedureWidget, DataClassWidget):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
-
+        super(Ui_SimpleProcedureWidget, self).__init__9
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -127,7 +133,7 @@ class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
-
+        super(Ui_ProcedureWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):

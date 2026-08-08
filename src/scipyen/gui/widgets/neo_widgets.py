@@ -63,12 +63,16 @@ from core import strutils as strutils
 from core.triggerevent import (DataMark, MarkType,
                                TriggerEvent, TriggerEventType)
 
-Ui_SimpleTriggerEventWidget, QWidget = loadUiType(
-    os.path.join(__module_path__,
-                 "simpletriggereventwidget.ui")
-    )
+try:
+    from gui.widgets.simpletriggereventwidget_ui import Ui_SimpleTriggerEventWidget
 
-class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
+except:
+    Ui_SimpleTriggerEventWidget, QWidget = loadUiType(
+        os.path.join(__module_path__,
+                    "simpletriggereventwidget.ui")
+        )
+
+class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QtWidgets.QWidget):
     r"""A simple widget for editing DataMark, TriggerEvents and neo.Event objects.
 """
     supported_types = dict(map(lambda t: (t.__name__, t),
@@ -82,7 +86,9 @@ class SimpleTriggerEventWidget(Ui_SimpleTriggerEventWidget, QWidget):
                  obj:typing.Optional[
                      typing.Union[neo.Event, DataMark, TriggerEvent]
                      ] = None,
-                 precision: typing.Optional[int] = None):
+                 precision: typing.Optional[int] = None):#
+
+        super(Ui_SimpleTriggerEventWidget, self).__init__()
 
         if not isinstance(parent, QtWidgets.QWidget):
             if obj is None and isinstance(parent, (neo.Event, DataMark, TriggerEvent)):

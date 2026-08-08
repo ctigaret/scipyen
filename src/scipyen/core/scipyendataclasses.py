@@ -33,49 +33,8 @@ from copy import (deepcopy, copy,) # noqa
 #### END core python modules
 
 #### BEGIN 3rd party modules
-# import qtpy
-# from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-# from qtpy.QtCore import (Signal, Slot, Property,)
-# __has_PySide6__ = False
-# __has_PyQt6__ = False
-# __has_sip__ = False
-# if os.environ["QT_API"] == "pyside6":
-#     __has_PySide6__ = True
-#     import PySide6
-#     from PySide6 import Shiboken
-#     # from PySide6.QtCore import (Signal, Slot, Property,)
-#     from PySide6.QtUiTools import loadUiType # -- A-HA!
-#     QAction = QtGui.QAction
-#     QActionGroup = QtGui.QActionGroup
-#     QShortcut = QtGui.QShortcut
-# else:
-#     if os.environ["QT_API"] == "pyqt6":
-#         __has_PyQt6__ = True
-#
-#     from qtpy import sip
-#     from qtpy.uic import loadUiType
-#     QAction = QtWidgets.QAction
-#     QActionGroup = QtWidgets.QActionGroup
-#     QShortcut = QtWidgets.QShortcut
-#     __has_sip__ = True
-
-# import qtpy
-# qtpy.API = os.environ["QT_API"]
-# if os.environ["QT_API"] == "pyside6":
-#     import PySide6
-#     from PySide6 import (QtGui, QtCore, QtWidgets,)
-# else:
-#     from qtpy import (QtGui, QtCore, QtWidgets,)
-# import numpy as np
-# from numpy import ndarray
-# import numpy.matlib as mlib
 import pandas as pd
 import quantities as pq
-# from core.vigra_patches import vigra
-# import neo
-# from neo.core import (baseneo, basesignal, container,)
-# from neo.core.dataobject import (DataObject, ArrayDict,)
-
 
 #### END 3rd party modules
 

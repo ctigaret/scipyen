@@ -55,14 +55,26 @@ from gui import guiutils
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_AuxiliaryInputWidget, QWidgetIn = loadUiType(
-    os.path.join(__module_path__, "auxiliaryinputwidget.ui")
-    )
-Ui_AuxiliaryOutputWidget, QWidgetOut = loadUiType(
-    os.path.join(__module_path__, "auxiliaryoutputwidget.ui")
-    )
+try:
+    from gui.widgets.auxiliaryinputwidget_ui import Ui_AuxiliaryInputWidget
 
-class AuxiliaryInputWidget(Ui_AuxiliaryInputWidget, QWidgetIn):
+except:
+    Ui_AuxiliaryInputWidget, QWidgetIn = loadUiType(
+        os.path.join(__module_path__, "auxiliaryinputwidget.ui")
+        )
+
+
+
+try:
+    from gui.widgets.auxiliaryoutputwidget_ui import Ui_AuxiliaryOutputWidget
+
+except:
+    Ui_AuxiliaryOutputWidget, _ = loadUiType(
+        os.path.join(__module_path__, "auxiliaryoutputwidget.ui")
+        )
+
+
+class AuxiliaryInputWidget(Ui_AuxiliaryInputWidget, QtWidgets.QWidget):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
 
     defaultName: str = "aux_in"
@@ -77,7 +89,8 @@ class AuxiliaryInputWidget(Ui_AuxiliaryInputWidget, QWidgetIn):
         #         obj = parent
         #     parent = None
 
-        QWidget.__init__(self, parent=parent)
+        QtWidgets.QWidget.__init__(self, parent=parent)
+        super(Ui_AuxiliaryInputWidget, self).__init__()
 
         if not isinstance(obj, AuxiliaryInput): # and obj is not None:
             # scipywarn(f"This widget does not support objects of type {type(obj).__name__}")
@@ -222,7 +235,7 @@ class AuxiliaryInputWidget(Ui_AuxiliaryInputWidget, QWidgetIn):
     def value(self) -> AuxiliaryInput:
         return self._data_
 
-class AuxiliaryOutputWidget(Ui_AuxiliaryOutputWidget, QWidgetOut):
+class AuxiliaryOutputWidget(Ui_AuxiliaryOutputWidget, QtWidgets.QWidget):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
 
     defaultName: str = "aux_out"
@@ -237,7 +250,8 @@ class AuxiliaryOutputWidget(Ui_AuxiliaryOutputWidget, QWidgetOut):
         #         obj = parent
         #     parent = None
 
-        QWidget.__init__(self, parent=parent)
+        QtWidgets.QWidget.__init__(self, parent=parent)
+        super(Ui_AuxiliaryOutputWidget, self).__init__()
 
         if not isinstance(obj, AuxiliaryOutput): # and obj is not None:
             # scipywarn(f"This widget does not support objects of type {type(obj).__name__}")

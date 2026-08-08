@@ -102,9 +102,13 @@ __ui_path__ = adapt_ui_path(__module_path__, "tableeditorwidget.ui")
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_TableEditorWidget, QWidget = loadUiType(__ui_path__)
+try:
+    from gui.widgets.tableeditorwidget_ui import Ui_TableEditorWidget
 
-class TableEditorWidget(QWidget, Ui_TableEditorWidget):
+except:
+    Ui_TableEditorWidget, _ = loadUiType(__ui_path__)
+
+class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
     r"""Uses TableDataView as the UI"""
     # TODO 2019-11-01 22:57:01
     # finish implementing all these
@@ -130,6 +134,7 @@ class TableEditorWidget(QWidget, Ui_TableEditorWidget):
                  readOnly:bool=True, enforceFloat:bool=False,
                  enforceReadOnly:bool=False) -> None:
         super().__init__(parent=parent)
+        super(Ui_TableEditorWidget, self).__init__()
         # FIXME: 2025-11-23 09:58:38 next line is DEPRECATED
         self._is_vigra_filter_kernel_:bool = False # needed in future implementations of editing functionality
         self._selectedIndexes_ = list()

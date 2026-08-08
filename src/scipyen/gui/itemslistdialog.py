@@ -41,20 +41,25 @@ from core.prog import scipywarn
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-__ui_path__ = adapt_ui_path(__module_path__, "itemslistdialog.ui")
 
 # print(f"__ui_path__ {__ui_path__}")
+try:
+    from gui.itemslistdialog_ui import Ui_ItemsListDialog
 
-Ui_ItemsListDialog, QDialog = loadUiType(__ui_path__)
+except:
+    __ui_path__ = adapt_ui_path(__module_path__, "itemslistdialog.ui")
+    Ui_ItemsListDialog, _ = loadUiType(__ui_path__)
 
-class ItemsListDialog(QDialog, Ui_ItemsListDialog):
+
+class ItemsListDialog(QtWidgets.QDialog, Ui_ItemsListDialog):
     itemSelected = QtCore.Signal(str)
 
     def __init__(self, parent = None, itemsList = None, title = None,
                  preSelected = None,
                  modal = False,
                  selectmode = QtWidgets.QAbstractItemView.SingleSelection):
-        super(ItemsListDialog, self).__init__(parent)
+        super().__init__(parent)
+        super(Ui_ItemsListDialog, self).__init__()
         self.setupUi(self)
         self.setModal(modal)
         self.preSelected = list()

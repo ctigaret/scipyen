@@ -42,13 +42,21 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_CellWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "cellwidget.ui")
-    )
+try:
+    from gui.widgets.dataclasswidgets.cellwidget_ui import Ui_CellWidget
 
-Ui_NeuronWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "neuronwidget.ui")
-    )
+except:
+    Ui_CellWidget, _ = loadUiType(
+        os.path.join(__module_path__, "cellwidget.ui")
+        )
+
+try:
+    from gui.widgets.dataclasswidgets.neuronwidget_ui import Ui_NeuronWidget
+
+except:
+    Ui_NeuronWidget, _ = loadUiType(
+        os.path.join(__module_path__, "neuronwidget.ui")
+        )
 
 class CellWidget(Ui_CellWidget, DataClassWidget):
     _objectTypes_ = (sdc.Cell, )
@@ -56,7 +64,7 @@ class CellWidget(Ui_CellWidget, DataClassWidget):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
-
+        super(Ui_CellWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -134,7 +142,7 @@ class NeuronWidget(Ui_NeuronWidget, DataClassWidget):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
-
+        super(Ui_NeuronWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):

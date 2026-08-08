@@ -64,34 +64,35 @@ import confuse # for programmatic read/write of non-gui settings
 #### END 3rd party modules
 
 # BEGIN PyQt/PySide
-import qtpy
+# import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ =False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    # import PySide6
+    # from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-    from qtpy.uic import loadUiType
+    # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
 
 __has_qtdbus__ = False
-try:
-    from qtpy import QtDBus
-    __has_qtdbus__ = True
-except:
-    __has_qtdbus__ = False
+if sys.platform == "linux":
+    try:
+        from qtpy import QtDBus
+        __has_qtdbus__ = True
+    except:
+        __has_qtdbus__ = False
 
 # END PyQt/PySide
 

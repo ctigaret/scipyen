@@ -78,12 +78,25 @@ from gui.itemmodels.digtriggerstablemodel import DIGTriggersTableModel
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-if os.environ["QT_API"] in ("pyqt5", "pyside2"):
-    Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "widgets", "triggerdetect.ui"), from_imports=True, import_from="gui")
-    Ui_ImportDIGTriggerWidget, _ = loadUiType(os.path.join(__module_path__, "widgets", "importDIGtrigger.ui"), from_imports=True, import_from="gui")
-else:
-    Ui_TriggerDetectWidget, QWidget = loadUiType(os.path.join(__module_path__, "widgets", "triggerdetect.ui"))
-    Ui_ImportDIGTriggerWidget, _ = loadUiType(os.path.join(__module_path__, "widgets", "importDIGtrigger.ui"))
+try:
+    from gui.widgets.triggerdetect_ui import Ui_TriggerDetectWidget
+
+except:
+    if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+        Ui_TriggerDetectWidget, _ = loadUiType(os.path.join(__module_path__, "widgets", "triggerdetect.ui"), from_imports=True, import_from="gui")
+
+    else:
+        Ui_TriggerDetectWidget, _ = loadUiType(os.path.join(__module_path__, "widgets", "triggerdetect.ui"))
+
+try:
+    from gui.widgets.importDIGtrigger_ui import Ui_ImportDIGTriggerWidget
+
+except:
+    if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+        Ui_ImportDIGTriggerWidget, _ = loadUiType(os.path.join(__module_path__, "widgets", "importDIGtrigger.ui"), from_imports=True, import_from="gui")
+    else:
+        Ui_ImportDIGTriggerWidget, _ = loadUiType(os.path.join(__module_path__, "widgets", "importDIGtrigger.ui"))
+
 
 
 # class _DIGTriggersTable_(QtWidgets.QTableView):
@@ -92,6 +105,7 @@ class DIGTriggersWidget(QtWidgets.QWidget, Ui_ImportDIGTriggerWidget):
  """
     def __init__(self, data:typing.Optional[list] = None, parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
+        super(Ui_ImportDIGTriggerWidget, self).__init__()
         # {dig_index: [(event, ), (sweep indices)]}
         self._dataModel_ = DIGTriggersTableModel(parent=self)
         self._dataModel_.setObjectName("_dataModel_")
@@ -188,7 +202,7 @@ class DIGTriggersWidget(QtWidgets.QWidget, Ui_ImportDIGTriggerWidget):
 
         return ret
 
-class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
+class TriggerDetectWidget(QtWidgets.QWidget, Ui_TriggerDetectWidget):
     r"""
     """
 
@@ -223,6 +237,7 @@ class TriggerDetectWidget(QWidget, Ui_TriggerDetectWidget):
 
         """
         super().__init__(parent)
+        super(Ui_TriggerDetectWidget, self).__init__()
 
         self._sig_start_  = ephys_start
         self._sig_stop_   = ephys_end

@@ -89,9 +89,12 @@ from gui import guiutils
 # from gui.scipyen_console_styles.keplerdark import KeplerDark
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget.ui')
 
-Ui_PythonHelpWidget, QWidget = loadUiType(__ui_path__)
+try:
+    from gui.pythonhelpwidget_ui import Ui_PythonHelpWidget
+except:
+    __ui_path__ = adapt_ui_path(__module_path__,'pythonhelpwidget.ui')
+    Ui_PythonHelpWidget, _ = loadUiType(__ui_path__)
 
 class _PythonHelpThread_(QtCore.QThread):
     # ready = Signal(str, name="ready")
@@ -227,6 +230,8 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
             super().__init__(parent)
         else:
             super(QtWidgets.QWidget, self).__init__(parent)
+
+        super(Ui_PythonHelpWidget, self).__init__()
             
         self._cache_ = {}
         

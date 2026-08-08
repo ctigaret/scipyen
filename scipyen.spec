@@ -758,7 +758,7 @@ hiddenimports.extend(zmq_hiddenimports)
 hiddenimports.extend(['gui.widgets',
                       'gui.widgets.basescipyendatawidget',
                       'gui.widgets.metadatawidget',
-                      'gui.widgets.modelfitting_ui',
+                      # 'gui.widgets.modelparameterswidget_ui',
                       ])
 
 plugin_hidden_imports, plugin_toc = collect_internal_scipyen_plugins(scipyen_dir)

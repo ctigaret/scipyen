@@ -63,10 +63,12 @@ import pandas as pd
 import vigra
 # BEGIN matplotlib modules
 import matplotlib as mpl
+
 if __has_PyQt6__ or __has_PySide6__: # still doesn't seem to work properly? see NOTE: 2025-06-22 22:38:23 in ScipyenWindow.newViewer(…)
     mpl.use("qtagg")
 else:
     mpl.use("qt5agg")
+
 from matplotlib._pylab_helpers import Gcf as Gcf
 import matplotlib.mlab as mlb
 import matplotlib.pyplot as plt
@@ -145,24 +147,30 @@ else:
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
-_curvefittingwindow_ui_file = "curvefittingtool.ui"
 
-if __has_PyQt6__ or __has_PySide6__:
-    # Form class,        Base class
-    __CVTUI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, _curvefittingwindow_ui_file))
+try:
+    from gui.curvefittingtool_ui import Ui_CurveFittingWindow
 
-else:
-    # Form class,        Base class
-    __CVTUI_MainWindow__, _ = loadUiType(os.path.join(__module_path__, _curvefittingwindow_ui_file),
-                                                    from_imports=True, import_from="gui")
+except:
+    _curvefittingwindow_ui_file = "curvefittingtool.ui"
+
+    if __has_PyQt6__ or __has_PySide6__:
+        # Form class,        Base class
+        Ui_CurveFittingWindow, _ = loadUiType(os.path.join(__module_path__, _curvefittingwindow_ui_file))
+
+    else:
+        # Form class,        Base class
+        Ui_CurveFittingWindow, _ = loadUiType(os.path.join(__module_path__, _curvefittingwindow_ui_file),
+                                                        from_imports=True, import_from="gui")
 
 
-class CurveFittingTool(QtWidgets.QMainWindow, __CVTUI_MainWindow__, WorkspaceGuiMixin):
+class CurveFittingTool(QtWidgets.QMainWindow, Ui_CurveFittingWindow, WorkspaceGuiMixin):
     viewer_for_types = tuple()
     def __init__(self, data: typing.Optional[np.ndarray] = None,
                  modelFunction:typing.Optional[typing.Callable] = None,
                  parent=None):
         super().__init__(parent=parent)
+        super(Ui_CurveFittingWindow, self).__init__()
         WorkspaceGuiMixin.__init__(self, parent=parent)
         # self._fittingWidget_ = ModelFittingWidget(parent=self)
         if isinstance(data, np.ndarray) and datatypes.is_vector(data):

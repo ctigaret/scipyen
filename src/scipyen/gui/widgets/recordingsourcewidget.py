@@ -61,9 +61,13 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_RecordingSourceWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "recordingsourcewidget.ui")
-    )
+try:
+    from gui.widgets.recordingsourcewidget_ui import Ui_RecordingSourceWidget
+
+except:
+    Ui_RecordingSourceWidget, QWidget = loadUiType(
+        os.path.join(__module_path__, "recordingsourcewidget.ui")
+        )
 
 T = ephys_pathways.RecordingSource
 
@@ -76,6 +80,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget):
                  obj: typing.Optional[T] = None,
                  **kwargs):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
+        super(Ui_RecordingSourceWidget, self).__init__()
 
         if isinstance(parent, self._objectTypes_):
             obj_ = parent

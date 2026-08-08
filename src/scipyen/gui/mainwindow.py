@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-FileCopyrightText: 2017-2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -361,13 +361,21 @@ from .widgets import gradientwidgets # noqa
 from .widgets import stylewidgets # noqa
 from .widgets import colorwidgets # noqa
 from .workspacegui import (WorkspaceGuiMixin, DirectoryObserver) # noqa
-from gui.itemmodels.workspacemodel import WorkspaceModel # noqa
-from gui.itemmodels.filesystemmodel import FileSystemModel # noqa
+
+from gui.itemmodels.workspacemodel import WorkspaceModel
+from gui.itemmodels.filesystemmodel import FileSystemModel
+
+# NOTE: 2026-08-07 22:33:36
+# using ui modules precompiled with pyside6-uic
+from gui.aboutdialog import AboutDialog
+from gui.scriptmanager import ScriptManager
+# from gui.workspaceviewer import WorkspaceViewer
 
 
 from iolib import h5io, jsonio, network, navigation # noqa
 from iolib.navigation import filesystems # noqa
 from iolib import pictio as pio # noqa
+from iolib.navigation import navigator # noqa
 
 
 from core.pyqtgraph_patch import pyqtgraph as pg # noqa
@@ -382,23 +390,6 @@ from core.pyqtgraph_patch import pyqtgraph as pg # noqa
 neuron_spec = importlib.util.find_spec("neuron")
 has_neuron = neuron_spec is not None
 # END
-
-# BEGIN GUI themes according to platform (incomplete...)
-
-# if sys.platform.startswith("linux"):
-# END
-
-# BEGIN scipyen core modules
-# NOTE: 2017-04-16 09:48:15
-# these are also imported into the console in slot_initQtConsole(), so they are
-# available directly in the console
-# also imports datetime & time; all become directly available in console, see
-# NOTE: 2017-04-16 09:48:15 above
-
-# import core.simulations as sim
-
-
-# END scipyen core modules
 
 # NOTE: 2025-01-07 12:37:46
 # part of the singleton design pattern for main window
@@ -446,6 +437,7 @@ _valid_varname__regex_ = '^[A-Za-z_][A-Za-z0-9_]{1,30}$'
 #     u'\n\nTherefore ipython line magics such as %pylab or %mtplotlib, although still available, are not necessary anymore\n'
 
 __is_pyinstaller_bundled__ = getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
+
 
 def checkVersion():
     verstr = None
@@ -557,402 +549,18 @@ def console_info():
 # in scipyen.py by importing this module AFTER the QApplication is initialized
 # see NOTE: 2025-01-22 08:56:42
 # QWidget: Must construct a QApplication before a QWidget
-from iolib.navigation import navigator # noqa
 
-_mainwindow_ui_file = "mainwindow.ui"
-
-if __has_PyQt6__ or __has_PySide6__:
-    # Form class,        Base class
-    __UI_MainWindow__, __QMainWindow__ = loadUiType(os.path.join(__module_path__, _mainwindow_ui_file))
-
-    __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"))
-
-    __UI_AboutLicense__, _ = loadUiType(os.path.join(__module_path__, "AboutDialog.ui"))
-
-else:
-    # Form class,        Base class
-    __UI_MainWindow__, _ = loadUiType(os.path.join(__module_path__, _mainwindow_ui_file),
-                                                    from_imports=True, import_from="gui")
-
-    __UI_ScriptManagerWindow__, _ = loadUiType(os.path.join(__module_path__, "scriptmanagerwindow.ui"),
-                                               from_imports=True, import_from="gui")
-
-    __UI_AboutLicense__, _ = loadUiType(os.path.join(__module_path__, "AboutDialog.ui"),
-                                        from_imports=True, import_from="gui")
-
-class WorkspaceViewer(QtWidgets.QTableView):
-    r"""Inherits QTableView with customized drag & drop
-    """
-
-    def __init__(self, mainWindow=None, parent=None):
-        super().__init__(parent=parent)
-
-        self.dragStartPosition = QtCore.QPoint()
-
-        self.mainWindow = mainWindow
-
-    @safewrapper
-    def mousePressEvent(self, event):
-        # print("WorkspaceViewer.mousePressEvent")
-        if event.button() == QtCore.Qt.LeftButton:
-            self.dragStartPosition = event.pos()
-
-        event.accept()
-
-    @safewrapper
-    def contextMenuEvent(self, event):
-        # print("WorkspaceViewer.contextMenuEvent")
-        # print(event.pos())
-        self.customContextMenuRequested.emit(event.pos())
-
-    @safewrapper
-    def mouseMoveEvent(self, event):
-        # print("WorkspaceViewer.mouseMoveEvent")
-        # NOTE: 2019-08-10 00:24:01
-        # create QDrag objects for each dragged item
-        # ignore the DropEvent mimeData in the console ()
-        if event.buttons() & QtCore.Qt.LeftButton:
-            if (event.pos() - self.dragStartPosition).manhattanLength() >= QtWidgets.QApplication.startDragDistance():
-                indexList = [i for i in self.selectedIndexes()
-                             if i.column() == 0]
-
-                if len(indexList) == 0:
-                    return
-
-                if not isinstance(self.mainWindow, ScipyenWindow):
-                    return
-
-                varNames = [self.mainWindow.workspaceModel.item(
-                    index.row(), 0).text() for index in indexList]
-
-                for varName in varNames:
-                    drag = QtGui.QDrag(self)
-                    mimeData = QtCore.QMimeData()
-                    mimeData.setText(varName)
-                    drag.setMimeData(mimeData)
-                    dropAction = drag.exec(QtCore.Qt.CopyAction) # noqa
-
-# NOTE 2016-03-27 16:53:16
-# the way multiple inheritance works in pyqt dictates that additional signals are
-# inerited only from the _FIRST_ superclass, which must also have the deepest
-# inheritance tree
-# class WindowManager(ConfigurableQMainWindowMeta):
-
-class ScriptManager(QtWidgets.QMainWindow, __UI_ScriptManagerWindow__, WorkspaceGuiMixin):
-    signal_forgetScripts = Signal(object)
-    signal_executeScript = Signal(str)
-    signal_importScript = Signal(str)
-    signal_pasteScript = Signal(str)
-    signal_editScript = Signal(str)
-    signal_openScriptFolder = Signal(str)
-    signal_pythonFileReceived = Signal(str, QtCore.QPoint)
-    signal_pythonFileAdded = Signal(str)
-    signal_scriptManagerClosed = Signal()
-
-    # NOTE recently run scripts is managed by ScipyenWindow instance mainWindow
-    # FIXME 2021-09-18 14:16:14 Change this so that it is managed instead by
-    # ScriptManager
-    # We then need to connect pasting/dropping script file onto Scipyen mainWindow
-    # or the internal console to script execution and adding of script file to
-    # the internal scripts list  here.
-
-    # @timemethod
-    def __init__(self, parent=None, scipyenWindow=None):
-        super(ScriptManager, self).__init__(parent) # noqa
-        self.setupUi(self)
-        WorkspaceGuiMixin.__init__(self, parent=parent,scipyenWindow=scipyenWindow)
-        self._configureUI_()
-
-        self.setWindowTitle("Scipyen Script Manager")
-
-        self.loadSettings()
-
-    # @timemethod
-    def _configureUI_(self):
-        addScript = self.menuScripts.addAction("Add scripts...")
-        addScript.triggered.connect(self.slot_addScripts)
-        self.scriptsTable.customContextMenuRequested[QtCore.QPoint].connect(
-            self.slot_customContextMenuRequested)
-        self.scriptsTable.cellDoubleClicked[int, int].connect(
-            self.slot_cellDoubleClick)
-        self.scriptsTable.setSortingEnabled(True)
-        # self.scriptsTable.sortByColumn(0, QtCore.Qt.AscendingOrder)
-        self.acceptDrops = True
-        self.scriptsTable.acceptDrops = True
-
-    def closeEvent(self, evt):
-        self.saveSettings()
-        evt.accept()
-        self.close()
-
-        evt.accept()
-        # self.signal_scriptManagerClosed.emit()
-
-    def loadSettings(self):
-        loadWindowSettings(self.qsettings, self)
-
-    def saveSettings(self):
-        saveWindowSettings(self.qsettings, self)
-
-    def setData(self, scriptsDict):
-        if not isinstance(scriptsDict, dict):
-            return
-
-        self.scriptsTable.clearContents()
-
-        if len(scriptsDict) == 0:
-            return
-
-        self.scriptsTable.setRowCount(len(scriptsDict))
-
-        for k, (key, value) in enumerate(scriptsDict.items()):
-            # print(f"ScriptManager.setData {k}: key={key}, value={value}")
-            path_item = QtWidgets.QTableWidgetItem(key)
-            path_item.setToolTip(key)
-
-            script_item = QtWidgets.QTableWidgetItem(value)
-            script_item.setToolTip(value)
-
-            self.scriptsTable.setItem(k, 0, script_item)
-            self.scriptsTable.setItem(k, 1, path_item)
-
-        # self.scriptsTable.sortByColumn(0, QtCore.Qt.AscendingOrder)
-        self.scriptsTable.resizeColumnToContents(0)
-
-    @safewrapper
-    def dragEnterEvent(self, event):
-        event.acceptProposedAction()
-        event.accept()
-
-    @safewrapper
-    def dropEvent(self, evt):
-        if evt.mimeData().hasUrls():
-            urls = evt.mimeData().urls()
-            for url in urls:
-                if (url.isRelative() or url.isLocalFile()) and os.path.isfile(url.path()):
-                    # check if this is a python source file
-                    mimeType = QtCore.QMimeDatabase().mimeTypeForFile(QtCore.QFileInfo(url.path()))
-                    # print(mimeType.name())
-                    if all([s in mimeType.name() for s in ("text", "python")]):
-                        self.signal_pythonFileAdded.emit(url.path())
-
-            # if len(urls) == 1 and (urls[0].isRelative() or urls[0].isLocalFile()) and os.path.isfile(urls[0].path()):
-                # check if this is a python source file
-                # mimeType = QtCore.QMimeDatabase().mimeTypeForFile(QtCore.QFileInfo(urls[0].path()))
-                # print(mimeType.name())
-                # if all([s in mimeType.name() for s in ("text", "python")]):
-                    # self.signal_pythonFileAdded.emit(urls[0].path())
-
-        evt.accept()
-
-    def clear(self):
-        self.scriptsTable.clearContents()
-        self.scriptsTable.setRowCount(0)
-
-    @property
-    def scriptsCount(self):
-        return self.scriptsTable.rowCount()
-
-    @property
-    def scriptNames(self):
-        return [self.scriptsTable.item(row, 0).text() for row in range(self.scriptsTable.rowCount())]
-
-    @property
-    def scriptFileNames(self):
-        return [self.scriptsTable.item(row, 1).text() for row in range(self.scriptsTable.rowCount())]
-
-    @Slot("QPoint")
-    @safewrapper
-    def slot_customContextMenuRequested(self, pos):
-        items = self.scriptsTable.selectedItems()
-
-        cm = QtWidgets.QMenu("Open Scripts Manager", self)
-        # actions = list()
-
-        if len(items):
-            if len(items) == 1:
-                execItem = cm.addAction("Run")
-                execItem.setToolTip("Execute selected script")
-                execItem.triggered.connect(self.slot_executeScript)
-
-                # actions.append(execItem)
-
-                pasteItem = cm.addAction("Paste in Console")
-                pasteItem.setToolTip("Paste script contents in console")
-                pasteItem.triggered.connect(self.slot_teleportScript)
-
-                # actions.append(pasteItem)
-
-                editItem = cm.addAction("Edit")
-                editItem.setToolTip(
-                    "Edit script in system's default text editor")
-                editItem.triggered.connect(self.slot_editScript)
-
-                openFolderItem = cm.addAction("Open Containing Folder")
-                openFolderItem.setToolTip("Open Containing Folder")
-                openFolderItem.triggered.connect(self.slot_openScriptFolder)
-
-            cm.addSeparator()
-
-            delItems = cm.addAction("Forget")
-            delItems.setToolTip("Forget selected scripts")
-            delItems.triggered.connect(self.slot_forgetScripts)
-            # actions.append(delItems)
-
-            clearAction = cm.addAction("Forget All")
-            clearAction.setToolTip("Forget All")
-            clearAction.triggered.connect(self.slot_forgetAll)
-
-        # actions.append(clearAction)
-        cm.addSeparator()
-        registerScript = cm.addAction("Add script...")
-        registerScript.triggered.connect(self.slot_addScript)
-
-        cm.popup(self.scriptsTable.mapToGlobal(pos))
-
-    @Slot(int, int)
-    @safewrapper
-    def slot_cellDoubleClick(self, row, col):
-        item = self.scriptsTable.item(row, 1)
-
-        self.signal_executeScript.emit(item.text())
-
-    @Slot()
-    @safewrapper
-    def slot_addScript(self):
-        targetDir = os.getcwd()
-        fileFilter = "Python script (*.py)"
-        fileName = self.chooseFile(caption=u"Add python script",
-                                   fileFilter="Python script (*.py)",
-                                   targetDir=targetDir)
-
-        # print(f"ScriptManager.slot_addScript fileName: { fileName}" )
-
-        if isinstance(fileName, tuple):
-            # NOTE: PyQt5 QFileDialog.getOpenFileName returns a tuple (fileName, filter string)
-            fileName, fileFilter = fileName
-
-        if pio.checkFileReadAccess(fileName):
-            mime_file_type = pio.getMimeAndFileType(fileName)
-            # print(f"ScriptManager.slot_addScript {mime_file_type}")
-            # for s in mime_file_type:
-            # print(f"ScriptManager.slot_addScript s: {s}, type: {type(s).__name__}")
-            if any("python" in s for s in mime_file_type if isinstance(s, str)):
-                self.signal_pythonFileAdded.emit(fileName)
-
-            elif any("text" in s for s in mime_file_type if isinstance(s, str)) and os.path.splitext(fileName)[-1] == ".py":
-                self.signal_pythonFileAdded.emit(fileName)
-
-    @Slot()
-    @safewrapper
-    def slot_addScripts(self):
-        targetDir = os.getcwd()
-
-        # NOTE: returns a tuple (path list, filter)
-        # fileNames, fileFilter = QtWidgets.QFileDialog.getOpenFileNames(self, caption=u"Run python script", filter="Python script (*.py)", directory = targetDir)
-
-        fn, fl = self.chooseFile(caption=u"Add python scripts",
-                                 filter="Python script (*.py)",
-                                 targetDir=targetDir,
-                                 single=False)
-
-        if pio.checkFileReadAccess(fn):
-            for fileName in fn:
-                mft = pio.getMimeAndFileType(fileName)
-                if any("python" in s for s in mft):
-                    self.signal_pythonFileAdded.emit(fileName)
-
-    @Slot()
-    @safewrapper
-    def slot_forgetScripts(self):
-        if len(self.scriptsTable.selectedItems()) == 0:
-            return
-
-        rows = list(set([i.row() for i in self.scriptsTable.selectedItems()]))
-
-        items = [self.scriptsTable.item(r, 1).text() for r in rows]
-
-        for r in rows:
-            self.scriptsTable.removeRow(r)
-
-        self.signal_forgetScripts.emit(items)
-
-    @Slot()
-    @safewrapper
-    def slot_forgetAll(self):
-        items = [self.scriptsTable.item(r, 1).text()
-                 for r in range(self.scriptsTable.rowCount())]
-
-        self.scriptsTable.clearContents()
-        self.scriptsTable.setRowCount(0)
-
-        self.signal_forgetScripts.emit(items)
-
-    @Slot()
-    @safewrapper
-    def slot_executeScript(self):
-        if len(self.scriptsTable.selectedItems()) != 1:
-            return
-
-        row = [i.row() for i in self.scriptsTable.selectedItems()][0]
-
-        item = self.scriptsTable.item(row, 1).text()
-
-        self.signal_executeScript.emit(item)
-
-    @Slot()
-    @safewrapper
-    def slot_importAsModule(self):
-        if len(self.scriptsTable.selectedItems()) != 1:
-            return
-
-        row = [i.row() for i in self.scriptsTable.selectedItems()][0]
-
-        item = self.scriptsTable.item(row, 1).text()
-
-        self.signal_importScript.emit(item)
-
-    @Slot()
-    @safewrapper
-    def slot_editScript(self):
-        if len(self.scriptsTable.selectedItems()) != 1:
-            return
-
-        row = [i.row() for i in self.scriptsTable.selectedItems()][0]
-
-        item = self.scriptsTable.item(row, 1).text()
-
-        self.signal_editScript.emit(item)
-
-    @Slot()
-    @safewrapper
-    def slot_openScriptFolder(self):
-        if len(self.scriptsTable.selectedItems()) != 1:
-            return
-
-        row = [i.row() for i in self.scriptsTable.selectedItems()][0]
-
-        item = self.scriptsTable.item(row, 1).text()
-
-        self.signal_openScriptFolder.emit(item)
-
-    @Slot()
-    @safewrapper
-    def slot_teleportScript(self):
-        if len(self.scriptsTable.selectedItems()) != 1:
-            return
-
-        row = [i.row() for i in self.scriptsTable.selectedItems()][0]
-
-        item = self.scriptsTable.item(row, 1).text()
-
-        self.signal_pasteScript.emit(item)
-
-# NOTE 2019-09-12 09:34:31
-# Beginning to consolidate variable handling in the GUI framework
-# TODO: make this configurable (a mime type-like mechanism?)
-# class VTH(QtCore.QObject):
-class VTH(object):
+try:
+    from gui.mainwindow_ui import Ui_MainWindow
+
+except:
+    _mainwindow_ui_file = "mainwindow.ui"
+    if __has_PyQt6__ or __has_PySide6__:
+        Ui_MainWindow, _ = loadUiType(os.path.join(__module_path__, _mainwindow_ui_file))
+    else:
+        Ui_MainWindow, _ = loadUiType(os.path.join(__module_path__, _mainwindow_ui_file),
+                                                        from_imports=True, import_from="gui")
+class VTH:
     r"""Variable Type Handler.
     Centralized the handling of Python object types with Scipyen viewers.
     """
@@ -1066,39 +674,7 @@ class VTH(object):
             VTH.gui_handlers[viewerClass] = deepcopy(
                 VTH.default_handlers[viewerClass])
 
-class AboutDialog(QtWidgets.QDialog, __UI_AboutLicense__):
-    def __init__(self, txt, parent, aboutSuffix:typing.Optional[str] = None):
-        QtWidgets.QDialog.__init__(self, parent)
-        self._configureUI_()
-
-        self.textBrowser.setHtml(txt)
-        wintitle = f"About {aboutSuffix}"
-        self.setWindowTitle(wintitle)
-        self.show()
-
-    def _configureUI_(self):
-        self.setupUi(self)
-        self.textBrowser.anchorClicked.connect(self.slot_openLink)
-
-    @Slot(QtCore.QUrl)
-    def slot_openLink(self, link:QtCore.QUrl):
-        # print(f"{self.__class__.__name__}.slot_openLink: {link.scheme()}")
-        if link.scheme() == "scipyen":
-            # NOTE: 2025-06-02 16:42:38
-            # this below needs to take into account the casefolding in Urls
-            cmd = link.toString().replace("scipyen://", "")
-            # print(f"cmd: {cmd}")
-            method = getattr(self.parent(), cmd, None)
-            if inspect.ismethod(method):
-                try:
-                    method.__call__()
-                except: # noqa
-                    traceback.print_exc()
-        elif not link.isRelative():
-            QtGui.QDesktopServices.openUrl(link)
-
-
-class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin):
+class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     ''' Main pict GUI window
     '''
     _instance = None # NOTE: Singleton design pattern
@@ -1527,6 +1103,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             myparent=self
 
         super().__init__(parent)
+        super(Ui_MainWindow, self).__init__()
         WorkspaceGuiMixin.__init__(self, parent=myparent, scipyenWindow=self)
 
         self.__version__ = __verstr__
@@ -1879,7 +1456,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # NOTE: 2025-06-24 22:05:04
         # used to be called from self._configureUI_, but not anymore
         self.workspaceView.setModel(self.workspaceModel)
-        self.workspaceView.selectionModel().selectionChanged[QtCore.QItemSelection, QtCore.QItemSelection].connect(self.slot_selectionChanged)
+        self.workspaceView.selectionModel().selectionChanged[QtCore.QItemSelection, QtCore.QItemSelection].connect(self.slot_workspaceSelectionChanged)
+
         self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
         self.workspaceModel.modelContentsChanged.connect(self.slot_updateWorkspaceView)
         #
@@ -6049,14 +5627,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
     @Slot(QtCore.QItemSelection, QtCore.QItemSelection)
     @safewrapper
-    def slot_selectionChanged(self, selected, deselected):
+    def slot_workspaceSelectionChanged(self, selected, deselected):
         r"""Selection change in the workspace viewer
         """
         if not selected.isEmpty():
             modelIndex = selected.indexes()[0]
 
-            # source_ns = self.workspaceModel.item(
-            #     modelIndex.row(), standard_obj_summary_headers.index("Workspace")).text()
             source_ns = self.workspaceModel.item(modelIndex.row(), self._wspace_headers_.index("Workspace")).text()
             if source_ns != "Internal":  # avoid standard menu for data in remote kernels
                 # TODO separate menu for variables in remote namespaces
@@ -6064,7 +5640,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
             self.currentVarItem, self.currentVarItemName = self._getWorkspaceVarItemAndName_(
                 modelIndex)
-            obj = self.workspace[self.currentVarItemName]
+
+            # obj = self.workspace[self.currentVarItemName]
 
         else:
             self.currentVarItemName = None
@@ -6613,6 +6190,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         ''' Collect file menu actions & submenus that are built in the UI file. This should be
             done before loading the plugins.
         '''
+        # self.ui = mainwindow_ui.Ui_MainWindow()
+        # self.ui.setupUi(self)
         self.setupUi(self)
         # NOTE: 2021-04-15 10:12:33 TODO
         # allow user to choose app style interactively --
@@ -6791,7 +6370,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.actionAbout.triggered.connect(self._slot_about)
         self.actionAbout_Components.triggered.connect(self._slot_aboutComponents)
         self.actionAbout_Qt.triggered.connect(self._slot_about_qt)
-        self.actionLicense.triggered.connect(self._slot_showLicense)
+        self.actionLicense.triggered.connect(self._slot_showAboutScipyen)
 
         # # NOTE: 2016-05-02 12:22:21 -- refactoring plugin codes
         # self.startPluginLoad.connect(self.slot_loadPlugins)
@@ -6805,7 +6384,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         self.newViewersMenu.setToolTipsVisible(True)
         self.newViewersMenu.addAction(guiutils.getIcon("window"),"Figure", lambda: self.newViewer(mpl.figure.Figure))
         self.menuViewers.addMenu(self.newViewersMenu)
-        #
+
         self.menuView.setIcon(guiutils.getIcon("quickview", "view-preview"))
         self.menuConsoles.setIcon(guiutils.getIcon("akonadiconsole"))
         self.menuSettings.setIcon(guiutils.getIcon("settings-configure", "configure"))
@@ -6943,7 +6522,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
         # ### BEGIN workspace view
         #
-
+        self.workspaceView.mainWindow = self
         self.workspaceView.setShowGrid(False)
 
         # ### BEGIN
@@ -6953,8 +6532,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         # furthermore, workspaceView.selectionModel() REQUIRES the presence of a
         # item model for the workspaceView
         # ### END
-        # self.workspaceView.setModel(self.workspaceModel)
-        # self.workspaceView.selectionModel().selectionChanged[QtCore.QItemSelection, QtCore.QItemSelection].connect(self.slot_selectionChanged)
         # NOTE 2021-07-28 14:26:09
         # avoid editing by db-click
         self.workspaceView.setEditTriggers(QtWidgets.QAbstractItemView.EditKeyPressed)
@@ -10400,52 +9977,26 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
         if val == "Default":
             styleProxy = MenuProxy(QtWidgets.QApplication.style())
             self.app.setStyle(styleProxy)
-            # self.app.setStyle(QtWidgets.QApplication.style())
-            # self._current_GUI_style_name = "Default"
+
         else:
             qtStyle = QtWidgets.QStyleFactory.create(val)
             qtPalette = qtStyle.standardPalette()
             styleProxy = MenuProxy(qtStyle)
+
             self.app.setPalette(qtPalette)
             self.app.setStyle(styleProxy)
-#             if hasQDarkTheme and val.startswith("Qt"):
-#                 #theme = val.replace("PyQtDarkTheme_", "")
-#                 theme = val.replace("Qt", "").lower()
-#                 qdarktheme.setup_theme(theme)
-#             elif hasQDarkStyle and val.startswith("QDarkStyle"):
-#                 if val == "QDarkstyle Dark":
-#                     self.app.setStyleSheet(qdarkstyle.load_stylesheet(palette = qdarkstyle.dark.palette.DarkPalette))
-#                 else:
-#                     self.app.setStyleSheet(qdarkstyle.load_stylesheet(palette = qdarkstyle.light.palette.LightPalette))
-#
-#                 styleProxy = MenuProxy(QtWidgets.QApplication.style())
-#                 self.app.setStyle(styleProxy)
-#             else:
-#                 qtStyle = QtWidgets.QStyleFactory.create(val)
-#                 qtPalette = qtStyle.standardPalette()
-#                 styleProxy = MenuProxy(qtStyle)
-#
-#                 # NOTE: 2024-09-26 14:54:59 HACK
-#                 # remove traces of qdarktheme from the app
-#                 # undoes the HACK in qdarktheme.setup_theme
-#                 qdarkstyleprop = "_qdarktheme_use_setup_style"
-#                 props = self.app.dynamicPropertyNames()
-#                 if qdarkstyleprop in (bytes(p).decode() for p in props):
-#                     self.app.setProperty(qdarkstyleprop, False)
-#
-                # self.app.setPalette(qtPalette)
-                # self.app.setStyle(styleProxy)
 
     @Slot()
     @safewrapper
     def _slot_set_ExternalHDF5Viewer(self):
-        # NOTE: 2025-03-24 21:35:03 NOT USED
+        # NOTE: 2025-03-24 21:35:03 NOT USED FIXME
         caption = "Path to external HDF5 Viewer executable"
-        kw = dict()
+        kw = {}
+
         if sys.platform.startswith("win32"):
             kw = {"options":QtWidgets.QFileDialog.Option.DontUseNativeDialog}
 
-        hdf5Viewer = str(QtWidgets.QFileDialog.getExistingDirectory(
+        fileName = str(QtWidgets.QFileDialog.getExistingDirectory(
             self, caption=caption, directory = pathlib.Path.home().as_posix(), **kw))
 
         if len(fileName) > 0:
@@ -10472,8 +10023,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
             self.userPluginsDirectory = dirName
 
         self.slot_reloadPlugins()
-
-        # self.informationMessage_static(text=f"Restart Scipyen to load plugins from {self.userPluginsDirectory}")
 
     @Slot()
     @safewrapper
@@ -10502,10 +10051,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, __UI_MainWindow__, WorkspaceGuiMixin)
 
 
     @Slot()
-    def _slot_showLicense(self) -> None:
+    def _slot_showAboutScipyen(self) -> None:
         txt = pio.loadTextFile(os.path.join(self._scipyendir_, "doc", "AboutLicense.html"))
-        d = AboutDialog(txt, self, "License")
-        # d.show()
+        AboutDialog(txt, self, "License")
 
     @Slot()
     @safewrapper

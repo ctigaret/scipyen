@@ -79,43 +79,44 @@ from traitlets.utils.bunch import Bunch
 # import xml.etree.ElementTree as ET
 from xml.dom import minidom # noqa
 
-import qtpy # noqa
+# import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg) # noqa
 from qtpy.QtCore import (Signal, Slot, Property) # noqa
 
 __has_PySide6__ = False
 __has_PyQt6__ = False
-__has_sip__ = False
+# __has_sip__ = False
 
 if os.environ["QT_API"] == "pyside6":
-    import PySide6 # noqa
-    from PySide6 import Shiboken # noqa
+    # import PySide6 # nodqa
+    # from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
     __has_PySide6__ = True
 
 else:
-    from qtpy import sip # noqa
-    from qtpy.uic import loadUiType # noqa
+    # from qtpy import sip # noqa
+    # from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
 
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-    __has_sip__ = True
+    # __has_sip__ = True
     
-__has_qtdbus__ = False
-
-try:
-    from qtpy import QtDBus
-    __has_qtdbus__ = True
-
-except: # noqa
+if sys.platform == "linux":
     __has_qtdbus__ = False
+
+    try:
+        from qtpy import QtDBus
+        __has_qtdbus__ = True
+
+    except: # noqa
+        __has_qtdbus__ = False
 
 # import pyudev
 import quantities as pq

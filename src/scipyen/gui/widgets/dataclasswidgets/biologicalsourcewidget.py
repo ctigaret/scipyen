@@ -62,9 +62,14 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_BiologicalSourceWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "biologicalsourcewidget.ui")
-    )
+try:
+    from gui.widgets.dataclasswidgets.biologicalsourcewidget_ui import Ui_BiologicalSourceWidget
+
+except:
+    Ui_BiologicalSourceWidget, _ = loadUiType(
+        os.path.join(__module_path__, "biologicalsourcewidget.ui")
+        )
+
 
 class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
     _objectTypes_ = (sdc.BiologicalSource, )
@@ -72,6 +77,7 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.BiologicalSource] = None,
                  **kwargs):
+        super(Ui_BiologicalSourceWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):

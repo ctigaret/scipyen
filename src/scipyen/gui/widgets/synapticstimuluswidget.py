@@ -58,9 +58,13 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_SynapticStimulusChannelWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "synapticstimuluswidget.ui")
-    )
+try:
+    from gui.widgets.synapticstimuluswidget_ui import Ui_SynapticStimulusChannelWidget
+
+except:
+    Ui_SynapticStimulusChannelWidget, QWidget = loadUiType(
+        os.path.join(__module_path__, "synapticstimuluswidget.ui")
+        )
 
 class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, DataClassWidget):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
@@ -74,7 +78,7 @@ class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, DataClassW
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[SynapticStimulusChannel] = None,
                  **kwargs):
-
+        super(Ui_SynapticStimulusChannelWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):

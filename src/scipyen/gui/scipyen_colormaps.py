@@ -75,18 +75,18 @@ from matplotlib import cm as cm
 from matplotlib import colors as colors
 from traitlets import Bunch
 
-import qtpy
+# import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
-__has_sip__ = False
+# __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    # import PySide6
+    # from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -94,25 +94,28 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    # from qtpy import sip
+    # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
-    __has_sip__ = True
+    # __has_sip__ = True
 
 
+__has_cmocean__ = False
 try:
     import cmocean # some cool palettes/luts
+    __has_cmocean__ = True
+
 except:
     pass
 
 
+__has_cmasher__=False
 try:
     import cmasher
-    has_cmasher=True
+    __has_cmasher__=True
 except:
-    has_cmasher=False
     pass
 
 from core import scipyen_config as scipyenconf
@@ -148,32 +151,32 @@ standardPalette = (
 )
 
 standardPaletteDict = Bunch({
-    "white":            (255, 255, 255), #
-    "light gray":       (192, 192, 192), #
-    "gray":             (160, 160, 160), #
-    "dark gray":        (128, 128, 128), #
-    "black":            (  0,   0,   0), #
-    "light red":        (255, 128, 128), #
-    "light orange":     (255, 192, 128), #
-    "light yellow":     (255, 255, 128), #
-    "light green":      (128, 255, 128), #
-    "cyan blue":      (128, 255, 255), #
-    "light blue":       (128, 128, 255), #
-    "light violet":     (255, 128, 255), #
-    "red":              (255,   0,   0), #
-    "orange":           (255, 128,   0), #
-    "yellow":           (255, 255,   0), #
-    "green":            (  0, 255,   0), #
-    "light blue":       (  0, 255, 255), #
-    "blue":             (  0,   0, 255), #
-    "violet":           (255,   0, 255), #
-    "dark red":         (128,   0,   0), #
-    "dark orange":      (128,  64,   0), #
-    "dark yellow":      (128, 128,   0), #
-    "dark green":       (  0, 128,   0), #
-    "dark light blue":  (  0, 128, 128), #
-    "dark blue":        (  0,   0, 128), #
-    "dark violet":      (128,   0, 128)  #
+    "white":            (255, 255, 255),
+    "light gray":       (192, 192, 192),
+    "gray":             (160, 160, 160),
+    "dark gray":        (128, 128, 128),
+    "black":            (  0,   0,   0),
+    "light red":        (255, 128, 128),
+    "light orange":     (255, 192, 128),
+    "light yellow":     (255, 255, 128),
+    "light green":      (128, 255, 128),
+    "cyan blue":      (128, 255, 255),
+    "light blue":       (128, 128, 255),
+    "light violet":     (255, 128, 255),
+    "red":              (255,   0,   0),
+    "orange":           (255, 128,   0),
+    "yellow":           (255, 255,   0),
+    "green":            (  0, 255,   0),
+    "light blue":       (  0, 255, 255),
+    "blue":             (  0,   0, 255),
+    "violet":           (255,   0, 255),
+    "dark red":         (128,   0,   0),
+    "dark orange":      (128,  64,   0),
+    "dark yellow":      (128, 128,   0),
+    "dark green":       (  0, 128,   0),
+    "dark light blue":  (  0, 128, 128),
+    "dark blue":        (  0,   0, 128),
+    "dark violet":      (128,   0, 128)
 })
 
 svgPalette = Bunch(

@@ -73,9 +73,13 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_RecordingEpisodeWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "recordingepisodewidget.ui")
-    )
+try:
+    from gui.widgets.recordingepisodewidget_ui import Ui_RecordingEpisodeWidget
+
+except:
+    Ui_RecordingEpisodeWidget, QWidget = loadUiType(
+        os.path.join(__module_path__, "recordingepisodewidget.ui")
+        )
 
 T = ephys_pathways.RecordingEpisode
 
@@ -93,7 +97,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
                  obj: typing.Optional[T] = None,
                  **kwargs):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
-
+        super(Ui_RecordingEpisodeWidget, self).__init__()
         if isinstance(parent, (ephys_pathways.RecordingEpisode,
                                neo.Block, typing.Sequence)):
             obj_ = parent

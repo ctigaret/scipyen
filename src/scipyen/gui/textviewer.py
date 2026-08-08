@@ -11,27 +11,22 @@ import os
 #### END core python modules
 
 #### BEGIN 3rd party modules
-import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
-__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
-    __has_PySide6__ = True
-    import PySide6 # noqa
-    from PySide6 import Shiboken # noqa
-    # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
+    __has_PySide6__ = True
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip # noqa
-    from qtpy.uic import loadUiType # noqa
+    # from qtpy import sip # noqa
+    # from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut

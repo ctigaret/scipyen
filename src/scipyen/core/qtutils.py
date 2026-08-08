@@ -31,7 +31,7 @@ else:
         __has_PyQt6__ = True
 
     from qtpy import sip
-    from qtpy.uic import loadUiType # noqa
+    # from qtpy.uic import loadUiType # noqa
     from QtCore import QVariant
     QVariantType = QVariant
     QAction = QtWidgets.QAction

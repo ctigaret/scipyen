@@ -5,17 +5,12 @@
 
 
 import os, numbers
-import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
-__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
-    # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
@@ -24,16 +19,10 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
-    __has_sip__ = True
-
-
-    from qtpy.QtCore import Signal, Slot, Property
-    from qtpy.uic import loadUiType
 
 
 import numpy as np
@@ -51,13 +40,20 @@ from gui.itemmodels.triggerprotocolstablemodel import TriggerProtocolsTableModel
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
-if os.environ["QT_API"] in ("pyqt5", "pyside2"):
-    Ui_TriggerProtocolsEditorDialog, QDialog = loadUiType(os.path.join(__module_path__, "triggerprotocolseditordialog.ui"), from_imports=True, import_from="gui")
-else:
-    Ui_TriggerProtocolsEditorDialog, QDialog = loadUiType(os.path.join(__module_path__, "triggerprotocolseditordialog.ui"))
+try:
+    from gui.triggerprotocolseditordialog_ui import Ui_TriggerProtocolsEditorDialog
 
 
-class TriggerProtocolsEditorDialog(GuiMessages, QDialog, Ui_TriggerProtocolsEditorDialog):
+    if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+        Ui_TriggerProtocolsEditorDialog, _ = loadUiType(os.path.join(__module_path__, "triggerprotocolseditordialog.ui"), from_imports=True, import_from="gui")
+
+    else:
+        Ui_TriggerProtocolsEditorDialog, _ = loadUiType(os.path.join(__module_path__, "triggerprotocolseditordialog.ui"))
+except:
+
+
+
+class TriggerProtocolsEditorDialog(GuiMessages, QtWidgets.QDialog, Ui_TriggerProtocolsEditorDialog):
     r"""Gateway of GUI actions to triggers protocols management.
     The dialog uses Qt signal/slot communication to redirect GUI requests for
     trigger protocol changes, to caller code which actually implements these
@@ -78,6 +74,8 @@ class TriggerProtocolsEditorDialog(GuiMessages, QDialog, Ui_TriggerProtocolsEdit
 
     def __init__(self, parent=None, title="Protocol Editor"):
         super().__init__(parent)
+        super(Ui_TriggerProtocolsEditorDialog, self).__init__()
+
         self._dataModel_ = TriggerProtocolsTableModel(parent=self)
         self._configureUI_()
         if isinstance(title, str) and len(title.strip()):

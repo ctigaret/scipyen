@@ -57,9 +57,13 @@ from gui.widgets.anchoringcollapsiblewidget import AnchoringCollapsibleWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_DataExchangeWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "dataexchangewidget.ui")
-    )
+try:
+    from gui.widgets.dataclasswidgets.dataexchangewidget_ui import Ui_DataExchangeWidget
+
+except:
+    Ui_DataExchangeWidget, _ = loadUiType(
+        os.path.join(__module_path__, "dataexchangewidget.ui")
+        )
 
 class DataExchangeWidget(Ui_DataExchangeWidget, AnchoringCollapsibleWidget):
     r"""Common widget to use as 1st level child in various Scipyen compound widgets.
@@ -103,6 +107,7 @@ data object after loading from file or importing from the workspace.
     def __init__(self, objType: typing.Optional[type]=None,
                  parent: typing.Optional[QtWidgets.QWidget] = None,
                  **kwargs):
+        super(Ui_DataExchangeWidget, self).__init__()
         if isinstance(objType, QtWidgets.QWidget):
             obj_ = parent
             if isinstance(parent, type):

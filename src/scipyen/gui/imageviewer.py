@@ -167,12 +167,20 @@ import qimage2ndarray  # noqa
 from qimage2ndarray import gray2qimage, array2qimage, alpha_view, rgb_view, byte_view # noqa
 
 # used for ImageWindow below
-Ui_ImageViewerWindow, QMainWindow = loadUiType(adapt_ui_path(__module_path__, 'imageviewer.ui'))
+try:
+    from gui.imageviewer_ui import Ui_ImageViewerWindow
+except:
+    Ui_ImageViewerWindow, _ = loadUiType(adapt_ui_path(__module_path__, 'imageviewer.ui'))
 
-# Ui_AxesCalibrationDialog, QDialog = loadUiType(adapt_ui_path(__module_path__, "axescalibrationdialog.ui"))
-Ui_AxesCalibrationDialog2, QDialog = loadUiType(adapt_ui_path(__module_path__, "axescalibrationdialog2.ui"))
+try:
+    from gui.axescalibrationdialog2_ui import Ui_AxesCalibrationDialog
+except:
+    Ui_AxesiCalibrationDialog, _ = loadUiType(adapt_ui_path(__module_path__, "axescalibrationdialog2.ui"))
 
-Ui_TransformImageValueDialog, QDialog = loadUiType(adapt_ui_path(__module_path__,"transformimagevaluedialog.ui"))
+try:
+    from gui.transformimagevaluedialog_ui import Ui_TransformImageValueDialog
+except:
+    Ui_TransformImageValueDialog, _ = loadUiType(adapt_ui_path(__module_path__,"transformimagevaluedialog.ui"))
 
 class ComplexDisplay(Enum):
     r"""
@@ -206,7 +214,7 @@ class IntensityCalibrationLegend(pg.graphicsItems.GraphicsWidget.GraphicsWidget)
         self.layout.addItem(self.axis, 0, 1)
         
         
-class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
+class ImageBrightnessDialog(QtWidgets.QDialog, Ui_TransformImageValueDialog):
     """
     """
     signalAutoRange             = Signal(name="signalAutoRange")
@@ -219,6 +227,7 @@ class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
 
     def __init__(self, parent=None, title=None):
         super(ImageBrightnessDialog, self).__init__(parent)
+        super(Ui_TransformImageValueDialog, self).__init__()
         self.setupUi(self)
         
         self.factorLabel.setText("Brightness")
@@ -273,7 +282,7 @@ class ImageBrightnessDialog(QDialog, Ui_TransformImageValueDialog):
         self.rangeMaxSpinBox.setValue(val)
         
 
-class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
+class AxesCalibrationDialog(QtWidgets.QDialog, Ui_AxesCalibrationDialog):
     DefaultResolution = 1.0
     DefaultOrigin = 0.0
     DefaultUnits = scq.pixel_unit
@@ -284,7 +293,8 @@ class AxesCalibrationDialog2(QDialog, Ui_AxesCalibrationDialog2):
     def __init__(self, image:typing.Union[vigra.AxisTags, vigra.VigraArray], 
                  calibration:typing.Optional[AxesCalibration] = None,
                  pWin=None, parent=None):
-        super(AxesCalibrationDialog2, self).__init__(parent)
+        super(AxesCalibrationDialog, self).__init__(parent)
+        super(Ui_AxesCalibrationDialog, self).__init__()
         
         self.arrayshape=None
         self._data_=None
@@ -756,6 +766,8 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
         # # next call our own setData
         # super().__init__(data=None, parent=parent, ID=ID, win_title=win_title, 
         #                  doc_title=doc_title, frameIndex=frame, **kwargs)
+
+        super(Ui_ImageViewerWindow, self).__init__()
         self._image_width_ = 0
         self._image_height_ = 0
         self._imageNormalize             = None
@@ -2718,10 +2730,10 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
     def slot_editAxesScales(self):
         if isinstance(self._data_, (vigra.VigraArray, np.ndarray, QtGui.QImage, QtGui.QPixmap)):
             # dlg = AxesCalibrationDialog(self._data_)
-            dlg = AxesCalibrationDialog2(self._data_)
+            dlg = AxesCalibrationDialog(self._data_)
         else:
             # dlg = AxesCalibrationDialog(self._axes_calibration_)
-            dlg = AxesCalibrationDialog2(self._axes_calibration_)
+            dlg = AxesCalibrationDialog(self._axes_calibration_)
             
         # dlg.setModal(False)
         dlg.adjustSize()

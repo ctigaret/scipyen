@@ -62,9 +62,13 @@ from iolib import pictio as pio
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_BiometricsWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "biometricswidget.ui")
-    )
+try:
+    from gui.widgets.dataclasswidgets.biometricswidget_ui import Ui_BiometricsWidget
+
+except:
+    Ui_BiometricsWidget, _ = loadUiType(
+        os.path.join(__module_path__, "biometricswidget.ui")
+        )
 
 T = sdc.Biometrics
 
@@ -74,7 +78,7 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.Biometrics] = None,
                  **kwargs):
-
+        super(Ui_BiometricsWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):

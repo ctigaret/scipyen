@@ -40,14 +40,18 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 # don't use this yet, until we fully understand how to deal with VigraQt colormap
 # mechanism from Python side
-Ui_EditColorMapWidget, QWidget = loadUiType(adapt_ui_path(__module_path__,os.path.join("widgets","editcolormap2.ui")))
+try:
+    from gui.widgets.editcolormap2_ui.py import Ui_EditColorMapWidget
+except:
+    Ui_EditColorMapWidget, _ = loadUiType(adapt_ui_path(__module_path__,os.path.join("widgets","editcolormap2.ui")))
 
 
 ####don't use this yet, until we fully understand how to deal with VigraQt colormap
 ####mechanism from Python side
-class ColorMapEditor(QWidget, Ui_EditColorMapWidget):
+class ColorMapEditor(QtWidgets.QWidget, Ui_EditColorMapWidget):
  def __init__(self, parent = None):
-   super(ColorMapEditor, self).__init__(parent);
+   super().__init__(parent)
+   super(Ui_EditColorMapWidget, self).__init__()
    self.setupUi(self);
    self.colormapeditor = VigraQt.ColorMapEditor(EditColorMapWidget);
    self.colormapeditor.setObjectName(_fromUtf8("ColorMapEditor"));

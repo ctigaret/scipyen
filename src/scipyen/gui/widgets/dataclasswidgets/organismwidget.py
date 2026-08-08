@@ -64,9 +64,13 @@ from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-Ui_OrganismWidget, QWidget = loadUiType(
-    os.path.join(__module_path__, "organismwidget.ui")
-    )
+try:
+    from gui.widgets.dataclasswidgets.organismwidget_ui import Ui_OrganismWidget
+
+except:
+    Ui_OrganismWidget, QWidget = loadUiType(
+        os.path.join(__module_path__, "organismwidget.ui")
+        )
 
 class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
     _objectTypes_ = (sdc.Organism, )
@@ -74,7 +78,7 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.Biometrics] = None,
                  **kwargs):
-
+        super(Ui_OrganismWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
