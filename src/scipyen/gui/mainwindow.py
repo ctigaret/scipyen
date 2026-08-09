@@ -4191,7 +4191,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
             # Sequence of QTreeWidgetItem objects holding the statements in the
             # history
-            items = list()
+            items = []
 
             # NOTE: 2025-04-29 11:08:04
             # customize font appearance on history tree items
@@ -4205,13 +4205,16 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             for session, line, inline in hist:
                 if sessionNo is None or sessionNo != session:
                     sessionNo = session  # cache the session
-                    sessionInfo = self.historyAccessor.get_session_info(sessionNo)
-                    sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, self._historySessionInfo_(sessionNo))
+                    sessionInfo = self._historySessionInfo_(sessionNo)
+                    sessionItem = QtWidgets.QTreeWidgetItem(self.historyTreeWidget, sessionInfo)
+                    sessionItem.setData(1, QtCore.Qt.ToolTipRole, f"Session: {sessionInfo}")
                     for col in range(sessionItem.columnCount()):
                         sessionItem.setFont(col, font)
                     items.append(sessionItem)
 
-                lineItem = QtWidgets.QTreeWidgetItem(sessionItem, self._historyLineInfo_(line, inline))
+                sessionLine = self._historyLineInfo_(line, inline)
+                lineItem = QtWidgets.QTreeWidgetItem(sessionItem, sessionLine)
+                lineItem.setData(1, QtCore.Qt.ToolTipRole, sessionLine)
                 for col in range(lineItem.columnCount()):
                     lineItem.setFont(col, font)
                 items.append(lineItem)

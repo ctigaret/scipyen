@@ -4217,16 +4217,6 @@ def extract_AP_train( vm: neo.AnalogSignal, im: neo.AnalogSignal | tuple,
             if inj.size == 1:
                 inj = inj.flatten()[0]
 
-                # print(f"-> inj: {inj}")
-
-            # d, u, inj, c, l = sigp.parse_step_waveform_signal(im,
-            #                                                     method=method,
-            #                                                     box_size=box_size,
-            #                                                     adcres=adcres,
-            #                                                     adcrange=adcrange,
-            #                                                     adcscale=adcscale)
-
-
             if d.ndim > 0:
                 d = d[0]
 

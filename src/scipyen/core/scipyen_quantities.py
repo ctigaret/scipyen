@@ -608,7 +608,7 @@ def getBaseUnitQuantities(x:pq.Quantity | pq.UnitQuantity):
                 ret.append(bbase)
     return ret
 
-def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity], /,
+def getUnitFamily(unit: pq.Quantity | pq.UnitQuantity, /,
                   show_components:bool=False,
                   as_string:bool=True,
                   indicate_if_directly_found:bool=False) -> typing.Union[str, list[str]]:
@@ -811,7 +811,7 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity], /,
 #     return families
 
 
-def familyUnits(family:str, kind:typing.Optional[str]=None) -> set:
+def familyUnits(family: str, kind: str | None = None) -> set:
     """Returns the set of units belonging to a Units Family.
     Parameters:
     ==========
