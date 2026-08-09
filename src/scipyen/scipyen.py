@@ -15,8 +15,8 @@ import sys, os, platform, pathlib, subprocess, traceback # noqa
 
 import atexit, re, inspect, gc, io, time # noqa
 import faulthandler, warnings # noqa
-import xdg # noqa
-from xdg import IconTheme
+# import xdg # noqa
+# from xdg import IconTheme
 #
 # ### END core python modules
 
@@ -66,7 +66,10 @@ else:
 # ### END   Figure out the Python environment under which this is executed
 
 os.environ["FORCE_COLOR"] = "1" # for the python interpreter interface
-__QT_USE_NATIVE_MENUBAR__ = os.getenv("QT_USE_NATIVE_MENUBAR", 1)
+if sys.platform=="win32":
+    __QT_USE_NATIVE_MENUBAR__ = 0
+else:
+    __QT_USE_NATIVE_MENUBAR__ = os.getenv("QT_USE_NATIVE_MENUBAR", 1)
 
 # TODO 2024-09-11 23:56:17 - NO! see NOTE: 2025-07-01 09:42:46
 # use qtpaths or qtpaths6 to figure out where the platform QT5/6 is installed
@@ -167,6 +170,8 @@ mpath = pathlib.Path(__module_path__)
 themePaths = QtGui.QIcon.themeSearchPaths()
 fbPaths = QtGui.QIcon.fallbackSearchPaths()
 if sys.platform.startswith("linux"):
+    import xdg # noqa
+    from xdg import IconTheme
     themePaths.extend(IconTheme.icondirs)
     fbPaths.extend(IconTheme.icondirs)
     
@@ -346,6 +351,7 @@ def main():
         app = QtWidgets.QApplication(sys.argv)
         if __QT_USE_NATIVE_MENUBAR__ == 0:# or (desktoputils.is_x11() and not desktoputils.is_kde() and not desktoputils.is_gnome()):
             app.setAttribute(QtCore.Qt.AA_DontUseNativeMenuBar, True)
+            app.setAttribute(QtCore.Qt.AA_DontShowIconsInMenus, True)
         translator = QtCore.QTranslator(app)
 
         # NOTE: 2025-07-01 14:45:39

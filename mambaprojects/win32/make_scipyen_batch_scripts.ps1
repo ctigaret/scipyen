@@ -32,8 +32,8 @@ echo $myCondaEnv
 # $myActivate=Join-Path -Path $myAnaconda -ChildPath "Scripts\activate.bat"
 $program="cmd.exe"
 $setQTAPI=@"
-set QT_API=pyqt6
-set PYQTGRAPH_QT_LIB=PyQt6
+set QT_API=pyside6
+set PYQTGRAPH_QT_LIB=PySide6
 set FORCE_QT_API=1
 "@
 

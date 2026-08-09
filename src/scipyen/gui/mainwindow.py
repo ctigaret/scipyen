@@ -1491,6 +1491,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         if self._script_manager_autolaunch:
             self._showScriptsManagerWindow()
 
+        # if sys.platform == "win32":
+
         if self._connectDBus_():
             self._configureDBusUDisk_()
 
@@ -2321,6 +2323,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         for w in ww:
             if isinstance(w, QtWidgets.QMainWindow):
                 w.setToolButtonStyle(val)
+                # if sys.platform=="win32":
+                #     if w.menuBar().isVisible():
+
+
 
     @Slot()
     def _slot_configureToolButtonStyle(self):
@@ -11536,6 +11542,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                 currentMenu = None
 
                 for item in menuPathList:
+                    if isinstance(parentMenu, QtWidgets.QMenu) and not qtutils.isQObjectAlive(parentMenu):
+                        continue
                     currentMenu = self._locateMenuByItemText_(parentMenu, item)
                     siblingActionLabels = list(map(lambda a: a.text().replace('&', ''), parentMenu.actions()))
                     # print(f"item {item}, siblingActionLabels: {siblingActionLabels}")

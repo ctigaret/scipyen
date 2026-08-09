@@ -10,7 +10,7 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
-  - pyside6 # also install inter alia: pyqt6-qt6, pyqt6-sip
+  - pyside6
   # - pyqt6
   # - pyqt6-charts
   # - pyqt6-webengine

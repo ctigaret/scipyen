@@ -35,7 +35,7 @@ rem powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 
 rem powershell -c "irm https://astral.sh/uv/install.ps1 | more"
 rem or, in the activated environment, with pip install uv (and it be only availbale
 rem to the activated environment) - NOTE this last variant is executed here
-call pip installl uv || goto eof
+call pip install uv || goto eof
 call uv pip install -r mambaprojects\win32\mamba-pip-packages.txt || goto eof
 
 REM manually (follow commented lines in mambaprojects\win32\scipyenv.yml)
@@ -55,7 +55,7 @@ powershell -ExecutionPolicy Bypass -File %mydir%\mambaprojects\win32\\make_scipy
 :make_desktop_shortcut
 echo:
 echo Creating desktop link
-powershell -ExecutionPolicy Bypass -File %mydir%\mambaprojects\win32\\make_link.ps1 %mydir%  || goto eof
+powershell -ExecutionPolicy Bypass -File %mydir%\mambaprojects\win32\\make_desktop_shortcut.ps1 %mydir%  || goto eof
 echo:
 echo Scipyen can now be launched from the desktop icon
 

@@ -12,7 +12,7 @@ from abc import (ABC, ABCMeta, abstractmethod,) # noqa
 from traitlets import Bunch
 #from abc import (abstractmethod,)
 # import qtpy # noqa
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, QtDBus) # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork) #, QtDBus) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
