@@ -4629,7 +4629,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
     def assignToWorkspace(self, name: str, val: object, check_name:bool = True,
                           /,
-                          auto_name:bool = False) -> bool:
+                          auto_name:bool = False,
+                          overwrite: bool = False) -> bool:
         r"""Binds a Python object to a symbol in the user workspace.
 
         Parameters:
@@ -4657,7 +4658,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         WARNING:
 
-        If the symbol is already bound to a system variable² the function will
+        If the symbol is already bound to a hidden system variable² the function will
         display a critical message and returns False.
 
         -----------
@@ -4681,7 +4682,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             self.criticalMessage("Assign in workspace", f"The name {name} would overwrite a system {t.__name__} variable.\n Please choose a different name!")
             return False
 
-        if check_name is True:
+        if check_name is True and not overwrite:
             # validate name against existing user (visible) variables
             newVarNameOK, ctr = validate_varname(name, self.workspace, # noqa validate_varname "star" imported from workspacefunctions
                                                  returns_counter=None) # noqa validate_varname "star" imported from workspacefunctions
@@ -4733,6 +4734,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
                 else:
                     name=newVarNameOK
+
 
         self.workspaceModel.bindObjectInNamespace(name, val)
 

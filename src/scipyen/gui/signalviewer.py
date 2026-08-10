@@ -6964,7 +6964,7 @@ Var-keyword parameters ("name=value" pairs):
         self.signalChannelAxis = 1
         self.dataAxis = 0 # data as column vectors
 
-        self.singleFrame = False
+        self.singleFrame = singleFrame
 
         self._cached_title = ""
 
@@ -7643,7 +7643,7 @@ Var-keyword parameters ("name=value" pairs):
                 self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                 self._meta_index.frame[:,0] = self.frameIndex
 
-            elif all([isinstance(i, neo.Segment) for i in y]):
+            elif all(isinstance(i, neo.Segment) for i in y):
                 # NOTE: 2019-11-30 09:35:42
                 # treat this as the segments attribute of a neo.Block
                 # a segment is ALWAYS plotted in a single frame
@@ -7675,7 +7675,7 @@ Var-keyword parameters ("name=value" pairs):
 
                 self._meta_index.frame[:,0] = self.frameIndex
 
-            elif all([isinstance(i, neo.Block) for i in y]):
+            elif all(isinstance(i, neo.Block) for i in y):
                 # NOTE 2021-01-02 11:31:05
                 # treat this as a sequence of segments, but do NOT concatenate
                 x = None
@@ -7703,7 +7703,7 @@ Var-keyword parameters ("name=value" pairs):
                 self._meta_index.block[:,0] = mIndex[:,0]
                 self._meta_index.segment[:,0] = mIndex[:,1]
 
-            elif all([isinstance(i, SIGNAL_OBJECT_TYPES) for i in y]):
+            elif all(isinstance(i, SIGNAL_OBJECT_TYPES) for i in y):
                 # NOTE: 2019-11-30 09:42:27
                 # Treat this as a segment, EXCEPT that each signal is plotted
                 # in its own frame. This is because in a generic container
@@ -7720,19 +7720,26 @@ Var-keyword parameters ("name=value" pairs):
                 # CAUTION: the risk is of too many signals (and PlotItems) in one frame
 
                 # NOTE: 2023-01-18 08:33:13
-                # for very large lists of signals, passing frameAxis None will
+                # for lists of > 10 signals, passing frameAxis None will
                 # result in too many plotItems being created
                 #
-                # To avoid this, we set an arbitrary limit of 10 signals in the
+                # To avoid this, I set an arbitrary limit of 10 signals in the
                 # collection, beyond which we automatically revert to one signal
                 # per frame by setting frameAxis to 1
                 #
                 # The user may still overrride this - at their own risk - by
                 # passing a frameAxis int value different than 1 (one)
 
-                if len(y) > 10:
+                # Another condition for NOT plotting all signals in a single frame is
+                # when their domains have no overlap
+
+                if (len(y) > 10
+                    or all(y[k].t_stop < y[k+1].t_start for k in range(len(y)-1))
+                    or not singleFrame
+                    ):
                     if frameAxis is None:
                         frameAxis = 1
+
                     elif frameAxis != 1:
                         # for the sake of flexibility
                         frameAxis is None
@@ -7875,19 +7882,20 @@ Var-keyword parameters ("name=value" pairs):
 
     @with_doc(_parse_data_, use_header=True)
     @safewrapper
-    def _set_data_(self, x,  y = None, doc_title:(str, type(None)) = None,
-                   frameAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                   signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                   frameIndex:(int, tuple, list, range, slice, type(None)) = None,
-                   signalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
-                   signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
-                   irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
-                   irregularSignalChannelAxis:(int, type(None)) = None,
-                   irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
-                   separateSignalChannels:bool = False, separateChannelsIn:str="axes",
-                   singleFrame:bool=False,
-                   interval:(tuple, list, neo.Epoch, type(None)) = None,
-                   plotStyle:str = "plot", showFrame:int = None,
+    def _set_data_(self, x,  y = None, doc_title: str | None = None,
+                   frameAxis: (int, str, vigra.AxisInfo, type(None)) = None,
+                   signalChannelAxis: (int, str, vigra.AxisInfo, type(None)) = None,
+                   frameIndex: (int, tuple, list, range, slice, type(None)) = None,
+                   signalIndex: (str, int, tuple, list, range, slice, type(None)) = None,
+                   signalChannelIndex: (int, tuple, list, range, slice, type(None)) = None,
+                   irregularSignalIndex: (str, int, tuple, list, range, slice, type(None)) = None,
+                   irregularSignalChannelAxis: (int, type(None)) = None,
+                   irregularSignalChannelIndex: (int, tuple, list, range, slice, type(None)) = None,
+                   separateSignalChannels: bool = False,
+                   separateChannelsIn: str="axes",
+                   singleFrame: bool=False,
+                   interval: (tuple, list, neo.Epoch, type(None)) = None,
+                   plotStyle: str = "plot", showFrame: int | None = None,
                    *args, **kwargs):
         r"""Sets up internal variables and triggers plotting.
         Does the behind the scene work of self.setData(...)

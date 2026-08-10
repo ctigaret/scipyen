@@ -161,7 +161,7 @@ def isQObjectAlive(obj:QtCore.QObject):
     
     try:
         obj.parent()
-    except RuntimeError:
+    except (RuntimeError, TypeError):
         return False
     
     return True

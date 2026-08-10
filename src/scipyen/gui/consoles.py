@@ -3808,6 +3808,12 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.saveSettings()
         evt.accept()
 
+    def focusInEvent(self, evt):
+        cursor = self.consolewidget._control.textCursor()
+        cursor.movePosition(QtGui.QTextCursor.End)
+        evt.accept()
+
+
     def paste(self, *args, **kwargs):
         self.consoleWidget.paste(*args, **kwargs)
 

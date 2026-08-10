@@ -2566,7 +2566,7 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
 
     ddof: None (default) or a scalar int: delta degrees of freedom
 
-        When None, it sill be calculated from the size of x along the specified axes
+        When None, it will be calculated from the size of x along the specified axes
 
         ddof is passed onto numpy.std (see numpy.std for details)
 
@@ -3245,7 +3245,7 @@ def detect_boxcar(
 
     if not isinstance(method, BoxcarDetectionMethod):
         raise TypeError(
-            f"'methd' expected to be a BoxcarDetectionMethod; instead, got {type(method).__name__}"
+            f"'method' expected to be a BoxcarDetectionMethod; instead, got {type(method).__name__}"
         )
 
     # NOTE: 2023-06-19 08:59:37
