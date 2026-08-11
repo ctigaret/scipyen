@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
+# SPDX-FileCopyrightText: 2017 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
@@ -66,7 +66,10 @@ def test_fft_purelet(data, levels, wavename):
     
 def fft_purelet(image, nLevels, wavelet=None, sigma2=None, thr=None):
     '''
+    Implementation of the PURELET algorithm of Luisier et al, 2011.
 
+    Luisier, F., T. Blu, and M. Unser. 2011. Image denoising in mixed
+    Poisson-Gaussian noise. IEEE Trans. Image Process. 20:696-708.
     '''
     
     if image.ndim > 2:
@@ -921,7 +924,7 @@ def purelet_theta_analytic(x,y,thetaParams):
     Reference:
     
     Luisier, F., T. Blu, and M. Unser. 2011. Image denoising in mixed
-    Poisson-Gaussian noise. IEEE Trans. Image Process. 20:696?708.
+    Poisson-Gaussian noise. IEEE Trans. Image Process. 20:696-708.
     
     Copyright 2011-2015 by Cezar M. Tigaret <Cezar.Tigaret@bristol.ac.uk>
 

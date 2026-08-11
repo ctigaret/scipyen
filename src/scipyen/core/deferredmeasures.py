@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-# $Id: locationmeasure $
+# $Id: deferredmeasures.py $
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@proton.me>
     # SPDX-License-Identifier: GPL-3.0-or-later
     # SPDX-License-Identifier: LGPL-2.1-or-later
