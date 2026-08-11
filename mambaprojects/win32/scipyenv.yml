@@ -10,6 +10,7 @@ channels:
   - conda-forge
   - nodefaults
 dependencies:
+ - uv
   - pyside6
   # - pyqt6
   # - pyqt6-charts

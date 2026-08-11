@@ -3445,6 +3445,15 @@ class ScipyenConsoleWidget(ConsoleWidget):
 
         evt.accept()
 
+    # TODO 2026-08-11 15:57:06 FIXME
+    # disallow typing in etxt above prompt line - it is very confusing
+    def keyPressEvent(self, evt):
+        # print(f"{self.__class__.__name__}.keyPressEvent({evt})")
+        self._keep_cursor_in_buffer()
+        super().keyPressEvent(evt)
+        evt.accept()
+
+
     @safewrapper
     def __write_text_in_console_buffer__(self, text):
         from textwrap import dedent
@@ -3812,7 +3821,6 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         cursor = self.consolewidget._control.textCursor()
         cursor.movePosition(QtGui.QTextCursor.End)
         evt.accept()
-
 
     def paste(self, *args, **kwargs):
         self.consoleWidget.paste(*args, **kwargs)

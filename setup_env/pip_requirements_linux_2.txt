@@ -260,7 +260,7 @@ taxoniq
 allensdk
 pynwb
 swick
-### NOTE: thiese below will also install:
+### NOTE: brainglobe-workflows below will also install:
 ### brainglobe-atlasapi, brainglobe-space, brainglobe-utils,
 brainglobe-workflows
 napari[all]
@@ -268,3 +268,10 @@ brainglobe
 brainrender
 brainglobe-segmentation
 fenics
+# NOTE: 2026-08-11 22:56:18 ephys packages
+# ipfx: Allen Brain Institute; works with NWB files, see below
+ipfx
+# dandi: access the Neurodata Without Borders repository (NWB files)
+dandi
+# efel: EPFL Blue Brain Project; works with neo!
+efel
