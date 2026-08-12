@@ -231,7 +231,7 @@ def change_error_display_for_style(style:typing.Union[str, Style]):
     # TODO: 2024-09-20 12:56:07
     # match tb highlight in ultratb to a specification in the style itself.
     #
-    # (for now, it;s just replacing the ugly ansi yellow with the ansi red)
+    # (for now, it is just replacing the ugly ansi yellow with the ansi red)
     if isinstance(style, str):
         style_name = style
         style = styles.get_style_by_name(style)
@@ -247,7 +247,7 @@ def change_error_display_for_style(style:typing.Union[str, Style]):
         from IPython.core import ultratb
         ultratb.VerboseTB._tb_highlight = "bg:ansired"
     except Exception:
-        print("Error patching background color for tracebacks, they'll be the ugly default instead")
+        print("Error patching background color for tracebacks, we will use the ugly default instead")
 
 
 # JUPYTER_PYGMENT_STYLES = list(pstyles.get_all_styles())
@@ -677,7 +677,7 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
     def isTopLevel(self):
         r"""Overrides WorkspaceGuiMixin.isToplevel; always True for ScipyenConsole.
         This is because console inherits from RichJupyterWidget where 'parent'
-        is a traitlets.Instance property, and for ScipyenConsole is None.
+        is a traitlets.Instance property, and for ScipyenConsole this is None.
         """
         return True
 
@@ -3446,7 +3446,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
         evt.accept()
 
     # TODO 2026-08-11 15:57:06 FIXME
-    # disallow typing in etxt above prompt line - it is very confusing
+    # disallow typing in text above prompt line - it is very confusing
     def keyPressEvent(self, evt):
         # print(f"{self.__class__.__name__}.keyPressEvent({evt})")
         self._keep_cursor_in_buffer()

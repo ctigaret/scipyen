@@ -2516,9 +2516,9 @@ def root_mean_square(x, axis=None):
     """
     from . import datatypes
 
-    if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
+    if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, np.ndarray)):
         raise TypeError(
-            "Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datasignal.DataSignal; got %s instead"
+            "Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, a datasignal.DataSignal or a numpy array; got %s instead"
             % type(x).__name__
         )
 
@@ -2576,9 +2576,9 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
     """
     from . import datatypes
 
-    if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
+    if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, np.ndarray)):
         raise TypeError(
-            "Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datasignal.DataSignal; got %s instead"
+            "Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, a datasignal.DataSignal or a numpy array; got %s instead"
             % type(x).__name__
         )
 
@@ -2627,7 +2627,10 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
     ret = rms / std
 
     if db:
-        return np.log10(ret.magnitude.flatten()) * 20
+        if isinstance(ret, pq.Quantity):
+            return np.log10(ret.magnitude.flatten()) * 20
+        else:
+            return np.log10(ret.flatten()) * 20
 
     return ret
 
