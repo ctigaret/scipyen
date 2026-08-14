@@ -3128,8 +3128,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     @markConfigurable("ScipyenEditor", "Qt")
     @scipyenEditor.setter
     def scipyenEditor(self, val: typing.Optional[str] = None):
+        import shutil
         if isinstance(val, str) and len(val.strip()):
-            self._scipyenEditor = val
+            editorExecPath = shutil.which(val)
+            if editorExecPath is None:
+                self._scipyenEditor = ""
+            else:
+                self._scipyenEditor = editorExecPath
         else:
             self._scipyenEditor = ""
 
@@ -8669,9 +8674,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     @safewrapper
     def slot_systemEditScript(self, fileName):
         if os.path.exists(fileName) and os.path.isfile(fileName):
-            if self.overrideSystemEditor:
+            if (self.overrideSystemEditor
+                and isinstance(self.scipyenEditor, str)
+                and len(self.scipyenEditor)):
                 try:
-                    subprocess.run([self.scipyenEditor, fileName])
+                    process = QtCore.QProcess(self)
+                    process.start(self.scipyenEditor, [fileName])
+
                 except:
                     traceback.print_exc()
                     url = QtCore.QUrl.fromLocalFile(fileName)

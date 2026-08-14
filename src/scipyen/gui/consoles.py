@@ -3447,11 +3447,11 @@ class ScipyenConsoleWidget(ConsoleWidget):
 
     # TODO 2026-08-11 15:57:06 FIXME
     # disallow typing in text above prompt line - it is very confusing
-    def keyPressEvent(self, evt):
-        # print(f"{self.__class__.__name__}.keyPressEvent({evt})")
-        self._keep_cursor_in_buffer()
-        super().keyPressEvent(evt)
-        evt.accept()
+    # def keyPressEvent(self, evt):
+    #     # print(f"{self.__class__.__name__}.keyPressEvent({evt})")
+    #     self._keep_cursor_in_buffer()
+    #     super().keyPressEvent(evt)
+    #     evt.accept()
 
 
     @safewrapper

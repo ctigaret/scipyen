@@ -332,9 +332,11 @@ class ScriptManager(QtWidgets.QMainWindow, Ui_ScriptManagerWindow, WorkspaceGuiM
 
         row = [i.row() for i in self.scriptsTable.selectedItems()][0]
 
-        item = self.scriptsTable.item(row, 1).text()
+        fileName = self.scriptsTable.item(row, 1).text()
 
-        self.signal_editScript.emit(item)
+        self.scipyenWindow.slot_systemEditScript(fileName)
+
+        # self.signal_editScript.emit(fileName)
 
     @Slot()
     @safewrapper

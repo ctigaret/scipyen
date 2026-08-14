@@ -1,5 +1,5 @@
 # __scipyen_plugin__
-# -*- coding: utf-8 -*-
+# $Id: signalviewer.py $
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -10028,6 +10028,13 @@ Var-keyword parameters ("name=value" pairs):
         if len(analog) + len(irregs) == 0:
             return None, None
 
+        # BUG 2026-08-13 12:02:19 FIXME
+        # does not play well when the analogsignals collection in a segment has
+        # changed its length; I think the bug is upstream of this call, though...#
+        #
+        # the BUG manifests when the number of signals in a segment's analogsignals
+        # collection was changed manually, e.g. at the console - check the workspacemodel
+        # and how it signals the current viewer to refresh (if any)
         assert len(self.signalAxes) >= len(analog) + len(irregs), f"Mismatch between number of signal axes ({len(self.signalAxes)}) and available signals (analog {len(analog)} + irregs {len(irregs)} = {len(analog) + len(irregs)})"
 
         # NOTE: 2023-01-12 16:45:48
