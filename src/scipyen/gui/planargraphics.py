@@ -9378,7 +9378,7 @@ class GraphicsObject(QtWidgets.QGraphicsObject):
         #self.timed_paint(painter, styleOption, widget)
         self.__paint__(painter, styleOption, widget)
         
-    @timefunc # defined in core.prog
+    # @timefunc # defined in core.prog
     def timed_paint(self, painter, styleOption, widget):
         # NOTE: 2021-03-07 18:32:00
         # timed version of the painter; to time the painter, call this function

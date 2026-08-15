@@ -2363,35 +2363,39 @@ def normalized_index(
     silent: bool = False,
     ingroups: bool = False,
     childtype: type = neo.AnalogSignal,
-):
+    ):
     r"""Returns the integral index of a child object in its container.
-    The child object is identified by the value of its 'name' attribute.
-    CAUTION It is assumed that, in a given container, no two objects of the same
-    type have identical values for the 'name' attribute.
 
-    Useful to get the index of data by its name.
+    When the ``index`` parameter is a ``str``, the child object is identified by
+    the value of its ``name`` attribute. This is useful for looking up signal
+    data by its name, in a ``neo`` container.
+
+    .. caution::
+        It is assumed that, in a given container, no two objects of the same type have identical values for the 'name' attribute.
+
+    .. note::
+        When ``src`` is a ``neo.Segment``, the function will return the index of the signal in the segment's child collection that corresponds to the Python type of the signal as specified by the ``childtype`` parameter.
 
     Parameters:
     ----------
 
-    src: neo container (Block, Segment, Group)
-        NOTE: When neo.Block, the function descends recursively into the Block's
-        segments, unless 'ingroups' is set to True
+    :src: neo container e.g. ``Block``, ``Segment``, ``Group``
+        .. note::
+            When a ``neo.Block``, the function descends recursively into the Block's segments, unless ``ingroups`` is set to ``True``
 
-    index: int, str, tuple, list, range, or slice;
-        any valid form of indexing;
-        WARNING: when a str, this requires that the objects of 'childtype' have
-        an attribute 'name' of type str
+    :index: the criterion or criteria for looking up the element in ``src`` or its child containers
+        .. warning::
+            When a ``str``, this requires that the objects of ``childtype`` have an attribute ``name`` of type ``str``
 
-    silent: bool, default is False
+    :silent: bool, default is False
         Determines what happens when 'index' parameter is a str, and the elements
         in the collection do not have a 'name' attribute of type 'str':
 
-        'silent' is Fale -> the function will raise an exception
-        'silent' is True -> the function will ignore elements without a 'name':str
-            attribute
+        ``False`` -> the function will raise an exception
+        ``True`` -> the function will ignore elements without a ``name`` string
+            attribute, and return ``None`` or an empty ``list``
 
-    childtype: type object; the type of signal to index; valid signal types are
+    :childtype: type object; the type of signal to index; valid signal types are
         neo.AnalogSignal, neo.IrregularlySampledSignal,
         neo.Event, neo.Epoch, neo.SpikeTrain, neo.ImageSequence, neo.Unit,
         datasignal.DataSignal and datasignal.IrregularlySampledDataSignal
@@ -2406,7 +2410,7 @@ def normalized_index(
 
         Unit objects contain only spike trains.
 
-    ingroups:bool, default is False
+    :ingroups: default is False
         NOTE: Since 2025-03-26 09:24:15
 
         When True, and src is a neo.Block, the function descends into the
@@ -2415,7 +2419,8 @@ def normalized_index(
 
     Returns:
     --------
-    a range or list of integer indices
+    A ``range``, a ``list`` of ``int`` indices, or an ``int`` index, when there
+    is only one element which satisfies the criterion.
 
     """
     raise NotImplementedError(f"Function is not implemented for objects of type {type(src)}")
@@ -2426,7 +2431,7 @@ def _normalized_index_(src: neo.core.container.Container,
     silent: bool = False,
     ingroups: bool = False,
     childtype: type = neo.AnalogSignal,
-):
+    ):
     major, minor, dot = get_neo_version()
 
     if isinstance(src, neo.Block):
@@ -2475,20 +2480,9 @@ def _normalized_index_(src: neo.core.container.Container,
                 raise TypeError("Invalid indexing: %s" % index)
         else:
             collection = src.groups if ingroups else src.segments
-        # NOTE: groups collect data objects of similar type with the same index
-        # in their corresponding objectlists, across segments; in a trial, such
-        # dataobjects will also have the same name (ADC name), even if they are
-        # likely to differ numerically; therefore getting the index of a named
-        # data object (say and AnalogSignal) in a neo.Group's objectlist member
-        # (in this examplel ,'analogsignals') does NOT make sense at all (all
-        # signals have the same name)! This applies to all other types of data
-        # objects in any objectlisyt member of a neo.Group:
-        #     collection = src.groups
-        # else:
-        return list(map(lambda x: getsingle(normalized_index(x, index, silent=silent, ingroups=ingroups, childtype=childtype)), collection))
-        # return list(chain(map(lambda seg: normalized_index(seg, index, childtype, silent), src.segments)))
 
-    # print(f"neoutils.normalized_index: src is a {type(src)}")
+        return list(map(lambda x: getsingle(normalized_index(x, index, silent=silent, ingroups=ingroups, childtype=childtype)), collection))
+
     if not isinstance(src, (neo.Segment, neo.Group)):
         raise TypeError("Expecting a neo.Segment; got %s instead" % type(src).__name__)
 
@@ -2546,21 +2540,15 @@ def _normalized_index_(src: neo.core.container.Container,
     return normalized_index(signal_collection, index, silent=silent, ingroups=ingroups, childtype=childtype)
 
 @normalized_index.register(NeoObjectList) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
-@normalized_index.register(list) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
-@normalized_index.register(tuple) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
-@normalized_index.register(deque) # neo.core.objectlist.Objectlist for neo >= 0.13.0 or, simply, list
+@normalized_index.register(list)
+@normalized_index.register(tuple)
+@normalized_index.register(deque)
 def _normalized_index_(src: typing.Union[NeoObjectList, list, tuple, deque],
     index: typing.Union[int, str, range, slice, typing.Sequence], /,
     silent: bool = False,
     ingroups: bool = False, # not used
     childtype: type = neo.AnalogSignal # not used
-):
-    # print(f"neoutils.normalized_index in {type(src).__name__}:")
-    # print(f" index = {index} ({type(index).__name__}):")
-    # print(f" silent = {silent} ({type(silent).__name__}):")
-    # print(f" ingroups = {ingroups} ({type(ingroups).__name__}):")
-    # print(f" ingroups = {childtype} ({type(childtype).__name__}):")
-
+    ):
     if isinstance(index, (int, range, slice, np.ndarray, type(None))):
         return utilities.normalized_index(len(src), index)
 
@@ -2568,6 +2556,7 @@ def _normalized_index_(src: typing.Union[NeoObjectList, list, tuple, deque],
         if silent:
             ret = tuple(filter_attr(src, indices_only=True, name=index))
             return ret[0] if len(ret) == 1 else ret
+
         return tuple(map(lambda x: x.name, src)).index(index)
 
     elif isinstance(index, (tuple, list)):

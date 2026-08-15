@@ -186,7 +186,7 @@ def traitlet_set_scipyen_object_lists(instance, obj, value):
         obj._notify_trait(instance.name, old_value, new_value,
                             change_type=change_type)
 
-#@timefunc
+# @timefunc
 def traitlet_set(instance, obj, value):
     r"""Overrides traitlets.TraitType.set to check for special hash.
     This is supposed to also detect changes in the order of elements in sequences.

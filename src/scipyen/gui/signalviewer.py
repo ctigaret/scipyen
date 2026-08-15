@@ -217,7 +217,8 @@ from core.neoutils import (get_domain_name,
 # NOTE: when needed, call neoutils.normalized_index
 # from core.neoutils import normalized_index as normalized_index_neo
 
-from core.prog import (safewrapper, show_caller_stack, with_doc, scipywarn, timefunc)
+from core.prog import (safewrapper, show_caller_stack, with_doc, scipywarn,
+                       timefunc, timemethod)
 from core.datatypes import (array_slice, is_column_vector, is_vector, )
 
 from core.utilities import (normalized_index, normalized_axis_index,
@@ -2437,6 +2438,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
             return
 
+    # @timemethod
     def _clear_targets_overlay_(self, axis):
         r"""Removes the targets overlay from this axis
             Cached targets are left in place
@@ -2448,20 +2450,23 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #     print(f"\tcaller\t {s.function}")
         # traceback.print_stack(limit=8)
         #### END debug
-        axis, axNdx = self._check_axis_spec_ndx_(axis)
+        # axis, axNdx = self._check_axis_spec_ndx_(axis)
         items = [i for i in axis.items if isinstance(i, pg.TargetItem)]
-        # print(f"{self.windowTitle()} _clear_targets_overlay_ {len(items)} targets")
         for i in items:
             axis.removeItem(i)
 
-    def _clear_curves_overlay_(self, axis, frameNdx: int = None,
+    # @timemethod
+    def _clear_curves_overlay_(self, axis, frameNdx: int | None = None,
                                removeOverlaysFromCache: bool = False):
-        r"""Removed overlaid curves from the specified axis in the specified frame.
-    Optionally also removes the curve overlays from the internal cache
+        r"""Remove overlaid curves from a specific axis and frame.
+    Optionally also removes the curve overlays from the internal cache.
     """
+
         axis, axNdx = self._check_axis_spec_ndx_(axis)
+
         if not isinstance(frameNdx, int) or (frameNdx < 0 or frameNdx >= self.nFrames):
             cFrame = self.frameIndex[self.currentFrame]
+
         else:
             cFrame = frameNdx
 
@@ -2514,6 +2519,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         return axis, axNdx
 
+    # @timemethod
     def _update_annotations_(self, data=None):
         self.dataAnnotations.clear()
 
@@ -7941,14 +7947,8 @@ Var-keyword parameters ("name=value" pairs):
             # self._n_signal_axes_ = len(self.signalAxes)
 
             if dataOK:
-                self._clear_lris_() # remove gremlins (i.e. any epochs LinearRegionItem)
-
-                # NOTE: 2023-06-02 13:09:25
-                # to avoid flicker, set up axes ONLY if data demands a different
-                # number of axes
-                if n_axes != self._n_signal_axes_:
-                    self._setup_axes_(n_axes) # also assigns n_axes to self._n_signal_axes_
-
+                # NOTE: 2026-08-15 16:05:45
+                # set this up early as is needed by methods called below
                 if isinstance(showFrame, int):
                     if showFrame < 0:
                         showFrame = 0
@@ -7961,6 +7961,21 @@ Var-keyword parameters ("name=value" pairs):
                 else:
                     if self._current_frame_index_ not in self.frameIndex:
                         self._current_frame_index_ = self.frameIndex[-1]
+
+                # NOTE: 2026-08-15 16:06:07
+                # remove gremlins (i.e. any epochs LinearRegionItem)
+                if len(self.axes):
+                    for ax in self.axes:
+                        if self._axis_has_lris(ax):
+                            self._clear_axis_lris_(ax)
+                # self._clear_lris_()
+
+
+                # NOTE: 2023-06-02 13:09:25
+                # to avoid flicker, set up axes ONLY if data demands a different
+                # number of axes
+                if n_axes != self._n_signal_axes_:
+                    self._setup_axes_(n_axes) # also assigns n_axes to self._n_signal_axes_
 
                 if isinstance(plotStyle, str):
                     self.plotStyle = plotStyle
@@ -8322,6 +8337,12 @@ Var-keyword parameters ("name=value" pairs):
                         plotStyle = plotStyle,
                         showFrame = showFrame,
                         **kwargs)
+
+        # NOTE: 2026-08-15 16:11:38
+        # self._slot_set_data_finished is inherited from ScipyenViewer; does nothing
+        # to the data plots or axes, just does some housekeeping common to all
+        # ScipyenViewer objects
+        # TODO: use it in other viewers, too!
         worker.signals.signal_Finished.connect(self._slot_set_data_finished)
         worker.run()
 
@@ -8383,9 +8404,12 @@ Var-keyword parameters ("name=value" pairs):
         return self._current_frame_index_
 
     @currentFrame.setter
+    # @timemethod
     def currentFrame(self, val:typing.Union[int, type(MISSING), type(NA), type(None), float]):
         r""" Programmatically sets up the index of the displayed frame.
-        CAUTION: emits self.frameChanged signal
+
+        Overrides ScipyenFrameViewer.currentFrame() setter.
+
         """
         missing = (isinstance(self._missing_frame_value_, (int, float)) and val == self._missing_frame_value_) or \
             self._missing_frame_value_ in (MISSING, NA) and val is self._missing_frame_value_
@@ -8741,9 +8765,10 @@ Var-keyword parameters ("name=value" pairs):
             hostitem = self.signalsLayout.scene()
 
         elif isinstance(index, int):
+            nAxesWLayout = len(self.axesWithLayoutPositions)
             if index >=0:
-                if index >= len(self.axesWithLayoutPositions):
-                    raise ValueError("index must be between -1 and %d; got %d instead" % (len(self.axesWithLayoutPositions), index))
+                if index >= nAxesWLayout:
+                    raise ValueError(f"Index must be between -1 and {nAxesWLayout}; got {index} instead")
 
                 hostitem = self.axis(index)
 
@@ -8754,12 +8779,10 @@ Var-keyword parameters ("name=value" pairs):
             hostitem = index
 
         if hostitem is not None: # may be None if there is no scene, i.e. no plot item
-            ret =  [c for c in self._data_cursors_.values() if c.hostItem is hostitem]
+            return  [c for c in self._data_cursors_.values() if c.hostItem is hostitem]
 
         else:
-            ret = list()
-
-        return ret
+            return []
 
     def getSignalCursors(self, cursorType:typing.Optional[typing.Union[str, SignalCursorTypes]]=None):
         r"""Returns the dictionary of SignalCursor objects with the specified type.
@@ -8947,6 +8970,7 @@ Var-keyword parameters ("name=value" pairs):
             axis.update(axis.boundingRect())
         # self.displayFrame()
 
+    # @timemethod
     @safewrapper
     def displayFrame(self):
         r""" Plots individual frame (data "sweep" or "segment")
@@ -9049,59 +9073,118 @@ Var-keyword parameters ("name=value" pairs):
 
         self._update_annotations_() # is this one crashing the thread? -- No!
 
-        # Check if cursors want to stay in axis or stay with the domain
-        # and act accordingly
-        # mfun = lambda x: -np.inf if x is None else x
-        # pfun = lambda x: np.inf if x is None else x
+        # kAx = 0
+
+        visibleSignalAxes = [] # needed below, at NOTE: 2026-08-15 15:20:53
+        visibleAxes = []
 
         for k, ax in enumerate(self.axes):
-            # NOTE: 2025-07-13 22:21:02 potentia BUG / FIXME
-            # what is axes have different item data boundaries?
-            [[dataxmin, dataxmax], [dataymin, dataymax]] = guiutils.getPlotItemDataBoundaries(ax)
+            if not ax.isVisible():
+                continue
 
-            ax_xUnits = ax.data(0)
-            ax_yUnits = ax.data(1)
+            if ax in self._signal_axes_:
+                visibleSignalAxes.append(ax) # needed below at NOTE: 2026-08-15 15:32:38
 
-            if isinstance(ax_xUnits, pq.Quantity):
-                dataxmin, dataxmax = tuple(map(lambda v: v * ax_xUnits, (dataxmin, dataxmax)))
+            if self._axis_has_cursors_(ax):
+                self._update_axis_cursor_h_bounds_(ax)
 
-            if isinstance(ax_yUnits, pq.Quantity):
-                dataymin, dataymax = tuple(map(lambda v: v * ax_yUnits, (dataymin, dataymax)))
+            if self._axis_has_curve_overlays(ax, k, self.currentFrame):
+                self._update_axis_curve_overlays_(ax, k, self.currentFrame)
 
-            for c in self.cursorsInAxis(k):
-                if not c.staysInAxes:
-                    continue
+            if self._axis_has_target_overlays(ax):
+                self._clear_axis_target_overlays_(ax)
 
-                if not c.isHorizontal:
-                    newX = ephys.adapt_coordinate_to_lower_boundary(c.x, c.xBounds()[0], dataxmin)
-                    c.setBounds()
-                    c.x = newX
+            # NOTE: 2026-08-15 15:32:38
+            # update axes spines, so that they "share" their "X" axis, when it
+            # is feasible
+            # WARNING: MUST be done NOW, before meddling with X links and ranges
+            # below
+            if len(visibleAxes):
+                upperNeighbourAxis = visibleAxes[-1]
+                myXaxis = ax.getAxis("bottom")
+                myYaxis = ax.getAxis("left")
+                prevXaxis = upperNeighbourAxis.getAxis("bottom")
+                sameLabel = myXaxis.labelText == prevXaxis.labelText
+                prevXaxis.showLabel(not sameLabel)
+                prevXaxis.setStyle(showValues=False)
+                myYaxis.setWidth(self.leftLabelSpace)
 
-                if not c.isVertical:
-                    c.setBounds()
+            # NOTE: 2026-08-15 15:20:53
+            if self.xAxesLinked:
+                currentXLinkedView = ax.vb.linkedView(0)
+                if len(visibleSignalAxes):
+                    if currentXLinkedView:
+                        if ax is visibleSignalAxes[0]:
+                            ax.vb.setXLink(None)
 
-        # NOTE: 2022-11-22 11:49:47
-        # Finally, check for target overlays
+                        elif (currentXLinkedView.parentItem != visibleSignalAxes[0]):
+                            ax.vb.setXLink(visibleSignalAxes[0])
+                    else:
+                        ax.vb.setXLink(visibleSignalAxes[0])
 
-        try:
-            cFrame = self.frameIndex[self.currentFrame]
-        except:
-            cFrame = self.frameIndex[0]
+            # TODO: 2026-08-15 15:26:51 refactor this, merge with the above
+            # This is responsible to maintain the relative X offsets of axes
+            # across different framesm, when axes have been "zoomed" (i.e.,
+            # not showing the full range)
+            #
+            # Necessary especially when plotting a neo.Block, where signals in
+            # each segment have different time domains; also applies to other
+            # simlar cases e.g., plotting signals with different time domains in
+            # separate frames, etc
+            #
+            if len(self._axesXOffsetsCache_):
+                cachedXOffset = self._axesXOffsetsCache_[k]
+                currentBounds = guiutils.getPlotItemDataBoundaries(ax)
+                cachedXLinkedView = cachedXOffset["xLinkedView"]
+                currentXLinkedView = ax.vb.linkedView(0)
 
-        for k, ax in enumerate(self.axes):
-            if ax.isVisible():
-                self._clear_curves_overlay_(ax)
-                if cFrame in self._curve_overlays_:
-                    curveItems = self._curve_overlays_[cFrame].get(k, list())
-                    if len(curveItems):
-                        self._plot_curve_overlays_(curveItems, ax)
+                if cachedXOffset["autoRangeX"]:
+                    # skip plot items that auto-range on X axis
+                    # but ensure it STAYS auto-ranged
+                    ax.vb.enableAutoRange(0)
+                    # continue
 
-                self._clear_targets_overlay_(ax)
-                if cFrame in self._target_overlays_:
-                    targetItems = self._target_overlays_[cFrame].get(k, list())
-                    if len(targetItems):
-                        for tgt in targetItems:
-                            ax.addItem(tgt)
+                elif (isinstance(cachedXLinkedView, pg.ViewBox)
+                      and currentXLinkedView == cachedXLinkedView
+                      and not cachedXLinkedView.parentItem().isVisible()
+                      and cachedXLinkedView.parentItem().vb.state["autoRange"][0]
+                      ):
+                    ax.vb.enableAutoRange(0)
+                            # continue
+
+                # if currentXLinkedView and currentXLinkedView.state["autoRange"][0]:
+                #     continue
+
+                if (
+                    (not currentXLinkedView or not currentXLinkedView.state["autoRange"][0])
+                    and currentBounds[0][0] != cachedXOffset["bounds"][0][0]
+                    and currentBounds[0][1] != cachedXOffset["bounds"][0][1]
+                    ):
+
+                    newViewRangeX = (currentBounds[0][0] + cachedXOffset["xOffset"][0],
+                                     currentBounds[0][1] + cachedXOffset["xOffset"][1])
+
+                    if ax in self._signal_axes_:
+                        if currentXLinkedView:
+                            currentXLinkedView.blockLink(True)
+
+                        ax.setXRange(*newViewRangeX, padding = 0)
+
+                        if currentXLinkedView:
+                            currentXLinkedView.blockLink(False)
+
+                    else:
+                        if len(visibleSignalAxes) == 0:
+                            ax.setXRange(*newViewRangeX, padding = 0)
+
+            # NOTE: 2026-08-15 15:45:22
+            # append NOW, and NOT EARLIER
+            visibleAxes.append(ax) # needed above at NOTE: 2026-08-15 15:32:38
+
+        if len(visibleAxes):
+            visibleAxes[-1].getAxis("bottom").showLabel(True)
+            visibleAxes[-1].getAxis("bottom").setStyle(showValues = True)
+
 
         # NOTE: 2024-10-23 11:36:50 FIXME
         # hold off this for now
@@ -9109,10 +9192,10 @@ Var-keyword parameters ("name=value" pairs):
 
         # NOTE: 2026-04-02 09:19:39
         # connected to _slot_post_frameDisplay
-        self.sig_frameDisplayReady.emit()
+        # self.sig_frameDisplayReady.emit()
         self._new_data_ = False
 
-    def _get_axisXDataBounds(self, axis: typing.Union[int, pg.PlotItem]) -> tuple:
+    def _get_axisXDataBounds(self, axis: int | pg.PlotItem) -> tuple:
         # generator!
         # NOTE: 2026-04-07 22:42:49
         # possibly redundant with guiutils.getPlotItemDataBoundaries
@@ -9120,12 +9203,12 @@ Var-keyword parameters ("name=value" pairs):
 
     @Slot()
     def _slot_post_frameDisplay(self):
-        self._process_X_ranges_()
+        # self._process_X_ranges_() # FIXME 2026-08-15 15:07:08 TOO SLOW !!!
         self._update_axes_spines_()
 
     # NOTE: 2026-04-04 14:03:37
     # OK, so _process_X_ranges_ works but it's slow ...
-    # @timefunc
+    # @timemethod
     def _process_X_ranges_(self, padding:typing.Optional[float] = None):
         r""" Maintains an X view range for frames with different X data bounds.
     Necessary to recreate a view range to an axis relative to the axis' X data.
@@ -9227,6 +9310,7 @@ Var-keyword parameters ("name=value" pairs):
                     if len(visibleSignalAxes) == 0:
                         ax.setXRange(*newViewRangeX, padding = 0)
 
+    # @timemethod
     def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
 
@@ -9476,7 +9560,9 @@ Var-keyword parameters ("name=value" pairs):
     @_plot_data_.register(neo.Block)
     def __plot_data_(self, obj: neo.Block, *args, **kwargs):
         # NOTE: 2019-11-24 22:31:26
-        # select a segment then delegate to _plotSegment_()
+        # select a segment then dispatches to _plot_data_[segment]
+        # to delegate to _plotSegment_()
+        #
         # Segment selection is based on self.frameIndex, or on self.channelIndex
         # NOTE 2021-10-03 12:59:10 ChannelIndex is no more
 
@@ -9502,9 +9588,10 @@ Var-keyword parameters ("name=value" pairs):
         self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
 
     @_plot_data_.register(neo.Segment)
-    def __plot_data_(self, obj: neo.Segment, *args, **kwargs):
+    # @timemethod
+    def __plot_data_(self, obj: neo.Segment, *args, **kwargs): # noqa
         r"""Plots a neo.Segment.
-        Plots the signals (optionally the selected ones) present in a segment,
+        Plots the signals (optionally, only the selected ones) present in a segment,
         and the associated epochs, events, and spike trains.
         """
         analog = obj.analogsignals
@@ -11219,8 +11306,12 @@ Var-keyword parameters ("name=value" pairs):
             self.signalsLayout.scene().sigMouseClicked.connect(self._slot_mouseClickSelectPlotItem)
 
         for plotItem in self.axes:
-            self._clear_targets_overlay_(plotItem)
-            self._clear_labels_overlay_(plotItem)
+            if self._axis_has_target_overlays(plotItem):
+                self._clear_axis_target_overlays_(plotItem)
+            # self._clear_targets_overlay_(plotItem)
+            if self._axis_has_label_overlays(plotItem):
+                self._clear_axis_label_overlays_(plotItem)
+            # self._clear_labels_overlay_(plotItem)
 
             # NOTE: 2024-11-13 20:20:22 BUG/FiXME
             # hold thif off until we figure out a better way to manage the horizontal
@@ -11937,7 +12028,149 @@ Var-keyword parameters ("name=value" pairs):
     @Slot(object, object)
     def _slot_plotItemYRangeChanged(self, obj1: object, obj2: object):
         sender=self.sender()
-        print(f"{self.__class__.__name__}._slot_plotItemYRangeChanged({obj1},{obj2})")
-        print(f"\tfrom sender {sender}")
+        # print(f"{self.__class__.__name__}._slot_plotItemYRangeChanged({obj1},{obj2})")
+        # print(f"\tfrom sender {sender}")
 
 
+    # --- ancillay stuff
+
+    # @timemethod
+    def _clear_axis_target_overlays_(self, ax):
+        # if not ax.isVisible():
+        #     return
+
+        for item in self._get_axis_target_overlays(ax):
+            ax.removeItem(item)
+
+    # @timemethod
+    def _clear_axis_label_overlays_(self, ax):
+        # if not ax.isVisible():
+        #     return
+
+        for item in self._get_axis_label_overlays(ax):
+            ax.removeItem(item)
+
+    # @timemethod
+    def _clear_axis_lris_(self, ax):
+        for item in self._get_axis_lris(ax):
+            ax.removeItem(item)
+
+    # @timemethod
+    def _update_axis_cursor_h_bounds_(self, ax):
+        if not ax.isVisible():
+            return
+        cursors = self._get_axis_data_cursors(ax)
+        if len(cursors):
+            [dataxmin, dataxmax], _= guiutils.getPlotItemDataBoundaries(ax)
+            # [dataxmin, dataxmax], [dataymin, dataymax]= guiutils.getPlotItemDataBoundaries(ax)
+            ax_xUnits = ax.data(0)
+            ax_yUnits = ax.data(1)
+
+            if isinstance(ax_xUnits, pq.Quantity):
+                dataxmin, dataxmax = tuple(
+                    map(
+                            lambda v: v * ax_xUnits,
+                            (dataxmin, dataxmax)
+                        )
+                    )
+
+            for c in cursors:
+                if not c.staysInAxes:
+                    continue
+
+                if not c.isHorizontal:
+                    newX = ephys.adapt_coordinate_to_lower_boundary(c.x, c.xBounds()[0], dataxmin)
+                    c.setBounds()
+                    c.x = newX
+
+                if not c.isVertical:
+                    c.setBounds()
+
+    def _axis_has_cursors_(self, ax):
+        return any(c.hostItem is ax for c in self._data_cursors_.values())
+
+    # @timemethod
+    def _update_horizontal_bounds_for_cursors_(self):
+        for k, ax in enumerate(self.axes):
+            # NOTE: 2025-07-13 22:21:02 potential BUG / FIXME
+            # what axes have different item data boundaries?
+
+            if len(self.cursorsInAxis(k)) == 0:
+                continue
+
+            [[dataxmin, dataxmax], [dataymin, dataymax]] = guiutils.getPlotItemDataBoundaries(ax)
+
+            ax_xUnits = ax.data(0)
+            ax_yUnits = ax.data(1)
+
+            if isinstance(ax_xUnits, pq.Quantity):
+                dataxmin, dataxmax = tuple(map(lambda v: v * ax_xUnits, (dataxmin, dataxmax)))
+
+            # if isinstance(ax_yUnits, pq.Quantity):
+            #     dataymin, dataymax = tuple(map(lambda v: v * ax_yUnits, (dataymin, dataymax)))
+
+            for c in self.cursorsInAxis(k):
+                if not c.staysInAxes:
+                    continue
+
+                if not c.isHorizontal:
+                    newX = ephys.adapt_coordinate_to_lower_boundary(c.x, c.xBounds()[0], dataxmin)
+                    c.setBounds()
+                    c.x = newX
+
+                if not c.isVertical:
+                    c.setBounds()
+
+    # @timemethod
+    def _update_axis_curve_overlays_(self, ax, axNdx, frame):
+        if not ax.isvisible():
+            return
+        items = self._get_axis_curve_overlays_(ax, axNdx, frame)
+        if len(items):
+            for i in items:
+                ax.removeItem(i)
+
+        if frame in self._curve_overlays_:
+            curveItems = self._curve_overlays_[frame].get(axNdx, list())
+            if len(curveItems):
+                self._plot_curve_overlays_(curveItems, ax)
+
+
+    def _axis_has_target_overlays(self, ax):
+        return any(isinstance(i, pg.TargetItem) for i in ax.items)
+
+    def _axis_has_label_overlays(self, ax):
+        return any(isinstance(i, pg.TextItem) for i in ax.items)
+
+    def _axis_has_curve_overlays(self, ax, axNdx, frame):
+        if len(self._curve_overlays_) == 0:
+            return False
+
+        if frame in self._curve_overlays_:
+            if len(self._curve_overlays_[frame]) == 0:
+                return False
+
+            if axNdx not in self._curve_overlays_[frame]:
+                return False
+
+            return any(isinstance(i, pg.PlotDataItem) and i in self._curve_overlays_[frame][axNdx] for i in ax.items)
+
+        return False
+
+    def _axis_has_lris(self, ax):
+        return any(isinstance(i, pg.LinearRegionItem) for i in ax.items)
+
+    def _get_axis_curve_overlays_(self, ax, axNdx, frame) -> list:
+        return [i for i in ax.items if isinstance(i, pg.PlotDataItem) and i in self._curve_overlays_[axNdx][frame]]
+
+    def _get_axis_target_overlays(self, ax) -> list:
+        return [i for i in ax.items if isinstance(i, pg.TargetItem)]
+
+    def _get_axis_label_overlays(self, ax) -> list:
+        return [i for i in ax.items if isinstance(i, pg.TextItem)]
+
+    def _get_axis_data_cursors(self, ax) -> list:
+        return [c for c in self._data_cursors_.values() if c.hostItem is ax]
+
+    def _get_axis_lris(self, ax) -> list:
+        return [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]

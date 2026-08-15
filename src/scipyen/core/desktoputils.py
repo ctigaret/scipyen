@@ -748,7 +748,7 @@ def _fileSystemPlaceRejectPredicate_(x):
     else:
         return False
 
-@timefunc
+# @timefunc
 def get_local_filesystem_places(placesDict: typing.Optional[PlacesMap] = None) -> dict:
     r"""
     Get special directories (KDE Plasma5/6 specific)

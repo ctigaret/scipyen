@@ -10,7 +10,6 @@ from enum import IntEnum
 import numpy as np
 from ipykernel.inprocess.ipkernel import InProcessInteractiveShell
 from tribool import Tribool
-from core.utilities import get_least_pwr10
 
 import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
@@ -43,8 +42,9 @@ from gui.painting_shared import (FontStyleType, standardQtFontStyles,
                                  FontWeightType, standardQtFontWeights)
 
 import quantities as pq
+from core.utilities import get_least_pwr10
 from core.pyqtgraph_patch import pyqtgraph as pg
-
+from core.prog import timefunc
 from core import strutils, xmlutils
 
 class DisplayHint(IntEnum):
@@ -297,33 +297,37 @@ def validatorString(val:typing.Union[QtGui.QValidator.State, int]):
 
     return "Acceptable" if val == QtGui.QValidator.Acceptable else "Intermediate" if val == QtGui.QValidator.Intermediate else "Invalid"
 
-
+# @timefunc
 def getPlotItemDataBoundaries(item:pg.PlotItem):
     r"""Calculates data bounds (data domain, `X`, and data range, `Y`)
     Falls back on item's ViewBox view range
     """
-    [[vxmin, vxmax], [vymin, vymax]] = item.viewRange()
     plotDataItems = [i for i in item.listDataItems() if isinstance(i, pg.PlotDataItem) and all(v is not None for v in (i.xData, i.yData))]
+    [[vxmin, vxmax], [vymin, vymax]] = item.viewRange()
     if len(plotDataItems):
-        mfun = lambda x: -np.inf if x is None else x # noqa
-        pfun = lambda x: np.inf if x is None else x # noqa
+        mxfun = lambda x: vxmin if (x is None or np.isnan(x)) else x # noqa
+        pxfun = lambda x: vxmax if (x is None or np.isnan(x)) else x # noqa
+        myfun = lambda x: vymin if (x is None or np.isnan(x)) else x # noqa
+        pyfun = lambda x: vymax if (x is None or np.isnan(x)) else x # noqa
+        # mfun = lambda x: -np.inf if (x is None or np.isnan(x)) else x # noqa
+        # pfun = lambda x:  np.inf if (x is None or np.isnan(x)) else x # noqa
 
-        xmin = min(map(mfun, [min(p.xData) for p in plotDataItems]))
-        xmax = max(map(pfun, [max(p.xData) for p in plotDataItems]))
-        ymin = min(map(mfun, [min(p.yData) for p in plotDataItems]))
-        ymax = max(map(pfun, [max(p.yData) for p in plotDataItems]))
+        xmin = min(map(mxfun, [min(p.xData) for p in plotDataItems]))
+        xmax = max(map(pxfun, [max(p.xData) for p in plotDataItems]))
+        ymin = min(map(myfun, [min(p.yData) for p in plotDataItems]))
+        ymax = max(map(pyfun, [max(p.yData) for p in plotDataItems]))
 
-        if np.isinf(xmin) or np.isnan(xmin):
-            xmin = vxmin
-
-        if np.isinf(xmax) or np.isnan(xmax):
-            xmax = vxmax
-
-        if np.isinf(ymin) or np.isnan(ymin):
-            ymin = vymin
-
-        if np.isinf(ymax) or np.isnan(ymax):
-            ymax = vymax
+        # if np.isinf(xmin) or np.isnan(xmin):
+        #     xmin = vxmin
+        #
+        # if np.isinf(xmax) or np.isnan(xmax):
+        #     xmax = vxmax
+        #
+        # if np.isinf(ymin) or np.isnan(ymin):
+        #     ymin = vymin
+        #
+        # if np.isinf(ymax) or np.isnan(ymax):
+        #     ymax = vymax
 
     else: # no data plotted
         xmin = vxmin
