@@ -842,7 +842,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # if/when it does exist
             self._deregister_menuBar_()
 
-            self.sig_closeMe.emit()
 
             if self.isTopLevel:
                 if self._delete_on_close_ or getattr(self.scipyenWindow, "autoRemoveViewers", False):
@@ -851,6 +850,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
             super().closeEvent(evt)
             evt.accept()
+
+            self.sig_closeMe.emit()
 
     def event(self, evt:QtCore.QEvent):
         r"""Generic event handler
