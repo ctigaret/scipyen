@@ -3643,7 +3643,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         else:
             if isinstance(getattr(win, "sig_activated", None), QtCore.SignalInstance):
-                win.sig_activated[int].connect(self.slot_setCurrentViewer)
+                # win.sig_activated[int].connect(self.slot_setCurrentViewer)
+                win.sig_activated.connect(self.slot_setCurrentViewer)
             else:
                 winEvtFilter = WindowEventFilter(win, parent=self)
                 win.installEventFilter(winEvtFilter)
@@ -3770,13 +3771,15 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         """
         return [fig for fig in self.matplotlib_figures if fig in self.viewers[mpl.figure.Figure]]
 
-    @Slot(int)
+    # @Slot(int)
     @safewrapper
-    def slot_setCurrentViewer(self, wId):
+    def slot_setCurrentViewer(self):
+    # def slot_setCurrentViewer(self, wId):
         r""" Delegates to self.setCurrentWindow
             Only meant for QMainWindow instances
         """
         viewer = self.sender()
+        # print(f"{self.__class__.__name__}.slot_setCurrentViewer -> {viewer}")
         viewer_type_name = type(viewer).__name__
 
         if not isinstance(viewer, QtWidgets.QMainWindow):

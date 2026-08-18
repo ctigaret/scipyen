@@ -61,7 +61,8 @@ class TextViewer(ScipyenViewer):
     • only save as
     • no drag'n drop
     """
-    sig_activated = Signal(int)
+    sig_activated = Signal()
+    # sig_activated = Signal(int)
     sig_textChanged = Signal(name = "sig_textChanged")
     
     viewer_for_types = {str: 99, QtGui.QTextDocument: 99, strutils.is_html:99}

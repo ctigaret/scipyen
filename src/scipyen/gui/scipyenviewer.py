@@ -164,7 +164,8 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     data types for which there exists a specialized viewer will be displayed,
     by default, in that specialized viewer, instead of DataTreeViewer.
     """
-    sig_activated           = Signal(int, name="sig_activated")
+    # sig_activated           = Signal(int, name="sig_activated")
+    sig_activated           = Signal(name="sig_activated")
     sig_closeMe             = Signal()
     _sig_setNewDataBegin    = Signal(object, tuple, dict, name="_sig_setNewDataBegin")
 
@@ -417,9 +418,12 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         if sys.platform== "win32":
             self.windowHandle().raise_()
         else:
-            if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
-                return
+            # if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
+            #     return
             super().activateWindow()
+
+            self.sig_activated.emit()
+            # self.sig_activated.emit(self.winId())
 
     def getAppMenu(self):
         if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
@@ -859,8 +863,10 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """
         evt.accept()
 
-        if not __has_PySide6__ and evt.type() in (QtCore.QEvent.FocusIn, QtCore.QEvent.WindowActivate):
-            self.sig_activated.emit(self.ID)
+        # if not __has_PySide6__ and evt.type() in (QtCore.QEvent.FocusIn, QtCore.QEvent.WindowActivate):
+        if evt.type() in (QtCore.QEvent.FocusIn, QtCore.QEvent.WindowActivate):
+            self.sig_activated.emit()
+            # self.sig_activated.emit(self.ID)
             return True
 
         return super().event(evt)

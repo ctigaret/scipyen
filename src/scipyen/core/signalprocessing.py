@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -30,7 +29,7 @@ from core.datasignal import DataSignal, IrregularlySampledDataSignal
 from core.prog import safewrapper, with_doc
 from core import datatypes
 
-from plots.plots import plot_wavelet
+# from plots.plots import plot_wavelet
 #### END scipyen core modules
 
 class BoxcarDetectionMethod(IntEnum):
@@ -2458,8 +2457,42 @@ def forward_difference(
 
     return ret
 
+
+
 @singledispatch
-def rms(obj):
+def mad(x) -> float | list[float]:
+    r"""Mean absolute deviation for vector x.
+
+This is defined as median(abs(x-mean(x)))
+
+"""
+    raise NotImplementedError(f"{type(x).__name__} objects are not supported")
+
+@mad.register(np.ndarray)
+def __mad__(x: np.ndarray) -> float | list[float]:
+    if not datatypes.is_vector(x):
+        raise ValueError(f"Expecting a vector; instead, got data with shape: {x.shape}")
+
+    return np.median(np.abs(x-np.mean(x, axis=0)))
+
+@mad.register(neo.AnalogSignal)
+@mad.register(DataSignal)
+@mad.register(neo.IrregularlySampledSignal)
+@mad.register(IrregularlySampledDataSignal)
+def __mad__(x: (neo.AnalogSignal, neo.IrregularlySampledSignal,
+                DataSignal, IrregularlySampledDataSignal)) -> float | list[float]:
+    if x.ndims == 1:
+        return mad(x.flatten().magnitude) * x.units
+
+    result = [mad(x[:,channel].flatten().magnitude) * x[:,channel].units for channel in range(x.shape[1])]
+
+    if x.shape[1] == 1:
+        return result[0]
+
+    return result
+
+@singledispatch
+def rms(x) -> float | list[float]:
     r"""Root-mean-square of x
 
     Parameters:
@@ -2485,10 +2518,10 @@ def rms(obj):
         np.True_
 
     """
-    raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
+    raise NotImplementedError(f"{type(x).__name__} objects are not supported")
 
 @rms.register(np.ndarray)
-def __rms__(x: np.ndarray):
+def __rms__(x: np.ndarray) -> float | list[float]:
     # from core import datatypes
 
     if not datatypes.is_vector(x):
@@ -2501,12 +2534,12 @@ def __rms__(x: np.ndarray):
 @rms.register(DataSignal)
 @rms.register(neo.IrregularlySampledSignal)
 @rms.register(IrregularlySampledDataSignal)
-def __rms__(obj: (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal), **kwargs): # noqa
+def __rms__(x: (neo.AnalogSignal, neo.IrregularlySampledSignal,
+                DataSignal, IrregularlySampledDataSignal)) -> float | list[float]:#, **kwargs): # noqa
+    if x.ndim==1:
+        return rms(x.flatten().magnitude) * x.units
 
-    if obj.ndim==1:
-        return rms(obj.flatten().magnitude) * obj.units
-
-    result = [rms(obj[:,channel].flatten().magnitude) * obj[:,channel].units for channel in range(obj.shape[1])]
+    result = [rms(x[:,channel].flatten().magnitude) * x[:,channel].units for channel in range(x.shape[1])]
 
     if len(result) == 1:
         return result[0]

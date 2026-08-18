@@ -440,7 +440,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     """
     #dockedWidgetsNames = ["cursorsDockWidget"]
 
-    sig_activated = Signal(int, name="sig_activated")
+    # sig_activated = Signal(name="sig_activated")
+    # sig_activated = Signal(int, name="sig_activated")
     sig_plot = Signal(dict, name="sig_plot")
     sig_newEpochInData = Signal(name="sig_newEpochInData")
     sig_axisActivated = Signal(int, name="sig_axisActivated")

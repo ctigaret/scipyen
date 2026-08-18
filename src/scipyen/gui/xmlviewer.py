@@ -415,7 +415,8 @@ class XMLViewer(ScipyenViewer):
      problems with converting utf-8 characters => when saving document to file
      results in invalid XML 
     '''
-    sig_activated = Signal(int)
+    sig_activated = Signal()
+    # sig_activated = Signal(int)
     closeMe  = Signal(int)
     viewer_for_types = {xmlutils.xml.dom.minidom.Document: 99, 
                         xmlutils.xml.etree.ElementTree.Element: 99, 

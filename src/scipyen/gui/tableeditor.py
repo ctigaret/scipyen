@@ -105,7 +105,8 @@ class TableEditor(ScipyenViewer):
     #   varname: binding symbol of model data in the named namespace -
     #   namespace_name: the namespace name as registered with Scipyen's workspace model
     sig_dataChanged = Signal(str, str, name="sig_dataChanged")
-    sig_activated               = Signal(int)
+    # sig_activated               = Signal(int)
+    sig_activated               = Signal()
     closeMe                     = Signal(int)
     signal_window_will_close    = Signal()
 
