@@ -119,7 +119,8 @@ class DataTreeViewer(ScipyenViewer):
 A lot of things copied from there, EXCEPT that it now uses
 ``DataTreeview`` and ``DataTreeModel`` from ``gui.widgets.datatreeview`` module.
 """
-    sig_activated = Signal(int)
+    # sig_activated = Signal(int)
+    sig_activated = Signal()
     closeMe  = Signal(int)
     signal_window_will_close = Signal()
     _sig_setTreeViewData_ = Signal(dict, name="_sig_setTreeViewData_")
