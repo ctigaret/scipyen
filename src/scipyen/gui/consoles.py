@@ -3445,13 +3445,25 @@ class ScipyenConsoleWidget(ConsoleWidget):
 
         evt.accept()
 
-    # TODO 2026-08-11 15:57:06 FIXME
-    # disallow typing in text above prompt line - it is very confusing
-    # def keyPressEvent(self, evt):
-    #     # print(f"{self.__class__.__name__}.keyPressEvent({evt})")
-    #     self._keep_cursor_in_buffer()
-    #     super().keyPressEvent(evt)
-    #     evt.accept()
+    def eventFilter(self, obj, event) -> bool:
+        # NOTE: 2026-08-17 22:06:08
+        # disallow typing in text above prompt line clicking in the window
+        # it is very annyoing!
+        # however, allow selecting text from above the input buffer, so I make
+        # this contingent on the _control not having a non-empty text selection
+        #
+        # this BUG seems to have crept in qtconsole using more recent Qt6 (v.11?)
+        # regardless of the python binding (it happens with either PyQt or PySide)
+        #
+        if ((__has_PyQt6__ or __has_PySide6__)
+            and isinstance(event, QtGui.QMouseEvent) and event.type() == QtCore.QEvent.MouseButtonRelease
+            and (not self._control.textCursor().hasSelection()
+                or len(self._control.textCursor().selectedText()) == 0)
+            ):
+
+            self._keep_cursor_in_buffer()
+
+        return super().eventFilter(obj, event)
 
 
     @safewrapper

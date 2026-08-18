@@ -9,6 +9,7 @@ please use the "ephys" module.
 """
 
 import typing, numbers, functools, warnings, traceback
+from functools import singledispatch
 
 #### BEGIN 3rd party modules
 import numpy as np
@@ -21,12 +22,13 @@ from enum import (IntEnum, auto)
 #### END 3rd party modules
 
 #### BEGIN scipyen core modules
-from . import curvefitting as crvf
-from . import scipyen_quantities as scq
-from . import datasignal as sds
-from .datasignal import DataSignal, IrregularlySampledDataSignal
-from . import prog as prog
-from .prog import safewrapper, with_doc
+from core import curvefitting as crvf
+from core import scipyen_quantities as scq
+# from . import datasignal as sds
+from core.datasignal import DataSignal, IrregularlySampledDataSignal
+# from . import prog as prog
+from core.prog import safewrapper, with_doc
+from core import datatypes
 
 from plots.plots import plot_wavelet
 #### END scipyen core modules
@@ -34,7 +36,6 @@ from plots.plots import plot_wavelet
 class BoxcarDetectionMethod(IntEnum):
     state_levels = auto()
     kmeans = auto()
-
 
 def simplify_2d_shape(xy: np.ndarray, max_points: int = 5, k: int = 3):
     r"""Creates an simplified version of a 2D shape defined by x,y coordinate array
@@ -214,7 +215,6 @@ def simplify_2d_shape(xy: np.ndarray, max_points: int = 5, k: int = 3):
 
     return ret, splines
 
-
 def zero_crossings(x: np.ndarray):
     r"""Returns the zero crossings of x waveform, with grid accuracy.
 
@@ -240,7 +240,6 @@ def zero_crossings(x: np.ndarray):
 
     return np.where(x[:-1] * x[1:] < 0)[0]  # because where() returns a tuple which
     # for 1D data has only one element
-
 
 def value_crossings(x: np.ndarray, value: float):
     r"""Returns the sample indices, in a waveform, that cross an arbitrary value.
@@ -435,7 +434,7 @@ def normalise_waveform(
     FIXME: 2022-12-13 16:57:47 This is NOT nan-friendly!
 
     """
-    from core import datatypes
+    # from core import datatypes
 
     if x.ndim != 1:
         if x.ndim == 2:
@@ -1431,36 +1430,6 @@ def nansem(x: np.ndarray, **kwargs):
 
     return np.nanstd(x, ddof=ddof, axis=axis, keepdims=keepdims) / np.sqrt(sz - ddof)
 
-
-def rms(x: np.ndarray, **kwargs):
-    r"""Root-mean-square of x
-
-    Parameters:
-    ===========
-    x: 1D numpy array
-
-    """
-    from core import datatypes
-
-    if not isinstance(x, np.ndarray):
-        raise TypeError(f"Expecting a numpy array; got {type(x).__name__} instead")
-    if not datatypes.is_vector(x):
-        raise ValueError(f"Expecting a vector; instead, got data with shape: {x.shape}")
-
-    return np.sqrt(np.linalg.norm(x) / x.size)
-
-
-#     if isinstance(x, pq.Quantity):
-#         xdot = np.dot(np.abs(x.magnitude).T, np.abs(x.magnitude))
-#     else:
-#         xdot = np.dot(x.T, x)
-#
-#     return np.sqrt(xdot/x.size)
-
-#     if isinstance(xsq, pq.Quantity):
-#         return np.sqrt(xsq.magnitude/x.size)
-#
-#     return np.sqrt(xsq/x.size)
 
 
 def detrend(x: typing.Union[neo.AnalogSignal, DataSignal], **kwargs):
@@ -2489,63 +2458,63 @@ def forward_difference(
 
     return ret
 
+@singledispatch
+def rms(obj):
+    r"""Root-mean-square of x
 
-def root_mean_square(x, axis=None):
-    r"""Computes the RMS of a signal.
+    Parameters:
+    ===========
+    x: 1D numpy array or signal-like object
 
-    Positional parameters
-    =====================
-    x = neo.AnalogSignal, neo.IrregularlySampledSignal, or datasignal.DataSignal
+    Returns:
+    ========
+    RMS = np.linalg.norm(x,2)/√(x.size)
 
-    Named parameters
-    ================
+    For multi-channel signals, returns a list with the RMS of each channel
 
-    axis: None (defult), or a scalar int, or a sequence of int: index of the axis,
-            in the interval [0, x.ndim), or None (default)
+    .. note::
+        This is mathematically identical to
 
-            When a sequence of int, the RMS will be calculated across all the
-            specified axes
+        sqrt(mean(x^2))
 
-        When None (default) the RMS is calculated for the flattened signal array.
+        for x a vector (1D array)
 
-        This argument is passed on to numpy.mean
+    ..
+        np.isclose(rms(x) , np.sqrt(np.mean(x**2)))
 
-    Returns: a scalar float
-    RMS = sqrt(mean(x^2))
+        np.True_
 
     """
-    from . import datatypes
+    raise NotImplementedError(f"{type(obj).__name__} objects are not supported")
 
-    if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, np.ndarray)):
-        raise TypeError(
-            "Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, a datasignal.DataSignal or a numpy array; got %s instead"
-            % type(x).__name__
-        )
+@rms.register(np.ndarray)
+def __rms__(x: np.ndarray):
+    # from core import datatypes
 
-    if not isinstance(axis, (int, tuple, list, type(None))):
-        raise TypeError(
-            "axis expected to be an int or None; got %s instead" % type(axis).__name__
-        )
+    if not datatypes.is_vector(x):
+        raise ValueError(f"Expecting a vector; instead, got data with shape: {x.shape}")
 
-    if isinstance(axis, (tuple, list)):
-        if not all([isinstance(a, int) for a in axis]):
-            raise TypeError("Axis nindices must all be integers")
+    return np.linalg.norm(x, axis=0) / np.sqrt(x.size)
+    # return np.sqrt(np.linalg.norm(x, axis=0) / x.size)
 
-        if any([a < 0 or a > x.ndim for a in axis]):
-            raise ValueError("Axis indices must be inthe interval [0, %d)" % x.ndim)
+@rms.register(neo.AnalogSignal)
+@rms.register(DataSignal)
+@rms.register(neo.IrregularlySampledSignal)
+@rms.register(IrregularlySampledDataSignal)
+def __rms__(obj: (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, IrregularlySampledDataSignal), **kwargs): # noqa
 
-    if isinstance(axis, int):
-        if axis < 0 or axis >= x.ndim:
-            raise ValueError(
-                "Invalid axis index; expecting value between 0 and %d ; got %d instead"
-                % (x.ndim, axis)
-            )
+    if obj.ndim==1:
+        return rms(obj.flatten().magnitude) * obj.units
 
-    return np.sqrt(np.mean(np.abs(x), axis=axis))
+    result = [rms(obj[:,channel].flatten().magnitude) * obj[:,channel].units for channel in range(obj.shape[1])]
 
+    if len(result) == 1:
+        return result[0]
 
-def signal_to_noise(x, axis=None, ddof=None, db=True):
-    r"""Calculates SNR for the given signal.
+    return result
+
+def snr(x, axis=None, ddof=None, db=True):
+    r"""Calculates signal-to-noise ration (SNR) for the given signal.
 
     Positional parameters:
     =====================
@@ -2620,11 +2589,12 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
         if ddof < 0:
             raise ValueError("ddof must be >= 0; got %s instead" % ddof)
 
-    rms = root_mean_square(x, axis=axis)
+    # rms = root_mean_square(x, axis=axis)
+    sig_rms = rms(x, axis=axis)
 
-    std = np.std(x, axis=axis, ddof=ddof)
+    sig_std = np.std(x, axis=axis, ddof=ddof)
 
-    ret = rms / std
+    ret = sig_rms / sig_std
 
     if db:
         if isinstance(ret, pq.Quantity):

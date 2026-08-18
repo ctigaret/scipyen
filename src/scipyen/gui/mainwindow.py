@@ -55,6 +55,7 @@ import collections
 import cmath # noqa
 from tribool import Tribool # noqa
 import datetime
+import math
 
 # END core python modules
 
@@ -5268,13 +5269,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         # # from guiutils import testme
         from gui.pythonhelpwidget import PythonHelpWindow
         if not isinstance(self.pythonHelpWindow, QtWidgets.QMainWindow):
-            self.pythonHelpWindow = PythonHelpWindow(shell=self.shell, parent=self)
+            self.pythonHelpWindow = PythonHelpWindow(shell=self.shell)#, parent=self)
         self.pythonHelpWindow.show()
 
     def runPythonHelpGUI(self, cmd:str):
         from gui.pythonhelpwidget import PythonHelpWindow
         if not isinstance(self.pythonHelpWindow, QtWidgets.QMainWindow):
-            self.pythonHelpWindow = PythonHelpWindow(shell=self.shell, parent=self)
+            self.pythonHelpWindow = PythonHelpWindow(shell=self.shell)#, parent=self)
         self.pythonHelpWindow.show()
         self.pythonHelpWindow.help(cmd)
 

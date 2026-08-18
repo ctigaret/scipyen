@@ -423,9 +423,9 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         # self.exportDataToWorkspace(contents, "help_output", dialog=False)
 
 class PythonHelpWindow(QtWidgets.QMainWindow, WorkspaceGuiMixin):
-    def __init__(self, shell, parent=None):
+    def __init__(self, shell, parent=None, **kwargs):
         super().__init__(parent=parent)
-        WorkspaceGuiMixin.__init__(self, parent=parent)
+        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         self.setWindowTitle("Scipyen — Python help")
         self.helpWidget = PythonHelpWidget(shell=shell, parent=self)
         self.setCentralWidget(self.helpWidget)
