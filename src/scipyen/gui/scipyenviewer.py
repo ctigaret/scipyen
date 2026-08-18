@@ -164,7 +164,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     data types for which there exists a specialized viewer will be displayed,
     by default, in that specialized viewer, instead of DataTreeViewer.
     """
-    # sig_activated           = Signal(int, name="sig_activated")
     sig_activated           = Signal(name="sig_activated")
     sig_closeMe             = Signal()
     _sig_setNewDataBegin    = Signal(object, tuple, dict, name="_sig_setNewDataBegin")
