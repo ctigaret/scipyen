@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # $Id: pythonhelpwidget.py $
 # SPDX-FileCopyrightText: 2025 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -278,6 +277,7 @@ class PythonHelpWidget(QtWidgets.QWidget, Ui_PythonHelpWidget, WorkspaceGuiMixin
         self.setupUi(self)
         # self.helpDisplay.setPlaceholderText(self.placeHolder_msg)
         self.helpDisplay.setPlaceholderText('Enter a help topic in the field above (e.g., "topics", "pywt.Wavelet"), "?", or "help"')
+        self.helpDisplay.setOpenExternalLinks(True)
         self.removQueryAction = QAction(QtGui.QIcon.fromTheme("edit-delete"),
                                                                 "Remove this query from history",
                                                                 self.queryComboBox.lineEdit())

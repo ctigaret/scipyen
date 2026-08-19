@@ -139,7 +139,7 @@ from tribool import Tribool
 #### END core python modules
 
 #### BEGIN 3rd party modules
-import qtpy
+# import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
@@ -202,7 +202,7 @@ from iolib import pictio as pio
 #### BEGIN pict.core modules
 import core.signalprocessing as sgp
 from core import (xmlutils, strutils, svgutils)
-import core.neoutils as neoutils
+from core import neoutils
 import core.scipyen_quantities as scq
 from core.neoutils import (get_domain_name,
                            get_non_empty_spike_trains,
@@ -241,7 +241,7 @@ from core.sysutils import adapt_ui_path
 from imaging.vigrautils import kernel2array
 from core import scipyen_quantities as scq
 
-from ephys import ephys as ephys
+from ephys import ephys
 # from ephys.ephys import cursors2epoch
 
 #from core.patchneo import *
@@ -1476,8 +1476,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @enableAutoRangeAllAxesByDefault.setter
     def enableAutoRangeAllAxesByDefault(self, value: bool):
         enabled = value is True
-        signalBlocker = QtCore.QSignalBlocker(self.actionEnable_Auto_Range)
-        self.actionEnable_Auto_Range.setChecked(enabled)
+        with qtutils.SignalBlocker(self.actionEnable_Auto_Range):
+            self.actionEnable_Auto_Range.setChecked(enabled)
 
         self._enableAutoRangeAllAxesByDefault_ = enabled
 
@@ -1650,7 +1650,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     @cursorColors.setter
     def cursorColors(self, val:dict):
-        if isinstance(val, dict) and all((s in val for s in ("crosshair", "horizontal", "vertical"))):
+        if isinstance(val, dict) and all(s in val for s in ("crosshair", "horizontal", "vertical")):
             self.crosshairCursorColor = QtGui.QColor(val["crosshair"]).name(QtGui.QColor.HexArgb)
             self.horizontalCursorColor = QtGui.QColor(val["horizontal"]).name(QtGui.QColor.HexArgb)
             self.verticalCursorColor = QtGui.QColor(val["vertical"]).name(QtGui.QColor.HexArgb)
@@ -1688,7 +1688,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     @linkedCursorColors.setter
     def linkedCursorColors(self, val:dict):
-        if isinstance(val, dict) and all((s in val for s in ("crosshair", "horizontal", "vertical"))):
+        if isinstance(val, dict) and all(s in val for s in ("crosshair", "horizontal", "vertical")):
             self.linkedCrosshairCursorColor = QtGui.QColor(val["crosshair"]).name(QtGui.QColor.HexArgb)
             self.linkedHorizontalCursorColor = QtGui.QColor(val["horizontal"]).name(QtGui.QColor.HexArgb)
             self.linkedVerticalCursorColor = QtGui.QColor(val["vertical"]).name(QtGui.QColor.HexArgb)
@@ -3069,7 +3069,7 @@ anything else       anything else       ❌
 
         bk = len(newData)-1
 
-        mIndex = np.array(list(((bk,sk) for sk in range(len(obj.segments)))))
+        mIndex = np.array(list((bk,sk) for sk in range(len(obj.segments))))
 
         new_frame_meta_index = np.recarray((len(obj.segments), 1),
                                             dtype = [('block', int), ('segment', int)])
@@ -3691,6 +3691,7 @@ Var-keyword parameters ("name=value" pairs):
 
     @safewrapper
     def resizeEvent(self, evt:QtGui.QResizeEvent):
+        self._update_multi_axis_cursors_h_bounds()
         super().resizeEvent(evt)
 
         # NOTE: 2024-10-23 11:36:50 FIXME
@@ -3978,13 +3979,14 @@ Var-keyword parameters ("name=value" pairs):
                 fn = lambda s: neoutils.remove_events(s, TriggerEventType[comboItems[value]])
             else:
                 sdlg = ItemsListDialog(parent=self, itemsList = trigTypeNames,
-                                       title = "Select Trigger Event Types",#
+                                       title = "Select Trigger Event Types",
                                        modal = True,
                                        selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
                 sdlg.adjustSize()
 
                 if sdlg.exec():
-                    sel_types = list(map(lambda t: TriggerEventType[t], sdlg.selectedItemsText))
+                    sel_types = [TriggerEventType[t] for t in sdlg.selectedItemsText]
+                    # sel_types = list(map(lambda t: TriggerEventType[t], sdlg.selectedItemsText))
                     fn = lambda s: neoutils.remove_events(s, sel_types)
                 else:
                     return
@@ -4997,7 +4999,7 @@ Var-keyword parameters ("name=value" pairs):
         return SignalCursor.default_precision
 
 
-    @Slot((QtCore.QPoint))
+    @Slot(QtCore.QPoint)
     @safewrapper
     def slot_annotationsContextMenuRequested(self, point):
         if self._scipyenWindow_ is None:
@@ -5375,7 +5377,7 @@ Var-keyword parameters ("name=value" pairs):
                                         editFirst = False):
         # print(f"{self.__class__.__name__}._construct_multi_axis_vertical_ label = {label}, dynamic = {dynamic}")
         # NOTE: 2020-02-26 14:37:50
-        # code being migrated to _addCursor_()
+        # code being migrated to _addCursor_() # TODO !!!
         # with allowing for cursors to be added to an empty scene (i.e. with no
         # axes) on the condition that their coordinates must be reset once
         # something has been plotted
@@ -5385,7 +5387,7 @@ Var-keyword parameters ("name=value" pairs):
 
             # NOTE: 2023-01-14 23:23:06
             # always expect at least one PlotItem present
-            if len(pIs) == 0: #
+            if len(pIs) == 0:
                 scene_rect = self.signalsLayout.scene().sceneRect()
                 xbounds = (scene_rect.x(), scene_rect.x() + scene_rect.width())
                 precision=None
@@ -7693,7 +7695,7 @@ Var-keyword parameters ("name=value" pairs):
                 self.irregularSignalChannelAxis = None
                 self.irregularSignalChannelIndex = None
                 self.separateSignalChannels = False
-                self._data_frames_ = tuple(accumulate((len(b.segments) for b in y)))[-1]
+                self._data_frames_ = tuple(accumulate(len(b.segments) for b in y))[-1]
                 self.frameIndex = range(self._data_frames_)
                 self._number_of_frames_ = len(self.frameIndex)
                 self.signalIndex                    = signalIndex
@@ -9088,6 +9090,9 @@ Var-keyword parameters ("name=value" pairs):
 
             if self._axis_has_cursors_(ax):
                 self._update_axis_cursor_h_bounds_(ax)
+
+            if self._has_multi_axis_cursors_():
+                self._update_multi_axis_cursors_h_bounds()
 
             if self._axis_has_curve_overlays(ax, k, self.currentFrame):
                 self._update_axis_curve_overlays_(ax, k, self.currentFrame)
@@ -10518,7 +10523,7 @@ Var-keyword parameters ("name=value" pairs):
         symbolBrush = symbolStyle.get("brush", None)
         # symbol = symbolStyle["symbol"]
         # print(f"symbol = {symbol}")
-        max_len =  max((len(event.times) for event in entities_list))
+        max_len =  max(len(event.times) for event in entities_list)
         xx = [np.full((1,max_len), np.nan) for event in entities_list]
 
         yy = list()
@@ -12087,8 +12092,17 @@ Var-keyword parameters ("name=value" pairs):
                 if not c.isVertical:
                     c.setBounds()
 
+    def _update_multi_axis_cursors_h_bounds(self):
+        cursors = self._get_multi_axis_cursors()
+        if len(cursors):
+            for c in cursors:
+                c.setBounds()
+
     def _axis_has_cursors_(self, ax):
         return any(c.hostItem is ax for c in self._data_cursors_.values())
+
+    def _has_multi_axis_cursors_(self):
+        return any(c.hostItem is self.signalsLayout.scene() for c in self._data_cursors_.values())
 
     # @timemethod
     def _update_horizontal_bounds_for_cursors_(self):
@@ -12175,3 +12189,6 @@ Var-keyword parameters ("name=value" pairs):
 
     def _get_axis_lris(self, ax) -> list:
         return [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
+
+    def _get_multi_axis_cursors(self) -> list:
+        return [c for c in self._data_cursors_.values() if c.hostItem is self.signalsLayout.scene()]
