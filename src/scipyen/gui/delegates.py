@@ -595,14 +595,17 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         elif isinstance(data, (int, float, np.floating, np.integer)):
             if (
-                isinstance(choices, typing.Sequence)
-                and len(choices) > 0
-                and all(isinstance(v, (enum.Enum, str)) for v in choices)
-                ) or (
+                (
+                    isinstance(choices, typing.Sequence)
+                    and len(choices) > 0
+                    and all(isinstance(v, (enum.Enum, str)) for v in choices)
+                )
+                or (
                     isinstance(choices, dict)
                     and len(choices) > 0
                     and all(isinstance(k, str) for k in choices.keys())
-                    ):
+                    )
+                ):
                 if isinstance(choices, dict):
                     entries = list(choices.keys())
                     values = list(choices.values())

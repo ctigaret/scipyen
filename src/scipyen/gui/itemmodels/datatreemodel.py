@@ -1,10 +1,9 @@
-# -*- coding: utf-8 -*-
 # $Id: datatreeeditor.py $
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-from __future__ import print_function
+# from __future__ import print_function
 
 import os
 # import warnings
@@ -249,7 +248,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
         typeName = objDict["objType"].__name__
 
         info = objDict["objInfo"]
-        if isinstance(info, bool):
+
+        if isinstance(info, (bool, np.floating, np.integer, np.complexfloating)):
             info = f"{info}"
 
         memberAccess = objDict["memberAccess"]
@@ -355,8 +355,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
         readOnlyBrush = palette.brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
 
         for k, item in enumerate((item0, item1, item2)):
-            item.setData(readOnly, ReadOnlyRole) # noqa star import from gui.itemmodels.roles
-            item.setData(readOnlyChildren, ReadOnlyChildrenRole) # noqa star import from gui.itemmodels.roles
+            item.setData(readOnly, ReadOnlyRole) # star import from gui.itemmodels.roles
+            item.setData(readOnlyChildren, ReadOnlyChildrenRole) # star import from gui.itemmodels.roles
             if k == 2:
                 if readOnly or (
                                     (
@@ -518,7 +518,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType, visited)
         if self.readOnly:
             for item in rowItems:
-                item.setData(self.readOnly, ReadOnlyRole) # noqa
+                item.setData(self.readOnly, ReadOnlyRole)
 
         pItem = rowItems[0]
 
@@ -806,7 +806,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             info = f"{obj}"
             tip = f"{obj}"
             objDataAsChild = False
-            memberAccess = tuple()
+            memberAccess = tuple() # noqa
             accessType = None
             # choices = dict()
             # scipywarn(f"TODO: Support for objects of type {type(obj).__name__} awaits implementation. FIXME")
@@ -832,7 +832,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(type(MISSING))
     @_parseObject_.register(type(pd.NA))
     def __parseObject_(self: typing.Self, obj: typing.Union[type(None), type(MISSING), type(pd.NA)],
-          choices: dict = dict(),
+          choices: dict = dict(), # noqa
           _:bool = False) -> tuple:
         objType = type(obj)
         objId = id(obj)
@@ -1360,12 +1360,28 @@ class DataTreeModel(QtGui.QStandardItemModel):
           _: bool=True) -> tuple:
         objId = id(obj)
         objType = type(obj)
+
+#         if isinstance(obj, np.integer):
+#             objInfo = int(obj)
+#
+#         elif isinstance(obj, np.floating):
+#             objInfo = float(obj)
+#
+#         elif isinstance(obj, np.complexfloating):
+#             objInfo = complex(obj)
+#
+#         else:
+#             objInfo = obj
+#
+        objInfo = obj
+
         if not isinstance(choices, dict):
             if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
                 choices = dict()
         tip = objType.__name__
         return obj, {
-            "indirect": False, "objDataAsChild": False,
+            "indirect": False,
+            "objDataAsChild": False,
             "objInfo": obj,
             "objType": objType,
             "objTip": tip,
@@ -2042,10 +2058,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         tip = type(obj).__name__
         info = tip
-        if isinstance(obj, PVScan): # noqa # star imports from systems.PrairieView
+        if isinstance(obj, PVScan):
             info = f"{obj.attributes}"
 
-        elif isinstance(obj, PVSequence): # noqa # star imports from systems.PrairieView
+        elif isinstance(obj, PVSequence):
             nframes = len(obj.frames)
             info = f"{obj.attributes['sequencetypename']} with {nframes} {strutils.pluralize('frame', nframes)}"
 
@@ -2279,9 +2295,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
             exec(setexpr)
             newVal = eval(accexpr)
             OK = True
+
         except: # noqa
             traceback.print_exc()
-            pass
 
         if OK:
             objType = objItem.data(ObjectTypeRole) # noqa

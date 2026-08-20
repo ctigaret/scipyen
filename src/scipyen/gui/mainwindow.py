@@ -849,7 +849,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                                 # in the workspace table
                                 # therefore we don't need a prompt widget for it
                                 promptWidget = None  # so that argument parsing below works
-                                pass
                             else:
                                 raise ValueError(
                                     "Incorrect input type was supplied")
