@@ -608,6 +608,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._selectedCursorLineStyle_ = self.defaultSelectedCursorLineStyle
 
         self._data_cursors_ = collections.ChainMap(self._crosshairSignalCursors_, self._horizontalSignalCursors_, self._verticalSignalCursors_)
+
+        # ### BEGIN About cached cursors
         # maps signal name with list of cursors
         # NOTE: 2019-03-08 13:20:50
         # map plot item index (int) with list of cursors
@@ -685,6 +687,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #   after a cycle of changes in the plot items layout as above...
         #
         #
+        # ### END   About cached cursors
         self._cached_cursors_ = dict()
 
         # NOTE: 2023-01-01 22:56:20 see NOTE: 2023-01-01 22:48:10 point (1) above
@@ -844,6 +847,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._hovered_plot_item_ = None
         self._selected_plot_item_ = None
         self._selected_plot_item_index_ = -1
+
+        # NOTE: 2026-08-21 15:58:09
+        # see NOTE: 2025-07-14 21:49:57
+        # allow me to do something with it (e.g. change its symbol, etc)
+        self._selected_plot_data_item_ = None
         #### END plot items management
 
         self._mouse_coordinates_text_ = ""
@@ -3261,6 +3269,8 @@ anything else       anything else       ❌
             self._label_overlays_.clear()
             self._spiketrains_axis_ = None
             self._events_axis_ = None
+            self._selected_plot_item_ = None
+            self._selected_plot_data_item_ = None
 
             self._plot_names_.clear()
             for plotItem in self.axes:
@@ -8390,13 +8400,18 @@ Var-keyword parameters ("name=value" pairs):
         doc_title_prompt.variable.setClearButtonEnabled(True)
         doc_title_prompt.variable.redoAvailable = True
         doc_title_prompt.variable.undoAvailable = True
+        if isinstance(doc_title, str) and len(doc_title.strip()):
+            doc_title_prompt.setText(doc_title)
+        else:
+            doc_title_prompt.setText("")
+
         d.promptWidgets.append(doc_title_prompt)
 
-        doc_title_prompt.setText(doc_title)
         frameAxis_prompt = qd.StringInput(d, "Frame axis")
         frameAxis_prompt.variable.setClearButtonEnabled(True)
         frameAxis_prompt.variable.redoAvailable = True
         frameAxis_prompt.variable.undoAvailable = True
+        frameAxis_prompt.setText(f"{frameAxis}")
         d.promptWidgets.append(frameAxis_prompt)
 
         d.adjustSize()
@@ -8662,6 +8677,12 @@ Var-keyword parameters ("name=value" pairs):
     def selectedAxis(self):
         r"""Alias to currentAxis"""
         return self.currentAxis
+
+    @property
+    def selectedCurve(self) -> pg.PlotDataItem | None:
+        # NOTE: 2026-08-21 15:55:57
+        # see NOTE: 2025-07-14 21:49:57
+        return self._selected_plot_data_item_
 
     @property
     def plotNames(self):
@@ -10806,6 +10827,9 @@ Var-keyword parameters ("name=value" pairs):
         a pyqtgraph.PlotItem where the data was plotted
 
         """
+        # NOTE: 2026-08-21 15:53:12
+        # get the new plot data items to signal when they've been clicked (selected)
+
         # TODO 2026-04-18 23:18:00
         # think about using pg.ScatterPlotItem for events
 
@@ -10876,8 +10900,11 @@ Var-keyword parameters ("name=value" pairs):
         # OR array with shape (N,2);
         # "vectors" with shape (N,1) won't do
         # plotDataItems = [i for i in plotItem.listDataItems() if isinstance(i, plotDataItemClass)]
+
         cFrame = self.currentFrame
+
         axOverlayItems = self._curve_overlays_.get(cFrame, dict()).get(axNdx, list())
+
         plotDataItems = list(filter(lambda i: (isinstance(i, plotDataItemClass) and
                                                i not in axOverlayItems),
                                     plotItem.listDataItems()
@@ -10908,16 +10935,22 @@ Var-keyword parameters ("name=value" pairs):
                             plotItem.removeItem(item)
 
                     plotDataItems[0].clear()
+
                     if xx is not None:
                         plotDataItems[0].setData(x=xx, y=yy, **kwargs)
                     else:
                         plotDataItems[0].setData(y=yy, **kwargs)
 
                 else:
+                    # isntantiates new PlotDataItem objects
                     if xx is not None:
-                        plotItem.plot(x=xx, y=yy, **kwargs)
+                        pdi = plotItem.plot(x=xx, y=yy, **kwargs)
+
                     else:
-                        plotItem.plot(y=yy, **kwargs)
+                        pdi = plotItem.plot(y=yy, **kwargs)
+
+                    pdi.setCurveClickable(True)
+                    pdi.sigClicked[object, object].connect(self._slot_plotDataItemClicked)
 
             else:
                 if xx is not None:
@@ -11011,16 +11044,23 @@ Var-keyword parameters ("name=value" pairs):
                     else:
                         if xx is not None:
                             # print(f"kwargs = {kwargs}")
-                            plotItem.plot(x = xx, y = yy, **kwargs)
+                            pdi = plotItem.plot(x = xx, y = yy, **kwargs)
+
                         else:
-                            plotItem.plot(y = yy, **kwargs)
+                            pdi = plotItem.plot(y = yy, **kwargs)
+
+                        pdi.setCurveClickable(True)
+                        pdi.sigClicked[object, object].connect(self._slot_plotDataItemClicked)
 
                 else:
                     if xx is not None:
-                        plotItem.plot(x = xx, y = yy, **kwargs)
-                    else:
-                        plotItem.plot(y = yy, **kwargs)
+                        pdi = plotItem.plot(x = xx, y = yy, **kwargs)
 
+                    else:
+                        pdi = plotItem.plot(y = yy, **kwargs)
+
+                    pdi.setCurveClickable(True)
+                    pdi.sigClicked[object, object].connect(self._slot_plotDataItemClicked)
 
         plotItem.setLabels(bottom = [xlabel], left=[ylabel])
 
@@ -11047,6 +11087,8 @@ Var-keyword parameters ("name=value" pairs):
 
         plotItem.replot() # must be called NOW, and NOT earlier !
 
+
+
         return plotItem
 
     def _remove_axis_(self, plotItem:pg.PlotItem):
@@ -11072,6 +11114,8 @@ Var-keyword parameters ("name=value" pairs):
 
         if self.currentAxis == plotItem:
             self.currentAxis = self.axes[0] if len(self.axes) else None
+
+        self._selected_plot_data_item_ = None
 
         # if qtutils.isQObjectAlive(plotItem.vb):
         #     vb = plotItem.vb
@@ -11535,7 +11579,18 @@ Var-keyword parameters ("name=value" pairs):
     def _reportMouseCoordinatesInAxis_(self, pos, plotitem):
         if isinstance(plotitem, pg.PlotItem) and qtutils.isQObjectAlive(plotitem):
             if plotitem.sceneBoundingRect().contains(pos):
-                plot_name = plotitem.vb.name
+                if isinstance(plotitem.vb, pg.ViewBox):
+                    plot_name = plotitem.vb.name
+                else:
+                    if plotitem in self.signalAxes:
+                        ndx = self.signalAxes.index(plotitem)
+                        plot_name = f"Axis {ndx}"
+
+                    elif plotitem == self.eventsAxis:
+                        plot_name = "Events axis"
+
+                    elif plotitem == self.spikeTrainsAxis:
+                        plot_name = "Spike Trains Axis"
 
                 entity_text = None
 
@@ -11606,6 +11661,31 @@ Var-keyword parameters ("name=value" pairs):
     def _update_coordinates_viewer_(self):
         self.coordinatesViewer.setPlainText(self._cursor_coordinates_text_)
 
+    @Slot(object, object)
+    def _slot_plotDataItemClicked(self, *args):
+        # NOTE 2026-08-21 15:55:02
+        # see NOTE: 2025-07-14 21:49:57
+        # FIXME: 2026-08-21 17:06:37
+        # not quite right!
+        # print(f"{self.__class__.__name__}._slot_plotDataItemClicked({args})")
+        pci, evt = args
+        # print(f"{self.__class__.__name__}._slot_plotDataItemClicked -> pci = {pci} -> view={pci.getViewWidget()}")
+        # print(f"\n\tcurve item parent: {pci.parent()}")
+        if (
+            isinstance(pci, pg.PlotCurveItem)
+            and qtutils.isQObjectAlive(pci)
+            and self.selectedAxis is not None
+            ):
+            pdis = self.getAxisDataCurves(self.selectedAxis)
+            selectedpdi = None
+
+            for pdi in pdis:
+                if pci in (pdi.curve, pdi.scatter):
+                    selectedpdi = pdi
+                    break
+
+            self._selected_plot_data_item_ = selectedpdi
+
     @Slot(object)
     @safewrapper
     def _slot_mouseClickSelectPlotItem(self, evt):
@@ -11644,6 +11724,8 @@ Var-keyword parameters ("name=value" pairs):
             for ax in self.axes:
                 self._setAxisIsActive(ax, False)
 
+        self._selected_plot_data_item_ = None
+
     @safewrapper
     def clearEpochs(self):
         self._plotEpochs_()
@@ -11659,6 +11741,7 @@ Var-keyword parameters ("name=value" pairs):
         # print(f"{self.__class__.__name__}.clear()")
         self._selected_plot_item_ = None
         self._selected_plot_item_index_ = -1
+        self._selected_plot_data_item_ = None
         self._hovered_plot_item_ = None
 
         for axis in self.axes:
@@ -11692,15 +11775,6 @@ Var-keyword parameters ("name=value" pairs):
         self.linkedCrosshairCursors = []
         self.linkedHorizontalCursors = []
         self.linkedVerticalCursors = []
-#         if not keepCursors:
-#             self._crosshairSignalCursors_.clear() # a dict of SignalCursors mapping str name to cursor object
-#             self._verticalSignalCursors_.clear()
-#             self._horizontalSignalCursors_.clear()
-#             self._cached_cursors_.clear()
-#
-#             self.linkedCrosshairCursors = []
-#             self.linkedHorizontalCursors = []
-#             self.linkedVerticalCursors = []
 
         self.signalNo = 0
         self.frameIndex = [0]
@@ -11749,6 +11823,9 @@ Var-keyword parameters ("name=value" pairs):
 
     def clearAxes(self):
         self._clear_lris_()
+        self._selected_plot_item_ = None
+        self._selected_plot_item_index_ = -1
+        self._selected_plot_data_item_ = None
         for ax in self.axes:
             self.removeTargetsOverlay(ax)
             self.removeCurveOverlays(ax)
@@ -11998,9 +12075,9 @@ Var-keyword parameters ("name=value" pairs):
         r"""Alias to cursors and signalCursors properties"""
         return self.cursors
 
-    @property
-    def selectedAxis(self):
-        return self._selected_plot_item_
+    # @property
+    # def selectedAxis(self):
+    #     return self._selected_plot_item_
 
     # aliases to setData
     plot = setData
@@ -12192,3 +12269,24 @@ Var-keyword parameters ("name=value" pairs):
 
     def _get_multi_axis_cursors(self) -> list:
         return [c for c in self._data_cursors_.values() if c.hostItem is self.signalsLayout.scene()]
+
+    def _get_axis_data_curves_(self, ax, axNdx, frame) -> list:
+        items = [i for i in ax.items if isinstance(i, pg.PlotDataItem)]
+        if (axNdx in self._curve_overlays_
+            and isinstance(self._curve_overlays_[axNdx], dict)
+            and frame in self._curve_overlays_[axNdx]):
+            items = list(
+                            filter(
+                                    lambda i: i not in self._curve_overlays_[axNdx][frame],
+                                    items
+                                  )
+                        )
+
+        return items
+
+    def getAxisDataCurves(self, axis) -> list:
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+        return self._get_axis_data_curves_(axis, axNdx, self.currentFrame)
+
+    def getDataCurvesInSelectedAxis(self) -> list:
+        return getAxisDataCurves(self.selectedAxis)

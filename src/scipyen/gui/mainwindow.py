@@ -10598,47 +10598,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             # will raise exception if varname not in workspace
             self.console.execute(varname)
 
-    # , useSignalViewerForNdArrays=True):
-    def viewVar(self, varname, newWindow=False, winType=None,
-                askForParams=False):
-        r"""Displays a variable in the workspace.
-        The variable is selected by its name
-        """
-        # print(f"{self.__class__.__name__}.viewVar({varname}, newWindow={newWindow})")
-        if varname in self.workspace.keys():
-            if varname is None:
-                return False
-
-            obj = self.workspace[varname]
-            # print(f"-> obj is a {type(obj).__name__}")
-
-            # NOTE: 2022-12-22 09:59:02
-            # The following three checks are here to avoid launching a viewer for a
-            # scalar numpy array or nuemric object, or for a sequence with one element
-            #
-            if isinstance(obj, np.ndarray):
-                if obj.size < 2 or obj.ndim == 0:
-                    return False
-
-            if isinstance(obj, numbers.Number):
-                return False
-
-            # NOTE: 2026-06-13 22:12:57
-            # see NOTE: 2026-06-13 22:12:18
-            #
-
-            # if isinstance(obj, (tuple, list, collections.deque)) or hasattr(obj, "__iter__") or hasattr(obj, "__len__"):
-            #     if not isinstance(obj, NeoObjectList):
-            #         if len(obj) < 1:
-            #             return False
-
-            return self.viewObject(obj, varname,
-                                   winType=winType,
-                                   newWindow=newWindow,
-                                   askForParams=askForParams)
-
-        return False
-
     # @Slot(QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>")
     @Slot()
     def slot_fileSystemDataChanged(self, *args, **kwargs): # TODO 2023-09-27 22:43:52 revisit this
@@ -10789,7 +10748,36 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                     for i in changedItems:
                         self._monitoredDirsCache_[d][i] = i.stat()
 
+    def viewVar(self, varname, newWindow=False, winType=None,
+                askForParams=False):
+        r"""Displays a variable present in the workspace.
+        The variable is selected by its name;
+        eventually calls self.viewObject(…)
+        """
+        # print(f"{self.__class__.__name__}.viewVar({varname}, newWindow={newWindow})")
+        if varname in self.workspace:
+            if varname is None:
+                return False
 
+            obj = self.workspace[varname]
+            # print(f"-> obj is a {type(obj).__name__}")
+
+            # NOTE: 2022-12-22 09:59:02
+            # The following checks are here to avoid launching a viewer for a
+            # scalar numpy array or numeric object, or for a sequence with one element
+            #
+            if isinstance(obj, np.ndarray) and (obj.size < 2 or obj.ndim == 0):
+                return False
+
+            if isinstance(obj, numbers.Number):
+                return False
+
+            return self.viewObject(obj, varname,
+                                   winType=winType,
+                                   newWindow=newWindow,
+                                   askForParams=askForParams)
+
+        return False
 
     def viewObject(self, obj, objname, winType=None,
                    newWindow=False, askForParams=False):
