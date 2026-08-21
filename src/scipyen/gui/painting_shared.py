@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*- # noqa
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -79,13 +79,18 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 # PenStyleType._subs_tree():
 #  (typing.Union, tuple, list, int)
 
+# BrushStyleType = (int, QtCore.Qt.BrushStyle, QtGui.QGradient,
+#                               QtGui.QBitmap, QtGui.QPixmap, QtGui.QImage)
 BrushStyleType = typing.Union[int, QtCore.Qt.BrushStyle, QtGui.QGradient,
                               QtGui.QBitmap, QtGui.QPixmap, QtGui.QImage]
 
+# PenStyleType = (tuple, list, QtCore.Qt.PenStyle, int)
 PenStyleType = typing.Union[tuple, list, QtCore.Qt.PenStyle, int]
 
+# FontStyleType = (int, QtGui.QFont.Style)
 FontStyleType = typing.Union[int, QtGui.QFont.Style]
 
+# FontWeightType = (int, QtGui.QFont.Weight)
 FontWeightType = typing.Union[int, QtGui.QFont.Weight]
 
 #### BEGIN

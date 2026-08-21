@@ -11670,21 +11670,11 @@ Var-keyword parameters ("name=value" pairs):
         # print(f"{self.__class__.__name__}._slot_plotDataItemClicked({args})")
         pci, evt = args
         # print(f"{self.__class__.__name__}._slot_plotDataItemClicked -> pci = {pci} -> view={pci.getViewWidget()}")
-        # print(f"\n\tcurve item parent: {pci.parent()}")
-        if (
-            isinstance(pci, pg.PlotCurveItem)
-            and qtutils.isQObjectAlive(pci)
-            and self.selectedAxis is not None
-            ):
-            pdis = self.getAxisDataCurves(self.selectedAxis)
-            selectedpdi = None
+        # self.exportDataToWorkspace(pci, "pci", dialog=False)
 
-            for pdi in pdis:
-                if pci in (pdi.curve, pdi.scatter):
-                    selectedpdi = pdi
-                    break
-
-            self._selected_plot_data_item_ = selectedpdi
+        selectedpdi = pci.parentItem()
+        # print(f"\n\tselectedpdi -> {selectedpdi}")
+        self._selected_plot_data_item_ = selectedpdi
 
     @Slot(object)
     @safewrapper
@@ -11724,7 +11714,11 @@ Var-keyword parameters ("name=value" pairs):
             for ax in self.axes:
                 self._setAxisIsActive(ax, False)
 
-        self._selected_plot_data_item_ = None
+        if isinstance(self._selected_plot_data_item_, pg.PlotDataItem):
+            if self._selected_plot_data_item_ not in self._selected_plot_item_.items:
+                self._selected_plot_data_item_ = None
+
+        # self._selected_plot_data_item_ = None
 
     @safewrapper
     def clearEpochs(self):
@@ -12289,4 +12283,4 @@ Var-keyword parameters ("name=value" pairs):
         return self._get_axis_data_curves_(axis, axNdx, self.currentFrame)
 
     def getDataCurvesInSelectedAxis(self) -> list:
-        return getAxisDataCurves(self.selectedAxis)
+        return self.getAxisDataCurves(self.selectedAxis)

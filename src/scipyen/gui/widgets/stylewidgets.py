@@ -1,4 +1,5 @@
 r"""Style widgets
+TODO: 2026-08-21 21:26:00 FIXME BUG all over!!!
 """
 
 import array, os, typing, numbers
@@ -66,7 +67,7 @@ from gui.painting_shared import (make_transparent_bg,
                               ColorPalette,
                               ColorGradient,
                               Brush, Pen,
-                              )
+                              ) # noqa
 
 from gui.quickdialog import QuickDialog
 from .gradientwidgets import GradientDialog
@@ -257,7 +258,8 @@ class PenComboBox(QtWidgets.QComboBox):
             
         else:
             self._styles = standardQtPenStyles
-            if len(customStyles) and all ([isinstance(v, PenStyleType._subs_tree()[1:]) for v in customStyles]):
+            # if len(customStyles) and all ([isinstance(v, PenStyleType._subs_tree()[1:]) for v in customStyles]):
+            if len(customStyles) and all ([isinstance(v, PenStyleType) for v in customStyles]):
                 self._styles.update(customStyles)
             self._internalStyle = QtCore.Qt.SolidLine
             
@@ -267,8 +269,8 @@ class PenComboBox(QtWidgets.QComboBox):
         self.itemDelegate().styling = self._styling
         
         self._addStyles()
-        super().activated[int].connect(self._slotActivated)
-        super().highlighted[int].connect(self._slotHighlighted)
+        super().activated.connect(self._slotActivated)
+        super().highlighted.connect(self._slotHighlighted)
         self.setCurrentIndex(1)
         self._slotActivated(1)
         self.setMaxVisibleItems(13)
@@ -276,31 +278,34 @@ class PenComboBox(QtWidgets.QComboBox):
     @Slot(int)
     @safewrapper
     def _slotActivated(self, index:int):
-        if self.styling == "stroke" and index == 0:
-            from .quickdialog import (QuickDialog, OptionalStringInput)
-            dlg  = QuickDialog(self, "Custom Dash Pattern")
-            namePrompt = OptionalStringInput(dlg, "Name:")
-            dashPrompt = OptionalStringInput(dlg, "Dash style:")
-            dlg.adjustSize()
-            if dlg.exec_():
-                name = namePrompt.text()
-                dash = dashPrompt.text()
-                if len(dash.strip()):
-                    dashes = [eval(x) for x in dash.strip().split(",") if len(x)]
-                    
-                    if all([isinstance(v, numbers.Real) for v in dashes]):
-                        if len(name.strip()):
-                            self._setCustomStyle(name, dashes, True)
-                        else:
-                            self._setCustomStyle("Custom...", dashes, False)
-                            
-                    self.activated[object].emit(self._internalStyle)
-                    
-            return
+        print(f"{self.__class__.__name__}._slotActivated({index})")
+        if isinstance(index, int):
+            if self.styling == "stroke" and index == 0:
+                from .quickdialog import (QuickDialog, OptionalStringInput)
+                dlg  = QuickDialog(self, "Custom Dash Pattern")
+                namePrompt = OptionalStringInput(dlg, "Name:")
+                dashPrompt = OptionalStringInput(dlg, "Dash style:")
+                dlg.adjustSize()
+                if dlg.exec_():
+                    name = namePrompt.text()
+                    dash = dashPrompt.text()
+                    if len(dash.strip()):
+                        dashes = [eval(x) for x in dash.strip().split(",") if len(x)]
 
-        self._internalStyle = self.itemData(index, PenComboDelegate.ItemRoles.PenRole)
-        self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
-        self.activated[object].emit(self._internalStyle)
+                        if all([isinstance(v, numbers.Real) for v in dashes]):
+                            if len(name.strip()):
+                                self._setCustomStyle(name, dashes, True)
+                            else:
+                                self._setCustomStyle("Custom...", dashes, False)
+
+                        self.activated[object].emit(self._internalStyle)
+
+                return
+
+            self._internalStyle = self.itemData(index, PenComboDelegate.ItemRoles.PenRole)
+            self.setToolTip(self.itemData(index, QtCore.Qt.ToolTipRole))
+
+            self.activated[object].emit(self._internalStyle)
 
     @Slot(int)
     @safewrapper
@@ -505,7 +510,8 @@ class BrushComboDelegate(QtWidgets.QAbstractItemDelegate):
         #### Draw brush
         brushStyle = index.data(self.ItemRoles.BrushRole)
         painter.setPen(QtCore.Qt.transparent)
-        if isinstance(brushStyle, BrushStyleType._subs_tree()[1:]):
+        # if isinstance(brushStyle, BrushStyleType._subs_tree()[1:]):
+        if isinstance(brushStyle, BrushStyleType):
             if isinstance(brushStyle, QtGui.QGradient):
                 g = scaleGradient(brushStyle, innerRect)
                 brush = QtGui.QBrush(g)
@@ -665,7 +671,8 @@ class BrushComboBox(QtWidgets.QComboBox):
             
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.setPen(QtCore.Qt.transparent)
-        if isinstance(self._internalStyle, BrushStyleType._subs_tree()[1:]):
+        # if isinstance(self._internalStyle, BrushStyleType._subs_tree()[1:]):
+        if isinstance(self._internalStyle, BrushStyleType):
             if isinstance(self._internalStyle, QtGui.QGradient):
                 g = scaleGradient(self._internalStyle, frame) 
                 self._brush = QtGui.QBrush(g)
@@ -801,7 +808,8 @@ class BrushComboBox(QtWidgets.QComboBox):
             self.setItemData(k, name, QtCore.Qt.ToolTipRole)
             
     def _setCustomStyle(self, name:str, value:typing.Union[BrushStyleType, QtGui.QPixmap, QtGui.QImage, QtGui.QGradient]):
-        if not isinstance(value, BrushStyleType._subs_tree()[1:]): #and not isinstance(value, (QtGui.QPixmap, QtGui.QImage, QtGui.QGradient)):
+        # if not isinstance(value, BrushStyleType._subs_tree()[1:]): #and not isinstance(value, (QtGui.QPixmap, QtGui.QImage, QtGui.QGradient)):
+        if not isinstance(value, BrushStyleType): #and not isinstance(value, (QtGui.QPixmap, QtGui.QImage, QtGui.QGradient)):
             return
         self._customStyles[name] = value # adds or changes
         self._update_styles_()
