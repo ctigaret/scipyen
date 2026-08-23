@@ -3750,6 +3750,49 @@ See also:
 
     return result
 
+def pad_signal(sig: neo.AnalogSignal | DataSignal, extent: int | pq.Quantity,
+               value: float | None = None, left: bool = False):
+
+    if isinstance(extent, pq.Quantity):
+        if extent.units != sig.times.units:
+            if scq.unitsConvertible(extent, sig.times):
+                extent = extent.recale(sig.times.units)
+            else:
+                raise TypeError(f"'extent' units ({extent.units}) are incompatible with the signal's domain units ({sig.times.units})")
+
+        extent = int(extent * sig.sampling_rate.rescale(1/sig.times.units))
+
+    channel_pads = list()
+    for channel in range(sig.shape[1]):
+        if value is None:
+            sig_channel = sig[:, channel]
+            value = float(sig_channel[0][0].magnitude) if left is True else float(sig_channel[-1][0].magnitude)
+
+        channel_pads.append(np.array([[value]*extent]).T)
+
+    if len(channel_pads) > 1:
+        padding = np.concatenate(*channel_pads, axis=1)
+    else:
+        padding = channel_pads[0]
+
+        # print(f"padding shape = {padding.shape}, sig shape = {sig.shape}")
+
+    if left:
+        padding_sig = type(sig)(padding, units = sig.units,
+                                t_start = sig.t_start-extent*sig.sampling_period,
+                                sampling_period = sig.sampling_period)
+
+        ret = concatenate_signals(padding_sig, sig, axis=0)
+
+    else:
+        padding_sig = type(sig)(padding, units = sig.units,
+                                t_start = sig.t_stop,
+                                sampling_rate = sig.sampling_rate)
+
+        ret = concatenate_signals(sig, padding_sig, axis=0)
+
+    return ret
+
 
 @safewrapper
 def concatenate_signals( *args,  axis: int = 1, ignore_domain: bool = False,

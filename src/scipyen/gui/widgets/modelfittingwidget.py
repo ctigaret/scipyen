@@ -536,10 +536,19 @@ Named Parameters:
         if val.size == 0:
             raise ValueError("Received an empty signal!")
 
-        start = val.t_start
-        duration = val.duration
-        samplingRate = val.sampling_rate
-        waveformUnits = val.units
+        if isinstance(val, (neo.AnalogSignal, DataSignal)):
+            start = val.t_start
+            if scq.checkTimeUnits(start):
+                duration = duration.rescale(start.units)
+            duration = val.duration
+            samplingRate = val.sampling_rate
+            waveformUnits = val.units
+
+        else:
+            start = 0.0 * pq.dimensionless
+            duration = val.shape[0] * pq.dimensionless
+            sampling_rate = val.shape[0]/duration
+            waveformUnits = pq.dimensionless
 
         if val.ndim == 1 or (val.ndim==2 and val.shape[1] > 0):
             self._dataChannel_ = 0
@@ -551,7 +560,6 @@ Named Parameters:
             self.fitDataPushButton.setEnabled(True)
 
         elif val.ndim == 2:
-
             if self._dataChannel_ < -val.shape[1]:
                 self._dataChannel_ = -val.shape[-1]
 
@@ -922,7 +930,7 @@ Named Parameters:
     def generateWaveform(self, fitted:bool = False) -> neo.basesignal.BaseSignal | None:
         r"""Generates curve for the model using intial or the fitted coefficients.
     """
-        from gui.guiutils import getScipyenMainWindow
+        # from gui.guiutils import getScipyenMainWindow
 
         if not isinstance(self._model_, types.FunctionType) or not models.isModelFunction(self._model_):
             return
@@ -1259,6 +1267,12 @@ Named Parameters:
         if isinstance(self._fitResult_, types.SimpleNamespace):
             varname = f"{self._model_name_}_fitResult" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "fitResult"
 
+            ancestorWindow = getEnclosingQMainWindow(self)
+            if isinstance(ancestorWindow, WorkspaceGuiMixin):
+                ancestorWindow.exportDataToWorkspace(self._fitResult_, varname,
+                                                     title="Export Fitt Result")
+            else:
+                getScipyenMainWindow().assignToWorkspace(varname, self._fitResult_)
     @Slot()
     def _slot_makeUnitAmplitudeModel(self):
         # TODO 2026-05-06 11:49:36 FIXME
