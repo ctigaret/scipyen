@@ -1249,6 +1249,8 @@ Returns:
 WARNING: Since 2025-05-19 12:09:54 the second element in the tuple is a
 types.SimpleNamespace, and NOT a collections.OrderedDict anymore!
 
+CHANGE 2026-08-23 22:16:42 ModelFunction is now a function, NOT its name
+
 A tuple: (fitted curve, types.SimpleNamespace) where:
 
 • fitted curve is the realization of the model in `func` using the fitted
@@ -1256,7 +1258,7 @@ A tuple: (fitted curve, types.SimpleNamespace) where:
 
 • the types.SimpleNamespace contains the following fields:
 
-    ModelFunction   ↦ str, `func` module.name
+    ModelFunction   ↦ function
     Fit             ↦ scipy.optimize.OptimizeResult, the fit result output
                         by scipy.optimize.least_squares
     Coefficients    ↦ a types.SimpleNamespace, containing:
@@ -1527,9 +1529,12 @@ A tuple: (fitted curve, types.SimpleNamespace) where:
     # result = collections.OrderedDict()
     # NOTE: 2025-05-18 10:05:48 switching to SimpleNamespace
     # TODO: 2025-05-18 10:06:06 propagate this to other fit_* functions in this module
-    result = types.SimpleNamespace({"ModelFunction": f"{func.__module__}.{func.__name__}",
+    result = types.SimpleNamespace({"ModelFunction": func,
                                    "Fit": res,
                                    "Coefficients": coefficients})
+    # result = types.SimpleNamespace({"ModelFunction": f"{func.__module__}.{func.__name__}",
+    #                                "Fit": res,
+    #                                "Coefficients": coefficients})
     
     initialSupport = np.full((data.shape[0],), np.nan)
     

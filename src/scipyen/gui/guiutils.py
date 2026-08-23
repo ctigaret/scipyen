@@ -505,6 +505,29 @@ def get_font_weight(val:typing.Union[str, FontWeightType]) -> typing.Union[int, 
         return QtGui.QFont.Normal
 
 
+def getEnclosingQMainWindow(obj: QtWidgets.QWidget) -> QtWidgets.QMainWindow | None:
+    r"""Retrieves the highest level QMainWindow that contains this object.
+    This may be:
+    * the object itself, if the object is a QMainWindow, or a QWidget without
+    parent (in which case the system's window manager automatically encloses
+    the widget in a window instance)
+    * the object's immediate parent, if the parent is a QMainWindow
+    * the window enclosing all the parent hierarchy of this object
+    """
+    if not isinstance(obj, QtWidgets.QWidget):
+        return
+
+    parent = obj.parent()
+    if parent is None or isinstance(obj, QtWidgets.QMainWindow):
+        topW = obj
+
+    while isinstance(parent, QtWidgets.QWidget):
+        topW = parent
+        parent = parent.parent()
+
+    if isinstance(topW, QtWidgets.QMainWindow):
+        return topW
+
 def treeWidgetItems(tree: QtWidgets.QTreeWidget):
     r"""Generator that iterates the QTreeWidgetItems in a QTreeWidget 'tree'
     """

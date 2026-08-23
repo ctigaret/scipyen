@@ -82,6 +82,9 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         the widget in a window instance)
         * the object's immediate parent, if the parent is a QMainWindow
         * the window enclosing all the parent hierarchy of this object
+
+        NOTE: 2026-08-23 22:34:06 DEPRECATED
+        To be replaced with guituils.getEnclosingQMainWindow
         """
         parent = self.parent()
         if parent is None:

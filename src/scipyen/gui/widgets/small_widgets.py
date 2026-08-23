@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2022-2026 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-r"""
+r"""Small widgets
 """
 
 import typing, warnings, math, cmath, os, traceback, dataclasses, sys # noqa
@@ -56,6 +55,7 @@ from core import qtutils
 from core import prog
 from core.prog import scipywarn
 from core import datatypes as dt
+from core import utilities
 from iolib.navigation.navigator import UrlNavigatorButtonBase
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -549,6 +549,8 @@ class LineEdit(QtWidgets.QLineEdit):
 
         self._old_text_: str = ""
 
+        # self.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Fixed)
+
     def value(self) -> str:
         self._variable_ = super().text()
         return self._variable_
@@ -1020,7 +1022,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         # super().lineEdit().sig_textChanged.connect(self._slot_valueTextChanged)
 
-        self.setFocusPolicy(QtCore.Qt.StrongFocus)
+        # self.setFocusPolicy(QtCore.Qt.StrongFocus)
+
+        self.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Fixed)
+
+    # def sizeHint(self):
+    #     return QtCore.QSize()
 
     @property
     def fixSingleStep(self) -> bool:
@@ -1031,6 +1038,33 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self._fixSingleStep_ = val is True
 
     @property
+    def magnitude(self):
+        return self._magnitude_
+
+    def getMagnitude(self):
+        return self.magnitude
+
+    @magnitude.setter
+    def magnitude(self, val):
+        if isinstance(val, (float, np.floating, int, np.integer)):
+            self._magnitude_ = val
+
+        elif isinstance(val, np.ndarray):
+            if val.ndim > 0:
+                raise ValueError("Only 0-dimensional arrays are supported")
+
+            if isinstance(val, pq.Quantity):
+                val = val.magnitude
+
+            self._magnitude_ = float(val)
+
+        else:
+            raise TypeError(f"Unsupported value type: {type(val).__name__}")
+
+    def setMagnitude(self, val):
+        self.magnitude = val
+
+    @property
     def units(self) -> pq.Quantity:
         if not (self._keepDimensionless_ or self._forceDimensionless_):
             return self._units_
@@ -1039,10 +1073,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         return self.units
 
     @units.setter
-    def units(self, value:typing.Optional[pq.Quantity] = None):
+    def units(self, value: pq.Quantity | None = None):
         self.setUnits(value)
 
-    def setUnits(self, value:typing.Optional[pq.Quantity] = None):
+    def setUnits(self, value: pq.Quantity | None = None):
         if self._keepDimensionless_ or self._forceDimensionless_:
             return
 
@@ -1113,12 +1147,16 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
     @Slot(str)
     def _slot_valueTextChanged(self, s:str):
+        # print(f"{self.__class__.__name__}._slot_valueTextChanged({s!r}) -> valid: {self._validText_}")
         if self._validText_ == QtGui.QValidator.Acceptable:
             try:
                 val = self.valueFromText(s)
+                # print(f"\n -> val {val}")
                 if isinstance(val, (pq.Quantity, float, np.floating)):
                     self._magnitude_ = float(val)
                     self.sig_valueChanged.emit(self.value())
+
+                # print(f"\n -> magnitude {self._magnitude_} -> value: {self.value()}")
 
             except: # noqa
                 traceback.print_exc()
@@ -1388,6 +1426,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         event.accept()
 
     def valueFromText(self, text:str) -> float | pq.Quantity:
+        # print(f"{self.__class__.__name__}.valueFromText({text})")
         suffix = self._suffix_
         prefix = self._prefix_
         s = text
@@ -1431,6 +1470,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         return ret
 
     def textFromValue(self, value:typing.Union[float, pq.Quantity, np.ndarray]):
+        # print(f"{self.__class__.__name__}.textFromValue({value})")
+        # print(f"\n my value is {self.value()} with magnitude {self._magnitude_} and units {self._units_}")
+
         if isinstance(value, (pq.Quantity, np.ndarray)):
             if value.size > 1:
                 return "NA"
@@ -1449,14 +1491,9 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
             fval = float(value.magnitude)
 
-            if np.isnan(fval):
-                ret = "NaN"
+            # print(f"\n fval = {fval}")
 
-            elif np.isinf(fval):
-                ret = "-Inf" if fval in (-np.inf, -math.inf) else "Inf"
-
-            else:
-                ret = f"{fval:.{self.decimals}}"
+            ret = utilities.repr_val(fval, self.decimals)
 
             if len(prefix):
                 ret = f"{prefix} {ret}"
@@ -1464,76 +1501,68 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             if len(suffix):
                 ret = f"{ret} {suffix}"
 
+            # print(f"\n ret -> {ret}")
+
             return ret
 
-        elif isinstance(value, float):
-            if np.isnan(value):
-                ret = "NaN"
+        elif isinstance(value, (float, np.floating)):
+            ret = utilities.repr_val(value, self.decimals)
 
-            elif np.isinf(value):
-                ret = "-Inf" if value == -np.inf else "Inf"
-
-            else:
-                ret = f"{value:.{self.decimals}}"
-
+            # print(f"\n ret -> {ret}")
             return ret
 
         else:
             return "NA"
 
-    def setValue(self, value:typing.Union[pq.Quantity, float, int, type(pd.NA)]):
+    def setValue(self, value: (pq.Quantity, float, int, type(pd.NA))):
         r"""Also allows changing the units if not convertible to current ones.
         Otherwise the value will be rescaled to current units.
     WARNING: This is different from the case when new units are chosen while
     self.rescaleOnUnitChange is True.
     """
-        # from core.regexps import SCIENTIFIC_NUMBER_FORMAT_MATCH
-
         if isinstance(value, pq.Quantity):
             if value.size > 1:
                 # return # Only scalar quantities are allowed
-                raise TypeError("Only scalar quantities are allowed; Quantity arrays should have size 1")
+                raise TypeError("Only scalar and 0-dimensional Quantity arrays are supported")
 
             fval = float(value.magnitude.flatten()[0])
 
-            if not (self._keepDimensionless_ or self._forceDimensionless_):
-                if value.units != self.units:
-                    if scq.unitsConvertible(self.units, value.units):
-                        if fval > -math.inf and fval < math.inf:
-                            fval = float(value.rescale(self.units).magnitude)
-                    else:
-                        self.units = value.units
+            if not (self._keepDimensionless_ or self._forceDimensionless_) and value.units != self.units:
+                # when NOT in a dimensionless world, if the new value has
+                # different units:
+                #   if the new units are convertible to the current units =>
+                #       RESCALE the new value so that units are preserved
+                #   else =>
+                #       just adopt the new units, AND the new value as supplied
+                if scq.unitsConvertible(self.units, value.units):
+                    if fval > -math.inf and fval < math.inf:
+                        fval = float(value.rescale(self.units).magnitude)
+                else:
+                    self.units = value.units
 
             self._magnitude_ = fval
 
-        elif value is pd.NA or value in(math.nan, np.nan):
+        elif (
+                value is pd.NA
+                or isinstance(value, (int, float, np.integer, np.floating))
+                # or np.isnan(value) # NOTE: np.nan, math.nan are floats!
+                ):
             self._magnitude_ = value
-            self.units = None
-
-        elif isinstance(value, float):
-            self._magnitude_ = value
-            self.units = None
-
-        elif isinstance(value, int):
-            self._magnitude_ = float(value)
-            self.units = None
-
-        elif isinstance(value, (np.float64, np.int64)):
-            self._magnitude_ = float(value)
             self.units = None
 
         elif isinstance(value, np.ndarray):
-            if not issubclass(value.dtype.type, np.floating):
-                raise TypeError(f"Only floating point arrays; instead, got {value.dtype.type}")
+            if not issubclass(value.dtype.type, (np.integer, np.floating)):
+                raise TypeError(f"Unsupported dtype {value.dtype.type}")
 
             if value.size > 1:
-                raise TypeError("Only scalar values are allowed; arrays should have size 1")
+                raise TypeError("Only 0-dimensional arrays are supported")
 
             self._magnitude_ = value.flatten()[0]
 
         else:
             raise ValueError(f"Incompatible value: {value} ({type(value).__name__})")
 
+        # print(f"{self.__class__.__name__}.setValue({value}) =>\n self._magnitude_ -> {self._magnitude_}\n self._units_ -> {self._units_}")
 
         self._update_()
 
@@ -1543,7 +1572,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         # signalBlockers = list(map(QtCore.QSignalBlocker, (self, self.lineEdit())))
         with qtutils.SignalBlocker((self, self.lineEdit())):
             if self._magnitude_ is pd.NA:
-                self.setMinimum(-math.inf)
+                # self.setMinimum(-math.inf)
                 specialText = r"NA"
                 text = specialText
 
@@ -1555,8 +1584,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 if len(self._suffix_):
                     text = f"{text} {self._suffix_}"
 
-            elif self._magnitude_ in (math.nan, np.nan):
-                self.setMinimum(-math.inf)
+            elif np.isnan(self._magnitude_): # in (math.nan, np.nan):
+                # self.setMinimum(-math.inf)
                 specialText = r"NaN"
                 text = specialText
                 self._specialValueText_ = specialText
@@ -1581,9 +1610,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                     # the next line formats self._magnitude_ according to the number of decimals
                     # HOWEVER, this does NOT work when the generated text is in scientific format
                     # e.g., '1e-8'
-                    text = f"{self._magnitude_:.{self.decimals+1}}"
+                    text = utilities.repr_val(self._magnitude_, self.decimals)
+                    # text = f"{self._magnitude_:.{self.decimals+1}}"
 
                     mantissa, exponent, decimals = strutils.parse_sci_string(text)
+
+                    # print(f"{self.__class__.__name__}._update_ -> mantissa {mantissa}, exponent {exponent}, decimals {decimals}")
 
                     if exponent != 0:
                         sign = "+" if exponent > 0 else "" # '-' wil be automatically inserted by Python library
@@ -1621,8 +1653,19 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             else:
                 raise TypeError(f"_magnitude_ expected to be a scalar quantity, a float or pd.NA; instead, got {type(self._magnitude_).__name__}")
 
-            super().setDecimals(self._decimals_)
+            # ### BEGIN ATTENTION super() object and held value
+            #
+            # CAUTION: 2026-08-23 16:57:25
+            # The super() QDoubleSpinBox calls textFromValue internally, which
+            # will OVERWRITE the value
+            # Hence I need to set the value of the super() object BEFORE
+            # anything else !!!
+            #
             super().setValue(self._magnitude_)
+            #
+            # ### END   ATTENTION super() object and held value
+
+            super().setDecimals(self._decimals_)
             super().setSpecialValueText(self._specialValueText_)
             self.lineEdit().setText(text)
 

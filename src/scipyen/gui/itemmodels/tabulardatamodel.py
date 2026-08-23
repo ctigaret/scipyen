@@ -301,13 +301,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         r"""Set a new data with the specified role, at the specified model index in this model.
     Overrides QtCore.QAbstractTableModel.setData
     """
+        # print(f"{self.__class__.__name__}.setData(..., value={value}, role={role})")
         if self._modelData_ is None:
             return False
 
         row = modelIndex.row()
         col = modelIndex.column()
 
-        if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole):
+        if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, ObjectDataRole):
             return False
 
         if self._setDataValue_(value, row, col):
@@ -1240,6 +1241,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     def _setDataValue_(self, value, row, col):
         r"""Sets the EditRole data for the row & column in the tabular model"""
+        # print(f"{self.__class__.__name__}._setDataValue_({value}, row={row}, col={col})")
         if self._modelData_ is None:
             return False
 

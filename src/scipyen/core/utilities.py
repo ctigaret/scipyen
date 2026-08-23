@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -8,17 +7,17 @@
 '''
 Various utilities
 '''
-import traceback, re, itertools, functools, time, typing, types, warnings # noqa
-import operator, inspect, random, math, pprint, datetime, pathlib, sys, os # noqa
+import traceback, re, itertools, functools, time, typing, types, warnings
+import operator, inspect, random, math, pprint, datetime, pathlib, sys, os
 import enum
-import collections, collections.abc, dataclasses # noqa
+import collections, collections.abc, dataclasses
 import numbers
 from numbers import Number # noqa
 from sys import (getsizeof, stderr)
 from copy import (copy, deepcopy,) # noqa
-from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction, # noqa
+from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
                      isgeneratorfunction, iscoroutinefunction,
-                     iscoroutine, isawaitable, isasyncgenfunction, # noqa
+                     iscoroutine, isawaitable, isasyncgenfunction,
                      isasyncgen, istraceback, isframe, 
                      isabstract, ismethoddescriptor, isdatadescriptor,
                      isgetsetdescriptor, ismemberdescriptor,
@@ -26,9 +25,11 @@ from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction, # noqa
                      )
 from functools import (partial, partialmethod, reduce, singledispatch) # noqa
 from itertools import chain
-from collections import deque, OrderedDict
+from collections import deque, OrderedDict # noqa
 from dataclasses import MISSING
 import numpy as np
+import pandas as pd
+import quantities as pq
 import sympy
 import PIL
 from PIL.Image import Image as PILImage
@@ -48,15 +49,13 @@ except: # noqa
 # NOTE: SpikeTrainList is a ObjectList in recent nwo versions
 if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList
-    
+
 else:
     NeoObjectList = list # alias for backward compatibility :(
-import pandas as pd
-import quantities as pq
-from core.vigra_patches import vigra
-import pyqtgraph # for their own eq operator
-import matplotlib as mpl
-from tribool import Tribool
+from core.vigra_patches import vigra # noqa
+import pyqtgraph  # noqa # for their own eq operator
+import matplotlib as mpl # noqa
+from tribool import Tribool # noqa
 #import language_tool_python
 
 import qtpy # noqa
@@ -209,7 +208,7 @@ class SafeComparator(object):
             
             return ret ## good fallback, though potentially expensive
         
-        except Exception as e:
+        except Exception: # noqa
             #traceback.print_exc()
             #print("x:", x)
             #print("y:", y)
@@ -348,7 +347,7 @@ def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbe
     ret = len(x) == len(y)
     
     if ret:
-        ret &= reduce(operator.and_, (comparator(x_, y_) for (x,y) in zip(x,y)))
+        ret &= reduce(operator.and_, (comparator(x_, y_) for (x_, y_) in zip(x,y)))
         
     return ret
 
@@ -358,7 +357,7 @@ def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbe
     
     # use for comparisons between mapping values
     simp_fun = partial(is_same_as, rtol=rtol, atol=atol, 
-                       use_math=use_math, equal_nan=eual_nan,
+                       use_math=use_math, equal_nan=equal_nan,
                        comparator = comparator)
         
     if comparator is isclose:
@@ -484,11 +483,8 @@ def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbe
         y = y.magnitude
 
     if use_math:
-        if all(v is math.nan or v is np.nan for v in (x,y)):
-            return True
-        
-        return False
-    
+        return all(math.isnan(v) or np.isnan(v) for v in (x,y))
+
     return f_isclose(x,y)
 
 @isclose.register(pq.Quantity)
@@ -517,10 +513,8 @@ def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbe
     if use_math:
         # emulate equal_nan for math.isclose
         # NOTE: math.isclose operates only on scalars x and y
-        if all(v in (math.nan, np.nan) for v in (x,y)):
-            if equal_nan:
-                return True
-            return False
+        ret = all(math.isnan(v) or np.isnan(v) for v in (x,y))
+        return ret and equal_nan
     
     return f_isclose(x,y)
 
@@ -558,7 +552,7 @@ def hashiterable(x:typing.Iterable[typing.Any]) -> int:
         
     """
     if not hasattr(x, "__iter__"):
-        raise TypeError("Expecting an iterable; got %s instead" % type(x).__name__)
+        raise TypeError(f"Expecting an iterable; got {type(x).__name__} instead")
     
     # NOTE: 2021-08-21 10:02:46 FIXME
     # ATTENTION:
@@ -5245,68 +5239,114 @@ def sympygraph(s:sympy.Basic) -> GraphSource:
     
 
 @singledispatch
-def repr_val(val, decimals: int | None = None):
+def repr_val(val,  decimals: int | None = None, scientific: bool = False):
     return f"{val}"
 
 @repr_val.register(bool)
-def _repr_val_(val: bool, _):
+def _repr_val_(val: bool, _: int | None = None, __: bool = False):
     return "True" if val is True else "False"
 
 @repr_val.register(Tribool)
-def _repr_val_(val: Tribool, _):
+def _repr_val_(val: Tribool, _: int | None = None, __: bool = False): # noqa
     return "True" if val.value is True else "False" if val.value is False else ""
 
 @repr_val.register(float)
 @repr_val.register(np.floating)
-def _repr_val_(val: float | np.floating, decimals: int | None = None):
+def _repr_val_(val: float | np.floating,  # noqa
+               decimals: int | None = None, scientific: bool = False):
     if decimals is None:
-        return np.format_float_positional(val)
-
-    return np.format_float_positional(val, precision=decimals, unique=False)
+        if scientific is True:
+            return np.format_float_scientific(val)
+        else:
+            return np.format_float_positional(val)
+    else:
+        if scientific is True:
+            return np.format_float_scientific(val, precision=decimals, unique=False)
+        else:
+            return np.format_float_positional(val, precision=decimals, unique=False)
 
 @repr_val.register(complex)
 @repr_val.register(np.complexfloating)
-def _repr_val_(val: complex | np.complexfloating, decimals: int | None = None):
+def _repr_val_(val: complex | np.complexfloating,  # noqa
+               decimals: int | None = None, scientific: bool = False):
     if decimals is None:
-        rval = np.format_float_positional(val.real)
-        ival = np.format_float_positional(val.imag)
+        if scientific is True:
+            rval = np.format_float_scientific(val.real)
+            ival = np.format_float_scientific(val.imag)
+        else:
+            rval = np.format_float_positional(val.real)
+            ival = np.format_float_positional(val.imag)
 
     else:
-        rval = np.format_float_positional(val.real, precision=decimals, unique=False)
-        ival = np.format_float_positional(val.imag, precision=decimals, unique=False)
+        if scientific is True:
+            rval = np.format_float_scientific(val.real, precision=decimals, unique=False)
+            ival = np.format_float_scientific(val.imag, precision=decimals, unique=False)
+        else:
+            rval = np.format_float_positional(val.real, precision=decimals, unique=False)
+            ival = np.format_float_positional(val.imag, precision=decimals, unique=False)
 
     return f"{rval}+{ival}j"
 
 @repr_val.register(datetime.datetime)
-def _repr_val_(val: datetime.datetime, _: int | None = None):
+def _repr_val_(val: datetime.datetime, _: int | None = None, __: bool = False): # noqa
     return val.isoformat(" ")
 
 @repr_val.register(datetime.date)
 @repr_val.register(datetime.time)
-def _repr_val_(val: (datetime.date, datetime.time), _: int | None = None):
+def _repr_val_(val: (datetime.date, datetime.time), _: int | None = None, __: bool = False): # noqa
     return val.isoformat()
 
 @repr_val.register(enum.Enum)
-def _repr_val_(val: enum.Enum, _: int | None = None):
+def _repr_val_(val: enum.Enum, _: int | None = None, __: bool = False): # noqa
     return f"{val.name}"
 
 @repr_val.register(neo.Event)
-def _repr_val_(val: neo.Event, decimals: int | None = None):
+def _repr_val_(val: neo.Event,  # noqa
+               decimals: int | None = None, scientific: bool = False):
     from core.scipyen_quantities import quantity2str
-    return quantity2str(val.times, decimals)
+    return quantity2str(val.times, decimals, scientific)
 
 @repr_val.register(pq.Quantity)
-def _repr_val_(val: pq.Quantity, decimals: int | None = None):
+def _repr_val_(val: pq.Quantity,  # noqa
+               decimals: int | None = None, scientific: bool= False):
     from core.scipyen_quantities import quantity2str
-    return quantity2str(val, decimals)
+    return quantity2str(val, decimals, scientific)
 
 @repr_val.register(np.ndarray)
-def _repr_val_(val: np.ndarray, decimals: int | None = None):
-    if decimals is None:
-        with np.printoptions(floatmode="unique"):
-            return np.array2string(val)
+def _repr_val_(val: np.ndarray, # noqa
+               decimals: int | None = None, scientific: bool = False):
+    if val.size == 1:
+        # because a 0-dimensional array is still a ndarray,
+        # not a numpy number type!
+        # however, being 0-dimensional, one cannot use array indexing to get to
+        # the first (and only) element; hence it needs to be flattened thus gaining
+        # one dimension, thus allowing index access to the 1st element.
+        val = val.flatten()[0] # now, this MIGHT BE, e.g., a np.floatxx etc
+
+
+        # NOTE: 2026-08-23 17:03:05
+        # can I use the local context statement like next line?
+        # with np.printoptions(nanstr="NaN", infstr="Inf")
+        #
+        if np.isnan(val):
+            return "NaN"
+
+        if np.isinf(val):
+            return "-Inf" if val < 0 else "Inf"
+
+        return repr_val(val, decimals, scientific)
+
     else:
-        with np.printoptions(floatmode="fixed", precision=decimals):
-            return np.array2string(val)
+        if decimals is None:
+            with np.printoptions(floatmode="unique"):
+                return np.array2string(val)
+        else:
+            with np.printoptions(floatmode="fixed", precision=decimals):
+                return np.array2string(val)
+
+@repr_val.register(type(pd.NA))
+def _repr_val_(val, _ = None, __ = False): # noqa
+    return "NA"
+
 
 

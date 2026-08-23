@@ -1197,7 +1197,8 @@ def quantity2str(x:typing.Union[
                     pq.dimensionality.Dimensionality,
                     typing.Sequence[pq.Quantity]
                     ],
-                 precision: typing.Optional[typing.Union[int, str]] = "numpy"):
+                 precision: typing.Optional[typing.Union[int, str]] = "numpy",
+                 scientific: bool = False):
     r"""Returns a str representation of a Dimensionality, Quantity, or Quantity sequence.
 
 .. |nbsp| unicode:: 0xA0
@@ -1228,6 +1229,8 @@ Parameters:
     Passing the ``str`` "numpy" will use the precision determined from numpy package |nbsp|
     (see ``numpy.get_printoptions``). This precision can also be set during the current session |nbsp|
     by calling ``numpy.set_printoptions``.
+
+:scientific: (default False) - onlu used for scalar Quantity objects
 
 .. note::
 
@@ -1269,23 +1272,51 @@ Example 2: Converting a dimensionality:
     if isinstance(x, pq.dimensionality.Dimensionality):
         return x.string
 
-    if precision is None:
-        with np.printoptions(floatmode="unique"):
-            return " ".join([np.array2string(x.magnitude), x.units.dimensionality.string])
+    if x.ndim == 0: # scalar i.e., 0-dimensional array
+        if scientific:
+            format_fn = np.format_float_scientific
+        else:
+            format_fn = np.format_float_positional
 
-    elif precision == "numpy":
-        with np.printoptions(floatmode="fixed"):
-            return " ".join([np.array2string(x.magnitude), x.units.dimensionality.string])
+        if precision is None:
+            return " ".join([
+                format_fn(x.magnitude, unique=True),
+                x.units.dimensionality.string
+                ])
 
-    elif isinstance(precision, int):
-        if precision < 0:
-            raise ValueError("'precision' must be >= 0")
+        elif precision == "numpy":
+            return " ".join([
+                format_fn(x.magnitude, unique=False),
+                x.units.dimensionality.string
+                ])
 
-        with np.printoptions(floatmode="fixed", precision=precision):
-            return " ".join([np.array2string(x.magnitude), x.units.dimensionality.string])
+        elif isinstance(precision, int):
+            return " ".join([
+                format_fn(x.magnitude, precision = precision),
+                x.units.dimensionality.string
+                ])
+
+        else:
+            raise TypeError(f"Invalid precision: expecting an int, the string 'numpy' or None; instead, got {type(precision).__name__}")
 
     else:
-        raise TypeError(f"Invalid precision: expecting an int, the string 'numpy' or None; instead, got {type(precision).__name__}")
+        if precision is None:
+            with np.printoptions(floatmode="unique"):
+                return " ".join([np.array2string(x.magnitude), x.units.dimensionality.string])
+
+        elif precision == "numpy":
+            with np.printoptions(floatmode="fixed"):
+                return " ".join([np.array2string(x.magnitude), x.units.dimensionality.string])
+
+        elif isinstance(precision, int):
+            if precision < 0:
+                raise ValueError("'precision' must be >= 0")
+
+            with np.printoptions(floatmode="fixed", precision=precision):
+                return " ".join([np.array2string(x.magnitude), x.units.dimensionality.string])
+
+        else:
+            raise TypeError(f"Invalid precision: expecting an int, the string 'numpy' or None; instead, got {type(precision).__name__}")
 
 
 

@@ -58,7 +58,8 @@ from gui.widgets.small_widgets import QuantitySpinBox
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 try:
-    from gui.widgets.modelfittingwidget_ui import Ui_ModelFittingWidget
+    # from gui.widgets.modelfittingwidget_ui import Ui_ModelFittingWidget
+    from gui.widgets.ModelFittingWidget_ui import Ui_ModelFittingWidget
 
 except:
     Ui_ModelFittingWidget, _ = loadUiType(os.path.join(__module_path__, "ModelFittingWidget.ui"))
@@ -142,19 +143,20 @@ Named Parameters:
         self._data_:typing.Optional[neo.AnalogSignal | DataSignal] = None
         self._dataChannel_:int = 0
 
-        self._fittedCurve_:typing.Optional[np.ndarray] = None
-        self._fitResult_:typing.Optional[types.SimpleNamespace] = None
-        self._use_fitted_:bool = False
+        self._fittedCurve_: np.ndarray | None = None
+        self._modelWaveform_: np.ndarray | None = None
+        self._fitResult_: types.SimpleNamespace | None = None
+        # self._use_fitted_: bool = False
 
-        self._plot_data_overlaid_:bool = False
+        self._plot_data_overlaid_: bool = False
 
-        self._model_:typing.Optional[types.FunctionType] = None
+        self._model_: types.FunctionType | None = None
 
-        self._model_fit_coefficients_:typing.Optional[pd.DataFrame] = None
+        self._model_fit_coefficients_: pd.DataFrame | None = None
 
-        self._model_name_:typing.Optional[str] = None
-        self._model_expression_svg_:typing.Optional[QtGui.QPixmap] = None
-        self._waveformStart_:typing.Optional[pq.Quantity] = None
+        self._model_name_: str | None = None
+        self._model_expression_svg_: QtGui.QPixmap | None = None
+        self._waveformStart_: typing.Optional[pq.Quantity] = None
         self._waveformDuration_:typing.Optional[pq.Quantity] = None
         self._waveformSamplingRate_:typing.Optional[pq.Quantity] = None
         self._waveformUnits_:typing.Optional[pq.Quantity] = None
@@ -222,6 +224,7 @@ Named Parameters:
         self.removeStarredRowsPushButton.clicked.connect(self._slot_removeRowsForStarredCoeffs)
         self.fitDataPushButton.clicked.connect(self._slot_fitData)
         self.channelSpinBox.valueChanged.connect(self._slot_dataChannelChanged_)
+
         self.pythonHelpPushButton.setEnabled(False)
         self.generateWaveformPushButton.setEnabled(False)
         self.waveformExpressionPushButton.setEnabled(False)
@@ -233,11 +236,16 @@ Named Parameters:
         self.addStarredRowsPushButton.setEnabled(False)
         self.removeStarredRowsPushButton.setEnabled(False)
         self.channelSpinBox.setVisible(False)
+
         self.overlayDataCheckbox.setChecked(self._plot_data_overlaid_)
         self.overlayDataCheckbox.setEnabled(False)
+
         self.overlayDataCheckbox.toggled.connect(self._slot_setDataOverlay_)
         self.modelCoefficientsTable.enforceFloat = False
         self.modelCoefficientsTable.readOnly = False
+
+        self.setAsX0ToolButton.clicked.connect(self._slot_setWaveStartAsX0)
+        self.setAsX0ToolButton.setEnabled(False)
 
         if self._waveformUnits_ is None:
             self.unitsLabel.setText("")
@@ -261,8 +269,14 @@ Named Parameters:
         # print(f"{self.__class__.__name__}._configureUI_: csizes adjusted = {csizes}")
         self.controlsSplitter.setSizes(csizes)
 
+        # self.exportModelWaveformToolButton.setEnabled(False)
+        self.exportModelWaveformToolButton.clicked.connect(self._slot_exportModelWaveform)
+
         self.exportFitResultPushButton.setEnabled(False)
         self.exportFitResultPushButton.clicked.connect(self._slot_exportFitResult)
+
+        self.exportFitCurveToolButton.setEnabled(False)
+        self.exportFitCurveToolButton.clicked.connect(self._slot_exportFittedCurve)
 
     def _setModelData_(self, model:types.FunctionType,
                        data:typing.Optional[neo.AnalogSignal | DataSignal] = None,
@@ -394,6 +408,7 @@ Named Parameters:
         if isinstance(fitting_df, pd.DataFrame):
             self._model_fit_coefficients_ = fitting_df
             self._populateCoefficientsTable_(self._model_fit_coefficients_)
+            self.setAsX0ToolButton.setEnabled("x0" in self._model_fit_coefficients_.index)
 
         self._generateModelExpressionSVG()
 
@@ -472,11 +487,8 @@ Named Parameters:
         worker.deleteLater()
 
     @Slot(str)
-    def _slot_modelExpressionGenerated(self, svg:str|None):
-        # if isinstance(d, dict) and "svg" in d:
-            # print(f"{self.__class__.__name__}._setModelFunction_: {svg_out['svg']} \n is svg: {is_svg(svg_out['svg'])}")
+    def _slot_modelExpressionGenerated(self, svg: str|None):
         self._model_expression_svg_ = svg
-        # print(f"{self.__class__.__name__}._setModelFunction_: self._model_expression_svg_ is svg@ {is_svg(self._model_expression_svg_)}")
         self.svgWidget.setSvg(self._model_expression_svg_)
         if is_svg(self._model_expression_svg_):
             svgSize = self.svgWidget.svgSize()
@@ -489,6 +501,10 @@ Named Parameters:
     @property
     def domain(self) -> np.ndarray|None:
         return self._generateWaveformDomain_()
+
+    @property
+    def modelWaveform(self):
+        return self.generateModelWaveform()
 
     @property
     def model(self) -> types.FunctionType:
@@ -903,7 +919,9 @@ Named Parameters:
 
         return sig
 
-    def generateWaveform(self) -> neo.basesignal.BaseSignal | None:
+    def generateWaveform(self, fitted:bool = False) -> neo.basesignal.BaseSignal | None:
+        r"""Generates curve for the model using intial or the fitted coefficients.
+    """
         from gui.guiutils import getScipyenMainWindow
 
         if not isinstance(self._model_, types.FunctionType) or not models.isModelFunction(self._model_):
@@ -917,7 +935,8 @@ Named Parameters:
                 if "channel_names" not in yData.array_annotations:
                     yData.array_annotate(channel_names = list(map(lambda k: f"Channel {k}", range(yData.shape[1]))))
 
-            if self._use_fitted_:
+            # if self._use_fitted_:
+            if fitted is True:
                 if isinstance(yData, (neo.AnalogSignal, DataSignal)) and isinstance(self._fittedCurve_, np.ndarray) and self._fittedCurve_.shape[0] == yData.shape[0]:
                     name = yData.name
                     if not isinstance(name, str) or len(name.strip()):
@@ -938,15 +957,15 @@ Named Parameters:
                     y_.array_annotate(channel_names = ["Fitted data channel"])
             else:
                 y_ = self.generateModelWaveform()
-                # if self._plot_data_overlaid_:
-                #     y-
 
             # print(f"{self.__class__.__name__}.generateWaveform: yData: {type(yData).__name__}, y_: {type(y_).__name__}")
 
             if isinstance(yData, (neo.AnalogSignal, DataSignal)) and self._plot_data_overlaid_ :
                 sig = neoutils.concatenate_signals(yData, y_, axis=1)
-                if self._use_fitted_:
+                # if self._use_fitted_:
+                if fitted is True:
                     placeHolder = f"{self._model_.title} fit"
+
                 else:
                     placeHolder = f"{self._model_.title} model"
 
@@ -987,7 +1006,7 @@ Named Parameters:
                 else:
                 # if self._waveViewer_ is None:
                     varname = f"{self._model_name_}_waveform" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "model_waveform"
-                    getScipyenMainWindow().assignToWorkspace(varname, sig)
+                    # getScipyenMainWindow().assignToWorkspace(varname, sig)
 
             return sig
 
@@ -1087,12 +1106,20 @@ Named Parameters:
 
     @Slot(bool)
     def _slot_setDataOverlay_(self, val:bool):
-        self._plot_data_overlaid_ = val == True
+        self._plot_data_overlaid_ = val is True
 
     @Slot()
     def _slot_generateWaveform(self):
-        self._use_fitted_ = False
+        # self._use_fitted_ = False
         self.generateWaveform()
+
+    @Slot()
+    def _slot_setWaveStartAsX0(self):
+        x0 = self.startSpinBox.value()
+        if isinstance(x0, pq.Quantity):
+            x0 = float(x0.flatten()[0].magnitude)
+        self._model_fit_coefficients_.loc["x0", "Initial Value"] = x0
+
 
     @Slot(int)
     def _slot_dataChannelChanged_(self, val:int):
@@ -1161,6 +1188,7 @@ Named Parameters:
 
         try:
             self._fittedCurve_, self._fitResult_ = crvf.fit_model(data, self._model_, p0, x = x, bounds=bounds)
+
         except Exception as e:
             print(e)
             with io.StringIO() as bf:
@@ -1182,22 +1210,54 @@ Named Parameters:
             fitInfo += list(map(lambda i: f"{i[0]}:\t{i[1]}", self._fitResult_.Coefficients.GoF.__dict__.items()))
 
             self.fitResultsTextEdit.setPlainText ("\n".join(fitInfo))
-            self._use_fitted_ = True
-            self.generateWaveform()
+            # self._use_fitted_ = True
+            self.generateWaveform(True)
             self.exportFitResultPushButton.setEnabled(True)
+            self.exportFitCurveToolButton.setEnabled(True)
 
         else:
             self.fitResultsTextEdit.setPlainText("")
             self.exportFitResultPushButton.setEnabled(False)
+            self.exportFitCurveToolButton.setEnabled(False)
 
+    @Slot()
+    def _slot_exportModelWaveform(self):
+        from gui.guiutils import getScipyenMainWindow, getEnclosingQMainWindow
+        from gui.workspacegui import WorkspaceGuiMixin
 
+        wave = self.generateModelWaveform()
+        if isinstance(wave, np.ndarray):
+            varname = f"{self._model_name_}_modelCurve" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "modelCurve"
+
+            ancestorWindow = getEnclosingQMainWindow(self)
+            if isinstance(ancestorWindow, WorkspaceGuiMixin):
+                ancestorWindow.exportDataToWorkspace(wave, varname,
+                                                        title="Export Model Curve")
+            else:
+                getScipyenMainWindow().assignToWorkspace(varname, wave)
+
+    @Slot()
+    def _slot_exportFittedCurve(self):
+        from gui.guiutils import getScipyenMainWindow, getEnclosingQMainWindow
+        from gui.workspacegui import WorkspaceGuiMixin
+
+        wave = self.generateWaveform(True)
+        if isinstance(wave, np.ndarray):
+            varname = f"{self._model_name_}_fittedCurve" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "fittedCurve"
+
+            ancestorWindow = getEnclosingQMainWindow(self)
+            if isinstance(ancestorWindow, WorkspaceGuiMixin):
+                ancestorWindow.exportDataToWorkspace(wave, varname,
+                                                     title="Export Fitted Curve")
+            else:
+                getScipyenMainWindow().assignToWorkspace(varname, wave)
 
     @Slot()
     def _slot_exportFitResult(self):
-        from gui.guiutils import getScipyenMainWindow
+        from gui.guiutils import getScipyenMainWindow, getEnclosingQMainWindow
+        from gui.workspacegui import WorkspaceGuiMixin
         if isinstance(self._fitResult_, types.SimpleNamespace):
             varname = f"{self._model_name_}_fitResult" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "fitResult"
-            getScipyenMainWindow().assignToWorkspace(varname, self._fitResult_)
 
     @Slot()
     def _slot_makeUnitAmplitudeModel(self):
@@ -1283,12 +1343,16 @@ Named Parameters:
         return self._fitResult_
 
     @property
+    def fittedCurve(self) -> np.ndarray | None:
+        return self._fittedCurve_
+
+    @property
     def overlayData(self) -> bool:
         return self._plot_data_overlaid_
 
     @overlayData.setter
     def overlayData(self, val:bool):
-        self._plot_data_overlaid_ = val == True
+        self._plot_data_overlaid_ = val is True
         sigBlock = QtCore.QSignalBlocker(self.overlayDataCheckbox)
         self.overlayDataCheckbox.setChecked(self._plot_data_overlaid_)
 

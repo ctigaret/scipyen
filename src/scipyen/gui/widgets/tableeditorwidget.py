@@ -1057,3 +1057,13 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
 
         if isinstance(self._editItemDelegate_, PythonItemDelegate):
             self._editItemDelegate_.decimals = self._decimals_
+
+    @property
+    def dataModel(self) -> QtCore.QAbstractTableModel:
+        r"""Access the underlying data model used by self.tableView"""
+        return self._dataModel_
+
+    @property
+    def itemDelegate(self) -> QtWidgets.QStyledItemDelegate:
+        r"""The styled item delegate used to edit the table cells"""
+        return self._editItemDelegate_
