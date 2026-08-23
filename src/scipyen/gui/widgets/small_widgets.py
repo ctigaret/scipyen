@@ -520,20 +520,21 @@ class LineEdit(QtWidgets.QLineEdit):
         contents_ = None
         if isinstance(parent, QtWidgets.QWidget):
             parent_ = parent
+            contents_ = contents
         else:
             if isinstance(parent, str):
                 contents_ = parent
-            parent_ = None
+                parent_ = None
 
         super().__init__(parent=parent)
 
         if isinstance(parent_, QtWidgets.QWidget) and hasattr(parent_, "addWidget"):
             parent_.addWidget(self)
 
-        if not isinstance(contents_, str):
-            self._variable_ = contents
-        else:
-            self._variable_ = contents_
+        self._variable_ = contents_
+        # if not isinstance(contents_, str):
+        #     self._variable_ = contents
+        # else:
 
         self._lazy_: bool = lazy is True
         self._custom_menu_: typing.Optional[QtWidgets.QMenu] = None
@@ -902,7 +903,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         """
         # minimum, maximum: min & max values of the spin box - to be set manually
 
-        QtWidgets.QDoubleSpinBox.__init__(self, parent=parent)
+        # QtWidgets.QDoubleSpinBox.__init__(self, parent=parent)
+        super().__init__(parent=parent)
 
         # FIXME/TODO: 2022-11-07 13:32:41
         # This setting is not right; NA should be somewhat mapped to NA, NOT
@@ -1016,7 +1018,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         self.setValue(self._magnitude_ * self._units_)
 
-        super().lineEdit().sig_textChanged.connect(self._slot_valueTextChanged)
+        # super().lineEdit().sig_textChanged.connect(self._slot_valueTextChanged)
 
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
 
@@ -1111,11 +1113,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
     @Slot(str)
     def _slot_valueTextChanged(self, s:str):
-
         if self._validText_ == QtGui.QValidator.Acceptable:
             try:
                 val = self.valueFromText(s)
-                if isinstance(val, (pq.Quantity, float)):
+                if isinstance(val, (pq.Quantity, float, np.floating)):
                     self._magnitude_ = float(val)
                     self.sig_valueChanged.emit(self.value())
 
@@ -1344,6 +1345,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             val = 0
         self._decimals_ = val
         super().setDecimals(self._decimals_)
+        self._update_()
 
     def validate(self, text:str, pos:int):
         validator = InftyDoubleValidator(parent=self)

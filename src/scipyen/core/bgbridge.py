@@ -143,6 +143,11 @@ try:
                                                   get_local_atlas_version,
                                                   show_atlases)
     from brainglobe_atlasapi.structure_class import Structure, StructuresDict
+    from brainglobe_atlasapi import descriptors as bg_descriptors
+
+    remote_url_base = bg_descriptors.remote_url_base
+    remote_url_s3 = bg_descriptors.remote_url_s3
+    remote_url_s3_http = bg_descriptors.remote_url_s3_http
     # BGStructure = Structure
 
     hasBrainGlobe=True
@@ -154,6 +159,10 @@ except:
     get_atlases_lastversions = lambda : dict()
     get_downloaded_atlases = lambda : list()
     get_local_atlas_version = lambda x: str()
+    bg_descriptors = None
+    remote_url_base = None
+    remote_url_s3 = None
+    remote_url_s3_http = None
     def show_atlases(show_local_path:bool=False, table_width:int=88): None
 
 class BGStructureDescriptor:
@@ -223,7 +232,7 @@ class BrainAtlasManager(QtCore.QObject):
 
     default_config_file = brainglobe_atlasapi.config.CONFIG_PATH if hasBrainGlobeAtlasAPI else None
 
-    remoteUrlBase = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base if hasBrainGlobeAtlasAPI else None
+    remoteUrlBase = remote_url_base #if hasBrainGlobeAtlasAPI else None
 
     default_free_space_fraction_allowed = 0.01
 
