@@ -98,7 +98,8 @@ class ModelFittingWidget(Ui_ModelFittingWidget, QtWidgets.QWidget, workspacegui.
                  waveViewer:typing.Optional[typing.Union[mpl.figure.Figure, QtWidgets.QMainWindow]] = None,
                  # initial = None,
                  # lbubkf = None,
-                 parent=None):
+                 parent=None,
+                 **kwargs):
         r"""
 Parameters:
 ===========
@@ -159,6 +160,11 @@ Named Parameters:
         self._waveformUnits_:typing.Optional[pq.Quantity] = None
         self._model_expression_window_:typing.Optional[QtWidgets.QMainWindow] = None
         self._expressionWindow_:typing.Optional[QtWidgets.QMainWindow] = None
+
+        self._decimals_ = kwargs.pop("decimals", None)
+
+        if not isinstance(self._decimals_, int) or self._decimals_ < 0:
+            self._decimals_ = None
 
         self._configureUI_()
 
@@ -230,7 +236,7 @@ Named Parameters:
         self.overlayDataCheckbox.setChecked(self._plot_data_overlaid_)
         self.overlayDataCheckbox.setEnabled(False)
         self.overlayDataCheckbox.toggled.connect(self._slot_setDataOverlay_)
-        self.modelCoefficientsTable.enforceFloat = True
+        self.modelCoefficientsTable.enforceFloat = False
         self.modelCoefficientsTable.readOnly = False
 
         if self._waveformUnits_ is None:
@@ -284,11 +290,13 @@ Named Parameters:
             # wave controls unchanged
             if isinstance(start, (float, int)):
                 start = start*pq.s
+
             elif not isinstance(start, pq.Quantity):
                 start = 0*pq.s
 
             if isinstance(duration, (float, int)):
                 duration = duration*pq.s
+
             elif not isinstance(start, pq.Quantity):
                 start = 0*pq.s
 
@@ -331,10 +339,13 @@ Named Parameters:
         domainUnitsFamily = scq.getUnitFamily(self._waveformDuration_)
         if domainUnitsFamily == "Time":
             self._waveformSamplingRate_.rescale(pq.Hz)
+
         elif domainUnitsFamily in ("Length", "Space"):
             self._waveformSamplingRate_.rescale(pq.space_frequency_unit)
+
         elif domainUnitsFamily == "Angle" or self._waveformDuration_.units == pq.rad:
             self._waveformSamplingRate_.rescale(pq.angle_frequency_unit)
+
         else:
             self._waveformSamplingRate_.rescale(1/self._waveformDuration_.units)
 
@@ -344,13 +355,19 @@ Named Parameters:
         # print(f"\t\tself._waveformDuration_ -> {self._waveformDuration_}")
         # print(f"\t\tself._waveformSamplingRate_ -> {self._waveformSamplingRate_}")
         # print(f"\t\tself._waveformUnits_ -> {self._waveformUnits_}")
+        decimals = len(f"{float(self._waveformStart_)}".split(".")[-1]) + 2
+        self._decimals_ = decimals
+        self.startSpinBox.setDecimals(decimals)
         self.startSpinBox.setValue(self._waveformStart_)
+        self.durationSpinBox.setDecimals(decimals)
         self.durationSpinBox.setValue(self._waveformDuration_)
+        self.samplingRateSpinBox.setDecimals(decimals)
         self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
         self.waveformUnits = self._waveformUnits_ # will also set up the unitsLabel
+        self.modelCoefficientsTable.decimals = self._decimals_
 
 
-    def _setModelFunction_(self, model:types.FunctionType, coefficients=None): #, *initial, **lbubkf):
+    def _setModelFunction_(self, model:types.FunctionType, coefficients=None):
         # from core.strutils import is_svg
         assert models.isModelFunction(model), f"Expecting a model function — which is NOT a regular Python function; instead, got {model}"
         self._model_ = model
@@ -521,6 +538,7 @@ Named Parameters:
 
             if self._dataChannel_ < -val.shape[1]:
                 self._dataChannel_ = -val.shape[-1]
+
             elif self._dataChannel_ >= val.shape[-1]:
                 self._dataChannel_ = val.shape[-1]-1
 
@@ -803,6 +821,7 @@ Named Parameters:
         self.svgWidget.setSvg(self._model_expression_svg_)
 
     def _populateCoefficientsTable_(self, data:typing.Optional[pd.DataFrame]=None):
+        self.modelCoefficientsTable.decimals = self._decimals_
         if isinstance(data, pd.DataFrame) and data.size > 0:
             assert all(v in data.columns for v in ('Initial Value', 'Lower Bound', 'Upper Bound', 'Keep Feasible')), "Not a model parameters data frame"
             # if isinstance(self._model_fit_coefficients_, pd.DataFrame) and not np.all(data.index == self._model_fit_coefficients_.index):
@@ -857,6 +876,7 @@ Named Parameters:
 
             if scq.checkTimeUnits(self._waveformDuration_):
                 sig = neo.AnalogSignal(y, t_start = self._waveformStart_, units = sigUnits, sampling_rate=self._waveformSamplingRate_, name=name, codomain_name=sigName)
+
             else:
                 sig = datasignal.DataSignal(y, t_start = self._waveformStart_, units = sigUnits, domain_units = self._waveformDuration_.units,
                                         sampling_rate=self._waveformSamplingRate_, name=name, codomain_name=sigName)
@@ -951,7 +971,12 @@ Named Parameters:
         if isinstance(sig, neo.basesignal.BaseSignal):
             self.sig_waveformReady.emit(sig)
 
-            if self.receivers(self.sig_waveformReady) == 0:
+            if __has_PySide6__:
+                receivers = self.receivers("sig_waveformReady")
+            else:
+                receivers(self.sig_waveformReady)
+
+            if receivers == 0:
                 if isinstance(self._waveViewer_, mpl.figure.Figure):
                     plt.figure(self._waveViewer_)
                     plt.plot(sig)
@@ -1285,3 +1310,14 @@ Named Parameters:
             symbol = scq.shortSymbol(self._waveformUnits_)
             self.unitsLabel.setText(symbol)
             self.unitsLabel.setToolTip(symbol)
+
+    @property
+    def decimals(self) -> int | None:
+        return self._decimals_
+
+    @decimals.setter
+    def decimals(self, val: int | None = None):
+        if isinstance(val, int) and val >= 0:
+            self._decimals_ = val
+        else:
+            self._decimals_ = None

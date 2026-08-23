@@ -83,7 +83,7 @@ NOTE: To be used with my custom itemmodels
     def __init__(self, data: object = None,
                  parent = None,
                  lazy: bool = False,
-                 ):
+                 **kwargs):
         r"""
     CAUTION: The underlying central widget may call another instance of this !
 
@@ -95,8 +95,16 @@ NOTE: To be used with my custom itemmodels
         self._pendingChange_: bool = False
         self._lazy_ = lazy is True
 
+        self._decimals_ = kwargs.pop("decimals", None)
+
+        if not isinstance(self._decimals_, int) or self._decimals_ < 0:
+            self._decimals_ = None
+
         self._data_ = data
         self._widget_ = self.chooseEditor()
+
+        if hasattr(self._widget_, "decimals"):
+            self._widget_.decimals = self._decimals_
 
         # print (f"{self.__class__.__name__}.__init__ -> widget is {type(self._widget_).__name__}")
 
@@ -233,6 +241,20 @@ NOTE: To be used with my custom itemmodels
     def value(self) -> object:
         return self._data_
 
+    @property
+    def decimals(self) -> int | None:
+        return self._decimals_
+
+    @decimals.setter
+    def decimals(self, val: int | None = None):
+        if isinstance(val, int) and val >= 0:
+            self._decimals_ = val
+        else:
+            self._decimals_ = None
+
+        if isinstance(self._widget_, QtWidgets.QWidget) and hasattr(self._widget_, "decimals"):
+            self._widget_.decimals = self._decimals_
+
 
 class CutFileSystemItemDelegate(QtWidgets.QStyledItemDelegate):
     # WARNING: 2026-01-25 22:25:36 TODO
@@ -283,7 +305,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                  columnChoices: typing.Optional[dict[int,
                                                      dict[typing.Sequence,
                                                           bool]]] = None,
-                 enforceFloat: bool = False):
+                 enforceFloat: bool = False,
+                 decimals: int | None = None):
         r"""Instantiates a PythonItemDelegate.
 
         Parameters:
@@ -330,6 +353,13 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         self._currentData_:typing.Optional[typing.Any] = None
         self._externalDataEditor_: typing.Optional[QtWidgets.QWidget] = None
+
+        if isinstance(decimals, int) and decimals >= 0:
+            self._decimals_ = decimals
+
+        else:
+            self._decimals_  = None
+
         # self.sig_contentsChanged.connect(self._slot_sendToExternalEditor)
 
     def _checkColumnChoiceDict_(self, d:dict) -> bool:
@@ -638,6 +668,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     widget = QtWidgets.QDoubleSpinBox(parent, data)
                     widget.setMinimum(-math.inf)
                     widget.setMaximum(math.inf)
+
+                    if isinstance(self._decimals_, int):
+                        widget.setDecimals(self._decimals_)
+
                     # widget.setSingleStep(1)
                     if not inModel:
                         widget.setValue(data)
@@ -655,10 +689,12 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                         widget.valueChanged.connect(self.slot_valueChanged)
 
                     elif isinstance(data, (float, np.floating)):
-                        # widget = smw.QuantitySpinBox(parent, data)
-                        widget = QtWidgets.QDoubleSpinBox(parent)
+                        widget = smw.QuantitySpinBox(parent)
+                        # widget = QtWidgets.QDoubleSpinBox(parent)
                         widget.setMinimum(-math.inf)
                         widget.setMaximum(math.inf)
+                        if isinstance(self._decimals_, int):
+                            widget.setDecimals(self._decimals_)
                         # widget.setSingleStep(1)
                         if not inModel:
                             widget.setValue(data)
@@ -685,6 +721,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     widget.setValue(data)
 
                 widget.unitChanged.connect(self.slot_valueChanged)
+
             else:
                 if isinstance(data, neo.Event):
                     widget = neow.SimpleTriggerEventWidget(parent, data)
@@ -698,6 +735,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     if data.ndim == 0 or (data.ndim == 1 and data.size == 1):
                         if isComplex:
                             widget = smw.ComplexSpinBox(parent, data, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
+
                         else:
                             widget = smw.QuantitySpinBox(parent, data, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
 
@@ -1063,9 +1101,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         # CAUTION: Standard item model and standard items treat DisplayRole and
         # DisplayRole as being the same; in such case I need a custom role
         dataChoices = index.data(DataChoicesRole) # noqa
-        if isinstance(data, enum.Enum): # noqa
-            if dataChoices is None:
-                dataChoices = dict(map(lambda x: (x.name, x.value), type(data)))
+
+        if isinstance(data, enum.Enum) and dataChoices is None:
+            dataChoices = dict(map(lambda x: (x.name, x.value), type(data)))
 
         # NOTE: 2025-09-27 11:06:52
         # some models may be able to prevent editing indexes with certain rows
@@ -1128,12 +1166,13 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             if not isinstance(data, str):
                 scipywarn(f"{self.__class__.__name__}.createEditor: data type ({type(data).__name__}) is not supported for combo box")
                 return
-            self.endResetModel()
 
+            # self.endResetModel() # why this here ?!?
 
             choices = self._columnChoices_[index.column()]["choices"]
 
         w = self.createWidget(data, choices, True, parent)
+
         return w
 
     def setEditorData(self, editor: QtWidgets.QWidget,
@@ -1398,3 +1437,14 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         model.setData(index, data, role)
         if isinstance(self._currentModelIndex_, QtCore.QModelIndex):
             self._currentModelIndex_ = None
+
+    @property
+    def decimals(self) -> int | None:
+        return self._decimals_
+
+    @decimals.setter
+    def decimals(self, val: int | None = None):
+        if isinstance(val, int) and val >= 0:
+            self._decimals_ = val
+        else:
+            self._decimals_ = None

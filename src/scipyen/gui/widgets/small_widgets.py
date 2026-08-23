@@ -269,7 +269,7 @@ class ElidedPushButton(UrlNavigatorButtonBase):
         if oldMinWidth != minWidth:
             self.setMinimumWidth(minWidth)
 
-class QuantityChooserWidget(Ui_QuantityChooserWidget, QtWidgets.QWidget):
+class QuantityChooserWidget(QtWidgets.QWidget, Ui_QuantityChooserWidget):
     r"""Compound widget allowing the user to choose a physical dimensionality.
     Convenience UI elements to attach quantities to various numeric variables.
 
@@ -302,8 +302,8 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QtWidgets.QWidget):
             parent_ = None
 
         super(Ui_QuantityChooserWidget, self).__init__()
+        super().__init__(parent_)
 
-        QWidget.__init__(self, parent=parent_)
 
         if isinstance(parent_, QtWidgets.QWidget) and hasattr(parent_, "addWidget"):
             parent_.addWidget(self)
@@ -704,8 +704,8 @@ class ArrayEditorWidget(QtWidgets.QFrame):
     sig_valueChanged = Signal(object, name = "sig_valueChanged")
 
     def __init__(self, parent = None,
-                 value: typing.Optional[
-                        typing.Union[np.ndarray, typing.Sequence, typing.Set]
+                 value: typing.Optional[ # noqa
+                        typing.Union[np.ndarray, typing.Sequence, typing.Set] # noqa
                         ] = None,
                  ):
         value_ = None
@@ -871,8 +871,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     _default_internal_minimum_:float    = -sys.float_info.max
 
     _default_singleStep_:int = 1
-    _default_stepType_:QtWidgets.QAbstractSpinBox.StepType = QtWidgets.QAbstractSpinBox.DefaultStepType
-    _default_decimals_:int = np.get_printoptions()["precision"]
+    _default_stepType_: QtWidgets.QAbstractSpinBox.StepType = QtWidgets.QAbstractSpinBox.DefaultStepType
+    _default_decimals_: int = np.get_printoptions()["precision"]
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget]=None,
                  units: typing.Optional[typing.Union[pq.Quantity,

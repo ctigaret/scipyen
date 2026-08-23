@@ -2113,6 +2113,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
 
     if not isinstance(modelFun, types.FunctionType):
         modelFun = models.exponential
+
     else:
         if not models.isModelFunction(modelFun):
             raise ValueError(f"Expecting a model function; instead, {modelFun.__name__} is an ordinary function")
@@ -2120,12 +2121,14 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     # print(f"passive_Iclamp: ssEpoch = {ssEpoch}")
 
     try:
-        major, minor, micro = tuple(map(lambda x: int(x), scipy.__version__.split('.')))
-        if minor < 7:
+        # major, minor, micro = tuple(map(lambda x: int(x), scipy.__version__.split('.')))
+        scipyver_tuple = tuple(int(x) for x in scipy.__version__.split('.'))
+        if scipyver_tuple[1] < 7:
             from scipy.signal import boxcar
         else:
             from scipy.signal.windows import boxcar
-    except:
+
+    except: # noqa
         from scipy.signal import boxcar
     # from scipy.signal.windows import boxcar
 
@@ -2134,34 +2137,34 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
     # 1) sort out the baseline epoch parameter - this is the epoch BEFORE
     # current injection
     if isinstance(baseEpoch, (tuple, list)):
-        if all([isinstance(v, numbers.Real) for v in baseEpoch]):
+        if all(isinstance(v, numbers.Real) for v in baseEpoch):
             t0, t1 = baseEpoch
             baseEpoch = neo.Epoch(times = t0 * vm.times.units, durations = (t1-t0) * vm.times.units)
 
-        elif all([(isinstance(v, pq.Quantity) and unitsConvertible(v, vm.times)) for v in baseEpoch]):
+        elif all((isinstance(v, pq.Quantity) and unitsConvertible(v, vm.times)) for v in baseEpoch):
             t0, t1 = baseEpoch
             baseEpoch = neo.Epoch(times = t0, durations = (t1-t0))
 
         else:
-            raise TypeError("incompatible base epoch specification: %s", baseEpoch)
+            raise TypeError(f"incompatible base epoch specification: {baseEpoch}")
 
     elif isinstance(baseEpoch, Interval):
         baseEpoch = baseEpoch.toNeoEpoch()
 
     # 2) sort out the steady-state epoch parameter
     if isinstance(ssEpoch, (tuple, list)):
-        if all([isinstance(v, numbers.Real) for v in ssEpoch]):
+        if all(isinstance(v, numbers.Real) for v in ssEpoch):
             t0, t1 = ssEpoch
-            duration = t_stop - t_start
+            # duration = t_stop - t_start
             ssEpoch = neo.Epoch(times = t0 * vm.times.units,
                                   durations = (t1-t0) * vm.times.units)
 
-        elif all([(isinstance(v, pq.Quantity) and unitsConvertible(v, vm.times)) for v in ssEpoch]):
+        elif all((isinstance(v, pq.Quantity) and unitsConvertible(v, vm.times)) for v in ssEpoch):
             t0, t1 = ssEpoch
             ssEpoch = neo.Epoch(times=t0, durations=(t1-t0))
 
         else:
-            raise TypeError("incompatible steady-state epoch specification: %s", ssEpoch)
+            raise TypeError(f"incompatible steady-state epoch specification: {ssEpoch}")
 
     elif isinstance(ssEpoch, Interval):
         ssEpoch = ssEpoch.toNeoEpoch()
@@ -2291,10 +2294,11 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
             ssT0 = ssEpoch.times[0]
             ssT1 = ssT0 + ssEpoch.durations[0]
 
-        if baseT0 < 0*pq.s:
-            # use a shorter duration for baselines < steadyStateDuration
-            # i.e. begin at sweep start
-            baseT0 = 0*pq.s
+        baseT0 = max(baseT0, 0*pq.s)
+        # if baseT0 < 0*pq.s:
+        #     # use a shorter duration for baselines < steadyStateDuration
+        #     # i.e. begin at sweep start
+        #     baseT0 = 0*pq.s
 
         assert ssT0 > baseT1, "baseline and steay state epochs overlap"
 
@@ -2307,7 +2311,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         assert isinstance(Iinj, pq.Quantity) and Iinj.size == 1 and scq.unitsConvertible(Iinj.units, pq.A), f"im[0] expected to be an electrical current scalar; got {im[0]} instead"
 
         if not isinstance(baseEpoch, neo.Epoch):
-            raise ValueError("When ``im`` is a scalar quantity, base epoch (``baseEpoch``) must be specified")
+            raise TypeError("When ``im`` is a scalar quantity, base epoch (``baseEpoch``) must be specified")
 
         # when an epoch WAS specified, we take it as given i.e. as indicating the
         # ACTUAL baseline or steady-state epochs used for analysis
@@ -2315,7 +2319,7 @@ def passive_Iclamp(vm, im:typing.Union[neo.AnalogSignal, tuple, list],
         baseT1 = baseT0 + baseEpoch.durations
 
         if not isinstance(ssEpoch, neo.Epoch):
-            raise ValueError("When ``im`` is a scalar quantity, steady-state epoch (``ssEpoch``) must be specified")
+            raise TypeError("When ``im`` is a scalar quantity, the steady-state epoch (``ssEpoch``) must be specified")
 
 
         ssT0 = ssEpoch.times

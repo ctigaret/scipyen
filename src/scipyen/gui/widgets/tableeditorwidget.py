@@ -132,7 +132,8 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
 
     def __init__(self, parent:typing.Optional[QtWidgets.QMainWindow]=None,
                  readOnly:bool=True, enforceFloat:bool=False,
-                 enforceReadOnly:bool=False) -> None:
+                 enforceReadOnly:bool=False,
+                 **kwargs) -> None:
         super().__init__(parent=parent)
         super(Ui_TableEditorWidget, self).__init__()
         # FIXME: 2025-11-23 09:58:38 next line is DEPRECATED
@@ -143,6 +144,10 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
         self._enforceReadOnly_:bool = False
         self._autoResizeColumns_: bool = False
         self._autoResizeRows_: bool = False
+        self._decimals_ = kwargs.pop("decimals", None)
+
+        if not isinstance(self._decimals_, int) or self._decimals_ < 0:
+            self._decimals_ = None
 
         # NOTE: 2021-10-18 09:32:45
         # ### BEGIN keep this  - you may re-enable the possibility to use other custom tabular
@@ -162,8 +167,14 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
         self._dataModel_.sig_modelPopulated.connect(self._slot_modelPopulated)
 
         self._defaultItemDelegate_ = self.tableView.itemDelegate()
-        self._editItemDelegate_ = PythonItemDelegate(parent=self, enforceFloat = self._enforceFloat_)
+
+        self._editItemDelegate_ = PythonItemDelegate(
+            parent=self,
+            enforceFloat = self._enforceFloat_,
+            decimals = self._decimals_)
+
         self._editItemDelegate_.sig_indexRowColChanged.connect(self.sig_indexRowColChanged)
+
         self._editItemDelegate_.sig_indexChanged.connect(self.sig_indexChanged)
         # NOTE: 2021-08-16 17:22:20
         # By default, this is defined in the .ui file as:
@@ -174,6 +185,7 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
 
         if self._readOnly_:
             self.tableView.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+
         else:
             self.tableView.setItemDelegate(self._editItemDelegate_)
 
@@ -1018,3 +1030,30 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
                     removeRowAction.triggered.connect(self.slot_removeRow)
 
         cm.popup(self.tableView.mapToGlobal(pos), copySelectedAction)
+
+    @property
+    def decimals(self) -> int | None:
+        r"""Number of decimals used for displaying/editing floating point data.
+
+    This value includes the decimals separator, and is used only when using a
+    PythonItemDelegate object as item delegate.
+
+    A value of None indicates that the Qt default is being used (3).
+
+    """
+        return self._decimals_
+
+    @decimals.setter
+    def decimals(self, val: int | None = None):
+        if isinstance(val, int) and val >= 0:
+            self._decimals_ = val
+        else:
+            self._decimals_ = None
+
+        self.tableView.decimals = self._decimals_
+
+        if isinstance(self._dataModel_, TabularDataModel):
+            self._dataModel_.decimals = self._decimals_
+
+        if isinstance(self._editItemDelegate_, PythonItemDelegate):
+            self._editItemDelegate_.decimals = self._decimals_

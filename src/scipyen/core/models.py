@@ -78,7 +78,8 @@ else:
 
 from core import scipyen_quantities as scq
 # from core.datasignal import DataSignal
-from core.prog import (scipywarn, signature_as_dict, decorator, timefunc) # noqa
+from core.prog import (scipywarn, signature_as_dict, decorator,
+                       timefunc, timemethod, with_doc) # noqa
 from core import utilities
 # from core import datatypes
 from core.datatypes import (Real, Complex, Number)
@@ -110,8 +111,10 @@ def check_independent_variable(x:typing.Union[Real, np.ndarray], ndim:typing.Opt
     if not isinstance(x, (Real, np.ndarray)):
         raise TypeError(f"Independent variable 'x' has unexpected type: {type(x).__name__}")
 
+    # units = dict()
+
     if isinstance(x, pq.Quantity):
-        units['x'] = x.units
+        # units['x'] = x.units
         x = x.magnitude
 
     if isinstance(ndim, int):
@@ -478,7 +481,8 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
 
         setattr(f, "displaySVG", displaySVG is True)
 
-        # ### BEGIN NOTE: 2025-12-26 14:50:30 various optins - do NOT delete these; instead, keep for future reference
+        # ### BEGIN NOTE: 2025-12-26 14:50:30 various options
+        # do NOT delete these; instead, keep for future reference
         #
         # def __display__(f):
         #     if isinstance(f.expression, str):
@@ -524,7 +528,7 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
         # setattr(f, "__repr__", types.MethodType(__display_pretty__, f))
 
         #
-        # ### END   NOTE: 2025-12-26 14:50:30 various optins - do NOT delete; instead, keep for future reference
+        # ### END   NOTE: 2025-12-26 14:50:30 various options
 
         def __getCoefficients__(f, *initial) -> tuple:
             destarred = tuple(map(lambda c: c.strip("*"), f.starred_coefficients))
@@ -559,7 +563,11 @@ https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_opti
 
         setattr(f, "expressionAsSVG", types.MethodType(__expression2SVG__, f))
 
+        @with_doc(makeCoefficientsFitTable, use_header=False)
         def __generateFitTable__(f, *initial, **kwargs) -> tuple:
+            r"""Delegates to models.makeCoefficientsFitTable
+
+        """
             return makeCoefficientsFitTable(f, *initial, **kwargs)
 
         setattr(f, "generateFitTable", types.MethodType(__generateFitTable__, f))
@@ -671,12 +679,23 @@ Fields that map to ``None`` will be automatically assigned a sequence of ``-np.i
 Returns:
 =======
 
-A tuple (result:pd.Dataframe,
-        starred:typing.Sequence[str],
-        destarred:typing.Sequence[str],
-        starredGroups:int,
-        all_names:typing.Sequence[str])
+A tuple with the following elements:
 
+    * coefficients: pandas Dataframe with:
+        * *rows*, one for each model coefficient,
+        * *columns*: "Initial Value", "Lower Bound", "Upper Bound" and "Keep Feasible"
+
+
+    * starred: list[str],
+
+    * destarred: list[str],
+
+    * starredGroups: int,
+
+    * all_names: list[str])
+
+.. note::
+    The row index of the 'coefficients' contains the model coefficient names in the order expected by the model function call syntax
 """
     from core import strutils
     assert isModelFunction(f), f"Expecting a model function ('@modelfunction'-decorated regular Python function); instead, got {f}"
@@ -711,21 +730,11 @@ A tuple (result:pd.Dataframe,
         # so, currently we need to create a tuple of starred coeffs and repeat this at least once
 
         if len(initial) > 0:
-#             if len(destarred) == 0:
-#                 if len(initial) != len(unstarred):
-#                     raise RuntimeError(f"Too {'many' if len(initial) > len(unstarred) else 'few'} initial coefficient values ({len(initial)}) while expecting {len(unstarred)}")
-#
-#             else:
-#                 if len(initial) < len(concrete_names):
-#                     raise RuntimeError(f"Too few initial coefficient values ({len(initial)}) while expecting at least {len(concrete_names)}")
-#
-#                 if (len(initial) - len(unstarred)) % 2 != 0:
-#                     raise RuntimeError(f"Unexpected number of coefficient values ({len(initial)}); must be {len(starred)} × 𝒏 + {len(unstarred)} where 𝒏 is the number of instances of each starred coefficient")
-
             if not all(isinstance(v, Real) for v in initial):
                 raise TypeError("All initial coefficient values MUST be real scalars")
 
             lower = kwargs.pop("lower", None)
+
             if lower is None:
                 lower = [-np.inf] * len(initial)
 
@@ -737,6 +746,7 @@ A tuple (result:pd.Dataframe,
                 raise TypeError(f"Lower coefficient bounds expected to be a sequencce of Real scalars or None; instead got {type(lower).__name__}")
 
             upper = kwargs.pop("upper", None)
+
             if upper is None:
                 upper = [np.inf] * len(initial)
 
@@ -748,12 +758,14 @@ A tuple (result:pd.Dataframe,
 
 
             feasible = kwargs.pop("feasible", None)
+
             if feasible is None:
                 feasible = [True] * len(initial)
 
             elif isinstance(feasible, typing.Sequence):
                 if not all(isinstance(v, bool) for v in feasible):
                     raise TypeError("All feasible flags MUST be booleans")
+
             else:
                 raise TypeError(f"Feasibility flags expected to be a sequencce of bool or None; instead got {type(feasible).__name__}")
 
@@ -773,7 +785,9 @@ A tuple (result:pd.Dataframe,
 
         if not isFittingCoefficientsDict(f.fitting):
             all_names = fdict.pop("Names")
+
             ret = pd.DataFrame(fdict, index=(concrete_names))
+
             return ret, destarred, nStarredGroups, all_names
 
         mfd = {"Names":list(), "Initial Value": list(), "Lower Bound": list(), "Upper Bound": list(), "Keep Feasible": list()}
@@ -794,18 +808,23 @@ A tuple (result:pd.Dataframe,
         for k, name in enumerate(names):
             if name in fdict["Names"]:
                 ndx = fdict["Names"].index(name)
+
                 if ndx < len(init):
                     fdict["Initial Value"][ndx] = init[ndx]
+
                 if ndx < len(lo):
                     fdict["Lower Bound"][ndx] = lo[ndx]
+
                 if ndx < len(up):
                     fdict["Upper Bound"][ndx] = up[ndx]
+
                 if ndx < len(feas):
                     fdict["Keep Feasible"][ndx] = feas[ndx]
 
             else:
                 # add possibly extra concrete values for starred coeffs
                 stripped, sfx = strutils.get_int_sfx(name, sep="")
+
                 if f"{stripped}*" in starred:
                     fdict["Names"].append(name)
                     fdict["Initial Value"].append(init[k])

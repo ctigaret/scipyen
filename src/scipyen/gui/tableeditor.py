@@ -149,6 +149,8 @@ class TableEditor(ScipyenViewer):
                  *args, **kwargs) -> None:
         super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs) # calls _configureUI_ and loadSettings
 
+        self._decimals_ = kwargs.pop("decimals", None)
+
         self.selectedColumnIndex      = None
         self.selectedRowIndex         = None
 
@@ -731,3 +733,15 @@ class TableEditor(ScipyenViewer):
 
         self._use_matplotlib_ = value
 
+    @property
+    def decimals(self) -> int | None:
+        return self._decimals_
+
+    @decimals.setter
+    def decimals(self, val: int | None = None):
+        if isinstance(val, int) and val >= 0:
+            self._decimals_ = val
+        else:
+            self._decimals_ = None
+
+        self.tableWidget.decimals = self._decimals_

@@ -65,7 +65,8 @@ import matplotlib.mlab as mlb # noqa
 #from core.patchneo import *
 from core import datatypes
 import core.datatypes as dt
-import core.utilities as utilities # noqa
+from core import utilities
+from core.utilities import repr_val
 import core.strutils as strutils # noqa
 from core.strutils import str2float # noqa
 from core.prog import (safewrapper, scipywarn, unwind_type)
@@ -163,6 +164,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     def __init__(self, data=None, parent=None):
         super(TabularDataModel, self).__init__(parent=parent)
+
+        self._decimals_ = None
 
         self._is_vigra_filter_kernel_:bool = False
         self._original_data_:typing.Any = None
@@ -1066,23 +1069,21 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
             if isinstance(self._modelData_, pd.DataFrame):
                 val = self._modelData_.iloc[row,col]
+
                 ret_type = type(val).__name__
-                if isinstance(val, datetime.datetime):
-                    ret = val if role == QtCore.Qt.EditRole else val.isoformat(" ")
-                else:
-                    ret = val if role == QtCore.Qt.EditRole else f"{val}"
+
+                ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else repr_val(val, self.decimals)
 
             elif isinstance(self._modelData_, pd.Series):
                 val = self._modelData_.iloc[row,col]
                 ret_type = type(val).__name__
-                if isinstance(val, datetime.datetime):
-                    ret = val if role == QtCore.Qt.EditRole else val.isoformat(" ")
-                else:
-                    ret = val if role == QtCore.Qt.EditRole else f"{val}"
+
+                ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else repr_val(val, self.decimals)
 
             elif isinstance(self._modelData_, pd.Index):
                 if isinstance(self._modelData_, pd.RangeIndex):
                     val = self._modelData_[row]
+
                 else:
                     # CAUTION 2025-05-25 09:09:00
                     # when _modelData_ is the column index of a DataFrame, ``row``
@@ -1091,21 +1092,22 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                 ret_type = type(val).__name__
 
-                if isinstance(val, datetime.datetime):
-                    ret = val if role == QtCore.Qt.EditRole else val.isoformat(" ")
-
-                else:
-                    ret = val if role == QtCore.Qt.EditRole else f"{val}"
+                ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else repr_val(val, self.decimals)
 
             elif isinstance(self._modelData_, TriggerProtocolList):
                 protocol = self._modelData_[row]
                 val = getattr(protocol, self._modelDataColumnHeaders_[col])
-                if isinstance(val, enum.Enum):
-                    disp = f"{val.name}"
-                elif isinstance(val, neo.Event):
-                    disp = f"{val.times}"
-                else:
-                    disp = f"{val}"
+
+                disp = repr_val(val, self.decimals)
+
+                # if isinstance(val, enum.Enum):
+                #     disp = f"{val.name}"
+                #
+                # elif isinstance(val, neo.Event):
+                #     disp = f"{val.times}"
+                #
+                # else:
+                #     disp = f"{val}"
 
                 ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
 
@@ -1118,13 +1120,20 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             ):
                 obj = self._modelData_[row]
                 attribute = self._modelDataColumnHeaders_[col]
+
                 if attribute.lower() != "edit":
                     val = getattr(obj, attribute)
-                    if isinstance(val, enum.Enum):
-                        disp = f"{val.name}"
-                    else:
-                        disp = f"{val}"
+
+                    disp = repr_val(val, self.decimals)
+
+                    # if isinstance(val, enum.Enum):
+                    #     disp = f"{val.name}"
+                    #
+                    # else:
+                    #     disp = f"{val}"
+
                     ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
+
                 else:
                     return qVariant()
 
@@ -1133,14 +1142,13 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 attribute = self._modelDataColumnHeaders_[col]
                 if attribute.lower() != "edit":
                     val = getattr(obj, attribute)
-                    if isinstance(val, enum.Enum):
-                        disp = f"{val.name}"
-                    else:
-                        disp = f"{val}"
+
+                    disp = repr_val(val, self.decimals)
+
                     ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
+
                 else:
                     return qVariant()
-
 
             elif isinstance(self._modelData_, typing.Sequence):
                 if all(isinstance(d, ephys_pathways.RecordingSource) for d in self._modelData_):
@@ -1150,10 +1158,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         return qVariant()
                     else:
                         val = getattr(obj, attribute)
-                        if isinstance(val, enum.Enum):
-                            disp = f"{val.name}"
-                        else:
-                            disp = f"{val}"
+
+                        disp = repr_val(val, self.decimals)
+                        # if isinstance(val, enum.Enum):
+                        #     disp = f"{val.name}"
+                        # else:
+                        #     disp = f"{val}"
                         ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
 
                 else:
@@ -1163,10 +1173,11 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     else:
                         val = rowObj
 
-                    if isinstance(val, enum.Enum):
-                        disp = f"{val.name}"
-                    else:
-                        disp = f"{val}"
+                    disp = repr_val(val, self.decimals)
+                    # if isinstance(val, enum.Enum):
+                    #     disp = f"{val.name}"
+                    # else:
+                    #     disp = f"{val}"
                     ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
 
             elif isinstance(self._modelData_, neo.core.dataobject.DataObject):
@@ -1178,11 +1189,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     else:
                         val = self._modelData_[row]
 
-                if isinstance(val, datetime.datetime):
-                    ret = val if role == QtCore.Qt.EditRole else ret.isoformat(" ")
+                disp = repr_val(val, self.decimals)
+                ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else disp
 
-                else: # by default, value is a Quantity, here
-                    ret = val if role == QtCore.Qt.EditRole else f"{val.magnitude}"
+                # if isinstance(val, datetime.datetime):
+                #     ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else ret.isoformat(" ")
+                #
+                # else: # by default, value is a Quantity, here
+                #     ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else f"{val.magnitude}"
 
             elif isinstance(self._modelData_, np.ndarray):
                 # NOTE: 2026-06-06 16:05:25 this MAY be a general (generic) Quantity array, too!
@@ -1195,19 +1209,21 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 else:
                     val = self._modelData_[row]
 
+                disp = repr_val(val, self.decimals)
 
-                if isinstance(val, datetime.datetime):
-                    ret = val if role == QtCore.Qt.EditRole else ret.isoformat(" ")
-
-                else: # allow for python Quantity arrays, here
-                    ret = val if role == QtCore.Qt.EditRole else f"{val.magnitude}" if isinstance(self._modelData_, pq.Quantity) else f"{val}"
+                ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else disp
+                # if isinstance(val, datetime.datetime):
+                #     ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else ret.isoformat(" ")
+                #
+                # else: # allow for python Quantity arrays, here
+                #     ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else f"{val.magnitude}" if isinstance(self._modelData_, pq.Quantity) else f"{val}"
 
             else:
                 return qVariant()
 
             ret_type = type(val).__name__
 
-            if role == QtCore.Qt.EditRole:
+            if role in (QtCore.Qt.UserRole, QtCore.Qt.EditRole, ObjectDataRole):
                 return qVariant(val)
 
             elif role == QtCore.Qt.DisplayRole:
@@ -1215,9 +1231,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
             elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                 return qVariant(ret_type)
-
-            elif role in (QtCore.Qt.UserRole, ):
-                return qVariant(val)
 
             else:
                 return qVariant()
@@ -1959,6 +1972,26 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         return self._modelData_
 
     @property
+    def decimals(self) -> int | None:
+        r"""Number of decimals used for displaying/editing floating point data.
+
+    This value includes the decimals separator, and is used only when the
+    item delegate is a PythonItemDelegate object.
+
+    A value of None indicates that the Qt default is being used (3).
+
+    """
+        return self._decimals_
+
+    @decimals.setter
+    def decimals(self, val: int | None):
+        if not isinstance(val, int) or val < 0:
+            self._decimals_ = None
+
+        else:
+            self._decimals_ = val
+
+    @property
     def immutability(self) -> dict:
         r"""Mapping row & col indexes where cell contents CANNOT be altered.
     E.g.: {"columns": [2,3], "rows": [0,1], "joint":False}
@@ -2032,6 +2065,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @canAlterColumns.setter
     def canAlterColumns(self, val: bool):
         self._canAddRemoveColumns_ = val is True
+
 
 # @singledispatch
 # def _appendRow_(self,

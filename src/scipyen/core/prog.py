@@ -3144,27 +3144,28 @@ class with_doc:
 
     """
 
-    def __init__(
-        self,
-        method: typing.Union[
-            typing.Type,
-            typing.Callable,
-            typing.Sequence[typing.Union[typing.Type, typing.Callable]],
-        ],
-        use_header=True,
-        header_str: typing.Optional[str] = None,
-        indent: str = "   ",
-        indent_factor: int = 1,
-    ):
+    def __init__(self, method: typing.Union[
+                                            typing.Type,
+                                            typing.Callable,
+                                            typing.Sequence[typing.Union[typing.Type, typing.Callable]],
+                                           ],
+                                            use_header=True,
+                                            header_str: typing.Optional[str] = None,
+                                            indent: str = "   ",
+                                            indent_factor: int = 1,
+                ):
         # self.method = method
         if isinstance(
             method, (tuple, list)
-        ):  # and all(isinstance(v, typing.Callable) for v in method) or all(isinstance(v, typing.Type) for v in method):
+            ):  # and all(isinstance(v, typing.Callable) for v in method) or all(isinstance(v, typing.Type) for v in method):
             self.method = tuple(method)
+
         elif isinstance(method, typing.Callable):
             self.method = (method,)
+
         elif isinstance(method, typing.Type):
             self.method = tuple()
+
         else:
             self.method = tuple()
 
@@ -3172,8 +3173,10 @@ class with_doc:
             if len(self.method):
                 if all(isinstance(v, typing.Type) for v in self.method):
                     header_str = f"inherits from the {InflectEngine.plural('class', len(self.method))}:"
+
                 elif all(isinstance(v, typing.Callable) for v in self.method):
                     header_str = f"calls the {InflectEngine.plural('function', len(self.method))}:"
+
                 else:
                     header_str = "Notes:"
             else:

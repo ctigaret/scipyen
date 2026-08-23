@@ -870,7 +870,6 @@ def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]
         else:
             v = x[0]
 
-
         if v.dtype.name.startswith("complex"):
             return complex(v)
 
@@ -1198,8 +1197,7 @@ def quantity2str(x:typing.Union[
                     pq.dimensionality.Dimensionality,
                     typing.Sequence[pq.Quantity]
                     ],
-                 precision: typing.Optional[typing.Union[int, str]] = "numpy",
-                 format:str="f"):
+                 precision: typing.Optional[typing.Union[int, str]] = "numpy"):
     r"""Returns a str representation of a Dimensionality, Quantity, or Quantity sequence.
 
 .. |nbsp| unicode:: 0xA0
@@ -1230,8 +1228,6 @@ Parameters:
     Passing the ``str`` "numpy" will use the precision determined from numpy package |nbsp|
     (see ``numpy.get_printoptions``). This precision can also be set during the current session |nbsp|
     by calling ``numpy.set_printoptions``.
-
-:format: format string — single character ("f", "g"); optional; default is "f"
 
 .. note::
 
@@ -1265,8 +1261,7 @@ Example 2: Converting a dimensionality:
 """
     from core.datatypes import is_vector
     if isinstance(x, typing.Sequence) and all(isinstance(q, pq.Quantity) for q in x):
-        return ", ".join(list(map(lambda q: quantity2str(q), x)))
-
+        return ", ".join(list(map(lambda q: quantity2str(q, precision), x)))
 
     if not isinstance(x, (pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality)):
         raise TypeError("Expecting a python Quantity or UnitQuantity; got %s instead" % type(x).__name__)
@@ -1274,23 +1269,31 @@ Example 2: Converting a dimensionality:
     if isinstance(x, pq.dimensionality.Dimensionality):
         return x.string
 
-    return " ".join([np.array2string(x.magnitude), x.units.dimensionality.string])
+    if precision is None:
+        with np.printoptions(floatmode="unique"):
+            return " ".join([np.array2string(x.magnitude), x.units.dimensionality.string])
+
+    elif precision == "numpy":
+        with np.printoptions(floatmode="fixed"):
+            return " ".join([np.array2string(x.magnitude), x.units.dimensionality.string])
+
+    elif isinstance(precision, int):
+        if precision < 0:
+            raise ValueError("'precision' must be >= 0")
+
+        with np.printoptions(floatmode="fixed", precision=precision):
+            return " ".join([np.array2string(x.magnitude), x.units.dimensionality.string])
+
+    else:
+        raise TypeError(f"Invalid precision: expecting an int, the string 'numpy' or None; instead, got {type(precision).__name__}")
+
+
+
 
     # if x.magnitude.flatten().size != 1:
     #     if not is_vector(x):
     #         raise TypeError(f"Expecting a scalar quantity or a quantity vector; instead, got a quantity of size {x.magnitude.flatten().size} with {x.ndim} dimensions")
 
-    # if precision is None:
-    #     p10 = np.log10(x.magnitude.flatten()).min()
-    #     if p10 < 0:
-    #         precision = abs(int(np.floor(p10)) - 1)
-    #
-    # if not isinstance(precision, int) or precision != "numpy":
-    #     raise TypeError("precision expected to be an int or the string 'numpy'; got %s instead" % type(precision).__name__)
-    #
-    # if isinstance(precision, int):
-    #     if precision <= 0:
-    #         raise ValueError("precision must be strictly positive; got %d instead" % precision)
     #
     #     mag_format = "%d" % precision
     #

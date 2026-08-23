@@ -273,7 +273,7 @@ class CurveFittingTool(QtWidgets.QMainWindow, Ui_CurveFittingWindow, WorkspaceGu
 
 def launch():
     try:
-        win = mainWindow.newViewer(CurveFittingTool, parent = mainWindow,
+        win = mainWindow.newViewer(CurveFittingTool,
                                    win_title="Curve Fitting Tool",
                                    varName="curveFittingToolWindow")
         win.show()

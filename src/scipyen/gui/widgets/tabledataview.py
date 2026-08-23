@@ -62,8 +62,13 @@ For code painting the NW corner label see
 // Retrieved 2026-06-12, License - CC BY-SA 3.0
 
 """
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None):
+    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None, **kwargs):
         super().__init__(parent)
+
+        self._decimals_ = kwargs.pop("decimals", None)
+
+        if not isinstance(self._decimals_, int) or self._decimals_ < 0:
+            self._decimals_ = None
 
 #     def openPersistentEditor(self, index):
 #         model = self.model()
@@ -145,5 +150,17 @@ For code painting the NW corner label see
             data = self._currentModelIndex_.data(role)
 
             editor = ExternalEditorDelegate(data)
+            editor.decimals = self._decimals_
 
             editor.show()
+
+    @property
+    def decimals(self) -> int | None:
+        return self._decimals_
+
+    @decimals.setter
+    def decimals(self, val: int | None = None):
+        if isinstance(val, int) and val >= 0:
+            self._decimals_ = val
+        else:
+            self._decimals_ = None

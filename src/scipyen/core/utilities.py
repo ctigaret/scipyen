@@ -10,6 +10,7 @@ Various utilities
 '''
 import traceback, re, itertools, functools, time, typing, types, warnings # noqa
 import operator, inspect, random, math, pprint, datetime, pathlib, sys, os # noqa
+import enum
 import collections, collections.abc, dataclasses # noqa
 import numbers
 from numbers import Number # noqa
@@ -55,6 +56,7 @@ import quantities as pq
 from core.vigra_patches import vigra
 import pyqtgraph # for their own eq operator
 import matplotlib as mpl
+from tribool import Tribool
 #import language_tool_python
 
 import qtpy # noqa
@@ -83,14 +85,6 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
     
-
-# import qtpy
-# qtpy.API = os.environ["QT_API"]
-# if os.environ["QT_API"] == "pyside6":
-#     import PySide6
-#     from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, Shiboken)
-# else:
-#     from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
 
 from core import prog
 from core import qtutils
@@ -5249,3 +5243,70 @@ def sympygraph(s:sympy.Basic) -> GraphSource:
     
     return GraphSource(sympy.dotprint(s))
     
+
+@singledispatch
+def repr_val(val, decimals: int | None = None):
+    return f"{val}"
+
+@repr_val.register(bool)
+def _repr_val_(val: bool, _):
+    return "True" if val is True else "False"
+
+@repr_val.register(Tribool)
+def _repr_val_(val: Tribool, _):
+    return "True" if val.value is True else "False" if val.value is False else ""
+
+@repr_val.register(float)
+@repr_val.register(np.floating)
+def _repr_val_(val: float | np.floating, decimals: int | None = None):
+    if decimals is None:
+        return np.format_float_positional(val)
+
+    return np.format_float_positional(val, precision=decimals, unique=False)
+
+@repr_val.register(complex)
+@repr_val.register(np.complexfloating)
+def _repr_val_(val: complex | np.complexfloating, decimals: int | None = None):
+    if decimals is None:
+        rval = np.format_float_positional(val.real)
+        ival = np.format_float_positional(val.imag)
+
+    else:
+        rval = np.format_float_positional(val.real, precision=decimals, unique=False)
+        ival = np.format_float_positional(val.imag, precision=decimals, unique=False)
+
+    return f"{rval}+{ival}j"
+
+@repr_val.register(datetime.datetime)
+def _repr_val_(val: datetime.datetime, _: int | None = None):
+    return val.isoformat(" ")
+
+@repr_val.register(datetime.date)
+@repr_val.register(datetime.time)
+def _repr_val_(val: (datetime.date, datetime.time), _: int | None = None):
+    return val.isoformat()
+
+@repr_val.register(enum.Enum)
+def _repr_val_(val: enum.Enum, _: int | None = None):
+    return f"{val.name}"
+
+@repr_val.register(neo.Event)
+def _repr_val_(val: neo.Event, decimals: int | None = None):
+    from core.scipyen_quantities import quantity2str
+    return quantity2str(val.times, decimals)
+
+@repr_val.register(pq.Quantity)
+def _repr_val_(val: pq.Quantity, decimals: int | None = None):
+    from core.scipyen_quantities import quantity2str
+    return quantity2str(val, decimals)
+
+@repr_val.register(np.ndarray)
+def _repr_val_(val: np.ndarray, decimals: int | None = None):
+    if decimals is None:
+        with np.printoptions(floatmode="unique"):
+            return np.array2string(val)
+    else:
+        with np.printoptions(floatmode="fixed", precision=decimals):
+            return np.array2string(val)
+
+
