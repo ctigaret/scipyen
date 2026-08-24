@@ -1129,6 +1129,7 @@ Named Parameters:
         if isinstance(x0, pq.Quantity):
             x0 = float(x0.flatten()[0].magnitude)
         self._model_fit_coefficients_.loc["x0", "Initial Value"] = x0
+        self.modelCoefficientsTable.tableView.reset()
 
 
     @Slot(int)
@@ -1173,6 +1174,7 @@ Named Parameters:
             return
 
         fitParams = self._model_fit_coefficients_
+
         if not isinstance(fitParams, pd.DataFrame) or \
             not all(v in fitParams.columns for v in ("Initial Value", "Lower Bound", "Upper Bound", "Keep Feasible")) or \
                 fitParams.size == 0:
@@ -1199,7 +1201,9 @@ Named Parameters:
         try:
             self._fittedCurve_, self._fitResult_ = crvf.fit_model(data, self._model_, p0, x = x, bounds=bounds)
 
-        except Exception as e:
+            print(f"self._fitResult_.ModelFunction -> {self._fitResult_.ModelFunction}")
+
+        except Exception as e: # noqa
             print(e)
             with io.StringIO() as bf:
                 traceback.print_exc(file=bf)

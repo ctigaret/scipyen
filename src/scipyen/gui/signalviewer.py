@@ -9058,11 +9058,7 @@ Var-keyword parameters ("name=value" pairs):
         # a different X domain
         self._axesXOffsetsCache_ = self.getViewXOffsets()
 
-        # print(f"{self.__class__.__name__}.displayFrame for {self.currentFrame} with _new_frame_ = {self._new_frame_}: {len(self._axesStatesCache_)} axes states\n\n###\n\n")
-
         self.currentFrameAnnotations = None
-
-        # print(f"SignalViewer({self._winTitle_}).displayFrame {self.currentFrame}")
 
         self._plot_data_(self._yData_, *self.plot_args, **self.plot_kwargs)
 

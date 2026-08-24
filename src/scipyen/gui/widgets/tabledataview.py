@@ -119,18 +119,24 @@ For code painting the NW corner label see
                 obj, QtWidgets.QAbstractButton):
             return False
 
-        # Paint by hand (borrowed from QTableCornerButton)
+        # Paint table corner button (i.e. label for row index)
+        # by hand (borrowed from QTableCornerButton)
         opt = QtWidgets.QStyleOptionHeader()
         opt.initFrom(obj)
         styleState = QtWidgets.QStyle.State_None
+
         if obj.isEnabled():
             styleState |= QtWidgets.QStyle.State_Enabled
+
         if obj.isActiveWindow():
             styleState |= QtWidgets.QStyle.State_Active
+
         if obj.isDown():
             styleState |= QtWidgets.QStyle.State_Sunken
+
         opt.state = styleState
         opt.rect = obj.rect()
+
         # This line is the only difference to QTableCornerButton
         opt.text = obj.text()
         opt.position = QtWidgets.QStyleOptionHeader.OnlyOneSection
@@ -160,7 +166,14 @@ For code painting the NW corner label see
 
     @decimals.setter
     def decimals(self, val: int | None = None):
+        needsDataChanged = self._decimals_ != val
+
         if isinstance(val, int) and val >= 0:
             self._decimals_ = val
         else:
             self._decimals_ = None
+
+        if needsDataChanged:
+            self.reset()
+            # self.model().beginResetModel()
+            # self.model().endResetModel()

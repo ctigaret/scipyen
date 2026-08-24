@@ -626,6 +626,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # ### END   Define timer debug
 
         self.beginResetModel()
+
         try:
             self._is_vigra_filter_kernel_ = False
             self._original_data_ = data

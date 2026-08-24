@@ -306,7 +306,7 @@
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>268</width>
+                <width>262</width>
                 <height>192</height>
                </rect>
               </property>
@@ -472,13 +472,13 @@
             </sizepolicy>
            </property>
            <property name="toolTip">
-            <string>Adjust β such that the model has unit amplitude</string>
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Adjust β such that the model has unit amplitude&lt;/p&gt;&lt;p&gt;(WARNING: this is not supported by all models)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="statusTip">
-            <string>Adjust β such that the model has unit amplitude</string>
+            <string>Adjust β such that the model has unit amplitude (WARNING: this is not supported by all models)</string>
            </property>
            <property name="whatsThis">
-            <string>Adjust β such that the model has unit amplitude</string>
+            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Adjust β such that the model has unit amplitude&lt;/p&gt;&lt;p&gt;(WARNING: this is not supported by all models)&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
            </property>
            <property name="text">
             <string>Unit Amplitude</string>
@@ -500,10 +500,10 @@
             <string>Generate the model waveform using the initial coefficient values, duration and sampling rate</string>
            </property>
            <property name="statusTip">
-            <string>Generate waveform</string>
+            <string>Generate the model waveform using the initial coefficient values, duration and sampling rate</string>
            </property>
            <property name="whatsThis">
-            <string>Generate waveform</string>
+            <string>Generate the model waveform using the initial coefficient values, duration and sampling rate</string>
            </property>
            <property name="text">
             <string/>
@@ -518,6 +518,15 @@
          </item>
          <item>
           <widget class="QToolButton" name="exportModelWaveformToolButton">
+           <property name="toolTip">
+            <string>Export model waveform (NOT fitted)</string>
+           </property>
+           <property name="statusTip">
+            <string>Export model waveform (NOT fitted)</string>
+           </property>
+           <property name="whatsThis">
+            <string>Export model waveform (NOT fitted)</string>
+           </property>
            <property name="text">
             <string>Export Model Waveform</string>
            </property>
@@ -562,6 +571,15 @@
              <verstretch>0</verstretch>
             </sizepolicy>
            </property>
+           <property name="toolTip">
+            <string>Fit model to data</string>
+           </property>
+           <property name="statusTip">
+            <string>Fit model to data</string>
+           </property>
+           <property name="whatsThis">
+            <string>Fit model to data</string>
+           </property>
            <property name="text">
             <string/>
            </property>
@@ -575,6 +593,15 @@
          </item>
          <item>
           <widget class="QPushButton" name="exportFitResultPushButton">
+           <property name="toolTip">
+            <string>Export fit results to workspace</string>
+           </property>
+           <property name="statusTip">
+            <string>Export fit results to workspace</string>
+           </property>
+           <property name="whatsThis">
+            <string>Export fit results to workspace</string>
+           </property>
            <property name="text">
             <string/>
            </property>
@@ -588,6 +615,15 @@
          </item>
          <item>
           <widget class="QToolButton" name="exportFitCurveToolButton">
+           <property name="toolTip">
+            <string>Export fitted curve to workspace</string>
+           </property>
+           <property name="statusTip">
+            <string>Export fitted curve to workspace</string>
+           </property>
+           <property name="whatsThis">
+            <string>Export fitted curve to workspace</string>
+           </property>
            <property name="text">
             <string>Export fitted curve</string>
            </property>
@@ -607,6 +643,15 @@
              <verstretch>0</verstretch>
             </sizepolicy>
            </property>
+           <property name="toolTip">
+            <string>Select data channel</string>
+           </property>
+           <property name="statusTip">
+            <string>Select data channel</string>
+           </property>
+           <property name="whatsThis">
+            <string>Select data channel</string>
+           </property>
            <property name="maximum">
             <number>9999</number>
            </property>
@@ -619,6 +664,15 @@
              <horstretch>0</horstretch>
              <verstretch>0</verstretch>
             </sizepolicy>
+           </property>
+           <property name="toolTip">
+            <string>Help on the model function</string>
+           </property>
+           <property name="statusTip">
+            <string>Help on the model function</string>
+           </property>
+           <property name="whatsThis">
+            <string>Help on the model function</string>
            </property>
            <property name="text">
             <string/>

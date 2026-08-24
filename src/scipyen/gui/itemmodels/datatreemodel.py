@@ -172,6 +172,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
     @staticmethod
     def _check_public_member_(x: object, y: typing.Optional[object] = None):
+        # return not (isinstance(x[0], str) and not x[0].startswith("_"))
         return (not isinstance(x[0], str)
                 or not x[0].startswith("_"))
 

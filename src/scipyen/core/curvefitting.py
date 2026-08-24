@@ -1530,8 +1530,8 @@ A tuple: (fitted curve, types.SimpleNamespace) where:
     # NOTE: 2025-05-18 10:05:48 switching to SimpleNamespace
     # TODO: 2025-05-18 10:06:06 propagate this to other fit_* functions in this module
     result = types.SimpleNamespace({"ModelFunction": func,
-                                   "Fit": res,
-                                   "Coefficients": coefficients})
+                                    "Fit": res,
+                                    "Coefficients": coefficients})
     # result = types.SimpleNamespace({"ModelFunction": f"{func.__module__}.{func.__name__}",
     #                                "Fit": res,
     #                                "Coefficients": coefficients})
