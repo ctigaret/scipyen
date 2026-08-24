@@ -390,9 +390,11 @@ def is_scalar(x):
     r"""Checks if ``x`` is a numeric scalar or a numpy array with one element"""
     import numpy as np
     if isinstance(x, (bool, int, float, complex, numbers.Rational, fractions.Fraction)):
-        return False
+        return True
+
     elif isinstance(x, np.ndarray):
         return x.ndim == 0 or x.size == 1
+
     else:
         return False
 
