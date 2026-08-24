@@ -1783,13 +1783,6 @@ def checkDosageUnits(value):
     return any(f in families for f in acceptable_families)
 
 
-
-    # test if this is a Mass, Volume¹, Concentration, Compound, or Substance unit
-    #
-    # ¹ a dosing based exclusively on volume is theoretically possible, although
-    # impractical
-
-
 def checkTimeUnits(value):
     if not isinstance(value, (pq.UnitQuantity, pq.Quantity)):
         raise TypeError("Expecting a python UnitQuantity or Quantity; got %s instead" % type(value).__name__)

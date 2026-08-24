@@ -306,7 +306,7 @@
                <rect>
                 <x>0</x>
                 <y>0</y>
-                <width>331</width>
+                <width>268</width>
                 <height>192</height>
                </rect>
               </property>
@@ -383,6 +383,19 @@
            </item>
            <item>
             <layout class="QHBoxLayout" name="rowManipulationButtonsLayout">
+             <item>
+              <widget class="QPushButton" name="exportModelFittingTablePushButton">
+               <property name="text">
+                <string>Export Table</string>
+               </property>
+               <property name="icon">
+                <iconset theme="document-export"/>
+               </property>
+               <property name="flat">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
              <item>
               <widget class="QPushButton" name="addStarredRowsPushButton">
                <property name="sizePolicy">

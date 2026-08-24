@@ -278,6 +278,8 @@ Named Parameters:
         self.exportFitCurveToolButton.setEnabled(False)
         self.exportFitCurveToolButton.clicked.connect(self._slot_exportFittedCurve)
 
+        self.exportModelFittingTablePushButton.clicked.connect(self._slot_exportFitTable)
+
     def _setModelData_(self, model:types.FunctionType,
                        data:typing.Optional[neo.AnalogSignal | DataSignal] = None,
                        start:pq.Quantity=0*pq.dimensionless,
@@ -538,9 +540,9 @@ Named Parameters:
 
         if isinstance(val, (neo.AnalogSignal, DataSignal)):
             start = val.t_start
+            duration = val.duration
             if scq.checkTimeUnits(start):
                 duration = duration.rescale(start.units)
-            duration = val.duration
             samplingRate = val.sampling_rate
             waveformUnits = val.units
 
@@ -1261,6 +1263,19 @@ Named Parameters:
                 getScipyenMainWindow().assignToWorkspace(varname, wave)
 
     @Slot()
+    def _slot_exportFitTable(self):
+        from gui.guiutils import getScipyenMainWindow, getEnclosingQMainWindow
+        from gui.workspacegui import WorkspaceGuiMixin
+
+        varname = f"{self._model_name_}_fitCoefficientsTable" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "fitCoefficientsTable"
+        ancestorWindow = getEnclosingQMainWindow(self)
+        if isinstance(ancestorWindow, WorkspaceGuiMixin):
+            ancestorWindow.exportDataToWorkspace(self._model_fit_coefficients_, varname,
+                                                    title="Export Fit Coefficients Table")
+        else:
+            getScipyenMainWindow().assignToWorkspace(varname, self._model_fit_coefficients_)
+
+    @Slot()
     def _slot_exportFitResult(self):
         from gui.guiutils import getScipyenMainWindow, getEnclosingQMainWindow
         from gui.workspacegui import WorkspaceGuiMixin
@@ -1270,9 +1285,10 @@ Named Parameters:
             ancestorWindow = getEnclosingQMainWindow(self)
             if isinstance(ancestorWindow, WorkspaceGuiMixin):
                 ancestorWindow.exportDataToWorkspace(self._fitResult_, varname,
-                                                     title="Export Fitt Result")
+                                                     title="Export Fit Result")
             else:
                 getScipyenMainWindow().assignToWorkspace(varname, self._fitResult_)
+
     @Slot()
     def _slot_makeUnitAmplitudeModel(self):
         # TODO 2026-05-06 11:49:36 FIXME

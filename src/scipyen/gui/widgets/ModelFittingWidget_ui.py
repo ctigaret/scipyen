@@ -192,7 +192,7 @@ class Ui_ModelFittingWidget(object):
         self.scrollArea.setWidgetResizable(True)
         self.scrollAreaWidgetContents = QWidget()
         self.scrollAreaWidgetContents.setObjectName(u"scrollAreaWidgetContents")
-        self.scrollAreaWidgetContents.setGeometry(QRect(0, 0, 331, 192))
+        self.scrollAreaWidgetContents.setGeometry(QRect(0, 0, 268, 192))
         sizePolicy5.setHeightForWidth(self.scrollAreaWidgetContents.sizePolicy().hasHeightForWidth())
         self.scrollAreaWidgetContents.setSizePolicy(sizePolicy5)
         self.gridLayout_2 = QGridLayout(self.scrollAreaWidgetContents)
@@ -227,12 +227,20 @@ class Ui_ModelFittingWidget(object):
 
         self.rowManipulationButtonsLayout = QHBoxLayout()
         self.rowManipulationButtonsLayout.setObjectName(u"rowManipulationButtonsLayout")
+        self.exportModelFittingTablePushButton = QPushButton(self.layoutWidget11)
+        self.exportModelFittingTablePushButton.setObjectName(u"exportModelFittingTablePushButton")
+        icon2 = QIcon(QIcon.fromTheme(u"document-export"))
+        self.exportModelFittingTablePushButton.setIcon(icon2)
+        self.exportModelFittingTablePushButton.setFlat(True)
+
+        self.rowManipulationButtonsLayout.addWidget(self.exportModelFittingTablePushButton)
+
         self.addStarredRowsPushButton = QPushButton(self.layoutWidget11)
         self.addStarredRowsPushButton.setObjectName(u"addStarredRowsPushButton")
         sizePolicy.setHeightForWidth(self.addStarredRowsPushButton.sizePolicy().hasHeightForWidth())
         self.addStarredRowsPushButton.setSizePolicy(sizePolicy)
-        icon2 = QIcon(QIcon.fromTheme(QIcon.ThemeIcon.ListAdd))
-        self.addStarredRowsPushButton.setIcon(icon2)
+        icon3 = QIcon(QIcon.fromTheme(QIcon.ThemeIcon.ListAdd))
+        self.addStarredRowsPushButton.setIcon(icon3)
         self.addStarredRowsPushButton.setFlat(True)
 
         self.rowManipulationButtonsLayout.addWidget(self.addStarredRowsPushButton)
@@ -241,8 +249,8 @@ class Ui_ModelFittingWidget(object):
         self.removeStarredRowsPushButton.setObjectName(u"removeStarredRowsPushButton")
         sizePolicy.setHeightForWidth(self.removeStarredRowsPushButton.sizePolicy().hasHeightForWidth())
         self.removeStarredRowsPushButton.setSizePolicy(sizePolicy)
-        icon3 = QIcon(QIcon.fromTheme(QIcon.ThemeIcon.ListRemove))
-        self.removeStarredRowsPushButton.setIcon(icon3)
+        icon4 = QIcon(QIcon.fromTheme(QIcon.ThemeIcon.ListRemove))
+        self.removeStarredRowsPushButton.setIcon(icon4)
         self.removeStarredRowsPushButton.setFlat(True)
 
         self.rowManipulationButtonsLayout.addWidget(self.removeStarredRowsPushButton)
@@ -269,16 +277,15 @@ class Ui_ModelFittingWidget(object):
         self.generateWaveformPushButton.setObjectName(u"generateWaveformPushButton")
         sizePolicy2.setHeightForWidth(self.generateWaveformPushButton.sizePolicy().hasHeightForWidth())
         self.generateWaveformPushButton.setSizePolicy(sizePolicy2)
-        icon4 = QIcon(QIcon.fromTheme(u"waveform"))
-        self.generateWaveformPushButton.setIcon(icon4)
+        icon5 = QIcon(QIcon.fromTheme(u"waveform"))
+        self.generateWaveformPushButton.setIcon(icon5)
         self.generateWaveformPushButton.setFlat(True)
 
         self.waveControlAndDisplayHLayout.addWidget(self.generateWaveformPushButton)
 
         self.exportModelWaveformToolButton = QToolButton(self.layoutWidget)
         self.exportModelWaveformToolButton.setObjectName(u"exportModelWaveformToolButton")
-        icon5 = QIcon(QIcon.fromTheme(u"document-export"))
-        self.exportModelWaveformToolButton.setIcon(icon5)
+        self.exportModelWaveformToolButton.setIcon(icon2)
         self.exportModelWaveformToolButton.setAutoRaise(True)
 
         self.waveControlAndDisplayHLayout.addWidget(self.exportModelWaveformToolButton)
@@ -304,14 +311,14 @@ class Ui_ModelFittingWidget(object):
 
         self.exportFitResultPushButton = QPushButton(self.layoutWidget)
         self.exportFitResultPushButton.setObjectName(u"exportFitResultPushButton")
-        self.exportFitResultPushButton.setIcon(icon5)
+        self.exportFitResultPushButton.setIcon(icon2)
         self.exportFitResultPushButton.setFlat(True)
 
         self.waveControlAndDisplayHLayout.addWidget(self.exportFitResultPushButton)
 
         self.exportFitCurveToolButton = QToolButton(self.layoutWidget)
         self.exportFitCurveToolButton.setObjectName(u"exportFitCurveToolButton")
-        self.exportFitCurveToolButton.setIcon(icon5)
+        self.exportFitCurveToolButton.setIcon(icon2)
         self.exportFitCurveToolButton.setAutoRaise(True)
 
         self.waveControlAndDisplayHLayout.addWidget(self.exportFitCurveToolButton)
@@ -430,6 +437,7 @@ class Ui_ModelFittingWidget(object):
 #if QT_CONFIG(whatsthis)
         self.modelCoefficientsTable.setWhatsThis(QCoreApplication.translate("ModelFittingWidget", u"Model coefficient values used for waveform generation and curve fitting", None))
 #endif // QT_CONFIG(whatsthis)
+        self.exportModelFittingTablePushButton.setText(QCoreApplication.translate("ModelFittingWidget", u"Export Table", None))
 #if QT_CONFIG(tooltip)
         self.addStarredRowsPushButton.setToolTip(QCoreApplication.translate("ModelFittingWidget", u"Add one instance each, of starred coefficients", None))
 #endif // QT_CONFIG(tooltip)
