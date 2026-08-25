@@ -97,7 +97,7 @@ def fft_purelet(image, nLevels, wavelet=None, sigma2=None, thr=None):
 
     xqor          = np.zeros((image.shape[0], image.shape[1], 3))# h, v, d, per-level
 
-    ## NOTE: from this we derive per-level diagonal terms
+    ## NOTE: from this I derive per-level diagonal terms
 
     dDR = np.ones((image.shape[0], image.shape[1], 3))
 
@@ -169,7 +169,7 @@ def fft_purelet(image, nLevels, wavelet=None, sigma2=None, thr=None):
     zy_ = np.zeros(zy_0.shape, dtype=np.complex128)
 
     ## NOTE: low-pass reconstruction 2D transfer function is build it up recursively, 
-    ## NOTE: noting that we start from the highest resolution level instead of 
+    ## NOTE: noting that I start from the highest resolution level instead of
     ## NOTE: the coarsest level as is usually done (see fft_rec)
 
     LL_ = np.ones(image.shape, dtype=np.complex128) # to be updated at end of each iteration
@@ -202,7 +202,7 @@ def fft_purelet(image, nLevels, wavelet=None, sigma2=None, thr=None):
         zexp = np.power(2.0, k) ## NOTE: dilation operator at level k
 
         ## NOTE: z^(-zexp) dyadically upsamples the filter but also time-reverses it, 
-        ## NOTE: hence we compensate this by time-reversing the base FIRs kernels
+        ## NOTE: hence I compensate this by time-reversing the base FIRs kernels
         ## NOTE: used to generate the upsampled transfer functions (see above) 
 
                                       ## NOTE: level (k)  =         0,  1,  2,  3  
@@ -258,7 +258,7 @@ def fft_purelet(image, nLevels, wavelet=None, sigma2=None, thr=None):
         ## NOTE: (HL_, LH_, and HH_, calculated above) with the 2D transfer function
         ## NOTE: for the approximation subband at current decomposition level, LL_).
         ## NOTE:
-        ## NOTE: This multiplication step is required, since we're iterating from 
+        ## NOTE: This multiplication step is required, since I're iterating from
         ## NOTE: the finest to coarsest level here (i.e.,, "top to bottom"), 
         ## NOTE: as opposed to performing the reconstruction in the "bottom up" 
         ## NOTE: order (from the coarsest to the finest level) as it is usually done.
@@ -272,7 +272,7 @@ def fft_purelet(image, nLevels, wavelet=None, sigma2=None, thr=None):
         ## NOTE: Hadamard matrix product (element-wise multiplication) between 
         ## NOTE: the analysis and synthesis 2D FIRs. The 2D analysis FIRs are the
         ## NOTE: result of inverse Fourier transform of the 2D analysis transfer functions
-        ## NOTE: (HL, LH, and HH). Finally, we forward Fourier transform the product to
+        ## NOTE: (HL, LH, and HH). Finally, I forward Fourier transform the product to
         ## NOTE: obtain the 2D subband transfer functions for DoR and QoR
         
         hl_ll_ = np.fft.ifft2(HL_ * LL_, axes=(0, 1))  # horizontal
@@ -327,7 +327,7 @@ def fft_purelet(image, nLevels, wavelet=None, sigma2=None, thr=None):
         xqor[:,:,1] = np.real(np.fft.ifft2(X * QoRLH, axes=(0, 1)))
         xqor[:,:,2] = np.real(np.fft.ifft2(X * QoRHH, axes=(0, 1)))
 
-        ## NOTE: sigma2 is None means we want to estimate AWGN variance from the 
+        ## NOTE: sigma2 is None means I want to estimate AWGN variance from the
         ## NOTE: finest detail coefficients using Donoho's formula
         
         #print(x.shape)
@@ -363,7 +363,7 @@ def fft_purelet(image, nLevels, wavelet=None, sigma2=None, thr=None):
         
         ## NOTE: the inner vector product is essentially the sum of the element-wise 
         ## NOTE: product of the two vectors so to avoid confusion related to axes 
-        ## NOTE: conversions (flatten-reshape) we just multiply these matrices 
+        ## NOTE: conversions (flatten-reshape) I just multiply these matrices
         ## NOTE: element-wise then calculate the sum over the result
         
         yDelFy[k+nLevels] = ( np.sum(dt_dx * xdor) + \
@@ -382,7 +382,7 @@ def fft_purelet(image, nLevels, wavelet=None, sigma2=None, thr=None):
             
         #the inner vector product is the sum of the element-wise product of the vectors so to avoid
         #confusion related to axes conversions (flatten-reshape, which is column and which is row) 
-        # we just multiply these matrices element wise then calculate their sum
+        # I just multiply these matrices element wise then calculate their sum
         
         #yDiv_Fy_delFy[k+nLevels]  =( np.sum(dt_dx_all[:,:,:,k] * diagsDR) + np.sum(dt_dy_all[:,:,:,k] * diagsQR) - \
             #(np.sum(d2t_dx2_all[:,:,:,k] * diagsDoDR) + np.sum(d2t_dy2_all[:,:,:,k] * diagsQoQR) + 2. * np.sum(dt_dxdy_all[:,:,:,k] * diagsDoQR))) / N3
@@ -405,14 +405,14 @@ def fft_purelet(image, nLevels, wavelet=None, sigma2=None, thr=None):
         fy_t1[:,:,2] = fy_t1[:,:,2] * HH_ * LL_
         fy_t2[:,:,2] = fy_t2[:,:,2] * HH_ * LL_
         
-        ## NOTE: this overwrites the destination arrays, which is okay as we don't need 
+        ## NOTE: this overwrites the destination arrays, which is okay as I don't need
         ## NOTE: their previous contents anymore
         ## NOTE: furthermore, the destination arrays now contain real data (as opposed to Fourier domain)
         
         fy_t1 = np.real(np.fft.ifft2(np.sum(fy_t1, axis=2), axes=(0, 1)))
         fy_t2 = np.real(np.fft.ifft2(np.sum(fy_t2, axis=2), axes=(0, 1)))
         
-        # here is the only place were we still need to flatten
+        # here is the only place were I still need to flatten
         Fy[:,k] = fy_t1.flatten(order="F")
         Fy[:,k+nLevels] = fy_t2.flatten(order="F")
 
@@ -428,7 +428,7 @@ def fft_purelet(image, nLevels, wavelet=None, sigma2=None, thr=None):
     Fy_lp = np.real(np.fft.ifft2(X * LL_, axes=(0, 1)))
                             
     ## NOTE: finally compute the PURE vector `c', and solve for the linear parameters
-    yHi = (np.array(image) - Fy_lp).flatten(order="F") # this is faster, as we already have got these terms
+    yHi = (np.array(image) - Fy_lp).flatten(order="F") # this is faster, as I already have got these terms
     
     M = np.dot(Fy.T, Fy) / N
     
@@ -608,7 +608,7 @@ def tiwt_purelet(image, nLevels, wavelet=None, sigma2=None, thr=None):
     #
     # 7) inverse Fourier transform (back into image domain), discard imaginary part
     #
-    ## NOTE: if we were to do this, then what's the point in sticking with convolution in the 
+    ## NOTE: if I were to do this, then what's the point in sticking with convolution in the
     # image domain for the rest and NOT do everything in the Fourier domain 
     # (fft_purelet already does it)?
     #
@@ -1052,8 +1052,7 @@ def purelet_theta_analytic(x,y,thetaParams):
     return t, dt_dx, dt_dy, dt_dxdy, d2t_dx2, d2t_dy2
   
 def tiwt_dec(vigraimage, nLevels=None, wavelet=None):
-    r""" Translation invariant wavelet decomposition 
-      using a trous algorithm
+    r"""Translation invariant wavelet decomposition (analysis) using a trous algorithm
   
       Achieves perfect reconstruction within machine error
   
@@ -1080,7 +1079,7 @@ def tiwt_dec(vigraimage, nLevels=None, wavelet=None):
       # at level 0 the input to the filter bank is the signal itself; 
       # for successive levels, the input is the approximation from the previous level
       
-      # check we are given a 2D image devoid of channel axis (even if the latter is a singleton) 
+      # check I are given a 2D image devoid of channel axis (even if the latter is a singleton)
       # so that broadcasting can take place!
   
     if vigraimage.channels > 1:
@@ -1089,23 +1088,35 @@ def tiwt_dec(vigraimage, nLevels=None, wavelet=None):
     if vigraimage.spatialDimensions > 2:
         if vigraimage.depth > 1:
             raise ValueError("3D data not supported")
+
+    # NOTE: 2026-08-25 17:44:00
+    # below:
+    # "g0" -> low-pass decomposition filter kernel coefficients (wavelet's "dec_lo")
+    # "h0" -> high-pass decomposition filter kernel coefficients (wavelet's "dec_hi")
+    # are finite impulse response filters (FIRs)
+
      
     if isinstance(wavelet, str):
         wavelet = pywt.Wavelet(wavelet)
         g0 = np.array(wavelet.dec_lo)
         h0 = np.array(wavelet.dec_hi)
+
     elif isinstance(wavelet, pywt.Wavelet):
         g0 = np.array(wavelet.dec_lo)
         h0 = np.array(wavelet.dec_hi)
-    elif wavelet == None:
+
+    elif wavelet == None: # -> unnormalized Haar
         g0 = np.array([ 1., 1.])
         h0 = np.array([-1., 1.])
+
     else:
         raise ValueError("Second argument must be a valid pywt Wavelet object or a string with a valid pywt Wavelet name")
   
     # start with the image input
     LL = vigraimage.dropChannelAxis()
-    
+
+    # NOTE: 2026-08-25 17:46:02
+    # get the maximum number of decpomopition (aalysis) levels givn the size (width, height) of the image
     if nLevels is None:
         nLevels = np.int(np.log2(min(LL.shape)))
         for k in range(nLevels-1, -1, -1):
@@ -1121,6 +1132,8 @@ def tiwt_dec(vigraimage, nLevels=None, wavelet=None):
     print('Analysis low pass FIR: ',  g0)
     print('Analysis high pass FIR: ', h0)
     
+    # preallocate the result as a 4D array (analysis level goes on the highest
+    # axis order, tagged ws "time" axis just for convenience)
     ret = vigra.VigraArray((vigraimage.width, vigraimage.height, 4, newMaxLevels), \
                          axistags=vigra.VigraArray.defaultAxistags("xyzt"))
   
@@ -1130,7 +1143,6 @@ def tiwt_dec(vigraimage, nLevels=None, wavelet=None):
     # does dyadic a trous expansion of the kernels; 
     # at level 0 (starting level) this simply copies the values from g0, h0
     for i in range(nLevels):
-        #print("level ", i)
         filterLen = len(h0) << i
     
         # avoid per-level filter being longer than the smaller image dimension
@@ -1148,16 +1160,6 @@ def tiwt_dec(vigraimage, nLevels=None, wavelet=None):
       
         g = vigra.filters.explictKernel(0, filterLen-1, garray)
         h = vigra.filters.explictKernel(0, filterLen-1, harray)
-        
-        #print("g kernel: ")
-        
-        #for j in range(g.size()):
-            #print(g[j])
-            
-        #print("h kernel: ")
-        
-        #for j in range(h.size()):
-            #print(h[j])
         
         g.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_WRAP)
         h.setBorderTreatment(vigra.filters.BorderTreatmentMode.BORDER_TREATMENT_WRAP)
@@ -1179,20 +1181,23 @@ def tiwt_dec(vigraimage, nLevels=None, wavelet=None):
     return ret
 
 def tiwt_rec(coeffs, reclevel = None, wavelet=None):
-    r""" Synthesis of the image or of the approximation at level `reclevel' from 
-        the set of decomposition coefficients.
-        Achieves perfect reconstruction within machine error.
+    r"""SWavelet Footprints: Theory, Algorithms,
+and Applicationsynthesis (reconstruction) of the image or of the approximation at
+    level `reclevel' from the set of decomposition coefficients obtained by tiwt_dec.
+    Achieves perfect reconstruction within machine error.
         
-        Algorithm goes bottom-up (from the coarsest to the finest level)
+    Algorithm goes bottom-up (from the coarsest to the finest level)
     """
 
     if isinstance(wavelet, str):
         wavelet = pywt.Wavelet(wavelet)
         g0 = np.array(wavelet.rec_lo)
         h0 = np.array(wavelet.rec_hi)
+
     elif isinstance(wavelet, pywt.Wavelet):
         g0 = np.array(wavelet.rec_lo)
         h0 = np.array(wavelet.rec_hi)
+
     elif wavelet == None:
         g0 = np.array([1.,  1.]) / 2.0 # this is for unnormalized Haar wavelet
         h0 = np.array([1., -1.]) / 2.0
@@ -1208,8 +1213,8 @@ def tiwt_rec(coeffs, reclevel = None, wavelet=None):
     
     levels = coeffs.shape[coeffs.ndim-1]
     
-    rec_cf = vigra.VigraArray(coeffs.shape, \
-                         axistags=vigra.VigraArray.defaultAxistags("xyzt"))
+    rec_cf = vigra.VigraArray(
+        coeffs.shape,axistags=vigra.VigraArray.defaultAxistags("xyzt"))
                          
 #    print("shape of rec_cf: ", rec_cf.shape)
   
@@ -1224,6 +1229,7 @@ def tiwt_rec(coeffs, reclevel = None, wavelet=None):
   
     if reclevel is None or reclevel < 0:
         reclevel = 0 # reconstruct the original data
+
     elif reclevel >= (levels-1):
         reclevel = levels-2 # reconstruct the approximation at the one before last level
   
@@ -1277,7 +1283,7 @@ def tiwt_rec(coeffs, reclevel = None, wavelet=None):
 
 
 def fft_dec(image, nLevels, wavelet = None):
-    ''' Translation-invariant wavelet 2D decomposition in the Fourier domain.
+    ''' Translation-invariant wavelet 2D decomposition (analysis) in the Fourier domain.
     Uses orthogonal wavelets.
     
     Argments:
@@ -1302,30 +1308,31 @@ def fft_dec(image, nLevels, wavelet = None):
 # g = low-pass
 # h = high-pass
 
-# g0 = the low-pass analysis FIR for level 0 -- to be dyadically  expanded a-trous in the Fourier domain
+# g0 = the low-pass  analysis FIR for level 0 -- to be dyadically expanded a-trous in the Fourier domain
 # h0 = the high-pass analysis FIR for level 0 -- to be dyadically expanded a-trous in the Fourier domain
 #
 # NOTE that these analysis FIRs need to be time-reversed.
 # this can be done either in the time domain (i.e. when building up the np.array)
-# or at the time when we construct the 1D transfer functions
+# or at the time when I construct the 1D transfer functions
 #
 
-## alternatively, when we are given only the low-pass analysis FIR g0,
+## alternatively, when I are given only the low-pass analysis FIR g0,
 ## can construct h0 from g0 by mirrorfilt like so:
 #h0 = -1. * mirrorfilt(g0)
 
     if isinstance(wavelet, str):
         wavelet = pywt.Wavelet(wavelet)
-        g0 = np.array(wavelet.dec_lo) #[::-1, ] # time-reversal -- needed as explained below 
-        h0 = np.array(wavelet.dec_hi) #[::-1, ] # -- moved in the loop below, when we build the per-level 1D transfer functions
+        g0 = np.array(wavelet.dec_lo) #[::-1, ] # NOTE: 2026-08-25 18:01:22 time-reversal -- needed as explained below, see NOTE: 2026-08-25 18:02:00
+        h0 = np.array(wavelet.dec_hi) #[::-1, ] # -- moved in the loop below, when I build the per-level 1D transfer functions
 
     elif isinstance(wavelet, pywt.Wavelet):
-        g0 = np.array(wavelet.dec_lo) #[::-1, ] # see comments above
+        g0 = np.array(wavelet.dec_lo) #[::-1, ] # see NOTE: 2026-08-25 18:01:22 comments above
         h0 = np.array(wavelet.dec_hi) #[::-1, ] 
 
     elif wavelet == None:
         g0 = np.array([ 1., 1.]) # they will be time-reversed below
         h0 = np.array([-1., 1.])
+
     else:
         raise ValueError("Second argument must be a valid pywt Wavelet object or a string with a valid pywt Wavelet name, or None")
   
@@ -1339,7 +1346,7 @@ def fft_dec(image, nLevels, wavelet = None):
     # LL, HL, LH, HH: 2D transfer functions
     # 
     #
-    # at each level we generate the following transform coefficients: approx (LL), 
+    # at each level I generate the following transform coefficients: approx (LL),
     # and details: horizontal (LH), vertical (HL) and diagonal (HH)
     #
     # NOTE: pre-alocated array as VigraArray for convenience (i.e., for visualization)
@@ -1352,14 +1359,14 @@ def fft_dec(image, nLevels, wavelet = None):
     # transfer functions: they are obtained by regularly sampling the complex circle
     # corresponding to the normalized `width` and `height` respectively:
     # 
-    # exp(i * 2pi * x/width) with `x` running from 0 to width-1 (i.e. normalized width), and
+    # exp(i * 2pi * x/width)  with `x` running from 0 to width-1  (i.e. normalized width), and
     #
     # exp(i * 2pi * y/height) with `y` running from 0 to height-1 (i.e., normalized height)
     #
     # with `i` being the imaginary unit i.e. the complex number <0.0, 1.0> -- 
-    #       (in python (numpy) this is 1j)
+    #       (NOTE: in python (numpy) this is 1j)
     #
-    zx_0 = np.exp(1j * twopi * np.linspace(0, 1, image.shape[0],  endpoint=False)) # 0 .. 2 * pi
+    zx_0 = np.exp(1j * twopi * np.linspace(0, 1, image.shape[0], endpoint=False)) # 0 .. 2 * pi
     zy_0 = np.exp(1j * twopi * np.linspace(0, 1, image.shape[1], endpoint=False))
   
     X = np.fft.fft2(image.dropChannelAxis(), axes=(0, 1))
@@ -1367,23 +1374,24 @@ def fft_dec(image, nLevels, wavelet = None):
     for k in range(nLevels):
         zexp = np.power(2.0, k) # (2^k)
         
+        # NOTE: 2026-08-25 18:02:00
         # z^p dyadically upsamples the filter but also time-reverses it, hence
-        # we compensate this by time-reversing the base FIRs (see above) from
-        # which we generate the upsampled transfer functions
+        # I compensate this by time-reversing the base FIRs (see # NOTE: 2026-08-25 18:01:22 above)
+        # from which I generate the upsampled transfer functions
         
         #
         # this time-reversal results from the fact that np.polyval takes the
         # coefficients in the array in INCREASING order (like Matlab's polyval,
-        # which is the opposite to the way np.polynomial package does); without
-        # polyval's way of taking the coefficients in the INCREASING order, we wouldn't
+        # which is the opposite to the way np.polynomial package does it); without
+        # polyval's way of taking the coefficients in the INCREASING order, I wouldn't
         # need to reverse the array here
         #
         
         
-        # in the following we calculate the (discrete) Fourier transform of the FIRs
+        # in the following I calculate the (discrete) Fourier transform of the FIRs
         # thus obtaining the transfer functions; 
         
-        # first we generate the vlues for the complex variable to evaluate the polynomial;
+        # first I generate the vlues for the complex variable to evaluate the polynomial;
         # the polynomial coefficiets are represented by the elements in the FIR array
         
         # the argument is in fact the sampled complex circle (see above) exponentiated 
@@ -1398,7 +1406,7 @@ def fft_dec(image, nLevels, wavelet = None):
         zy = np.power(zy_0, -zexp)
         
         
-        # we now evaluate the polynomial represented by the basic FIR coefficients
+        # I now evaluate the polynomial represented by the basic FIR coefficients
         # at the complex argument zx (or zy)
         
         # this is equivalent to evaluating the FIR polynomial at the argument
@@ -1424,19 +1432,19 @@ def fft_dec(image, nLevels, wavelet = None):
         Hx = np.polyval(h0[::-1, ], zx) # time reversal done here
         Hy = np.polyval(h0[::-1, ], zy)
         
-        ##alternatively, if we have constructed h0 from g0 by mirrorfilt
+        ## alternatively, if h0 was constructed from g0 by mirrorfilt
         #Hx = np.polyval(h0, zx)
         #Hy = np.polyval(h0, zy)
         
     
-        # 2D transfer functions = outer prod of 1D transfer functions
+        # 2D transfer functions ⧋ outer prod of 1D transfer functions
         LL = np.outer(Lx, Ly) # low-pass (approximations)
         HL = np.outer(Hx, Ly) # high-pass (or "band-pass" a.k.a details) horizontal
         LH = np.outer(Lx, Hy) #                                          vertical
         HH = np.outer(Hx, Hy) #                                          diagonal
         
         # obtain detail coefficients with high-pass transfer functions
-        # (we need their real part)
+        # (I need their real part)
     
         ret[:,:,1,k] = vigra.VigraArray(np.real(np.fft.ifft2(X * HL, axes=(0, 1))), \
                                         axistags=vigra.AxisTags(vigra.AxisInfo.x(), vigra.AxisInfo.y()))
