@@ -1286,7 +1286,7 @@ Example 2: Converting a dimensionality:
 
         elif precision == "numpy":
             return " ".join([
-                format_fn(x.magnitude, unique=False),
+                format_fn(x.magnitude, unique=False, precision = np.get_printoptions()["precision"]),
                 x.units.dimensionality.string
                 ])
 

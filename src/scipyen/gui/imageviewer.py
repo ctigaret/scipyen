@@ -2363,7 +2363,7 @@ class ImageViewer(ScipyenFrameViewer, Ui_ImageViewerWindow):
                         self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self._imageNormalize))
                 
                 else:
-                    if self._currentFrameData_.min() == cFrame.max():
+                    if self._currentFrameData_.min() == self._currentFrameData_.max():
                         self.viewerWidget.view(self._currentFrameData_.qimage(normalize = False))
                     else:
                         self.viewerWidget.view(self._currentFrameData_.qimage(normalize = self._imageNormalize))
