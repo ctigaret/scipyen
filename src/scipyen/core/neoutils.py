@@ -3750,46 +3750,99 @@ See also:
 
     return result
 
-def pad_signal(sig: neo.AnalogSignal | DataSignal, extent: int | pq.Quantity,
-               value: float | None = None, left: bool = False):
+def pad_signal(sig: neo.AnalogSignal | DataSignal, pad_width: int | pq.Quantity,
+               mode:str, **kwargs):
 
-    if isinstance(extent, pq.Quantity):
-        if extent.units != sig.times.units:
-            if scq.unitsConvertible(extent, sig.times):
-                extent = extent.recale(sig.times.units)
+    pws = list()
+    new_t_start = sig.t_start
+
+    if isinstance(pad_width, typing.Sequence):
+        if len(pad_width not in (1,2)):
+            raise ValueError("pad width must have one or two elements")
+
+        for k in range(len(pad_width)):
+            pw = pad_width[k]
+            if isinstance(pw, pq.Quantity):
+                if pw.units != sig.times.units:
+                    if scq.unitsConvertible(pw, sig.times):
+                        pw = pw.rescale(sig.times.units)
+                    else:
+                        raise TypeError(f"'pad_width' units ({pw.units}) are incompatible with the signal's domain units ({sig.times.units})")
+                pws.append(int(pw * sig.sampling_rate.rescale(1/sig.times.units)))
+
+            elif isinstance(pw, int):
+                assert pw >=0, "Cannot use negative padding length!"
+                pws.append(pw)
+
+        pws = tuple(pws)
+        if pws[0] > 0:
+            new_t_start = sig.t_start-pws[0]*sig.sampling_period
+
+    elif isinstance(pad_width, pq.Quantity):
+        if pad_width.units != sig.times.units:
+            if scq.unitsConvertible(pad_width, sig.times):
+                pad_width = pad_width.rescale(sig.times.units)
             else:
-                raise TypeError(f"'extent' units ({extent.units}) are incompatible with the signal's domain units ({sig.times.units})")
+                raise TypeError(f"'pad_width' units ({pad_width.units}) are incompatible with the signal's domain units ({sig.times.units})")
 
-        extent = int(extent * sig.sampling_rate.rescale(1/sig.times.units))
+        pws = (int(pad_width * sig.sampling_rate.rescale(1/sig.times.units)), )
+        if pws[0] > 0:
+            new_t_start = sig.t_start-pws[0]*sig.sampling_period
 
-    channel_pads = list()
+    elif isinstance(pad_width, int):
+        assert pad_width >=0, "Cannot use negative padding length!"
+
+        if pad_width > 0:
+            new_t_start = sig.t_start-pad_width*sig.sampling_period
+
+        pws = (pad_width, )
+
+    else:
+        raise ValueError("Invalid 'pad_width' parameter")
+
+
+    padded_channels = list()
+
     for channel in range(sig.shape[1]):
-        if value is None:
-            sig_channel = sig[:, channel]
-            value = float(sig_channel[0][0].magnitude) if left is True else float(sig_channel[-1][0].magnitude)
+        padded_channels.append(np.pad(sig[:,channel].magnitude.flatten(), pws, mode, **kwargs).flatten())
 
-        channel_pads.append(np.array([[value]*extent]).T)
+    # return padded_channels
 
-    if len(channel_pads) > 1:
-        padding = np.concatenate(*channel_pads, axis=1)
-    else:
-        padding = channel_pads[0]
+    ret = neo.AnalogSignal(np.hstack(padded_channels), units = sig.units,
+                                  t_start = new_t_start, sampling_rate=sig.sampling_rate,
+                                  array_annotations = sig.array_annotations)
 
-        # print(f"padding shape = {padding.shape}, sig shape = {sig.shape}")
 
-    if left:
-        padding_sig = type(sig)(padding, units = sig.units,
-                                t_start = sig.t_start-extent*sig.sampling_period,
-                                sampling_period = sig.sampling_period)
 
-        ret = concatenate_signals(padding_sig, sig, axis=0)
-
-    else:
-        padding_sig = type(sig)(padding, units = sig.units,
-                                t_start = sig.t_stop,
-                                sampling_rate = sig.sampling_rate)
-
-        ret = concatenate_signals(sig, padding_sig, axis=0)
+#     channel_pads = list()
+#
+#     for channel in range(sig.shape[1]):
+#         if value is None:
+#             sig_channel = sig[:, channel]
+#             value = float(sig_channel[0][0].magnitude) if left is True else float(sig_channel[-1][0].magnitude)
+#
+#         channel_pads.append(np.array([[value]*extent]).T)
+#
+#     if len(channel_pads) > 1:
+#         padding = np.concatenate(*channel_pads, axis=1)
+#     else:
+#         padding = channel_pads[0]
+#
+#         # print(f"padding shape = {padding.shape}, sig shape = {sig.shape}")
+#
+#     if left:
+#         padding_sig = type(sig)(padding, units = sig.units,
+#                                 t_start = sig.t_start-extent*sig.sampling_period,
+#                                 sampling_period = sig.sampling_period)
+#
+#         ret = concatenate_signals(padding_sig, sig, axis=0)
+#
+#     else:
+#         padding_sig = type(sig)(padding, units = sig.units,
+#                                 t_start = sig.t_stop,
+#                                 sampling_rate = sig.sampling_rate)
+#
+#         ret = concatenate_signals(sig, padding_sig, axis=0)
 
     return ret
 

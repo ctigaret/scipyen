@@ -1201,7 +1201,7 @@ Named Parameters:
         try:
             self._fittedCurve_, self._fitResult_ = crvf.fit_model(data, self._model_, p0, x = x, bounds=bounds)
 
-            print(f"self._fitResult_.ModelFunction -> {self._fitResult_.ModelFunction}")
+            # print(f"self._fitResult_.ModelFunction -> {self._fitResult_.ModelFunction}")
 
         except Exception as e: # noqa
             print(e)
