@@ -3327,9 +3327,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def _slot_visibility_changed(self, val):
         if (self.menuBar().isNativeMenuBar()
             and hasattr(self, "_wm_id_")
-            and self._wm_id_ != int(self.winId())):
-            if self._globalMenuServiceName_ == "com.canonical.AppMenu.Registrar":
-                self._restore_menuBar_()
+            and self._wm_id_ != int(self.winId())
+            and self._globalMenuServiceName_ == "com.canonical.AppMenu.Registrar"
+            ):
+            self._restore_menuBar_()
 
     #
     # ### END   Global menu stuff - see also BEGIN  global menu stuff - END  global menu stuff block in __init__
@@ -11832,12 +11833,15 @@ class WindowEventFilter(QtCore.QObject):
             self.scipyenWindow = None
 
     def eventFilter(self, obj: QtCore.QObject, evt: QtCore.QEvent):
-        if evt.type() in (QtCore.QEvent.FocusIn, QtCore.QEvent.WindowActivate, QtCore.QEvent.Show):
-            if self.scipyenWindow is not None:
-                if isinstance(self.fig, (mpl.figure.Figure, QtWidgets.QMainWindow)):
-                    self.scipyenWindow.raiseWindow(self.fig)
+        if qtutils.isQObjectAlive(self.scipyenWindow) and qtutils.isQObjectAlive(obj):
+            if evt.type() in (QtCore.QEvent.FocusIn, QtCore.QEvent.WindowActivate, QtCore.QEvent.Show):
+                if self.scipyenWindow is not None:
+                    if isinstance(self.fig, (mpl.figure.Figure, QtWidgets.QMainWindow)):
+                        self.scipyenWindow.raiseWindow(self.fig)
 
-        return False  # do not block the event; pass it on to obj
+            return False  # do not block the event; pass it on to obj
+
+        return True
 
 
 

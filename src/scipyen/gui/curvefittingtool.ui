@@ -37,6 +37,13 @@
        <widget class="QComboBox" name="modelFunctionsComboBox"/>
       </item>
       <item>
+       <widget class="QLabel" name="label">
+        <property name="text">
+         <string>Data vector:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QPushButton" name="openDataPushButton">
         <property name="enabled">
          <bool>false</bool>
@@ -123,7 +130,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>27</height>
+     <height>26</height>
     </rect>
    </property>
   </widget>

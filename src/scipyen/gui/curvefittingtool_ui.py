@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'curvefittingtool.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.11.1
+## Created by: Qt User Interface Compiler version 6.11.2
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -41,6 +41,11 @@ class Ui_CurveFittingWindow(object):
         self.modelFunctionsComboBox.setObjectName(u"modelFunctionsComboBox")
 
         self.horizontalLayout.addWidget(self.modelFunctionsComboBox)
+
+        self.label = QLabel(self.centralwidget)
+        self.label.setObjectName(u"label")
+
+        self.horizontalLayout.addWidget(self.label)
 
         self.openDataPushButton = QPushButton(self.centralwidget)
         self.openDataPushButton.setObjectName(u"openDataPushButton")
@@ -84,7 +89,7 @@ class Ui_CurveFittingWindow(object):
         CurveFittingWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(CurveFittingWindow)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 800, 27))
+        self.menubar.setGeometry(QRect(0, 0, 800, 26))
         CurveFittingWindow.setMenuBar(self.menubar)
         self.statusbar = QStatusBar(CurveFittingWindow)
         self.statusbar.setObjectName(u"statusbar")
@@ -107,6 +112,7 @@ class Ui_CurveFittingWindow(object):
         self.modelLabel.setWhatsThis(QCoreApplication.translate("CurveFittingWindow", u"Select model function", None))
 #endif // QT_CONFIG(whatsthis)
         self.modelLabel.setText(QCoreApplication.translate("CurveFittingWindow", u"Model Function:", None))
+        self.label.setText(QCoreApplication.translate("CurveFittingWindow", u"Data vector:", None))
 #if QT_CONFIG(tooltip)
         self.openDataPushButton.setToolTip(QCoreApplication.translate("CurveFittingWindow", u"Open curve data (numpy array, signal-like)", None))
 #endif // QT_CONFIG(tooltip)
