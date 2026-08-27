@@ -80,8 +80,8 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
                  atlas: typing.Optional[bgbridge.BrainGlobeAtlas] = None,
                  structure: typing.Optional[bgbridge.Structure] = None,
                  **kwargs):
-        super().__init__(parent=parent)
-        super(Ui_BGAtlasStructureLookupWidget, self).__init__()
+        QtWidgets.QWidget.__init__(self, parent=parent)
+        Ui_BGAtlasStructureLookupWidget.__init__(self)
 
         containerWidget: typing.Optional[QtWidgets.QWidget] = kwargs.pop("containerWidget", None)
 

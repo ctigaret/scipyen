@@ -52,6 +52,7 @@ except: # noqa
     __has_qtdbus__ = False
 
 from core.prog import scipywarn # noqa
+from core import desktoputils
 from core import qtutils
 from core import scipyendataclasses as sdc
 # from core import scipyen_quantities as scq
@@ -245,27 +246,38 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget, QtWidge
     #     sb = QtCore.QSignalBlocker(self.toggleSpecimenEditorToolButton) # noqa
     #     self.toggleSpecimenEditorToolButton.setChecked(False)
 
+    def _makeSpecimenEditor(self, spWidgetType, data):
+        anchoringWidget = self.provideAnchoringWidget()
+        self.specimenEditor = self._setupCollapsibleChild_(
+            spWidgetType,
+            "specimenEditor",
+            self._slot_specimenChanged,
+            self.toggleSpecimenEditorToolButton,
+            anchoringWidget,
+            not desktoputils.is_wayland(),
+            data,
+            objSymbol = "specimen"
+            )
+
+
     @Slot()
     def _slot_editSpecimen(self):
-        anchoringWidget = self.provideAnchoringWidget()
+        # anchoringWidget = self.provideAnchoringWidget()
         if isinstance(self._data_.specimen, self._data_.specimenTypes):
             spWidgetType = self._setSpecimenWidgetType_(self._data_.specimen)
-            if not isinstance(self.specimenEditor, spWidgetType) or self._needsNewSpecimenWidget_:
-                self._removeAnchoringCollapsibleWidget_(self.specimenEditor)
-                # self.specimenEditor.deleteLater()
-                # self.specimenEditor = None
-                self.specimenEditor = self._setupCollapsibleChild_(
-                    spWidgetType,
-                    "specimenEditor",
-                    self._slot_specimenChanged,
-                    self.toggleSpecimenEditorToolButton,
-                    anchoringWidget,
-                    self._data_.specimen,
-                    objSymbol = "specimen"
-                    )
+            if isinstance(self.specimenEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenEditor):
+                if self._needsNewSpecimenWidget_ or type(self.specimenEditor) is not spWidgetType:
+                    self._removeAnchoringCollapsibleWidget_(self.specimenEditor)
+                    self._makeSpecimenEditor(spWidgetType, self._data_.specimen)
 
-                self._needsNewSpecimenWidget_ = False
+                else:
+                    self.specimenEditor.setValue(self._data_.specimen,
+                                                 objSymbol="specimen")
 
+            else:
+                self._makeSpecimenEditor(spWidgetType, self._data_.specimen)
+
+            self._needsNewSpecimenWidget_ = False
             self.specimenEditor.show()
             if isinstance(self._data_.specimen.name, str) and len(self._data_.specimen.name.strip()):
                 self.specimenEditor.setWindowTitle(f"Specimen: {self._data_.specimen.name} ({type(self._data_.specimen).__name__})")
@@ -350,9 +362,9 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget, QtWidge
 
         self.specimenNameLabel.setText(spNameLabel)
 
-        if isinstance(self.organismEditor, DataClassWidget):
-            sb = QtCore.QSignalBlocker(self.organismEditor) # noqa
-            self.organismEditor.setValue(self._data_.getOrganism(), objSymbol="organism")
+        if isinstance(self.organismEditor, DataClassWidget) and qtutils.isQObjectAlive(self.organismEditor):
+            with qtutils.Signalblocker(self.organismEditor):
+                self.organismEditor.setValue(self._data_.getOrganism(), objSymbol="organism")
 
 
 

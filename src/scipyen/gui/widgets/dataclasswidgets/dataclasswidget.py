@@ -45,6 +45,7 @@ else:
 
 
 from core.prog import scipywarn #, safewrapper, print_styled
+from core import desktoputils
 # from core.sysutils import adapt_ui_path
 import core.taxonbridge as taxonbridge
 # import core.bgbridge as bgbridge
@@ -96,13 +97,18 @@ class DataClassWidget(AnchoringCollapsibleWidget):
         self.organismEditor = None
         # self._data_ = None
 
-
         super().__init__(parent, **kwargs)
-        if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
-            if hasattr(self, "_data_") and self._data_ is not None:
-                objSymbols = self.getDataSymbolInWorkspace(self._data_)
-                if isinstance(objSymbols, typing.Sequence) and len(objSymbols) > 0:
-                    self._objSymbol_ = objSymbols[0]
+
+        if (
+            (
+                self._objSymbol_ is None
+                or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0)
+            )
+            and (hasattr(self, "_data_") and self._data_ is not None)
+            ):
+            objSymbols = self.getDataSymbolInWorkspace(self._data_)
+            if isinstance(objSymbols, typing.Sequence) and len(objSymbols) > 0:
+                self._objSymbol_ = objSymbols[0]
 
         # self._configureUI_() # --- ?!?
 
@@ -317,51 +323,51 @@ class DataClassWidget(AnchoringCollapsibleWidget):
             if isinstance(self.parentEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.parentEditor):
                 self.parentEditor.collapse(False)
 
+    def _makeParentEditor(self, editorWidgetType, data):
+        anchoringWidget = self.provideAnchoringWidget()
+        self.parentEditor = self._setupCollapsibleChild_(
+            editorWidgetType,
+            "parentEditor",
+            self._slot_parentChanged,
+            self.nameDescriptionWidget.toggleParentEditorToolButton,
+            anchoringWidget,
+            not desktoputils.is_wayland(),
+            data,
+            objSymbol="parent"
+            )
+
+
     @Slot()
     def _slot_editParent(self):
-        anchoringWidget = self.provideAnchoringWidget()
-        parent = None
+        parentData = None
         if (hasattr(self, "_data_")
             and hasattr(self, "_objectTypes_")
             and isinstance(self._data_, self._objectTypes_)
             and hasattr(self._data_, "parentTypes")
             and hasattr(self._data_, "parent")
             and isinstance(self._data_.parent, self._data_.parentTypes)): # dataclasses.is_dataclass(self._data_.parent)):
-            parent = self._data_.parent
+            parentData = self._data_.parent
+
+        editorWidgetType = self._setParentEditorType_(parentData)
+        if editorWidgetType is None:
+            return
 
         if isinstance(self.parentEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.parentEditor):
-            editorWidgetType = self._setParentEditorType_(parent)
             if self._needsNewParentWidget_ or type(self.parentEditor) is not editorWidgetType:
-                self.parentEditor.close()
-                self.parentEditor.deleteLater()
-                # self.parentEditor = editor
-                self.parentEditor.setObjectName("parentEditor")
+                # self.parentEditor.close()
+                # self.parentEditor.deleteLater()
+                self._removeAnchoringCollapsibleWidget_(self.parentEditor)
+                self._makeParentEditor(editorWidgetType, parentData)
 
-                self.parentEditor = self._setupCollapsibleChild_(
-                    editorWidgetType,
-                    "parentEditor",
-                    self._slot_parentChanged,
-                    self.nameDescriptionWidget.toggleParentEditorToolButton,
-                    anchoringWidget,
-                    parent,
-                    objSymbol="parent"
-                    )
+            else:
+                self.parentEditor.setValue(parentData, objSymbol="parent")
 
         else:
-            editorWidgetType = self._setParentEditorType_(parent)
-            self.parentEditor = self._setupCollapsibleChild_(
-                editorWidgetType,
-                "parentEditor",
-                self._slot_parentChanged,
-                self.nameDescriptionWidget.toggleParentEditorToolButton,
-                anchoringWidget,
-                parent,
-                objSymbol="parent"
-                )
+            self._makeParentEditor(editorWidgetType, parentData)
 
         self._needsNewParentWidget_ = False
+        self.parentEditor.setWindowTitle(f"Parent: {type(parentData).__name__}")
         self.parentEditor.show()
-        self.parentEditor.setWindowTitle(f"Parent: {type(parent).__name__}")
 
     @Slot()
     def _slot_chooseNewParentType(self):
@@ -414,43 +420,45 @@ class DataClassWidget(AnchoringCollapsibleWidget):
             if isinstance(self.organismEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismEditor):
                 self.organismEditor.collapse(False)
 
+    def _makeOrganismEditor(self, data):
+        from gui.widgets.dataclasswidgets.organismwidget import OrganismWidget
+        anchoringWidget = self.provideAnchoringWidget()
+
+        self.organismEditor = self._setupCollapsibleChild_(
+            OrganismWidget,
+            "organismEditor",
+            self._slot_organismChanged,
+            self.nameDescriptionWidget.organismToolButton,
+            anchoringWidget,
+            not desktoputils.is_wayland(),
+            data,
+            objSymbol="organism"
+            )
+
+
     @Slot()
     def _slot_editOrganism(self):
         from gui.widgets.dataclasswidgets.organismwidget import OrganismWidget
-        anchoringWidget = self.provideAnchoringWidget()
         try:
             organism = self._data_.getOrganism()
         except: # noqa
             organism = sdc.Organism()
+
         if isinstance(self.organismEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismEditor):
             if not isinstance(self.organismEditor, OrganismWidget):
-                self.organismEditor.close()
-                self.organismEditor.deleteLater()
-                self.organismEditor = None
+                # self.organismEditor.close()
+                # self.organismEditor.deleteLater()
+                # self.organismEditor = None
+                self._removeAnchoringCollapsibleWidget_(self.organismEditor)
+                self._makeOrganismEditor(organism)
 
-                self.organismEditor = self._setupCollapsibleChild_(
-                    OrganismWidget,
-                    "organismEditor",
-                    self._slot_organismChanged,
-                    self.nameDescriptionWidget.organismToolButton,
-                    anchoringWidget,
-                    organism,
-                    objSymbol="organism"
-                    )
+            else:
+                self.organismEditor.setValue(organism, objSymbol="organism")
 
         else:
-            self.organismEditor = self._setupCollapsibleChild_(
-                OrganismWidget,
-                "organismEditor",
-                self._slot_organismChanged,
-                self.nameDescriptionWidget.organismToolButton,
-                anchoringWidget,
-                organism,
-                objSymbol="organism"
-                )
+            self._makeOrganismEditor(organism)
 
-        if not self.organismEditor.isVisible():
-            self.organismEditor.show()
+        self.organismEditor.show()
 
         taxon = organism.taxon
 
@@ -486,7 +494,9 @@ class DataClassWidget(AnchoringCollapsibleWidget):
 
     @singledispatchmethod
     def _setParentEditorType_(self, obj) -> type:
-        raise NotImplementedError(f"{type(obj)} objects are not supported")
+        scipywarn(f"{type(obj)} objects are not supported")
+        return
+        # raise NotImplementedError(f"{type(obj)} objects are not supported")
 
     @_setParentEditorType_.register(sdc.Neuron)
     def __setParentEditorType__(self, obj: sdc.Neuron) -> type:

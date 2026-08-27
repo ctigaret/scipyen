@@ -61,6 +61,7 @@ from ephys import ephys
 from ephys import ephys_pathways
 from ephys import ephys_protocol
 from core import datatypes # noqa
+from core import desktoputils
 from core import strutils
 from core import qtutils
 from core import scipyendataclasses as sdc
@@ -215,28 +216,36 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
             if isinstance(self.procedureEditor, DataClassWidget) and qtutils.isQObjectAlive(self.procedureEditor):
                 self.procedureEditor.collapse(False)
 
+    def _makeProcedureEditor(self, data):
+        from gui.widgets.dataclasswidgets.procedurewidget import SimpleProcedureWidget
+        anchoringWidget = self.provideAnchoringWidget()
+        self.procedureEditor = self._setupCollapsibleChild_(
+            SimpleProcedureWidget,
+            "procedureEditor",
+            self._slot_procedureChanged,
+            self.toggleProcedureEditor,
+            anchoringWidget,
+            not desktoputils.is_wayland(),
+            data,
+            objSymbol="procedure"
+            )
+
     @Slot()
     def _slot_showProcedureWidget(self):
         from gui.widgets.dataclasswidgets.procedurewidget import SimpleProcedureWidget
-        anchoringWidget = self.provideAnchoringWidget()
-        if not isinstance(self.procedureEditor, SimpleProcedureWidget):
-            if isinstance(self.procedureEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.procedureEditor):
+        if isinstance(self.procedureEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.procedureEditor):
+            if not isinstance(self.procedureEditor, SimpleProcedureWidget):
                 self._removeAnchoringCollapsibleWidget_(self.procedureEditor)
+                self._makeProcedureEditor(self._data_.procedure)
+
+            else:
+                self.procedureEditor.setValue(self._data_.procedure,
+                                              objSymbol="procedure")
 
             # print(f"{self.__class__.__name__}.)_slot_showProcedureWidget self._data_.procedure -> {self._data_.procedure}")
-            self.procedureEditor = self._setupCollapsibleChild_(
-                SimpleProcedureWidget,
-                "procedureEditor",
-                self._slot_procedureChanged,
-                self.toggleProcedureEditor,
-                anchoringWidget,
-                self._data_.procedure,
-                objSymbol="procedure"
-                )
 
         else:
-            self.procedureEditor.setValue(self._data_.procedure,
-                                          objSymbol="procedure")
+            self._makeProcedureEditor(self._data_.procedure)
 
         if isinstance(self._data_.procedure.name, str) and len(self._data_.procedure.name.strip()):
             self.procedureEditor.setWindowTitle(f"Procedure: {self._data_.procedure.name} ({self._data_.procedure.procedureType.name})")

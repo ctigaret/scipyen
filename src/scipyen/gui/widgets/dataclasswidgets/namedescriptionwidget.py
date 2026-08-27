@@ -41,7 +41,7 @@ else:
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-
+from core import desktoputils
 from core.prog import scipywarn #noqa
 from core import qtutils
 from iolib import pictio as pio
@@ -135,35 +135,39 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
             if isinstance(self.dataExchangeWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.dataExchangeWidget):
                 self.dataExchangeWidget.collapse(False)
 
+    def _makeDataExchangeWidget(self):
+        anchoringWidget = self.provideAnchoringWidget()
+        self.dataExchangeWidget = self._setupCollapsibleChild_(
+            DataExchangeWidget,
+            "dataExchangeWidget",
+            None,
+            self.toggleDataExchangeWidgetToolButton,
+            anchoringWidget,
+            not desktoputils.is_wayland(),
+            self._data_,
+            objSymbol = self._objSymbol_
+            )
+        self.dataExchangeWidget.sig_requestDataExport.connect(self.slot_exportData)
+        self.dataExchangeWidget.sig_requestDataSave.connect(self.slot_saveData)
+        self.dataExchangeWidget.sig_requestDataCopy.connect(self.slot_copyData)
+        self.dataExchangeWidget.sig_requestImportData.connect(self._slot_importData)
+        self.dataExchangeWidget.sig_requestLoadData.connect(self._slot_loadData)
+        self.dataExchangeWidget.sig_requestNewObject.connect(self.sig_requestNewObject)
+
     @Slot()
     def _slot_showDataExchangeWidget(self):
-        anchoringWidget = self.provideAnchoringWidget()
         # print(f"{self.__class__.__name__}._slot_showDataExchangeWidget: anchoringWidget -> {anchoringWidget} for anchored widget")
-        if not isinstance(self.dataExchangeWidget, DataExchangeWidget):
-            if isinstance(self.dataExchangeWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.dataExchangeWidget):
+        if isinstance(self.dataExchangeWidget, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.dataExchangeWidget):
+            if not isinstance(self.dataExchangeWidget, DataExchangeWidget):
                 self._removeAnchoringCollapsibleWidget_(self.dataExchangeWidget)
+                self._makeDataExchangeWidget()
+            else:
+                self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
 
-            self.dataExchangeWidget = self._setupCollapsibleChild_(
-                DataExchangeWidget,
-                "dataExchangeWidget",
-                None,
-                self.toggleDataExchangeWidgetToolButton,
-                anchoringWidget,
-                self._data_,
-                objSymbol = self._objSymbol_
-                )
+        else:
+            self._makeDataExchangeWidget()
 
-            self.dataExchangeWidget.setWindowTitle("Input/Output")
-            # self.dataExchangeWidget.setVisible(False)
-            self.dataExchangeWidget.sig_requestDataExport.connect(self.slot_exportData)
-            self.dataExchangeWidget.sig_requestDataSave.connect(self.slot_saveData)
-            self.dataExchangeWidget.sig_requestDataCopy.connect(self.slot_copyData)
-            self.dataExchangeWidget.sig_requestImportData.connect(self._slot_importData)
-            self.dataExchangeWidget.sig_requestLoadData.connect(self._slot_loadData)
-            self.dataExchangeWidget.sig_requestNewObject.connect(self.sig_requestNewObject)
-
-        self.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
-
+        self.dataExchangeWidget.setWindowTitle("Input/Output")
         self.dataExchangeWidget.show()
 
     @Slot()

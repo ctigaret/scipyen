@@ -52,14 +52,11 @@ except: # noqa
 
 # from core.prog import scipywarn
 from core import scipyendataclasses as sdc
-# from core import scipyen_quantities as scq # noqa
+from core import desktoputils
 from core import taxonbridge
 from core import qtutils
 from gui import datatreeviewer
-# from gui.widgets import small_widgets as smw
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
-# from gui.workspacegui import WorkspaceGuiMixin
-# from gui.widgets.datawidgetmixin import DataWidgetMixin
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
@@ -255,34 +252,42 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget, QtWidgets.QWidget):
 
         self.sig_valueChanged.emit(self._data_)
 
+    def _makeBiometricsEditor(self, data):
+        from gui.widgets.dataclasswidgets.biometricswidget import BiometricsWidget
+        anchoringWidget = self.provideAnchoringWidget()
+        self.biometricsEditor = self._setupCollapsibleChild_(
+            BiometricsWidget,
+            "biometricsEditor",
+            self._slot_biometricsChanged,
+            self.toggleBiometricsToolButton,
+            anchoringWidget,
+            not desktoputils.is_wayland(),
+            data,
+            objSymbol="biometrics"
+            )
+
+
     @Slot()
     def _slot_editBiometrics(self):
         from gui.widgets.dataclasswidgets.biometricswidget import BiometricsWidget
-        anchoringWidget = self.provideAnchoringWidget()
+        # anchoringWidget = self.provideAnchoringWidget()
         # anchoringWidget = self._anchoringWidget_ if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
-        if not isinstance(self.biometricsEditor, BiometricsWidget):
-            if isinstance(self.biometricsEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biometricsEditor):
+
+        if isinstance(self.biometricsEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biometricsEditor):
+            if not isinstance(self.biometricsEditor, BiometricsWidget):
                 self._removeAnchoringCollapsibleWidget_(self.biometricsEditor)
+                self._makeBiometricsEditor(self._data_.biometrics)
 
-
-            self.biometricsEditor = self._setupCollapsibleChild_(
-                BiometricsWidget,
-                "biometricsEditor",
-                self._slot_biometricsChanged,
-                self.toggleBiometricsToolButton,
-                anchoringWidget,
-                self._data_.biometrics,
-                objSymbol="biometrics"
-                )
-
-            self.biometricsEditor.setWindowTitle("Biometrics")
+            else:
+                self.biometricsEditor.setValue(self._data_.biometrics,
+                                                objSymbol="biometrics")
 
         else:
-            self.biometricsEditor.setValue(self._data_.biometrics,
-                                           objSymbol="biometrics")
+            self._makeBiometricsEditor(self._data_.biometrics)
 
-        if not self.biometricsEditor.isVisible():
-            self.biometricsEditor.show()
+        self.biometricsEditor.setWindowTitle("Biometrics")
+        self.biometricsEditor.show()
+
 
     # @Slot()
     # def _slot_biometricsEditorCollapsed(self):
