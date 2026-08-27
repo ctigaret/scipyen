@@ -70,7 +70,7 @@ except:
     Ui_MetaDataWidget, _ = loadUiType(os.path.join(__module_path__, "metadatawidget.ui"))
 
 
-class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
+class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget, QtWidgets.QWidget):
     r"""Widget for displaying BaseScipyenData objectx.
     """
     sig_valueChanged = Signal(object, name="sig_valueChanged")
@@ -80,7 +80,6 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget]=None,
                  obj: typing.Optional[bsc.BaseScipyenData] = None,
                  **kwargs):
-        super(Ui_MetaDataWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -95,11 +94,15 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
         else:
             self._data_ = obj
 
+
         objSymbol = kwargs.get("objSymbol", "")
+
         if len(objSymbol.strip()) == 0:
             kwargs["objSymbol"] = "metadata"
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_MetaDataWidget.__init__(self)
 
         self._configureUI_()
 
@@ -188,10 +191,11 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
     def _slot_editBiologicalSource(self):
         from gui.widgets.dataclasswidgets.biologicalsourcewidget import BiologicalSourceWidget
         anchoringWidget = self.provideAnchoringWidget()
-        if not isinstance(self.biologicalSourceEditor, BiologicalSourceWidget):
-            if isinstance(self.biologicalSourceEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor):
-                self._removeAnchoringCollapsibleWidget_(self.biologicalSourceEditor)
 
+        if (not isinstance(self.biologicalSourceEditor, BiologicalSourceWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor)):
+            self._removeAnchoringCollapsibleWidget_(self.biologicalSourceEditor)
+
+        if not isinstance(self.biologicalSourceEditor, BiologicalSourceWidget) or not qtutils.isQObjectAlive(self.biologicalSourceEditor):
             self.biologicalSourceEditor = self._setupCollapsibleChild_(
                 BiologicalSourceWidget,
                 "biologicalSourceEditor",
@@ -201,6 +205,7 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
                 self._data_.source,
                 objSymbol="source"
                 )
+
 
         else:
             self.biologicalSourceEditor.setValue(self._data_.source,
@@ -224,6 +229,7 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget):
 
     @Slot(bool)
     def _slot_toggleBioSourceEditor(self, val: bool):
+        print(f"{self.__class__.__name__}._slot_toggleBioSourceEditor({val})")
         if val is True:
             self._slot_editBiologicalSource()
         else:

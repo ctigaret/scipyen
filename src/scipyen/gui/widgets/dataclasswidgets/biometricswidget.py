@@ -72,13 +72,12 @@ except:
 
 T = sdc.Biometrics
 
-class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
+class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget, QtWidgets.QWidget):
     _objectTypes_ = (sdc.Biometrics,)
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.Biometrics] = None,
                  **kwargs):
-        super(Ui_BiometricsWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -96,7 +95,9 @@ class BiometricsWidget(Ui_BiometricsWidget, DataClassWidget):
         self._geneticSexNames_ = list(sdc.GeneticSex.names())
         self._devStageNames_ = list(sdc.DevelopmentalStage.names())
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_BiometricsWidget.__init__(self)
 
         self._configureUI_()
 

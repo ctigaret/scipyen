@@ -71,12 +71,11 @@ except:
         )
 
 
-class BiologicalProductWidget(Ui_BiologicalProductWidget, DataClassWidget):
+class BiologicalProductWidget(Ui_BiologicalProductWidget, DataClassWidget, QtWidgets.QWidget):
     _objectTypes_ = (sdc.BiologicalProduct, )
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.BiologicalSource] = None,
                  **kwargs):
-        super(Ui_BiologialProductWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -93,7 +92,9 @@ class BiologicalProductWidget(Ui_BiologicalProductWidget, DataClassWidget):
 
         self._entityTypeNames_ = list(sdc.BioProductType.names())
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_BiologialProductWidget.__init__(self)
 
         self._configureUI_()
 

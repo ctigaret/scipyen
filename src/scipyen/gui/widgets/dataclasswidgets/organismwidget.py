@@ -72,13 +72,12 @@ except:
         os.path.join(__module_path__, "organismwidget.ui")
         )
 
-class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
+class OrganismWidget(Ui_OrganismWidget, DataClassWidget, QtWidgets.QWidget):
     _objectTypes_ = (sdc.Organism, )
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.Biometrics] = None,
                  **kwargs):
-        super(Ui_OrganismWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -98,7 +97,9 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget):
         if len(objSymbol.strip()) == 0:
             kwargs["objSymbol"] = "organism"
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_OrganismWidget.__init__(self)
 
         self._configureUI_()
 

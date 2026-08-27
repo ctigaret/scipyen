@@ -78,13 +78,12 @@ except:
         )
 
 
-class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
+class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget, QtWidgets.QWidget):
     _objectTypes_ = (sdc.CellCompartment, sdc.UltrastructureElement)
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
-        super(Ui_CellCompartmentWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -101,7 +100,9 @@ class CellCompartmentWidget(Ui_CellCompartmentWidget, DataClassWidget):
 
         self._entityTypeNames_ = self._getEntityTypes_(self._data_)
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_CellCompartmentWidget.__init__(self)
 
         self._configureUI_()
 

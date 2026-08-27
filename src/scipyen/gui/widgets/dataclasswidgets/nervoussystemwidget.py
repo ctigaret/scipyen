@@ -71,13 +71,12 @@ except:
         os.path.join(__module_path__, "nervoussystemwidget.ui")
         )
 
-class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget):
+class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget, QtWidgets.QWidget):
     r"""NOTE: This relates to ALL organs in a BrainGlobeAtlas, not just the brain!"""
     _objectTypes_ = (sdc.NervousSystem, )
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.BiologicalSource] = None,
                  **kwargs):
-        super(Ui_NervousSystemWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -92,7 +91,9 @@ class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget):
         else:
             self._data_ = obj
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_NervousSystemWidget.__init__(self)
 
         self._bman_ = bgbridge.BrainAtlasManager(self)
 

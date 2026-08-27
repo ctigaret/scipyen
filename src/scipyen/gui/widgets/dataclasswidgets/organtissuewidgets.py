@@ -70,12 +70,11 @@ except:
         os.path.join(__module_path__, "organtissuewidget.ui")
         )
 
-class OrganWidget(Ui_OrganTissueWidget, DataClassWidget):
+class OrganWidget(Ui_OrganTissueWidget, DataClassWidget, QtWidgets.QWidget):
     _objectTypes_ = (sdc.Organ, )
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.BiologicalSource] = None,
                  **kwargs):
-        super(Ui_OrganTissueWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -90,7 +89,9 @@ class OrganWidget(Ui_OrganTissueWidget, DataClassWidget):
         else:
             self._data_ = obj
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_OrganTissueWidget.__init__(self)
 
         self._configureUI_()
 
@@ -100,7 +101,7 @@ class OrganWidget(Ui_OrganTissueWidget, DataClassWidget):
         self.sig_uiConfigured.emit()
 
 
-class TissueWidget(Ui_OrganTissueWidget, DataClassWidget):
+class TissueWidget(Ui_OrganTissueWidget, DataClassWidget, QtWidgets.QWidget):
     _objectTypes_ = (sdc.Tissue, sdc.BiologicalProduct,)
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[typing.Union[sdc.Tissue, sdc.BiologicalProduct]] = None,
@@ -119,6 +120,7 @@ class TissueWidget(Ui_OrganTissueWidget, DataClassWidget):
         else:
             self._data_ = obj
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
 
         self._configureUI_()

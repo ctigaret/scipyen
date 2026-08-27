@@ -20,9 +20,6 @@ __has_PyQt6__ =False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
     import PySide6 # noqa
-    # from PySide6 import Shiboken # noqa
-    # from PySide6.QtCore import (Signal, Slot, Property,)
-    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -30,7 +27,6 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-    # from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -40,13 +36,13 @@ from core import qtutils
 from core import desktoputils
 from gui.workspacegui import WorkspaceGuiMixin
 
-class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
+class AnchoringCollapsibleWidget(WorkspaceGuiMixin):
     # sig_moved = Signal(QtCore.QPoint, name="sig_moved")
     sig_closing = Signal(name="sig_closing")
     sig_collapsed = Signal(name="sig_collapsed")
     sig_uiConfigured = Signal(name="sig_uiConfigured")
 
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
+    def __init__(self, parent: QtWidgets.QWidget | None = None,
                  **kwargs):
         anchoringWidget = kwargs.pop("anchoringWidget", None)
         self._overrideAnchor_ = kwargs.pop("overrideAnchor", False)
@@ -54,7 +50,7 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         self._windowFlags_ = kwargs.pop("windowFlags", None)
 
         # NOTE: does not work on Wayland!
-        self._positionHint_: typing.Optional[QtCore.QPoint] = None
+        self._positionHint_: QtCore.QPoint | None = None
 
         self._closeRequested_: bool = False
         self._anchoringWidget_ = None
@@ -63,16 +59,15 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         self._opacityEffect_ = None
         self._opacityAnimation_ = None
         self._animationGroup_ = None
-        self._positionHint_ = None
 
-        self._collapsibleChildren_ = dict() # Qt objectName ↦ (collapsible widget, toggle control widget, collapsible widget id)
+        # Qt objectName ↦ (collapsible widget, toggle control widget, collapsible widget id)
+        self._collapsibleChildren_ = {}
 
         if isinstance(anchoringWidget, QtWidgets.QWidget):
             self._anchoringWidget_ = anchoringWidget
 
-        QtWidgets.QWidget.__init__(self, parent=parent)
+        super().__init__(parent=parent, **kwargs)
 
-        WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
 
     def getHighestAncestor(self) -> QtWidgets.QWidget:
         r"""Retrieves the highest level QMainWindow that contains this object.
@@ -114,26 +109,28 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         """
         # print(f"{self.__class__.__name__}._setupCollapsibleChild_: anchoringWidget = {anchoringWidget}")
         child = widgetType(*args, **kwargs, anchoringWidget=anchoringWidget)
+
         if len(objectName.strip()) == 0:
-            objectName = widgetType.__name__
-            objectName = objectName[0].lower() + objectName[1:]
+            objectName =  widgetType.__name__.lower() + objectName[1:]
+
         child.setObjectName(objectName)
+
         if hasattr(child, "sig_valueChanged") and inspect.ismethod(valueChangedSlot):
             child.sig_valueChanged.connect(valueChangedSlot)
+
         if hasattr(child, "sig_closing"):
             child.sig_closing.connect(self._slot_anchoredWidgetClosingOrCollapsing, QtCore.Qt.QueuedConnection)
+
         if hasattr(child, "sig_collapsed"):
             child.sig_collapsed.connect(self._slot_anchoredWidgetClosingOrCollapsing, QtCore.Qt.QueuedConnection)
+
         if hasattr(child, "_slot_anchoringWidgetMoved"):
             self.sig_moved.connect(child._slot_anchoringWidgetMoved)
 
         if not isinstance(getattr(anchoringWidget, "_collapsibleChildren_", None), dict):
             anchoringWidget._collapsibleChildren_ = dict()
 
-        # anchoringWidget._collapsibleChildren_[objectName] = (child, toggleControl)
         anchoringWidget._collapsibleChildren_[id(child)] = (child, toggleControl, objectName)
-
-        # print(f"\tchild: {child} anchored to {child.anchoringWidget}")
 
         return child
 
@@ -142,7 +139,6 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             wid = id(widget)
 
             if qtutils.isQObjectAlive(widget):
-                widget.close()
                 if widget.isAnchoredWidget and wid in widget.anchoringWidget._collapsibleChildren_:
                     toggle = widget.anchoringWidget._collapsibleChildren_[wid][1]
                     if (
@@ -150,26 +146,38 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                         and hasattr(toggle, "setChecked")
                         and qtutils.isQObjectAlive(toggle)
                         ):
-                        sb = QtCore.QSignalBlocker(toggle) # noqa
-                        toggle.setChecked(False)
-                    del widget.anchoringWidget._collapsibleChildren_[wid]
+                        with qtutils.SignalBlocker(toggle):
+                            toggle.setChecked(False)
+
+                    widget.anchoringWidget._collapsibleChildren_.pop(wid)
+
+                widget.close()
                 widget.deleteLater()
                 widget = None
 
     @Slot()
     def _slot_uiConfigured_(self):
         r"""Required to set up geometries etc AFTER UI components in the subclass
-            instance have been initialized by calling self._configureUI_.
+            instance have been initialized by calling self._configureUI_()
         """
         if self.anchoringWidget:
             if desktoputils.is_wayland():
-                # self.setWindowFlag(QtCore.Qt.Popup, True)
-                # self.setWindowFlag(QtCore.Qt.Dialog, True)
-    #             self.setWindowFlags(
-    # QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowStaysOnTopHint
-    #                 )
-                self.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, True)
-                self.setWindowFlag(QtCore.Qt.ExpandedClientAreaHint, True)
+                self.setWindowFlags(self.windowFlags() | QtCore.Qt.Popup)#  | QtCore.Qt.CustomizeWindowHint | QtCore.Qt.BypassWindowManagerHint)
+
+
+                # tried and failed:
+                # self.setWindowFlag(QtCore.Qt.Tool, True)
+                # self.setWindowFlags(self.windowFlags() | QtCore.Qt.Popup | QtCore.Qt.CustomizeWindowHint | QtCore.Qt.BypassWindowManagerHint)
+                # self.setWindowFlags(QtCore.Qt.Popup | QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint)
+                # self.setWindowFlags(QtCore.Qt.CustomizeWindowHint | QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint)
+                # self.setWindowFlags(QtCore.Qt.Popup | QtCore.Qt.Dialog) # same as Qt.Tool!
+                # self.setWindowFlag(QtCore.Qt.CustomizeWindowHint, True)
+                # self.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint, True)
+                # self.setWindowFlag(QtCore.Qt.ExpandedClientAreaHint, True)
+                # self.setWindowFlag(QtCore.Qt.WindowTitleHint, True)
+                # self.setWindowFlag(QtCore.Qt.WindowCloseButtonHint, True)
+
+                # self.setWindowModality(QtCore.Qt.WindowModal) # no effect when using Popup !
             else:
                 if isinstance(self._windowFlags_, QtCore.Qt.WindowType):
                     self.setWindowFlags(self._windowFlags_)
@@ -209,6 +217,7 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
             if self._useOpacityEffect_:
                 self._animationGroup_.addAnimation(self._opacityAnimation_)
+
             self._animationGroup_.stateChanged.connect(self._slot_animationStateChanged)
 
             # topRight = self._anchoringWidget_.geometry().topRight()
@@ -230,7 +239,7 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         #
         # The latter case is NOT A BUG but it MUST be captured in closeSubWidgets
         widget = self.sender()
-        # print(f"{self.__class__.__name__}._slot_anchoredWidgetClosingOrCollapsing: widget = {widget}")
+        print(f"{self.__class__.__name__}._slot_anchoredWidgetClosingOrCollapsing: sender widget = {widget}")
         wid = id(widget)
         if (
             isinstance(getattr(widget, "anchoringWidget", None), QtWidgets.QWidget)
@@ -241,15 +250,15 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             if wid in ccd:
                 # toggle = self._collapsibleChildren_[widget.objectName()][1]
                 toggle = ccd[wid][1]
-                # print(f"{self.__class__.__name__}._slot_anchoredWidgetClosingOrCollapsing: toggle -> {toggle}")
+                print(f"{self.__class__.__name__}._slot_anchoredWidgetClosingOrCollapsing: toggle -> {toggle}")
 
                 if (
                     isinstance(toggle, QtWidgets.QWidget)
                     and hasattr(toggle, "setChecked")
                     and qtutils.isQObjectAlive(toggle)
                     ):
-                    sb = QtCore.QSignalBlocker(toggle) # noqa
-                    toggle.setChecked(False)
+                    with qtutils.SignalBlocker(toggle):
+                        toggle.setChecked(False)
 
     def provideAnchoringWidget(self, widget: typing.Optional[QtWidgets.QWidget] = None) -> QtWidgets.QWidget | None:
         r"""Provides an anchoring widget to a collapsible child widget, if required.
@@ -296,9 +305,12 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
     def collapse(self, close: bool=False):
         if hasattr(self, "collapseSubWidgets"):
             self.collapseSubWidgets(close)
-        self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
+
         self._closeRequested_ = close
-        self._animationGroup_.start()
+
+        if isinstance(self.anchoringWidget, QtWidgets.QWidget):
+            self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
+            self._animationGroup_.start()
 
         if close:
             self.close()
@@ -316,9 +328,12 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
 
     def closeEvent(self, evt):
         self.sig_closing.emit()
+
         self.closeSubWidgets()
+
         if hasattr(super(), "closeEvent"):
             super().closeEvent(evt)
+
         evt.accept()
 
     def closeSubWidgets(self):
@@ -341,13 +356,16 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
                     and hasattr(toggle, "setChecked")
                     and qtutils.isQObjectAlive(toggle)
                     ):
-                    sb = QtCore.QSignalBlocker(toggle) # noqa
-                    toggle.setChecked(False)
+                    with qtutils.SignalBlocker(toggle):
+                        toggle.setChecked(False)
 
                 if qtutils.isQObjectAlive(obj):
                     obj.close()
                     obj.deleteLater()
-                wids.append(objId)
+
+                if obj.isAnchoredWidget:
+                    wids.append(objId)
+
                 obj = None
 
         for wid in wids:
@@ -410,8 +428,10 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
         if newState == QtCore.QAbstractAnimation.Running:
             self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
             # self._parentOpacityAnimation_.start()
+
         elif newState == QtCore.QAbstractAnimation.Stopped:
             self.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, False)
+
             if self._animationGroup_.direction() == QtCore.QAbstractAnimation.Backward:
                 self.sig_collapsed.emit()
                 if self._closeRequested_ is True:
@@ -435,17 +455,32 @@ class AnchoringCollapsibleWidget(QtWidgets.QWidget, WorkspaceGuiMixin):
             heightHint = self.sizeHint().height()
             # print(f"height hint: {heightHint} -> height: {height}")
             self._sizeAnimation_.setEndValue(self.sizeHint().width())
+
             topRight = self._anchoringWidget_.geometry().topRight()
+            # print(f"{self.__class__.__name__}.{self.objectName()} anchoring topRight = {topRight}")
+
             geometry.setHeight(heightHint)
+
             if isinstance(self._anchoringWidget_.parent(), QtWidgets.QWidget):
                 self._positionHint_ = self._anchoringWidget_.parent().mapToGlobal(topRight)
+                # self._positionHint_ = self._anchoringWidget_.mapToGlobal(topRight)
+
             else:
                 self._positionHint_ = topRight
+
+
             if not desktoputils.is_wayland():
                 geometry.setX(self._positionHint_.x())
                 geometry.setY(self._positionHint_.y())
-            self.setGeometry(geometry)
+
+                self.setGeometry(geometry)
+
+            else:
+                self.move(self._positionHint_)
+                # self.windowHandle().setTransientParent(self._anchoringWidget_.parent().windowHandle())
+
             self._animationGroup_.start()
+
             super().show()
 
         else:

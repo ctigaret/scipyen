@@ -84,7 +84,7 @@ class DataClassWidget(AnchoringCollapsibleWidget):
 
     _objectTypes_ = tuple()
 
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
+    def __init__(self, parent: QtWidgets.QWidget | None = None,
                  **kwargs):
         self._objSymbol_ = kwargs.pop("objSymbol", None)
 
@@ -94,13 +94,17 @@ class DataClassWidget(AnchoringCollapsibleWidget):
         self.toggleParentEditorToolButton = None
         self.parentEditor = None
         self.organismEditor = None
+        # self._data_ = None
 
 
-        AnchoringCollapsibleWidget.__init__(self, parent=parent, **kwargs)
+        super().__init__(parent, **kwargs)
         if self._objSymbol_ is None or (isinstance(self._objSymbol_, str) and len(self._objSymbol_.strip()) == 0):
-            objSymbols = self.getDataSymbolInWorkspace(self._data_)
-            if isinstance(objSymbols, typing.Sequence) and len(objSymbols) > 0:
-                self._objSymbol_ = objSymbols[0]
+            if hasattr(self, "_data_") and self._data_ is not None:
+                objSymbols = self.getDataSymbolInWorkspace(self._data_)
+                if isinstance(objSymbols, typing.Sequence) and len(objSymbols) > 0:
+                    self._objSymbol_ = objSymbols[0]
+
+        # self._configureUI_() # --- ?!?
 
     def _configureUI_(self):
         self.sig_uiConfigured.connect(self._slot_uiConfigured_)
@@ -526,7 +530,8 @@ class DataClassWidget(AnchoringCollapsibleWidget):
     def closeSubWidgets(self):
         super().closeSubWidgets()
 
-        self.nameDescriptionWidget.closeSubWidgets()
+        if isinstance(self.nameDescriptionWidget, QtWidgets.QWidget) and hasattr(self.nameDescriptionWidget, "closeSubWidgets"):
+            self.nameDescriptionWidget.closeSubWidgets()
 
     def _make_value_(self):
         r"""SHOULD override this in subclasses"""

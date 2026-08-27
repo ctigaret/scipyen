@@ -58,13 +58,12 @@ except:
         os.path.join(__module_path__, "neuronwidget.ui")
         )
 
-class CellWidget(Ui_CellWidget, DataClassWidget):
+class CellWidget(Ui_CellWidget, DataClassWidget, QtWidgets.QWidget):
     _objectTypes_ = (sdc.Cell, )
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
-        super(Ui_CellWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -79,7 +78,9 @@ class CellWidget(Ui_CellWidget, DataClassWidget):
 
         self._data_ = obj
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_CellWidget.__init__(self)
 
         self._configureUI_()
 
@@ -136,13 +137,12 @@ class CellWidget(Ui_CellWidget, DataClassWidget):
     def _slot_cellSubTypeChanged(self, val: str):
         self._data_.cellSubType = val
 
-class NeuronWidget(Ui_NeuronWidget, DataClassWidget):
+class NeuronWidget(Ui_NeuronWidget, DataClassWidget, QtWidgets.QWidget):
     _objectTypes_ = (sdc.Neuron,)
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
-        super(Ui_NeuronWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -159,7 +159,9 @@ class NeuronWidget(Ui_NeuronWidget, DataClassWidget):
 
         self._data_ = obj
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_NeuronWidget.__init__(self)
 
         self._configureUI_()
 

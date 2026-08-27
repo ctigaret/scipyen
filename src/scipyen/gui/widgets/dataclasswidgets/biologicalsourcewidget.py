@@ -71,13 +71,12 @@ except:
         )
 
 
-class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
+class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget, QtWidgets.QWidget):
     _objectTypes_ = (sdc.BiologicalSource, )
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.BiologicalSource] = None,
                  **kwargs):
-        super(Ui_BiologicalSourceWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -92,6 +91,7 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
         else:
             self._data_ = obj
 
+        # self._anchoringWidget_ = kwargs.pop("anchoringWidget", None)
 
         self._bioSourceTypeNames_ = list(sdc.BioSourceType.names())
 
@@ -104,7 +104,9 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget):
 
         self._needsNewSpecimenWidget_: bool = True
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_BiologicalSourceWidget.__init__(self)
 
         self._configureUI_()
 

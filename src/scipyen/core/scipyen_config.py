@@ -1174,7 +1174,7 @@ class ScipyenConfigurable(object):
     _user_settings_src_ = scipyen_user_config_source
     _user_settings_file_ = _user_settings_src_.filename
 
-    def __init__(self, configTag:typing.Optional[str]=None):
+    def __init__(self, configTag: str | None = None, **kwargs):
         self.configurable_traits = DataBag(__parent__ = self)
         if hasattr(self, "_observe_configurables_"):
             self.configurable_traits.observe(self._observe_configurables_)

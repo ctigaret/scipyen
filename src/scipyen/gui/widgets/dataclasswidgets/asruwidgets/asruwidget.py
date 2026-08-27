@@ -53,14 +53,13 @@ except:
         os.path.join(__module_path__, "asruwidget.ui")
         )
 
-class ASRUWidget(Ui_ASRUWidget, DataClassWidget):
+class ASRUWidget(Ui_ASRUWidget, DataClassWidget, QtWidgets.QWidget):
     _objectTypes_ = (sdc.PPL, sdc.PIL)
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
 
-        super(Ui_ASRUWidget, self).__init__()
 
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
@@ -76,7 +75,9 @@ class ASRUWidget(Ui_ASRUWidget, DataClassWidget):
 
         self._data_ = obj
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_ASRUWidget.__init__(self)
 
         self._configureUI_()
 

@@ -67,13 +67,12 @@ except:
         os.path.join(__module_path__, "simpleprocedurewidget.ui")
         )
 
-class SimpleProcedureWidget(Ui_SimpleProcedureWidget, DataClassWidget):
+class SimpleProcedureWidget(Ui_SimpleProcedureWidget, DataClassWidget, QtWidgets.QWidget):
     _objectTypes_ = (sdc.Procedure, )
     procedureTypeNames = list(sdc.ProcedureType.names())
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
-        super(Ui_SimpleProcedureWidget, self).__init__9
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -88,7 +87,9 @@ class SimpleProcedureWidget(Ui_SimpleProcedureWidget, DataClassWidget):
 
         self._data_ = obj
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_SimpleProcedureWidget.__init__(self)
 
         self._configureUI_()
 
@@ -123,7 +124,7 @@ class SimpleProcedureWidget(Ui_SimpleProcedureWidget, DataClassWidget):
         self._data_.procedureType = sdc.ProcedureType[self.procedureTypeNames[val]]
         self.sig_valueChanged.emit(self._data_)
 
-class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
+class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget, QtWidgets.QWidget):
     # TODO: 2026-07-17 10:44:58 FIXME
     # • include a field to edit the legal framework (currently this is fixed to
     #   "ASPA 1986")
@@ -133,7 +134,6 @@ class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
-        super(Ui_ProcedureWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -148,8 +148,9 @@ class ProcedureWidget(Ui_ProcedureWidget, DataClassWidget):
 
         self._data_ = obj
 
-
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_ProcedureWidget.__init__(self)
 
         self._configureUI_()
 

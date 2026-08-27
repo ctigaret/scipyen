@@ -60,7 +60,6 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QtWidgets.QWidget):
     sig_valueChanged = Signal(name="sig_valueChanged")
 
     def __init__(self, parent=None, **kwargs):
-        super(Ui_BaseScipyenDataWidget, self).__init__()
         # super().__init__(self, parent=parent)
 
         self._dataVarName = kwargs.pop("varname", "")
@@ -114,7 +113,8 @@ class BaseScipyenDataWidget(Ui_BaseScipyenDataWidget, QtWidgets.QWidget):
 
         self._data_description_ = kwargs.pop("description", "")
 
-        QWidget.__init__(self, parent=parent)
+        QtWidgets.QWidget.__init__(self, parent=parent)
+        Ui_BaseScipyenDataWidget.__init__(self)
         self._descriptionEditor = None
         self._configureUI_()
 

@@ -65,7 +65,7 @@ except:
         os.path.join(__module_path__, "dataexchangewidget.ui")
         )
 
-class DataExchangeWidget(Ui_DataExchangeWidget, AnchoringCollapsibleWidget):
+class DataExchangeWidget(Ui_DataExchangeWidget, AnchoringCollapsibleWidget, QtWidgets.QWidget):
     r"""Common widget to use as 1st level child in various Scipyen compound widgets.
 Contains a set of tool buttons for loading/saving data to/from piclkle files and
 for importing/exporting data to the user workspace.
@@ -107,7 +107,6 @@ data object after loading from file or importing from the workspace.
     def __init__(self, objType: typing.Optional[type]=None,
                  parent: typing.Optional[QtWidgets.QWidget] = None,
                  **kwargs):
-        super(Ui_DataExchangeWidget, self).__init__()
         if isinstance(objType, QtWidgets.QWidget):
             obj_ = parent
             if isinstance(parent, type):
@@ -122,7 +121,12 @@ data object after loading from file or importing from the workspace.
         self._objectType_ = objType
         self._objSymbol_ = kwargs.pop("objSymbol", None)
 
+        # AnchoringCollapsibleWidget.__init__(self, parent=parent, **kwargs)
+        # super().__init__(parent, **kwargs)
+        QtWidgets.QWidget.__init__(self, parent)
         AnchoringCollapsibleWidget.__init__(self, parent=parent, **kwargs)
+
+        Ui_DataExchangeWidget.__init__(self)
 
         self._configureUI_()
 

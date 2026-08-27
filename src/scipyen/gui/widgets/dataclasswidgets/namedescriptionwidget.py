@@ -62,7 +62,7 @@ except:
         os.path.join(__module_path__, "namedescriptionwidget.ui")
         )
 
-class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget):
+class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget, QtWidgets.QWidget):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
     sig_detailsChanged = Signal(name="sig_dataChanged")
     sig_nameChanged = Signal(str, name="sig_nameChanged")
@@ -73,10 +73,9 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
     sig_organismEditRequest = Signal(bool, name="sig_organismEditRequest")
     sig_requestNewObject = Signal(name="sig_requestNewObject")
 
-    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
-                 obj: typing.Optional[typing.Any] = None,
+    def __init__(self, parent: QtWidgets.QWidget | None = None,
+                 obj = None,
                  **kwargs):
-        super(Ui_NameDescriptionWidget, self).__init__()
         if not isinstance(parent, QtWidgets.QWidget):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -93,7 +92,10 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
         self._dataDescription_ = kwargs.pop("dataDescription", "")
         self._objSymbol_ = kwargs.pop("objSymbol", "")
 
+        QtWidgets.QWidget.__init__(self, parent)
         AnchoringCollapsibleWidget.__init__(self, parent=parent, **kwargs)
+
+        Ui_NameDescriptionWidget.__init__(self)
         # QtCore.QObject.__init__(self, parent=parent)
 
         self.dataExchangeWidget = None

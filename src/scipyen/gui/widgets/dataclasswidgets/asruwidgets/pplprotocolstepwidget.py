@@ -55,12 +55,11 @@ except:
         )
 
 
-class PPLProtocolStepWidget(Ui_PPLProtocolStepWidget, DataClassWidget):
+class PPLProtocolStepWidget(Ui_PPLProtocolStepWidget, DataClassWidget, QtWidgets.QWidget):
     _objectTypes_ = (sdc.PPLProtocol, sdc.PPLProtocolStep)
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
-        super(Ui_PPLProtocolStepWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -75,7 +74,9 @@ class PPLProtocolStepWidget(Ui_PPLProtocolStepWidget, DataClassWidget):
 
         self._data_ = obj
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_PPLProtocolStepWidget.__init__(self)
 
         self._configureUI_()
 

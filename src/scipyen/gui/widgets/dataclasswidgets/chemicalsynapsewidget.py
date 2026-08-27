@@ -57,13 +57,12 @@ except:
         os.path.join(__module_path__, "chemicalsynapsewidget.ui")
         )
 
-class ChemicalSynapseWidget(Ui_ChemicalSynapseWidget, DataClassWidget):
+class ChemicalSynapseWidget(Ui_ChemicalSynapseWidget, DataClassWidget, QtWidgets.QWidget):
     _objectTypes_ = (sdc.ChemicalSynapse, )
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):
-        super(Ui_ChemicalSynapseWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -84,7 +83,9 @@ class ChemicalSynapseWidget(Ui_ChemicalSynapseWidget, DataClassWidget):
 
         self._transmitters_ = list(sdc.Neurotransmitter.names())
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_ChemicalSynapseWidget.__init__(self)
 
         self._configureUI_()
 
