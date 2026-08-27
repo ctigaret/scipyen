@@ -187,6 +187,19 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget, QtWidgets.QWidget):
             with qtutils.SignalBlocker(self.biologicalSourceEditor):
                 self.biologicalSourceEditor.setValue(self._data_.source, objSymbol="source")
 
+    def _makeBioSourceEditor(self):
+        from gui.widgets.dataclasswidgets.biologicalsourcewidget import BiologicalSourceWidget
+        anchoringWidget = self.provideAnchoringWidget()
+        self.biologicalSourceEditor = self._setupCollapsibleChild_(
+            BiologicalSourceWidget,
+            "biologicalSourceEditor",
+            self._slot_biologicalSourceChanged,
+            self.toggleSourceEditorToolButton,
+            anchoringWidget,
+            self._data_.source,
+            objSymbol="source"
+            )
+
     @Slot()
     def _slot_editBiologicalSource(self):
         from gui.widgets.dataclasswidgets.biologicalsourcewidget import BiologicalSourceWidget
@@ -194,18 +207,10 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget, QtWidgets.QWidget):
 
         if (not isinstance(self.biologicalSourceEditor, BiologicalSourceWidget) and qtutils.isQObjectAlive(self.biologicalSourceEditor)):
             self._removeAnchoringCollapsibleWidget_(self.biologicalSourceEditor)
+            self._makeBioSourceEditor()
 
-        if not isinstance(self.biologicalSourceEditor, BiologicalSourceWidget) or not qtutils.isQObjectAlive(self.biologicalSourceEditor):
-            self.biologicalSourceEditor = self._setupCollapsibleChild_(
-                BiologicalSourceWidget,
-                "biologicalSourceEditor",
-                self._slot_biologicalSourceChanged,
-                self.toggleSourceEditorToolButton,
-                anchoringWidget,
-                self._data_.source,
-                objSymbol="source"
-                )
-
+        elif not qtutils.isQObjectAlive(self.biologicalSourceEditor):
+            self._makeBioSourceEditor()
 
         else:
             self.biologicalSourceEditor.setValue(self._data_.source,
@@ -229,7 +234,7 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget, QtWidgets.QWidget):
 
     @Slot(bool)
     def _slot_toggleBioSourceEditor(self, val: bool):
-        print(f"{self.__class__.__name__}._slot_toggleBioSourceEditor({val})")
+        # print(f"{self.__class__.__name__}._slot_toggleBioSourceEditor({val})")
         if val is True:
             self._slot_editBiologicalSource()
         else:
@@ -245,8 +250,21 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget, QtWidgets.QWidget):
             if isinstance(self.procedureEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.procedureEditor):
                 self.procedureEditor.collapse(False)
 
+    def _makeProcedureEditor(self):
+        from gui.widgets.dataclasswidgets.procedurewidget import ProcedureWidget
+        anchoringWidget = self.provideAnchoringWidget()
+        self.procedureEditor = self._setupCollapsibleChild_(
+            ProcedureWidget,
+            "procedureEditor",
+            self._slot_procedureChanged,
+            self.toggleProcedureEditorToolButton,
+            anchoringWidget,
+            self._data_.procedure, objSymbol="procedure"
+            )
+
+
     @Slot()
-    def _slot_editProcedure(self): # TODO
+    def _slot_editProcedure(self):
         from gui.widgets.dataclasswidgets.procedurewidget import ProcedureWidget
         anchoringWidget = self.provideAnchoringWidget()
         # anchoringWidget = self.anchoringWidget if (isinstance(self._anchoringWidget_, QtWidgets.QWidget) and self.overrideAnchor) else self if self.parent() is None else None
@@ -255,14 +273,11 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget, QtWidgets.QWidget):
             if isinstance(self.procedureEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.procedureEditor):
                 self._removeAnchoringCollapsibleWidget_(self.procedureEditor)
 
-            self.procedureEditor = self._setupCollapsibleChild_(
-                ProcedureWidget,
-                "procedureEditor",
-                self._slot_procedureChanged,
-                self.toggleProcedureEditorToolButton,
-                anchoringWidget,
-                self._data_.procedure, objSymbol="procedure"
-                )
+            self._makeProcedureEditor()
+
+        elif not qtutils.isQObjectAlive(self.procedureEditor):
+            self._makeProcedureEditor()
+
         else:
             self.procedureEditor.setValue(self._data_.procedure,
                                           objSymbol="procedure")

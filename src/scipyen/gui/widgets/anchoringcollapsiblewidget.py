@@ -239,7 +239,7 @@ class AnchoringCollapsibleWidget(WorkspaceGuiMixin):
         #
         # The latter case is NOT A BUG but it MUST be captured in closeSubWidgets
         widget = self.sender()
-        print(f"{self.__class__.__name__}._slot_anchoredWidgetClosingOrCollapsing: sender widget = {widget}")
+        # print(f"{self.__class__.__name__}._slot_anchoredWidgetClosingOrCollapsing: sender widget = {widget}")
         wid = id(widget)
         if (
             isinstance(getattr(widget, "anchoringWidget", None), QtWidgets.QWidget)
@@ -250,7 +250,7 @@ class AnchoringCollapsibleWidget(WorkspaceGuiMixin):
             if wid in ccd:
                 # toggle = self._collapsibleChildren_[widget.objectName()][1]
                 toggle = ccd[wid][1]
-                print(f"{self.__class__.__name__}._slot_anchoredWidgetClosingOrCollapsing: toggle -> {toggle}")
+                # print(f"{self.__class__.__name__}._slot_anchoredWidgetClosingOrCollapsing: toggle -> {toggle}")
 
                 if (
                     isinstance(toggle, QtWidgets.QWidget)
