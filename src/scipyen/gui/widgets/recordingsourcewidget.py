@@ -71,7 +71,7 @@ except:
 
 T = ephys_pathways.RecordingSource
 
-class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget):
+class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets.QWidget):
     # sig_valueChanged = Signal(object, name="sig_valueChanged")
     _objectType_ = ephys_pathways.RecordingSource
     _objectTypes_ = (ephys_pathways.RecordingSource, )
@@ -80,7 +80,6 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget):
                  obj: typing.Optional[T] = None,
                  **kwargs):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
-        super(Ui_RecordingSourceWidget, self).__init__()
 
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
@@ -117,7 +116,9 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget):
             self._electrode_ = self._data_.electrodeMode
             self._pathways_ = self._data_.pathways
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_RecordingSourceWidget.__init__(self)
         self._configureUI_()
 
         # if not isinstance(self._data_, self._objectTypes_):

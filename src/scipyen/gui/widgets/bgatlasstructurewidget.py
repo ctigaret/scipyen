@@ -121,52 +121,52 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
         # BUG: 2026-07-06 11:10:34 FIXME in DataTreeViewer TODO
         # do NOT block signals from this one as it will prevent updating itself
         #
-        sigBlockers = list(
-                            map(
-                                lambda w: QtCore.QSignalBlocker(w),
-                                (self.ancestorComboBox,
+        self.structureIDAcroNameLabel.setText(self._structureIdentityText_)
+        with qtutils.SignalBlocker((self.ancestorComboBox,
                                  self.descendantComboBox,
                                  self.acronymOrNameEdit,
                                  # self.detailsViewer,
-                                )
-                               )
-                           )
+                                )):
 
+            self.ancestorComboBox.clear()
+
+            for t in ["None"] + list(self._ancestors_.keys()):
+                self.ancestorComboBox.addItem(t)
+
+            self.ancestorComboBox.setCurrentIndex(0)
+
+            self.descendantComboBox.clear()
+
+            for t in ["None"] + list(self._descendants_.keys()):
+                self.descendantComboBox.addItem(t)
+
+            self.descendantComboBox.setCurrentIndex(0)
+            self.acronymOrNameEdit.clear()
+
+    def clear(self):
+        self._structureIdentityText_ = ""
         self.structureIDAcroNameLabel.setText(self._structureIdentityText_)
-        self.ancestorComboBox.clear()
 
-        for t in ["None"] + list(self._ancestors_.keys()):
-            self.ancestorComboBox.addItem(t)
+        with qtutils.SignalBlocker((self.ancestorComboBox,
+                                 self.descendantComboBox,
+                                 self.acronymOrNameEdit,
+                                 # self.detailsViewer,
+                                )):
+            self.ancestorComboBox.clear()
 
-        self.ancestorComboBox.setCurrentIndex(0)
+            # for t in ["None"] + list(self._ancestors_.keys()):
+            #     self.ancestorComboBox.addItem(t)
+            #
+            # self.ancestorComboBox.setCurrentIndex(0)
 
-        self.descendantComboBox.clear()
+            self.descendantComboBox.clear()
 
-        for t in ["None"] + list(self._descendants_.keys()):
-            self.descendantComboBox.addItem(t)
+            # for t in ["None"] + list(self._descendants_.keys()):
+            #     self.descendantComboBox.addItem(t)
+            #
+            # self.descendantComboBox.setCurrentIndex(0)
+            self.acronymOrNameEdit.clear()
 
-        self.descendantComboBox.setCurrentIndex(0)
-        self.acronymOrNameEdit.clear()
-
-        # if isinstance(self._containerWidget_, DataClassWidget):
-        #     self.structureTreeView.setEnabled(False)
-        #     self.structureTreeView.setVisible(False)
-        #     self.detailsToolButton.setEnabled(True)
-        #     self.detailsToolButton.setVisible(True)
-        #     if (isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer)
-        #         and self.detailsViewer.isVisible()
-        #         ):
-        #         # print(f"{self.__class__.__name__}._setup_UIFields -> updating details viewer for structure {self._structure_}")
-        #         self.detailsViewer.view(self._structure_, doc_title="structure")
-        #
-        # else:
-        #     self.structureTreeView.setEnabled(True)
-        #     self.structureTreeView.setVisible(True)
-        #     self.detailsToolButton.setEnabled(False)
-        #     self.detailsToolButton.setVisible(False)
-        #     self.structureTreeView.setData(self._structure_, "structure")
-
-        # self.structureTreeView.readOnly=True
 
     def closeEvent(self, evt):
         if isinstance(self.detailsViewer, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.detailsViewer):

@@ -8,6 +8,12 @@
 import os, csv, unicodedata, traceback, codecs
 import IPython.core.completer as completer
 
+try:
+    latex_symbols = completer.latex_symbols
+except:
+    import IPython.core.latex_symbols as ltx_sym
+    latex_symbols = ltx_sym.latex_symbols
+
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
 
@@ -30,13 +36,14 @@ with codecs.open(os.path.join(__module_path__,"unicode_input_table.py"), 'r', en
             continue
         unicode_input[items[2]]=items[1]
 
+symbols = latex_symbols
+
 for k,i in unicode_input.items():
-    if k not in completer.latex_symbols:
-        completer.latex_symbols[k]=i
-        
+    if k not in latex_symbols:
+        latex_symbols[k]=i
+
 del unicode_input
 
-symbols = completer.latex_symbols
 
 def u(x:str):
     return symbols.get(x, x)

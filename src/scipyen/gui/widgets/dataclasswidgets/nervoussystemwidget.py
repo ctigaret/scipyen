@@ -8,6 +8,7 @@ r"""
 """
 
 import sys, os, typing, types, warnings, math, cmath # noqa
+import traceback
 # import numbers
 # import numpy as np
 # import quantities as pq
@@ -18,6 +19,7 @@ import pandas as pd
 # import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,) # noqa
+from copy import deepcopy
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
@@ -100,17 +102,34 @@ class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget, QtWidgets.QWi
         self._atlas_ = None
         self._availableStructures_ = None
 
-        self._localAtlasNames_ = ["Undefined"]
+        # self._localAtlasNames_ = ["Undefined"]
+        self._atlasNames_ = ["Undefined"]
+
+        self._bgAvailable_ = False
         # self._atlasStructureNamesAcronyms_ = {"Undefined": "Undefined"}
 
+        # print(f"{self.__class__.__name__}.__init__: _data_.atlasName = {self._data_.atlasName}")
+
         if bgbridge.hasBrainGlobe and bgbridge.hasBrainGlobeAtlasAPI:
-            for atlasName, atlasVersion in self._bman_.localAtlases.items():
-                self._localAtlasNames_.append(f"{atlasName} ({atlasVersion})")
+            try:
+                # for atlasName, atlasVersion in self._bman_.localAtlases.items():
+                for atlasName, atlasVersion in self._bman_.getAtlasesConfiguration().items():
+                    # self._localAtlasNames_.append(f"{atlasName} ({atlasVersion})")
+                    self._atlasNames_.append(f"{atlasName} ({atlasVersion})")
 
-            if self._data_.atlasName in self._bman_.localAtlases:
-                self._atlas_ = self._bman_.initAtlas(self._data_.atlasName)
-                self._availableStructures_ = self._atlas_.lookup_df
+                # if isinstance(self._data_.atlasName, str) and self._data_.atlasName in self._bman_.localAtlases:
+                if isinstance(self._data_.atlasName, str) and self._data_.atlasName in self._bman_.atlases:
+                    self._atlas_ = self._bman_.initAtlas(self._data_.atlasName, interactive=False)
+                    self._availableStructures_ = self._atlas_.lookup_df
 
+                self._bgAvailable_ = True
+
+            except:
+                traceback.print_exc()
+                self.warningMessage("Nervous System Editor", "No local BrainGlobe atlases are available; some functionality will be limited")
+
+        else:
+            self.warningMessage("Nervous System Editor", "No local BrainGlobe atlases are available; some functionality will be limited")
 
         self._configureUI_()
 
@@ -120,30 +139,41 @@ class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget, QtWidgets.QWi
 
         self.bgStructureWidget.containerWidget = self
 
-        for t in self._localAtlasNames_:
-            self.brainAtlasComboBox.addItem(t)
+        if self._bgAvailable_:
 
-        if isinstance(self._data_.atlasName, str) and self._data_.atlasName in self._bman_.localAtlases.keys():
-            ndx = list(self._bman_.localAtlases.keys()).index(self._data_.atlasName) + 1 # to account for "Undefined"
-            self.brainAtlasComboBox.setCurrentIndex(ndx)
+            # for t in self._localAtlasNames_:
+            for t in self._atlasNames_:
+                self.brainAtlasComboBox.addItem(t)
 
-        else:
-            self.brainAtlasComboBox.setCurrentIndex(0) # use "Undefined"
+            if isinstance(self._data_.atlasName, str) and self._data_.atlasName in self._bman_.localAtlases.keys():
+                ndx = list(self._bman_.localAtlases.keys()).index(self._data_.atlasName) + 1 # to account for "Undefined"
+                self.brainAtlasComboBox.setCurrentIndex(ndx)
 
-        self.brainAtlasComboBox.currentIndexChanged.connect(self._slot_atlasChanged)
+            else:
+                self.brainAtlasComboBox.setCurrentIndex(0) # use "Undefined"
 
-        if (bgbridge.hasBrainGlobe
-            and bgbridge.hasBrainGlobeAtlasAPI):
-            if (isinstance(self._atlas_, bgbridge.BrainGlobeAtlas)
-            and "brainglobe_atlasapi" in type(self._atlas_).__module__):
+            self.brainAtlasComboBox.currentIndexChanged.connect(self._slot_atlasChanged)
+
+            if (bgbridge.hasBrainGlobe
+                and bgbridge.hasBrainGlobeAtlasAPI
+                and isinstance(self._atlas_, bgbridge.BrainGlobeAtlas)
+                and "brainglobe_atlasapi" in type(self._atlas_).__module__
+                ):
+
                 self.bgStructureWidget.atlas = self._atlas_
+
                 if (isinstance(self._data_.structure, bgbridge.Structure)
                     and "brainglobe_atlasapi" in type(self._data_.structure).__module__):
                     self.bgStructureWidget.setValue(self._data_.structure)
 
-        self.bgStructureWidget.sig_valueChanged.connect(self._slot_structureChanged)
+            self.bgStructureWidget.sig_valueChanged.connect(self._slot_structureChanged)
+
+        else:
+            self.bgStructureWidget.setEnabled(False)
+
 
         self.sig_uiConfigured.emit()
+
 
     @Slot(object)
     def _slot_structureChanged(self, val: object):
@@ -153,15 +183,32 @@ class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget, QtWidgets.QWi
 
     @Slot(int)
     def _slot_atlasChanged(self, val: int):
-        if not isinstance(val, int) or val <= 0 or val >=len(self._bman_.localAtlases):
+        # if not isinstance(val, int) or val <= 0 or val >=len(self._bman_.localAtlases):
+        old_atlas_name = deepcopy(self._data_.atlasName)
+
+        if not isinstance(val, int) or val <= 0 or val >=len(self._bman_.atlases):
             self._data_.atlasName = pd.NA
+            self.bgStructureWidget.clear()
+            return
 
-        else:
-            self._data_.atlasName = list(self._bman_.localAtlases.keys())[val-1]
+        # else:
+            # self._data_.atlasName = list(self._bman_.localAtlases.keys())[val-1]
+        newName = list(self._bman_.atlases.keys())[val-1]
 
-        if self._data_.atlasName in self._bman_.localAtlases:
-            self._atlas_ = self._bman_.initAtlas(self._data_.atlasName)
+        if newName is pd.NA:
+            self._data_.atlasName = newName
+            self.bgStructureWidget.clear()
+            return
+
+        if self._data_.atlasName is not pd.NA and newName != self._data_.atlasName:
+            self.bgStructureWidget.clear()
+
+        # if self._data_.atlasName in self._bman_.localAtlases:
+        if newName in self._bman_.atlases:
+            self._atlas_ = self._bman_.initAtlas(newName, localAtlasesOnly=False,
+                                                 interactive=False)
             self.bgStructureWidget.atlas = self._atlas_
+            self._data_.atlasName = newName
             if (self._data_.structure is None or
                 self._data_.structure["id"] not in self._atlas_.structures):
                 self._data_.structure = None

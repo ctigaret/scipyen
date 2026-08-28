@@ -84,7 +84,7 @@ except:
 
 T = ephys_pathways.RecordingEpisode
 
-class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
+class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidgets.QWidget):
     sig_trialsChanged = Signal(name="sig_trialsChanged")
     sig_protocolChanged = Signal(name="sig_protocolChanged")
     sig_newObjectCreated = Signal(object, name="sig_newObjectCreated")
@@ -98,7 +98,6 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
                  obj: typing.Optional[T] = None,
                  **kwargs):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
-        super(Ui_RecordingEpisodeWidget, self).__init__()
         if isinstance(parent, (ephys_pathways.RecordingEpisode,
                                neo.Block, typing.Sequence)):
             obj_ = parent
@@ -132,7 +131,9 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget):
             self._procedure_ = self._data_.procedure
             self._description_ = self._data_.description
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_RecordingEpisodeWidget.__init__(self)
         self._configureUI_()
 
 

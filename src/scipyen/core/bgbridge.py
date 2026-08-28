@@ -38,6 +38,7 @@ Wrapper around BrainGlobe API, with shims
 
 import traceback, os, sys, pathlib, shutil, inspect
 import collections, typing, dataclasses, functools, itertools
+import subprocess
 # import json
 import re
 from dataclasses import MISSING
@@ -677,7 +678,7 @@ class BrainAtlasManager(QtCore.QObject):
     def testAtlasDownload(self):
         r"""Tests downloading and extracting an atlas archive.
         See iolib.network.example_sequential_download_handler for explanations
-        TODO - refactor this into self.downloadAtlas/self._updateAtlas
+        TODO - refactor this into self.uiDownloadAtlas/self._updateAtlas
         """
         if not self.hasBrainGlobeAtlasAPI():
             return
@@ -815,14 +816,14 @@ class BrainAtlasManager(QtCore.QObject):
                         )
                     )
                 ):
-
                 name = self.selectAtlasName(localAtlasesOnly = localAtlasesOnly)
 
                 if name is None:
                     return
                     # name = self.default_atlas_name
 
-            if name not in self.localAtlasNames:
+            atlasNames = self.localAtlasNames if localAtlasesOnly else self.atlasNames
+            if name not in atlasNames:
                 if interactive:
                     GuiMessages.informationMessage_static(
                         title = f"Atlas {name}:",
@@ -834,13 +835,13 @@ class BrainAtlasManager(QtCore.QObject):
                                 ]
                             )
                         )
-                return
-                # if download:
-                #     scipywarn(f"The atlas {name} will be available as the 'atlas' attribute once donwloaded and initialized")
-                #     self.downloadAtlas(name, True)
-                # else:
-                #     scipywarn(f"The atlas {name} must be downloaded manually")
-                #     return
+                else:
+                    if download:
+                        scipywarn(f"The atlas {name} will be available as the 'atlas' attribute once donwloaded and initialized")
+                        self.downloadAtlas(name, True)
+                    else:
+                        scipywarn(f"The atlas {name} must be downloaded manually")
+                        return
             else:
                 # TODO 2024-11-24 21:23:14
                 # make 'check_latest' below a Scipyen configurable variable
@@ -908,7 +909,7 @@ class BrainAtlasManager(QtCore.QObject):
         except:
             traceback.print_exc()
 
-    def downloadAtlas(self, name:typing.Optional[str], initAtlas:bool=False) -> None:
+    def uiDownloadAtlas(self, name:typing.Optional[str], initAtlas:bool=False) -> None:
         r"""Downloads an atlas data from the BrainGlobe GIN repository
 
         https://gin.g-node.org/brainglobe/atlases/raw/master/
@@ -962,6 +963,22 @@ class BrainAtlasManager(QtCore.QObject):
                                    url = url)
 
         self._netMan_.getUrl(url1, destination=None, replyHandler=handle)
+
+    def downloadAtlas(self, name:str, init:bool=True):
+
+        command = ["brainglobe", "install", "-a", name]
+
+        proc = subprocess.run(command)
+
+        if proc.returncode == 0:
+            if init:
+                self._current_atlas_ = BrainGlobeAtlas(name, check_latest=False)
+                self._atlas_name_to_initialize_ = None
+            else:
+                scipywarn(f"The atlas {name} was downloaded but it must be manually initialized")
+
+        else:
+            scipywarn(f"Download process exited with code {proc.returncode}")
 
 
     @Slot()
