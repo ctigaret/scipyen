@@ -323,18 +323,18 @@ class DataClassWidget(AnchoringCollapsibleWidget):
             if isinstance(self.parentEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.parentEditor):
                 self.parentEditor.collapse(False)
 
-    def _makeParentEditor(self, editorWidgetType, data):
-        anchoringWidget = self.provideAnchoringWidget()
-        self.parentEditor = self._setupCollapsibleChild_(
-            editorWidgetType,
-            "parentEditor",
-            self._slot_parentChanged,
-            self.nameDescriptionWidget.toggleParentEditorToolButton,
-            anchoringWidget,
-            not desktoputils.is_wayland(),
-            data,
-            objSymbol="parent"
-            )
+    # def _makeParentEditor(self, editorWidgetType, data):
+    #     anchoringWidget = self.provideAnchoringWidget()
+    #     self.parentEditor = self._setupCollapsibleChild_(
+    #         editorWidgetType,
+    #         "parentEditor",
+    #         self._slot_parentChanged,
+    #         self.nameDescriptionWidget.toggleParentEditorToolButton,
+    #         anchoringWidget,
+    #         not desktoputils.is_wayland(),
+    #         data,
+    #         objSymbol="parent"
+    #         )
 
 
     @Slot()
@@ -349,21 +349,29 @@ class DataClassWidget(AnchoringCollapsibleWidget):
             parentData = self._data_.parent
 
         editorWidgetType = self._setParentEditorType_(parentData)
+
         if editorWidgetType is None:
             return
 
-        if isinstance(self.parentEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.parentEditor):
-            if self._needsNewParentWidget_ or type(self.parentEditor) is not editorWidgetType:
-                # self.parentEditor.close()
-                # self.parentEditor.deleteLater()
+        if isinstance(self.parentEditor, QtWidgets.QWidget):
+            if (
+                not qtutils.isQObjectAlive(self.parentEditor)
+                or type(self.parentEditor) is not editorWidgetType
+                or self._needsNewParentWidget_):
                 self._removeAnchoringCollapsibleWidget_(self.parentEditor)
-                self._makeParentEditor(editorWidgetType, parentData)
+                self.parentEditor = self._makeEditorWidget(editorWidgetType, "parentEditor",
+                                       self._slot_parentChanged,
+                                       self.nameDescriptionWidget.toggleParentEditorToolButton,
+                                       parentData, "parent")
 
             else:
                 self.parentEditor.setValue(parentData, objSymbol="parent")
 
         else:
-            self._makeParentEditor(editorWidgetType, parentData)
+            self.parentEditor = self._makeEditorWidget(editorWidgetType, "parentEditor",
+                                    self._slot_parentChanged,
+                                    self.nameDescriptionWidget.toggleParentEditorToolButton,
+                                    parentData, "parent")
 
         self._needsNewParentWidget_ = False
         self.parentEditor.setWindowTitle(f"Parent: {type(parentData).__name__}")
@@ -420,20 +428,41 @@ class DataClassWidget(AnchoringCollapsibleWidget):
             if isinstance(self.organismEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismEditor):
                 self.organismEditor.collapse(False)
 
-    def _makeOrganismEditor(self, data):
-        from gui.widgets.dataclasswidgets.organismwidget import OrganismWidget
+    def _makeEditorWidget(self, widgetType: type, widgetName: str,
+                          valueChangedSlot: Slot,
+                          toggleControl: QtWidgets.QWidget,
+                          data: object,
+                          dataSymbol: str,
+                          ) -> QtWidgets.QWidget:
         anchoringWidget = self.provideAnchoringWidget()
-
-        self.organismEditor = self._setupCollapsibleChild_(
-            OrganismWidget,
-            "organismEditor",
-            self._slot_organismChanged,
-            self.nameDescriptionWidget.organismToolButton,
+        obj = self._setupCollapsibleChild_(
+            widgetType,
+            widgetName,
+            valueChangedSlot,
+            toggleControl,
             anchoringWidget,
             not desktoputils.is_wayland(),
             data,
-            objSymbol="organism"
+            dataSymbol="organism"
             )
+
+        return obj
+
+
+    # def _makeOrganismEditor(self, data):
+    #     from gui.widgets.dataclasswidgets.organismwidget import OrganismWidget
+    #     anchoringWidget = self.provideAnchoringWidget()
+    #
+    #     self.organismEditor = self._setupCollapsibleChild_(
+    #         OrganismWidget,
+    #         "organismEditor",
+    #         self._slot_organismChanged,
+    #         self.nameDescriptionWidget.organismToolButton,
+    #         anchoringWidget,
+    #         not desktoputils.is_wayland(),
+    #         data,
+    #         objSymbol="organism"
+    #         )
 
 
     @Slot()
@@ -444,19 +473,28 @@ class DataClassWidget(AnchoringCollapsibleWidget):
         except: # noqa
             organism = sdc.Organism()
 
-        if isinstance(self.organismEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.organismEditor):
-            if not isinstance(self.organismEditor, OrganismWidget):
-                # self.organismEditor.close()
-                # self.organismEditor.deleteLater()
-                # self.organismEditor = None
+        if isinstance(self.organismEditor, QtWidgets.QWidget):
+            if not qtutils.isQObjectAlive(self.organismEditor) or not isinstance(self.organismEditor, OrganismWidget):
                 self._removeAnchoringCollapsibleWidget_(self.organismEditor)
-                self._makeOrganismEditor(organism)
+                # self.organismEditor = None
+
+            # if not isinstance(self.organismEditor, OrganismWidget):
+            #     self._removeAnchoringCollapsibleWidget_(self.organismEditor)
+                self.organismEditor = self._makeEditorWidget(OrganismWidget, "organismEditor",
+                                       self._slot_organismChanged,
+                                       self.nameDescriptionWidget.organismToolButton,
+                                       organism, "organism")
+                # self._makeOrganismEditor(organism)
 
             else:
                 self.organismEditor.setValue(organism, objSymbol="organism")
 
         else:
-            self._makeOrganismEditor(organism)
+            self.organismEditor = self._makeEditorWidget(OrganismWidget, "organismEditor",
+                                    self._slot_organismChanged,
+                                    self.nameDescriptionWidget.organismToolButton,
+                                    organism, "organism")
+            # self._makeOrganismEditor(organism)
 
         self.organismEditor.show()
 

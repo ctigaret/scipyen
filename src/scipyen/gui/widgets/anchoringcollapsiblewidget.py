@@ -138,25 +138,13 @@ class AnchoringCollapsibleWidget(WorkspaceGuiMixin):
 
     def _removeAnchoringCollapsibleWidget_(self, widget: QtWidgets.QWidget):
         if isinstance(widget, QtWidgets.QWidget):
-            wid = id(widget)
-
             if qtutils.isQObjectAlive(widget):
-                if widget.isAnchoredWidget and wid in widget.anchoringWidget._collapsibleChildren_:
-                    toggle = widget.anchoringWidget._collapsibleChildren_[wid][1]
-                    if (
-                        isinstance(toggle, QtWidgets.QWidget)
-                        and hasattr(toggle, "setChecked")
-                        and qtutils.isQObjectAlive(toggle)
-                        ):
-                        with qtutils.SignalBlocker(toggle):
-                            toggle.setChecked(False)
-
-
+                widget._selfDetach_()
                 widget.close()
                 widget.deleteLater()
                 widget = None
 
-            widget.anchoringWidget._collapsibleChildren_.pop(wid, None)
+        return widget
 
     @Slot()
     def _slot_uiConfigured_(self):
@@ -186,17 +174,15 @@ class AnchoringCollapsibleWidget(WorkspaceGuiMixin):
                 if isinstance(self._windowFlags_, QtCore.Qt.WindowType):
                     self.setWindowFlags(self._windowFlags_)
                 else:
-                    self.setWindowFlags(QtCore.Qt.Tool)
+                    self.setWindowFlags(self.windowFlags() | QtCore.Qt.Tool)
 
             geometry = self.geometry()
             heightHint = self.sizeHint().height()
             widthHint = self.sizeHint().width()
-            # print(f"{self.__class__.__name__}._slot_uiConfigured_:")
-            # print(f"\theightHint -> {heightHint}, widthHint -> {widthHint}")
+
             self._positionHint_ = self.anchoringWidget.geometry().topRight()
             self._sizeAnimationMax_ = widthHint
-            # self._sizeAnimation_.setEndValue(widthHint)
-            # self._sizeAnimationMax_ = 200
+
             self._sizeAnimation_ = QtCore.QPropertyAnimation(self, b'widgetWidth', self)
             self._sizeAnimation_.setStartValue(0)
             self._sizeAnimation_.setDuration(200) # ms
@@ -236,33 +222,9 @@ class AnchoringCollapsibleWidget(WorkspaceGuiMixin):
 
     @Slot()
     def _slot_anchoredWidgetClosingOrCollapsing(self):
-        # BUG?: 2026-07-24 16:25:48 FIXME?
-        # the problem here is that the widget might have been already removed
-        # from _collapsibleChildren_, or not even having been added to this, but
-        # rather in an anchoring widget higher up th hierarchy
-        #
-        # The latter case is NOT A BUG but it MUST be captured in closeSubWidgets
         widget = self.sender()
-        # print(f"{self.__class__.__name__}._slot_anchoredWidgetClosingOrCollapsing: sender widget = {widget}")
-        wid = id(widget)
-        if (
-            isinstance(getattr(widget, "anchoringWidget", None), QtWidgets.QWidget)
-            and len(getattr(widget.anchoringWidget, "_collapsibleChildren_", dict()))
-            ):
-            aw = widget.anchoringWidget
-            ccd = aw._collapsibleChildren_
-            if wid in ccd:
-                # toggle = self._collapsibleChildren_[widget.objectName()][1]
-                toggle = ccd[wid][1]
-                # print(f"{self.__class__.__name__}._slot_anchoredWidgetClosingOrCollapsing: toggle -> {toggle}")
-
-                if (
-                    isinstance(toggle, QtWidgets.QWidget)
-                    and hasattr(toggle, "setChecked")
-                    and qtutils.isQObjectAlive(toggle)
-                    ):
-                    with qtutils.SignalBlocker(toggle):
-                        toggle.setChecked(False)
+        if isinstance(widget, self.__class__):
+            widget._selfDetach_()
 
     def provideAnchoringWidget(self, widget: typing.Optional[QtWidgets.QWidget] = None) -> QtWidgets.QWidget | None:
         r"""Provides an anchoring widget to a collapsible child widget, if required.
@@ -316,8 +278,27 @@ class AnchoringCollapsibleWidget(WorkspaceGuiMixin):
             self._animationGroup_.setDirection(QtCore.QAbstractAnimation.Backward)
             self._animationGroup_.start()
 
+        # self._selfDetach_()
+
         if close:
             self.close()
+        else:
+            self.setVisible(False)
+
+            # if self.isAnchoredWidget:
+            #     wid = id(self)
+            #     acc = getattr(self.anchoringWidget, "collapsibleChildren", None)
+            #     if isinstance(acc, dict) and wid in acc:
+            #         toggle = acc[wid][1]
+            #         if (
+            #             isinstance(toggle, QtWidgets.QWidget)
+            #             and hasattr(toggle, "setChecked")
+            #             and qtutils.isQObjectAlive(toggle)
+            #             ):
+            #             with qtutils.SignalBlocker(toggle):
+            #                 toggle.setChecked(False)
+            # self.sig_closing.emit()
+
 
     def collapseSubWidgets(self, close: bool= False):
         if len(self._collapsibleChildren_) == 0:
@@ -330,7 +311,23 @@ class AnchoringCollapsibleWidget(WorkspaceGuiMixin):
                 except: # noqa
                     pass
 
+    def _selfDetach_(self):
+        if self.isAnchoredWidget:
+            wid = id(self)
+            acc = getattr(self.anchoringWidget, "collapsibleChildren", None)
+            if isinstance(acc, dict) and wid in acc:
+                toggle = acc[wid][1]
+                if (
+                    isinstance(toggle, QtWidgets.QWidget)
+                    and hasattr(toggle, "setChecked")
+                    and qtutils.isQObjectAlive(toggle)
+                    ):
+                    with qtutils.SignalBlocker(toggle):
+                        toggle.setChecked(False)
+
+
     def closeEvent(self, evt):
+        self._selfDetach_()
         self.closeSubWidgets()
 
         if hasattr(super(), "closeEvent"):
@@ -346,7 +343,7 @@ class AnchoringCollapsibleWidget(WorkspaceGuiMixin):
 
         # NOTE: 2026-07-24 16:35:05
         # cache widget IDs to avoid _collapsibleChildren_ changing size during iteration
-        wids = list()
+        wids = list() # noqa
         for obj, toggle, objName in self._collapsibleChildren_.values():
             if isinstance(obj, QtWidgets.QWidget):
                 if obj.isAnchoredWidget:
@@ -411,6 +408,7 @@ class AnchoringCollapsibleWidget(WorkspaceGuiMixin):
 
     @Slot(QtCore.QPoint)
     def _slot_anchoringWidgetMoved(self, pos: QtCore.QPoint):
+        r"""Has no effect when running in a Walyand window manager"""
         if not isinstance(self._anchoringWidget_, QtWidgets.QWidget):
             return
 
@@ -499,3 +497,11 @@ class AnchoringCollapsibleWidget(WorkspaceGuiMixin):
 
         else:
             super().show()
+
+    @property
+    def collapsibleChildren(self) -> dict:
+        return self._collapsibleChildren_
+
+    @property
+    def anchoredChildren(self) -> dict:
+        return self.collapsibleChildren
