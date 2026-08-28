@@ -197,21 +197,23 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
                 self._structureIdentityText_ = f"{self._structure_['acronym']}: {self._structure_['name']} (ID: {self._structure_['id']})"
 
                 if isinstance(self._atlas_, bgbridge.BrainGlobeAtlas) and "brainglobe_atlasapi" in type(self._atlas_).__module__:
-                    self._ancestors_ = dict(
-                        map(
-                            lambda a: (self._atlas_.structures[a]["acronym"],
-                                       (self._atlas_.structures[a]["name"], self._atlas_.structures[a]["id"])),
-                            list(reversed(self._atlas_.get_structure_ancestors(self._structure_["id"])))
+                    if self._structure_["id"] in self._atlas_.lookup_df["id"]:
+                        self._ancestors_ = dict(
+                            map(
+                                lambda a: (self._atlas_.structures[a]["acronym"],
+                                        (self._atlas_.structures[a]["name"], self._atlas_.structures[a]["id"])),
+                                list(reversed(self._atlas_.get_structure_ancestors(self._structure_["id"])))
+                                )
                             )
-                        )
 
-                    self._descendants_ = dict(
-                        map(
-                            lambda a: (self._atlas_.structures[a]["acronym"],
-                                       (self._atlas_.structures[a]["name"], self._atlas_.structures[a]["id"])),
-                            list(reversed(self._atlas_.get_structure_descendants(self._structure_["id"])))
+                        self._descendants_ = dict(
+                            map(
+                                lambda a: (self._atlas_.structures[a]["acronym"],
+                                        (self._atlas_.structures[a]["name"], self._atlas_.structures[a]["id"])),
+                                list(reversed(self._atlas_.get_structure_descendants(self._structure_["id"])))
+                                )
                             )
-                        )
+
 
     @Slot(str)
     def _slot_lookupStructure(self, val: str):
