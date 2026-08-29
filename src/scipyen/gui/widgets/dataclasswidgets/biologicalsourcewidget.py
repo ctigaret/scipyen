@@ -246,18 +246,18 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget, QtWidge
     #     sb = QtCore.QSignalBlocker(self.toggleSpecimenEditorToolButton) # noqa
     #     self.toggleSpecimenEditorToolButton.setChecked(False)
 
-    def _makeSpecimenEditor(self, spWidgetType, data):
-        anchoringWidget = self.provideAnchoringWidget()
-        self.specimenEditor = self._setupCollapsibleChild_(
-            spWidgetType,
-            "specimenEditor",
-            self._slot_specimenChanged,
-            self.toggleSpecimenEditorToolButton,
-            anchoringWidget,
-            not desktoputils.is_wayland(),
-            data,
-            objSymbol = "specimen"
-            )
+    # def _makeSpecimenEditor(self, spWidgetType, data):
+    #     anchoringWidget = self.provideAnchoringWidget()
+    #     self.specimenEditor = self._setupCollapsibleChild_(
+    #         spWidgetType,
+    #         "specimenEditor",
+    #         self._slot_specimenChanged,
+    #         self.toggleSpecimenEditorToolButton,
+    #         anchoringWidget,
+    #         not desktoputils.is_wayland(),
+    #         data,
+    #         objSymbol = "specimen"
+    #         )
 
 
     @Slot()
@@ -268,14 +268,30 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget, QtWidge
             if isinstance(self.specimenEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.specimenEditor):
                 if self._needsNewSpecimenWidget_ or type(self.specimenEditor) is not spWidgetType:
                     self._removeAnchoringCollapsibleWidget_(self.specimenEditor)
-                    self._makeSpecimenEditor(spWidgetType, self._data_.specimen)
+                    # self._makeSpecimenEditor(spWidgetType, self._data_.specimen)
+                    self.specimenEditor = self._makeEditorWidget(
+                        spWidgetType,
+                        "specimenEditor",
+                        self._slot_specimenChanged,
+                        self.toggleSpecimenEditorToolButton,
+                        self._data_.specimen,
+                        "specimen"
+                        )
 
                 else:
                     self.specimenEditor.setValue(self._data_.specimen,
                                                  objSymbol="specimen")
 
             else:
-                self._makeSpecimenEditor(spWidgetType, self._data_.specimen)
+                # self._makeSpecimenEditor(spWidgetType, self._data_.specimen)
+                self.specimenEditor = self._makeEditorWidget(
+                    spWidgetType,
+                    "specimenEditor",
+                    self._slot_specimenChanged,
+                    self.toggleSpecimenEditorToolButton,
+                    self._data_.specimen,
+                    "specimen"
+                    )
 
             self._needsNewSpecimenWidget_ = False
             self.specimenEditor.show()

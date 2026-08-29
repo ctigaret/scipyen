@@ -57,6 +57,13 @@
       </widget>
      </item>
      <item>
+      <widget class="QLabel" name="procedureNameTypeLabel">
+       <property name="text">
+        <string/>
+       </property>
+      </widget>
+     </item>
+     <item>
       <spacer name="horizontalSpacer_2">
        <property name="orientation">
         <enum>Qt::Orientation::Horizontal</enum>
@@ -141,6 +148,13 @@
        </property>
        <property name="text">
         <string>Biological Source: </string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="biologicalSourceNameTypeLabel">
+       <property name="text">
+        <string/>
        </property>
       </widget>
      </item>

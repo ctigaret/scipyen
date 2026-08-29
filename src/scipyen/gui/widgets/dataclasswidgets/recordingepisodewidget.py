@@ -100,7 +100,6 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[T] = None,
                  **kwargs):
-        # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
         if isinstance(parent, (ephys_pathways.RecordingEpisode,
                                neo.Block, typing.Sequence)):
             obj_ = parent
@@ -138,7 +137,6 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
         DataClassWidget.__init__(self, parent=parent, **kwargs)
         Ui_RecordingEpisodeWidget.__init__(self)
         self._configureUI_()
-
 
     def _configureUI_(self):
         self.setupUi(self)
@@ -220,39 +218,38 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
             if isinstance(self.procedureEditor, DataClassWidget) and qtutils.isQObjectAlive(self.procedureEditor):
                 self.procedureEditor.collapse(False)
 
-    def _makeProcedureEditor(self, data):
-        from gui.widgets.dataclasswidgets.procedurewidget import SimpleProcedureWidget
-        anchoringWidget = self.provideAnchoringWidget()
-        self.procedureEditor = self._setupCollapsibleChild_(
-            SimpleProcedureWidget,
-            "procedureEditor",
-            self._slot_procedureChanged,
-            self.toggleProcedureEditor,
-            anchoringWidget,
-            not desktoputils.is_wayland(),
-            data,
-            objSymbol="procedure"
-            )
-
     @Slot()
     def _slot_showProcedureWidget(self):
         from gui.widgets.dataclasswidgets.procedurewidget import SimpleProcedureWidget
         if isinstance(self.procedureEditor, QtWidgets.QWidget) and qtutils.isQObjectAlive(self.procedureEditor):
             if not isinstance(self.procedureEditor, SimpleProcedureWidget):
                 self._removeAnchoringCollapsibleWidget_(self.procedureEditor)
-                self._makeProcedureEditor(self._data_.procedure)
+                self.procedureEditor = self._makeEditorWidget(
+                    SimpleProcedureWidget,
+                    "procedureEditor",
+                    self._slot_procedureChanged,
+                    self.toggleProcedureEditor,
+                    self._data_.procedure,
+                    "procedure"
+                    )
 
             else:
                 self.procedureEditor.setValue(self._data_.procedure,
                                               objSymbol="procedure")
 
-            # print(f"{self.__class__.__name__}.)_slot_showProcedureWidget self._data_.procedure -> {self._data_.procedure}")
-
         else:
-            self._makeProcedureEditor(self._data_.procedure)
+            self.procedureEditor = self._makeEditorWidget(
+                SimpleProcedureWidget,
+                "procedureEditor",
+                self._slot_procedureChanged,
+                self.toggleProcedureEditor,
+                self._data_.procedure,
+                "procedure"
+                )
 
         if isinstance(self._data_.procedure.name, str) and len(self._data_.procedure.name.strip()):
             self.procedureEditor.setWindowTitle(f"Procedure: {self._data_.procedure.name} ({self._data_.procedure.procedureType.name})")
+
         else:
             self.procedureEditor.setWindowTitle(f"Procedure: {self._data_.procedure.procedureType.name}")
 
@@ -359,7 +356,21 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
     def _slot_procedureChanged(self, value: sdc.Procedure):
         if not isinstance(value, sdc.Procedure):
             value = sdc.Procedure()
+
         self._procedure_ = value
+
+        typ = self._procedure_.procedureType.name
+
+        name = self._procedure_.name
+
+        if isinstance(name, str) and len(name.strip()):
+            txt = name + f" ({typ})"
+        else:
+            txt = typ
+
+        self.procedureTypeNameLabel.setText(txt)
+        self.procedureTypeNameLabel.setToolTip(f"Procedure type: {typ}")
+
         self._make_value_()
         self.sig_valueChanged.emit(self.value())
 

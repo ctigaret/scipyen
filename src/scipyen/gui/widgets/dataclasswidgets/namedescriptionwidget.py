@@ -113,9 +113,10 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
         self.nameLineEdit.redoAvailable=True
         self.nameLineEdit.setText(self._dataName_)
         self.nameLineEdit.setClearButtonEnabled(True)
-        self.nameLineEdit.setToolTip(f"Name of the {self._objectType_.__name__} object")
-        self.nameLineEdit.setWhatsThis(f"Name of the {self._objectType_.__name__} object")
-        self.nameLineEdit.setStatusTip(f"Name of the {self._objectType_.__name__} object")
+        objType = f" {self._objectType_.name}" if self._objectType_ is not type(None) else ""
+        self.nameLineEdit.setToolTip(f"Name of the {objType} data")
+        self.nameLineEdit.setWhatsThis(f"Name of the {objType} data")
+        self.nameLineEdit.setStatusTip(f"Name of the {objType} data")
 
         self.nameLineEdit.sig_textChanged.connect(self._slot_nameChanged)
         self.descriptionToolButton.clicked.connect(self._slot_editDescription)

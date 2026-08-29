@@ -48,6 +48,8 @@ from core import scipyendataclasses as sdc
 from core import qtutils
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 
+PROCEDURE_TYPE_NAMES = list(sdc.ProcedureType.names())
+
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
@@ -69,7 +71,8 @@ except:
 
 class SimpleProcedureWidget(Ui_SimpleProcedureWidget, DataClassWidget, QtWidgets.QWidget):
     _objectTypes_ = (sdc.Procedure, )
-    procedureTypeNames = list(sdc.ProcedureType.names())
+    procedureTypeNames = PROCEDURE_TYPE_NAMES
+
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.CellCompartment] = None,
                  **kwargs):

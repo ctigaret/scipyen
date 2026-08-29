@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'metadatawidget.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.11.1
+## Created by: Qt User Interface Compiler version 6.11.2
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -62,6 +62,11 @@ class Ui_MetaDataWidget(object):
 
         self.horizontalLayout_5.addWidget(self.label_4)
 
+        self.procedureNameTypeLabel = QLabel(MetaDataWidget)
+        self.procedureNameTypeLabel.setObjectName(u"procedureNameTypeLabel")
+
+        self.horizontalLayout_5.addWidget(self.procedureNameTypeLabel)
+
         self.horizontalSpacer_2 = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout_5.addItem(self.horizontalSpacer_2)
@@ -111,6 +116,11 @@ class Ui_MetaDataWidget(object):
 
         self.horizontalLayout_4.addWidget(self.label_2)
 
+        self.biologicalSourceNameTypeLabel = QLabel(MetaDataWidget)
+        self.biologicalSourceNameTypeLabel.setObjectName(u"biologicalSourceNameTypeLabel")
+
+        self.horizontalLayout_4.addWidget(self.biologicalSourceNameTypeLabel)
+
         self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout_4.addItem(self.horizontalSpacer)
@@ -155,6 +165,7 @@ class Ui_MetaDataWidget(object):
         MetaDataWidget.setWindowTitle(QCoreApplication.translate("MetaDataWidget", u"Form", None))
         self.label_5.setText(QCoreApplication.translate("MetaDataWidget", u"Analysed: ", None))
         self.label_4.setText(QCoreApplication.translate("MetaDataWidget", u"Procedure: ", None))
+        self.procedureNameTypeLabel.setText("")
 #if QT_CONFIG(tooltip)
         self.toggleProcedureEditorToolButton.setToolTip(QCoreApplication.translate("MetaDataWidget", u"Edit procedure", None))
 #endif // QT_CONFIG(tooltip)
@@ -168,6 +179,7 @@ class Ui_MetaDataWidget(object):
         self.label.setText(QCoreApplication.translate("MetaDataWidget", u"File Origin: ", None))
         self.fileOriginLabel.setText(QCoreApplication.translate("MetaDataWidget", u"_file_origin_datetime_", None))
         self.label_2.setText(QCoreApplication.translate("MetaDataWidget", u"Biological Source: ", None))
+        self.biologicalSourceNameTypeLabel.setText("")
 #if QT_CONFIG(tooltip)
         self.toggleSourceEditorToolButton.setToolTip(QCoreApplication.translate("MetaDataWidget", u"Edit Source", None))
 #endif // QT_CONFIG(tooltip)

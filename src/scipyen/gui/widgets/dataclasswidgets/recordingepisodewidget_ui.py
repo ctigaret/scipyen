@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'recordingepisodewidget.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.11.1
+## Created by: Qt User Interface Compiler version 6.11.2
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -25,7 +25,7 @@ class Ui_RecordingEpisodeWidget(object):
     def setupUi(self, RecordingEpisodeWidget):
         if not RecordingEpisodeWidget.objectName():
             RecordingEpisodeWidget.setObjectName(u"RecordingEpisodeWidget")
-        RecordingEpisodeWidget.resize(329, 246)
+        RecordingEpisodeWidget.resize(332, 246)
         self.gridLayout_2 = QGridLayout(RecordingEpisodeWidget)
         self.gridLayout_2.setObjectName(u"gridLayout_2")
         self.horizontalLayout_3 = QHBoxLayout()
@@ -153,6 +153,11 @@ class Ui_RecordingEpisodeWidget(object):
 
         self.horizontalLayout_6.addWidget(self.label_8)
 
+        self.procedureTypeNameLabel = QLabel(RecordingEpisodeWidget)
+        self.procedureTypeNameLabel.setObjectName(u"procedureTypeNameLabel")
+
+        self.horizontalLayout_6.addWidget(self.procedureTypeNameLabel)
+
         self.horizontalSpacer_4 = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout_6.addItem(self.horizontalSpacer_4)
@@ -230,6 +235,7 @@ class Ui_RecordingEpisodeWidget(object):
 #endif // QT_CONFIG(whatsthis)
         self.createObjectPushButton.setText(QCoreApplication.translate("RecordingEpisodeWidget", u"New", None))
         self.label_8.setText(QCoreApplication.translate("RecordingEpisodeWidget", u"Procedure:", None))
+        self.procedureTypeNameLabel.setText("")
         self.toggleProcedureEditor.setText(QCoreApplication.translate("RecordingEpisodeWidget", u"Edit Procedure", None))
     # retranslateUi
 

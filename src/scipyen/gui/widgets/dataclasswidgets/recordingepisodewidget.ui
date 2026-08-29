@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>329</width>
+    <width>332</width>
     <height>246</height>
    </rect>
   </property>
@@ -221,6 +221,13 @@
       <widget class="QLabel" name="label_8">
        <property name="text">
         <string>Procedure:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="procedureTypeNameLabel">
+       <property name="text">
+        <string/>
        </property>
       </widget>
      </item>

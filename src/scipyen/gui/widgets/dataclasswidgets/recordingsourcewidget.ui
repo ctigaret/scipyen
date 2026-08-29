@@ -175,15 +175,15 @@
  </widget>
  <customwidgets>
   <customwidget>
-   <class>TableEditorWidget</class>
-   <extends>QWidget</extends>
-   <header location="global">gui.widgets.tableeditorwidget</header>
-   <container>1</container>
-  </customwidget>
-  <customwidget>
    <class>NameDescriptionWidget</class>
    <extends>QWidget</extends>
    <header location="global">gui.widgets.dataclasswidgets.namedescriptionwidget</header>
+   <container>1</container>
+  </customwidget>
+  <customwidget>
+   <class>TableEditorWidget</class>
+   <extends>QWidget</extends>
+   <header location="global">gui.widgets.tableeditorwidget</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

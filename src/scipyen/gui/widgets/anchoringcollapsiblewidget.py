@@ -314,7 +314,7 @@ class AnchoringCollapsibleWidget(WorkspaceGuiMixin):
     def _selfDetach_(self):
         if self.isAnchoredWidget:
             wid = id(self)
-            acc = getattr(self.anchoringWidget, "collapsibleChildren", None)
+            acc = getattr(self.anchoringWidget, "_collapsibleChildren_", None)
             if isinstance(acc, dict) and wid in acc:
                 toggle = acc[wid][1]
                 if (

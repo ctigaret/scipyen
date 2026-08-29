@@ -8272,22 +8272,20 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                 self.statusBar().showMessage(elided)
                 self.errorMessage("Navigation", f"Inaccessible recent directory:\n{txt}")
 
-
     @Slot()
     @safewrapper
-    def slot_changeDirectory(self, targetDir:str=None):
+    def slot_changeDirectory(self, targetDir: str | None = None):
         r"""Convergence for all directory navigation in ScipyenWindow"""
         # print(f"{self.__class__.__name__}.slot_changeDirectory(targetDir = {targetDir})")
-        if targetDir is None:
-            if isinstance(self.sender(), QAction):
-                targetDir = str(self.sender().text()).replace('&', '')
-                pathPart = itemText.split('[')[-1]
-                fName = pathPart.split(']')[0]
-                if os.path.exists(fName):
-                    if os.path.isfile(fName):
-                        targetDir = os.path.dirname(fName)
-                    elif os.path.isdir(fName):
-                        targetDir = fName
+        if targetDir is None and isinstance(self.sender(), QAction):
+            targetDir = str(self.sender().text()).replace('&', '')
+            pathPart = itemText.split('[')[-1]
+            fName = pathPart.split(']')[0]
+            if os.path.exists(fName):
+                if os.path.isfile(fName):
+                    targetDir = os.path.dirname(fName)
+                elif os.path.isdir(fName):
+                    targetDir = fName
 
         if isinstance(targetDir, str): # and "&" in targetDir:
             # NOTE: 2017-03-04 16:08:17 because for whatever reason Qt also
@@ -8338,8 +8336,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             try:
                 self.navPrevDir.appendleft(os.getcwd())
 
-            except:
-                pass
+            except: # noqa
+                pass # noqa
 
             if sys.platform.startswith("win32"):
                 targetDir = targetDir.replace("\\", "/")
@@ -9101,10 +9099,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
             excStr.replace(")", ")\n")
 
-            errMsgDlg = QtWidgets.QErrorMessage(self)
+            self.errorMessage(excInfo[0].__name__,
+                              excStr)
 
-            errMsgDlg.setWindowTitle(excInfo[0].__name__)
-            errMsgDlg.showMessage(excStr)  # python3 way
+            # errMsgDlg = QtWidgets.QErrorMessage(self)
+            #
+            # errMsgDlg.setWindowTitle(excInfo[0].__name__)
+            # errMsgDlg.showMessage(excStr)  # python3 way
             ret = False
 
         return ret
@@ -9115,9 +9116,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             ret = True
 
         except Exception as e:
-            errMsgDlg = QtWidgets.QErrorMessage(self)
-            errMsgDlg.setWindowTitle("Exception")
-            errMsgDlg.showMessage(e.message)
+            self.errorMessage("Exception", e.message)
+            # QtWidgets.QApplication.beep()
+            # errMsgDlg = QtWidgets.QErrorMessage(self)
+            # errMsgDlg.setWindowTitle("Exception")
+            # errMsgDlg.showMessage(e.message)
             ret = False
 
         return ret
@@ -9829,15 +9832,24 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         varNames = self.workspaceModel.getDisplayedVariableNames()
         prompt = self.tr("Remove all variables from the workspace?")
         wintitle = self.tr("Delete variables")
-        msgBox = QtWidgets.QMessageBox()
+        info = self.tr("This operation cannot be undone!")
 
-        msgBox.setWindowTitle(wintitle)
-        msgBox.setIcon(QtWidgets.QMessageBox.Warning)
-        msgBox.setText(prompt)
-        msgBox.setInformativeText(self.tr("This operation cannot be undone!"))
-        msgBox.setStandardButtons(
-            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-        msgBox.setDefaultButton(QtWidgets.QMessageBox.No)
+        ret = self.detailedMessage(wintitle, prompt, info, "Warning",
+                             buttons = (
+        QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No),
+                             defaultButton = QtWidgets.QMessageBox.No
+        )
+#         msgBox.setDefaultButton(QtWidgets.QMessageBox.No)
+#
+#         msgBox = QtWidgetsd.QMessageBox()
+
+        # msgBox.setWindowTitle(wintitle)
+        # msgBox.setIcon(QtWidgets.QMessageBox.Warning)
+        # msgBox.setText(prompt)
+        # msgBox.setInformativeText(self.tr("This operation cannot be undone!"))
+        # msgBox.setStandardButtons(
+        #     QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        # msgBox.setDefaultButton(QtWidgets.QMessageBox.No)
 
         ret = msgBox.exec()
         if ret == QtWidgets.QMessageBox.No:
