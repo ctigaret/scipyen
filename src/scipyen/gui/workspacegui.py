@@ -335,7 +335,7 @@ class _X11WMBridge_(QtCore.QObject): # FIXME: 2023-05-08 21:39:42 not used !
             self.timer.start()
 
 
-class GuiMessages(object):
+class GuiMessages:
     @safewrapper
     def errorMessage(self, title:str, text:str):
         QtWidgets.QApplication.beep()

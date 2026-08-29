@@ -53,10 +53,10 @@ __has_PyQt6__ = False
 # __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    # import PySide6 # noqa
-    # from PySide6 import Shiboken # noqa
+    # import PySide6
+    # from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    # from PySide6.QtUiTools import loadUiType # -- A-HA! # noqa
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -64,7 +64,7 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    # from qtpy import sip # noqa
+    # from qtpy import sip
     # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
@@ -72,7 +72,7 @@ else:
     # __has_sip__ = True
 
 
-# import matplotlib as mpl # noqa
+# import matplotlib as mpl
 # from core.pyqtgraph_patch import pyqtgraph as pg
 #### END 3rd party modules
 
@@ -97,14 +97,14 @@ from core import utilities # noqa
 from core import neoutils
 from core import strutils
 from core import curvefitting as crvf # noqa
-from core import models as models
+from core import models
 
 from core.utilities import (reverse_mapping_lookup, # noqa
                             get_index_for_seq,
                             sp_set_loc,
                             normalized_index,
                             unique,
-                            GeneralIndexType) # noqa
+                            GeneralIndexType)
 
 from core.neoutils import (get_index_of_named_signal, concatenate_blocks) # noqa
 from core import scipyen_quantities as scq # noqa
@@ -319,138 +319,6 @@ class RecordingEpisode(Episode):
 class RecordingSchedule(Schedule):
     r"""Sequence of RecordingEpisode objects"""
     allowed_contents: typing.ClassVar = (RecordingEpisode, )
-
-    # def __init__(self, name: typing.Optional[str] = None, **kwargs):
-    #     super().__init__(name, **kwargs)
-
-#     def __hash__(self) -> int:
-#         return hash((self.name, self.description, self.episodes))
-#
-#     def __repr__(self):
-#         ret = list()
-#         ret.append(f"{self.__class__.__name__}(name='{self.name}'), with {len(self.episodes)} episodes:")
-#         for k,e in enumerate(self.episodes):
-#             ret.append(f"{k}: {e}")
-#
-#         return "\n".join(ret)
-#
-#     def __add__(self, other):
-#         if isinstance(other, self.__class__):
-#             newepisodes = self.episodes.__add__(list(map(deepcopy, other.episodes)))
-#
-#             ret = self.__class__(name=self.name, description=self.description,
-#                                   episodes = newepisodes)
-#
-#         elif isinstance(other, typing.Sequence):
-#             if len(other) and not all(isinstance(e, RecordingEpisode) for e in other):
-#                 raise TypeError("Can only add a sequence of RecordingEpisodes")
-#             newepisodes = self.episodes.__add__(list(map(deepcopy, other)))
-#
-#             ret = self.__class__(name=self.name, description=self.description,
-#                                   episodes=newepisodes)
-#
-#         else:
-#             raise TypeError(f"Invalid argument type ({type(other).__name__})")
-#
-#         ret.__adjustBeginFrameAllEpisodes__()
-#
-#         return ret
-#
-#     def __iadd__(self, other):
-#         if isinstance(other, self.__class__):
-#             self.episodes.__iadd__(list(map(deepcopy, other.episodes)))
-#
-#         elif isinstance(other, typing.Sequence):
-#             if len(other) and not all(isinstance(e, RecordingEpisode) for e in other):
-#                 raise TypeError("Can only add a sequence of RecordingEpisodes")
-#             self.episodes.__iadd__(list(map(deepcopy, other)))
-#
-#         else:
-#             raise TypeError(f"Invalid argument type ({type(other).__name__})")
-#
-#         self.__adjustBeginFrameAllEpisodes__()
-#
-#         return self
-#
-#     def append(self, value:RecordingEpisode):
-#         if not isinstance(value, RecordingEpisode):
-#             raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
-#
-#         value = deepcopy(value)
-#
-#         self.episodes.append(value)
-#
-#     def insert(self, index:int, value: RecordingEpisode):
-#         if not isinstance(value, RecordingEpisode):
-#             raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
-#
-#         self.episodes.insert(index, value)
-#
-#     def remove(self, value:RecordingEpisode):
-#         if not isinstance(value, RecordingEpisode):
-#             raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
-#
-#         self.episodes.remove(value)
-#
-#     def extend(self, value):
-#         if isinstance(value, self.__class__):
-#             self.episodes.append(value.episodes)
-#
-#         elif isinstance(value, typing.Sequence):
-#             if len(value):
-#                 if all(isinstance(v, RecordingEpisode) for v in value):
-#                     self.episodes.append(value)
-#                 else:
-#                     raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
-#
-#         else:
-#             raise TypeError("Can only append a RecordingSchedule or a sequence of RecordingEpisodes")
-#
-#     def index(self, episode:RecordingEpisode):
-#         if not isinstance(episode, RecordingEpisode):
-#             raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
-#
-#         if episode not in self.episodes:
-#             raise ValueError("Episode is not contained in this RecordingSchedule")
-#
-#         ndx = [k for k in range(len(self.episodes)) if self.episodes[k] == episode]
-#
-#         return ndx[0]
-#
-#     def count(self, episode:RecordingEpisode):
-#         if not isinstance(episode, RecordingEpisode):
-#             raise TypeError("A RecordingSchedule can only contain RecordingEpisodes")
-#
-#         if episode not in self.episodes:
-#             return 0
-#
-#         return len(e for e in self.episodes if e == episode)
-
-    # @property
-    # def nFrames(self) -> int:
-    #     return sum([e.nFrames for e in self.episodes])
-    #
-    # @property
-    # def pathways(self):
-    #     return unique(list(itertools.chain.from_iterable([e.pathways for e in self.episodes])))
-    #
-    # @property
-    # def blocks(self) -> typing.List[neo.Block]:
-    #     ret = list()
-    #
-    #     for episode in self.episodes:
-    #         ret += episode.blocks
-    #
-    #     return ret
-
-    # def updateEpisodeFrames(self):
-    #     currentFrame = 0
-    #     for k, episode in enumerate(self.episodes):
-    #         episode.setFrameLimits(currentFrame, currentFrame + episode.nFrames - 1)
-    #         # episode.nFrames = currentFrame + episode.nFrames - 1
-    #         # episode.beginFrame = currentFrame
-    #         currentFrame = episode.nFrames + 1
-
 
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
@@ -1471,7 +1339,7 @@ class SweepPathCommands(ScipyenDataclass):
     def __hash__(self) -> int:
         return hash((self.pathway, self.abfEpochs, self.triggers))
 
-class PathwaysStimulationLayout(): # noqa
+class PathwaysStimulationLayout:
     r"""Represents the sequence of pathway stimulations per sweep, as defined in a protocol.
 
     .. |nbsp| unicode:: 0xA0
@@ -2039,6 +1907,8 @@ class SynapticPathway(ScipyenDataclass):
     measurements: dict[str, list] = dataclasses.field(default_factory = dict)
     # source: RecordingSource = dataclasses.field(default_factory = lambda: RecordingSource())
 
+    # index: int = dataclasses.field(default = 0)
+
     def __post_init__(self, electrode:typing.Union[ephys.ElectrodeMode, int, str] = ephys.ElectrodeMode.Null,
                       pathType:typing.Union[SynapticPathwayType, int, str] = SynapticPathwayType.Null):
 
@@ -2280,8 +2150,9 @@ class SynapticPathwayList(NeoObjectList): # noqa
 
     def __iter__(self):
         """Implement iter(self)"""
-        for item in self._items:
-            yield item
+        yield from self._items
+        # for item in self._items:
+        #     yield item
 
     def __delitem__(self, i: int) -> None:
         if len(self._items) == 0:
@@ -2473,6 +2344,7 @@ class RecordingSource(ScipyenDataclass):
                                         electrode = self.electrodeMode)
                 # print(f"\tcreated synaptic pathway {pathway}")
                 self.pathways.append(pathway)
+
         self.pathways.parent=self
         # print(f"\tpathways = {self.pathways}")
 

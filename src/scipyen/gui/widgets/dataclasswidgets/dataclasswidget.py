@@ -24,8 +24,6 @@ __has_PySide6__ = False
 __has_PyQt6__ = False
 # __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
-    # import PySide6 # noqa
-    # from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -36,8 +34,6 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    # from qtpy import sip # noqa
-    # from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut

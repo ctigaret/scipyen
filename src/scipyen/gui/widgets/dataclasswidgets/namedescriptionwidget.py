@@ -17,7 +17,7 @@ import sys, os, typing, types, warnings, math, cmath, datetime # noqa
 
 import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
-from qtpy.QtCore import (Signal, Slot) #, Property,) # noqa
+from qtpy.QtCore import (Signal, Slot) #, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
