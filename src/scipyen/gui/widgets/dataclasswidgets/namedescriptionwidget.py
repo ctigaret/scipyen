@@ -113,18 +113,14 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
         self.nameLineEdit.redoAvailable=True
         self.nameLineEdit.setText(self._dataName_)
         self.nameLineEdit.setClearButtonEnabled(True)
-        self.nameLineEdit.setToolTip("Data name")
-        self.nameLineEdit.setWhatsThis("Data name")
-        self.nameLineEdit.setStatusTip("Data name")
-        # if self._objectType_ is type(None):
-        #     self.nameLineEdit.setToolTip("Data name")
-        #     self.nameLineEdit.setWhatsThis("Data name")
-        #     self.nameLineEdit.setStatusTip("Data name")
-        # else:
-        #     objType = f" {self._objectType_.name}" if self._objectType_ is not type(None) else ""
-        #     self.nameLineEdit.setToolTip("Name")
-        #     self.nameLineEdit.setWhatsThis("Name")
-        #     self.nameLineEdit.setStatusTip("Name")
+        if self._objectType_ is type(None):
+            self.nameLineEdit.setToolTip("Data name")
+            self.nameLineEdit.setWhatsThis("Data name")
+            self.nameLineEdit.setStatusTip("Data name")
+        else:
+            self.nameLineEdit.setToolTip(f"Name of {self._objectType_.name}")
+            self.nameLineEdit.setWhatsThis(f"Name of {self._objectType_.name}")
+            self.nameLineEdit.setStatusTip(f"Name of {self._objectType_.name}")
 
         self.nameLineEdit.sig_textChanged.connect(self._slot_nameChanged)
         self.descriptionToolButton.clicked.connect(self._slot_editDescription)
@@ -135,6 +131,18 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
         self.toggleDataExchangeWidgetToolButton.toggled.connect(self._slot_toggleDataExchangeWidget)
 
         self.sig_uiConfigured.emit()
+
+    def _updateUIFields(self):
+        if self._objectType_ is type(None):
+            self.nameLineEdit.setToolTip("Data name")
+            self.nameLineEdit.setWhatsThis("Data name")
+            self.nameLineEdit.setStatusTip("Data name")
+        else:
+            self.nameLineEdit.setToolTip(f"Name of {self._objectType_.__name__}")
+            self.nameLineEdit.setWhatsThis(f"Name of {self._objectType_.__name__}")
+            self.nameLineEdit.setStatusTip(f"Name of {self._objectType_.__name__}")
+
+
 
     @Slot(bool)
     def _slot_toggleDataExchangeWidget(self, val: bool):
@@ -432,3 +440,4 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
     def setData(self, obj: typing.Any):
         self._data_ = obj
         self._objectType_ = type(self._data_)
+        self._updateUIFields()

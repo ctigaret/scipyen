@@ -121,9 +121,6 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
         Ui_RecordingSourceWidget.__init__(self)
         self._configureUI_()
 
-        # if not isinstance(self._data_, self._objectTypes_):
-        #     self._make_value_()
-
     def default(self) -> T:
         self._name_ = "source"
         self._adc_ = 0
@@ -142,6 +139,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
         super()._configureUI_() # DataClassWidget!
 
         self.nameDescriptionWidget.symbol="recordingSource"
+        self.nameDescriptionWidget.setData(self._data_)
         # self.nameDescriptionWidget.sig_valueChanged.connect
         self.adcSpinBox.setToolTip("Index of ADC (input) channel used for recording")
         self.adcSpinBox.setWhatsThis("Index of ADC (input) channel used for recording")

@@ -188,53 +188,47 @@ class DataClassWidget(AnchoringCollapsibleWidget):
                 else:
                     self._objSymbol_ = ""
 
-            # if isinstance(self.dataExchangeWidget, DataExchangeWidget) and isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
-            if isinstance(self.nameDescriptionWidget, NameDescriptionWidget):
-                if hasattr(self, "_data_"):
-                    sigBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), # noqa
-                                        (
-                                            # self.dataExchangeWidget,
-                                            self.nameDescriptionWidget,
-                                            )
-                                        )
-                                    )
-
-                    # self.nameDescriptionWidget.dataExchangeWidget.setValue(self._data_, self._objSymbol_)
+            if (
+                isinstance(self.nameDescriptionWidget, NameDescriptionWidget)
+                and hasattr(self, "_data_")
+                ):
+                with qtutils.SignalBlocker( (
+                                        self.nameDescriptionWidget,
+                                        )):
                     self.nameDescriptionWidget.setData(self._data_)
                     self.nameDescriptionWidget.dataName = self._data_.name
                     self.nameDescriptionWidget.symbol = self._objSymbol_
                     self.nameDescriptionWidget.dataDescription = self._data_.description
 
-                    if (isinstance(self.nameDescriptionWidget.detailsViewer, DataTreeViewer)
-                        and self.nameDescriptionWidget.detailsViewer.isVisible()):
-                        self.nameDescriptionWidget.detailsViewer.view(self._data_,
-                                                                    doc_title = self._objSymbol_,
-                                                                    name = self._objSymbol_)
+                if (isinstance(self.nameDescriptionWidget.detailsViewer, DataTreeViewer)
+                    and self.nameDescriptionWidget.detailsViewer.isVisible()):
+                    self.nameDescriptionWidget.detailsViewer.view(self._data_,
+                                                                doc_title = self._objSymbol_,
+                                                                name = self._objSymbol_)
 
-                    self.nameDescriptionWidget.toggleParentEditorToolButton.setEnabled(False)
-                    self.nameDescriptionWidget.toggleParentEditorToolButton.setVisible(False)
-                    self.nameDescriptionWidget.replaceParentToolButton.setEnabled(False)
-                    self.nameDescriptionWidget.replaceParentToolButton.setVisible(False)
+                self.nameDescriptionWidget.toggleParentEditorToolButton.setEnabled(False)
+                self.nameDescriptionWidget.toggleParentEditorToolButton.setVisible(False)
+                self.nameDescriptionWidget.replaceParentToolButton.setEnabled(False)
+                self.nameDescriptionWidget.replaceParentToolButton.setVisible(False)
 
-                    if hasattr(self._data_, "parent"):
-                        self.nameDescriptionWidget.toggleParentEditorToolButton.setEnabled(True)
-                        self.nameDescriptionWidget.toggleParentEditorToolButton.setVisible(True)
+                if hasattr(self._data_, "parent"):
+                    self.nameDescriptionWidget.toggleParentEditorToolButton.setEnabled(True)
+                    self.nameDescriptionWidget.toggleParentEditorToolButton.setVisible(True)
 
-                        if (
-                            hasattr(self._data_, "parentTypes")
-                            and len(self._data_.parentTypes) > 1
-                            ):
-                            self.nameDescriptionWidget.replaceParentToolButton.setEnabled(True)
-                            self.nameDescriptionWidget.replaceParentToolButton.setVisible(True)
-
-                    # print(f"{self.__class__.__name__}.setValue(): checking for organism access")
                     if (
-                        not isinstance(self._data_, (sdc.Organism, sdc.Organ))
-                        and hasattr(self._data_, "getOrganism")
-                        and hasattr(self._data_, "setOrganism")
+                        hasattr(self._data_, "parentTypes")
+                        and len(self._data_.parentTypes) > 1
                         ):
-                        self.nameDescriptionWidget.organismToolButton.setEnabled(True)
-                        self.nameDescriptionWidget.organismToolButton.setVisible(True)
+                        self.nameDescriptionWidget.replaceParentToolButton.setEnabled(True)
+                        self.nameDescriptionWidget.replaceParentToolButton.setVisible(True)
+
+                if (
+                    not isinstance(self._data_, (sdc.Organism, sdc.Organ))
+                    and hasattr(self._data_, "getOrganism")
+                    and hasattr(self._data_, "setOrganism")
+                    ):
+                    self.nameDescriptionWidget.organismToolButton.setEnabled(True)
+                    self.nameDescriptionWidget.organismToolButton.setVisible(True)
 
     @Slot()
     def _slot_dataExportRequested(self):
