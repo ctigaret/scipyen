@@ -59,7 +59,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 try:
-    from gui.widgets.synapticpathwaywidget_ui import Ui_SynapticPathwayWidget
+    from gui.widgets.dataclasswidgets.synapticpathwaywidget_ui import Ui_SynapticPathwayWidget
 
 except:
     Ui_SynapticPathwayWidget, _ = loadUiType(
@@ -67,7 +67,7 @@ except:
         )
 
 
-class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget):
+class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget, QtWidgets.QWidget):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
     _objectTypes_ = (ephys_pathways.SynapticPathway, )
     _objectType_ = ephys_pathways.SynapticPathway
@@ -76,7 +76,6 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget):
                  obj: typing.Optional[ephys_pathways.SynapticPathway] = None,
                  **kwargs):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
-        super(Ui_SynapticPathwayWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -111,7 +110,9 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget):
             self._schedule_ = self._data_.schedule
             self._measurements_ = self._data_.measurements
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_SynapticPathwayWidget.__init__(self)
         self._configureUI_()
 
     def _configureUI_(self):

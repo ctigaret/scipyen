@@ -135,13 +135,18 @@ NOTE: To be used with my custom itemmodels
 
     def chooseEditor(self) -> QtWidgets.QWidget:
         # print(f"{self.__class__.__name__}.chooseEditor for {type(self._data_).__name__}")
-        from gui.widgets import (synapticstimuluswidget, # noqa
-                                 synapticpathwaywidget,
-                                 auxiliaryiowidget,
-                                 recordingsourcewidget,
-                                 recordingepisodewidget,
-                                 tableeditorwidget,
-                                 )
+        from gui.widgets import (
+            auxiliaryiowidget,
+            tableeditorwidget,
+            )
+
+        from gui.widgets.dataclasswidgets import (
+            synapticstimuluswidget, # noqa
+            synapticpathwaywidget,
+            recordingsourcewidget,
+            recordingepisodewidget,
+            )
+
         widget = None
         editorName = f"{type(self._data_).__name__} Editor"
         self.setWindowTitle(editorName)

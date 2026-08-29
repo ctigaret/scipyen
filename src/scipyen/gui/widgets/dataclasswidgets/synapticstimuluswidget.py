@@ -59,14 +59,14 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 try:
-    from gui.widgets.synapticstimuluswidget_ui import Ui_SynapticStimulusChannelWidget
+    from gui.widgets.dataclasswidgets.synapticstimuluswidget_ui import Ui_SynapticStimulusChannelWidget
 
 except:
     Ui_SynapticStimulusChannelWidget, QWidget = loadUiType(
         os.path.join(__module_path__, "synapticstimuluswidget.ui")
         )
 
-class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, DataClassWidget):
+class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, DataClassWidget, QtWidgets.QWidget):
     sig_valueChanged = Signal(object, name="sig_valueChanged")
 
     defaultName: str = "stim"
@@ -78,7 +78,6 @@ class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, DataClassW
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[SynapticStimulusChannel] = None,
                  **kwargs):
-        super(Ui_SynapticStimulusChannelWidget, self).__init__()
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -87,16 +86,6 @@ class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, DataClassW
                 parent = None
 
             obj = obj_
-
-
-
-        # if not isinstance(obj, SynapticStimulusChannel): # and obj is not None:
-        #     # scipywarn(f"This widget does not support objects of type {type(obj).__name__}")
-        #     self._data_ = self._objectType_()
-        # else:
-        #     self._data_ = obj
-
-        # print(f"{self.__class__.__name__}.__init__: self._data_ = {self._data_}")
 
         if not isinstance(obj, self._objectTypes_):
             self._name_ = "Stim"
@@ -109,7 +98,9 @@ class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, DataClassW
             self._channel_ = self._data_.channel
             self._digital_ = self._data_.dig
 
+        QtWidgets.QWidget.__init__(self, parent)
         DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_SynapticStimulusChannelWidget.__init__(self)
         self._configureUI_()
 
     def _configureUI_(self):

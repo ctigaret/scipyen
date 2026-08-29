@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""
+Recording episode widget
 """
 
 # import sys
@@ -75,7 +76,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 try:
-    from gui.widgets.recordingepisodewidget_ui import Ui_RecordingEpisodeWidget
+    from gui.widgets.dataclasswidgets.recordingepisodewidget_ui import Ui_RecordingEpisodeWidget
 
 except:
     Ui_RecordingEpisodeWidget, QWidget = loadUiType(
@@ -83,6 +84,8 @@ except:
         )
 
 T = ephys_pathways.RecordingEpisode
+
+RECORDING_EPISODE_TYPE_NAMES = list(ephys_pathways.RecordingEpisodeType.names())
 
 class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidgets.QWidget):
     sig_trialsChanged = Signal(name="sig_trialsChanged")
@@ -92,7 +95,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
     _objectType_ = ephys_pathways.RecordingEpisode
     _objectTypes_ = (ephys_pathways.RecordingEpisode, )
 
-    recordingEpisodeTypeNames = list(ephys_pathways.RecordingEpisodeType.names())
+    recordingEpisodeTypeNames = RECORDING_EPISODE_TYPE_NAMES
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[T] = None,
@@ -156,10 +159,10 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
 
         self.previewProtocolToolButton.clicked.connect(self.slot_viewProtocolDetails)
 
-        for text in self.recordingEpisodeTypeNames:
+        for text in RECORDING_EPISODE_TYPE_NAMES:
             self.episodeTypeComboBox.addItem(text)
 
-        currentEpisodeTypeNdx = self.recordingEpisodeTypeNames.index(self._episodeType_.name)
+        currentEpisodeTypeNdx = RECORDING_EPISODE_TYPE_NAMES.index(self._episodeType_.name)
         self.episodeTypeComboBox.setCurrentIndex(currentEpisodeTypeNdx)
 
         self.episodeTypeComboBox.currentTextChanged.connect(self._slot_episodeTypeChanged)
@@ -332,11 +335,11 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
     @Slot(str)
     @Slot(int)
     def _slot_episodeTypeChanged(self, val: int | str):
-        if isinstance(val, int) and val >=0 and val < len(self.recordingEpisodeTypeNames):
-            val = self.recordingEpisodeTypeNames[val]
+        if isinstance(val, int) and val >=0 and val < len(RECORDING_EPISODE_TYPE_NAMES):
+            val = RECORDING_EPISODE_TYPE_NAMES[val]
 
         if isinstance(val, str):
-            if val in self.recordingEpisodeTypeNames:
+            if val in RECORDING_EPISODE_TYPE_NAMES:
                 self._episodeType_ = ephys_pathways.RecordingEpisodeType[val]
 
             else:
@@ -572,7 +575,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
             self.trialsInfoLabel.setText(f"{len(self._blocks_)} {strutils.pluralize('Trial', len(self._blocks_))}")
 
 
-            currentEpisodeTypeNdx = self.recordingEpisodeTypeNames.index(self._episodeType_.name)
+            currentEpisodeTypeNdx = RECORDING_EPISODE_TYPE_NAMES.index(self._episodeType_.name)
 
             self.episodeTypeComboBox.setCurrentIndex(currentEpisodeTypeNdx)
 

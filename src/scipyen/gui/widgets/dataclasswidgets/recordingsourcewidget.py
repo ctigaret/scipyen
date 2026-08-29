@@ -62,7 +62,7 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
 try:
-    from gui.widgets.recordingsourcewidget_ui import Ui_RecordingSourceWidget
+    from gui.widgets.dataclasswidgets.recordingsourcewidget_ui import Ui_RecordingSourceWidget
 
 except:
     Ui_RecordingSourceWidget, QWidget = loadUiType(
