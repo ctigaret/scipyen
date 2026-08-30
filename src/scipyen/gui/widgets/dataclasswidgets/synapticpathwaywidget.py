@@ -154,6 +154,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget, QtWidgets
         self.pathTypeComboBox.currentTextChanged.connect(self._slot_pathwayTypeChanged)
 
         self.stimulusPushButton.clicked.connect(self._slot_editStimulus)
+        self.schedulePushButton.clicked.connect(self._slot_editSchedule)
 
         self.createObjectPushButton.setText("")
         self.createObjectPushButton.setIcon(guiutils.getIcon("list-add"))
@@ -248,12 +249,26 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget, QtWidgets
         stimEditor.sig_valueChanged.connect(self._slot_stimulusChanged)
         stimEditor.slot_Launch()
 
+    @Slot()
+    def _slot_editSchedule(self):
+        from gui.delegates import ExternalEditorDelegate
+        editor = ExternalEditorDelegate(self._schedule_)
+        editor.setObjectName("scheduleEditor")
+        editor.sig_valueChanged.connect(self._slot_scheduleChanged)
+        editor.slot_Launch()
 
     @Slot(object)
     def _slot_stimulusChanged(self, val):
         # print(f"{self.__class__.__name__}[{self.objectName()}]._slot_stimulusChanged({val})")
         if isinstance(val, ephys_pathways.SynapticStimulusChannel):
             self._stimulus_ = val
+            self._make_value_()
+            self.sig_valueChanged.emit(self._data_)
+
+    @Slot(object)
+    def _slot_scheduleChanged(self, val):
+        if isinstance(val, ephys_pathways.RecordingSchedule):
+            self._schedule_ = val
             self._make_value_()
             self.sig_valueChanged.emit(self._data_)
 

@@ -83,9 +83,7 @@ from core import scipyendataclasses as sdc
 from core import neoutils # noqa
 from core.qtutils import (qVariant, QVariantType)
 
-
-
-from ephys import (ephys, ephys_pathways)
+from ephys import (ephys, ephys_pathways, ephys_protocol)
 
 #### END pict.core modules
 
@@ -108,10 +106,24 @@ TabularType = typing.Union[pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
                            np.ndarray, vigra.VigraArray,
                            vigra.filters.Kernel1D, vigra.filters.Kernel2D,
                            NeoObjectList,
+                           ephys_pathways.AuxiliaryInputList,
+                           ephys_pathways.AuxiliaryOutputList,
                            ephys_pathways.RecordingSchedule,
+                           ephys_pathways.RecordingSourceList,
+                           ephys_pathways.SynapticPathwayList,
+                           ephys_pathways.SynapticStimulusChannelList,
+                           NeoObjectList,
+                           sdc.Schedule,
                            list, tuple, deque]
 
 TabularTypes = tuple(unwind_type(TabularType))
+
+# def _extEditableBodyFn_(ns, obj):
+#     ns["obj"] = obj
+#
+#
+# ExternallyEditableType = types.new_class("ExternallyEditableType",
+#                                          exec_body = _extEditableBodyFn_)
 
 class TabularDataModel(QtCore.QAbstractTableModel):
     r"""Table item model for tabular data in Scipyen.
@@ -534,6 +546,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                 ephys_pathways.AuxiliaryInput,
                                 ephys_pathways.AuxiliaryOutput,
                                 ephys_pathways.SynapticStimulusChannel,
+                                ephys_pathways.RecordingEpisode,
                                 TriggerProtocol
                                 )
                         ):
@@ -1057,7 +1070,129 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         except (IndexError, ):
             return qVariant()
 
-        # print(f"{self.__class__.__name__}._getHeaderData_ took {timer.elapsed()} milliseconds")
+    @singledispatchmethod
+    def _modelDataGetter_(self, mdata, row: int, col: int) -> object:
+        raise NotImplementedError(f"{type(mdata).__name__} object are not yet supported")
+
+    @_modelDataGetter_.register(pd.DataFrame)
+    @_modelDataGetter_.register(pd.Series)
+    def __modelDataGetter__(self, mdata: pd.DataFrame | pd.Series, row: int, col: int) -> object:
+        return mdata.iloc[row,col]
+
+    @_modelDataGetter_.register(pd.RangeIndex)
+    def __modelDataGetter__(self, mdata: pd.RangeIndex, row: int, col: int) -> object: # noqa
+        return mdata[row]
+
+    @_modelDataGetter_.register(pd.Index)
+    def __modelDataGetter__(self, mdata: pd.Index, row: int, col: int) -> object: # noqa
+        if isinstance(mdata, pd.RangeIndex):
+            val = mdata[row]
+
+        else:
+            val = mdata.iloc[row, col]
+
+        return val
+
+    @_modelDataGetter_.register(TriggerProtocolList)
+    def __modelDataGetter__(self, mdata: TriggerProtocolList, row: int, col: int) -> object: # noqa
+        obj = mdata[row]
+        return getattr(obj, self._modelDataColumnHeaders_[col])
+
+    @_modelDataGetter_.register(ephys_pathways.SynapticPathwayList)
+    @_modelDataGetter_.register(ephys_pathways.AuxiliaryInputList)
+    @_modelDataGetter_.register(ephys_pathways.AuxiliaryOutputList)
+    @_modelDataGetter_.register(ephys_pathways.SynapticStimulusChannelList)
+    @_modelDataGetter_.register(ephys_pathways.RecordingSchedule)
+    @_modelDataGetter_.register(ephys_pathways.RecordingSourceList)
+    def __modelDataGetter__(self, mdata: (ephys_pathways.SynapticPathwayList, # noqa
+                                          ephys_pathways.AuxiliaryInputList,
+                                          ephys_pathways.AuxiliaryOutputList,
+                                          ephys_pathways.SynapticStimulusChannelList,
+                                          ephys_pathways.RecordingSchedule,
+                                          ephys_pathways.RecordingSourceList),
+                            row: int, col: int) -> object:
+        obj = self._modelData_[row]
+        attributeName = self._modelDataColumnHeaders_[col]
+
+        if attributeName.lower() != "edit":
+            return getattr(obj, attributeName)
+            # ret_type = type(val).__name__
+            # disp = repr_val(val, self.decimals)
+            # ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) ret_type if role is Qtcore.Qt.ToolTipRole else disp # noqa
+            # return qVariant(ret)
+        else:
+            # return ExternallyEditableType(obj = obj)
+            return dataclasses.MISSING
+
+    @_modelDataGetter_.register(sdc.Schedule)
+    def __modelDataGetter__(self, mdata: sdc.Schedule, row: int, col: int) -> object: # noqa
+        obj = self._modelData_[row] # an Episode
+        attributeName = self._modelDataColumnHeaders_[col]
+        if attributeName.lower() == "edit":
+            # return ExternallyEditableType(obj = obj)
+            return dataclasses.MISSING
+        else:
+            return getattr(obj, attributeName)
+
+    @_modelDataGetter_.register(list)
+    @_modelDataGetter_.register(tuple)
+    @_modelDataGetter_.register(deque)
+    def __modelDataGetter__(self, mdata: (list, tuple, deque), row: int, col: int) -> object: # noqa
+        rowObj = self._modelData_[row]
+        if isinstance(rowObj, typing.Sequence):
+            val = rowObj[col]
+        else:
+            val = rowObj
+
+        return val
+
+    @_modelDataGetter_.register(neo.core.dataobject.DataObject)
+    def __modelDataGetter__(self, mdata: neo.core.dataobject.DataObject, row: int, col: int): # noqa
+        if col == 0:
+            val = mdata.times[row]
+        else:
+            if mdata.ndim > 1:
+                val = mdata[row, col-1]
+            else:
+                val = mdata[row]
+
+        return val
+
+    @_modelDataGetter_.register(np.ndarray)
+    def __modelDataGetter__(self, mdata: np.ndarray, row: int, col: int): # noqa
+        if mdata.ndim  == 0: # e.g. pq object
+            val = np.atleast_1d(mdata)[row]
+
+        elif mdata.ndim > 1:
+            val = mdata[row, col]
+
+        else:
+            val = mdata[row]
+
+        return val
+
+    def _getVariantForData_(self, obj, role: QtCore.Qt.ItemDataRole) -> QVariantType:
+        obj_type_name = qVariant(type(obj).__name__)
+
+        if isinstance(obj, (ephys_protocol.ElectrophysiologyProtocol,
+                            sdc.Procedure)):
+            ret = qVariant(obj)
+            obj_disp = qVariant(getattr(obj, "name", obj_type_name))
+
+        elif obj is dataclasses.MISSING:
+            ret = qVariant()
+            obj_type_name = qVariant()
+            obj_disp = qVariant()
+
+        elif isinstance(obj, (numbers.Number, np.number)):
+            ret = qVariant(obj)
+            obj_disp = qVariant(repr_val(obj, self.decimals))
+
+        else:
+            ret = qVariant(obj)
+            obj_disp = qVariant(f"{obj}")
+
+        return ret if role in (QtCore.Qt.EditRole, ObjectDataRole) else obj_type_name if role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole) else obj_disp
 
     def _getModelData_(self, row, col, role = QtCore.Qt.DisplayRole) -> QVariantType:
         r"""Retrieves tabular data associated with row & column, given the item role.
@@ -1069,173 +1204,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             QtCore.Qt.AccessibleTextRole):
                 return qVariant()
 
-            if isinstance(self._modelData_, pd.DataFrame):
-                val = self._modelData_.iloc[row,col]
+            ret = self._modelDataGetter_(self._modelData_, row, col)
 
-                ret_type = type(val).__name__
-
-                ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else repr_val(val, self.decimals)
-
-            elif isinstance(self._modelData_, pd.Series):
-                val = self._modelData_.iloc[row,col]
-                ret_type = type(val).__name__
-
-                ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else repr_val(val, self.decimals)
-
-            elif isinstance(self._modelData_, pd.Index):
-                if isinstance(self._modelData_, pd.RangeIndex):
-                    val = self._modelData_[row]
-
-                else:
-                    # CAUTION 2025-05-25 09:09:00
-                    # when _modelData_ is the column index of a DataFrame, ``row``
-                    # needs to be a column index!
-                    val = self._modelData_.iloc[row,col]
-
-                ret_type = type(val).__name__
-
-                ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else repr_val(val, self.decimals)
-
-            elif isinstance(self._modelData_, TriggerProtocolList):
-                protocol = self._modelData_[row]
-                val = getattr(protocol, self._modelDataColumnHeaders_[col])
-
-                disp = repr_val(val, self.decimals)
-
-                # if isinstance(val, enum.Enum):
-                #     disp = f"{val.name}"
-                #
-                # elif isinstance(val, neo.Event):
-                #     disp = f"{val.times}"
-                #
-                # else:
-                #     disp = f"{val}"
-
-                ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
-
-            elif isinstance(self._modelData_, (
-                                                ephys_pathways.SynapticPathwayList,
-                                                ephys_pathways.AuxiliaryInputList,
-                                                ephys_pathways.AuxiliaryOutputList,
-                                                ephys_pathways.SynapticStimulusChannelList,
-                                               )
-                            ):
-                obj = self._modelData_[row]
-                attribute = self._modelDataColumnHeaders_[col]
-
-                if attribute.lower() != "edit":
-                    val = getattr(obj, attribute)
-
-                    disp = repr_val(val, self.decimals)
-
-                    # if isinstance(val, enum.Enum):
-                    #     disp = f"{val.name}"
-                    #
-                    # else:
-                    #     disp = f"{val}"
-
-                    ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
-
-                else:
-                    return qVariant()
-
-            elif isinstance(self._modelData_, ephys_pathways.RecordingSchedule):
-                obj = self._modelData_[row]
-                attribute = self._modelDataColumnHeaders_[col]
-                if attribute.lower() != "edit":
-                    val = getattr(obj, attribute)
-
-                    disp = repr_val(val, self.decimals)
-
-                    ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
-
-                else:
-                    return qVariant()
-
-            elif isinstance(self._modelData_, typing.Sequence):
-                if all(isinstance(d, ephys_pathways.RecordingSource) for d in self._modelData_):
-                    obj = self._modelData_[row]
-                    attribute = self._modelDataColumnHeaders_[col]
-                    if attribute.lower() == "edit":
-                        return qVariant()
-                    else:
-                        val = getattr(obj, attribute)
-
-                        disp = repr_val(val, self.decimals)
-                        # if isinstance(val, enum.Enum):
-                        #     disp = f"{val.name}"
-                        # else:
-                        #     disp = f"{val}"
-                        ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
-
-                else:
-                    rowObj = self._modelData_[row]
-                    if isinstance(rowObj, typing.Sequence):
-                        val = rowObj[col]
-                    else:
-                        val = rowObj
-
-                    disp = repr_val(val, self.decimals)
-                    # if isinstance(val, enum.Enum):
-                    #     disp = f"{val.name}"
-                    # else:
-                    #     disp = f"{val}"
-                    ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else disp # noqa
-
-            elif isinstance(self._modelData_, neo.core.dataobject.DataObject):
-                if col == 0:
-                    val = self._modelData_.times[row]
-                else:
-                    if self._modelData_.ndim > 1:
-                        val = self._modelData_[row, col-1]
-                    else:
-                        val = self._modelData_[row]
-
-                disp = repr_val(val, self.decimals)
-                ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else disp
-
-                # if isinstance(val, datetime.datetime):
-                #     ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else ret.isoformat(" ")
-                #
-                # else: # by default, value is a Quantity, here
-                #     ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else f"{val.magnitude}"
-
-            elif isinstance(self._modelData_, np.ndarray):
-                # NOTE: 2026-06-06 16:05:25 this MAY be a general (generic) Quantity array, too!
-                if self._modelData_.ndim  == 0: # e.g. pq object
-                    val = np.atleast_1d(self._modelData_)[row]
-
-                elif self._modelData_.ndim > 1:
-                    val = self._modelData_[row, col]
-
-                else:
-                    val = self._modelData_[row]
-
-                disp = repr_val(val, self.decimals)
-
-                ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else disp
-                # if isinstance(val, datetime.datetime):
-                #     ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else ret.isoformat(" ")
-                #
-                # else: # allow for python Quantity arrays, here
-                #     ret = val if role in (QtCore.Qt.EditRole, ObjectDataRole) else f"{val.magnitude}" if isinstance(self._modelData_, pq.Quantity) else f"{val}"
-
-            else:
-                return qVariant()
-
-            ret_type = type(val).__name__
-
-            if role in (QtCore.Qt.UserRole, QtCore.Qt.EditRole, ObjectDataRole):
-                return qVariant(val)
-
-            elif role == QtCore.Qt.DisplayRole:
-                return qVariant("%s" % ret)
-
-            elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                return qVariant(ret_type)
-
-            else:
-                return qVariant()
+            return self._getVariantForData_(ret, role)
 
         except (IndexError,):
             return qVariant()
@@ -1353,7 +1324,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             tuple(
                 map(
                     lambda x: (x[0], f"{x[1]}"),
-                    enumerate(("name", "type", "Edit"))
+                    enumerate(("name", "begin", "end", "beginFrame","nFrames","procedure", "protocol","episodeType","Edit"))
                     )
                 )
             )

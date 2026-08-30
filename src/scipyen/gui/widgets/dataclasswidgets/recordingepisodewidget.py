@@ -146,10 +146,18 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
         self.procedureEditor = None
 
         self.nameDescriptionWidget.setData(self._data_)
-        # self.nameDescriptionWidget.nameLineEdit.setToolTip("Name of the recording source")
-        # self.nameDescriptionWidget.nameLineEdit.setWhatsThis("Name of the recording source")
-        # self.nameDescriptionWidget.nameLineEdit.setStatusTip("Name of the recording source")
         self.nameDescriptionWidget.symbol = "recordingEpisode"
+
+        typ = self._procedure_.procedureType.name
+        name = self._procedure_.name
+
+        if isinstance(name, str) and len(name.strip()):
+            txt = name + f" ({typ})"
+        else:
+            txt = typ
+
+        self.procedureTypeNameLabel.setText(txt)
+        self.procedureTypeNameLabel.setToolTip(f"Procedure type: {typ}")
 
         if isinstance(self._protocol_, ephys_protocol.ElectrophysiologyProtocol):
             self.protocolNameLabel.setText(self._protocol_.name)

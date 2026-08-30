@@ -1001,6 +1001,7 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
                     if isinstance(model._modelData_.allowed_contents, typing.Sequence):
                         if len(model._modelData_.allowed_contents) == 1:
                             rowEntity = f"{model._modelData_.allowed_contents[0].__name__ if isinstance (model._modelData_.allowed_contents[0], type) else type(model._modelData_.allowed_contents[0]).__name__} object"
+
                         elif len(model._modelData_.allowed_contents) > 1:
                             rowEntity = f"object ({', '.join(list(map(lambda c: c.__name__ if isinstance(c, type) else type(c).__name__)))})"
 

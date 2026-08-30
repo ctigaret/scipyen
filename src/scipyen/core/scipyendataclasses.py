@@ -432,7 +432,7 @@ class ProcedureType(TypeEnum):
     surgery = auto()
     biopsy = auto()
     postop = auto()
-    recovery = postop
+    recovery = auto()
     tagging = auto()
     weaning = auto()
     cull = auto()

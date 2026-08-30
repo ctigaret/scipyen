@@ -137,23 +137,28 @@ class RecordingSource: pass # noqa
 # ### END   forward class declarations
 
 class RecordingEpisodeType(TypeEnum):
-    r"""Once can define valid type combinations as follows:
-    Tracking | Drug     (= 3)   ⇒ Tracking episode recorded in the presence of
-                                    drug(s)
-    Conditioning | Drug (= 5)   ⇒ Conditioning in the presence of drug(s)
+    r"""
+    Two fundamental types are defined:
+    Monitoring - monitors (tracks) some electrophysiological behaviour over time,
+        e.g. synaptic currents, spikes, etc
 
-    A Tracking (no Drug) episode that follows a Drug episode is interpreted as
-    an episode of "drug washout".
+    Conditioning - applies to plasticity induction through electrophysiological means
 
-    A value of 0 and any value > 5 are invalid.
+    Further refinment is achieved by association with a specific procedure type,
+    where it makes sense e.g., treatment (with a drug), recovery (for washout).
+
+    In a RecordingSchedule, a Monitoring episode that follows a Conditioning episode
+    is considered as a "chase" i.e. tracks the evolution of responses AFTER the
+    conditioning.
 
     """
-    Tracking        = 1 # used for tracking the electrophysiological behaviour of
-                        # a source (e.g., synaptic responses, somatic spiking, etc);
+    Monitoring      = 1 # used for monitoring (tracking) the electrophysiological
+                        # behaviour of a source (e.g., synaptic responses, somatic
+                        # spiking, etc);
                         # this is the most common type of electrophysiology recording
-                        # epiode
-
-    Monitoring      = Tracking
+                        # episode; associates procedure types such as null, other,
+                        # or treatment; WARNING: be aware of non-sensical associations
+                        # with other procedure types.
 
     Conditioning    = 2 # used for induction of plasticity (i.e. application of
                         # the induction protocol)
@@ -169,8 +174,8 @@ class RecordingEpisode(Episode):
     experiment where distinct sets of conditions are applied in sequence.
 
     However, the episode contains NO segment (or sweep) data: it only defines the
-    temporal boundaries and the number of sweeps (``nFrames``) that correspond
-    to the actual experimental episode.
+    sweep boundaries (first sweep index and the number of sweeps a.k.a ``nFrames``)
+    that correspond to the actual experimental episode.
 
     Fields (constructor parameters):
     ================================
@@ -184,7 +189,7 @@ class RecordingEpisode(Episode):
     _: KW_ONLY
     protocol: typing.Optional[ElectrophysiologyProtocol] = None
     episodeType: DescriptorGenericValidator = DescriptorGenericValidator(
-            "episodeType", RecordingEpisodeType.Tracking,
+            "episodeType", RecordingEpisodeType.Monitoring,
             RecordingEpisodeType)
 
     # episodeType: RecordingEpisodeType = dataclasses.field(default = RecordingEpisodeType.Tracking)
@@ -2270,11 +2275,11 @@ class SynapticPathwayList(NeoObjectList): # noqa
 
     def append(self, obj):
         """
-        Appends a SynapticStimulusChannel
+        Appends a SynapticPathway
 
         Parameters
         ----------
-        obj: SynapticStimulusChannel
+        obj: SynapticPathway
 
         """
         # print(f"{self.__class__.__name__}.append({obj})")
@@ -2283,11 +2288,11 @@ class SynapticPathwayList(NeoObjectList): # noqa
         self._items.append(obj)
 
     def extend(self, iterable):
-        """Extends with additional SynapticStimulusChannel objects from an iterable
+        """Extends with additional SynapticPathway objects from an iterable
 
         Parameters
         ----------
-        iterable: iterable[SynapticStimulusChannel]
+        iterable: iterable[SynapticPathway]
 
         """
         if all (isinstance(o, self.allowed_contents) for o in iterable):
@@ -2859,6 +2864,212 @@ class RecordingSource(ScipyenDataclass):
                 ret += ",\n".join([f"'{p.name}'" for p in self.pathways])
         return "".join(ret)
 
+class RecordingSourceList(NeoObjectList):
+    allowed_contents = (RecordingSource, )
+    def __init__(self, *items, name:typing.Optional[str] = None,
+                 parent: object = None):
+
+        self.name = "" if not isinstance(name, str) else name
+        self._items = list()
+
+        if len(items):
+            if len(items) == 1 and isinstance(items[0], typing.Sequence):
+                items = items[0]
+
+            if any(
+                not isinstance(i, self.allowed_contents)
+                or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents)))
+                for i in items):
+                raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(item).__name__}")
+
+            self._items = list(items)
+
+        if parent is not None and ScipyenDataclass not in inspect.getmro(type(parent)):
+            raise TypeError(f"Parent must be a ScipyenDataclass or None; got {type(parent).__name__} instead")
+
+        self._parent = parent
+
+    @property
+    def parent(self) -> ScipyenDataclass | None:
+        return self._parent
+
+    @parent.setter
+    def parent(self, obj:typing.Optional[ScipyenDataclass] = None):
+        if isinstance(obj, ScipyenDataclass):
+            self._parent = obj
+        else:
+            self._parent = None
+
+    def __iter__(self):
+        """Implement iter(self)"""
+        yield from self._items
+        # for item in self._items:
+        #     yield item
+
+    def __delitem__(self, i: int) -> None:
+        if len(self._items) == 0:
+            return
+
+        if i < len(self._items) and i >= -len(self._items):
+            del(self._items[i])
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+    def __getitem__(self, i: int | slice) -> RecordingSource | None:
+        """x.__getitem__(y) <==> x[y]"""
+        if len(self._items) == 0:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+        if isinstance(i, int):
+            if i < len(self._items) and i >= -len(self._items):
+                return self._items[i]
+
+            else:
+                raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+        elif isinstance(i, slice):
+            return self._items[i]
+
+    def __setitem__(self, i: int, value: RecordingSource):
+        if not isinstance(value, self.allowed_contents):
+            raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(value).__name__}")
+
+        if len(self._items) == 0:
+            raise ValueError(f"Index {i} out of range for {len(self._items)} items")
+
+        if i < len(self._items) and i >= -len(self._items):
+            self._items[i] = value
+
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+    def __str__(self):
+        """Return str(self)"""
+        return f"<{self.__class__.__name__}> with {len(self._items)} {self.allowed_contents[0].__name__} objects"
+
+    def __repr__(self):
+        header = f"<{self.__class__.__name__}>"
+        if isinstance(self.name, str) and len(self.name.strip()):
+            header += f" '{self.name}'"
+
+        s = [f"{header} with {len(self._items)} {self.allowed_contents[0].__name__} objects",
+            ]
+
+        if len(self._items):
+            s[0]+= ":"
+            s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
+
+        return "\n".join(s)
+
+    def __len__(self):
+        """Return len(self)"""
+        return len(self._items)
+
+    def _add_items(self, other: typing.Self, in_place=False) -> typing.Self:
+        self._items = self._items + other._items
+        return self
+
+    def __add__(self, other):
+        """Return self + other"""
+        ret = self.__class__(self._items, parent=self.parent)
+        if isinstance(other, self.__class__):
+            return ret._add_items(other)
+
+        elif isinstance(other, self.allowed_contents):
+            ret._items.append(other)
+            return ret
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            ret._items.extend(list(other))
+            return ret
+
+        else:
+            return ret
+
+    def __iadd__(self, other):
+        """Return self"""
+        if isinstance(other, self.__class__):
+            return self._add_items(other, in_place=True)
+
+        elif isinstance(other, self.allowed_contents):
+            self._items.append(other)
+            return self
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            self._items.extend(list(other))
+            return self
+
+        else:
+            return self
+
+    def __radd__(self, other):
+        """Return other + self"""
+        ret = self.__class__(self._items, parent=self.parent)
+        if isinstance(other, self.__class__):
+            return other._add_items(ret)
+
+        elif isinstance(other, self.allowed_contents):
+            ret._items.append(other)
+            return ret
+
+        elif (isinstance(other, typing.Sequence)
+              and all(isinstance(o, self.allowed_contents) for o in other)):
+            ret._items.extend(list(other))
+            return ret
+        else:
+            return ret
+
+    def append(self, obj):
+        """
+        Appends a RecordingSource
+
+        Parameters
+        ----------
+        obj: RecordingSource
+
+        """
+        # print(f"{self.__class__.__name__}.append({obj})")
+        if not isinstance(obj, self.allowed_contents):
+            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
+        self._items.append(obj)
+
+    def extend(self, iterable):
+        """Extends with additional RecordingSource objects from an iterable
+
+        Parameters
+        ----------
+        iterable: iterable[RecordingSource]
+
+        """
+        if all (isinstance(o, self.allowed_contents) for o in iterable):
+            self._items.extend(iterable)
+        else:
+            raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
+
+    def insert(self, index:int, obj: object):
+        if isinstance(obj, self.allowed_contents):
+            self._items.insert(index, obj)
+        else:
+            raise TypeError(f"Can only insert {self.allowed_contents[0].__name__} objects")
+
+    def clear(self):
+        self._items.clear()
+
+    def pop(self, index: int = -1, /,) -> object:
+        return self._items.pop(index)
+
+    def remove(self, obj:object):
+        self._items.remove(obj)
+
+    def reverse(self):
+        return self.__class__(reversed(self._items))
+
+    def count(self, obj) -> int:
+        return self._items.count(obj)
+
+    def index(self, *args):
+        return self._index(*args)
 
 def infer_schedule(*args, name:typing.Optional[str] = None) -> RecordingSchedule:
     r"""WARNING: Based on the naming of the trials (neo.Block objects).

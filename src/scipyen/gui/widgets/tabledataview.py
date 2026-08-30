@@ -5,8 +5,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 # NOTE: 2026-02-02 08:32:09
-# DO NOT REMOVE
-# used in tableeditorwidget.TableEditorWidget and tableeditor.TableEditor
+# DO NOT REMOVE this module: it is used in tableeditorwidget.TableEditorWidget and tableeditor.TableEditor
 
 #### BEGIN core python modules
 from __future__ import print_function

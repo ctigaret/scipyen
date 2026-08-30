@@ -7,8 +7,17 @@
 r"""Delegates for Scipyen's item viewers
 """
 import os, sys, typing, types, math, pathlib, enum, datetime # noqa
-from functools import partial
+from functools import (partial, singledispatchmethod)
+from collections import deque
 import dataclasses
+import numpy as np
+import vigra
+import quantities as pq
+import pandas as pd
+import neo
+from neo.core.objectlist import ObjectList as NeoObjectList
+from tribool import Tribool
+
 import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,) # noqa
@@ -43,21 +52,14 @@ try:
 except: # noqa
     __has_qtdbus__ = False
 
+from core import datatypes
 from core.datatypes import (is_namedtuple, TypeEnum) # noqa
 from core.prog import (safewrapper, safeguiwrapper, scipywarn, print_styled) # noqa
 from core.sysutils import adapt_ui_path # noqa
-
-__module_path__ = os.path.abspath(os.path.dirname(__file__))
-
-import numpy as np
-import vigra
-import quantities as pq
-import pandas as pd
-import neo
-from tribool import Tribool
-# from core import scipyen_quantities as scq
 from core import strutils as strutils
-from core import datatypes
+from core import scipyendataclasses as sdc
+
+# from core import scipyen_quantities as scq
 from gui.widgets import small_widgets as smw
 from gui.widgets import neo_widgets as neow
 from gui.widgets import inlinefiledirchooser as ifdc
@@ -65,13 +67,16 @@ from gui.widgets import inlinefiledirchooser as ifdc
 # from core import typeenum
 from gui.itemmodels.roles import * # noqa
 from gui import guiutils
-from ephys import (ephys, ephys_pathways)
+from ephys import (ephys, ephys_pathways, ephys_protocol)
+
+__module_path__ = os.path.abspath(os.path.dirname(__file__))
+
 
 class ExternalEditorDelegate(QtWidgets.QMainWindow):
     r"""For use with external editing in PythonItemDelegate.
 
 
-NOTE: To be used with my custom itemmodels
+NOTE: To be used with Scipyen's custom itemmodels only
 
 
 """
@@ -133,62 +138,129 @@ NOTE: To be used with my custom itemmodels
         self.sig_valueChanged.emit(self._data_)
         evt.accept()
 
+    @singledispatchmethod
+    def _makeWidget_(self, obj, name: str) -> QtWidgets.QWidget | None:
+        scipywarn(f"{type(obj).__name__} object are not yet supported")
+
+    @_makeWidget_.register(ephys_pathways.SynapticStimulusChannel)
+    def __makeWidget__(self, obj: ephys_pathways.SynapticStimulusChannel, name: str) -> QtWidgets.QWidget | None:
+        from gui.widgets.dataclasswidgets import synapticstimuluswidget
+        widget = synapticstimuluswidget.SynapticStimulusChannelWidget(
+                parent=self, obj = obj,)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(ephys_pathways.AuxiliaryInput)
+    @_makeWidget_.register(ephys_pathways.AuxiliaryOutput)
+    def __makeWidget__(self, obj: ephys_pathways.AuxiliaryInput | ephys_pathways.AuxiliaryOutput, # noqa
+                       name: str) -> QtWidgets.QWidget | None:
+        from gui.widgets import auxiliaryiowidget
+        if isinstance(obj, ephys_pathways.AuxiliaryInput):
+            widget = auxiliaryiowidget.AuxiliaryInputWidget(self, obj)
+        else:
+            widget = auxiliaryiowidget.AuxiliaryOutputWidget(self, obj)
+
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(ephys_pathways.SynapticPathway)
+    def __makeWidget__(self, obj: ephys_pathways.SynapticPathway, # noqa
+                       name:str) -> QtWidgets.QWidget | None:
+        from gui.widgets.dataclasswidgets import synapticpathwaywidget
+        widget = synapticpathwaywidget.SynapticPathwayWidget(parent=self, obj=obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(ephys_pathways.RecordingEpisode)
+    def __makeWidget__(self, obj: ephys_pathways.RecordingEpisode, # noqa
+                       name: str) -> QtWidgets.QWidget | None:
+        from gui.widgets.dataclasswidgets import recordingepisodewidget
+        widget = recordingepisodewidget.RecordingEpisodeWidget(self, obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(ephys_pathways.RecordingSource)
+    def __makeWidget__(self, obj: ephys_pathways.RecordingSource, # noqa
+                       name: str) -> QtWidgets.QWidget | None:
+        from gui.widgets.dataclasswidgets import recordingsourcewidget
+        widget = recordingsourcewidget.RecordingSourceWidget(self, obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(ephys_pathways.RecordingSchedule)
+    def __makeWidget__(self, obj: ephys_pathways.RecordingSchedule, # noqa
+                       name:str) -> QtWidgets.QWidget | None:
+        from gui.widgets import tableeditorwidget
+        widget = tableeditorwidget.TableEditorWidget(self)
+        widget.setData(obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(sdc.Schedule)
+    def __makeWidget__(self, obj: sdc.Schedule, # noqa
+                       name:str) -> QtWidgets.QWidget | None:
+        from gui.widgets import tableeditorwidget
+        widget = tableeditorwidget.TableEditorWidget(self)
+        widget.setData(obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(sdc.Procedure)
+    def __makeWidget__(self, obj: sdc.Procedure, name: str) -> QtWidgets.QWidget | None: # noqa
+        from gui.widgets.dataclasswidgets import procedurewidget
+        widget = procedurewidget.SimpleProcedureWidget(self, obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(sdc.PPLProcedure)
+    def __makeWidget__(self, obj: sdc.PPLProcedure, name: str) -> QtWidgets.QWidget | None: # noqa
+        from gui.widgets.dataclasswidgets import procedurewidget
+        widget = procedurewidget.ProcedureWidget(self, obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(sdc.PPLProtocol)
+    @_makeWidget_.register(sdc.PPLProtocolStep)
+    def __makeWidget__(self, obj: sdc.PPLProtocol, name: str) -> QtWidgets.QWidget | None: # noqa
+        from gui.widgets.dataclasswidgets.asruwidgets import pplprotocolstepwidget
+        widget = pplprotocolstepwidget.PPLProtocolStepWidget(self, obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(sdc.PIL)
+    @_makeWidget_.register(sdc.PPL)
+    def __makeWidget__(self, obj: (sdc.PIL, sdc.PPL), name: str) -> QtWidgets.QWidget | None: # noqa
+        from gui.widgets.dataclasswidgets.aswruwidgets import asruwidget
+        widget = asruwidget.ASRUWidget(self, obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(ephys_protocol.ElectrophysiologyProtocol)
+    def __makeWidget__(self, obj: ephys_protocol.ElectrophysiologyProtocol, name: str) -> QtWidgets.QWidget | None: # noqa
+        from gui.widgets import datatreeviewer
+        widget = datatreeviewer.DataTreeView(data=obj, parent=self)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(list)
+    @_makeWidget_.register(tuple)
+    @_makeWidget_.register(deque)
+    @_makeWidget_.register(NeoObjectList)
+    def __makeWidget__(self, obj: (list, tuple, deque, NeoObjectList), # noqa
+                       name: str) -> QtWidgets.QWidget | None:
+        from gui.widgets import tableeditorwidget
+        widget = tableeditorwidget.TableEditorWidget(self)
+        widget.setData(obi)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
     def chooseEditor(self) -> QtWidgets.QWidget:
-        # print(f"{self.__class__.__name__}.chooseEditor for {type(self._data_).__name__}")
-        from gui.widgets import (
-            auxiliaryiowidget,
-            tableeditorwidget,
-            )
-
-        from gui.widgets.dataclasswidgets import (
-            synapticstimuluswidget, # noqa
-            synapticpathwaywidget,
-            recordingsourcewidget,
-            recordingepisodewidget,
-            )
-
+        from gui.widgets import tableeditorwidget
         widget = None
         editorName = f"{type(self._data_).__name__} Editor"
         self.setWindowTitle(editorName)
-        if isinstance(self._data_, ephys_pathways.SynapticStimulusChannel):
-            widget = synapticstimuluswidget.SynapticStimulusChannelWidget(
-                parent=self, obj = self._data_,)
-            widget.setObjectName(f"{editorName} Widget")
 
-        elif isinstance(self._data_, (ephys_pathways.AuxiliaryInput, ephys_pathways.AuxiliaryOutput)):
-            if isinstance(self._data_, ephys_pathways.AuxiliaryInput):
-                widget = auxiliaryiowidget.AuxiliaryInputWidget(self,
-                                                                self._data_,
-                                                                )
-            else:
-                widget = auxiliaryiowidget.AuxiliaryOutputWidget(self,
-                                                                 self._data_,
-                                                                 )
-            widget.setObjectName(f"{editorName} Widget")
-
-        elif isinstance(self._data_, ephys_pathways.SynapticPathway):
-            widget = synapticpathwaywidget.SynapticPathwayWidget(
-                parent=self,
-                obj = self._data_,
-                )
-            widget.setObjectName(f"{editorName} Widget")
-
-        elif isinstance(self._data_, ephys_pathways.RecordingEpisode):
-            widget = recordingepisodewidget.RecordingEpisodeWidget(self,
-                                                                   self._data_
-                                                                   )
-            widget.setObjectName(f"{editorName} Widget")
-
-        elif isinstance(self._data_, ephys_pathways.RecordingSource):
-            widget = recordingsourcewidget.RecordingSourceWidget(self,
-                                                                 self._data_,
-                                                                 )
-            widget.setObjectName(f"{editorName} Widget")
-
-        elif isinstance(self._data_, typing.Sequence) or datatypes.is_iterable(self._data_):
-            widget = tableeditorwidget.TableEditorWidget(self)
-            widget.setObjectName(f"{editorName} Widget")
-            widget.setData(self._data_)
+        widget = self._makeWidget_(self._data_, editorName.replace(" ", "_"))
 
         if isinstance(widget, QtWidgets.QWidget) and hasattr(widget, "sig_valueChanged"):
             # print(f"{self.__class__.__name__}.chooseEditor -> widget is a {type(widget).__name__}:")
@@ -991,8 +1063,49 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     self._externalDataEditor_.sig_closing.connect(self._slot_externalEditorClosing)
 
     @Slot()
+    def _slot_editDataAttributeExternally(self):
+        # NOTE: 2026-06-07 11:56:17
+        # external editor NEEDS a separate QMainWindow!
+        # self.sig_editExternally.emit(self.sender(), index)
+        sender = self.sender()
+        if (
+            isinstance(sender, QtWidgets.QPushButton)
+            and isinstance(self._currentModelIndex_, QtCore.QModelIndex)
+            and self._currentModelIndex_.isValid()
+            ):
+            model = self._currentModelIndex_.model()
+            if not hasattr(model, "_useExternalDataEditor_") or not hasattr(model, "_modelDataColumnHeaders_"):
+                return
+            modelData = getattr(model, "_modelData_", None)
+            if isinstance(modelData, typing.Iterable):
+                data = modelData[self._currentModelIndex_.row()]
+                attributeName = model._modelDataColumnHeaders_[self._currentModelIndex_.column()]
+                attributeObj = getattr(data, attributeName)
+                self._externalDataEditor_ = ExternalEditorDelegate(attributeObj)
+                self._externalDataEditor_.sig_valueChanged.connect(self._slot_dataAttributeEditedExternally)
+                self._externalDataEditor_.sig_closing.connect(self._slot_externalEditorClosing)
+
+    @Slot()
     def _slot_externalEditorClosing(self):
         self._externalDataEditor_ = None
+
+    @Slot(object)
+    def _slot_dataAttributeEditedExternally(self, val):
+        from gui.itemmodels.tabulardatamodel import TabularDataModel
+        if isinstance(self._currentModelIndex_, QtCore.QModelIndex):
+            model = self._currentModelIndex_.model()
+            modelData = getattr(model, "_modelData_", None)
+            if isinstance(model, TabularDataModel) and isinstance(modelData, typing.Iterable):
+                row = self._currentModelIndex_.row()
+                col = self._currentModelIndex_.column()
+                attributeName = model._modelDataColumnHeaders_[col]
+                data = modelData[row]
+                setattr(data, attributeName, val)
+                topLeft = model.index(row, 0)
+                bottomRight = model.index(row, model.columnCount()-1)
+                model.dataChanged.emit(topLeft, bottomRight)
+
+            self.sig_indexChanged.emit(self._currentModelIndex_)
 
     @Slot(object)
     def _slot_dataEditedExternally(self, val):
@@ -1142,16 +1255,30 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     return
 
         if hasattr(model, "_useExternalDataEditor_") and hasattr(model, "_modelDataColumnHeaders_"):
-            if model._useExternalDataEditor_ is True and model._modelDataColumnHeaders_[index.column()] == "Edit":
-                widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "", parent)
-                # widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "...", parent)
-                if hasattr(widget, "setFrame"):
-                    widget.setFrame(False)
-                    widget.setToolTip("Click to edit the object represented in this row")
-                widget.setAutoFillBackground(True)
-                widget.setObjectName(f"{type(widget).__name__}_LaunchExternalEdit_delegate")
-                widget.clicked.connect(self._slot_editDataExternally)
-                return widget
+            if model._useExternalDataEditor_ is True:
+                if model._modelDataColumnHeaders_[index.column()] == "Edit":
+                    widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "", parent)
+                    if hasattr(widget, "setFrame"):
+                        widget.setFrame(False)
+                        widget.setToolTip("Click to edit the object represented in this row")
+
+                    widget.setAutoFillBackground(True)
+                    widget.setObjectName(f"{type(widget).__name__}_LaunchExternalEdit_delegate")
+                    widget.clicked.connect(self._slot_editDataExternally)
+                    return widget
+
+                elif isinstance(data, (ephys_protocol.ElectrophysiologyProtocol,
+                                    sdc.Procedure)):
+                    # for these types call the external editor!
+                    widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "", parent)
+                    if hasattr(widget, "setFrame"):
+                        widget.setFrame(False)
+                        widget.setToolTip("Click to edit the object represented in this row")
+
+                    widget.setAutoFillBackground(True)
+                    widget.setObjectName(f"{type(widget).__name__}_LaunchExternal{type(data).__name__}Edit_delegate")
+                    widget.clicked.connect(self._slot_editDataAttributeExternally)
+                    return widget
 
         choices = list()
 

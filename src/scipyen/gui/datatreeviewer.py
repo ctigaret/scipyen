@@ -161,7 +161,7 @@ A lot of things copied from there, EXCEPT that it now uses
                  ID: typing.Optional[int] = None,
                  win_title: typing.Optional[str] = None,
                  doc_title: typing.Optional[str] = None,
-                 useTableEditor:bool = True,
+                 useTableEditor: bool = True,
                  predicate: typing.Optional[typing.Any] = None,
                  readOnly: bool = True,
                  initialExpandDepth: int = 1,
