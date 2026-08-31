@@ -830,16 +830,12 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
             index = model.rowCount()
             insert = True
 
-        if insert:
-            if model.insertModelRow(index, obj, QtCore.QModelIndex()):
-                self._data_ = model._modelData_
-                self.sig_dataChanged.emit()
-
-        # else:
-
-
-
-
+        if (
+            insert
+            and model.insertModelRow(index, obj, QtCore.QModelIndex())
+            ):
+            self._data_ = model._modelData_
+            self.sig_dataChanged.emit()
 
     @Slot()
     def slot_removeRow(self):

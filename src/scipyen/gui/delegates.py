@@ -270,7 +270,7 @@ NOTE: To be used with Scipyen's custom itemmodels only
         if isinstance(widget, QtWidgets.QWidget) and hasattr(widget, "sig_valueChanged"):
             # print(f"{self.__class__.__name__}.chooseEditor -> widget is a {type(widget).__name__}:")
             if isinstance(widget, tableeditorwidget.TableEditorWidget):
-                widget.sig_valueChanged.connect(self.slot_dataChanged)
+                widget.sig_dataChanged.connect(self.slot_dataChanged)
                 widget.sig_indexChanged.connect(self.sig_indexChanged)
                 widget.sig_indexChanged[QtCore.QModelIndex].connect(self.sig_indexChanged[QtCore.QModelIndex])
             else:

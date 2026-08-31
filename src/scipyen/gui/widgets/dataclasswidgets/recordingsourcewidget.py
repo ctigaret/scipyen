@@ -402,6 +402,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
 
     @Slot(QtCore.QModelIndex, QtCore.QModelIndex)
     def _slot_pathwaysListIndexesChanged(self, topLeft, bottomRight):
+        # print(f"{self.__class__.__name__}._slot_pathwaysListIndexesChanged")
         if topLeft.row() == bottomRight.row():
             row = topLeft.row()
             pathway = self.synapticPathwaysTable.value()[row]
