@@ -170,15 +170,16 @@ class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, DataClassW
         self._make_value_()
 
     def _make_value_(self):
-        if (isinstance(self._name_, str) and
-            isinstance(self._channel_, int) and
-            isinstance(self._digital_, bool)
-            ):
-            self._data_ = SynapticStimulusChannel(
-                name=self._name_, channel=self._channel_, dig=self._digital_
-                )
-        else:
-            self._data_ = SynapticStimulusChannel()
+        if not isinstance(self._data_, SynapticStimulusChannel):
+            if (isinstance(self._name_, str) and
+                isinstance(self._channel_, int) and
+                isinstance(self._digital_, bool)
+                ):
+                self._data_ = SynapticStimulusChannel(
+                    name=self._name_, channel=self._channel_, dig=self._digital_
+                    )
+            else:
+                self._data_ = SynapticStimulusChannel()
 
         self.createObjectPushButton.setEnabled(self._data_ is None)
 

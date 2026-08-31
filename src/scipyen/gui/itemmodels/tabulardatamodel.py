@@ -98,13 +98,22 @@ from gui.itemmodels.roles import * # noqa
 
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
 
-TabularType = typing.Union[pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
-                           neo.AnalogSignal, neo.IrregularlySampledSignal,
-                           neo.Epoch, neo.Event, neo.SpikeTrain,
-                           DataSignal, IrregularlySampledDataSignal,
-                           TriggerEvent, TriggerProtocolList,
-                           np.ndarray, vigra.VigraArray,
-                           vigra.filters.Kernel1D, vigra.filters.Kernel2D,
+TabularType = typing.Union[pd.DataFrame,
+                           pd.Series,
+                           neo.core.baseneo.BaseNeo,
+                           neo.AnalogSignal,
+                           neo.IrregularlySampledSignal,
+                           neo.Epoch,
+                           neo.Event,
+                           neo.SpikeTrain,
+                           DataSignal,
+                           IrregularlySampledDataSignal,
+                           TriggerEvent,
+                           TriggerProtocolList,
+                           np.ndarray,
+                           vigra.VigraArray,
+                           vigra.filters.Kernel1D,
+                           vigra.filters.Kernel2D,
                            NeoObjectList,
                            ephys_pathways.AuxiliaryInputList,
                            ephys_pathways.AuxiliaryOutputList,
@@ -112,7 +121,6 @@ TabularType = typing.Union[pd.DataFrame, pd.Series, neo.core.baseneo.BaseNeo,
                            ephys_pathways.RecordingSourceList,
                            ephys_pathways.SynapticPathwayList,
                            ephys_pathways.SynapticStimulusChannelList,
-                           NeoObjectList,
                            sdc.Schedule,
                            list, tuple, deque]
 
@@ -289,8 +297,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         r"""Number of rows the model currently handles.
         This may be less than the notional "rows" in the data
         """
-        nRows = (self._displayedRows_ if self._displayedRows_ <= self._modelDataRows_
-                 else self._modelDataRows_)
+        nRows = min(self._displayedRows_, self._modelDataRows_)
+        # nRows = (self._displayedRows_ if self._displayedRows_ <= self._modelDataRows_
+        #          else self._modelDataRows_)
         # return 0 if parentIndex.isValid() else nRows
         return nRows
         # return 0 if parentIndex.isValid() else self._displayedRows_
@@ -656,7 +665,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 self.headerDataChanged.emit(QtCore.Qt.Horizontal, 0, self._modelDataColumns_)
                 self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, self._modelDataRows_)
 
-        except Exception as e:
+        except Exception as e: # noqa
             traceback.print_exc()
 
         self.endResetModel()
@@ -1391,7 +1400,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # column
         self._modelDataColumnHeaders_ = dict(
             tuple(
-                map(
+                map( # noqa
                     lambda x: (x[0], f"{x[1]}"),
                     enumerate(("name", "adc", "Edit"))
                     )
@@ -1412,7 +1421,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # NOTE: 2026-06-07 21:37:08 see NOTE: 2026-06-07 21:36:23
         self._modelDataColumnHeaders_ = dict(
             tuple(
-                map(
+                map( # noqa
                     lambda x: (x[0], f"{x[1]}"),
                     enumerate(("name", "channel", "Edit"))
                     )
@@ -1433,7 +1442,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # NOTE: 2026-06-07 21:38:07 see NOTE: 2026-06-07 21:36:23
         self._modelDataColumnHeaders_ = dict(
             tuple(
-                map(
+                map( # noqa
                     lambda x: (x[0], f"{x[1]}"),
                     enumerate(("name", "channel", "dig"))
                     )
@@ -1478,15 +1487,15 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     channel_names = None
                     if len(data.array_annotations):
                         if "channel_names" in data.array_annotations:
-                            channel_names = list(
-                                map(
+                            channel_names = list( # noqa
+                                map( # noqa
                                     lambda n: f"{n}",
                                     data.array_annotations["channel_names"]
                                     )
                                 )
                         elif "channel_ids" in data.array_annotations:
-                            channel_names = list(
-                                map(
+                            channel_names = list( # noqa
+                                map( # noqa
                                     lambda i: f"{i}",
                                     data.array_annotations["channel_ids"]
                                     )

@@ -227,13 +227,13 @@ class TableEditorWidget(QtWidgets.QWidget, Ui_TableEditorWidget):
     @Slot()
     def _slot_modelPopulated(self):
         # print(f"{self.__class__.__name__}._slot_modelPopulated")
-        if isinstance(self._dataModel_, TabularDataModel):
-            if (isinstance(self._dataModel_._modelDataRowIndexName_, str) and
-                len(self._dataModel_._modelDataRowIndexName_.strip())
-                ):
-                self.tableView.setCornerButtonEnabled(True)
-                # print(f"{self.__class__.__name__}.setData: corner label -> {self._dataModel_._modelDataRowIndexName_}")
-                self.tableView.setCornerLabel(self._dataModel_._modelDataRowIndexName_)
+        if (isinstance(self._dataModel_, TabularDataModel)
+            and isinstance(self._dataModel_._modelDataRowIndexName_, str)
+            and len(self._dataModel_._modelDataRowIndexName_.strip())
+            ):
+            self.tableView.setCornerButtonEnabled(True)
+            # print(f"{self.__class__.__name__}.setData: corner label -> {self._dataModel_._modelDataRowIndexName_}")
+            self.tableView.setCornerLabel(self._dataModel_._modelDataRowIndexName_)
 
 
     def setData(self, data: TabularType, *args, **kwargs):

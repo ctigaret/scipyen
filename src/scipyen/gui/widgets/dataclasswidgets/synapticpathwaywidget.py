@@ -232,12 +232,13 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget, QtWidgets
         self._make_value_()
 
     def _make_value_(self):
-        self._data_ = ephys_pathways.SynapticPathway(
-            name=self._name_, adc=self._adc_, dac=self._dac_,
-            stimulus=self._stimulus_, electrode=self._electrode_,
-            pathType=self._pathType_, schedule=self._schedule_,
-            measurements=self._measurements_
-            )
+        if not isinstance(self._data_, ephys_pathways.SynapticPathway):
+            self._data_ = ephys_pathways.SynapticPathway(
+                name=self._name_, adc=self._adc_, dac=self._dac_,
+                stimulus=self._stimulus_, electrode=self._electrode_,
+                pathType=self._pathType_, schedule=self._schedule_,
+                measurements=self._measurements_
+                )
         self.createObjectPushButton.setEnabled(self._data_ is None)
 
     @Slot()
@@ -252,7 +253,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget, QtWidgets
     @Slot()
     def _slot_editSchedule(self):
         from gui.delegates import ExternalEditorDelegate
-        editor = ExternalEditorDelegate(self._schedule_)
+        editor = ExternalEditorDelegate(self._schedule_, self)
         editor.setObjectName("scheduleEditor")
         editor.sig_valueChanged.connect(self._slot_scheduleChanged)
         editor.slot_Launch()
