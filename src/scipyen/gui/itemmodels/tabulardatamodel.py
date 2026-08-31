@@ -1334,7 +1334,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 map( # noqa
                     lambda x: (x[0], f"{x[1]}"),
                     enumerate(("name", "begin", "end", "beginFrame", "nFrames",
-                               "procedure", "protocol","episodeType", "Edit"))
+                               "procedure", "protocol","episodeType", "stimLayout",
+                               "Edit"))
                     )
                 )
             )

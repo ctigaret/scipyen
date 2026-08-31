@@ -72,6 +72,14 @@ def fromQVariant(obj):
     else:
         return obj.value() if isinstance(obj, QVariantType) else obj
 
+def getAssociatedObjects(action: QAction, oType: type = QtWidgets.QWidget) -> list:
+    if __has_PyQt6__ or __has_PySide6__:
+        aao = action.associatedObjects()
+    else:
+        aao = action.associatedWidgets()
+
+    return [o for o in aao if isinstance(o, oType)]
+
 # from qt import *
 # import weakref
 

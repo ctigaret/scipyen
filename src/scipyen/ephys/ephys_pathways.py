@@ -36,6 +36,8 @@ from dataclasses import (dataclass, MISSING, KW_ONLY) # noqa
 #     raise
 import numpy as np
 import quantities as pq # noqa
+# import matplotlib as mpl
+from matplotlib import pyplot as plt
 import neo
 from neo.core.objectlist import ObjectList as NeoObjectList
 import h5py
@@ -79,9 +81,9 @@ else:
 #### BEGIN pict.core modules
 from core.basescipyen import BaseScipyenData # noqa
 # from core.traitcontainers import DataBag
-from core.prog import (safewrapper, with_doc,
+from core.prog import (safewrapper, with_doc,# noqa
                        get_func_param_types, scipywarn,
-                       DescriptorGenericValidator) # noqa
+                       DescriptorGenericValidator)
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal) # noqa
 from core.datazone import (DataZone, Interval) # noqa
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType, ) # noqa
@@ -188,9 +190,13 @@ class RecordingEpisode(Episode):
     """
     _: KW_ONLY
     protocol: typing.Optional[ElectrophysiologyProtocol] = None
+
     episodeType: DescriptorGenericValidator = DescriptorGenericValidator(
             "episodeType", RecordingEpisodeType.Monitoring,
             RecordingEpisodeType)
+
+    stimLayout: DescriptorGenericValidator = DescriptorGenericValidator(
+        "stimLayout", None, PathwaysStimulationLayout, allow_none=True)
 
     # episodeType: RecordingEpisodeType = dataclasses.field(default = RecordingEpisodeType.Tracking)
 
@@ -1351,11 +1357,11 @@ class PathwaysStimulationLayout:
         :trim:
 
     This function helps identifying cases where an protocol is configured to |nbsp|
-    digitally stimulate more than one synaptic pathway during the same sweep(s).
+    digitally stimulate more than one synaptic pathway during the same sweep.
 
     This strategy is typically used to test cross-talk, or overlap, between two synaptic |nbsp|
     pathways based on short-term plasticity phenomena such as paired-pulse |nbsp|
-    facilitation). cases, reporting the order in which |nbsp|
+    facilitation, reporting the order in which |nbsp|
     the pathways are individually stimulated, in each sweep.
 
 
@@ -1393,7 +1399,7 @@ class PathwaysStimulationLayout:
 
     ::
 
-        source = synevoke.twoPathwaysSource(0, 0, name="Two-pathways CA3-CA1 EPSCs")
+        source = twoPathwaysSource(0, 0, name="Two-pathways CA3-CA1 EPSCs")
 
     The stimulus pair is delivered at 0.26562 s since the start of the sweep, with 50 ms inter-stimulus interval) , according |nbsp|
     to the schematic below.
@@ -1420,7 +1426,7 @@ class PathwaysStimulationLayout:
             path 1 (DIG 1)  ______|_|_________
 
 
-        synevoke.getPathwaysStimulationLayout(source.pathways, protocol, reportPathNames=True)
+        PathwaysStimulationLayout(source.pathways, protocol, reportPathNames=True)
 
         ->
 
@@ -1430,8 +1436,8 @@ class PathwaysStimulationLayout:
 
     Example 2:
     ==========
-    The same source as in Example 1, but the protocol stimulates  the pathways |nbsp|
-    according to the scheme below:
+    The same source as in Example 1, but the protocol stimulates the pathways |nbsp|
+    according to the scheme below (NOTE: a 'cross-talk' layout):
 
 
     ::
@@ -1458,7 +1464,7 @@ class PathwaysStimulationLayout:
 
     ::
 
-        synevoke.getPathwaysStimulationLayout(source.pathways, protocol, reportPathNames=True)
+        PathwaysStimulationLayout(source.pathways, protocol, reportPathNames=True)
 
         ->
 
@@ -1470,11 +1476,7 @@ class PathwaysStimulationLayout:
 
 
     """
-    # NOTE: 2026-05-04 09:02:28
-    # implementing dict API - put on hold for now...
-
-    def __init__(self, source: typing.Union[RecordingSource,
-                                            typing.Sequence[SynapticPathway]],
+    def __init__(self, source: RecordingSource | typing.Sequence[SynapticPathway],
                  protocol: ElectrophysiologyProtocol, /,
                  temporalOrder: bool = True,
                  **kwargs,
@@ -1516,7 +1518,7 @@ class PathwaysStimulationLayout:
             assert (isinstance(name, str) and len(name.strip()) > 0), f"The 'name' keyword parameter must be specified with a non empty string; instead got {name}"
 
             self._pathways_ = source
-            syn = tuple(map(lambda p: p.stimulus, self._pathways_))
+            syn = tuple(map(lambda p: p.stimulus, self._pathways_)) # noqa
             self._source_ = RecordingSource(name, adc, dac, syn, electrodeMode = electrodeMode)
 
         else:
@@ -1525,7 +1527,6 @@ class PathwaysStimulationLayout:
         assert isinstance(protocol, pab.ABFProtocol), f"'protocol' expected to be an ABFProtocol; instead got a  {type(protocol).__name__}"
         self._protocol_ = protocol
         self._layout_ = self._parseLayout_(temporalOrder)
-        # self._layout_ = self._parseLayout_(pathways, protocol, temporalOrder)
 
         self.name = kwargs.pop("name", self.__class__.__name__)
         self.description = kwargs.pop("description", "")
@@ -1533,7 +1534,12 @@ class PathwaysStimulationLayout:
     def _parseLayout_(self, temporalOrder: bool = True) -> dict:
         stimulusLayout = dict()
 
-        stimByPaths = tuple(map(lambda p: (p, getPathwayStimulationSequence(p, self._protocol_)), self._pathways_))
+        stimByPaths = tuple(
+            map( # noqa
+                lambda p: (p, getPathwayStimulationSequence(p, self._protocol_)),
+                self._pathways_
+                )
+            )
 
         for sweep in range(self._protocol_.nSweeps):
             for path, pStim in stimByPaths:
@@ -1551,7 +1557,7 @@ class PathwaysStimulationLayout:
                         stimulusLayout[sweep] = [sPC]
 
         if temporalOrder:
-            for sweep in stimulusLayout:
+            for sweep in stimulusLayout: # noqa
                 pps = sorted(stimulusLayout[sweep],
                             key = lambda sPC: min(list(map(lambda tr: tr.times[0], sPC.triggers))))
 
@@ -1590,7 +1596,7 @@ class PathwaysStimulationLayout:
 
     def getSweepsForPathway(self, pathway:SynapticPathway
                             ) -> typing.Optional[int | tuple[int]]:
-        result = list()
+        result = list() # noqa
         for sweep, sPCs in self.sweeps.items():
             if len(sPCs) == 0:
                 continue
@@ -1608,8 +1614,8 @@ class PathwaysStimulationLayout:
     def _getSweepEpochsWithRoleForPathway_(self, pathway: SynapticPathway, sweep: int,
                             role: pab.ABFEpochRole,
                             ensureUnique: bool = True,
-                            asNeoEpoch: bool = False) -> typing.Optional[
-                                typing.Union[pab.ABFEpoch,
+                            asNeoEpoch: bool = False) -> typing.Optional[ # noqa
+                                typing.Union[pab.ABFEpoch, # noqa
                                              typing.List[pab.ABFEpoch]
                                              ]
                                 ]:
@@ -1642,7 +1648,12 @@ class PathwaysStimulationLayout:
                 e = epochs_roles[0][0]
                 return self._protocol_.getNeoEpoch(epoch=e, dac=pathway.dac, sweep=sweep) if asNeoEpoch else e
             else:
-                return list(map(lambda e: self._protocol_.getNeoEpoch(epoch=e[0], dac=pathway.dac, sweep=sweep) if asNeoEpoch else e[0], epochs_roles))
+                return list( # noqa
+                    map(
+                        lambda e: self._protocol_.getNeoEpoch(epoch=e[0], dac=pathway.dac, sweep=sweep) if asNeoEpoch else e[0],
+                        epochs_roles
+                        )
+                    )
 
         else:
             e = epochs_roles[0][0]
@@ -1662,9 +1673,9 @@ class PathwaysStimulationLayout:
 
     def getEpochsWithRole(self, pathway:SynapticPathway, role: pab.ABFEpochRole,
                          ensureUnique: bool = False,
-                         sweep:typing.Optional[int] = None,
-                         asNeoEpoch: bool = False) -> typing.Optional[
-                                                typing.Union[
+                         sweep: int | None = None,
+                         asNeoEpoch: bool = False) -> typing.Optional[ # noqa
+                                                typing.Union[ # noqa
                                                     pab.ABFEpoch,
                                                     neo.Epoch,
                                                     list[pab.ABFEpoch],
@@ -1731,26 +1742,30 @@ class PathwaysStimulationLayout:
         elif not isinstance(sweeps, typing.Sequence) or len(sweeps) == 0 or not all(isinstance(s, int) for s in sweeps):
             return
 
-        result = dict()
+        result = dict() # noqa
 
         if isinstance(sweep, int):
             if sweep not in sweeps:
                 return
+            else:
+                return self._getSweepEpochsWithRoleForPathway_(pathway, sweep, role, ensureUnique, asNeoEpoch)
 
-            return self._getSweepEpochsWithRoleForPathway_(pathway, sweep, role, ensureUnique, asNeoEpoch)
-
-        for sweep in sweeps:
+        for sweep in sweeps: # noqa
             if sweep not in self.sweeps:
                 continue
 
             epochs = self._getSweepEpochsWithRoleForPathway_(pathway, sweep, role, ensureUnique, asNeoEpoch)
+
             if isinstance(epochs, (pab.ABFEpoch, neo.Epoch)):
                 result[sweep] = epochs
-            elif isinstance(epochs, list) and len(epochs) and all(isinstance(e, (pab.ABFEpoch, neo.Epoch)) for e in epochs):
+
+            elif (isinstance(epochs, list)
+                  and len(epochs)
+                  and all(isinstance(e, (pab.ABFEpoch, neo.Epoch)) for e in epochs)
+                  ):
                 result[sweep] = epochs
 
         return result
-
 
     def getMembraneTestEpoch(self, pathway:SynapticPathway,
                              sweep: typing.Optional[int] = None,
@@ -1859,6 +1874,94 @@ class PathwaysStimulationLayout:
                 and all(isinstance(l_, SweepPathCommands) for l_ in l)
                 and l[0].pathway != l[1].pathway
                 )
+
+    @property
+    def pathways(self):
+        return self._pathways_
+
+    @property
+    def layout(self) -> dict:
+        r"""Alias ot self.sweeps"""
+        return self.sweeps
+
+    def traces(self):
+        nPaths = len(self.pathways)
+
+        δy = 1/nPaths
+
+        tVal = 0.9
+
+        # δt = self.protocol.sweepDuration/10
+
+        traces = []
+
+        for k, p in enumerate(self.pathways):
+            pSweeps = self.getSweepsForPathway(p)
+            if isinstance(pSweeps, int):
+                pSweeps = [pSweeps]
+            for ks in pSweeps:
+                s = self.sweeps[ks]
+                s_start = self.protocol.sweepTimes[ks]
+                for kc, cmd in enumerate(s):
+                    trace = neo.AnalogSignal(
+                        np.full([self.protocol.sweepSampleCount,1], 1-(δy * (k+1))),
+                        units = pq.dimensionless, t_start = ks * self.protocol.sweepDuration * 1.1,
+                        sampling_rate = self.protocol.samplingRate,
+                        name=f"{p.name} sweep {ks} command {kc}"
+                    )
+
+                    for trigger in cmd.triggers:
+                        for t in trigger.times:
+                            trace[trace.time_index(t+trace.t_start-s_start)] = trace[0] + δy * tVal
+
+                    traces.append(trace)
+
+
+        return traces
+
+    def plot_traces(self):
+        traces = self.traces()
+        fig = plt.figure()
+        fig.set_size_inches(4,2.5)
+        fig.set_layout_engine("constrained", w_pad=0.1)
+        ax = plt.gca()
+        for trace in traces:
+            ax.plot(trace.times, trace, label=trace.name)
+
+        ax.spines["top"].set_visible(False)
+        ax.spines["bottom"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_visible(False)
+        ax.xaxis.set_ticks([])
+        ax.yaxis.set_ticks([])
+        plt.legend()
+
+        return fig
+
+    def ascii_traces(self):
+        print("\n")
+        for k, p in enumerate(self.pathways):
+            pSweeps = self.getSweepsForPathway(p)
+            if isinstance(pSweeps, int):
+                pSweeps = [pSweeps]
+            for ks in pSweeps:
+                sDuration = self.protocol.sweepDuration
+                s = self.sweeps[ks]
+                s_start = self.protocol.sweepTimes[ks]
+                for kc, cmd in enumerate(s):
+                    trace = ["_"] * 70
+
+                    for trigger in cmd.triggers:
+                        for t in trigger.times:
+                            tt = int(70*(t-s_start)/sDuration)
+                            trace[tt] = "|"
+
+                    print(f"{p.name} sweep {ks} command {kc}:\n")
+                    print(f"{''.join(trace)}\n\n")
+
+
+
+
 
 @dataclass
 class SynapticPathway(ScipyenDataclass):
@@ -3237,53 +3340,53 @@ def parseEpochs(pathway: SynapticPathway, protocol: pab.ABFProtocol,
 def getPathwayStimulationSequence(pathway: SynapticPathway,
                          protocol: pab.ABFProtocol,
                          concatenateEvents: bool = True) -> dict | None:
-    r"""Outputs the sequence of synaptic stimuli (digital TTLs) a synaptic pathway.
+    r"""Outputs the sequence of synaptic stimuli (digital TTLs) on a synaptic pathway.
 
-.. |nbsp| unicode:: 0xA0
-    :trim:
+    .. |nbsp| unicode:: 0xA0
+        :trim:
 
-Identifies the sweeps where a protocol is configured to trigger synaptic stimuli |nbsp|
-for a given SynapticPathway ('pathway') through TTL pulses or trains via digital |nbsp|
-channels, and the timings of these stimuli, relative to the start of the sweep.
+    Identifies the sweeps where a protocol is configured to trigger synaptic stimuli |nbsp|
+    for a given SynapticPathway ('pathway') through TTL pulses or trains via digital |nbsp|
+    channels, and the timings of these stimuli, relative to the start of the sweep.
 
-Parameters:
------------
-    :pathway: The synaptic pathway stimulated in the protocol
+    Parameters:
+    -----------
+        :pathway: The synaptic pathway stimulated in the protocol
 
-    :protocol: The acquisition protocol used in the trial. Currently, only |nbsp|
-        Clampex protocols (core.pyabfbridge.ABFProtocol) are supported.
+        :protocol: The acquisition protocol used in the trial. Currently, only |nbsp|
+            Clampex protocols (core.pyabfbridge.ABFProtocol) are supported.
 
-    :concatenateEvents: When ``True`` (default) and the pathway is stimulated on |nbsp|
-        distinct acquisition epochs in the same sweep, the TriggerEvents from these
-        epochs will be concatenated.
-
-
-Returns:
---------
-    A (possibly empty) mapping of key -> value, where:
-
-    :key: (``int``) is the index of the sweep where the protocol triggers synaptic |nbsp|
-        stimuli on the specified pathway.
-
-        Sweeps during which the given pathway is **not** stimulated are excluded.
-
-    :value: ``list`` of ``TriggerEvent`` objects with type ``TriggerEventType.presynaptic`` |nbsp|
-        containing the timings of the synaptic stimuli  relative to the start of the sweep.
-
-        For Clampex protocols, where a sweep is divided in a number of "epochs" |nbsp|
-        (Scipyen's ``ABFEpoch`` objects) the function will generate a ``presynaptic`` |nbsp|
-        ``TriggerEvent`` for each epoch that was configured, in the protocol, to |nbsp|
-        emit synaptic stimuli.
-
-        If needed, these ``TriggerEvent`` objects can be concatenated post-hoc |nbsp|
-        to create a single ``TriggerEvent`` object of the same ``TriggerEventType``.
+        :concatenateEvents: When ``True`` (default) and the pathway is stimulated on |nbsp|
+            distinct acquisition epochs in the same sweep, the TriggerEvents from these
+            epochs will be concatenated.
 
 
-.. note::
-    Only stimuli sent via digital channels are supported at the moment.
+    Returns:
+    --------
+        A (possibly empty) mapping of key -> value, where:
+
+        :key: (``int``) is the index of the sweep where the protocol triggers synaptic |nbsp|
+            stimuli on the specified pathway.
+
+            Sweeps during which the given pathway is **not** stimulated are excluded.
+
+        :value: ``list`` of ``TriggerEvent`` objects with type ``TriggerEventType.presynaptic`` |nbsp|
+            containing the timings of the synaptic stimuli  relative to the start of the sweep.
+
+            For Clampex protocols, where a sweep is divided in a number of "epochs" |nbsp|
+            (Scipyen's ``ABFEpoch`` objects) the function will generate a ``presynaptic`` |nbsp|
+            ``TriggerEvent`` for each epoch that was configured, in the protocol, to |nbsp|
+            emit synaptic stimuli.
+
+            If needed, these ``TriggerEvent`` objects can be concatenated post-hoc |nbsp|
+            to create a single ``TriggerEvent`` object of the same ``TriggerEventType``.
 
 
-"""
+    .. note::
+        Only stimuli sent via digital channels are supported at the moment.
+
+
+    """
     # NOTE: 2026-05-04 08:58:36 DO NOT DELETE
     # this function, while at module level, is used by PathwaysStimulationLayout
 

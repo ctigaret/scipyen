@@ -6456,10 +6456,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         for w in tw:
             w.setPopupMode(QtWidgets.QToolButton.InstantPopup)
 
-        if __has_PyQt6__ or __has_PySide6__:
-            self.tbOpen = [w for w in self.actionOpen.associatedObjects() if isinstance(w, QtWidgets.QToolButton)][0]
-        else:
-            self.tbOpen = [w for w in self.actionOpen.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
+        aao = qtutils.getAssociatedObjects(self.actionOpen, QtWidgets.QToolButton)
+
+        self.tbOpen = aao[0]
 
         self.actionOpeningARecentFileNavigatesToItsDirectory.toggled.connect(self._slot_setNavigateToOpenedRecentFileDirectory)
         self.actionSynchronize_working_directory_when_opening_a_dropped_file.toggled.connect(self._slot_setNavigateToDroppedFileDirectory)
@@ -6468,10 +6467,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.tbOpen.setToolTip("Open (click on arrow to the right to reveal recently opened files; hold SHIFT to ALSO change to directory of the recent file when opening)")
         self.tbOpen.setMenu(self.recentFilesMenu)
 
-        if __has_PyQt6__ or __has_PySide6__:
-            self.tbChDir = [w for w in self.actionChange_Working_Directory.associatedObjects() if isinstance(w, QtWidgets.QToolButton)][0]
-        else:
-            self.tbChDir = [w for w in self.actionChange_Working_Directory.associatedWidgets() if isinstance(w, QtWidgets.QToolButton)][0]
+        aao = qtutils.getAssociatedObjects(self.actionChange_Working_Directory, QtWidgets.QToolButton)
+        self.tbChDir = aao[0]
 
         self.tbChDir.setPopupMode(QtWidgets.QToolButton.MenuButtonPopup)
         self.tbChDir.setMenu(self.recentDirectoriesMenu)
@@ -6485,7 +6482,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.actionUseShellAutomagic.toggled.connect(self._slot_UseShellAutomagic)
 
         self.lockToolBarAction = QAction(guiutils.getIcon("lock-symbolic"), "Lock Toolbar Positions", self)
-        # self.lockToolBarAction = QAction(QtGui.QIcon.fromTheme("lock-symbolic"), "Lock Toolbar Positions", self)
         self.lockToolBarAction.setCheckable(True)
         self.lockToolBarAction.setChecked(self._lockedToolBar)
         self.lockToolBarAction.toggled[bool].connect(self._slot_changeToolBarLockedState)
@@ -6591,7 +6587,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.removeSelectedVarsToolBtn.clicked.connect(self.slot_deleteSelectedWorkspaceObjects)
         self.clearWorkspaceToolBtn.clicked.connect(self._slot_clearInternalWorkspace)
         self.saveVariableToolBtn.setIcon(guiutils.getIcon("document-save-symbolic", "document-save"))
-        # self.actionDisplay_In_Console.triggered.connect(self.slot_consoleDisplaySelectedVariables)
         self.sendVarnameToConsoleToolBtn.setIcon(guiutils.getIcon("edit-paste-symbolic", "edit-paste"))
         self.renameVarnameToolBtn.setIcon(guiutils.getIcon("edit-rename-symbolic", "edit-rename"))
         self.removeSelectedVarsToolBtn.setIcon(guiutils.getIcon("edit-delete-symbolic", "edit-delete"))
@@ -6693,7 +6688,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             previewParentLayout.addWidget(self.fileSystemColumnViewPreviewWidget)
 
         self.fileSystemColumnView.setModel(self.fileSystemModel)
-        # self.fileSystemColumnView.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.fileSystemColumnView.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
         self.fileSystemColumnView.activated[QtCore.QModelIndex].connect(
             self.slot_fileSystemItemActivated)
