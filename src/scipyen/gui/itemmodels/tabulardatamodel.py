@@ -1331,9 +1331,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelDataRows_ = len(data)
         self._modelDataColumnHeaders_ = dict(
             tuple(
-                map(
+                map( # noqa
                     lambda x: (x[0], f"{x[1]}"),
-                    enumerate(("name", "begin", "end", "beginFrame","nFrames","procedure", "protocol","episodeType","Edit"))
+                    enumerate(("name", "begin", "end", "beginFrame", "nFrames",
+                               "procedure", "protocol","episodeType", "Edit"))
                     )
                 )
             )
