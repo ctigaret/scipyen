@@ -111,6 +111,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
             obj = obj_
 
         if not isinstance(obj, self._objectTypes_):
+            self._data_ = None
             self._name_ = "Episode"
             self._episodeType_ = ephys_pathways.RecordingEpisodeType.Tracking
             self._begin_ = datetime.datetime.now()
@@ -212,7 +213,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
         self.toggleProcedureEditor.toggled.connect(self._slot_toggleProcedureEditor)
 
         self.createObjectPushButton.setText("")
-        self.createObjectPushButton.setIcon(guiutils.getIcon("list-add"))
+        self.createObjectPushButton.setIcon(guiutils.getIcon("document-new"))
         self.createObjectPushButton.setToolTip("Create Recording Episode")
         self.createObjectPushButton.setWhatsThis("Create Recording Episode")
         self.createObjectPushButton.setStatusTip("Create Recording Episode")

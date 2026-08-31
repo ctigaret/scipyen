@@ -87,7 +87,12 @@ class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, DataClassW
 
             obj = obj_
 
+        QtWidgets.QWidget.__init__(self, parent)
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_SynapticStimulusChannelWidget.__init__(self)
+
         if not isinstance(obj, self._objectTypes_):
+            self._data_ = None
             self._name_ = "Stim"
             self._channel_ = 0
             self._digital_ = Tribool()
@@ -98,23 +103,11 @@ class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, DataClassW
             self._channel_ = self._data_.channel
             self._digital_ = self._data_.dig
 
-        QtWidgets.QWidget.__init__(self, parent)
-        DataClassWidget.__init__(self, parent=parent, **kwargs)
-        Ui_SynapticStimulusChannelWidget.__init__(self)
         self._configureUI_()
 
     def _configureUI_(self):
         self.setupUi(self)
         super()._configureUI_() # DataClassWidget!
-        # self.nameLineEdit.undoAvailable=True
-        # self.nameLineEdit.redoAvailable=True
-        # self.nameLineEdit.setClearButtonEnabled(True)
-        # self.nameLineEdit.setToolTip("Name of the stimulus")
-        # self.nameLineEdit.setWhatsThis("Name of the stimulus")
-        # self.nameLineEdit.setStatusTip("Name of the stimulus")
-        # if isinstance(self._name_, str) and len(self._name_.strip()):
-        #     self.nameLineEdit.setText(self._name_)
-        # self.nameLineEdit.textChanged.connect(self._slot_nameChanged)
 
         self.nameDescriptionWidget.symbol="stimulus"
         self.outputChannelSpinBox.setToolTip("Output channel index")
@@ -133,13 +126,11 @@ class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, DataClassW
         self.isDigitalCheckBox.toggled.connect(self._slot_isDigitalChanged)
 
         self.createObjectPushButton.setText("")
-        self.createObjectPushButton.setIcon(guiutils.getIcon("list-add"))
+        self.createObjectPushButton.setIcon(guiutils.getIcon("document-new"))
         self.createObjectPushButton.setToolTip("Create Stimulus")
         self.createObjectPushButton.setWhatsThis("Create Stimulus")
         self.createObjectPushButton.setStatusTip("Create Stimulus")
-
         self.createObjectPushButton.clicked.connect(self._slot_new)
-        self.createObjectPushButton.setEnabled(self._data_ is None)
 
     @Slot(bool)
     def _slot_isDigitalChanged(self, val: bool):
@@ -170,18 +161,15 @@ class SynapticStimulusChannelWidget(Ui_SynapticStimulusChannelWidget, DataClassW
         self._make_value_()
 
     def _make_value_(self):
-        if not isinstance(self._data_, SynapticStimulusChannel):
-            if (isinstance(self._name_, str) and
-                isinstance(self._channel_, int) and
-                isinstance(self._digital_, bool)
-                ):
-                self._data_ = SynapticStimulusChannel(
-                    name=self._name_, channel=self._channel_, dig=self._digital_
-                    )
-            else:
-                self._data_ = SynapticStimulusChannel()
-
-        self.createObjectPushButton.setEnabled(self._data_ is None)
+        if (isinstance(self._name_, str) and
+            isinstance(self._channel_, int) and
+            isinstance(self._digital_, bool)
+            ):
+            self._data_ = SynapticStimulusChannel(
+                name=self._name_, channel=self._channel_, dig=self._digital_
+                )
+        else:
+            self._data_ = SynapticStimulusChannel()
 
     def setValue(self, val:typing.Optional[SynapticStimulusChannel] = None):
         if isinstance(val, SynapticStimulusChannel):

@@ -134,8 +134,13 @@ NOTE: To be used with Scipyen's custom itemmodels only
         # store data from underlying central widget
         if isinstance(self._widget_, QtWidgets.QWidget) and hasattr(self._widget_, "value"):
             self._data_ = self._widget_.value()
-        self.sig_closing.emit()
+
         self.sig_valueChanged.emit(self._data_)
+        # self._widget_.close()
+        # self._widget_.deleteLater()
+        # self._widget_ = None
+        self.sig_closing.emit()
+
         evt.accept()
 
     @singledispatchmethod
@@ -274,7 +279,7 @@ NOTE: To be used with Scipyen's custom itemmodels only
         return widget
 
     @Slot()
-    def _slot_externalEditorClosing(self):
+    def _slot_externalEditorClosing(self): # --?!? what's this doing ?!?
         self._pendingChange_ = False
 
     @Slot()
@@ -1049,18 +1054,21 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         # external editor NEEDS a separate QMainWindow!
         # self.sig_editExternally.emit(self.sender(), index)
         sender = self.sender()
-        if isinstance(sender, QtWidgets.QPushButton):
-            if isinstance(self._currentModelIndex_, QtCore.QModelIndex) and self._currentModelIndex_.isValid():
-                model = self._currentModelIndex_.model()
-                modelData = getattr(model, "_modelData_", None)
+        if (
+            isinstance(sender, QtWidgets.QPushButton)
+            and isinstance(self._currentModelIndex_, QtCore.QModelIndex)
+            and self._currentModelIndex_.isValid()
+            ):
+            model = self._currentModelIndex_.model()
+            modelData = getattr(model, "_modelData_", None)
 
-                # CAUTION 2026-06-09 19:08:50
-                # this is supposed to edit the python object represented by the
-                # entire model data row!!!
-                if isinstance(modelData, typing.Iterable):
-                    self._externalDataEditor_ = ExternalEditorDelegate(modelData[self._currentModelIndex_.row()])
-                    self._externalDataEditor_.sig_valueChanged.connect(self._slot_dataEditedExternally)
-                    self._externalDataEditor_.sig_closing.connect(self._slot_externalEditorClosing)
+            # CAUTION 2026-06-09 19:08:50
+            # this is supposed to edit the python object represented by the
+            # entire model data row!!!
+            if isinstance(modelData, typing.Iterable):
+                self._externalDataEditor_ = ExternalEditorDelegate(modelData[self._currentModelIndex_.row()])
+                self._externalDataEditor_.sig_valueChanged.connect(self._slot_dataEditedExternally)
+                self._externalDataEditor_.sig_closing.connect(self._slot_externalEditorClosing)
 
     @Slot()
     def _slot_editDataAttributeExternally(self):
@@ -1087,6 +1095,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
     @Slot()
     def _slot_externalEditorClosing(self):
+        self._externalDataEditor_.deleteLater()
         self._externalDataEditor_ = None
 
     @Slot(object)
@@ -1114,7 +1123,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         if isinstance(self._currentModelIndex_, QtCore.QModelIndex):
             model = self._currentModelIndex_.model()
             modelData = getattr(model, "_modelData_", None)
-            if isinstance(model, TabularDataModel) and isinstance(modelData, typing.Iterable):
+            if (isinstance(model, TabularDataModel)
+                and isinstance(modelData, typing.Iterable)):
                 row = self._currentModelIndex_.row()
                 modelData[row] = val
                 topLeft = model.index(row, 0)
@@ -1122,7 +1132,6 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 model.dataChanged.emit(topLeft, bottomRight)
 
             self.sig_indexChanged.emit(self._currentModelIndex_)
-            # self.sig_indexRowColChanged.emit(self._currentModelIndex_.row(), self._currentModelIndex_.column())
 
     @Slot()
     def slot_commitAndCloseEditor(self):

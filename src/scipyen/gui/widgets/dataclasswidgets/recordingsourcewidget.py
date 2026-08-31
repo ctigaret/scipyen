@@ -76,11 +76,9 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
     _objectType_ = ephys_pathways.RecordingSource
     _objectTypes_ = (ephys_pathways.RecordingSource, )
 
-    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
-                 obj: typing.Optional[T] = None,
+    def __init__(self, parent: QtWidgets.QWidget | None = None,
+                 obj: T | None = None,
                  **kwargs):
-        # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
-
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):
@@ -90,12 +88,17 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
 
             obj = obj_
 
+        QtWidgets.QWidget.__init__(self, parent)
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_RecordingSourceWidget.__init__(self)
+
         self._electrodeModeNames_ = list(ephys.ElectrodeMode.names())
 
         self._pendingPathwayChange_ = None
         self._pendingStimulusChange_ = None
 
         if not isinstance(obj, self._objectTypes_):
+            self._data_ = None
             self._name_ = "source"
             self._adc_ = 0
             self._dac_ = 0
@@ -116,9 +119,6 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
             self._electrode_ = self._data_.electrodeMode
             self._pathways_ = self._data_.pathways
 
-        QtWidgets.QWidget.__init__(self, parent)
-        DataClassWidget.__init__(self, parent=parent, **kwargs)
-        Ui_RecordingSourceWidget.__init__(self)
         self._configureUI_()
 
     def default(self) -> T:
@@ -170,13 +170,11 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
         self.auxOutPushButton.clicked.connect(self._slot_editAuxOut)
 
         self.createObjectPushButton.setText("")
-        self.createObjectPushButton.setIcon(guiutils.getIcon("list-add"))
+        self.createObjectPushButton.setIcon(guiutils.getIcon("document-new"))
         self.createObjectPushButton.setToolTip("Create Recording Source")
         self.createObjectPushButton.setWhatsThis("Create Recording Source")
         self.createObjectPushButton.setStatusTip("Create Recording Source")
-
         self.createObjectPushButton.clicked.connect(self._slot_new)
-        self.createObjectPushButton.setEnabled(True)
 
         self.stimulusListTable.isAutoResizeColumns = True
         self.stimulusListTable.setToolTip("Configured Stimulus Channels")
@@ -273,8 +271,6 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
                                             auxin=self._auxin_,
                                             auxout=self._auxout_,
                                             electrodeMode = self._electrode_)
-
-        # self.createObjectPushButton.setEnabled(self._data_ is None)
 
     @Slot()
     def _slot_editStimulus(self):

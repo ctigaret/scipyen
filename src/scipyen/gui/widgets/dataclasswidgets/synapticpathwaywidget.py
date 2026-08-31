@@ -72,8 +72,8 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget, QtWidgets
     _objectTypes_ = (ephys_pathways.SynapticPathway, )
     _objectType_ = ephys_pathways.SynapticPathway
 
-    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
-                 obj: typing.Optional[ephys_pathways.SynapticPathway] = None,
+    def __init__(self, parent: QtWidgets.QWidget | None = None,
+                 obj: ephys_pathways.SynapticPathway | None = None,
                  **kwargs):
         # print(f"{self.__class__.__name__}.__init__(parent={parent}, obj={obj})")
         if isinstance(parent, self._objectTypes_):
@@ -85,10 +85,15 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget, QtWidgets
 
             obj = obj_
 
+        QtWidgets.QWidget.__init__(self, parent)
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_SynapticPathwayWidget.__init__(self)
+
         self._electrodeModeNames_ = list(ephys.ElectrodeMode.names())
         self._pathwayTypeNames_ = list(ephys_pathways.SynapticPathwayType.names())
 
         if not isinstance(obj, self._objectTypes_):
+            self._data_ = None
             self._name_ = "pathway"
             self._adc_ = 0
             self._dac_ = 0
@@ -110,14 +115,12 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget, QtWidgets
             self._schedule_ = self._data_.schedule
             self._measurements_ = self._data_.measurements
 
-        QtWidgets.QWidget.__init__(self, parent)
-        DataClassWidget.__init__(self, parent=parent, **kwargs)
-        Ui_SynapticPathwayWidget.__init__(self)
         self._configureUI_()
 
     def _configureUI_(self):
         self.setupUi(self)
         super()._configureUI_() # DataClassWidget!
+
         self.nameDescriptionWidget.symbol="pathway"
         self.adcSpinBox.setToolTip("Input channel index")
         self.adcSpinBox.setWhatsThis("Input channel index")
@@ -133,6 +136,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget, QtWidgets
         self.dacSpinBox.setMinimum(0)
         if isinstance(self._dac_, int) and self._dac_ >= 0 :
             self.dacSpinBox.setValue(self._dac_)
+
         self.dacSpinBox.valueChanged.connect(self._slot_dacChanged)
 
         for text in self._electrodeModeNames_:
@@ -157,13 +161,11 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget, QtWidgets
         self.schedulePushButton.clicked.connect(self._slot_editSchedule)
 
         self.createObjectPushButton.setText("")
-        self.createObjectPushButton.setIcon(guiutils.getIcon("list-add"))
+        self.createObjectPushButton.setIcon(guiutils.getIcon("document-new"))
         self.createObjectPushButton.setToolTip("Create Synaptic Pathway")
         self.createObjectPushButton.setWhatsThis("Create Synaptic Pathway")
         self.createObjectPushButton.setStatusTip("Create Synaptic Pathway")
-
         self.createObjectPushButton.clicked.connect(self._slot_new)
-        self.createObjectPushButton.setEnabled(self._data_ is None)
 
     @Slot(int)
     def _slot_adcChanged(self, val: int):
@@ -232,14 +234,12 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget, QtWidgets
         self._make_value_()
 
     def _make_value_(self):
-        if not isinstance(self._data_, ephys_pathways.SynapticPathway):
-            self._data_ = ephys_pathways.SynapticPathway(
-                name=self._name_, adc=self._adc_, dac=self._dac_,
-                stimulus=self._stimulus_, electrode=self._electrode_,
-                pathType=self._pathType_, schedule=self._schedule_,
-                measurements=self._measurements_
-                )
-        self.createObjectPushButton.setEnabled(self._data_ is None)
+        self._data_ = ephys_pathways.SynapticPathway(
+            name=self._name_, adc=self._adc_, dac=self._dac_,
+            stimulus=self._stimulus_, electrode=self._electrode_,
+            pathType=self._pathType_, schedule=self._schedule_,
+            measurements=self._measurements_
+            )
 
     @Slot()
     def _slot_editStimulus(self):
@@ -279,7 +279,7 @@ class SynapticPathwayWidget(Ui_SynapticPathwayWidget, DataClassWidget, QtWidgets
         self._data_ = val
         # print(f"\t=>{self._data_}")
 
-    def setValue(self, val: typing.Optional[ephys_pathways.SynapticPathway] = None):
+    def setValue(self, val: ephys_pathways.SynapticPathway | None = None):
         # print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
         if isinstance(val, ephys_pathways.SynapticPathway):
             self._data_ = val

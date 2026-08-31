@@ -110,6 +110,9 @@ class AuxiliaryInputWidget(Ui_AuxiliaryInputWidget, QtWidgets.QWidget):
 
         self._configureUI_()
 
+        if not isinstance(self._data_, AuxiliaryInput):
+            self._make_value_()
+
     def _configureUI_(self):
         self.setupUi(self)
         self.nameLineEdit.undoAvailable=True
@@ -146,13 +149,11 @@ class AuxiliaryInputWidget(Ui_AuxiliaryInputWidget, QtWidgets.QWidget):
         self.isCommandCheckBox.toggled.connect(self._slot_isCommandChanged)
 
         self.createObjectPushButton.setText("")
-        self.createObjectPushButton.setIcon(guiutils.getIcon("list-add"))
+        self.createObjectPushButton.setIcon(guiutils.getIcon("document-new"))
         self.createObjectPushButton.setToolTip("Create Auxiliary Input")
         self.createObjectPushButton.setWhatsThis("Create Auxiliary Input")
         self.createObjectPushButton.setStatusTip("Create Auxiliary Input")
-
         self.createObjectPushButton.clicked.connect(self._slot_new)
-        self.createObjectPushButton.setEnabled(self._data_ is None)
 
     @Slot(str)
     def _slot_nameChanged(self, val:str):
@@ -212,7 +213,7 @@ class AuxiliaryInputWidget(Ui_AuxiliaryInputWidget, QtWidgets.QWidget):
             isinstance(self._command_, Tribool)
             ):
             self._data_ = AuxiliaryInput(self._name_, self._channel_, self._command_)
-        self.createObjectPushButton.setEnabled(self._data_ is None)
+        # self.createObjectPushButton.setEnabled(self._data_ is None)
 
     def setValue(self, val:typing.Optional[AuxiliaryInput] = None):
         if isinstance(val, AuxiliaryInput):
@@ -242,13 +243,8 @@ class AuxiliaryOutputWidget(Ui_AuxiliaryOutputWidget, QtWidgets.QWidget):
     defaultChannel: int = 0
     defaultCmd: Tribool = Tribool()
 
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None,
-                 obj: typing.Optional[AuxiliaryOutput] = None):
-
-        # if not isinstance(parent, QtWidgets.QWidget):
-        #     if obj is None and isinstance(parent, AuxiliaryOutput):
-        #         obj = parent
-        #     parent = None
+    def __init__(self, parent: QtWidgets.QWidget | None = None,
+                 obj: AuxiliaryOutput | None = None):
 
         QtWidgets.QWidget.__init__(self, parent=parent)
         super(Ui_AuxiliaryOutputWidget, self).__init__()
@@ -270,6 +266,9 @@ class AuxiliaryOutputWidget(Ui_AuxiliaryOutputWidget, QtWidgets.QWidget):
             self._command_ = None
 
         self._configureUI_()
+
+        if not isinstance(self._data_, AuxiliaryOutput):
+            self._make_value_()
 
     def _configureUI_(self):
         self.setupUi(self)
@@ -307,13 +306,11 @@ class AuxiliaryOutputWidget(Ui_AuxiliaryOutputWidget, QtWidgets.QWidget):
         self.isDigTTLCheckBox.toggled.connect(self._slot_isTTLChanged)
 
         self.createObjectPushButton.setText("")
-        self.createObjectPushButton.setIcon(guiutils.getIcon("list-add"))
+        self.createObjectPushButton.setIcon(guiutils.getIcon("document-new"))
         self.createObjectPushButton.setToolTip("Create Auxiliary Output")
         self.createObjectPushButton.setWhatsThis("Create Auxiliary Output")
         self.createObjectPushButton.setStatusTip("Create Auxiliary Output")
-
         self.createObjectPushButton.clicked.connect(self._slot_new)
-        self.createObjectPushButton.setEnabled(self._data_ is None)
 
     @Slot(str)
     def _slot_nameChanged(self, val:str):
