@@ -140,7 +140,6 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
 
         self.nameDescriptionWidget.symbol="recordingSource"
         self.nameDescriptionWidget.setData(self._data_)
-        # self.nameDescriptionWidget.sig_valueChanged.connect
         self.adcSpinBox.setToolTip("Index of ADC (input) channel used for recording")
         self.adcSpinBox.setWhatsThis("Index of ADC (input) channel used for recording")
         self.adcSpinBox.setStatusTip("Index of ADC (input) channel used for recording")
@@ -195,6 +194,8 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
         self.synapticPathwaysTable.sig_indexRowColChanged.connect(self._slot_singleSynapticPathwayChanged)#, type=QtCore.Qt.DirectConnection)
         self.synapticPathwaysTable.sig_indexChanged.connect(self._slot_singleSynapticPathwayChanged)#, type=QtCore.Qt.DirectConnection)
         self.synapticPathwaysTable.sig_dataChanged.connect(self._slot_synapticPathwaysListChanged)
+
+        self.createTwoPathwaysSourcePushButton.clicked.connect(self._slot_makeTwoPathwaysSource)
 
     @Slot(int)
     def _slot_adcChanged(self, val: int):
@@ -542,6 +543,25 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
     def slot_valueChanged(self, val):
         self._data_ = val
 
+    @Slot()
+    def _slot_makeTwoPathwaysSource(self):
+        from gui import interact
+
+        paths = interact.getInputs(path0=0, path1=1,
+                                   dlg_title="Digital output channels for pathway stimulation",
+                                   dlg_widget_orientation=QtCore.Qt.Horizontal)
+        if paths is None:
+            return
+
+        path0stim, path1stim = paths
+
+        result = ephys_pathways.twoPathwaysSource(self._adc_, self._dac_,
+                                                 path0stim=path0stim,
+                                                 path1stim=path1stim,
+                                                 name=self._name_,
+                                                 electrodeMode = self._electrode_)
+        self.setValue(result)
+
     def setValue(self, val: typing.Optional[T] = None):
         # print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
         if isinstance(val, self._objectType_):
@@ -578,7 +598,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
                 self.stimulusListTable,
             )
             ):
-            self.nameDescriptionWidget.dataName = self._data_.name
+            super().setValue(self._data_) # to populate the DataClassWidget fields
             self.adcSpinBox.setValue(self._data_.adc)
             self.dacSpinBox.setValue(self._data_.dac)
             currentElectrodeModeNdx = self._electrodeModeNames_.index(self._electrode_.name)

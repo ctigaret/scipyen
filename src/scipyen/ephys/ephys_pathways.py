@@ -3370,3 +3370,141 @@ Returns:
         pass
 
     return stimulation_sequence
+
+def twoPathwaysSource(adc: int | str=0, dac: int | None=None,
+                      path0stim: int = 0, path1stim : int = 1,
+                      name: str | None=None,
+                      electrodeMode: ephys.ElectrodeMode = ephys.ElectrodeMode.Null,
+                      **kwargs) -> RecordingSource:
+    r"""Factory for a RecordingSource in two-pathways synaptic plasticity experiments.
+
+    Synaptic stimulation is carried out via extracellular electrodes using
+    simulus devices driven by TTLs via DIG channels.
+
+    By default DIG channel indices are 0 and 1, but they can be specified using
+    the 'path0' and 'path1' parameters.
+
+    By default, the 'dac' parameter is None, indicating a recording from an
+    𝑢𝑛𝑐𝑙𝑎𝑚𝑝𝑒𝑑 RecordingSource (e.g. a field recording, or recording from an unclamped cell).
+
+    When 'dac' parameter is specified as an int (index) or str (name), the
+    source is considered to be recorded in 𝑐𝑙𝑎𝑚𝑝𝑖𝑛𝑔 mode (i.e. voltage- or
+    current-clamp), and, by implication, the RecordingSource is a cell or a membrane
+    patch.
+
+    Synaptic responses are recorded on ADC 0 by default, but this can be specified
+    using the 'adc' parameter as an int (index) or str (name).
+
+    By default the source 'name' field is "cell"¹ but this can be specified using
+    the 'name' parameter as a str.
+
+    RecordingSources with more complex configurations (e.g. using photostimulation of
+    synaptic activity triggered with DAC-emulated TTLs) should be constructed
+    directly (see ephys.RecordingSource documentation for details).
+
+    Named parameters:
+    -----------------
+    adc, dac, name: See ephys.ephys.RecordingSource constructor for a full description.
+        Briefly:
+        adc, dac: int, physical indexes of the ADC & DAC used
+        name: str, name of the source (e.g. 'cell01')
+
+    NOTE: for convenience, a string may be passed as first parameter (in place of `adc`).
+    This will be used as the 'name' of the source, and `adc` will be set to 0 (zero).
+    In this case, specifying the `name` parameter again will raise an exception.
+
+    path0, path1 (int) >= 0 indices of DIG channels used to stimulate the pathways.
+
+    Here, the default parameter values associate 'adc' 0 with 'dac' 0 and two
+    SynapticStimulusChannel objects, using 'dig' 0 and 'dig' 1, respectively.
+
+    Var-keyword parameters:
+    --------------------------
+    • `auxin` and `auxout`, and by default are set to 'None'.
+    • `path0name` and `path1name`: both strings -- custom names for the two pathways
+        ∘ by default, these are set to 'path0' and 'path1', respectively
+        ∘ when given, they should be different
+    • `path0stimname`, `path1stimname`: both strings -- curtom name for the
+        SynapticStimulusChannel obejct associated with each pathway
+        ∘ defaults are "path0stim" and "path1stim"
+
+    Returns:
+    --------
+    An immutable ephys.ephys.RecordingSource object (a NamedTuple).
+
+    One can create a modified version using the '_replace' method:
+    (WARNING: Remember to also change the value of the RecordingSource's 'name' field)
+
+
+    cell  = twoPathwaysSource()
+    cell1 = twoPathwaysSource(dac=1, name="cell1")
+    cell2 = cell._replace(dac=1,   name="cell1")
+
+    assert cell1 == cell2, "The objects are different"
+
+    ¹ It is illegal to use Python keywords as name here.
+
+    """
+    _name = None
+    if isinstance(adc, str) and len(adc.strip()):
+        _name = adc
+        adc = 0
+
+    if name is None:
+        if isinstance(_name, str):
+            name = _name
+        else:
+            name = "cell"
+
+    elif isinstance(name, str):
+        if isinstance(_name, str):
+            raise SyntaxError("'name' was already specified by first parameter")
+
+        if len(name.strip()) == 0:
+            name = "cell"
+
+    else:
+        raise TypeError(f"'name' expected to be  str or None; instead, got {type(name).__name__}")
+
+    assert path0stim != path1stim, "Pathways must have distinct stimulus channels"
+
+    if isinstance(electrodeMode, (int, str)):
+        if electrodeMode not in ephys.ElectrodeMode:
+            raise ValueError(f"Invalid electrodeMode {electrodeMode}")
+
+        electrodeMode = ephys.ElectrodeMode.type(electrodeMode)
+
+    if not isinstance(electrodeMode, ephys.ElectrodeMode):
+        raise TypeError(f"Invalid electrodeMode {electrodeMode}")
+
+    p0name = kwargs.get("path0name", 'path0')
+    p1name = kwargs.get("path1name", 'path1')
+    s0name = kwargs.get("path0stimname", f"{p0name}stim")
+    s1name = kwargs.get("path1stimname", f"{p1name}stim")
+
+    syn     = SynapticStimulusChannelList(SynapticStimulusChannel(name=s0name, channel=path0stim),
+                                          SynapticStimulusChannel(name=s1name, channel=path1stim))
+    auxin   = kwargs.pop("auxin", None)
+    auxout  = kwargs.pop("auxout", None)
+
+    if auxin is not None:
+        if not isinstance(auxin, AuxiliaryInputList):
+            raise TypeError(f"'auxin' expected to be an AuxiliaryInputList or None; instead got {type(auxin).__name__}")
+
+    else:
+        auxin = AuxiliaryInputList()
+
+    if auxout is not None:
+        if not isinstance(auxout, AuxiliaryOutputList):
+            raise TypeError(f"'auxout' expected to be an AuxiliaryOutputList or None; instead got {type(auxout).__name__}")
+    else:
+        auxout = AuxiliaryOutputList()
+
+
+    ret = RecordingSource(name=name, adc=adc, dac=dac, syn=syn,
+                          auxin=auxin, auxout=auxout,
+                          electrodeMode=electrodeMode)
+
+    ret.pathways[0].name = p0name
+    ret.pathways[1].name = p1name
+    return ret
