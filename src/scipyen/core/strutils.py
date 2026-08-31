@@ -961,6 +961,7 @@ def is_pathname_valid(pathname: str) -> bool:
     # Did we mention this should be shipped with Python already?
 
 def guess_sfx_sep(s, suppress_warnings:bool=False) -> str:
+    from core.prog import scipywarn
     nosepPattern = _re.compile(r"(.*?)??(\d*)$")
     try_match = nosepPattern.match(s)
     # print(f"try_match -> {try_match}")
@@ -973,7 +974,7 @@ def guess_sfx_sep(s, suppress_warnings:bool=False) -> str:
                 sep = " "
             else:
                 sep = ""
-        except:
+        except: # noqa
             if not suppress_warnings:
                 scipywarn("Cannot guess whether separator is '_', ' ', or ''; assuming ''.")
             sep = ""

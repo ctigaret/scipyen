@@ -562,7 +562,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
                                                  electrodeMode = self._electrode_)
         self.setValue(result)
 
-    def setValue(self, val: typing.Optional[T] = None):
+    def setValue(self, val: T | None = None):
         # print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
         if isinstance(val, self._objectType_):
             self._data_ = val

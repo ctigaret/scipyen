@@ -1869,12 +1869,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     @_setValueInModelData_.register(ephys_pathways.AuxiliaryOutputList)
     @_setValueInModelData_.register(ephys_pathways.RecordingSchedule)
     @_setValueInModelData_.register(ephys_pathways.SynapticStimulusChannelList)
+    @_setValueInModelData_.register(sdc.Schedule)
     def __setValueInModelData__(self, mdata: typing.Union[ # noqa
                                                 ephys_pathways.SynapticPathwayList,
                                                 ephys_pathways.AuxiliaryInputList,
                                                 ephys_pathways.AuxiliaryOutputList,
                                                 ephys_pathways.RecordingSchedule,
                                                 ephys_pathways.SynapticStimulusChannelList,
+                                                sdc.Schedule,
                                                 ], pyvalue, row, col) -> bool:
         if row >= len(mdata):
             return False
@@ -1883,7 +1885,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         attr = self._modelDataColumnHeaders_[col]
 
-        if attr.lower() != "edit":
+        if attr.lower() != "edit": # noqa
             old_val = getattr(obj, attr)
             if isinstance(old_val, enum.Enum):
                 if isinstance(pyvalue, int):
@@ -1912,6 +1914,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             setattr(obj, attr, new_val)
 
         mdata[row] = obj
+
+        if (
+            isinstance(mdata, (ephys_pathways.RecordingSchedule, sdc.Schedule))
+            and attr in ("beginFrame", "nFrames")
+            ):
+            mdata.update()
 
         return True
 

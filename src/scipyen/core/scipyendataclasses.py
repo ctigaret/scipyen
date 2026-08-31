@@ -1675,13 +1675,13 @@ class Episode(ScipyenDataclass):
         In addition, the `description` attribute (a str) has an informative role
         without affecting the identity of an Episode
     """
+    name: str = dataclasses.field(default="episode")
     _: KW_ONLY
-    begin:datetime.datetime = datetime.datetime.now()
-    end:datetime.datetime = datetime.datetime.now()
+    begin:datetime.datetime = datetime.datetime.now() # noqa
+    end:datetime.datetime = datetime.datetime.now() # noqa
     beginFrame:int = 0
     nFrames:int = 0
-    # description:str = ""
-    procedure:typing.Optional[Procedure] = dataclasses.field(default_factory = Procedure)
+    procedure: Procedure = dataclasses.field(default_factory = Procedure)
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
@@ -2091,6 +2091,10 @@ class Schedule(ScipyenDataclass):
 
     def sort(self, *args, **kwargs):
         self.episodes.sort(*args, **kwargs)
+        self.__adjustBeginFrameAllEpisodes__()
+
+    def update(self):
+        r"""Call this after individual changes to an episode frame boundaries in this schedule"""
         self.__adjustBeginFrameAllEpisodes__()
 
     def extend(self, value):

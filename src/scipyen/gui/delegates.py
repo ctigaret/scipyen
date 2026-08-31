@@ -308,6 +308,7 @@ NOTE: To be used with Scipyen's custom itemmodels only
             else:
                 self._pendingChange_ = False
             self.show()
+            self.resize(-1, -1)
 
     def setValue(self, data: object):
         self._data_ = data
