@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -16,7 +15,7 @@ descriptor validators.
 # import pprint
 
 from abc import ABC, abstractmethod
-import importlib, inspect, pathlib, warnings, operator, functools # noqa
+import importlib, inspect, pathlib, warnings, operator, functools
 from importlib import abc as importlib_abc
 import pkgutil
 import enum, io, os, re, itertools, sys, time, traceback, types, typing # noqa
@@ -290,7 +289,8 @@ class DescriptorValidatorABC(ABC):
         # a) as the instance attribute 'preset_hook' of this descriptor
         # (initialized in the c'tor)
         if hasattr(self, "preset_hook"):
-            if isinstance(self.preset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(self.preset_hook, "__call__", None)):
+            # if isinstance(self.preset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(self.preset_hook, "__call__", None)):
+            if isinstance(self.preset_hook, (types.MethodType, types.FunctionType)) or callable(self.preset_hook):
                 # above checxk includes a generic way to check for a callable; AttributeAdapter is but one example
                 preset_func = self.preset_hook
 
@@ -303,7 +303,9 @@ class DescriptorValidatorABC(ABC):
         # NOTE: this is old code;
         elif hasattr(obj, "_preset_hooks_") and isinstance(obj._preset_hooks_, dict):
             obj_preset_hook = obj._preset_hooks_.get(self.public_name, None)
-            if isinstance(obj_preset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(obj_preset_hook, "__call__", None)):
+
+            # if isinstance(obj_preset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(obj_preset_hook, "__call__", None)):
+            if isinstance(obj_preset_hook, (types.MethodType, types.FunctionType)) or callable(obj_preset_hook):
                 preset_func = obj_preset_hook
 
         if preset_func is not None:
@@ -323,8 +325,10 @@ class DescriptorValidatorABC(ABC):
             # print(f"{self.__class__.__name__}<DescriptorValidatorABC> preset function for {self.public_name} in {type(obj).__name__}: {preset_func} with {len(args)} parameters")
             if len(args) == 1:
                 preset_func(obj)
+
             elif len(args) == 2:
                 preset_func(obj, value)
+
             else:
                 scipywarn(f"Ignoring the preset function {preset_func} for {self.public_name} attribute of {type(obj).__name__}, as it is expecting {len(args)} positional parameters")
 
@@ -342,18 +346,15 @@ class DescriptorValidatorABC(ABC):
         postset_func = None
 
         if hasattr(self, "postset_hook"):
-            if isinstance(self.postset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(self.postset_hook, "__call__", None)):
+            if isinstance(self.postset_hook, (types.MethodType, types.FunctionType)) or callable(self.postset_hook):
                 postset_func = self.postset_hook
 
         elif hasattr(obj, "_postset_hooks_") and isinstance(obj._postset_hooks_, dict):
             obj_postset_hook = obj._postset_hooks_.get(self.public_name, None)
-            if isinstance(obj_postset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(obj_postset_hook, "__call__", None)):
+            if isinstance(obj_postset_hook, (types.MethodType, types.FunctionType)) or callable(obj_postset_hook):
                 postset_func = obj_postset_hook
 
         if postset_func is not None:
-            # print(f"{print_styled(f'\n\twill call postset_hook {postset_func}', color='yellow')}")
-            # print(f"postset {postset_func} for {self.public_name}")
-
             if isinstance(postset_func, types.MethodType):
                 args = inspect.getfullargspec(postset_func).args[1:]
 
@@ -368,8 +369,10 @@ class DescriptorValidatorABC(ABC):
 
             elif len(args) == 1:
                 postset_func(obj)
+
             elif len(args) == 2:
                 postset_func(obj, value)
+
             else:
                 scipywarn(f"Ignoring the postset function {postset_func} for {self.public_name} attribute of {type(obj).__name__}, as it is expecting {len(args)} positional parameters")
 
@@ -398,14 +401,10 @@ class BaseDescriptorValidator(DescriptorValidatorABC):
     def __init__(
         self,
         name: str,
-        default: typing.Optional[typing.Any] = None,
+        default: object | None = None,
         use_private: bool = True,
-        preset_hook: typing.Optional[
-            typing.Union[collections.abc.Callable, types.MethodType, types.FunctionType]
-        ] = None,
-        postset_hook: typing.Optional[
-            typing.Union[collections.abc.Callable, types.MethodType, types.FunctionType]
-        ] = None,
+        preset_hook: collections.abc.Callable | types.MethodType | types.FunctionType | None = None,
+        postset_hook: collections.abc.Callable | types.MethodType | types.FunctionType | None = None,
     ):
         self.use_private = use_private
         self.public_name = name
@@ -494,7 +493,7 @@ class OneOf(BaseDescriptorValidator):
 
 class DescriptorTypeValidator(BaseDescriptorValidator):
     def __init__(self, name: str, /, *types):
-        self.types = set(t for t in types if isinstance(t, type))
+        self.types = {t for t in types if isinstance(t, type)}
 
     def validate(self, value):
         if not isinstance(value, tuple(self.types)):
@@ -504,6 +503,12 @@ class DescriptorTypeValidator(BaseDescriptorValidator):
 
 
 class DescriptorGenericValidator(BaseDescriptorValidator):
+    r"""Generic descriptor with validation for value type.
+
+.. caution ::
+    Buggy when used with types that do have a default constructor, as descriptor for a dataclass field
+
+"""
     def __init__(self, name: str, defval: typing.Any, /, *args, **kwargs):
         r"""Generic validator for descriptors
 
@@ -726,44 +731,49 @@ class DescriptorGenericValidator(BaseDescriptorValidator):
     def validate(self, value):
         r"""Validate `value` against the criteria set in __init__"""
 
-        # NOTE: 2024-08-01 10:46:58 Explannation of what is being done here
+        # NOTE: 2024-08-01 10:46:58 Explanation of what is being done here
         #
-        # 1) check if there are contraints on the range of acceptable object
+        # 1) check if there are constraints on the range of acceptable object
         #   types that the descriptor can accept (self.types); if there are,
         #   then check that the supplied value is of one of these types (or
         #   inherits from them)
         #
-        #    optionally, allow a None to be passed (is self.allow_none)
+        #    optionally, allow a None to be passed (if self.allow_none is True)
         #
         #    also, if the value to be validate is actually a `type`, then check
         #    if it inherits from any of the self.types
 
         value_type = type(value)
+        # print(f"{self.__class__.__name__}.validate({value})")
 
         if len(self.types):
             comparand = tuple(self.types)
+
             if self.allow_none:
                 comparand = comparand + (type(None),)
 
-            if isinstance(value, type):
-                if not issubclass(value, comparand):
-                    raise AttributeError(
-                        f"{self.__class__.__name__}: For {self.private_name} a subclass of: {comparand} was expected; got {value.__name__} instead"
-                    )
+            # print(f"\n\t{value} vs comparand {comparand} => {isinstance(value, comparand)}")
 
-            if not isinstance(value, comparand):
+            if isinstance(value, type) and not issubclass(value, comparand):
                 raise AttributeError(
-                    f"{self.__class__.__name__}: For descriptor '{self.public_name}' ('{self.private_name}') one of the types: {comparand} was expected; got {type(value).__name__} instead"
+                    f"{self.__class__.__name__}: For {self.private_name} a subclass of: {comparand} was expected; got {value.__name__} instead"
+                )
+
+            elif (
+                not isinstance(value, comparand)
+                or not any(isinstance(value, t) for t in comparand)
+                ):
+                raise AttributeError(
+                    f"{self.__class__.__name__}: For descriptor '{self.public_name}' ('{self.private_name}') value type is expected one of: {comparand} was expected; got {type(value)} instead"
                 )
 
         # NOTE: 2021-11-30 10:42:08
         # it makes sense to validate further, only when allow_none is False
-        if not self.allow_none:
-            if len(self.predicates):
-                if not functools.reduce(operator.and_, self.predicates, True):
-                    raise AttributeError(
-                        f"{self.__class__.__name__}: Unexpected value for {self.private_name}: {value}"
-                    )
+        if not self.allow_none and len(self.predicates):
+            if not functools.reduce(operator.and_, self.predicates, True):
+                raise AttributeError(
+                    f"{self.__class__.__name__}: Unexpected value for {self.private_name}: {value}"
+                )
 
             if len(self.dcriteria):
                 # check to see if type of value is a key in criteria

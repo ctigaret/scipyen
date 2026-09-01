@@ -191,12 +191,13 @@ class RecordingEpisode(Episode):
     _: KW_ONLY
     protocol: typing.Optional[ElectrophysiologyProtocol] = None
 
-    episodeType: DescriptorGenericValidator = DescriptorGenericValidator(
-            "episodeType", RecordingEpisodeType.Monitoring,
-            RecordingEpisodeType)
+    episodeType: DescriptorGenericValidator = DescriptorGenericValidator( # noqa
+        "episodeType", RecordingEpisodeType.Monitoring,
+        RecordingEpisodeType)
 
-    stimLayout: DescriptorGenericValidator = DescriptorGenericValidator(
-        "stimLayout", None, PathwaysStimulationLayout, allow_none=True)
+    stimLayout: PathwaysStimulationLayout | None = dataclasses.field(default = None)
+    # stimLayout: DescriptorGenericValidator = DescriptorGenericValidator( # noqa
+    #     "stimLayout", PathwaysStimulationLayout, PathwaysStimulationLayout, allow_none=True)
 
     # episodeType: RecordingEpisodeType = dataclasses.field(default = RecordingEpisodeType.Tracking)
 
@@ -1586,14 +1587,22 @@ class PathwaysStimulationLayout:
             self._source_ = RecordingSource(name, adc, dac, syn, electrodeMode = electrodeMode)
 
         else:
-            raise TypeError(f"'source' must be a Recording Source or a sequence of SynapticPathway objects; instead got {type(source).__name__}")
+            # self._source_ = None
+            # self._pathways_ = []
+            raise TypeError(f"'source' must be a RecordingSource or a sequence of SynapticPathway objects; instead got {type(source).__name__}")
 
-        assert isinstance(protocol, pab.ABFProtocol), f"'protocol' expected to be an ABFProtocol; instead got a  {type(protocol).__name__}"
+        assert isinstance(protocol, ElectrophysiologyProtocol), f"'protocol' expected to be an ABFProtocol; instead got a  {type(protocol).__name__}"
         self._protocol_ = protocol
-        self._layout_ = self._parseLayout_(temporalOrder)
 
         self.name = kwargs.pop("name", self.__class__.__name__)
         self.description = kwargs.pop("description", "")
+
+        self._layout_ = self._parseLayout_(temporalOrder)
+        # if isinstance(self._source_, RecordingSource) and isinstance(self._protocol_, ElectrophysiologyProtocol):
+        #     self._layout_ = self._parseLayout_(temporalOrder)
+        # else:
+        #     self._layout = {}
+
 
     def _parseLayout_(self, temporalOrder: bool = True) -> dict:
         stimulusLayout = dict()

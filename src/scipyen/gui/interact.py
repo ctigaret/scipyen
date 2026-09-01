@@ -166,11 +166,11 @@ def selectWSData(*args, title="", single=True, asDict=False,
 
     if ans == QtWidgets.QDialog.Accepted:
         if asDict:
-            return dict((i, ws[i]) for i in dialog.selectedItemsText)
+            return dict((i, ws[i]) for i in dialog.selectedItemsText) # noqa
 
         return tuple(ws[i] for i in dialog.selectedItemsText)
 
-    return dict() if asDict else tuple()
+    return dict() if asDict else tuple() # noqa
 
 
 def getInputs(**kwargs):
@@ -184,8 +184,14 @@ Typical use:
 """
     dlg_title = kwargs.pop("dlg_title", "Input Values")
     dlg_widget_orientation = kwargs.pop("dlg_widget_orientation", None)
+    modal = kwargs.pop("modal", False)
+
+    # NOTE: 2026-09-01 15:17:19
+    # needed in order to pass prompt kwargs separately
+
     kw = {"dlg_title": dlg_title,
-          "dlg_widget_orientation": dlg_widget_orientation}
+          "dlg_widget_orientation": dlg_widget_orientation,
+          "modal": modal}
 
     return getInput(kwargs, mapping=False, **kw)
 
@@ -251,8 +257,19 @@ dialog.
     from core import strutils as strutils
     dlg_title = kwargs.pop("dlg_title", "Input Values")
     dlg_widget_orientation = kwargs.pop("dlg_widget_orientation", None)
-
+    modal = kwargs.pop("modal", False)
     dlg = qd.QuickDialog(title=dlg_title)
+
+    if isinstance(modal, bool):
+        if modal is True:
+            dlg.setWindowModality(QtCore.Qt.WindowModal)
+
+        else:
+            dlg.setWindowModality(QtCore.Qt.NonModal)
+
+    elif isinstance(modal, QtCore.Qt.WindowModality):
+        dlg.setWindowModality(modal)
+
     if len(prompts) == 0 or not isinstance(prompts[0], dict):
         raise TypeError(f"'prompts' expected to be contain dict; got {prompts} instead")
 

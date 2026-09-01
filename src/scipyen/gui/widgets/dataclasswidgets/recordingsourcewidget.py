@@ -549,7 +549,8 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
 
         paths = interact.getInputs(path0=0, path1=1,
                                    dlg_title="Digital output channels for pathway stimulation",
-                                   dlg_widget_orientation=QtCore.Qt.Horizontal)
+                                   dlg_widget_orientation=QtCore.Qt.Horizontal,
+                                   modal=True)
         if paths is None:
             return
 
@@ -561,6 +562,7 @@ class RecordingSourceWidget(Ui_RecordingSourceWidget, DataClassWidget, QtWidgets
                                                  name=self._name_,
                                                  electrodeMode = self._electrode_)
         self.setValue(result)
+        self.sig_valueChanged.emit(self._data_)
 
     def setValue(self, val: T | None = None):
         # print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
