@@ -6212,8 +6212,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         ''' Collect file menu actions & submenus that are built in the UI file. This should be
             done before loading the plugins.
         '''
-        # self.ui = mainwindow_ui.Ui_MainWindow()
-        # self.ui.setupUi(self)
         self.setupUi(self)
         # NOTE: 2021-04-15 10:12:33 TODO
         # allow user to choose app style interactively --
@@ -6232,7 +6230,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.actionSet_user_plugins_directory.triggered.connect(self._slot_set_Users_Plugins_directory)
         self.actionFile_SystemIconSize.triggered.connect(self._slot_fileSystemIconSize)
         self.actionWorkspaceIconSize.triggered.connect(self._slot_workSpaceIconSize)
-        # self.actionConfigure_external_HDF_viewer.triggered.connect(self._slot_set_ExternalHDF5Viewer)
         self.actionAuto_launch_Script_Manager.toggled.connect(self._slot_set_scriptManagerAutoLaunch)
         self.actionAuto_delete_viewer.triggered.connect(self._slot_setAutoRemoveViewers)
 
@@ -6246,24 +6243,18 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         #
         # NOTE: 2024-09-21 14:55:07
         # menuScripts is now def'ed in the ui file
-        # self.menuScripts = QtWidgets.QMenu("Scripts", self)
-        # self.menubar.insertMenu(self.menuHelp.menuAction(), self.menuScripts)
-        # self.actionScriptRun = QAction(QtGui.QIcon.fromTheme("system-run"), "Run...", self)
         self.menuScripts.setIcon(guiutils.getIcon("automated-tasks"))
         self.actionScriptRun = QAction(guiutils.getIcon("system-run"), "Run...", self)
         self.actionScriptRun.triggered.connect(self.slot_runPythonScript)
         self.menuScripts.addAction(self.actionScriptRun)
-        # self.actionScriptToConsole = QAction(QtGui.QIcon.fromTheme("scriptnew", "dialog-scripts"), "To Console...", self)
         self.actionScriptToConsole = QAction(guiutils.getIcon("scriptnew", "dialog-scripts"), "To Console...", self)
         self.actionScriptToConsole.triggered.connect(self.slot_pastePythonScript)
         self.menuScripts.addAction(self.actionScriptToConsole)
         self.menuScripts.addSeparator()
         self.recentScriptsMenu = QtWidgets.QMenu("Recent Scripts", self)
-        # self.recentScriptsMenu.setIcon(QtGui.QIcon.fromTheme("document-open-recent"))
         self.recentScriptsMenu.setIcon(guiutils.getIcon("document-open-recent"))
         self.menuScripts.addMenu(self.recentScriptsMenu)
         self.menuScripts.addSeparator()
-        # self.actionManageScripts = QAction(QtGui.QIcon.fromTheme("scriptnew"), "Script Manager", self)
         self.actionManageScripts = QAction(guiutils.getIcon("scriptnew", "dialog-scripts"), "Script Manager", self)
         self.actionManageScripts.triggered.connect(self.slot_showScriptsManagerWindow)
         self.menuScripts.addAction(self.actionManageScripts)
@@ -6271,7 +6262,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         # ### END scripts menu
 
         # ### BEGIN Applications menu
-        # self.menuApplications = QtWidgets.QMenu("Applications", self) # NOTE: 2024-09-26 12:02:54 def'ed in the ui file
         self.menuApplications.setTearOffEnabled(True)
         self.menuApplications.setToolTipsVisible(True)
         self.menuApplications.setIcon(guiutils.getIcon("homerun", "window-list"))
@@ -6279,9 +6269,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         # ### END   Applications menu
 
         # ### BEGIN Help menu
-        # self.testPythonHelpAction = QAction(QtGui.QIcon.fromTheme("help-contextual"), "Python help", self)
-        # self.testPythonHelpAction.triggered.connect(self._slot_PythonHelp)
-        # self.menuHelp.addAction(self.testPythonHelpAction)
         self.actionPython_help.triggered.connect(self._slot_PythonHelp)
 
         self.whatsThisAction = QtWidgets.QWhatsThis.createAction(self)
@@ -6295,14 +6282,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         self.actionOpen_System_Terminal.triggered.connect(self.slot_openCurrentDirInSystemTerminal)
 
-        # self.actionConsole = QAction(QtGui.QIcon.fromTheme("scriptnew"), "Scipyen Console", self)
         self.actionConsole = QAction(guiutils.getIcon("scriptnew", "dialog-scripts"), "Scipyen Console", self)
 
         self.actionConsole.triggered.connect(self.slot_initQtConsole)
         self.menuConsoles.addAction(self.actionConsole)
 
         if not self._pyinstaller_bundled_:
-            # self.actionExternalIPython = QAction(QtGui.QIcon.fromTheme("scriptnew"), "External IPython", self)
             self.actionExternalIPython = QAction(guiutils.getIcon("scriptnew", "dialog-scripts"), "External IPython", self)
 
             self.actionExternalIPython.triggered.connect(self.slot_launchExternalIPython)
@@ -6311,20 +6296,17 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
             if has_neuron:
                 self.actionExternalNrnIPython = QAction(
-                    # QtGui.QIcon.fromTheme("scriptnew"), "External IPython for NEURON", self)
                     guiutils.getIcon("scriptnew", "dialog-scripts"), "External IPython for NEURON", self)
                 self.actionExternalNrnIPython.triggered.connect(
                     self.slot_launchExternalNeuronIPython)
                 self.menuConsoles.addAction(self.actionExternalNrnIPython)
 
             self.menuWith_Running_Kernel = QtWidgets.QMenu("With Running Kernel", self)
-            # self.menuWith_Running_Kernel.setIcon(QtGui.QIcon.fromTheme("run-build"))
             self.menuWith_Running_Kernel.setIcon(guiutils.getIcon("run-build"))
 
             self.menuConsoles.addMenu(self.menuWith_Running_Kernel)
 
             self.actionRunning_IPython = QAction(
-                # QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel ...", self)
                 guiutils.getIcon("scriptnew", "dialog-scripts"), "Choose kernel ...", self)
 
             self.actionRunning_IPython.triggered.connect(
@@ -6334,7 +6316,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
             if has_neuron:
                 self.actionRunning_IPython_for_Neuron = QAction(
-                    # QtGui.QIcon.fromTheme("scriptnew"), "Choose kernel and launch NEURON", self)
                     guiutils.getIcon("scriptnew", "dialog-scripts"), "Choose kernel and launch NEURON", self)
 
                 self.actionRunning_IPython_for_Neuron.triggered.connect(
@@ -6346,7 +6327,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             self.menuConsoles.addSeparator()
             self.menuConsoles.addAction(self.actionOpen_System_Terminal)
 
-        # self.actionRestore_Workspace.triggered.connect(self.slot_restoreWorkspace)
         self.actionHelp_On_Console.triggered.connect(self._slot_helpOnConsole_)
 
         self.actionOpen.triggered.connect(self.slot_openFiles)
@@ -6357,7 +6337,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.actionSave.triggered.connect(self.slot_saveFile)
         self.actionChange_Working_Directory.triggered.connect(self.slot_selectWorkDir)
         self.actionChange_Working_Directory.setIcon(guiutils.getIcon("document-open-folder"))
-        # self.actionSave_pickle.triggered.connect(self.slot_saveSelectedVariables)
 
         # NOTE: 2017-07-07 22:14:40
         # Shortcut to delete selected items in workspaceView
@@ -6370,19 +6349,12 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         # NOTE: File menu - some actions defined in mainwindow.ui
         self.actionImport_PrairieView_data.triggered.connect(self.slot_importPrairieView)
         self.recentFilesMenu = QtWidgets.QMenu("Open recent...", self)
-        # self.recentFilesMenu.setIcon(QtGui.QIcon.fromTheme("document-open-recent"))
         self.recentFilesMenu.setIcon(guiutils.getIcon("document-open-recent"))
-        # self.menuFile.insertMenu(self.actionOpen, self.recentFilesMenu)
         self.menuFile.insertMenu(self.menuImport.menuAction(), self.recentFilesMenu)
         self.menuImport.setIcon(guiutils.getIcon("document-import"))
-        # NOTE: 2025-01-24 22:22:20 switch to UrlNavigatorMenu
-        # self.recentDirectoriesMenu = QtWidgets.QMenu("Recent Working Directories", self)
         self.recentDirectoriesMenu = navigator.UrlNavigatorMenu("Recent Working Directories", self)
         self.recentDirectoriesMenu.mouseButtonClicked.connect(self.slot_recentDirActivated)
-        # self.recentDirectoriesMenu.setLayoutDirection(QtCore.Qt.LeftToRight)
-        # self.recentDirectoriesMenu.setIcon(QtGui.QIcon.fromTheme("folder-open-recent"))
         self.recentDirectoriesMenu.setIcon(guiutils.getIcon("folder-open-recent"))
-        # self.recentDirectoriesMenu.sig_closed.connect(self._slot_recenDirsMenuClosed)
 
         self.menuFile.insertMenu(self.actionReload_Plugins, self.recentDirectoriesMenu)
         self.menuFile.insertSeparator(self.actionReload_Plugins)
@@ -6393,9 +6365,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.actionAbout_Components.triggered.connect(self._slot_aboutComponents)
         self.actionAbout_Qt.triggered.connect(self._slot_about_qt)
         self.actionLicense.triggered.connect(self._slot_showAboutScipyen)
-
-        # # NOTE: 2016-05-02 12:22:21 -- refactoring plugin codes
-        # self.startPluginLoad.connect(self.slot_loadPlugins)
 
         self.sig_refreshRecentFilesMenu.connect(self._slot_refreshRecentFilesMenu_)
 
@@ -6545,7 +6514,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         # ### BEGIN
         # NOTE: 2025-06-24 22:03:52
-        # Next two lines henceforth called AFTER workspaceModel initialization, which is AFTER
+        # Next two lines are called AFTER workspaceModel initialization, which is AFTER
         # self._init_QtConsole_, which now is AFTER self._configureUI_()
         # furthermore, workspaceView.selectionModel() REQUIRES the presence of a
         # item model for the workspaceView
@@ -6573,10 +6542,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         # TODO 2024-07-21 23:30:05
         # make this configurable (and locale-dependent?)
         self.workspaceView.horizontalHeader().setDefaultAlignment(QtCore.Qt.AlignLeft)
-
-        # NOTE: 2025-06-24 22:09:00 see NOTE: 2025-06-24 22:03:52
-        # self.workspaceModel.itemChanged.connect(self.slot_variableItemNameChanged)
-        # self.workspaceModel.modelContentsChanged.connect(self.slot_updateWorkspaceView)
 
         self.copyVarnameToolBtn.clicked.connect(self.slot_copyWorkspaceSelection)
         self.sendVarnameToConsoleToolBtn.clicked.connect(self.slot_pasteWorkspaceSelection)
@@ -8192,10 +8157,13 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     @Slot(QtCore.QItemSelection, QtCore.QItemSelection)
     def slot_fileSystemColumnViewSelectionChanged(self, selected: QtCore.QItemSelection,
                                                   deselected: QtCore.QItemSelection):
+        # print(f"{self.__class__.__name__}.slot_fileSystemColumnViewSelectionChanged")
         indexes = selected.indexes()
+        desel = deselected.indexes()
+        # print(f"\n\tselected -> {len(indexes)}")
+        # print(f"\n\tdeselected -> {len(desel)}")
         if len(indexes) == 1:
             self._fileSystemColumnViewPopulatePreview(indexes[0])
-        # else:
 
 
     def _fileSystemColumnViewPopulatePreview(self, index: QtCore.QModelIndex):
@@ -10598,7 +10566,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             # will raise exception if varname not in workspace
             self.console.execute(varname)
 
-    # @Slot(QtCore.QModelIndex, QtCore.QModelIndex, "QVector<int>")
     @Slot()
     def slot_fileSystemDataChanged(self, *args, **kwargs): # TODO 2023-09-27 22:43:52 revisit this
         # print(f"{self.__class__.__name__}.slot_fileSystemDataChanged args {args} kwargs {kwargs}" )
