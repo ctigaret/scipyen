@@ -522,11 +522,13 @@ A lot of things copied from there, EXCEPT that it now uses
 
         else:
             # print(f"\n\nsame data -> objName = {objName}; top title = {self._top_title_}")
-            if isinstance(objName, str) and len(objName.strip()):
-                if self._top_title_ != objName:
-                    self._top_title_ = objName
-                    self.treeView.setRootName(self._top_title_)
-
+            if (
+                isinstance(objName, str)
+                and len(objName.strip())
+                and self._top_title_ != objName
+                ):
+                self._top_title_ = objName
+                self.treeView.setRootName(self._top_title_)
 
     def _populateTreeView_(self):
         if len(self._obj_cache_):

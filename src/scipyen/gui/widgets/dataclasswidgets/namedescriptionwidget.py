@@ -1,20 +1,12 @@
-# -*- coding: utf-8 -*-
 # $Id: namedescriptionwidget.py $
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@proton.me>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-r"""
+r"""Dataclass widget for access fields common to ScipyenDataclass objects
 """
 
 import sys, os, typing, types, warnings, math, cmath, datetime # noqa
-# import numbers
-# import numpy as np
-# import quantities as pq
-# import pandas as pd
-# import neo
-# from tribool import Tribool
-
 import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot) #, Property,)
@@ -299,7 +291,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
     @Slot()
     def _slot_loadData(self):
         fileNameFilter = "*.pkl"
-        fn, fl = self.chooseFile(caption = "Open Pickle File",
+        fn, _ = self.chooseFile(caption = "Open Pickle File",
                                 fileFilter = fileNameFilter,
                                 single=True)
 
@@ -316,7 +308,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
 
         fileNameFilter = "*.pkl"
 
-        fn, fl = self.chooseFile(caption = f"Save {type(self._data_).__name__} as Pickle File",
+        fn, _ = self.chooseFile(caption = f"Save {type(self._data_).__name__} as Pickle File",
                                 fileFilter = fileNameFilter,
                                 single=True, save=True)
 
@@ -343,7 +335,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
                 )
 
         if isinstance(ret, dict) and len(ret) == 1:
-            varName = list(ret.keys())[0]
+            varName = list(ret.keys())[0] # noqa # ruff says [ruff] (RUF015) Prefer `next(iter(ret.keys()))` over single element slice
             self._data_ = ret[varName]
             self._updateSymbol_(varName)
             self.sig_valueChanged.emit(self._data_)

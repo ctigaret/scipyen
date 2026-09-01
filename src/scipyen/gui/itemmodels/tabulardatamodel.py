@@ -87,7 +87,9 @@ from ephys import (ephys, ephys_pathways, ephys_protocol) # noqa
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
-from gui.delegates import PythonItemDelegate # noqa
+# from gui.delegates import PythonItemDelegate
+from gui import guiutils
+
 from gui.itemmodels.roles import *
 #### END pict.gui modules
 
@@ -511,7 +513,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         ephys_pathways.SynapticStimulusChannelList,
         ephys_pathways.RecordingSchedule,
         TriggerProtocolList
-        ], # noqa
+        ],
         row: int,
         obj: typing.Optional[ephys_pathways.SynapticPathway] = None) -> bool:
 
@@ -573,8 +575,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     @_insertDataRow_.register(list)
     @_insertDataRow_.register(deque)
-    def __insertDataRow__(self, mdata: typing.Sequence, # noqa
-                       row: int, # noqa
+    def __insertDataRow__(self, mdata: (list, deque), # noqa
+                       row: int,
                        obj: typing.Optional[object] = None) -> bool:
         if len(mdata):
             if all(isinstance(o, ephys_pathways.RecordingSource) for o in mdata):
@@ -596,7 +598,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     return False
 
             else:
-                if all(
+                if (all(
                     isinstance(d,
                                     (int, float, str, bool,
                                     np.integer, np.floating, np.complexfloating,
@@ -604,12 +606,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                     pq.Quantity)
                                 )
                     for d in mdata
-                    ):
-                    if not isinstance(obj, ((int, float, str, bool,
+                    )
+                    and not isinstance(obj, ((int, float, str, bool,
                                     np.integer, np.floating, np.complexfloating,
                                     np.character, np.bool,
-                                    pq.Quantity, types.NoneType))):
-                        return False
+                                    pq.Quantity, types.NoneType)))):
+                    return False
 
         else:
             return False
@@ -1072,7 +1074,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             else:
                 return qVariant()
 
-        except (IndexError, ):
+        except IndexError:
             return qVariant()
 
     @singledispatchmethod
@@ -1176,9 +1178,15 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         obj_type_name = qVariant(type(obj).__name__)
 
         if isinstance(obj, (ephys_protocol.ElectrophysiologyProtocol,
-                            sdc.Procedure)):
+                            sdc.Procedure,
+                            ephys_pathways.PathwaysStimulationLayout)):
+        # if isinstance(obj, (ephys_protocol.ElectrophysiologyProtocol,
+        #                     sdc.Procedure,
+        #                     )
+        #             ):
             ret = qVariant(obj)
             obj_disp = qVariant(getattr(obj, "name", obj_type_name))
+            # obj_disp = qVariant(getattr(obj, "name", guiutils.getIcon("view-list-tree")))
 
         elif obj is dataclasses.MISSING:
             ret = qVariant()

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # $Id: delegates.py $
 # SPDX-FileCopyrightText: 2025 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -38,7 +37,7 @@ else:
         __has_PyQt6__ = True
 
     from qtpy import sip # noqa
-    # from qtpy.uic import loadUiType # noqa
+    # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -52,22 +51,22 @@ try:
 except: # noqa
     __has_qtdbus__ = False
 
-from core import datatypes
+# from core import datatypes
 from core.datatypes import (is_namedtuple, TypeEnum) # noqa
 from core.prog import (safewrapper, safeguiwrapper, scipywarn, print_styled) # noqa
 from core.sysutils import adapt_ui_path # noqa
-from core import strutils as strutils
+# from core import strutils
 from core import scipyendataclasses as sdc
 
 # from core import scipyen_quantities as scq
+from gui import guiutils
+from gui.itemmodels.roles import *
 from gui.widgets import small_widgets as smw
 from gui.widgets import neo_widgets as neow
 from gui.widgets import inlinefiledirchooser as ifdc
 # from gui import quickdialog as qd
 # from core import typeenum
-from gui.itemmodels.roles import * # noqa
-from gui import guiutils
-from ephys import (ephys, ephys_pathways, ephys_protocol)
+from ephys import (ephys_pathways, ephys_protocol)
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
@@ -243,8 +242,9 @@ NOTE: To be used with Scipyen's custom itemmodels only
     @_makeWidget_.register(ephys_protocol.ElectrophysiologyProtocol)
     @_makeWidget_.register(ephys_pathways.PathwaysStimulationLayout)
     def __makeWidget__(self, obj: ephys_protocol.ElectrophysiologyProtocol | ephys_pathways.PathwaysStimulationLayout, name: str) -> QtWidgets.QWidget | None: # noqa
-        from gui.widgets import datatreeviewer
-        widget = datatreeviewer.DataTreeView(data=obj, parent=self)
+        from gui.widgets import datatreeview
+        widget = datatreeview.DataTreeView(parent=self)
+        widget.setData(obj)
         widget.setObjectName(f"{name}_Widget")
         return widget
 
@@ -462,13 +462,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             return False
 
         checkSubKeys = lambda v: all(k in ("editable", "choices") for k in v.keys()) # noqa
-        checkChoices = lambda v: isinstance(v["choices"], typing.Sequence) and len(v["choices"]) > 0 and all(isinstance(o, str) for o in v["choices"]) # noqa
-        checkEditable= lambda v: isinstance(v["editable"], bool) # noqa
+        checkChoices = lambda v: isinstance(v["choices"], typing.Sequence) and len(v["choices"]) > 0 and all(isinstance(o, str) for o in v["choices"])
+        checkEditable= lambda v: isinstance(v["editable"], bool)
 
-        if not all(isinstance(v, dict) and checkSubKeys(v) and checkChoices(v) and checkEditable(v) for v in values):
-            return False
-
-        return True
+        return not all(isinstance(v, dict) and checkSubKeys(v) and checkChoices(v) and checkEditable(v) for v in values)
 
     # @property
     # def immutability(self) -> dict:
@@ -598,14 +595,15 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             if not isinstance(col, int) or col < 0:
                 scipywarn(f"{self.__class__.__name__}.setChoicesForColumn: incorrect column specification: col = {col}")
                 return
+
             if isinstance(choiceData, dict):
                 # may be a choices subdictionary
-                if all(k in ("choices", "editable") for k in choiceData.keys()) and isinstance(choiceData["choices"], typing.Sequence) and len(choiceData["choices"]) > 0 and all(isinstance(o, str) for o in choiceData["choices"]) and isinstance(choiceData["editable"], bool):
+                if all(k in ("choices", "editable") for k in choiceData) and isinstance(choiceData["choices"], typing.Sequence) and len(choiceData["choices"]) > 0 and all(isinstance(o, str) for o in choiceData["choices"]) and isinstance(choiceData["editable"], bool):
                     self._columnChoices_[col] = choiceData
 
-                elif len(choiceData) == 0: # empty dict -> wipe out the choices for a specific column
-                    if col in self._columnChoices_:
-                        self._columnChoices_.pop(col)
+                elif len(choiceData) == 0 and col in self._columnChoices_:
+                    # empty dict -> wipe out the choices for a specific column
+                    self._columnChoices_.pop(col)
 
             elif isinstance(choiceData, typing.Sequence): # create or remove choices for a column
                 if len(choiceData) == 0: # also wipes out the choices for specified column
@@ -648,7 +646,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                                                      TypeEnum,
                                                      str]
                                                     ],
-                                    typing.Dict]
+                                    dict]
                                 ] = None,
         inModel: bool=True,
         parent: typing.Optional[QtWidgets.QWidget] = None
@@ -717,7 +715,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 or (
                     isinstance(choices, dict)
                     and len(choices) > 0
-                    and all(isinstance(k, str) for k in choices.keys())
+                    and all(isinstance(k, str) for k in choices)
                     )
                 ):
                 if isinstance(choices, dict):
@@ -1229,10 +1227,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         # disp = index.data(QtCore.Qt.DisplayRole)
         # CAUTION: Standard item model and standard items treat DisplayRole and
         # DisplayRole as being the same; in such case I need a custom role
-        dataChoices = index.data(DataChoicesRole) # noqa
+        dataChoices = index.data(DataChoicesRole)
 
         if isinstance(data, enum.Enum) and dataChoices is None:
-            dataChoices = dict(map(lambda x: (x.name, x.value), type(data)))
+            dataChoices = dict(map(lambda x: (x.name, x.value), type(data))) # noqa
 
         # NOTE: 2025-09-27 11:06:52
         # some models may be able to prevent editing indexes with certain rows
@@ -1265,32 +1263,37 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     # print(f"\t-> immutable row")
                     return
 
-        if hasattr(model, "_useExternalDataEditor_") and hasattr(model, "_modelDataColumnHeaders_"):
-            if model._useExternalDataEditor_ is True:
-                if model._modelDataColumnHeaders_[index.column()] == "Edit":
-                    widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "", parent)
-                    if hasattr(widget, "setFrame"):
-                        widget.setFrame(False)
-                        widget.setToolTip("Click to edit the object represented in this row")
+        if (
+            hasattr(model, "_useExternalDataEditor_")
+            and hasattr(model, "_modelDataColumnHeaders_")
+            and model._useExternalDataEditor_ is True
+            ):
+            if model._modelDataColumnHeaders_[index.column()] == "Edit":
+                widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "", parent)
 
-                    widget.setAutoFillBackground(True)
-                    widget.setObjectName(f"{type(widget).__name__}_LaunchExternalEdit_delegate")
-                    widget.clicked.connect(self._slot_editDataExternally)
-                    return widget
+                if hasattr(widget, "setFrame"):
+                    widget.setFrame(False)
+                    widget.setToolTip("Click to edit the object represented in this row")
 
-                elif isinstance(data, (ephys_protocol.ElectrophysiologyProtocol,
-                                        sdc.Procedure,
-                                        ephys_pathways.PathwaysStimulationLayout)):
-                    # for these types call the external editor!
-                    widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "", parent)
-                    if hasattr(widget, "setFrame"):
-                        widget.setFrame(False)
-                        widget.setToolTip("Click to edit or view the object represented in this cell")
+                widget.setAutoFillBackground(True)
+                widget.setObjectName(f"{type(widget).__name__}_LaunchExternalEdit_delegate")
+                widget.clicked.connect(self._slot_editDataExternally)
 
-                    widget.setAutoFillBackground(True)
-                    widget.setObjectName(f"{type(widget).__name__}_LaunchExternal{type(data).__name__}Edit_delegate")
-                    widget.clicked.connect(self._slot_editDataAttributeExternally)
-                    return widget
+                return widget
+
+            elif isinstance(data, (ephys_protocol.ElectrophysiologyProtocol,
+                                    sdc.Procedure,
+                                    ephys_pathways.PathwaysStimulationLayout)):
+                # for these types call the external editor!
+                widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "", parent)
+                if hasattr(widget, "setFrame"):
+                    widget.setFrame(False)
+                    widget.setToolTip("Click to edit or view the object represented in this cell")
+
+                widget.setAutoFillBackground(True)
+                widget.setObjectName(f"{type(widget).__name__}_LaunchExternal{type(data).__name__}Edit_delegate")
+                widget.clicked.connect(self._slot_editDataAttributeExternally)
+                return widget
 
         choices = list()
 

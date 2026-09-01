@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # $Id: datatreeeditor.py $
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -7,7 +6,7 @@
 r"""
 New data viewer widget, based on datatreemodel
 """
-from __future__ import print_function
+# from __future__ import print_function
 
 import os, sys
 # import warnings
