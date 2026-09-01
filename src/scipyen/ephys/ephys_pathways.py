@@ -36,7 +36,7 @@ from dataclasses import (dataclass, MISSING, KW_ONLY) # noqa
 #     raise
 import numpy as np
 import quantities as pq # noqa
-# import matplotlib as mpl
+import matplotlib as mpl
 from matplotlib import pyplot as plt
 import neo
 from neo.core.objectlist import ObjectList as NeoObjectList
@@ -99,7 +99,7 @@ from core import utilities # noqa
 from core import neoutils
 from core import strutils
 from core import curvefitting as crvf # noqa
-from core import models
+from core import models # noqa
 
 from core.utilities import (reverse_mapping_lookup, # noqa
                             get_index_for_seq,
@@ -1341,7 +1341,71 @@ class PathwaysCrossTalk(ScipyenDataclass):
 
 @dataclass
 class SweepPathCommands(ScipyenDataclass):
-    r"""Encapsulates the DAC and DIG commands sent to the pathway during a given sweep.
+    r"""Encapsulates the DAC and DIG commands sent to the pathway during a given
+    sweep.
+
+    DAC commands:
+    =============
+
+    These are digital-to-anlog signals sent to the amplifier as "command" signals
+    in voltage- or current-clamp.
+
+    In the pClamp software, these commands are configured and sent to the pathway
+    during specific sweep recording subintervals known as "Epochs", and represented
+    in Scipyen as AbfEpoch objects.
+
+
+
+    DIG commands:
+    =============
+    The commands sent via digital channels (DIG) are TTL signals that trigger
+    external devices, such as stimulus isolation boxes, image acquisition or
+    photostimulation devices, etc.
+
+    TTL triggers:
+    =============
+    Theoretically there are two ways to send TTL triggers:
+
+    1. via DIG channels (see above)
+
+    2. via analog waveforms through a DAC channel *NOT* used as voltage- or
+    current-clamp command channel.
+
+        These pulses are typically short (~ 1 ms) boxcar waveforms of ±5V
+    amplitude, with their polarity depending on what the triggered device expects.
+
+    Scipyen represents TTL triggers as TriggerEvent objects that inherit from
+    the neo.Event clss and are uniquely defined by the following attributes:
+
+    * ``times``: a Quantity array of time stamps of the actual triggers, acommodating
+        a single TTL 'pulse', or a train of TTL signals ('TTL train')
+
+    * ``name``: the name of the TriggerEvent object
+
+    * ``labels``: the label associated with each element in the ``times`` array
+
+    * ``type``: a TriggerEventType enum value indicating the semantic role of the
+        trigger:
+
+        * undefined
+
+        * presynaptic
+
+        * postsynaptic
+
+        * photostimulation
+
+        * imaging_frame
+
+        * imaging_line
+
+        * sweep
+
+        * user
+
+    In the context of a "synaptic pathway", the trigger events used for synaptic
+    stimulation should have 'presynaptic' ``type``.
+
     """
     pathway: SynapticPathway = dataclasses.field(default_factory=SynapticPathway)
     abfEpochs: dict = dataclasses.field(default_factory = dict)
@@ -1884,7 +1948,7 @@ class PathwaysStimulationLayout:
         r"""Alias ot self.sweeps"""
         return self.sweeps
 
-    def traces(self):
+    def triggerTraces(self):
         nPaths = len(self.pathways)
 
         δy = 1/nPaths
@@ -1919,12 +1983,18 @@ class PathwaysStimulationLayout:
 
         return traces
 
-    def plot_traces(self):
-        traces = self.traces()
-        fig = plt.figure()
+    def plotTriggerTraces(self, fig: mpl.figure.Figure | None = None, show: bool=False) -> mpl.figure.Figure:
+        traces = self.triggerTraces()
+        if not isinstance(fig, mpl.figure.Figure):
+            if show:
+                fig = plt.Figure()
+                ax = plt.gca()
+            else:
+                fig = mpl.figure.Figure()
+                ax = fig.subplots()
         fig.set_size_inches(4,2.5)
         fig.set_layout_engine("constrained", w_pad=0.1)
-        ax = plt.gca()
+
         for trace in traces:
             ax.plot(trace.times, trace, label=trace.name)
 
@@ -1934,11 +2004,11 @@ class PathwaysStimulationLayout:
         ax.spines["left"].set_visible(False)
         ax.xaxis.set_ticks([])
         ax.yaxis.set_ticks([])
-        plt.legend()
+        ax.legend()
 
         return fig
 
-    def ascii_traces(self):
+    def asciiTriggerTraces(self):
         print("\n")
         for k, p in enumerate(self.pathways):
             pSweeps = self.getSweepsForPathway(p)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # $Id: tabulardatamodel.py $
 # SPDX-FileCopyrightText: 2023 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -9,7 +8,7 @@ r"""Table model, for tabular-like data
 
 
 #### BEGIN core python modules
-from __future__ import print_function
+# from __future__ import print_function
 
 import os, inspect, warnings, traceback, datetime, typing, types, numbers, enum # noqa
 from functools import (singledispatch, singledispatchmethod) # noqa
@@ -26,8 +25,8 @@ __has_PyQt6__ = False
 # __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    # import PySide6 # noqa
-    # from PySide6 import Shiboken # noqa
+    # import PySide6
+    # from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
     # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -37,8 +36,8 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    # from qtpy import sip # noqa
-    # from qtpy.uic import loadUiType # noqa
+    # from qtpy import sip
+    # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -64,18 +63,18 @@ import matplotlib.mlab as mlb # noqa
 #### BEGIN pict.core modules
 #from core.patchneo import *
 from core import datatypes
-import core.datatypes as dt
-from core import utilities
+import core.datatypes as dt # noqa
+from core import utilities # noqa
 from core.utilities import repr_val
 import core.strutils as strutils # noqa
 from core.strutils import str2float # noqa
 from core.prog import (safewrapper, scipywarn, unwind_type)
 from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType) # noqa
-from core.marktrain import MarkTrain
-from core.triggerprotocols import (TriggerProtocol, TriggerProtocolList) # noqa
+from core.marktrain import MarkTrain # noqa
+from core.triggerprotocols import (TriggerProtocol, TriggerProtocolList)
 from core.datazone import DataZone
 import core.datasignal # noqa
-from core.datasignal import (DataSignal, IrregularlySampledDataSignal,) # noqa
+from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
 from core.datatypes import array_slice # noqa
 from core.sysutils import adapt_ui_path # noqa
 from core import scipyen_quantities as scq
@@ -83,13 +82,13 @@ from core import scipyendataclasses as sdc
 from core import neoutils # noqa
 from core.qtutils import (qVariant, QVariantType)
 
-from ephys import (ephys, ephys_pathways, ephys_protocol)
+from ephys import (ephys, ephys_pathways, ephys_protocol) # noqa
 
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
 from gui.delegates import PythonItemDelegate # noqa
-from gui.itemmodels.roles import * # noqa
+from gui.itemmodels.roles import *
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules
@@ -183,7 +182,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     sig_indexRowColChanged = Signal(int, int, name="sig_indexRowColChanged")
 
     def __init__(self, data=None, parent=None):
-        super(TabularDataModel, self).__init__(parent=parent)
+        super(TabularDataModel, self).__init__(parent=parent) # noqa
 
         self._decimals_ = None
 
@@ -293,25 +292,25 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         return self._getHeaderData_(section, orientation, role)
 
-    def rowCount(self, parentIndex:QtCore.QModelIndex = QtCore.QModelIndex()):
+    def rowCount(self, parentIndex: QtCore.QModelIndex | None = None):
         r"""Number of rows the model currently handles.
         This may be less than the notional "rows" in the data
         """
+        if not isinstance(parentIndex, QtCore.QModelIndex):
+            parentIndex = QtCore.QModelIndex()
         nRows = min(self._displayedRows_, self._modelDataRows_)
-        # nRows = (self._displayedRows_ if self._displayedRows_ <= self._modelDataRows_
-        #          else self._modelDataRows_)
-        # return 0 if parentIndex.isValid() else nRows
         return nRows
-        # return 0 if parentIndex.isValid() else self._displayedRows_
 
-    def columnCount(self, parentIndex:QtCore.QModelIndex = QtCore.QModelIndex()):
+    def columnCount(self, parentIndex: QtCore.QModelIndex | None = None):
+        if not isinstance(parentIndex, QtCore.QModelIndex):
+            parentIndex = QtCore.QModelIndex()
         nCols = (self._displayedColumns_ if self._displayedColumns_ <= self._modelDataRows_
                  else self._modelDataColumns_)
         return 0 if parentIndex.isValid() else nCols
 
     #### BEGIN editable items
     #
-    def flags(self, modelIndex:QtCore.QModelIndex):
+    def flags(self, modelIndex: QtCore.QModelIndex):
         if not modelIndex.isValid():
             return QtCore.Qt.ItemIsEnabled
 
@@ -361,16 +360,12 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     #### BEGIN resizable model
     #
 
-    def insertRow(self, row: int, index: QtCore.QModelIndex = QtCore.QModelIndex()) -> bool:
+    def insertRow(self, row: int, index: QtCore.QModelIndex | None = None) -> bool:
         r"""Overrrides QAbstractItemModel.insertRow"""
-        # print(f"{self.__class__.__name__}.insertRow(row={row}, index={(index.row(), index.column())})")
+        if not isinstance(index, QtCore.QModelIndex):
+            index = QtCore.QModelIndex()
         last = row+1
-        # if row == self._modelDataRows_:
-        #     first = row-1
-        # else:
-        #     first = row
         first = row
-        # print(f"\n\t calling beginInsertRows({first}, {last})")
 
         self.beginInsertRows(index, first, last)
         ret = False
@@ -385,13 +380,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         return ret
 
 
-    def insertModelRow(self, row: int, row_value: object, parent: QtCore.QModelIndex = QtCore.QModelIndex()) -> bool:
+    def insertModelRow(self, row: int, row_value: object, parent: QtCore.QModelIndex | None = None) -> bool:
         # print(f"{self.__class__.__name__}.insertModelRow: row {row}, value {row_value}, parent {parent}")
+        if not isinstance(parent, QtCore.QModelIndex):
+            parent = QtCore.QModelIndex()
 
         if not datatypes.is_iterable(self._modelData_):
             return False
 
-        # print(f"\n\tmodel data has {len(self._modelData_)} row(s)")
         if row < 0 or row > len(self._modelData_):
             return False
 
@@ -1125,12 +1121,8 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         if attributeName.lower() != "edit":
             return getattr(obj, attributeName)
-            # ret_type = type(val).__name__
-            # disp = repr_val(val, self.decimals)
-            # ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) ret_type if role is Qtcore.Qt.ToolTipRole else disp # noqa
-            # return qVariant(ret)
+
         else:
-            # return ExternallyEditableType(obj = obj)
             return dataclasses.MISSING
 
     @_modelDataGetter_.register(sdc.Schedule)
@@ -1208,7 +1200,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     """
         try:
-            if role not in (ObjectDataRole, QtCore.Qt.DisplayRole, # noqa
+            if role not in (ObjectDataRole, QtCore.Qt.DisplayRole,
                             QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole,
                             QtCore.Qt.AccessibleTextRole):
                 return qVariant()
@@ -1217,7 +1209,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
             return self._getVariantForData_(ret, role)
 
-        except (IndexError,):
+        except IndexError:
             return qVariant()
 
     def _setDataValue_(self, value, row, col):
@@ -1334,7 +1326,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 map( # noqa
                     lambda x: (x[0], f"{x[1]}"),
                     enumerate(("name", "begin", "end", "beginFrame", "nFrames",
-                               "procedure", "protocol","episodeType", "stimLayout",
+                               "procedure", "protocol", "episodeType", "stimLayout",
                                "Edit"))
                     )
                 )
@@ -1372,7 +1364,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._canAddRemoveRows_ = True
         self._canAddRemoveColumns_ = False
 
-        names = list(map(lambda f: f.name, dataclasses.fields(ephys_pathways.SynapticPathway))) + ["Edit"]
+        #names = list(map(lambda f: f.name, dataclasses.fields(ephys_pathways.SynapticPathway))) + ["Edit"]
 
         # NOTE: 2026-06-07 21:38:40 see NOTE: 2026-06-07 21:36:23
         self._modelDataColumnHeaders_ = dict(
@@ -1490,14 +1482,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     if len(data.array_annotations):
                         if "channel_names" in data.array_annotations:
                             channel_names = list( # noqa
-                                map( # noqa
+                                map(
                                     lambda n: f"{n}",
                                     data.array_annotations["channel_names"]
                                     )
                                 )
                         elif "channel_ids" in data.array_annotations:
                             channel_names = list( # noqa
-                                map( # noqa
+                                map(
                                     lambda i: f"{i}",
                                     data.array_annotations["channel_ids"]
                                     )
@@ -1585,11 +1577,9 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         headers = [domain_name, ] + channel_names
 
                     self._modelDataColumnHeaders_ = dict(
-                            (
-                                tuple(map(lambda x: (x[0]+1, x),
-                                            enumerate(headers))
-                                    )
-                            )
+                            tuple(map(lambda x: (x[0]+1, x),
+                                        enumerate(headers))
+                                )
                         )
 
                     self._modelDataRowIndexName_ = domain_name

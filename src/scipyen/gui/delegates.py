@@ -241,7 +241,8 @@ NOTE: To be used with Scipyen's custom itemmodels only
         return widget
 
     @_makeWidget_.register(ephys_protocol.ElectrophysiologyProtocol)
-    def __makeWidget__(self, obj: ephys_protocol.ElectrophysiologyProtocol, name: str) -> QtWidgets.QWidget | None: # noqa
+    @_makeWidget_.register(ephys_pathways.PathwaysStimulationLayout)
+    def __makeWidget__(self, obj: ephys_protocol.ElectrophysiologyProtocol | ephys_pathways.PathwaysStimulationLayout, name: str) -> QtWidgets.QWidget | None: # noqa
         from gui.widgets import datatreeviewer
         widget = datatreeviewer.DataTreeView(data=obj, parent=self)
         widget.setObjectName(f"{name}_Widget")
@@ -1278,12 +1279,13 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     return widget
 
                 elif isinstance(data, (ephys_protocol.ElectrophysiologyProtocol,
-                                    sdc.Procedure)):
+                                        sdc.Procedure,
+                                        ephys_pathways.PathwaysStimulationLayout)):
                     # for these types call the external editor!
                     widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "", parent)
                     if hasattr(widget, "setFrame"):
                         widget.setFrame(False)
-                        widget.setToolTip("Click to edit the object represented in this row")
+                        widget.setToolTip("Click to edit or view the object represented in this cell")
 
                     widget.setAutoFillBackground(True)
                     widget.setObjectName(f"{type(widget).__name__}_LaunchExternal{type(data).__name__}Edit_delegate")

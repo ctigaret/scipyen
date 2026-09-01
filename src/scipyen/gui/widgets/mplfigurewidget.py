@@ -42,6 +42,7 @@ from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as Navigation
 from matplotlib.backends.qt_compat import QtWidgets
 from matplotlib.figure import Figure
 
+from core import desktoputils
 from core.prog import (scipywarn, timefunc, timemethod)
 
 class MplFigureWidget(QtWidgets.QWidget):
@@ -49,7 +50,8 @@ class MplFigureWidget(QtWidgets.QWidget):
         super().__init__(parent=parent)
         layout = QtWidgets.QGridLayout(self)
         layout.setContentsMargins(0,0,0,0)
-        self._canvas_ = FigureCanvas(Figure())
+        self._fig_ = Figure()
+        self._canvas_ = FigureCanvas(self._fig_)
 
         layout.addWidget(NavigationToolbar(self._canvas_, self))
         layout.addWidget(self._canvas_)
@@ -58,7 +60,7 @@ class MplFigureWidget(QtWidgets.QWidget):
 
     @property
     def figure(self):
-        return self._canvas_.figure
+        return self._canvas_.figure # same as self._fig_, no !?
 
     @property
     def canvas(self):
@@ -104,6 +106,14 @@ class MplFigureWidget(QtWidgets.QWidget):
         if len(self.figure.legends):
             self.clearLegend()
         self.canvas.draw_idle()
+
+    # def resizeEvent(self, evt):
+    #     size = evt.size()
+    #     w,h = desktoputils.sizeToInches(size.width(), size.height())
+    #     self.figure.set_size_inches(w,h)
+    #     super().resizeEvent(evt)
+    #     evt.accept()
+
 
 
 
