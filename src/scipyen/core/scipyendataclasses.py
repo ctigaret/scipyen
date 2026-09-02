@@ -67,7 +67,7 @@ class DoseDescriptor:
             return #self._default
         return getattr(obj, self._name, None)
 
-    def __set__(self, obj:object, value:typing.Optional[pq.Quantity] = None):
+    def __set__(self, obj:object, value: pq.Quantity | None = None):
         if isinstance(value, pq.Quantity):
             if not scq.checkDosageUnits(value):
                 raise ValueError(f"Expecting dosage units; instead got {value.units}")
@@ -88,11 +88,10 @@ class ModelFunctionDescriptor:
             return #self._default
         return getattr(obj, self._name, None)
 
-    def __set__(self, obj:object, value:typing.Optional[pq.Quantity] = None):
+    def __set__(self, obj:object, value: pq.Quantity | None = None):
         from core import models
-        if isinstance(value, types.FunctionType):
-            if not models.isModelFunction(value):
-                raise ValueError(f"Expecting a model function; instead, {value.__name__} is an ordinary function")
+        if isinstance(value, types.FunctionType) and not models.isModelFunction(value):
+            raise ValueError(f"Expecting a model function; instead, {value.__name__} is an ordinary function")
 
         elif value is not None:
             raise ValueError(f"Expecting a model function; instead, {value.__name__} is an ordinary function")
@@ -111,15 +110,12 @@ class FileOriginDescriptor:
             return #self._default
         return getattr(obj, self._name, None)
 
-    def __set__(self, obj: object, value: typing.Optional[
-            typing.Union[str, pathlib.Path,
-                         typing.Sequence[typing.Union[str, pathlib.Path]]]
-            ] = None):
+    def __set__(self, obj: object, value: str | pathlib.Path | typing.Sequence[str | pathlib.Path] | None = None):
         from iolib.navigation.filesystems import getFileCreationDateTime
         if isinstance(value, typing.Sequence) and all (isinstance(v, (str, pathlib.Path)) for v in value):
             setattr(obj, self._name, value)
             if hasattr(obj, "file_datetime"):
-                obj.file_datetime = list(map(lambda f: getFileCreationDateTime(f), value))
+                obj.file_datetime = list(map(lambda f: getFileCreationDateTime(f), value)) # noqa
 
         elif isinstance(value, (str, pathlib.Path)):
             setattr(obj, self._name, value)
@@ -147,14 +143,14 @@ class ScipyenDataclass:
         if other.__class__ != self.__class__:
             raise TypeError(f"Expecting an object of type {self.__class__.__name__}; instead, got {type(other).__name__}")
 
-        fields = tuple(map(lambda f: (f.name, getattr(self, f.name), getattr(other, f.name)), dataclasses.fields(self.__class__)))
+        fields = tuple(map(lambda f: (f.name, getattr(self, f.name), getattr(other, f.name)), dataclasses.fields(self.__class__))) # noqa
 
         diff_fields = tuple(filter(lambda f: type(f[1]) is not type(f[2]) or not safe_identity_test(f[1], f[2]), fields))
 
         if showValues:
-            return dict(map(lambda f: (f[0], (f[1], f[2])), diff_fields))
+            return dict(map(lambda f: (f[0], (f[1], f[2])), diff_fields)) # noqa
 
-        return tuple(map(lambda f: f[0], diff_fields))
+        return tuple(map(lambda f: f[0], diff_fields)) # noqa
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, self.__class__):
@@ -176,27 +172,8 @@ class ScipyenDataclass:
     =======
     True if a field with name suplied by `val` exists in this instance.
     """
-        return val in map(lambda f: f.name, dataclasses.fields(self))
-
-    # def merge(self, *others) -> typing.Self:
-    #     if len(others) == 0:
-    #         return self
-    #
-    #     if not all(isDataclass(o) for o in others):
-    #         raise TypeError("Expecting instances of ScipyenDataclass")
-    #
-    #     of = tuple(itertools.chain.from_iterable(tuple(map(lambda o: tuple(map(lambda f: (o, f.name), dataclasses.fields(o))),
-    #                                                     (parameters, *extra_params)))))
-    #
-    #     invalid_field_names = tuple(filter(lambda x: x[1] not in self))
-    #
-    #     if len(invalid_field_names):
-    #         raise TypeError(f"Arguments contain the following fields which are invalid for this {type(self).__name__} instance: {invalid_field_names}")
-    #
-    #     for (o, fname) in of:
-    #         setattr(self, fname, getattr(o, fname))
-    #
-    #     return self
+        return val in (f.name for f in dataclasses.fields(self))
+        # return val in map(lambda f: f.name, dataclasses.fields(self))
 
     def toHDF5(self, group:h5py.Group, name:str, oname:str,
                        compression:str, chunks:bool, track_order:bool,
@@ -218,8 +195,6 @@ class ScipyenDataclass:
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
             group[target_name] = cached_entity
-            # print(f"{self.__class__.__name__}.toHDF5 found entity {cached_entity}")
-            # print(f"### END {self.__class__.__name__}.toHDF5 \n\n")
             return cached_entity
 
         if isinstance(name, str) and len(name.strip()):
@@ -234,7 +209,8 @@ class ScipyenDataclass:
         dataclass_fields = list(filter(lambda f: dataclasses.is_dataclass(getattr(self, f.name)), dataclasses.fields(self)))
 
         # then assign these back into the dictionary from above:
-        data.update(dict(map(lambda f: (f.name, getattr(self, f.name)), dataclass_fields)))
+        data.update({f.name: getattr(self, f.name) for f in dataclass_fields})
+        # data.update(dict(map(lambda f: (f.name, getattr(self, f.name)), dataclass_fields)))
 
         # NOTE: 2024-12-12 15:41:25
         # instead of creating a nested hf5 group, just populate this one with
@@ -247,7 +223,8 @@ class ScipyenDataclass:
             if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
                 entity[name] = cached_entity
             else:
-                element_entity = h5io.toHDF5(value, entity, name=name,
+                # element_entity = h5io.toHDF5(value, entity, name=name,
+                h5io.toHDF5(value, entity, name=name,
                                              compression=compression,
                                              chunks=chunks,
                                              track_order=track_order,
@@ -263,38 +240,29 @@ class ScipyenDataclass:
 #                     print(msg)
                 # ### END   for debugging
 
-        # print(f"### END {self.__class__.__name__}.toHDF5 \n\n")
         return entity
 
     @classmethod
-    def fromHDF5(cls, entity:h5py.Group,
-                attrs:typing.Optional[dict] = None, cache:dict = dict()):
+    def fromHDF5(cls, entity: h5py.Group, attrs: dict | None = None,
+                 cache: dict = dict()): # noqa
         from iolib import h5io
-
-        # print(f"\n\n### BEGIN {cls.__name__}.fromHDF5 ")
 
         if entity in cache:
             val = cache[entity]
-            # print(f"{cls.__name__}.fromHDF5 got cached entity {type(val).__name__}")
             return val
 
         attrs = h5io.attrs2dict(entity.attrs)
 
-        # print(f"{cls.__name__}.fromHDF5: attrs = {attrs}")
-
-        # assert attrs["python_class"] == str(cls).strip("<").strip(">").strip("class").strip()[1:-1], \
         assert attrs["python_class"] == cls, f"Object has unexpected class: {attrs['python_class']}"
 
         attrs_as_entities = [a for a in cls.__match_args__ if a not in attrs]
 
-        kwargs = dict()
+        kwargs = {}
 
         for a in attrs_as_entities:
-            if a in entity.keys():
+            if a in entity():
                 kwargs[a] = h5io.fromHDF5(entity[a], cache=cache)
-                # print(f"{cls.__name__}.fromHDF5: got field '{a}' with type: {type(kwargs[a]).__name__}\n")
 
-        # print(f"### END {cls.__name__}.fromHDF5 \n\n")
         return cls(**kwargs)
 
     @classmethod
@@ -308,7 +276,8 @@ class ScipyenDataclass:
     =======
     True if a field with name suplied by `val` exists in this class.
     """
-        return val in map(lambda f: f.name, dataclasses.fields(cls))
+        return val in (f.name for f in dataclasses.fields(cls))
+        # return val in map(lambda f: f.name, dataclasses.fields(cls))
 
 class UltrastructureElementType(TypeEnum):
     r"""Organelles, etc.
@@ -2222,22 +2191,12 @@ class Schedule(ScipyenDataclass):
         elif episode.beginFrame > nFramesBefore:
             episode.beginFrame = nFramesBefore
 
+    @property
     def episodeNames(self) -> list[str]:
         return [e.name for e in self.episodes]
 
     def episodeIndex(self, name:str) -> int:
         return self.episodeNames.index(name)
-
-    # def addEpisode(self, episode:Episode):
-    #     if episode not in self.episodes:
-    #         self.episodes.append(deepcopy(episode))
-    #
-    # def addEpisodes(self, episodes:typing.Sequence[Episode]):
-    #     self.episodes.extend([e for e in episodes if e not in self.episodes])
-    #
-    # def removeEpisode(self, episode):
-    #     if episode in self.episodes:
-    #         self.episodes.remove(episode)
 
     @property
     def procedures(self):
@@ -2395,13 +2354,17 @@ def mergeDataclasses(typename:str, *args, **kwargs) -> type:
     # #                            module=None)
 
 def repr_attr(x):
-    indent = lambda x: x.replace("\n", "\n\t") # noqa
+    indent = lambda x: x.replace("\n", "\n\t")
+
     if isinstance(x, str):
         return f": {type(x).__name__} → '{x}'"
+
     elif dataclasses.is_dataclass(type(x)):
         return f": {type(x).__name__} → {indent(x.__repr__())}"
+
     elif isinstance(x, Enum):
         return f": {type(x).__name__} →  '{x.name}' ({x})"
+
     else:
         return f": {type(x).__name__} → {x}"
 

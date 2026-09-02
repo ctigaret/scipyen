@@ -71,7 +71,7 @@ else:
         __has_PyQt6__ = True
 
     from qtpy import sip # noqa
-    # from qtpy.uic import loadUiType # noqa
+    # from qtpy.uic import loadUiType
 
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup

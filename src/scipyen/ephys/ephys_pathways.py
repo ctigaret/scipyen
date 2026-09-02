@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # $Id: ephys_pathways.py $
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@proton.me>
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -9,16 +8,11 @@
 import os
 # import sys
 import collections
-import traceback # noqa
-import datetime # noqa
-import numbers # noqa
+# import traceback
+# import datetime
+# import numbers
 import inspect
-import itertools # noqa
-import functools # noqa
-from functools import singledispatch # noqa
-import warnings # noqa
 import typing
-import types # noqa
 # from copy import deepcopy
 # import difflib
 # import re as _re
@@ -35,7 +29,7 @@ from dataclasses import (dataclass, MISSING, KW_ONLY) # noqa
 #     print("Please install mypy first")
 #     raise
 import numpy as np
-import quantities as pq # noqa
+import quantities as pq
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 import neo
@@ -113,11 +107,11 @@ from core import scipyen_quantities as scq # noqa
 from core.scipyen_quantities import (unitsConvertible, checkTimeUnits, # noqa
                              checkElectricalCurrentUnits,
                              checkElectricalPotentialUnits,
-                             checkRescale) # noqa
+                             checkRescale)
 
 import core.pyabfbridge as pab
 
-from core.deferredmeasures import * # noqa
+from core.deferredmeasures import *
 
 from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes) # noqa
 
@@ -131,10 +125,11 @@ from ephys.ephys_protocol import ElectrophysiologyProtocol
 #### END pict.core modules
 
 # ### BEGIN forward class declarations
-class SynapticPathway: pass # noqa
-class PathwaysStimulationLayout: pass # noqa
-class SynapticPathwayList: pass # noqa
-class RecordingSource: pass # noqa
+class SynapticPathway: pass
+class PathwaysStimulationLayout: pass
+class SynapticPathwayList: pass
+class RecordingSource: pass
+# class PathwayTrials: pass
 
 # ### END   forward class declarations
 
@@ -189,17 +184,13 @@ class RecordingEpisode(Episode):
 
     """
     _: KW_ONLY
-    protocol: typing.Optional[ElectrophysiologyProtocol] = None
+    protocol: ElectrophysiologyProtocol | None = None
 
     episodeType: DescriptorGenericValidator = DescriptorGenericValidator( # noqa
         "episodeType", RecordingEpisodeType.Monitoring,
         RecordingEpisodeType)
 
     stimLayout: PathwaysStimulationLayout | None = dataclasses.field(default = None)
-    # stimLayout: DescriptorGenericValidator = DescriptorGenericValidator( # noqa
-    #     "stimLayout", PathwaysStimulationLayout, PathwaysStimulationLayout, allow_none=True)
-
-    # episodeType: RecordingEpisodeType = dataclasses.field(default = RecordingEpisodeType.Tracking)
 
     def __hash__(self) -> int:
         return hash(
@@ -217,7 +208,7 @@ class RecordingEpisode(Episode):
             )
 
     def __repr__(self) -> str:
-        ret = list()
+        ret = []
         ret.append(f"{self.__class__.__name__}(name='{self.name}', type={self.type.name}), with:")
         ret.append(f"\t{self.nFrames} frames")
         ret.append(f"\tbegin={self.begin}, end={self.end}")
@@ -264,13 +255,14 @@ class RecordingEpisode(Episode):
             group[target_name] = cached_entity
             return cached_entity
 
-        attrs = dict((x, getattr(self, x)) for x in (
-                        "name", "description",
-                        "begin", "end",
-                        "beginFrame", "nFrames",
-                        "episodeType", "procedure",
-                        )
+        attrs = {
+                x: getattr(self, x) for x in (
+                    "name", "description",
+                    "begin", "end",
+                    "beginFrame", "nFrames",
+                    "episodeType", "procedure",
                     )
+                }
 
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
@@ -291,8 +283,8 @@ class RecordingEpisode(Episode):
         return entity
 
     @classmethod
-    def fromHDF5(cls, entity:h5py.Group,
-                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+    def fromHDF5(cls, entity:h5py.Group, attrs: dict | None = None,
+                 cache: dict = {}): # noqa
 
         from iolib import h5io
         if entity in cache:
@@ -366,8 +358,7 @@ class RecordingSchedule(Schedule):
         return entity
 
     @classmethod
-    def fromHDF5(cls, entity:h5py.Dataset,
-                             attrs:typing.Optional[dict]=None, cache:dict={}):
+    def fromHDF5(cls, entity:h5py.Dataset, attrs: dict | None = None, cache: dict = {}): # noqa
 
         # NOTE: 2024-07-21 10:05:58 see NOTE: 2024-07-20 18:48:45
 
@@ -383,6 +374,14 @@ class RecordingSchedule(Schedule):
         episodes = h5io.fromHDF5(entity["episodes"], cache)
 
         return cls(name=name, description=description, episodes=episodes)
+
+    @property
+    def protocols(self) -> list[ElectrophysiologyProtocol]:
+        return [e.protocol for e in self.episodes]
+
+    @property
+    def stimulationLayouts(self) -> list:
+        return [e.stimLayout for e in self.episodes]
 
 class SynapticPathwayType(TypeEnum):
     r"""
@@ -465,15 +464,16 @@ class SynapticStimulusChannel(ScipyenDataclass):
        implied the stimulus is a DAC channel and not a DIG output channel.
 """
     name: str = "stim"
-    channel: typing.Union[int, str] = 0
-    dig: bool=True
+    channel: int | str = 0
+    dig: bool = True
 
     def __eq__(self, other) -> bool:
         ret = type(self) is type(other)
         if not ret:
             return ret
 
-        ret &= all(getattr(self, f) == getattr(other, f) for f in map(lambda f: f.name, dataclasses.fields(self)))
+        # ret &= all(getattr(self, f) == getattr(other, f) for f in map(lambda f: f.name, dataclasses.fields(self)))
+        ret &= all(getattr(self, n) == getattr(other, n) for n in (f.name for f in  dataclasses.fields(self)))
 
         return ret
 
@@ -485,7 +485,8 @@ class SynapticStimulusChannel(ScipyenDataclass):
 
         from iolib import h5io
         # print(f"{self.__class__.__name__}.toHDF5: {self.name} -> name: {name}, oname: {oname}")
-        target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        # target_name, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
+        _, obj_attrs = h5io.makeObjAttrs(self, oname=oname)
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
             group[name] = cached_entity
@@ -496,8 +497,8 @@ class SynapticStimulusChannel(ScipyenDataclass):
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
 
-        if isinstance(name, str) and len(name.strip()):
-            target_name = name
+        # if isinstance(name, str) and len(name.strip()):
+        #     target_name = name
 
         entity = group.create_dataset(name, data = h5py.Empty("f"),
                                       track_order=track_order)
@@ -507,8 +508,8 @@ class SynapticStimulusChannel(ScipyenDataclass):
         return entity
 
     @classmethod
-    def fromHDF5(cls, entity:h5py.Dataset,
-                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+    def fromHDF5(cls, entity: h5py.Dataset, attrs: dict | None = None,
+                 cache:dict = {}): # noqa
 
         from iolib import h5io
         if entity in cache:
@@ -528,17 +529,12 @@ class SynapticStimulusChannel(ScipyenDataclass):
 
         return cls(name, channel, dig)
 
-# SynapticStimulusChannel.name.__doc__ = "str: the name of this synaptic simulus; default is 'stim'"
-# SynapticStimulusChannel.channel.__doc__ = "int, str: index or name of the output channel sending TTL triggers"
-# SynapticStimulusChannel.dig.__doc__ = "bool: indicates if the triggering channel if a digital output (True) or a DAC (False)"
-
 class SynapticStimulusChannelList(NeoObjectList):
     allowed_contents = (SynapticStimulusChannel, )
 
-    def __init__(self, *items, name:typing.Optional[str] = None,
-                 parent: object = None):
+    def __init__(self, *items, name: str | None = None, parent: object = None):
         self.name = "" if not isinstance(name, str) else name
-        self._items = list()
+        self._items = []
 
         if len(items):
             if len(items) == 1:
@@ -549,7 +545,7 @@ class SynapticStimulusChannelList(NeoObjectList):
 
             if any(
                 not isinstance(i, self.allowed_contents)
-                or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents)))
+                or not any(type(i).__name__ in n for n in list(map(lambda t: t.__name__, self.allowed_contents))) # noqa
                 for i in items):
                 raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(item).__name__}")
 
@@ -565,9 +561,11 @@ class SynapticStimulusChannelList(NeoObjectList):
         return self._parent
 
     def __iter__(self):
-        """Implement iter(self)"""
-        for item in self._items:
-            yield item
+        """Implements iter(self)"""
+        # NOTE: 2026-09-02 20:32:36 -> this is a generator!
+        yield from self._items
+        # for item in self._items:
+        #     yield item
 
     def __delitem__(self, i: int) -> None:
         if len(self._items) == 0:
@@ -575,6 +573,7 @@ class SynapticStimulusChannelList(NeoObjectList):
 
         if i < len(self._items) and i >= -len(self._items):
             del(self._items[i])
+
         else:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
@@ -616,7 +615,7 @@ class SynapticStimulusChannelList(NeoObjectList):
 
         if len(self._items):
             s[0]+= ":"
-            s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items))))
+            s.extend(list(map(lambda p: f"{p[0]}: {p[1]}", enumerate(self._items)))) # noqa
 
         return "\n".join(s)
 
@@ -691,6 +690,7 @@ class SynapticStimulusChannelList(NeoObjectList):
         """
         if not isinstance(obj, self.allowed_contents):
             raise TypeError(f"Can only append {self.allowed_contents[0].__name__} objects")
+
         self._items.append(obj)
 
     def extend(self, iterable):
@@ -730,7 +730,7 @@ class SynapticStimulusChannelList(NeoObjectList):
     def index(self, *args):
         return self._index(*args)
 
-def synstim(name:str, channel:typing.Optional[int]=None, dig:bool=True) -> SynapticStimulusChannel:
+def synstim(name:str, channel: int| None = None, dig: bool=True) -> SynapticStimulusChannel:
     r"""Shorthand constructor of SynapticStimulusChannel (saves typing)"""
     return SynapticStimulusChannel(name, channel, dig)
 
@@ -768,14 +768,14 @@ class AuxiliaryInput(ScipyenDataclass):
     name: str = "aux_in"
     adc: int = 0
     # adc: typing.Union[int, str] = 0
-    cmd: Tribool = Tribool() # reflects an input that "copies" a command signal
+    cmd: Tribool = dataclasses.field(default_factory = Tribool) # reflects an input that "copies" a command signal
 
     def __eq__(self, other) -> bool:
         ret = type(self) == type(other)
         if not ret:
             return ret
 
-        ret &= all(getattr(self, f) == getattr(other, f) for f in map(lambda f: f.name, datalasses.fields(self)))
+        ret &= all(getattr(self, f) == getattr(other, f) for f in map(lambda f: f.name, datalasses.fields(self))) # noqa
 
         return ret
 
@@ -808,8 +808,8 @@ class AuxiliaryInput(ScipyenDataclass):
         return entity
 
     @classmethod
-    def fromHDF5(cls, entity:h5py.Dataset,
-                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+    def fromHDF5(cls, entity:h5py.Dataset, attrs: dict | None = None,
+                 cache: dict = {}): # noqa
 
         from iolib import h5io
 
@@ -832,8 +832,7 @@ class AuxiliaryInput(ScipyenDataclass):
 class AuxiliaryInputList(NeoObjectList):
     allowed_contents = (AuxiliaryInput, )
 
-    def __init__(self, *items, name:typing.Optional[str] = None,
-                 parent: object = None):
+    def __init__(self, *items, name: str | None = None, parent: object = None):
         self.name = "" if not isinstance(name, str) else name
         self._items = list()
 
@@ -860,8 +859,9 @@ class AuxiliaryInputList(NeoObjectList):
 
     def __iter__(self):
         """Implement iter(self)"""
-        for item in self._items:
-            yield item
+        yield from self._items
+        # for item in self._items:
+        #     yield item
 
     def __delitem__(self, i: int) -> None:
         if len(self._items) == 0:
@@ -1024,12 +1024,14 @@ class AuxiliaryInputList(NeoObjectList):
     def index(self, *args):
         return self._index(*args)
 
-def auxinput(name:str, adc:typing.Optional[int]=None, cmd:typing.Optional[bool]=None) -> AuxiliaryInput:
+def auxinput(name:str, adc: int | None = None, cmd: bool | None =None) -> AuxiliaryInput:
     r"""Constructs a run-of-the-mill AuxiliaryInput"""
     if adc is None:
         adc = 0
+
     elif not isinstance(adc, int):
         raise TypeError(f"'adc' expected an int; instead, got {type(adc).__name__}")
+
     return AuxiliaryInput(name, adc, cmd)
 
 @dataclass
@@ -1061,7 +1063,7 @@ class AuxiliaryOutput(ScipyenDataclass):
 """
     name: str = "aux_out"
     channel: int = 0
-    digttl: Tribool = Tribool()
+    digttl: Tribool = Tribool() # noqa
 
     def __eq__(self, other) -> bool:
         ret = type(self) == type(other)
@@ -1949,10 +1951,6 @@ class PathwaysStimulationLayout:
                 )
 
     @property
-    def pathways(self):
-        return self._pathways_
-
-    @property
     def layout(self) -> dict:
         r"""Alias ot self.sweeps"""
         return self.sweeps
@@ -2509,12 +2507,12 @@ class SynapticPathwayList(NeoObjectList): # noqa
 @dataclass
 class RecordingSource(ScipyenDataclass):
     adc: int = 0
-    dac: typing.Optional[int] = None
-    syn: typing.Optional[SynapticStimulusChannelList]  = dataclasses.field(default_factory=SynapticStimulusChannelList)
-    auxin: typing.Optional[AuxiliaryInputList]     = dataclasses.field(default_factory=AuxiliaryInputList)
-    auxout: typing.Optional[AuxiliaryOutputList]   = dataclasses.field(default_factory=AuxiliaryOutputList)
-    electrodeMode: ephys.ElectrodeMode = dataclasses.field(default=ephys.ElectrodeMode.Null)
-    pathways: SynapticPathwayList = dataclasses.field(default_factory = SynapticPathwayList)
+    dac: int | None = None
+    syn: SynapticStimulusChannelList    = dataclasses.field(default_factory=SynapticStimulusChannelList)
+    auxin: AuxiliaryInputList           = dataclasses.field(default_factory=AuxiliaryInputList)
+    auxout: AuxiliaryOutputList         = dataclasses.field(default_factory=AuxiliaryOutputList)
+    electrodeMode: ephys.ElectrodeMode  = dataclasses.field(default=ephys.ElectrodeMode.Null)
+    pathways: SynapticPathwayList       = dataclasses.field(default_factory = SynapticPathwayList)
 
     def __post_init__(self):
         # print(f"{self.__class__.__name__}.__post_init__")
@@ -2592,8 +2590,8 @@ class RecordingSource(ScipyenDataclass):
         return entity
 
     @classmethod
-    def fromHDF5(cls, entity:h5py.Group,
-                             attrs:typing.Optional[dict]=None, cache:dict = {}):
+    def fromHDF5(cls, entity:h5py.Group, attrs: dict | None = None,
+                 cache: dict = {}): # noqa
 
         from iolib import h5io
         if entity in cache:
@@ -2643,7 +2641,7 @@ class RecordingSource(ScipyenDataclass):
         for optogenetic stimulation.
         """
         if isinstance(self.syn, SynapticStimulusChannel):
-            return (self.syn.channel,) if self.syn.dig else tuple()
+            return (self.syn.channel,) if self.syn.dig else ()
 
         if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulusChannel) for s in self.syn):
             return tuple(s.channel for s in self.syn if s.dig)
@@ -2659,12 +2657,12 @@ class RecordingSource(ScipyenDataclass):
         for optogenetic stimulation.
         """
         if isinstance(self.syn, SynapticStimulusChannel):
-            return (self.syn.channel, ) if not self.syn.dig else tuple()
+            return (self.syn.channel, ) if not self.syn.dig else ()
 
         if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulusChannel) for s in self.syn):
             return tuple(s.channel for s in self.syn if not s.dig)
 
-        return tuple()
+        return ()
 
     # FIXME: 2024-10-17 22:35:04
     # this approach is WRONG, because it will create a new Python object
@@ -2732,12 +2730,12 @@ class RecordingSource(ScipyenDataclass):
 
         """
         if isinstance(self.auxin, AuxiliaryInput):
-            return (self.auxin.adc, ) if self.auxin.cmd is True else tuple()
+            return (self.auxin.adc, ) if self.auxin.cmd is True else ()
 
         if isinstance(self.auxin, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.auxin):
             return tuple(a.adc for a in self.auxin if a.cmd is True)
 
-        return tuple()
+        return ()
 
     @property
     def in_daq_triggers(self) -> tuple:
@@ -2762,12 +2760,12 @@ class RecordingSource(ScipyenDataclass):
 
         """
         if isinstance(self.auxin, AuxiliaryInput):
-            return tuple(self.auxin.adc) if self.auxin.cmd is False else tuple()
+            return tuple(self.auxin.adc) if self.auxin.cmd is False else ()
 
         if isinstance(self.auxin, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.auxin):
             return tuple(a.adc for a in self.auxin if a.cmd is False)
 
-        return tuple()
+        return ()
 
     @property
     def other_inputs(self) -> tuple:
@@ -2783,12 +2781,12 @@ class RecordingSource(ScipyenDataclass):
 
         """
         if isinstance(self.auxin, AuxiliaryInput):
-            return tuple(self.auxin.adc) if self.auxin.cmd is None else tuple()
+            return tuple(self.auxin.adc) if self.auxin.cmd is None else ()
 
         if isinstance(self.auxin, typing.Sequence) and all(isinstance(v, AuxiliaryInput) for v in self.auxin):
             return tuple(a.adc for a in self.auxin if a.cmd is None)
 
-        return tuple()
+        return ()
 
     @property
     def syn_blocks(self) -> tuple:
@@ -2801,7 +2799,7 @@ class RecordingSource(ScipyenDataclass):
         if isinstance(self.syn, typing.Sequence) and all(isinstance(s, SynapticStimulusChannel) for s in self.syn):
             return tuple((s.name, neo.Block()) for s in self.syn)
 
-        return tuple()
+        return ()
 
     @property
     def syn_blocks_dict(self) -> dict:
@@ -2816,12 +2814,12 @@ class RecordingSource(ScipyenDataclass):
         May be empty
         """
         if isinstance(self.auxout, AuxiliaryOutput):
-            return (self.auxout.channel, ) if self.auxout.digttl is True else (tuple)
+            return (self.auxout.channel, ) if self.auxout.digttl is True else ()
 
         if isinstance(self.auxout, typing.Sequence) and all(isinstance(v, AuxiliaryOutput) for v in self.auxout):
             return tuple(o.channel for o in self.auxout if o.digttl is True)
 
-        return tuple()
+        return ()
 
     @property
     def out_dac_triggers(self) -> tuple:
@@ -2830,38 +2828,37 @@ class RecordingSource(ScipyenDataclass):
         for purposes other than synaptic stimulation.
         """
         if isinstance(self.auxout, AuxiliaryOutput):
-            return (self.auxout.channel, ) if self.auxout.digttl is False else (tuple)
+            return (self.auxout.channel, ) if self.auxout.digttl is False else ()
 
         if isinstance(self.auxout, typing.Sequence) and all(isinstance(v, AuxiliaryOutput) for v in self.auxout):
             return tuple(o.channel for o in self.auxout if o.digttl is False)
 
-        return tuple()
+        return ()
 
     @property
     def pathway_names(self) -> tuple:
-        return tuple(map(lambda p: p.name), self.pathways)
+        return tuple(p.name for p in self.pathways)
 
     @property
     def other_outputs(self) -> tuple:
         if isinstance(self.auxout, AuxiliaryOutput):
-            return (self.auxout.channel, ) if self.auxout.digttl is None else (tuple)
+            return (self.auxout.channel, ) if self.auxout.digttl is None else ()
 
         if isinstance(self.auxout, typing.Sequence) and all(isinstance(v, AuxiliaryOutput) for v in self.auxout):
             return tuple(o.channel for o in self.auxout if o.digttl is None)
 
-        return tuple()
+        return ()
 
     def getPathway(self, name:str):
         result = list(filter(lambda p: p.name == name, self.pathways))
+
         if len(result) == 1:
             return result[0]
+
         return result
 
-    def getPathwaysByStimulationType(self, digital: typing.Optional[
-                                                    typing.Union[bool, Tribool]
-                                                    ] = Tribool(),
-                                     asDict:bool=False
-                                     ) -> typing.Union[tuple, dict[str, tuple]]:
+    def getPathwaysByStimulationType(self, digital: bool | Tribool = Tribool(),
+                                     asDict: bool = False) -> tuple | dict[str, tuple]:
         r"""Groups the synaptic pathways in this recording source by their means of activation.
 
         A synaptic pathway is activated by stimulating its synaptic inputs¹ using a
@@ -2919,23 +2916,29 @@ class RecordingSource(ScipyenDataclass):
         pathways = self.pathways
         if len(pathways) == 0:
             if asDict:
-                return {"DACStimPathways": tuple(), "DIGStimPathways": tuple()}
-            return tuple(), tuple()
+                return {"DACStimPathways": (), "DIGStimPathways": ()}
+
+            return (), ()
 
         if isinstance(digital, bool):
             digital = Tribool(digital)
+
         elif digital is None:
             digital = Tribool()
+
         elif not isinstance(digital, Tribool):
             raise TypeError(f"'digital' parameters expected to be a Tribool, a bool, or None; instead got {type(digital).__name__}")
 
 
         if digital.value is True:
-            dac_stim = tuple()
+            dac_stim = ()
             dig_stim = tuple(x for x in pathways if x.stimulus.dig)
+
         elif digital.value is False:
             dac_stim = tuple(x for x in pathways if not x.stimulus.dig)
-            dig_stim = tuple()
+
+            dig_stim = ()
+
         else:
             dac_stim, dig_stim = tuple(tuple(x) for x in more_itertools.partition(lambda x: x.stimulus.dig, pathways))
 
@@ -2943,7 +2946,7 @@ class RecordingSource(ScipyenDataclass):
             return {"DACStimPathways": dac_stim, "DIGStimPathways": dig_stim}
         return dac_stim, dig_stim
 
-    def pathwaysInProtocol(self, protocol:ElectrophysiologyProtocol, asDict:bool=False) -> typing.Union[tuple, dict[str, tuple]]:
+    def pathwaysInProtocol(self, protocol:ElectrophysiologyProtocol, asDict: bool = False) -> tuple | dict[str, tuple]:
         r"""SynapticPathway objects used in 'protocol'.
 
         The method identified which SynapticPathway objects defined by this
@@ -3690,3 +3693,31 @@ def twoPathwaysSource(adc: int | str=0, dac: int | None=None,
     ret.pathways[0].name = p0name
     ret.pathways[1].name = p1name
     return ret
+
+class PathwayTrials(dict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if len(self):
+            assert all(isinstance(k, SynapticPathway) for k in self), "PathwayTrials accepts only SynapticPathway objects as keys"
+            assert all(isinstance(v, neo.Block) for v in self.values()), "PathwayTrials accepts only neo.Block objects as values"
+
+        def __getitem__(self, key: SynapticPathway | str):
+            if isinstance(key, SynapticPathway):
+                return super().__getitem__(key)
+
+            else:
+                raise TypeError(f"Invalid key type {type(key).__name__} when a SynapticPathway or str (SynaptiPathway name)was expected")
+
+        def __setitem__(self, key: SynapticPathway, value: neo.Block):
+            # print(f"{self.__class__.__name__}.__setitem__({key}, {value})")
+            if not isinstance(key, SynapticPathway):
+                raise TypeError(f"Invalid key type {type(key).__name__} when a SynapticPathway was expected")
+
+            if not isinstance(value, neo.Block):
+                raise TypeError(f"Invalid value type {type(value).__name__} when a neo.Block was expected")
+
+            super().__setitem__(key, value)
+
+        def _hash__(self):
+            return hash(tuple(self.keys()), tuple(self.values()))
