@@ -19,7 +19,7 @@ import typing
 # from enum import Enum, IntEnum
 # from abc import ABC
 import dataclasses
-from dataclasses import (dataclass, MISSING, KW_ONLY) # noqa
+from dataclasses import (dataclass, MISSING, KW_ONLY)
 #### END core python modules
 
 #### BEGIN 3rd party modules

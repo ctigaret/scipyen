@@ -848,15 +848,12 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                             lambda i: (
                                         l_getName(i),
                                         self.sourceModel.getDataObjectForLeaf(i)
-                                        # self.sourceModel.getDataObjectForLeaf(self.proxyModel.maptoSource(i))
-                                        # self.model().getDataObjectForLeaf(i)
                                         ),
                             list(
                                 filter(
                                     (
                                         lambda i: i.column() == 0
                                         and not i.data(StandaloneEditorWidgetRole) # noqa
-                                        # and not self.proxyModel.mapToSource(i).data(StandaloneEditorWidgetRole) # noqa
                                     ),
                                     items
                                     )

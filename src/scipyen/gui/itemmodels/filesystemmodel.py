@@ -6,9 +6,12 @@ r""" Custom file system model
 """
 import os, sys, pathlib, traceback, typing, types, stat, datetime # noqa
 import dataclasses
+import math
 import psutil
 from functools import (singledispatch, singledispatchmethod) # noqa
 from enum import Enum, IntEnum # noqa
+import numpy as np
+import quantities as pq
 # import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,) # noqa
@@ -146,8 +149,36 @@ class FileSystemModel(QtGui.QFileSystemModel):
             infoData.append(f"<p><b>Created:</b> {guiutils.formatRelativeDateTime(bTime, tFormat, fancy=True)}<br>")
             infoData.append(f"<b>Modified:</b> {guiutils.formatRelativeDateTime(lastMod, tFormat, fancy=True)}</p>")
 
-        size = fileInfo.size()
-        infoData.append(f"<p><b>Size (bytes):</b> {size}</p>")
+        size = int(fileInfo.size())
+        pwr = int(math.log(size, 1024))
+        if pwr < 1:
+            sz = np.round(size*pq.byte, 1)
+
+        elif pwr >= 1 and pwr < 2:
+            sz = np.round((size*pq.byte).rescale(pq.KiB), 1)
+
+        elif pwr >= 2 and pwr < 3:
+            sz = np.round((size*pq.byte).rescale(pq.MiB), 1)
+
+        elif pwr >= 3 and pwr < 4:
+            sz = np.round((size*pq.byte).rescale(pq.GiB), 1)
+
+        elif pwr >= 4 and pwr < 5:
+            sz = np.round((size*pq.byte).rescale(pq.TiB), 1)
+
+        elif pwr >= 5 and pwr < 6:
+            sz = np.round((size*pq.byte).rescale(pq.PiB), 1)
+
+        elif pwr >= 6 and pwr < 7:
+            sz = np.round((size*pq.byte).rescale(pq.EiB), 1)
+
+        elif pwr >= 7 and pwr < 8:
+            sz = np.round((size*pq.byte).rescale(pq.ZiB), 1)
+
+        else:
+            sz = np.round((size*pq.byte).rescale(pq.YiB), 1)
+
+        infoData.append(f"<p><b>Size:</b> {sz} </p>")
 
         owner = fileInfo.owner()
         if len(owner):

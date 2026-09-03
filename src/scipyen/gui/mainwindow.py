@@ -8146,7 +8146,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                                                   deselected: QtCore.QItemSelection):
         # print(f"{self.__class__.__name__}.slot_fileSystemColumnViewSelectionChanged")
         indexes = selected.indexes()
-        desel = deselected.indexes()
+        # desel = deselected.indexes()
         # print(f"\n\tselected -> {len(indexes)}")
         # print(f"\n\tdeselected -> {len(desel)}")
         if len(indexes) == 1:

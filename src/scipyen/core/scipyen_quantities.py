@@ -156,7 +156,8 @@ def makeScaledUnitQuantity(quantity:pq.Quantity,
             if power not in prefixes.keys():
                 raise ValueError(f"Power {power} is invalid")
 
-            name = "%s%s" % (power, quantity.units.dimensionality)
+            name = f"{power, quantity.units.dimensionality}" #"%s%s" % (power, quantity.units.dimensionality)
+            # name = "%s%s" % (power, quantity.units.dimensionality)
             if not isinstance(symbol, str) or len(symbol.strip())==0:
                 symbol = "%s%s" % (prefixes[power]["symbol"], quantity.units.dimensionality)
             power = prefixes[power]["exponent"]
