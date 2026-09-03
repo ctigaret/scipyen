@@ -139,10 +139,10 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget, QtWidgets.QWidget):
         else:
             self.recDateTimeLabel.setText("")
 
-        if isinstance(self._data_.analysis_datetime, datetime.datetime):
-            self.analysisDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._data_.analysis_datetime))
-        else:
-            self.analysisDateTimeEdit.setDateTime(qtutils.datetime2Qt(datetime.datetime.now()))
+        if not isinstance(self._data_.analysis_datetime, datetime.datetime):
+            self._data_.analysis_datetime = datetime.datetime.now()
+
+        self.analysisDateTimeEdit.setDateTime(qtutils.datetime2Qt(self._data_.analysis_datetime))
 
         self.analysisDateTimeEdit.dateTimeChanged.connect(self._slot_analysisDateTimeChanged)
 
@@ -171,7 +171,9 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget, QtWidgets.QWidget):
         super().closeSubWidgets()
 
     def value(self):
-        r"""Returns a dict with field values takes from individual children
+        r"""Returns the underyling data - a BaseScipyenData.
+
+    The relevant, updated metadata fields must be accessed individually by the caller
         """
         return self._data_
 

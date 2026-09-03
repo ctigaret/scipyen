@@ -2507,7 +2507,7 @@ class SynapticPathwayList(NeoObjectList): # noqa
 @dataclass
 class RecordingSource(ScipyenDataclass):
     adc: int = 0
-    dac: int | None = None
+    dac: int = 0
     syn: SynapticStimulusChannelList    = dataclasses.field(default_factory=SynapticStimulusChannelList)
     auxin: AuxiliaryInputList           = dataclasses.field(default_factory=AuxiliaryInputList)
     auxout: AuxiliaryOutputList         = dataclasses.field(default_factory=AuxiliaryOutputList)

@@ -7659,15 +7659,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         fileSystemView = self._getFileSystemView()
 
-        # if self.fileSystemViewMode == "Tree":
-        #     fileSystemView = self.fileSystemTreeView
-        #
-        # elif self.fileSystemViewMode in ("Icon", "List"):
-        #     fileSystemView = self.fileSystemListView
-        #
-        # elif self.fileSystemViewMode == "Column":
-        #     fileSystemView = self.fileSystemColumnView
-
         if not isinstance(fileSystemView, QtWidgets.QAbstractItemView):
             return
 
@@ -7681,15 +7672,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         elif any([mimeData.hasText(), mimeData.hasImage(), mimeData.hasHtml(), mimeData.hasColor()]):
             pasteActionName = "Paste clipboard contents"
 
-        # itemAtMouse = self.fileSystemTreeView.indexAt(point)
-        # print(f"{self.__class__.__name__}.slot_fileSystemContextMenuRequest: indexAtMouse: {itemAtMouse.data()}")
         if not self.fileSystemModel.rootDirectory().isEmpty():
             cm = QtWidgets.QMenu("Selected Items", self)
 
             selectedFileSystemIndexes = [index for index in fileSystemView.selectedIndexes()
                             if index.column() == 0]  # list of QModelIndex
-
-            # print(f"{self.__class__.__name__}.slot_fileSystemContextMenuRequest\n {type(fileSystemView).__name__} selectedFileSystemIndexes -> {selectedFileSystemIndexes}")
 
 
             scripts = set()
@@ -8482,12 +8469,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     def slot_openSelectedFileItems(self) -> bool:
         r"""Opens files via (triggered from) context menu in File system browser"""
         fileSystemView = self._getFileSystemView()
-        # if self.fileSystemViewMode == "Tree":
-        #     fileSystemView = self.fileSystemTreeView
-        # elif self.fileSystemViewMode in ("Icon", "List"):
-        #     fileSystemView = self.fileSystemListView
-        # elif self.fileSystemViewMode == "Column":
-        #     fileSystemView = self.fileSystemColumnView
 
         if not isinstance(fileSystemView, QtWidgets.QAbstractItemView):
             return
@@ -8537,8 +8518,6 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         # print(f"{self.__class__.__name__}.slot_openSelectedFileItems")
         self.loadFiles(selectedFileSystemIndexes,
                        self._openSelectedFileItemsThreaded, updateUi=False)
-        # self.loadFiles(selectedFileSystemIndexes,
-        #                self._openSelectedFileItemsThreaded, updateUi=True)
 
         return True
 
@@ -8561,13 +8540,8 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         loopControl = kwargs.pop("loopControl", None)
         progressSignal = kwargs.pop("progressSignal", None)
-        # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded progressSignal = {progressSignal}")
-        # finishedSignal = kwargs.pop("finishedSignal", None)
-        # resultSignal = kwargs.pop("resultSignal", None)
-        # print(f"{self.__class__.__name__}._openSelectedFileItemsThreaded resultSignal = {resultSignal}")
         canceledSignal = kwargs.pop("canceledSignal", None)
         ioReader = kwargs.pop("ioReader", None)
-        # separateWorkspaceViewUpdate = kwargs.pop("updateAfter", False) is True
         updateUi = kwargs.pop("updateUi", True)
 
         if not isinstance(ioReader, typing.Callable):
@@ -9328,26 +9302,25 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         allMimeTypes = ";;".join([i[0] + " (" + i[1] + ") " for i in zip(
             pio.mimetypes.types_map.values(), pio.mimetypes.types_map.keys())])
 
-        filesFilterString = ';;'.join(
-            ["All file types (*.*)", allImageTypesFilter, individualImageTypeFilters, allMimeTypes])
+        # filesFilterString = ';;'.join(
+        #     ["All file types (*.*)", allImageTypesFilter, individualImageTypeFilters, allMimeTypes])
+        filesFilterString = f"All file types (*.*);; {allImageTypesFilter};; {individualImageTypeFilters};; {allMimeTypes}"
 
         targetDir = self.recentDirectories[0]
 
         if isinstance(targetDir, str) and len(targetDir) and os.path.isdir(targetDir):
-            fileNames, _ = self.chooseFile(caption=u'Open Files', fileFilter=filesFilterString,
+            fileNames, _ = self.chooseFile(caption='Open Files', fileFilter=filesFilterString,
                                            single=False, targetDir=targetDir)
 
         else:
-            fileNames, _ = self.chooseFile(caption=u'Open Files', fileFilter=filesFilterString,
+            fileNames, _ = self.chooseFile(caption='Open Files', fileFilter=filesFilterString,
                                            single=False, targetDir=None)
 
         if len(fileNames) > 0:
             for fileName in fileNames:
-                if isinstance(fileName, str) and len(fileName) > 0:
-                    if not self.loadDiskFile(fileName):
-                        return
-
-            # self.workspaceModel.update()
+                # calls loadDiskfile for each fileName
+                if isinstance(fileName, str) and len(fileName) > 0 and not self.loadDiskFile(fileName):
+                    return
 
     @Slot()
     @safewrapper
