@@ -3702,22 +3702,52 @@ class PathwayTrials(dict):
             assert all(isinstance(k, SynapticPathway) for k in self), "PathwayTrials accepts only SynapticPathway objects as keys"
             assert all(isinstance(v, neo.Block) for v in self.values()), "PathwayTrials accepts only neo.Block objects as values"
 
-        def __getitem__(self, key: SynapticPathway | str):
-            if isinstance(key, SynapticPathway):
-                return super().__getitem__(key)
+    def __getitem__(self, key: SynapticPathway | str) -> neo.Block:
+        if isinstance(key, SynapticPathway):
+            return super().__getitem__(key)
 
-            else:
-                raise TypeError(f"Invalid key type {type(key).__name__} when a SynapticPathway or str (SynaptiPathway name)was expected")
+        elif isinstance(key, str):
+            if key not in (p.name for p in self):
+                raise KeyError(f"No pathway named {name} found")
 
-        def __setitem__(self, key: SynapticPathway, value: neo.Block):
-            # print(f"{self.__class__.__name__}.__setitem__({key}, {value})")
-            if not isinstance(key, SynapticPathway):
-                raise TypeError(f"Invalid key type {type(key).__name__} when a SynapticPathway was expected")
+            pathway = [p for p in self if p.name == key]
 
-            if not isinstance(value, neo.Block):
-                raise TypeError(f"Invalid value type {type(value).__name__} when a neo.Block was expected")
+            if len(pathway) > 1:
+                raise RuntimeError(f"Duplicate pathway name: {name}")
 
-            super().__setitem__(key, value)
+            return super().__getitem__(pathway[0])
 
-        def _hash__(self):
-            return hash(tuple(self.keys()), tuple(self.values()))
+        else:
+            raise TypeError(f"Invalid key type {type(key).__name__} when a SynapticPathway or str (SynapticPathway name)was expected")
+
+    def __setitem__(self, key: SynapticPathway, value: neo.Block):
+        # print(f"{self.__class__.__name__}.__setitem__({key}, {value})")
+        if not isinstance(key, SynapticPathway):
+            raise TypeError(f"Invalid key type {type(key).__name__} when a SynapticPathway was expected")
+
+        if not isinstance(value, neo.Block):
+            raise TypeError(f"Invalid value type {type(value).__name__} when a neo.Block was expected")
+
+        super().__setitem__(key, value)
+
+    def _hash__(self):
+        return hash(tuple(self.keys()), tuple(self.values()))
+
+    @property
+    def pathways(self):
+        yield from self
+
+    @property
+    def pathwayNames(self):
+        yield from (p.name for p in self)
+
+    # def getPathway(self, name:str):
+    #     if name in self.pathwayNames:
+    #         pathway = [p for p in self.pathways if p.name == name]
+    #
+    #         if len(pathway) > 1:
+    #             raise RuntimeError(f"Duplicate pathway name: {name}")
+    #
+    #         return pathway[0]
+    #
+    #     raise KeyError(f"No pathway named {name} found")

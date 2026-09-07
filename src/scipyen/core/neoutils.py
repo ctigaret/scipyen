@@ -4384,9 +4384,10 @@ def _copy_with_data_subset_(obj:neo.Block, **kwargs):
         raise
 
     for k, seg in enumerate(new_segments):
+        osn = f" named {seg.name} " if isinstance(seg.name, str) and len(seg.name.strip()) else " "
         seg.annotate(
             origin=obj.file_origin,
-            original_segment=f"Segment [{k}] with {seg.name} of {obj.__class__.__name__} object {getattr(obj, 'name', None)}",
+            original_segment=f"Segment [{k}]{osn} of {obj.__class__.__name__} object {getattr(obj, 'name', None)}",
         )
         # seg.annotations["origin"] = f"Segment {seg.name} [{seg.index}] of {obj.name}"
         seg.index = k
@@ -4833,7 +4834,7 @@ def concatenate_blocks(*args, **kwargs):
     file_origin = kwargs.get("file_origin", "")
     file_datetime = kwargs.get("file_datetime", None)
     rec_datetime = kwargs.get("datetime", datetime.datetime.now())
-    annotations = kwargs.get("annotations", dict())
+    annotations = kwargs.get("annotations", {})
     sortby = kwargs.pop("sortby", None)
     ascending = kwargs.pop("ascending", True)
 
@@ -4937,7 +4938,7 @@ def concatenate_blocks(*args, **kwargs):
                 if reverse:
                     blocks.reverse()
 
-            except:
+            except: # noqa
                 traceback.print_exc()
                 return
 
@@ -5027,7 +5028,7 @@ def concatenate_blocks(*args, **kwargs):
                             # this may be a DataZone!
                             epch = epoch.__class__(
                                 times=epoch.times + deltaSeconds,
-                                durations=epopch.durations,
+                                durations=epoch.durations,
                                 labels=epoch.labels,
                                 units=epoch.units,
                                 name=epoch.name,
@@ -5045,7 +5046,7 @@ def concatenate_blocks(*args, **kwargs):
                         iseq.t_start += deltaSeconds
 
                 if len(seg.spiketrains):
-                    stt = list()
+                    stt = []
                     for st in seg.spiketrains:
                         st_copy = neo.SpikeTrain(
                             st.times + deltaSeconds,
@@ -5083,7 +5084,7 @@ def concatenate_blocks(*args, **kwargs):
                             name=group.name, allowed_types=group.allowed_types
                         )
 
-                    objects = list()
+                    objects = []
 
                     for (
                         child_class_name,
@@ -5118,6 +5119,7 @@ def concatenate_blocks(*args, **kwargs):
                             new_group.add(*objects)
                             ret.groups.append(new_group)
                             target_group = new_group
+
                         elif isinstance(existing_group, neo.Group):
                             existing_group.add(*objects)
                             target_group = existing_group
@@ -5139,6 +5141,7 @@ def concatenate_blocks(*args, **kwargs):
                                             ]
                                         )
                                     )
+
                                     if any(
                                         is_same_as(channelview.obj, o_) for o_ in data
                                     ):

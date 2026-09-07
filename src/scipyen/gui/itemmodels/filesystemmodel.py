@@ -149,8 +149,68 @@ class FileSystemModel(QtGui.QFileSystemModel):
             infoData.append(f"<p><b>Created:</b> {guiutils.formatRelativeDateTime(bTime, tFormat, fancy=True)}<br>")
             infoData.append(f"<b>Modified:</b> {guiutils.formatRelativeDateTime(lastMod, tFormat, fancy=True)}</p>")
 
-        size = int(fileInfo.size())
+        # size = int(fileInfo.size())
+        # pwr = int(math.log(size, 1024))
+        # if pwr < 1:
+        #     sz = np.round(size*pq.byte, 1)
+        #
+        # elif pwr >= 1 and pwr < 2:
+        #     sz = np.round((size*pq.byte).rescale(pq.KiB), 1)
+        #
+        # elif pwr >= 2 and pwr < 3:
+        #     sz = np.round((size*pq.byte).rescale(pq.MiB), 1)
+        #
+        # elif pwr >= 3 and pwr < 4:
+        #     sz = np.round((size*pq.byte).rescale(pq.GiB), 1)
+        #
+        # elif pwr >= 4 and pwr < 5:
+        #     sz = np.round((size*pq.byte).rescale(pq.TiB), 1)
+        #
+        # elif pwr >= 5 and pwr < 6:
+        #     sz = np.round((size*pq.byte).rescale(pq.PiB), 1)
+        #
+        # elif pwr >= 6 and pwr < 7:
+        #     sz = np.round((size*pq.byte).rescale(pq.EiB), 1)
+        #
+        # elif pwr >= 7 and pwr < 8:
+        #     sz = np.round((size*pq.byte).rescale(pq.ZiB), 1)
+        #
+        # else:
+        #     sz = np.round((size*pq.byte).rescale(pq.YiB), 1)
+
+        sz = self.getFileSize(fileInfo)
+
+        infoData.append(f"<p><b>Size:</b> {sz} </p>")
+
+        owner = fileInfo.owner()
+        if len(owner):
+            infoData.append(f"<p><b>Owner:</b> {owner}")
+
+        group = fileInfo.group()
+        if len(group):
+            if len(owner):
+                infoData.append(f"<br><b>Group:</b> {group}<p>")
+            else:
+                infoData.append(f"<p><b>Group:</b> {group}<p>")
+        else:
+            infoData.append("<p>")
+
+        infoData.append(f"<p><b>Readable:</b> {fileInfo.isReadable()}<br>")
+        infoData.append(f"<b>Writable:</b> {fileInfo.isWritable()}<br>")
+        infoData.append(f"<b>Executable:</b> {fileInfo.isExecutable()}</p>")
+        infoData.append("</html>")
+        return "\n".join(infoData)
+
+    def getFileSize(self, obj: QtCore.QModelIndex | QtCore.QFileInfo) -> pq.Quantity:
+        if isinstance(obj, QtCore.QModelIndex):
+            obj = obj.data(QtGui.QFileSystemModel.FileInfoRole)
+
+        elif not isinstance(obj, QtCore.QFileInfo):
+            raise TypeError(f"Expecting a QFileInfo or QModelIndex; got {type(obj).__name__} instead")
+
+        size = int(obj.size())
         pwr = int(math.log(size, 1024))
+
         if pwr < 1:
             sz = np.round(size*pq.byte, 1)
 
@@ -178,26 +238,8 @@ class FileSystemModel(QtGui.QFileSystemModel):
         else:
             sz = np.round((size*pq.byte).rescale(pq.YiB), 1)
 
-        infoData.append(f"<p><b>Size:</b> {sz} </p>")
+        return sz
 
-        owner = fileInfo.owner()
-        if len(owner):
-            infoData.append(f"<p><b>Owner:</b> {owner}")
-
-        group = fileInfo.group()
-        if len(group):
-            if len(owner):
-                infoData.append(f"<br><b>Group:</b> {group}<p>")
-            else:
-                infoData.append(f"<p><b>Group:</b> {group}<p>")
-        else:
-            infoData.append("<p>")
-
-        infoData.append(f"<p><b>Readable:</b> {fileInfo.isReadable()}<br>")
-        infoData.append(f"<b>Writable:</b> {fileInfo.isWritable()}<br>")
-        infoData.append(f"<b>Executable:</b> {fileInfo.isExecutable()}</p>")
-        infoData.append("</html>")
-        return "\n".join(infoData)
 
         # if not self.isDir(index):
         #     fileInfo = index.data(QtGui.QFileSystemModel.FileInfoRole)

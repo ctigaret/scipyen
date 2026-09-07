@@ -8144,26 +8144,47 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
     @Slot(QtCore.QItemSelection, QtCore.QItemSelection)
     def slot_fileSystemColumnViewSelectionChanged(self, selected: QtCore.QItemSelection,
                                                   deselected: QtCore.QItemSelection):
-        # print(f"{self.__class__.__name__}.slot_fileSystemColumnViewSelectionChanged")
+        print(f"{self.__class__.__name__}.slot_fileSystemColumnViewSelectionChanged")
         indexes = selected.indexes()
-        # desel = deselected.indexes()
-        # print(f"\n\tselected -> {len(indexes)}")
-        # print(f"\n\tdeselected -> {len(desel)}")
-        if len(indexes) == 1:
-            self._fileSystemColumnViewPopulatePreview(indexes[0])
+        desel = deselected.indexes()
+        print(f"\n\tselected -> {len(indexes)}")
+        print(f"\n\tdeselected -> {len(desel)}")
+        self._fileSystemColumnViewPopulatePreview(indexes)
+        # if len(indexes) == 1:
+        #     self._fileSystemColumnViewPopulatePreview(indexes[0])
+        # else:
+        #     self._fileSystemColumnViewPopulatePreview(indexes)
 
 
-    def _fileSystemColumnViewPopulatePreview(self, index: QtCore.QModelIndex):
+
+    def _fileSystemColumnViewPopulatePreview(self, indexes: list):
         self.fileSystemColumnViewPreviewWidget.document().clear()
-        if isinstance(index, QtCore.QModelIndex):
-            icon = self.fileSystemModel.getFileIcon(index)
-            text = self.fileSystemModel.getFileInfoText(index)
-            docCursor = QtGui.QTextCursor(self.fileSystemColumnViewPreviewWidget.document())
-            if isinstance(icon, QtGui.QPixmap):
-                icon = icon.toImage()
-                docCursor.insertImage(icon)
-                docCursor.insertText("\n")
-            docCursor.insertHtml(text)
+
+        if len(indexes) == 1:
+            index = indexes[0]
+            if isinstance(index, QtCore.QModelIndex):
+                icon = self.fileSystemModel.getFileIcon(index)
+                text = self.fileSystemModel.getFileInfoText(index)
+                docCursor = QtGui.QTextCursor(self.fileSystemColumnViewPreviewWidget.document())
+                if isinstance(icon, QtGui.QPixmap):
+                    icon = icon.toImage()
+                    docCursor.insertImage(icon)
+                    docCursor.insertText("\n")
+                docCursor.insertHtml(text)
+
+        elif len(indexes) > 1:
+            try:
+                fileSizes = [self.fileSystemModel.getFileSize(index) for index in indexes]
+                print(f"{self.__class__.__name__} file sizes = {fileSizes}")
+                totalSize = np.sum(np.fromiter(self.fileSystemModel.getFileSize(index) for index in indexes))
+                text = f"{len(indexes)} files selected (total size: {totalSize})"
+                infoData = ["<html>"]
+                infoData.append(f"<p> {text} </p>")
+                infoData.append("</html>")
+                docCursor = QtGui.QTextCursor(self.fileSystemColumnViewPreviewWidget.document())
+                docCursor.insertHtml("\n".join(infoData))
+            except:
+                traceback.print_exc()
 
 
 
