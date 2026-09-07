@@ -440,6 +440,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
         pData, objDict = self._parseObject_(obj, dict(),
                                             self._showPrivate_)
 
+        self.setRowCount(objDict["nChildren"])
+
         self._privateData_ = pData
 
         self._buildTree_(self._privateData_, objDict, self._rootTitle_)
@@ -469,13 +471,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
     def _slot_branchLoaded(self, row: int, items: tuple[QtGui.QStandardItem],
                            parentItem: QtGui.QStandardItem, ):
         parentItem.insertRow(row, items)
-        # if (not isinstance(obj, NOTMEMOIZED)
-        #     and not issubclass(
-        #         type(obj), NOTMEMOIZED + PODS
-        #     )
-        #     and objId not in self._visited_):
-        #     itemPath = f"{self._rootTitle_}{self.getPathForLeaf(objItem)}"
-        #     self._memoize_(obj, itemPath, objDict)
 
     @singledispatchmethod
     def _buildBranch_(self: typing.Self, obj: object, objDict: dict,
@@ -503,9 +498,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
         if objDict["objDataAsChild"] and self._inlineTables_:
             dataItem = QtGui.QStandardItem("")
             dataItem.setData(qVariant(True), StandaloneEditorWidgetRole) # noqa
-            self._sig_branchLoaded.emit(0, (dataItem, ), objItem)
+            # self._sig_branchLoaded.emit(0, (dataItem, ), objItem)
+            objItem.insertRow(0, [dataItem])
             # return objItem
-            # objItem.insertRow(0, [dataItem])
+
         else:
             dataItem = rowItems[-1]
             if len(visited) == 0:
@@ -519,7 +515,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
             parentItem = self.invisibleRootItem()
 
         if parentItem:
-            # parentItem.insertRow(row, rowItems)
             if (not isinstance(obj, NOTMEMOIZED)
                 and not issubclass(
                     type(obj), NOTMEMOIZED + PODS
@@ -528,7 +523,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 itemPath = f"{self._rootTitle_}{self.getPathForLeaf(objItem)}"
                 self._memoize_(obj, itemPath, objDict)
 
-        self._sig_branchLoaded.emit(row, rowItems, parentItem)
+            parentItem.insertRow(row, rowItems)
+
+        # self._sig_branchLoaded.emit(row, rowItems, parentItem)
 
         return objItem
 
@@ -562,8 +559,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         if objDict["objDataAsChild"]:
             dataItem = QtGui.QStandardItem("")
-            self._sig_branchLoaded.emit(0, (dataItem, ), pItem)
-            # pItem.insertRow(0, [dataItem])
+            # self._sig_branchLoaded.emit(0, (dataItem, ), pItem)
+            pItem.insertRow(0, [dataItem])
             k += 1
 
         else:
@@ -572,8 +569,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
             pItem.setData(qVariant(accessType), ObjectDataAccessTypeRole) # noqa
 
             if parentItem:
-                # parentItem.insertRow(row, rowItems)
-
                 if not issubclass(
                     type(obj), NOTMEMOIZED + PODS
                 ):
@@ -581,10 +576,12 @@ class DataTreeModel(QtGui.QStandardItemModel):
                         itemPath = f"{self._rootTitle_}{self.getPathForLeaf(pItem)}"
                         self._memoize_(obj, itemPath, objDict)
 
+                parentItem.insertRow(row, rowItems)
+
                 # self._sig_branchLoaded.emit(row, rowItems, parentItem)
 
         if len(visited):
-            self._sig_branchLoaded.emit(row, rowItems, parentItem)
+            # self._sig_branchLoaded.emit(row, rowItems, parentItem)
             return pItem
 
         for key, value in obj.items():
@@ -620,7 +617,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
             k += 1
 
-        self._sig_branchLoaded.emit(row, rowItems, parentItem)
+        # self._sig_branchLoaded.emit(row, rowItems, parentItem)
 
         return pItem
 
@@ -978,7 +975,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         return obj, {
             "indirect": False,
-            "nchildren": 0,
+            "nChildren": 0,
             "objDataAsChild": False,
             "objInfo": info,
             "objType": objType,
@@ -1699,7 +1696,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         return obj, {
             "indirect": False,
-            "nChidlren": 0,
+            "nChildren": 0,
             "objDataAsChild": True,
             "objInfo": info,
             "objType": objType,
@@ -1974,6 +1971,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         return pData, {
             "indirect": True,
+            "nChildren": len(pData),
             "objDataAsChild": False,
             "objInfo": info,
             "objType": objType,
@@ -1998,6 +1996,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         return obj, {
             "indirect": False,
+            "nChildren":0,
             "objDataAsChild": False,
             "objInfo": info,
             "objType": objType,

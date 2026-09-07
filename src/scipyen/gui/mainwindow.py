@@ -7331,6 +7331,10 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             self.slot_systemOpenFileOrFolder(
                 self.fileSystemModel.filePath(item))
 
+    @property
+    def fileSystemView(self) -> QtWidgets.QAbstractItemView:
+        return self._getFileSystemView()
+
     @safewrapper
     def _addRecentFile_(self, item, loader=None):
         '''Add the fully qualified file path 'item' as a key to the dictionary of
@@ -8142,14 +8146,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         #     )
 
     @Slot(QtCore.QItemSelection, QtCore.QItemSelection)
-    def slot_fileSystemColumnViewSelectionChanged(self, selected: QtCore.QItemSelection,
-                                                  deselected: QtCore.QItemSelection):
-        print(f"{self.__class__.__name__}.slot_fileSystemColumnViewSelectionChanged")
-        indexes = selected.indexes()
-        desel = deselected.indexes()
-        print(f"\n\tselected -> {len(indexes)}")
-        print(f"\n\tdeselected -> {len(desel)}")
-        self._fileSystemColumnViewPopulatePreview(indexes)
+    def slot_fileSystemColumnViewSelectionChanged(self, *args):
+        # print(f"{self.__class__.__name__}.slot_fileSystemColumnViewSelectionChanged")
+        # indexes = selected.indexes()
+        # desel = deselected.indexes()
+        # print(f"\n\tselected -> {len(indexes)}")
+        # print(f"\n\tdeselected -> {len(desel)}")
+        self._fileSystemColumnViewPopulatePreview()
+        # self._fileSystemColumnViewPopulatePreview(indexes)
         # if len(indexes) == 1:
         #     self._fileSystemColumnViewPopulatePreview(indexes[0])
         # else:
@@ -8157,9 +8161,9 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
 
 
-    def _fileSystemColumnViewPopulatePreview(self, indexes: list):
+    def _fileSystemColumnViewPopulatePreview(self):
         self.fileSystemColumnViewPreviewWidget.document().clear()
-
+        indexes = self.fileSystemView.selectedIndexes()
         if len(indexes) == 1:
             index = indexes[0]
             if isinstance(index, QtCore.QModelIndex):
@@ -8175,8 +8179,11 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         elif len(indexes) > 1:
             try:
                 fileSizes = [self.fileSystemModel.getFileSize(index) for index in indexes]
-                print(f"{self.__class__.__name__} file sizes = {fileSizes}")
-                totalSize = np.sum(np.fromiter(self.fileSystemModel.getFileSize(index) for index in indexes))
+                totalSize = fileSizes[0]
+                for x in fileSizes[1:]:
+                    totalSize += x
+                # print(f"{self.__class__.__name__} file sizes = {fileSizes}")
+                # totalSize = np.sum(np.fromiter(self.fileSystemModel.getFileSize(index) for index in indexes))
                 text = f"{len(indexes)} files selected (total size: {totalSize})"
                 infoData = ["<html>"]
                 infoData.append(f"<p> {text} </p>")
@@ -8352,6 +8359,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         else:
             self.fileSystemTreeView.setCurrentIndex(
                 self.fileSystemModel.index(targetDir))
+
             self.fileSystemListView.setCurrentIndex(targetIndex)
             self.fileSystemColumnView.setCurrentIndex(targetIndex)
 
