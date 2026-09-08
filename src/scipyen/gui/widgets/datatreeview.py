@@ -588,8 +588,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             # deleted (i.e. the special (hidden) symbol is removed from the
             # workspace)
             self._scipyenMainWindow_.assignToWorkspace("____", obj)
-            self._scipyenMainWindow_.console.execute("____", interactive=False)
-            self._scipyenMainWindow_.console.execute("del ____", hidden=True, interactive=False)
+            self._scipyenMainWindow_.console.execute("____", interactive=False, store_history=False)
+            self._scipyenMainWindow_.console.execute("del ____", hidden=True, interactive=False, store_history=False)
         except:
             traceback.print_exc()
 

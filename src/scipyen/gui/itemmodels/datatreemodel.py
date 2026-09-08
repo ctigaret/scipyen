@@ -5,7 +5,7 @@
 
 # from __future__ import print_function
 
-import os
+import os # noqa
 # import warnings
 import types
 import traceback
@@ -71,44 +71,44 @@ import neo # noqa
 if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList
 import quantities as pq # noqa
-import numpy as np # noqa
-import scipy # noqa
-import pandas as pd # noqa
-import vigra # noqa
-import meshio # noqa
+import numpy as np
+import scipy
+import pandas as pd
+import vigra
+import meshio
 # ### END 3rd party modules
 
-from core.qtutils import qVariant #, QVariantType #, qVariants, fromQVariant, isQObjectAlive) # noqa
+from core.qtutils import qVariant #, QVariantType #, qVariants, fromQVariant, isQObjectAlive)
 import core.datatypes as datatypes # noqa
-from core.datatypes import (is_namedtuple, TypeEnum) # noqa
-from core.prog import (scipywarn, timefunc, processtimefunc) # noqa
-from core import taxonbridge # noqa
-from core import bgbridge # noqa
+from core.datatypes import (is_namedtuple, TypeEnum)
+from core.prog import (scipywarn, timefunc, processtimefunc)  # noqa
+from core import taxonbridge
+from core import bgbridge
 from core.triggerprotocols import TriggerProtocol # noqa
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType) # noqa
 import core.datasignal as datasignal # noqa
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal) # noqa
 import core.datazone as datazone # noqa
-from core.datazone import (DataZone, Interval) # noqa
+from core.datazone import (DataZone, Interval)
 from core import xmlutils, strutils # noqa
-from core import scipyen_quantities as scq # noqa
-from core.utilities import unique # noqa
+from core import scipyen_quantities as scq
+from core.utilities import unique
 from core.prog import (safewrapper, safeguiwrapper, print_styled, # noqa
                        is_hashable)
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,) # noqa
-from core.scipyendataclasses import (isDataclass, getField, getFieldOrProperty) # noqa
-from core.datatypes import PODS # noqa
+from core.scipyendataclasses import (isDataclass, getField, getFieldOrProperty)
+from core.datatypes import PODS
 
 # print(f"has brain globe: {bgbridge.hasBrainGlobe}")
 
 # NOTE: 2026-02-07 09:14:19 FIXME/TODO
 # to break cycling dependencies in systems.PrairieView, which needs this for the
 # importer gui, MOVE the latter to a separate module
-from systems.PrairieView import * # noqa
+from systems.PrairieView import *
 
 from imaging import vigrautils # noqa
-import imaging.axiscalibration # noqa
-from imaging.axiscalibration import ( # noqa
+import imaging.axiscalibration
+from imaging.axiscalibration import (
     AxesCalibration,
     AxisCalibrationData,
     ChannelCalibrationData,
@@ -119,7 +119,7 @@ from imaging.axisutils import (axisTypeStrings, # noqa
 import imaging.scandata # noqa
 from imaging.scandata import (ScanData, AnalysisUnit) # noqa
 
-from gui.itemmodels.roles import * # noqa
+from gui.itemmodels.roles import *
 
 
 NOTMEMOIZED = (
@@ -287,22 +287,23 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # print(f"{self.__class__.__name__}._makeObjectRow_: objName -> {objName}")
 
         item0 = QtGui.QStandardItem(objName)
+        item0.setRowCount(objDict["nChildren"])
         item0.setData(objName, QtCore.Qt.DisplayRole)
-        item0.setData(objDict["objType"], ObjectTypeRole) # noqa
+        item0.setData(objDict["objType"], ObjectTypeRole)
         item0.setData(objDict["objType"].__name__, QtCore.Qt.ToolTipRole)
 
         # NOTE: 2026-02-09 21:47:10
         # used to construct the acess path to the object for this item
-        item0.setData(qVariant(memberAccess), ObjectDataAccessRole) # noqa star import from gui.itemmodels.roles
+        item0.setData(qVariant(memberAccess), ObjectDataAccessRole) # star import from gui.itemmodels.roles
 
         # NOTE: 2026-02-09 21:47:38
         # reference to the actual Python object
-        item0.setData(qVariant(obj), ObjectDataRole) # noqa star import from gui.itemmodels.roles
+        item0.setData(qVariant(obj), ObjectDataRole) # star import from gui.itemmodels.roles
 
         # NOTE: 2026-02-09 21:47:57
         # reference to the object's binding in its parent: e.g. symbol of an
         # attribute or field, index (for sequences), key (for mappings)
-        item0.setData(qVariant(objKey), ObjectKeyRole) # noqa
+        item0.setData(qVariant(objKey), ObjectKeyRole)
 
         # NOTE: 2026-02-09 21:49:05
         # object "bindings" are are int for sequences, any hashable object type
@@ -313,10 +314,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # "lazy" evaluation of the collection's contents - in itself for a good
         # reason) ; therefore, I apply the same philosophy here
         #
-        item0.setData(qVariant(objKeyType), ObjectKeyTypeRole) # noqa
+        item0.setData(qVariant(objKeyType), ObjectKeyTypeRole)
 
         editExternally = objDict["objDataAsChild"] and qVariant(not self._inlineTables_)
-        item0.setData(editExternally, ObjectDataEditExternallyRole) # noqa star import from gui.itemmodels.roles
+        item0.setData(editExternally, ObjectDataEditExternallyRole) # star import from gui.itemmodels.roles
 
         if visited:
             typeName = visited[-1].__name__
@@ -356,7 +357,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 item2.setData(info, QtCore.Qt.EditRole)
 
             choices = objDict.get("choices", {})
-            item2.setData(choices, DataChoicesRole) # noqa
+            item2.setData(choices, DataChoicesRole)
 
 
         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
@@ -381,7 +382,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                                         objDict.get("indirect", False) is True
                                         or objDict.get("objDataAsChild", False) is True
                                     )
-                                    and len(objDict.get("choices", dict())) == 0
+                                    and len(objDict.get("choices", {})) == 0
                                 ):
                     item.setData(readOnlyBrush, QtCore.Qt.ForegroundRole)
                     item.setData(readOnlyFont, QtCore.Qt.FontRole)
@@ -400,9 +401,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
     # @timefunc
     def populateModel(self, obj: object, rootTitle: str = "",
-        predicate: typing.Optional[types.FunctionType] = None,
+        predicate: types.FunctionType | None = None,
         showPrivate: bool = False,
-        # dataTypeStr: typing.Optional[str] = None,
         hideRoot: bool = False,
         readOnly: bool = False,
         valuesOnly: bool = True,
@@ -437,8 +437,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         self.setHorizontalHeaderLabels(["Object", "Type", "Information or Value"])
 
-        pData, objDict = self._parseObject_(obj, dict(),
-                                            self._showPrivate_)
+        pData, objDict = self._parseObject_(obj, {}, self._showPrivate_)
 
         self.setRowCount(objDict["nChildren"])
 
@@ -465,7 +464,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                                                     0
                                                     )
         if self.readOnly:
-            self._topObjectItem_.setData(self.readOnly, ReadOnlyRole) # noqa
+            self._topObjectItem_.setData(self.readOnly, ReadOnlyRole)
 
     @Slot(int, tuple, QtGui.QStandardItem)
     def _slot_branchLoaded(self, row: int, items: tuple[QtGui.QStandardItem],
@@ -478,43 +477,45 @@ class DataTreeModel(QtGui.QStandardItemModel):
                       parentItem: QtGui.QStandardItem,
                       row: int) -> QtGui.QStandardItem:
 
-        visited = tuple()
+        visited = ()
         objId = objDict["objId"]
 
-        if not issubclass(
-            type(obj), NOTMEMOIZED + PODS
-        ):
-            if objId in self._visited_ and objDict["objType"] == self._visited_[objId][-1]:
-                visited = self._visited_[objId]
+        if (
+            not issubclass(type(obj), NOTMEMOIZED + PODS)
+            and objId in self._visited_
+            and objDict["objType"] == self._visited_[objId][-1]
+            ):
+            visited = self._visited_[objId]
 
         rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType, visited)
 
         if self.readOnly:
             for item in rowItems:
-                item.setData(self.readOnly, ReadOnlyRole) # noqa
+                item.setData(self.readOnly, ReadOnlyRole)
 
         objItem = rowItems[0]
 
         if objDict["objDataAsChild"] and self._inlineTables_:
             dataItem = QtGui.QStandardItem("")
-            dataItem.setData(qVariant(True), StandaloneEditorWidgetRole) # noqa
+            dataItem.setData(qVariant(True), StandaloneEditorWidgetRole)
             # self._sig_branchLoaded.emit(0, (dataItem, ), objItem)
-            objItem.insertRow(0, [dataItem])
+            # objItem.insertRow(0, [dataItem])
+            objItem.setChild(0, dataItem)
             # return objItem
 
         else:
             dataItem = rowItems[-1]
             if len(visited) == 0:
-                dataItem.setData(qVariant(obj), ObjectDataRole) # noqa
+                dataItem.setData(qVariant(obj), ObjectDataRole)
 
         accessType = objDict.get("accessType", None)
 
-        objItem.setData(qVariant(accessType), ObjectDataAccessTypeRole) # noqa
+        objItem.setData(qVariant(accessType), ObjectDataAccessTypeRole)
 
         if not parentItem:
             parentItem = self.invisibleRootItem()
 
-        if parentItem:
+        if parentItem is not self.invisibleRootItem():
             if (not isinstance(obj, NOTMEMOIZED)
                 and not issubclass(
                     type(obj), NOTMEMOIZED + PODS
@@ -523,7 +524,16 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 itemPath = f"{self._rootTitle_}{self.getPathForLeaf(objItem)}"
                 self._memoize_(obj, itemPath, objDict)
 
-            parentItem.insertRow(row, rowItems)
+            for ki, item in enumerate(rowItems):
+                parentItem.setChild(row, ki, item)
+
+            rootItem = self.invisibleRootItem()
+            rootItem.setRowCount(1)
+            rootItem.setChild(0, parentItem)
+
+        # else:
+        #     parentIt
+        #     parentItem.insertRow(row, rowItems)
 
         # self._sig_branchLoaded.emit(row, rowItems, parentItem)
 
@@ -533,19 +543,20 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_buildBranch_.register(UserDict)
     @_buildBranch_.register(types.MappingProxyType)
     @_buildBranch_.register(OrderedDict)
-    def __buildBranch_(self: typing.Self, obj: typing.Union[dict, types.MappingProxyType, UserDict, OrderedDict],
+    def __buildBranch_(self: typing.Self, obj: (dict, types.MappingProxyType, UserDict, OrderedDict),
           objDict: dict, objKey: object, objKeyType: type,
           parentItem: QtGui.QStandardItem, row: int) -> QtGui.QStandardItem:
         # print(f"{self.__class__.__name__}._buildBranch_<{type(obj)}>")
-        visited = tuple()
+        visited = ()
 
         objId = objDict["objId"]
 
-        if not issubclass(
-            type(obj), NOTMEMOIZED + PODS
-        ):
-            if objId in self._visited_ and objDict["objType"] == self._visited_[objId][-1]:
-                visited = self._visited_[objId]
+        if (
+            not issubclass(type(obj), NOTMEMOIZED + PODS)
+            and objId in self._visited_
+            and objDict["objType"] == self._visited_[objId][-1]
+            ):
+            visited = self._visited_[objId]
 
         rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType, visited)
 
@@ -560,23 +571,26 @@ class DataTreeModel(QtGui.QStandardItemModel):
         if objDict["objDataAsChild"]:
             dataItem = QtGui.QStandardItem("")
             # self._sig_branchLoaded.emit(0, (dataItem, ), pItem)
-            pItem.insertRow(0, [dataItem])
+            # pItem.insertRow(0, [dataItem])
+            pItem.setChild(0, dataItem)
             k += 1
 
         else:
             accessType = objDict.get("accessType", None)
 
-            pItem.setData(qVariant(accessType), ObjectDataAccessTypeRole) # noqa
+            pItem.setData(qVariant(accessType), ObjectDataAccessTypeRole)
 
             if parentItem:
-                if not issubclass(
-                    type(obj), NOTMEMOIZED + PODS
-                ):
-                    if objId not in self._visited_:
-                        itemPath = f"{self._rootTitle_}{self.getPathForLeaf(pItem)}"
-                        self._memoize_(obj, itemPath, objDict)
+                if (
+                    not issubclass(type(obj), NOTMEMOIZED + PODS)
+                    and objId not in self._visited_
+                    ):
+                    itemPath = f"{self._rootTitle_}{self.getPathForLeaf(pItem)}"
+                    self._memoize_(obj, itemPath, objDict)
 
-                parentItem.insertRow(row, rowItems)
+                for ki, item in enumerate(rowItems):
+                    parentItem.setChild(row, ki, item)
+                # parentItem.insertRow(row, rowItems)
 
                 # self._sig_branchLoaded.emit(row, rowItems, parentItem)
 
@@ -594,21 +608,26 @@ class DataTreeModel(QtGui.QStandardItemModel):
             # TODO/FIXME: 2026-03-28 17:13:47
             # try and read the object's options for this member ("value")
             # and create choices accordingly
-            pValue, valDict = self._parseObject_(value, dict(), self._showPrivate_)
+            pValue, valDict = self._parseObject_(value, {}, self._showPrivate_)
 
-            if objDict["indirect"] and not self._showMethods_:
+            if (
+                objDict["indirect"]
+                and not self._showMethods_
+                and valDict["objType"] in (types.FunctionType,
+                                          types.BuiltinFunctionType,
+                                          types.MethodType,
+                                          types.BuiltinMethodType)
+                ):
                 # NOTE: 2026-05-05 22:33:51
                 # DO show functions & method values in a dict-like object, where
                 # "indirect" is False
-                if valDict["objType"] in (types.FunctionType,
-                                          types.BuiltinFunctionType,
-                                          types.MethodType,
-                                          types.BuiltinMethodType):
-                    continue
+                continue
 
-            if self._showValueAttributesOnly_:
-                if type in inspect.getmro(valDict["objType"]):
-                    continue
+            if (
+                self._showValueAttributesOnly_
+                and type in inspect.getmro(valDict["objType"])
+                ):
+                continue
 
             if (objDict.get("readOnlyChildren", False) is True) or self.readOnly:
                 valDict["readOnly"] = True
@@ -753,21 +772,22 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         if isDataclass(obj):
             datafields = dataclasses.fields(obj)
-            # all_attr_names = list(f.name for f in datafields) + [x[0] for x in inspect.getmembers_static(obj, lambda x: isinstance(x, property))]
-            # a_val = lambda a: getFieldOrProperty(obj,a).name if a in ('electrodeMode', 'pathwayType') else f"'{getFieldOrProperty(obj, a)}'" if a == 'name' else getFieldOrProperty(obj, a) # noqa
+
             try:
-                fieldnames = list(map(lambda f: f.name, datafields))
+                fieldnames = [f.name for f in datafields] #list(map(lambda f: f.name, datafields))
                 membernames = list(obj.__dict__.keys())
-                childnames = list(sorted(unique(membernames + fieldnames)))
-                pData = dict(map(lambda c: (c, getFieldOrProperty(obj, c)), childnames))
-                # pData = dict(map(lambda c: (c, getattr(obj, c)), childnames))
+                childnames = sorted(unique(membernames + fieldnames))
+                pData = {c: getFieldOrProperty(obj, c) for c in childnames}
+                # pData = dict(map(lambda c: (c, getFieldOrProperty(obj, c)), childnames))
             except: # noqa
                 # traceback.print_exc()
                 # print(
                 #     f"{print_styled(f'for {type(obj).__name__} data', color='red')}"
                 # )
                 # pData = dict(map(lambda x: (x.name, getattr(obj, x.name)), datafields))
-                pData = dict(map(lambda x: (x.name, getField(obj, x)), datafields))
+                # pData = dict(map(lambda x: (x.name, getField(obj, x)), datafields))
+                pData = {x.name: getField(obj,x) for x in datafields}
+                # nChildren = len(pData)
 
             if not includePrivateMembers:
                 pData = dict(
@@ -781,9 +801,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
             else:
                 readOnlyChildren = True
 
-            n = len(pData)
+            nChildren = len(pData)
 
-            info = f"{n} {strutils.pluralize('member', n)}"
+            info = f"{nChildren} {strutils.pluralize('member', nChildren)}"
             tip = f"{type(obj).__name__} (dataclass)"
             indirect = True
             objDataAsChild = False
@@ -802,6 +822,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             info = ""
             memberAccess = ("[", "]")
             accessType = "index"
+            nChildren = len(pData)
 
         elif HAS_MESHIO and isinstance(obj, meshio.Mesh):
             pData = obj
@@ -814,6 +835,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             accessType = None
             readOnly = True
             readOnlyChildren = True
+            nChildren = 0
 
         elif self._introspect_ and self.introspectable(obj) :
             # print(f"{self.__class__.__name__}._parseObject_ introspecting")
@@ -832,8 +854,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
             # indirect = True
             objDataAsChild = False
 
-            n = len(pData)
-            info = f"{n} {strutils.pluralize('member', n)}"
+            nChildren = len(pData)
+            info = f"{nChildren} {strutils.pluralize('member', nChildren)}"
             # choices = dict()
             memberAccess = (".", )
             accessType = "attribute"
@@ -848,6 +870,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             objDataAsChild = False
             memberAccess = tuple() # noqa
             accessType = None
+            nChildren = 0
             # choices = dict()
             # scipywarn(f"TODO: Support for objects of type {type(obj).__name__} awaits implementation. FIXME")
             # raise NotImplementedError(
@@ -856,6 +879,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         return pData, {
             "indirect": indirect,
+            "nChildren": nChildren,
             "objDataAsChild": objDataAsChild,
             "objInfo": info,
             "memberAccess": memberAccess,

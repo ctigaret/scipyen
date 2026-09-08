@@ -7692,97 +7692,122 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                 if not all(self.fileSystemModel.permissions(i) & QtCore.QFileDevice.ReadOwner for i in selectedFileSystemIndexes):
                     return
 
-                fileNames = set([self.fileSystemModel.filePath(i) for i in selectedFileSystemIndexes])
-                infos = list(map(lambda i: i.data(QtGui.QFileSystemModel.FileInfoRole), selectedFileSystemIndexes))
-                parents = list(map(lambda i: i.parent(), selectedFileSystemIndexes))
-                parentInfos = list(map(lambda i: i.data(QtGui.QFileSystemModel.FileInfoRole), parents))
+                # fileNames = set([self.fileSystemModel.filePath(i) for i in selectedFileSystemIndexes])
+                # infos = list(map(lambda i: i.data(QtGui.QFileSystemModel.FileInfoRole), selectedFileSystemIndexes))
+                # parents = list(map(lambda i: i.parent(), selectedFileSystemIndexes))
+                # parentInfos = list(map(lambda i: i.data(QtGui.QFileSystemModel.FileInfoRole), parents))
 
-                if len(selectedFileSystemIndexes) == 1:
+                infos = []
+                # parents = []
+                parentInfos = []
+                fileNames = []
+
+                for index in selectedFileSystemIndexes:
+                    fileName = self.fileSystemModel.filePath(index)
+                    info = index.data(QtGui.QFileSystemModel.FileInfoRole)
+                    if info.exists():
+                        # parent = i.parent()
+                        # parentInfo = parent.data(QtGui.QFileSystemModel.FileInfoRole)
+
+                        if fileName not in fileNames:
+                            fileNames.append(fileName)
+                            infos.append(info)
+                            # parentInfos.append(parentInfo)
+
+                if len(fileNames) == 0:
+                    return
+
+                fileNames = set(fileNames)
+
+                # if len(selectedFileSystemIndexes) == 1:
+                if len(infos) == 1:
                     # item = selectedFileSystemIndexes[0]
                     # info = item.data(QtGui.QFileSystemModel.FileInfoRole)
                     info = infos[0]
                     # print(f"\tpath: {self.fileSystemModel.filePath(item)}")
                     # print(f"\tisDir {info.isDir()}")
                     cm.addSeparator()
-                    if info.exists() and info.isDir() and info.isWritable():
-                        createNewFolderAction = cm.addAction(guiutils.getIcon("folder-new"), "Create New Folder")
-                        # createNewFolderAction = cm.addAction(QtGui.QIcon.fromTheme("folder-new"), "Create New Folder")
-                        createNewFolderAction.triggered.connect(self._slot_createNewFolder)
-                        cm.addSeparator()
-                        action_0 = createNewFolderAction
-                        create_new = createNewFolderAction
+                    # if info.exists() and info.isDir() and info.isWritable():
+                    if info.isDir():
+                        if info.isWritable():
+                            createNewFolderAction = cm.addAction(guiutils.getIcon("folder-new"), "Create New Folder")
+                            # createNewFolderAction = cm.addAction(QtGui.QIcon.fromTheme("folder-new"), "Create New Folder")
+                            createNewFolderAction.triggered.connect(self._slot_createNewFolder)
+                            cm.addSeparator()
+                            action_0 = createNewFolderAction
+                            create_new = createNewFolderAction
 
-                if all(i.exists() for i in infos):
-                    if len(infos) == 1:
-                        if infos[0].isDir():
-                            openIcon = guiutils.getIcon("document-open-folder")
-                        else:
-                            openIcon = guiutils.getIcon("document-open")
-
+                        openIcon = guiutils.getIcon("document-open-folder")
                     else:
-                        openIcon = guiutils.getIcon("project-open")
+                        openIcon = guiutils.getIcon("document-open")
 
-                    openFileObjects = cm.addAction(openIcon, "Open")
-                    openFileObjects.triggered.connect(self.slot_openSelectedFileItems)
+                else:
+                    openIcon = guiutils.getIcon("project-open")
 
-                    spreads = set([f for f in fileNames if pio.is_spreadsheet(f)])
-                    scripts = set([f for f in fileNames if pio.is_python_source(f)])
+                openFileObjects = cm.addAction(openIcon, "Open")
+                openFileObjects.triggered.connect(self.slot_openSelectedFileItems)
 
-                    if len(fileNames - spreads) == 0:
-                        importAsDataFrame = cm.addAction(guiutils.getIcon("document-open"), "Open as DataFrame")
-                        # importAsDataFrame = cm.addAction(QtGui.QIcon.fromTheme("document-open"), "Open as DataFrame")
-                        importAsDataFrame.triggered.connect(self.slot_importDataFrame)
+                # if all(i.exists() for i in infos):
+                # if len(infos) == 1:
+                #     if infos[0].isDir():
+                #         openIcon = guiutils.getIcon("document-open-folder")
+                #     else:
+                #         openIcon = guiutils.getIcon("document-open")
+                #
+                # else:
+                #     openIcon = guiutils.getIcon("project-open")
+                #
+                # openFileObjects = cm.addAction(openIcon, "Open")
+                # openFileObjects.triggered.connect(self.slot_openSelectedFileItems)
 
-                    if len(fileNames - scripts) == 0:
-                        addToScriptManager = cm.addAction(guiutils.getIcon("open-for-editing"), "Add to Script Manager")
-                        # addToScriptManager = cm.addAction(QtGui.QIcon.fromTheme("open-for-editing"), "Add to Script Manager")
-                        addToScriptManager.triggered.connect(
-                            self._slot_cm_AddPythonScriptToManager)
+                spreads = set([f for f in fileNames if pio.is_spreadsheet(f)])
+                scripts = set([f for f in fileNames if pio.is_python_source(f)])
 
-                    fileNamesToConsole = cm.addAction(guiutils.getIcon("text-field-framed"), "Send Name(s) to Console")
-                    # fileNamesToConsole = cm.addAction(QtGui.QIcon.fromTheme("text-field-framed"), "Send Name(s) to Console")
-                    fileNamesToConsole.triggered.connect(self._sendFileNamesToConsole_)
+                if len(fileNames - spreads) == 0:
+                    importAsDataFrame = cm.addAction(guiutils.getIcon("document-open"), "Open as DataFrame")
+                    importAsDataFrame.triggered.connect(self.slot_importDataFrame)
+
+                if len(fileNames - scripts) == 0:
+                    addToScriptManager = cm.addAction(guiutils.getIcon("open-for-editing"), "Add to Script Manager")
+                    addToScriptManager.triggered.connect(
+                        self._slot_cm_AddPythonScriptToManager)
+
+                fileNamesToConsole = cm.addAction(guiutils.getIcon("text-field-framed"), "Send Name(s) to Console")
+                fileNamesToConsole.triggered.connect(self._sendFileNamesToConsole_)
+
+                cm.addSeparator()
+                openFilesInSystemApp = cm.addAction(guiutils.getIcon("application-menu"), "Open With Default Application")
+                openFilesInSystemApp.triggered.connect(self.slot_systemOpenSelectedFiles)
+
+
+                if all(i.isWritable() for i in parentInfos):
+                    cm.addSeparator()
+                    cutFilesAction = cm.addAction(guiutils.getIcon("edit-cut"),"Cut")
+                    cutFilesAction.triggered.connect(self._slot_cutFileSystemItems)
+
+                    copyFileItemsAction = cm.addAction(guiutils.getIcon("edit-copy"),"Copy")
+                    copyFileItemsAction.triggered.connect(self._slot_copyFileSystemItems)
+
+                    pasteAction = cm.addAction(guiutils.getIcon("edit-paste"), pasteActionName)
+                    pasteAction.triggered.connect(self._slot_pasteIntoFileSystemDirectory)
+                    paste_action = pasteAction
+
+                    if len(selectedFileSystemIndexes) == 1:
+                        cm.addSeparator()
+                        renameAction = cm.addAction(guiutils.getIcon("edit-rename"),"Rename")
+                        renameAction.triggered.connect(self._slot_renameFileSystemItem)
 
                     cm.addSeparator()
-                    openFilesInSystemApp = cm.addAction(guiutils.getIcon("application-menu"), "Open With Default Application")
-                    # openFilesInSystemApp = cm.addAction(QtGui.QIcon.fromTheme("application-menu"), "Open With Default Application")
-                    openFilesInSystemApp.triggered.connect(self.slot_systemOpenSelectedFiles)
+                    if QtCore.QFile.supportsMoveToTrash():
+                        trashAction = cm.addAction(guiutils.getIcon("trash-empty"),"Move To Wastebin")
+                        trashAction.triggered.connect(self._slot_trashFileItems)
 
+                    deleteAction = cm.addAction(guiutils.getIcon("edit-delete"),"Delete")
+                    deleteAction.triggered.connect(self._slot_deleteFileItems)
+                    cm.addSeparator()
 
-                    if all(i.isWritable() for i in parentInfos):
-                        cm.addSeparator()
-                        cutFilesAction = cm.addAction(guiutils.getIcon("edit-cut"),"Cut")
-                        # cutFilesAction = cm.addAction(QtGui.QIcon.fromTheme("edit-cut"),"Cut")
-                        cutFilesAction.triggered.connect(self._slot_cutFileSystemItems)
-
-                        copyFileItemsAction = cm.addAction(guiutils.getIcon("edit-copy"),"Copy")
-                        # copyFileItemsAction = cm.addAction(QtGui.QIcon.fromTheme("edit-copy"),"Copy")
-                        copyFileItemsAction.triggered.connect(self._slot_copyFileSystemItems)
-
-                        pasteAction = cm.addAction(guiutils.getIcon("edit-paste"), pasteActionName)
-                        # pasteAction = cm.addAction(QtGui.QIcon.fromTheme("edit-paste"), pasteActionName)
-                        pasteAction.triggered.connect(self._slot_pasteIntoFileSystemDirectory)
-                        paste_action = pasteAction
-
-                        if len(selectedFileSystemIndexes) == 1:
-                            cm.addSeparator()
-                            renameAction = cm.addAction(guiutils.getIcon("edit-rename"),"Rename")
-                            # renameAction = cm.addAction(QtGui.QIcon.fromTheme("edit-rename"),"Rename")
-                            renameAction.triggered.connect(self._slot_renameFileSystemItem)
-
-                        cm.addSeparator()
-                        if QtCore.QFile.supportsMoveToTrash():
-                            trashAction = cm.addAction(guiutils.getIcon("trash-empty"),"Move To Wastebin")
-                            # trashAction = cm.addAction(QtGui.QIcon.fromTheme("trash-empty"),"Move To Wastebin")
-                            trashAction.triggered.connect(self._slot_trashFileItems)
-
-                        deleteAction = cm.addAction(guiutils.getIcon("edit-delete"),"Delete")
-                        # deleteAction = cm.addAction(QtGui.QIcon.fromTheme("edit-delete"),"Delete")
-                        deleteAction.triggered.connect(self._slot_deleteFileItems)
-                        cm.addSeparator()
-
-                    if action_0 is None:
-                        action_0 = openFileObjects
+                if action_0 is None:
+                    action_0 = openFileObjects
 
             cm.addSeparator()
 

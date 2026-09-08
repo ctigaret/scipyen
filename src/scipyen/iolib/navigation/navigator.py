@@ -159,7 +159,7 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
     # from qtpy import sip # noqa
-    # ____has_sip____ = True
+    # __has_sip__ = True
     # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
     # from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
