@@ -347,7 +347,7 @@ class ScipyenInProcessKernelClient(QtInProcessKernelClient):
             self.shell_channel.call_handlers_later(reply_msg)
 
 class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
-    r"""
+    r"""Modified RichJupyterWidget
     """
     # NOTE: This is , ultimately, a qtconsole.frontend_widget.FrontentWidget
     def __init__(self, *args, **kw):
@@ -374,6 +374,18 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
 
 
         ScipyenConfigurable.__init__(self)
+
+    # def _execute(self, source, hidden, store_history=True):
+    #     """ Execute 'source'. If 'hidden', do not show any output.
+    #
+    #     See parent class :meth:`execute` docstring for full details.
+    #     """
+    #     msg_id = self.kernel_client.execute(source, hidden, store_history)
+    #     self._request_info['execute'][msg_id] = self._ExecutionRequest(
+    #         msg_id, 'user', hidden)
+    #     if not hidden:
+    #         self.executing.emit(source)
+
 
     def _flush_pending_stream(self):
         r""" Flush out pending text into the widget.
@@ -414,6 +426,88 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
         cursor.insertText('')
         cursor.endEditBlock()
 
+    # def execute(self, source=None, hidden=False, interactive=False, store_history=True):
+    #     """ Executes source or the input buffer, possibly prompting for more
+    #     input.
+    #
+    #     Parameters
+    #     ----------
+    #     source : str, optional
+    #
+    #         The source to execute. If not specified, the input buffer will be
+    #         used. If specified and 'hidden' is False, the input buffer will be
+    #         replaced with the source before execution.
+    #
+    #     hidden : bool, optional (default False)
+    #
+    #         If set, no output will be shown and the prompt will not be modified.
+    #         In other words, it will be completely invisible to the user that
+    #         an execution has occurred.
+    #
+    #     interactive : bool, optional (default False)
+    #
+    #         Whether the console is to treat the source as having been manually
+    #         entered by the user. The effect of this parameter depends on the
+    #         subclass implementation.
+    #
+    #     Raises
+    #     ------
+    #     RuntimeError
+    #         If incomplete input is given and 'hidden' is True. In this case,
+    #         it is not possible to prompt for more input.
+    #
+    #     Returns
+    #     -------
+    #     A boolean indicating whether the source was executed.
+    #     """
+    #     # WARNING: The order in which things happen here is very particular, in
+    #     # large part because our syntax highlighting is fragile. If you change
+    #     # something, test carefully!
+    #
+    #     # Decide what to execute.
+    #     if source is None:
+    #         source = self.input_buffer
+    #
+    #     elif not hidden:
+    #         self.input_buffer = source
+    #
+    #     if hidden:
+    #         self._execute(source, hidden, store_history)
+    #     # Execute the source or show a continuation prompt if it is incomplete.
+    #     elif interactive and self.execute_on_complete_input:
+    #         self._register_is_complete_callback(
+    #             source, partial(self.do_execute, source, store_history=store_history))
+    #     else:
+    #         self.do_execute(source, True, '', store_history=store_history)
+    #
+    # def do_execute(self, source, complete, indent, store_history=True):
+    #     if complete:
+    #         self._append_plain_text('\n')
+    #         self._input_buffer_executing = self.input_buffer
+    #         self._executing = True
+    #         self._finalize_input_request()
+    #
+    #         # Perform actual execution.
+    #         self._execute(source, False, store_history)
+    #
+    #     else:
+    #         # Do this inside an edit block so continuation prompts are
+    #         # removed seamlessly via undo/redo.
+    #         cursor = self._get_end_cursor()
+    #         cursor.beginEditBlock()
+    #         try:
+    #             cursor.insertText('\n')
+    #             self._insert_continuation_prompt(cursor, indent)
+    #         finally:
+    #             cursor.endEditBlock()
+    #
+    #         # Do not do this inside the edit block. It works as expected
+    #         # when using a QPlainTextEdit control, but does not have an
+    #         # effect when using a QTextEdit. I believe this is a Qt bug.
+    #         self._control.moveCursor(QtGui.QTextCursor.End)
+    #
+    #         # Advance where text is inserted
+    #         self._insert_text_cursor.movePosition(QtGui.QTextCursor.End)
 
     @safewrapper
     @Slot()
@@ -812,8 +906,8 @@ class ConsoleWidget(RichJupyterWidget, ScipyenConfigurable):
 f"""
 get_ipython().InteractiveTB.tb_highlight = 'bg:ansired'
 """,
-            True)
-            except:
+            True)#, False)
+            except: # noqa
                 traceback.print_exc()
 
 class ExternalConsoleWindow(MainWindow, WorkspaceGuiMixin):

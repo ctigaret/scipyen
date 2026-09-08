@@ -64,14 +64,14 @@ import pandas as pd
 # import vigra
 # ### END 3rd party modules
 
-from core.workspacefunctions import (validate_varname, user_workspace)
+# from core.workspacefunctions import (validate_varname, user_workspace)
 from core import prog
 from core.prog import safewrapper
 from core import strutils
 
 from gui.delegates import PythonItemDelegate
 from gui.workspacegui import WorkspaceGuiMixin
-from gui.itemmodels.roles import * #noqa
+from gui.itemmodels.roles import *
 from gui.itemmodels.datatreemodel import DataTreeModel
 from gui import quickdialog
 
@@ -86,6 +86,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     sig_itemDoubleClicked = Signal(QtGui.QStandardItem, name="sig_itemDoubleClicked")
     sig_dataChanged = Signal(QtCore.QModelIndex, QtCore.QModelIndex, name="sig_dataChanged")
     sig_modelDataChanged = Signal(name = "sig_modelDataChanged")
+
     def __init__(self: typing.Self, *args, **kwargs):
         # print(f"{self.__class__.__name__}.__init__")
         parent = kwargs.pop("parent", None)
@@ -130,7 +131,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
         self._defaultDelegate_ = self.itemDelegate()
         self._delegate_ = PythonItemDelegate(parent = self)
-        self._dragStartPosition_: typing.Optional[QtCore.QPoint] = None
+        self._dragStartPosition_: QtCore.QPoint | None = None
 
         self._currentExpansionDepth_: int = 0
 
@@ -588,8 +589,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             # deleted (i.e. the special (hidden) symbol is removed from the
             # workspace)
             self._scipyenMainWindow_.assignToWorkspace("____", obj)
-            self._scipyenMainWindow_.console.execute("____", interactive=False, store_history=False)
-            self._scipyenMainWindow_.console.execute("del ____", hidden=True, interactive=False, store_history=False)
+            self._scipyenMainWindow_.console.execute("____", hidden=False, interactive=False)#, store_history=False)
+            self._scipyenMainWindow_.console.execute("del ____", hidden=True, interactive=False)#, store_history=False)
         except:
             traceback.print_exc()
 
@@ -630,52 +631,54 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         model = self.sourceModel
         # model = self.model()
         # index = item.index()
-        objData = item.data(ObjectDataRole) # noqa
-        objType = item.data(ObjectTypeRole) # noqa
+        objData = item.data(ObjectDataRole)
+        objType = item.data(ObjectTypeRole)
 
         if item.column() == 0 and item.hasChildren():
             for row in range(item.rowCount()):
                 childItem = item.child(row, 0)
+                if childItem:
+                    if row == 0:
+                        hasEditorWidgetChild = childItem.data(StandaloneEditorWidgetRole)
+                        if hasEditorWidgetChild is True:
+                            flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
+                            # NOTE: 2026-04-01 11:03:24
+                            # this sets the child in row 0 to span all columns
+                            self.setFirstColumnSpanned(0, self.proxyModel.mapFromSource(item.index()), True)
+                            # self.setFirstColumnSpanned(0, item.index(), True)
+
+                            # self.setItemDelegateForColumn(childItem.column(), self._delegate_)
+                            # self.setItemDelegateForRow(childItem.row(), self._delegate_)
+                            childItem.setFlags(flags)
+
+                            # childIndex = item.child(0).index()
+                            # ### BEGIN 2026-04-01 10:52:25 Too slow, but working; DO NOT DELETE
+                            #
+
+                            if hasattr(model, "_inlineTables_") and model._inlineTables_:
+                                # print(f"{self.__class__.__name__}._setupChildDataItem_ for _inlineTables_")
+                                editorWidget = self._delegate_.createWidget(objData,
+                                                                            choices = [],
+                                                                            inModel = False,
+                                                                            parent = self)
+                                # if self.model().readOnly or item.data(ReadOnlyRole) is True:
+                                if model.readOnly or item.data(ReadOnlyRole) is True:
+                                    if hasattr(editorWidget,  "readOnly") and type(editorWidget).readOnly.__name__ == "property":
+                                        editorWidget.readOnly = True
+
+                                    elif hasattr(editorWidget, "setReadOnly") and isinstance(type(editorWidget).setReadOnly, (types.FunctionType, types.MethodType)):
+                                        editorWidget.setReadOnly(True)
+
+                                self.setIndexWidget(self.proxyModel.mapFromSource(childItem.index()), editorWidget)
+                                # self.setIndexWidget(childItem.index(), editorWidget)
+
+                            # ### END   2026-04-01 10:52:25 Too slow, but working; DO NOT DELETE
+
+                            continue
+
+                    self._setupChildDataItem_(childItem)
+
                 infoItem = item.child(row, 2)
-                if row == 0:
-                    hasEditorWidgetChild = childItem.data(StandaloneEditorWidgetRole) # noqa
-                    if hasEditorWidgetChild is True:
-                        flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
-                        # NOTE: 2026-04-01 11:03:24
-                        # this sets the child in row 0 to span all columns
-                        self.setFirstColumnSpanned(0, self.proxyModel.mapFromSource(item.index()), True)
-                        # self.setFirstColumnSpanned(0, item.index(), True)
-
-                        # self.setItemDelegateForColumn(childItem.column(), self._delegate_)
-                        # self.setItemDelegateForRow(childItem.row(), self._delegate_)
-                        childItem.setFlags(flags)
-
-                        # childIndex = item.child(0).index()
-                        # ### BEGIN 2026-04-01 10:52:25 Too slow, but working; DO NOT DELETE
-                        #
-
-                        if hasattr(model, "_inlineTables_") and model._inlineTables_:
-                            # print(f"{self.__class__.__name__}._setupChildDataItem_ for _inlineTables_")
-                            editorWidget = self._delegate_.createWidget(objData,
-                                                                        choices = list(),
-                                                                        inModel = False,
-                                                                        parent = self)
-                            # if self.model().readOnly or item.data(ReadOnlyRole) is True:
-                            if model.readOnly or item.data(ReadOnlyRole) is True:
-                                if hasattr(editorWidget,  "readOnly") and type(editorWidget).readOnly.__name__ == "property":
-                                    editorWidget.readOnly = True
-                                elif hasattr(editorWidget, "setReadOnly") and isinstance(type(editorWidget).setReadOnly, (types.FunctionType, types.MethodType)):
-                                    editorWidget.setReadOnly(True)
-
-                            self.setIndexWidget(self.proxyModel.mapFromSource(childItem.index()), editorWidget)
-                            # self.setIndexWidget(childItem.index(), editorWidget)
-
-                        # ### END   2026-04-01 10:52:25 Too slow, but working; DO NOT DELETE
-
-                        continue
-
-                self._setupChildDataItem_(childItem)
-
                 if infoItem:
                     self._setupChildDataItem_(infoItem) #, objData)
 

@@ -167,7 +167,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     sequenceTypes = (typing.Sequence, tuple, list, deque, bytes)
     iterableCollectionTypes = sequenceTypes + mappingTypes
 
-    _sig_branchLoaded = Signal(int, tuple, QtGui.QStandardItem, name="_sig_branchLoaded")
+    # _sig_branchLoaded = Signal(int, tuple, QtGui.QStandardItem, name="_sig_branchLoaded")
 
     sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
     sig_modelDataChanged = Signal(name="sig_modelDataChanged")
@@ -220,7 +220,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         self.endResetModel()
 
-        self._sig_branchLoaded.connect(self._slot_branchLoaded)
+        # self._sig_branchLoaded.connect(self._slot_branchLoaded)
 
     # def canFetchMore(self, parentIndex: QtCore.QModelIndex) -> bool:
     #     return False if parentIndex.isValid() else parentIndex.rowCount() <
@@ -466,10 +466,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
         if self.readOnly:
             self._topObjectItem_.setData(self.readOnly, ReadOnlyRole)
 
-    @Slot(int, tuple, QtGui.QStandardItem)
-    def _slot_branchLoaded(self, row: int, items: tuple[QtGui.QStandardItem],
-                           parentItem: QtGui.QStandardItem, ):
-        parentItem.insertRow(row, items)
+    # @Slot(int, tuple, QtGui.QStandardItem)
+    # def _slot_branchLoaded(self, row: int, items: tuple[QtGui.QStandardItem],
+    #                        parentItem: QtGui.QStandardItem, ):
+    #     parentItem.insertRow(row, items)
 
     @singledispatchmethod
     def _buildBranch_(self: typing.Self, obj: object, objDict: dict,
@@ -500,7 +500,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
             dataItem.setData(qVariant(True), StandaloneEditorWidgetRole)
             # self._sig_branchLoaded.emit(0, (dataItem, ), objItem)
             # objItem.insertRow(0, [dataItem])
+            # print(f"{self.__class__.__name__}._buildBranch_ -> inserting {dataItem}('{dataItem.data(QtCore.Qt.DisplayRole)}') for inlineTables as child of {objItem}('{objItem.data(QtCore.Qt.DisplayRole)}')")
             objItem.setChild(0, dataItem)
+            # objItem.setData(qVariant(accessType), ObjectDataAccessTypeRole)
             # return objItem
 
         else:
@@ -525,6 +527,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 self._memoize_(obj, itemPath, objDict)
 
             for ki, item in enumerate(rowItems):
+                # print(f"{self.__class__.__name__}._buildBranch_[dict] -> inserting {item}('{item.data(QtCore.Qt.DisplayRole)}') as child of {parentItem}('{parentItem.data(QtCore.Qt.DisplayRole)}') at row {row}, column {ki}")
                 parentItem.setChild(row, ki, item)
 
             rootItem = self.invisibleRootItem()
@@ -568,10 +571,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         k = 0
 
-        if objDict["objDataAsChild"]:
+        if objDict["objDataAsChild"] and self._inlineTables_:
             dataItem = QtGui.QStandardItem("")
             # self._sig_branchLoaded.emit(0, (dataItem, ), pItem)
             # pItem.insertRow(0, [dataItem])
+            # print(f"{self.__class__.__name__}._buildBranch_[dict] -> inserting {dataItem}('{dataItem.data(QtCore.Qt.DisplayRole)}') for inlineTables as child of {pItem}('{pItem.data(QtCore.Qt.DisplayRole)}')")
             pItem.setChild(0, dataItem)
             k += 1
 
@@ -589,52 +593,53 @@ class DataTreeModel(QtGui.QStandardItemModel):
                     self._memoize_(obj, itemPath, objDict)
 
                 for ki, item in enumerate(rowItems):
+                    # print(f"{self.__class__.__name__}._buildBranch_[dict] -> inserting {item}('{item.data(QtCore.Qt.DisplayRole)}') as child of {parentItem}('{parentItem.data(QtCore.Qt.DisplayRole)}') at row {row}, column {ki}")
                     parentItem.setChild(row, ki, item)
                 # parentItem.insertRow(row, rowItems)
 
                 # self._sig_branchLoaded.emit(row, rowItems, parentItem)
 
-        if len(visited):
-            # self._sig_branchLoaded.emit(row, rowItems, parentItem)
-            return pItem
+            if len(visited):
+                # self._sig_branchLoaded.emit(row, rowItems, parentItem)
+                return pItem
 
-        for key, value in obj.items():
-            if isinstance(key, str):
-                keyName = key
+            for key, value in obj.items():
+                if isinstance(key, str):
+                    keyName = key
 
-            else:
-                keyName = f"{key}"
+                else:
+                    keyName = f"{key}"
 
-            # TODO/FIXME: 2026-03-28 17:13:47
-            # try and read the object's options for this member ("value")
-            # and create choices accordingly
-            pValue, valDict = self._parseObject_(value, {}, self._showPrivate_)
+                # TODO/FIXME: 2026-03-28 17:13:47
+                # try and read the object's options for this member ("value")
+                # and create choices accordingly
+                pValue, valDict = self._parseObject_(value, {}, self._showPrivate_)
 
-            if (
-                objDict["indirect"]
-                and not self._showMethods_
-                and valDict["objType"] in (types.FunctionType,
-                                          types.BuiltinFunctionType,
-                                          types.MethodType,
-                                          types.BuiltinMethodType)
-                ):
-                # NOTE: 2026-05-05 22:33:51
-                # DO show functions & method values in a dict-like object, where
-                # "indirect" is False
-                continue
+                if (
+                    objDict["indirect"]
+                    and not self._showMethods_
+                    and valDict["objType"] in (types.FunctionType,
+                                            types.BuiltinFunctionType,
+                                            types.MethodType,
+                                            types.BuiltinMethodType)
+                    ):
+                    # NOTE: 2026-05-05 22:33:51
+                    # DO show functions & method values in a dict-like object, where
+                    # "indirect" is False
+                    continue
 
-            if (
-                self._showValueAttributesOnly_
-                and type in inspect.getmro(valDict["objType"])
-                ):
-                continue
+                if (
+                    self._showValueAttributesOnly_
+                    and type in inspect.getmro(valDict["objType"])
+                    ):
+                    continue
 
-            if (objDict.get("readOnlyChildren", False) is True) or self.readOnly:
-                valDict["readOnly"] = True
+                if (objDict.get("readOnlyChildren", False) is True) or self.readOnly:
+                    valDict["readOnly"] = True
 
-            self._buildBranch_(pValue, valDict, keyName, type(key), pItem, k)
+                self._buildBranch_(pValue, valDict, keyName, type(key), pItem, k)
 
-            k += 1
+                k += 1
 
         # self._sig_branchLoaded.emit(row, rowItems, parentItem)
 
@@ -1898,13 +1903,16 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
     @_parseObject_.register(vigra.VigraArray)
     def __parseObject_(self: typing.Self, obj:vigra.VigraArray, # noqa
-          choices: dict = dict(),
+          choices: dict = {},
           _: bool = True) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        if not isinstance(choices, dict):
-            if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
-                choices = dict()
+        if (
+            not isinstance(choices, dict)
+            and len(choices)> 0
+            and not all(isinstance(v, objType) for v in choices.values())
+            ):
+            choices = dict()
 
         # NOTE: 2026-02-11 21:11:11
         # member access relates to metadata attributes (i.e., axistags);
