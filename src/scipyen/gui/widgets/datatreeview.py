@@ -123,10 +123,11 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         if hasattr(self.sourceModel, "sig_modelDataChanged"):
             self.sourceModel.sig_modelDataChanged.connect(self.sig_modelDataChanged)
 
-        self.proxyModel = QtCore.QSortFilterProxyModel(self)
-        self.proxyModel.setSourceModel(self.sourceModel)
+        # self.proxyModel = QtCore.QSortFilterProxyModel(self)
+        # self.proxyModel.setSourceModel(self.sourceModel)
 
-        super().setModel(self.proxyModel)
+        # super().setModel(self.proxyModel)
+        super().setModel(self.sourceModel)
         self.setSortingEnabled(True)
 
         self._defaultDelegate_ = self.itemDelegate()
@@ -644,8 +645,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                             flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
                             # NOTE: 2026-04-01 11:03:24
                             # this sets the child in row 0 to span all columns
-                            self.setFirstColumnSpanned(0, self.proxyModel.mapFromSource(item.index()), True)
-                            # self.setFirstColumnSpanned(0, item.index(), True)
+                            # self.setFirstColumnSpanned(0, self.proxyModel.mapFromSource(item.index()), True)
+                            self.setFirstColumnSpanned(0, item.index(), True)
 
                             # self.setItemDelegateForColumn(childItem.column(), self._delegate_)
                             # self.setItemDelegateForRow(childItem.row(), self._delegate_)
@@ -669,8 +670,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                                     elif hasattr(editorWidget, "setReadOnly") and isinstance(type(editorWidget).setReadOnly, (types.FunctionType, types.MethodType)):
                                         editorWidget.setReadOnly(True)
 
-                                self.setIndexWidget(self.proxyModel.mapFromSource(childItem.index()), editorWidget)
-                                # self.setIndexWidget(childItem.index(), editorWidget)
+                                # self.setIndexWidget(self.proxyModel.mapFromSource(childItem.index()), editorWidget)
+                                self.setIndexWidget(childItem.index(), editorWidget)
 
                             # ### END   2026-04-01 10:52:25 Too slow, but working; DO NOT DELETE
 
@@ -722,7 +723,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         # WARNING: 2026-06-28 11:45:39
         # DO NOT call begin/endResetMdoel on the proxyModel here
         # see also WARNING: 2026-06-28 11:43:14 in itemmodels.datatreemodel.DataTreeModel
-        self.proxyModel.setSourceModel(self.sourceModel)
+        # self.proxyModel.setSourceModel(self.sourceModel)
 
         root = self.sourceModel.invisibleRootItem()
         if root.hasChildren():
@@ -740,10 +741,10 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                 if col >=0 and col < 3:
                     self.resizeColumnToContents(col)
 
-            # self.proxyModel.setDynamicSortFilter(False)
-            # self.proxyModel.setSourceModel(self.sourceModel)
-            self.proxyModel.sort(-1)
-            # self.proxyModel.setDynamicSortFilter(True)
+            # # self.proxyModel.setDynamicSortFilter(False)
+            # # self.proxyModel.setSourceModel(self.sourceModel)
+            # self.proxyModel.sort(-1)
+            # # self.proxyModel.setDynamicSortFilter(True)
 
     def setRootName(self, value: str):
         # print(f"{self.__class__.__name__}.setRootName({value})")
@@ -760,7 +761,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         for col in self.autoResizeColumns:
             if col >=0 and col < 3:
                 self.resizeColumnToContents(col)
-        self.proxyModel.sort(-1)
+        # self.proxyModel.sort(-1)
 
     @property
     def hasData(self) -> bool:
@@ -794,15 +795,17 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         # WARNING: delegates are handled by the viewer owner of this model!
 
     def selectedItems(self: typing.Self) -> typing.Sequence:
-        return list(
-                        filter(lambda i: i.column() == 0,
-                               map(
-                                   # lambda i: self.model().itemFromIndex(i),
-                                   lambda i: self.sourceModel.itemFromIndex(self.proxyModel.mapToSource(i)),
-                                   self.selectedIndexes()
-                                   )
-                               )
-                    )
+        return [self.model().itemFromIndex(i) for i in self.selectedIndexes() if i.column() == 0]
+        # return [self.sourceModel.itemFromIndex(self.proxyModel.mapToSource(i) for i in self.selectedIndexes() if i.column() == 0]
+        # return list(
+        #                 filter(lambda i: i.column() == 0,
+        #                        map(
+        #                            lambda i: self.model().itemFromIndex(i),
+        #                            # lambda i: self.sourceModel.itemFromIndex(self.proxyModel.mapToSource(i)),
+        #                            self.selectedIndexes()
+        #                            )
+        #                        )
+        #             )
 
     def getDataForItems(
         self: typing.Self,
@@ -923,7 +926,8 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
     def mouseDoubleClickEvent(self: typing.Self, evt: QtGui.QMouseEvent):
         pos = evt.position().toPoint()
-        index = self.proxyModel.mapToSource(self.indexAt(pos))
+        index = self.indexAt(pos)
+        # index = self.proxyModel.mapToSource(self.indexAt(pos))
         item = self.sourceModel.itemFromIndex(index)
         if item.column() == 0:
             self.sig_itemDoubleClicked.emit(item)
