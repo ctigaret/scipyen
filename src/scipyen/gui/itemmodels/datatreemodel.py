@@ -797,9 +797,12 @@ class DataTreeModel(QtGui.QStandardItemModel):
         objDataAsChild: bool = False
         objType = type(obj)
         objId = id(obj)
-        if not isinstance(choices, dict):
-            if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
-                choices = dict()
+        if (
+            not isinstance(choices, dict)
+            and len(choices)> 0
+            and not all(isinstance(v, objType) for v in choices.values())
+            ):
+            choices = {}
         readOnly = False
         readOnlyChildren = False
 
@@ -847,7 +850,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         elif HAVE_METAARRAY and (
                 hasattr(obj, "implements") and obj.implements("MetaArray")
             ):
-            pData = dict(
+            pData = dict( # noqa
                     [("data", obj.view(np.ndarray)), ("meta", obj.infoCopy())]
                 )
             indirect = True
@@ -860,11 +863,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
         elif HAS_MESHIO and isinstance(obj, meshio.Mesh):
             pData = obj
             indirect=False,
-            s = " × ".join(list(map(lambda x: f"{x}", obj.points.shape)))
+            s = " × ".join(list(map(lambda x: f"{x}", obj.points.shape))) # noqa
             info = f"{obj.points.size} points ({s})"
             tip = type(obj).__name__
             objDataAsChild = False
-            memberAccess = tuple()
+            memberAccess = ()
             accessType = None
             readOnly = True
             readOnlyChildren = True
@@ -928,9 +931,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(type(None))
     @_parseObject_.register(type(MISSING))
     @_parseObject_.register(type(pd.NA))
-    def __parseObject_(self: typing.Self, obj: typing.Union[type(None), type(MISSING), type(pd.NA)],
-          choices: dict = dict(), # noqa
-          _:bool = False) -> tuple:
+    def __parseObject_(self: typing.Self, obj: (type(None), type(MISSING), type(pd.NA)),
+          choices: dict = {}, _:bool = False) -> tuple: # noqa
         objType = type(obj)
         objId = id(obj)
         pData = obj
@@ -938,11 +940,14 @@ class DataTreeModel(QtGui.QStandardItemModel):
         info = f"{obj}"
         tip = f"{obj}"
         objDataAsChild = False
-        memberAccess = tuple()
+        memberAccess = ()
         accessType = None
-        if not isinstance(choices, dict):
-            if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
-                choices = dict()
+        if (
+            not isinstance(choices, dict)
+            and len(choices)> 0
+            and not all(isinstance(v, objType) for v in choices.values())
+            ):
+            choices = {}
 
         # TODO/FIXME: 2026-03-28 16:57:15
         # mechanism to see if a new object of another type is acceptable here, in which case call a UI c'tor'
@@ -974,8 +979,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                                                datetime.time,
                                                datetime.timedelta,
                                                datetime.timezone],
-          choices: dict = dict(),
-          _:bool = False) -> tuple:
+          _: dict = {}, __:bool = False) -> tuple: # noqa
 
         objType = type(obj)
         objId = id(obj)
@@ -985,9 +989,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
         objDataAsChild = False
         memberAccess = tuple()
         accessType = None
-        if not isinstance(choices, dict):
-            if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
-                choices = dict()
+        # if not isinstance(choices, dict):
+        #     if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
+        #         choices = dict()
         readOnly = False
 
         return pData, {
@@ -999,7 +1003,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "accessType": accessType,
             "objTip": tip,
             "objType": objType,
-            "choices": dict(),
+            "choices": {},
             "readOnly": readOnly,
             "objId": objId
             }
@@ -1488,16 +1492,19 @@ class DataTreeModel(QtGui.QStandardItemModel):
                                                numbers.Number,
                                                np.integer, np.floating,
                                                np.complexfloating],
-          choices: dict = dict(),
-          _: bool=True) -> tuple:
+          choices: dict = {}, _: bool=True) -> tuple: # noqa
         objId = id(obj)
         objType = type(obj)
 
         objInfo = obj
 
-        if not isinstance(choices, dict):
-            if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
-                choices = dict()
+        if (
+            not isinstance(choices, dict)
+            and len(choices)> 0
+            and not all(isinstance(v, objType) for v in choices.values())
+            ):
+            choices = {}
+
         tip = objType.__name__
         return obj, {
             "indirect": False,
@@ -2451,7 +2458,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         OK = False
         try:
             # print(f"{self.__class__.__name__}.setData: setexpr = {setexpr}")
-            exec(setexpr)
+            exec(setexpr) # noqa
             newVal = eval(accexpr)
             OK = True
 
@@ -2479,6 +2486,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
             self.sig_modelDataChanged.emit()
 
         return OK
+
+    def hasChildren(self, index:QtCore.QModelIndex) -> bool:
+        return True
 
 
 
