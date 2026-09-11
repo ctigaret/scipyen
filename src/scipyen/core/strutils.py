@@ -861,9 +861,26 @@ def is_path(s: str) -> bool:
     import pydoc
     if not isinstance(s, str) or len(s.strip()) == 0:
         return False
-    return pydoc.ispath(s)
+    return pydoc.ispath(s) or is_windows_path(s) or is_absolute_windows_path(s)
     # return isinstance(x, str) and x.find(os.sep) >= 0
 
+def is_windows_path(s: str) -> bool:
+    from pathlib import PureWindowsPath
+    if not isinstance(s, str) or not s:
+        return False
+
+    path = PureWindowsPath(s)
+
+    # Windows-specific path syntax:
+    return (
+        path.drive != ""             # C:\file.txt or \\server\share
+        or "\\" in s                 # relative path such as folder\file.txt
+    )
+
+def is_absolute_windows_path(s: str) -> bool:
+    from pathlib import PureWindowsPath
+    path = PureWindowsPath(s)
+    return path.is_absolute()
 
 def str2range(s: str) -> range:
     r"""Parses the string representation of a range into a range object"""

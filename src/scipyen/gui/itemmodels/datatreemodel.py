@@ -701,7 +701,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
     @singledispatchmethod
     def _parseObject_(self: typing.Self, obj: object,
-                      choices: dict = {},
+                      choices: dict = {},  # noqa: B006
                       includePrivateMembers: bool = False,
                    ) -> tuple:
         r"""
@@ -786,28 +786,32 @@ class DataTreeModel(QtGui.QStandardItemModel):
         readOnlyChildren = False
 
         if isDataclass(obj):
-            datafields = dataclasses.fields(obj)
-
-            try:
-                fieldnames = [f.name for f in datafields] #list(map(lambda f: f.name, datafields))
-                membernames = list(obj.__dict__.keys())
-                childnames = sorted(unique(membernames + fieldnames))
-                pData = {c: getFieldOrProperty(obj, c) for c in childnames}
-
-            except: # noqa
-                pData = {x.name: getField(obj,x) for x in datafields}
-
-            if not includePrivateMembers: # self._showPrivate_ passed as this
-                pData = self._exclude_private_members_(pData)
-
-            else:
-                readOnlyChildren = True
-
-            nChildren = len(pData)
-
-            info = f"{nChildren} {strutils.pluralize('member', nChildren)}"
-            tip = f"{type(obj).__name__} (dataclass)"
+            pData, fullCount, nChildren = self._generate_dict_(obj, includePrivateMembers)
             indirect = True
+            if includePrivateMembers:
+                readOnlyChildren = True
+            # datafields = dataclasses.fields(obj)
+            #
+            # try:
+            #     fieldnames = [f.name for f in datafields] #list(map(lambda f: f.name, datafields))
+            #     membernames = list(obj.__dict__.keys())
+            #     childnames = sorted(unique(membernames + fieldnames))
+            #     pData = {c: getFieldOrProperty(obj, c) for c in childnames}
+            #
+            # except: # noqa
+            #     pData = {x.name: getField(obj,x) for x in datafields}
+            #
+            # if not includePrivateMembers: # self._showPrivate_ passed as this
+            #     pData = self._exclude_private_members_(pData)
+            #
+            # else:
+            #     readOnlyChildren = True
+            #
+            # nChildren = len(pData)
+
+            info = f"{nChildren} {strutils.pluralize('member', nChildren)} (of {fullCount})"
+            tip = f"{type(obj).__name__} (dataclass)"
+            # indirect = True
             objDataAsChild = False
             memberAccess = (".",)
             accessType = "attribute"
@@ -818,15 +822,17 @@ class DataTreeModel(QtGui.QStandardItemModel):
             and hasattr(obj, "implements")
             and obj.implements("MetaArray")
             ):
-            pData = dict( # noqa
-                    [("data", obj.view(np.ndarray)), ("meta", obj.infoCopy())]
-                )
+            pData, fullCount, nChildren = self._generate_dict_(obj, includePrivateMembers)
             indirect = True
+            # pData = dict( # noqa
+            #         [("data", obj.view(np.ndarray)), ("meta", obj.infoCopy())]
+            #     )
+            # indirect = True
             objDataAsChild = False
             info = ""
             memberAccess = ("[", "]")
             accessType = "index"
-            nChildren = len(pData)
+            # nChildren = len(pData)
 
         elif HAS_MESHIO and isinstance(obj, meshio.Mesh):
             pData = obj
@@ -842,20 +848,21 @@ class DataTreeModel(QtGui.QStandardItemModel):
             nChildren = 0
 
         elif self._introspect_ and self.introspectable(obj) :
-            # self._introspect_ set by self.showIntrospection
-            pData = datatypes.inspect_members(obj, self._predicate_)
+            pData, fullCount, nChildren = self._generate_dict_(obj, includePrivateMembers)
             indirect = True
-            if not includePrivateMembers:
-                pData = self._exclude_private_members_(pData)
-
-            if not self._showMethods_:
-                pData = self._exclude_methods_and_functions_(pData)
+            # self._introspect_ set by self.showIntrospection
+            # pData = datatypes.inspect_members(obj, self._predicate_)
+            # if not includePrivateMembers:
+            #     pData = self._exclude_private_members_(pData)
+            #
+            # if not self._showMethods_:
+            #     pData = self._exclude_methods_and_functions_(pData)
 
             # indirect = True
             objDataAsChild = False
 
-            nChildren = len(pData)
-            info = f"{nChildren} {strutils.pluralize('member', nChildren)}"
+            # nChildren = len(pData)
+            info = f"{nChildren} {strutils.pluralize('member', nChildren)} (of {fullCount})"
             # choices = dict()
             memberAccess = (".", )
             accessType = "attribute"
@@ -891,6 +898,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         return pData, {
             "indirect": indirect,
             "nChildren": nChildren,
+            # "fullCount": fullCount,
             "objDataAsChild": objDataAsChild,
             "objInfo": info,
             "memberAccess": memberAccess,
@@ -1360,23 +1368,30 @@ class DataTreeModel(QtGui.QStandardItemModel):
             ):
             choices = {}
 
-        readOnly = False
-        readOnlyChildren = False
+        readOnly = self.readOnly
+        readOnlyChildren = self.readOnly
         objDataAsChild = False
         tip = objType.__name__
-        n = len(obj)
-        if n > 100:
-            info = (
-                obj[:97] if isinstance(obj, str) else obj.decode()[:97]
-            )
-            info += "..."
-            objDataAsChild = True
-        else:
-            info = obj if isinstance(obj, str) else obj.decode()
-
-        if isinstance(obj, (bytes, bytearray)) or self.readOnly:
+        if isinstance(obj, str) and strutils.is_path(obj):
+            objDataAsChild = False
+            info = obj
             readOnly = True
             readOnlyChildren = True
+
+        else:
+            n = len(obj)
+            if n > 100:
+                info = (
+                    obj[:97] if isinstance(obj, str) else obj.decode()[:97]
+                )
+                info += "..."
+                objDataAsChild = True
+            else:
+                info = obj if isinstance(obj, str) else obj.decode()
+
+            if isinstance(obj, (bytes, bytearray)) or self.readOnly:
+                readOnly = True
+                readOnlyChildren = True
 
         return  obj, {
             "indirect": False,
@@ -1418,10 +1433,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "objInfo": info,
             "objType": objType,
             "objTip": tip,
-            "memberAccess": tuple(),
+            "memberAccess": (),
             "accessType": None,
             "choices": choices,
-            "readOnly": False,
+            "readOnly": self.readOnly,
             "objId": objId
             }
 
@@ -1547,7 +1562,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(vigra.filters.Kernel1D)
     @_parseObject_.register(vigra.filters.Kernel2D)
     def __parseObject_(self: typing.Self, obj: vigra.filters.Kernel1D | vigra.filters.Kernel2D,
-           choices: dict = {} , _: bool = True) -> tuple:
+           choices: dict = {} , _: bool = True) -> tuple:  # noqa: B006
         # ### BEGIN NOTE: 2026-02-08 21:20:00 TODO/FIXME
         #
         # enable representation of the kernel as: (think hard & choose one)
@@ -1680,19 +1695,22 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(pd.Index)
     def __parseObject_(self: typing.Self, obj: typing.Union[pd.DataFrame, pd.Series, # noqa
                                                pd.Index],
-          choices: dict = dict(),
+          choices: dict = {},  # noqa: B006
           _: bool = True) -> tuple:
         objId = id(obj)
         objType = type(obj)
 
-        if not isinstance(choices, dict):
-            if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
-                choices = dict()
+        if (
+            not isinstance(choices, dict)
+            and len(choices)> 0
+            and not all(isinstance(v, objType) for v in choices.values())
+            ):
+            choices = {}
 
         # NOTE: 2026-02-11 21:09:34
         # TableEditorWidget gives direct read-write access, so no direct access
         # required in this model
-        memberAccess = tuple()
+        memberAccess = ()
 
         # Don;t be fooled by the nomenclature; for a column index, this is the
         # number of columns
@@ -1768,7 +1786,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "memberAccess": (".", ),
             "accessType": "attribute",
             "choices": choices,
-            "readOnly": False,
+            "readOnly": self.readOnly,
+            "readOnlyChildren": self.readOnly,
             "objId": objId
             }
 
@@ -1816,13 +1835,15 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(TriggerEvent)
     def __parseObject_(self: typing.Self, obj: typing.Union[neo.Event, DataMark, # noqa
         TriggerEvent],
-          choices: dict = dict(),
+          choices: dict = dict(),  # noqa: B006
           _: bool = True) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        if not isinstance(choices, dict):
-            if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
-                choices = dict()
+        if (
+            not isinstance(choices, dict)
+            and len(choices)> 0
+            and not all(isinstance(v, objType) for v in choices.values())):
+            choices = {}
 
         pData = {"times": obj.times, "labels": obj.labels}
 
@@ -1952,12 +1973,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
           choices: dict = {}, _: bool = True) -> tuple: # noqa
         objId = id(obj)
         objType = type(obj)
-        # if (
-        #     not isinstance(choices, dict)
-        #     and len(choices)> 0
-        #     and not all(isinstance(v, objType) for v in choices.values())
-        #     ):
-        #     choices = {}
 
         # TableEditorWidget gives read-write access to array data
         tip = type(obj).__name__
@@ -1988,13 +2003,15 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
     @_parseObject_.register(vigra.AxisInfo)
     def __parseObject_(self: typing.Self, obj: vigra.AxisInfo, # noqa
-          choices: dict = dict(),
+          choices: dict = dict(),  # noqa: C408
           _: bool = False) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        if not isinstance(choices, dict):
-            if len(choices)> 0 and not all(isinstance(v, objType) for v in choices.values()):
-                choices = dict()
+        if (
+            not isinstance(choices, dict)
+            and len(choices)> 0 and
+            not all(isinstance(v, objType) for v in choices.values())):
+            choices = {}
 
         info = f"{type(obj).__name__} ({getNameForAxisType(obj.typeFlags)}) key {obj.key}"
         tip = type(obj).__name__
@@ -2065,7 +2082,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "memberAccess": (".", ),
             "accessType": "attribute",
             "choices": choices,
-            "readOnly": False, # allow editin he content, unless specified otherwise by the caller
+            "readOnly": self.readOnly,
+            "readOnlyChildren": self.readOnly,
             "objId": objId
             }
 
@@ -2108,6 +2126,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "accessType": "attribute",
             "choices": False,
             "readOnly": True,
+            "readOnlyChildren": self.readOnly,
             "objId": objId
             }
 
@@ -2138,7 +2157,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
             "memberAccess": (".", ),
             "accessType": "attribute",
             "choices": choices,
-            "readOnly": False,
+            "readOnly": True,
+            "readOnlyChildren": self.readOnly,
             "objId": objId
             }
 
@@ -2445,7 +2465,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
     def _exclude_methods_and_functions_(self, pDict):
         return {i[0]:i[1] for i in pDict.items() if type(i[1]) not in FUNCTION_TYPES}
 
-    def _generate_dict_(self, obj) -> dict:
+    # @singledispatchmethod
+    def _generate_dict_(self, obj, includePrivateMembers=False) -> dict:
         if isDataclass(obj):
             try:
                 fieldnames = [f.name for f in datafields] #list(map(lambda f: f.name, datafields))
@@ -2468,12 +2489,12 @@ class DataTreeModel(QtGui.QStandardItemModel):
         elif self._introspect_ and self.introspectable(obj) :
             # self._introspect_ set by self.showIntrospection
             pData = datatypes.inspect_members(obj, self._predicate_)
-            indirect = True
-            if not includePrivateMembers:
-                pData = self._exclude_private_members_(pData)
-
-            if not self._showMethods_:
-                pData = self._exclude_methods_and_functions_(pData)
+            # indirect = True
+            # if not includePrivateMembers:
+            #     pData = self._exclude_private_members_(pData)
+            #
+            # if not self._showMethods_:
+            #     pData = self._exclude_methods_and_functions_(pData)
 
         else:
             raise NotImplementedError(f"{type(obj).__name__} are not supported")
@@ -2489,4 +2510,10 @@ class DataTreeModel(QtGui.QStandardItemModel):
         finalCount = len(pData)
 
         return pData, fullCount, finalCount
+
+    # @_generate_dict_.register(AxesCalibration)
+    # def __generate_dict__(self, obj: AxesCalibration):
+    #     pData = dict(enumerate(obj.calibrations))
+    #     n = len(pData)
+    #     return pData, n, n
 
