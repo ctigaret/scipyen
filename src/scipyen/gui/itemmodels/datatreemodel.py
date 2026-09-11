@@ -906,7 +906,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(type(None))
     @_parseObject_.register(type(MISSING))
     @_parseObject_.register(type(pd.NA))
-    def __parseObject_(self: typing.Self, obj: (type(None), type(MISSING), type(pd.NA)),
+    def __parseObject_(self: typing.Self, obj: typing.Union[type(None), type(MISSING), type(pd.NA)], # noqa
           choices: dict = {}, _:bool = False) -> tuple: # noqa
         objType = type(obj)
         objId = id(obj)
@@ -1349,8 +1349,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
     @_parseObject_.register(str)
     @_parseObject_.register(bytes)
     @_parseObject_.register(bytearray)
-    def __parseObject_(self: typing.Self, obj: typing.Union[str, bytes, bytearray], # noqa
-          choices: dict = {}, _: bool = True) -> tuple:
+    def __parseObject_(self: typing.Self, obj: typing.Union[str, bytes, bytearray],   # noqa: UP007,F811
+          choices: dict = {}, _: bool = True) -> tuple:  # noqa: B006
         objId = id(obj)
         objType = type(obj)
         if (
@@ -1374,7 +1374,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         else:
             info = obj if isinstance(obj, str) else obj.decode()
 
-        if isinstance(obj, (bytes, bytearray)):
+        if isinstance(obj, (bytes, bytearray)) or self.readOnly:
             readOnly = True
             readOnlyChildren = True
 
@@ -1445,7 +1445,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         objId = id(obj)
         objType = type(obj)
 
-        objInfo = obj
+        # objInfo = obj
 
         if (
             not isinstance(choices, dict)
@@ -2443,7 +2443,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         return {i[0]:i[1] for i in pDict.items() if self._check_public_member_(i)}
 
     def _exclude_methods_and_functions_(self, pDict):
-        return {i[0]:i[1] for i in pdict.items() if type(i[1]) not in FUNCTION_TYPES}
+        return {i[0]:i[1] for i in pDict.items() if type(i[1]) not in FUNCTION_TYPES}
 
     def _generate_dict_(self, obj) -> dict:
         if isDataclass(obj):

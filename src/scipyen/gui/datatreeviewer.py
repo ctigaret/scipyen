@@ -15,9 +15,9 @@ Qt-based viewer window for dict and subclasses.
 # CLEAR UP THE IMPORTS AND OTHER STUFF COPIED OVER FROM DATAVIEWER
 
 #### BEGIN core python modules
-from __future__ import print_function
+from __future__ import print_function  # noqa
 
-import os, sys, warnings, types, traceback, itertools, inspect
+import os, sys, warnings, types, traceback, itertools, inspect # noqa
 import typing, dataclasses, numbers
 #### END core python modules
 
@@ -30,10 +30,10 @@ __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
+    import PySide6  # noqa: I001
     # from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -60,27 +60,28 @@ import vigra
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
-import core.datatypes
+# import core.datatypes
 
-import imaging.axiscalibration
+# import imaging.axiscalibration
 from imaging.axiscalibration import AxesCalibration
 
-import imaging.scandata
+# import imaging.scandata
 from imaging.scandata import (ScanData, AnalysisUnit)
 
 from core.triggerprotocols import TriggerProtocol
 from core.triggerevent import (TriggerEvent, TriggerEventType)
 
-import core.datasignal
+# import core.datasignal
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal)
 
-from core import xmlutils, strutils
+# from core import xmlutils, strutils
 
-from core.workspacefunctions import validate_varname
+# from core.workspacefunctions import validate_varname
 
-from core.utilities import NestedFinder
+# from core.utilities import NestedFinder
 
-from core.prog import (safewrapper, safeguiwrapper, scipywarn)
+from core.prog import (safewrapper, scipywarn)
+# from core.prog import (safewrapper, safeguiwrapper, scipywarn)
 
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,)
 from core.scipyendataclasses import ScipyenDataclass
@@ -89,6 +90,8 @@ from core import bgbridge
 from core import taxonbridge
 
 #### END pict.core modules
+
+from ephys import ephys_protocol
 
 #### BEGIN pict.gui modules
 # from gui.tableeditor import (TableEditorWidget, TabularDataModel,)
@@ -132,40 +135,45 @@ A lot of things copied from there, EXCEPT that it now uses
     # TODO: 2019-11-01 22:44:34
     # implement viewing of other data structures (e.g., viewing their __dict__
     # for the generic case, )
-    viewer_for_types = {dict:99,
-                        list:99,
-                        tuple:99,
-                        types.TracebackType:99,
-                        pd.DataFrame:0,
-                        pd.Series:0,
-                        pd.Index:0,
-                        neo.core.dataobject.DataObject:0,
-                        pq.Quantity:0,
-                        np.ndarray:0,
-                        AnalysisUnit:0,
-                        AxesCalibration:0,
-                        # neo.core.baseneo.BaseNeo:0,
-                        ScanData:0,
-                        TriggerProtocol:0,
-                        types.SimpleNamespace:0,
-                        ScipyenDataclass:0}
+    viewer_for_types = { # noqa
+        dict:99,
+        list:99,
+        tuple:99,
+        types.TracebackType:99,
+        pd.DataFrame:0,
+        pd.Series:0,
+        pd.Index:0,
+        neo.core.dataobject.DataObject:0,
+        pq.Quantity:0,
+        np.ndarray:0,
+        AnalysisUnit:0,
+        AxesCalibration:0,
+        # neo.core.baseneo.BaseNeo:0,
+        ScanData:0,
+        TriggerProtocol:0,
+        types.SimpleNamespace:0,
+        ScipyenDataclass:0
+        }
 
-    read_only_types = [
+    read_only_types = ( # noqa
         bgbridge.BrainGlobeAtlas,
         bgbridge.Structure,
-        taxonbridge.Taxon
-        ]
+        taxonbridge.Taxon,
+        ephys_protocol.ElectrophysiologyProtocol,
+        bytes,
+        bytearray
+        )
 
-    def __init__(self, data: typing.Optional[object] = None,
-                 parent: typing.Optional[QtWidgets.QMainWindow] = None,
-                 ID: typing.Optional[int] = None,
-                 win_title: typing.Optional[str] = None,
-                 doc_title: typing.Optional[str] = None,
+    def __init__(self, data: object | None = None,
+                 parent: QtWidgets.QMainWindow | None = None,
+                 ID: int | None = None,
+                 win_title: str | None = None,
+                 doc_title: str | None = None,
                  useTableEditor: bool = True,
-                 predicate: typing.Optional[typing.Any] = None,
+                 predicate: object | None = None,
                  readOnly: bool = True,
                  initialExpandDepth: int = 1,
-                 autoResizeColumns: set[int] = {0,1},
+                 autoResizeColumns: set[int] | None = None,
                  *args, **kwargs):
         r"""
         Parameters:
@@ -207,6 +215,9 @@ A lot of things copied from there, EXCEPT that it now uses
         self._alwaysSortRows_: bool = False
         self._showInlineTables_: bool = False
 
+        if not isinstance(autoResizeColumns, set):
+            autoResizeColumns = {0,1}
+
         if inspect.isfunction(predicate):
             if not self._showMethods_:
                 self.predicate = lambda x: predicate(x) and not inspect.ismethod(x)
@@ -232,7 +243,7 @@ A lot of things copied from there, EXCEPT that it now uses
         self._dataTypeStr_ = None
 
         # contains data selected from child widgets (table, and text widgets)
-        self._subselections_ = list()
+        self._subselections_ = []
 
         self._obj_to_view_ = (dataclasses.MISSING, "")
 
@@ -447,9 +458,7 @@ A lot of things copied from there, EXCEPT that it now uses
         else:
             # print(f"{self.__class__.__name__}._check_cache_: obj is a {type(obj).__name__}, name: {name} ({type(name).__name__}))")
             for (o,n) in self._obj_cache_:
-                if all(isinstance(o_, np.ndarray) for o_ in (o, obj)) and np.all(obj == o) and name ==n:
-                    return True
-                return False
+                return all(isinstance(o_, np.ndarray) for o_ in (o, obj)) and np.all(obj == o) and name == n
 
     def _get_cache_index_(self, obj:typing.Any, name:str) -> int | None:
         if isinstance(obj, np.ndarray):
@@ -481,7 +490,7 @@ A lot of things copied from there, EXCEPT that it now uses
         Displays new data
         """
         # print(f"{self.__class__.__name__}._set_data_({type(data)},\n\tkwargs = {kwargs})")
-        self._readOnly_ = kwargs.get("readOnly", False) or isinstance(data, tuple(self.read_only_types))
+        self._readOnly_ = kwargs.get("readOnly", False) or isinstance(data, self.read_only_types)
 
         objName = kwargs.pop("name", None)
 
@@ -540,6 +549,7 @@ A lot of things copied from there, EXCEPT that it now uses
                 self._obj_cache_[self._cache_index_] = (obj, name)
             # print(f"{self.__class__.__name__}._populateTreeView_: name = {name}")
             self.update_title(doc_title = name, win_title=self._winTitle_)
+
             what = {"data": obj,
                     "predicate": self.predicate,
                     "root_title": name,
@@ -582,7 +592,7 @@ A lot of things copied from there, EXCEPT that it now uses
         if d.exec():
             val = w.value()
             if len(val.strip()):
-                indices = set(list(map(lambda s: eval(s), val.split(","))))
+                indices = set(list(map(lambda s: eval(s), val.split(",")))) # noqa
                 self.autoResizeColumns = indices
 
             else:
