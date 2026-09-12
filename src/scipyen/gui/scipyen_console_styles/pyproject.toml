@@ -23,4 +23,5 @@ Issues = "https://github.com/ctigaret/scipyen/issues"
 
 [project.entry-points."pygments.styles"]
 KeplerDark = "keplerstyles:KeplerDark"
+KeplerDark2 = "keplerstyles:KeplerDark2"
 KeplerLight = "keplerstyles:KeplerLight"

@@ -3540,22 +3540,37 @@ class ScipyenConsoleWidget(ConsoleWidget):
         evt.accept()
 
     def eventFilter(self, obj, event) -> bool:
-        # NOTE: 2026-08-17 22:06:08
-        # disallow typing in text above prompt line clicking in the window
-        # it is very annyoing!
-        # however, allow selecting text from above the input buffer, so I make
-        # this contingent on the _control not having a non-empty text selection
-        #
-        # this BUG seems to have crept in qtconsole using more recent Qt6 (v.11?)
-        # regardless of the python binding (it happens with either PyQt or PySide)
-        #
-        if ((__has_PyQt6__ or __has_PySide6__)
-            and isinstance(event, QtGui.QMouseEvent) and event.type() == QtCore.QEvent.MouseButtonRelease
-            and (not self._control.textCursor().hasSelection()
-                or len(self._control.textCursor().selectedText()) == 0)
-            ):
+        # # NOTE: 2026-08-17 22:06:08
+        # # disallow typing in text above prompt line clicking in the window
+        # # it is very annyoing!
+        # # however, allow selecting text from above the input buffer, so I make
+        # # this contingent on the _control not having a non-empty text selection
+        # #
+        # # this BUG seems to have crept in qtconsole using more recent Qt6 (v.11?)
+        # # regardless of the python binding (it happens with either PyQt or PySide)
+        # #
+        if (
+            (__has_PyQt6__ or __has_PySide6__)
+            and (
+                    (
+                        isinstance(event, QtGui.QMouseEvent)
+                        and event.type() == QtCore.QEvent.MouseButtonRelease
+                    )
 
-            self._keep_cursor_in_buffer()
+                    or event.type() == QtCore.QEvent.KeyPress
+                )
+            ):
+                cursor = self._control.textCursor()
+                endpos = cursor.selectionEnd()
+                startpos = cursor.selectionStart()
+
+                if any(v < self._prompt_pos for v in (startpos, endpos)):
+                    self._control.setReadOnly(True)
+
+                else:
+                    self._control.setReadOnly(False)
+
+            # self._keep_cursor_in_buffer()
 
         return super().eventFilter(obj, event)
 

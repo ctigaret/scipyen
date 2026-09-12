@@ -6581,12 +6581,12 @@ class ABFOutputConfiguration:
 
     @property
     def emulatesTTL(self)->bool:
-        r"""True when this ADC emulates TTLs for3rd party devices.
+        r"""True when this ADC emulates TTLs for 3rd party devices.
         This can happen when:
         • the DAC has analog waveform enabled
         • the DAC has epochs that emulate TTLs via analog waveforms (see ABFEpoch.emulatesTTL)
         """
-        return self.analogWaveformEnabled and len(self.getEpochsWithTTLWaveforms())
+        return self.analogWaveformEnabled and len(self.getEpochsWithTTLWaveforms()) > 0
 
     @property
     def analogWaveformEnabled(self) -> bool:

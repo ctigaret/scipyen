@@ -50,16 +50,17 @@ __module_path__ = os.path.abspath(os.path.dirname(__file__))
 # I am introducing these "placeholders"  to avoid messing about with
 # the entire Scipyen codebase forever
 
-def qVariants(*args) -> typing.List:
+def qVariants(*args) -> list:
     r"""In PyQt*, Creates and returns a list of QVariant objects wrapping each element in args.
     In PySide6 just returns the list of objects in *args"""
 
     if __has_PySide6__:
         return list(args)
     else:
-        return list(map(lambda o: o if isinstance(o, QVariantType) else QVariantType(o), args))
+        return [o if isinstance(o, QVariantType) else QVariantType(o) for o in args]
+        # return list(map(lambda o: o if isinstance(o, QVariantType) else QVariantType(o), args))
 
-def qVariant(obj: typing.Optional = None):
+def qVariant(obj):
     if __has_PySide6__:
         return obj
 
@@ -153,10 +154,10 @@ class SignalBlocker():
 def isQObjectDeleted(obj:QtCore.QObject):
     if not __has_sip__:
         return False # fallback
-    
+
     if not isinstance(obj, QtCore.QObject):
         return True
-    
+
     try:
         sip.unwrapinstance(obj)
     except RuntimeError:
@@ -166,21 +167,21 @@ def isQObjectDeleted(obj:QtCore.QObject):
 def isQObjectAlive(obj:QtCore.QObject):
     if not isinstance(obj, QtCore.QObject):
         return False
-    
+
     try:
         obj.parent()
     except (RuntimeError, TypeError):
         return False
-    
+
     return True
 
 def datetime2Qt(d:datetime.datetime)->QtCore.QDateTime:
     from core import utilities
-    
+
     timeStamp = int(utilities.posixUTC(d))
     return QtCore.QDateTime.fromSecsSinceEpoch(timeStamp) # converts to local time,
 
 def datetimeFromQt(d:QtCore.QDateTime)->datetime.datetime:
     timeStamp = d.toSecsSinceEpoch()
     return datetime.datetime.fromtimestamp(timeStamp) # converts to local time,
-    
+

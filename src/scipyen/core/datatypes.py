@@ -184,9 +184,9 @@ ndarray_type = ndarray.__name__
 NUMPY_NUMERIC_KINDS = set("buifc")
 NUMPY_STRING_KINDS = set("SU")
 
-Real: typing.TypeAlias = typing.Union[int, float, np.integer, np.floating]
-Complex: typing.TypeAlias = typing.Union[complex, np.complexfloating]
-Number: typing.TypeAlias = typing.Union[Real, Complex]
+Real: typing.TypeAlias = typing.Union[int, float, np.integer, np.floating]      # noqa: UP007
+Complex: typing.TypeAlias = typing.Union[complex, np.complexfloating]           # noqa: UP007
+Number: typing.TypeAlias = typing.Union[Real, Complex]                          # noqa: UP007
 
 PODS = (
     bool,
@@ -194,9 +194,9 @@ PODS = (
     int,
     float,
     complex,
-    # bytes,
-    # bytearray,
-    # str,
+    bytes,
+    bytearray,
+    str,
     np.integer,
     np.floating,
     np.complexfloating,
