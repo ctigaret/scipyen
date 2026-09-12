@@ -2443,6 +2443,14 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         return choices
 
+#     def canFetchMore(self, parent: QtCore.QModelIndex) -> bool:
+#         if not parent.isValid():
+#             return False
+#
+#         item = self.itemFromIndex(parent)
+#         if item.hasChildren():
+
+
 
 
     # @_generate_dict_.register(AxesCalibration)

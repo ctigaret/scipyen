@@ -299,8 +299,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
         # print(f"{self.__class__.__name__}._slot_indexExpanded -> epxansion depth = {depth}")
 
-        if depth > self._currentExpansionDepth_:
-            self._currentExpansionDepth_ = depth
+        self._currentExpansionDepth_ = max(depth, self._currentExpansionDepth_)
 
 
         # print(f"{self.__class__.__name__}._slot_indexExpanded -> {type(item)}")
@@ -319,8 +318,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             parent = parent.parent()
 
         # print(f"{self.__class__.__name__}._slot_indexCollapsed -> depth = {depth}")
-        if depth-1 > self._currentExpansionDepth_: # noqa
-            self._currentExpansionDepth_ = depth-1
+        self._currentExpansionDepth_ = min(depth-1,  self._currentExpansionDepth_)
 
 
         # item = self.sourceModel.itemFromIndex(index)
