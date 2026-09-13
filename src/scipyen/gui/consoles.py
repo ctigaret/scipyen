@@ -3560,17 +3560,29 @@ class ScipyenConsoleWidget(ConsoleWidget):
                     or event.type() == QtCore.QEvent.KeyPress
                 )
             ):
-                cursor = self._control.textCursor()
-                endpos = cursor.selectionEnd()
-                startpos = cursor.selectionStart()
+            cursor = self._control.textCursor()
+            endpos = cursor.selectionEnd()
+            startpos = cursor.selectionStart()
 
-                if any(v < self._prompt_pos for v in (startpos, endpos)):
-                    self._control.setReadOnly(True)
+            if any(v < self._prompt_pos for v in (startpos, endpos)):
+                self._control.setReadOnly(True)
+                # if (
+                #     event.type() == QtCore.QEvent.KeyPress
+                #     and (
+                #         bool(event.modifiers() & QtCore.Qt.ShiftModifier)
+                #         or bool(event.modifiers() & QtCore.Qt.ControlModifier)
+                #         or bool(event.modifiers() & QtCore.Qt.AltModifier)
+                #         or bool(event.modifiers() & QtCore.Qt.MetaModifier)
+                #         )
+                #     ):
+                #     self._control.setReadOnly(True)
+                # else:
+                #     self._keep_cursor_in_buffer()
 
-                else:
-                    self._control.setReadOnly(False)
 
-            # self._keep_cursor_in_buffer()
+            else:
+                self._control.setReadOnly(False)
+
 
         return super().eventFilter(obj, event)
 
