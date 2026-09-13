@@ -308,6 +308,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # print(f"{self.__class__.__name__}._makeObjectRow_: objName -> {objName}")
 
         objectItem = QtGui.QStandardItem(objName)
+        objectItem.setData(qVariant(False), PopulatedChildrenRole)
         # NOTE: 2026-02-09 21:47:38
         # reference to the actual Python object
         objectItem.setData(qVariant(obj), ObjectDataRole)

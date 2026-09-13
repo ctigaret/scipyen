@@ -1211,14 +1211,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             if role not in (ObjectDataRole, QtCore.Qt.DisplayRole,
                             QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole,
                             QtCore.Qt.AccessibleTextRole):
-                return qVariant()
+                return qVariant(None)
 
             ret = self._modelDataGetter_(self._modelData_, row, col)
 
             return self._getVariantForData_(ret, role)
 
         except IndexError:
-            return qVariant()
+            return qVariant(None)
 
     def _setDataValue_(self, value, row, col):
         r"""Sets the EditRole data for the row & column in the tabular model"""

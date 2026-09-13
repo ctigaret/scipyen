@@ -41,7 +41,7 @@ copy of variables between the two namespaces and provides a mechanism to salvage
 some of the lost variables across kill - restart cycles.
 
 """
-import os
+import os  # noqa: I001
 import signal
 import json
 import sys, typing, traceback, itertools, subprocess, asyncio, re
@@ -92,7 +92,7 @@ except:
     pass
 
 #### BEGIN ipython/jupyter modules
-from traitlets.config.application import boolean_flag
+from traitlets.config.application import boolean_flag  # noqa: I001
 from traitlets.config.application import catch_config_error
 from traitlets import (
     Dict, Unicode, CBool, Any, Bunch, HasTraits, Instance, Int,
@@ -114,7 +114,7 @@ except:
     ipythonHasTips = False
 
 
-from qtconsole.svg import save_svg, svg_to_clipboard, svg_to_image
+from qtconsole.svg import save_svg, svg_to_clipboard, svg_to_image  # noqa: I001
 
 from tornado import ioloop
 from tornado.queues import Queue
@@ -3671,6 +3671,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     def __init__(self, parent=None, **kwargs):
         banner = kwargs.pop("banner", None)
         scipyenWindow = kwargs.pop("scipyenWindow", None) # take this out for below...
+        self._opacity_ = 1.0
         super().__init__(parent=parent, **kwargs) # initializes QtWidgets.QMainWindow
         kwargs["scipyenWindow"] = scipyenWindow # ... then place back in kwargs for WorkspaceGuiMixin
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs) # initializes WorkspaceGuiMixin
@@ -3695,7 +3696,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.loadSettings()
 
     def _configureUI_(self):
-        ctrl = "Meta" if sys.platform.startswith('darwin') else "Ctrl"
+        ctrl = "Meta" if sys.platform.startswith('darwin') else "Ctrl" # noqa:F841
         menuBar = self.menuBar()
         self.file_menu = menuBar.addMenu("File")
 
@@ -3734,24 +3735,20 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         # available_syntax_styles = scipyen_console_styles.get_available_syntax_styles() # defined in this module
 
         # if len(available_syntax_styles):
-        if len(PYGMENT_STYLES): # noqa
+        if len(PYGMENT_STYLES):
             self.syntax_style_menu = self.settings_menu.addMenu("Syntax Style")
 
             style_group = QActionGroup(self)
 
-            # actions = [
-            #     QAction("{}".format(s), self, triggered = partial(self.active_frontend._set_syntax_style, s)) for s in PYGMENT_STYLES # noqa
-            #     ]
-
-            actions = list(
+            actions = list(                                                     # noqa:C417
                 map(
-                    lambda s: QAction("{}".format(s), self,
+                    lambda s: QAction("{}".format(s), self,  # noqa: UP032
                                       triggered = partial(
                                           self.active_frontend._set_syntax_style,
                                           s
                                           )
                                       ),
-                    PYGMENT_STYLES # noqa
+                    PYGMENT_STYLES
                     )
                 )
 
@@ -3766,8 +3763,8 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.colors_menu = self.settings_menu.addMenu("Console Colors")
         colors_group = QActionGroup(self)
         for c in self.active_frontend.available_colors:
-            action = QAction("{}".format(c), self,
-                                       triggered = lambda:
+            action = QAction("{}".format(c), self,  # noqa: UP032
+                                       triggered = lambda c:
                                            self.active_frontend._set_console_colors(c))
             action.setCheckable(True)
             colors_group.addAction(action)
@@ -3780,7 +3777,7 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.sb_menu = self.settings_menu.addMenu("Scrollbar Position")
         sb_group = QActionGroup(self)
         for s in self.active_frontend.scrollbar_positions.values():
-            action = QAction("{}".format(s), self,
+            action = QAction("{}".format(s), self,  # noqa: UP032
                                        triggered = lambda v, val = s:
                                            self.active_frontend._set_sb_pos(val=val))
             action.setCheckable(True)
@@ -3815,6 +3812,27 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         self.set_useInlineMatplotlibAction.toggled.connect(self._slot_useInlineMatplotlib)
         self.settings_menu.addAction(self.set_useInlineMatplotlibAction)
         self.addAction(self.set_useInlineMatplotlibAction)
+        if __has_PyQt6__ or __has_PySide6__:
+            self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
+            self._graphicsOpacityEffect_ = QtWidgets.QGraphicsOpacityEffect(self)
+            # self.setGraphicsEffect(self._graphicsOpacityEffect_)
+
+            # NOTE: https://runebook.dev/en/docs/qt/qwindow/opacity-prop
+            # https://discuss.kde.org/t/bug-opacity-does-not-seem-to-work-for-qt6-apps-in-wayland/44611/3
+
+            # self.consoleWidget.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
+            # self._graphicsOpacityEffect_ = QtWidgets.QGraphicsOpacityEffect(self.consoleWidget)
+            # self.consoleWidget.setGraphicsEffect(self._graphicsOpacityEffect_)
+
+            # self.consoleWidget._control.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
+            # self._graphicsOpacityEffect_ = QtWidgets.QGraphicsOpacityEffect(self.consoleWidget._control)
+            # self.consoleWidget._control.setGraphicsEffect(self._graphicsOpacityEffect_)
+
+            # self._graphicsOpacityEffect_.setOpacity(self._opacity_)
+        else:
+            self.setAttribute(QtCore.Qt.WA_TranslucentBackground, True)
+            self.setWindowOpacity(self._opacity_)
+            self._graphicsOpacityEffect_ = None
 
 
     @Slot(bool)
@@ -4010,6 +4028,23 @@ class ScipyenConsole(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     @consoleFont.setter
     def consoleFont(self, val:QtGui.QFont):
         self.active_frontend.font = val
+
+    @property
+    def opacity(self) -> float:
+        return self._opacity_
+
+    @opacity.setter
+    def opacity(self, val: float):
+        scipywarn("This feature is not yet implemented")
+        if val >=0 and val <= 1.:
+            self._opacity_ = val
+        else:
+            self._opacity_ = 1.
+
+        # if isinstance(self._graphicsOpacityEffect_,QtWidgets.QGraphicsOpacityEffect):
+        #     self._graphicsOpacityEffect_.setOpacity(self._opacity_)
+        # else:
+        #     self.setWindowOpacity(self._opacity_)
 
     @property
     def kernel_manager(self):

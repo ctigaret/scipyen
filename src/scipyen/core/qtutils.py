@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2025 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -22,7 +21,7 @@ if os.environ["QT_API"] == "pyside6":
     from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     # from PySide6.QtUiTools import loadUiType # -- A-HA!
-    QAction = QtGui.QAction # noqa
+    QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
     QVariantType = object
@@ -30,8 +29,8 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
-    # from qtpy.uic import loadUiType # noqa
+    from qtpy import sip  # noqa: I001
+    # from qtpy.uic import loadUiType
     from QtCore import QVariant
     QVariantType = QVariant
     QAction = QtWidgets.QAction
@@ -60,7 +59,7 @@ def qVariants(*args) -> list:
         return [o if isinstance(o, QVariantType) else QVariantType(o) for o in args]
         # return list(map(lambda o: o if isinstance(o, QVariantType) else QVariantType(o), args))
 
-def qVariant(obj):
+def qVariant(obj=None):
     if __has_PySide6__:
         return obj
 
@@ -94,7 +93,7 @@ def getAssociatedObjects(action: QAction, oType: type = QtWidgets.QWidget) -> li
 #             return wr
 #         wr = weakref.ref.__new__(typ, obj)
 #         if callback is not None:
-#             wr._callback = lambda: callback(wr) # noqa
+#             wr._callback = lambda: callback(wr)
 #             QtCore.QObject.connect(o, SIGNAL("destroyed()"), wr._callback)
 #             return wr
 #
@@ -115,13 +114,13 @@ def getAssociatedObjects(action: QAction, oType: type = QtWidgets.QWidget) -> li
 #         type(obj).__name__, id(obj))
 #         return "<qtweakref at %08X; is dead>" % id(self)
 
-class SignalBlocker():
-    def __init__(self, widgets: typing.Union[QtWidgets.QWidget,
-                                             typing.Sequence[QtWidgets.QWidget]]):
-        self._blockers_ = tuple()
-        # if isinstance(widgets, QtWidgets.QWidget):
+class SignalBlocker:
+    r"""Context manager for temporarily blocking Qt signals from Qt objects"""
+    def __init__(self, widgets: QtWidgets.QWidget | typing.Sequence[QtWidgets.QWidget]):
+        self._blockers_ = ()
         if isinstance(widgets, QtCore.QObject):
             self._widgets_ = (widgets, )
+
         else:
             self._widgets_ = tuple(
                 filter(
@@ -132,7 +131,7 @@ class SignalBlocker():
 
     def __enter__(self):
         self._blockers_ = tuple(
-            map(
+            map(  # noqa: C417
                 lambda w: QtCore.QSignalBlocker(w),
                 tuple(
                     filter(
@@ -144,12 +143,7 @@ class SignalBlocker():
             )
 
     def __exit__(self, exc_type, exc_value, traceback):
-        # if len(self._blockers_) and all(isinstance(b, QtCore.QSignalBlocker) for b in self._blockers_):
-        #     for b in self._blockers_:
-        #         # b.deleteLater()
-        #         b = None
-
-        self._blockers_ = tuple()
+        self._blockers_ = ()
 
 def isQObjectDeleted(obj:QtCore.QObject):
     if not __has_sip__:
@@ -183,5 +177,5 @@ def datetime2Qt(d:datetime.datetime)->QtCore.QDateTime:
 
 def datetimeFromQt(d:QtCore.QDateTime)->datetime.datetime:
     timeStamp = d.toSecsSinceEpoch()
-    return datetime.datetime.fromtimestamp(timeStamp) # converts to local time,
+    return datetime.datetime.fromtimestamp(timeStamp) # converts to local time,  # noqa: DTZ006
 

@@ -44,6 +44,7 @@ ReadOnlyRole = QtCore.Qt.UserRole + 390
 ReadOnlyChildrenRole = QtCore.Qt.UserRole + 400
 ObjectDataEditExternallyRole = QtCore.Qt.UserRole + 410
 ObjectChildrenCountRole = QtCore.Qt.UserRole + 420
+PopulatedChildrenRole = QtCore.Qt.UserRole + 430
 
 
 __all__ = (
@@ -56,6 +57,7 @@ __all__ = (
     "ObjectKeyRole",
     "ObjectKeyTypeRole",
     "ObjectTypeRole",
+    "PopulatedChildrenRole",
     "ReadOnlyChildrenRole",
     "ReadOnlyRole",
     "StandaloneEditorWidgetRole",
