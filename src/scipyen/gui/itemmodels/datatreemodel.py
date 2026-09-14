@@ -737,11 +737,11 @@ class DataTreeModel(QtGui.QStandardItemModel):
         #     return True
 
         ret = (
-            not isinstance(obj, NOTMEMOIZED)
+            not isinstance(obj, NOTMEMOIZED + PODS)
             and not issubclass(type(obj), NOTMEMOIZED + PODS)
             )
 
-        return not ret
+        return ret
 
     def _is_memoized_(self, obj, objId, objDict) -> bool:
         return (
