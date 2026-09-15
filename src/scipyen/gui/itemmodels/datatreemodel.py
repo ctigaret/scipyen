@@ -564,18 +564,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
         if debug:
             print(f"\tparentItem.hasChildren: {parentItem.hasChildren()}")
 
-        # if not objDict["objDataAsChild"] or not self._inlineTables_:
-
-        # if isinstance(parentItem, QtGui.QStandardItem):
-        #     for ki, item in enumerate(rowItems):
-        #         parentItem.setChild(row, ki, item)
-
-        # if (not isinstance(obj, NOTMEMOIZED)
-        #     and not issubclass(
-        #         type(obj), NOTMEMOIZED + PODS
-        #     )
-        #     and objId not in self._visited_):
-
         if (
             self._can_memoize_(obj)
             and objId not in self._visited_
@@ -886,7 +874,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
             indirect = True
             objDataAsChild = False
 
-            info = f"{nChildren} {strutils.pluralize('member', nChildren)} (of {fullCount})"
+            # info = f"{nChildren} {strutils.pluralize('member', nChildren)} (of {fullCount})"
+            info = f"{nChildren} members (of {fullCount})"
             memberAccess = (".", )
             accessType = "attribute"
             readOnly = True

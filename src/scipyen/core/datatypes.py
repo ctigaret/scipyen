@@ -1133,7 +1133,7 @@ def categorize_data_frame_columns(data:pd.DataFrame, *column_names, inplace:bool
         return ret
 
 
-def inspect_members(obj:typing.Any, predicate:typing.Optional[typing.Callable] = None) -> dict:
+def inspect_members(obj:typing.Any, predicate: typing.Callable | None = None) -> dict:
     skips = ("__class__", "__module__", "__name__", "__qualname__", "__func__",
              "__self__", "__code__", "__defaults__", "__kwdefaults__",
              "__globals__", "__builtins__", "__annotations__", "__doc__",
@@ -1145,17 +1145,20 @@ def inspect_members(obj:typing.Any, predicate:typing.Optional[typing.Callable] =
 
     mbi = tuple((k, n, inspect.getattr_static(obj, n, None)) for k,n in enumerate(names))
 
-    mb = list()
+    mb = []
 
     for k, mbi_name, mbi_obj in mbi:
         try:
             # NOTE: for treelib Tree adapt to new API:
             if mbi_name == "bpointer":
                 mbi_name = "predecessor"
+
             if mbi_name == "fpointer":
                 mbi_name = "successors"
+
             v = getattr(obj, mbi_name)
-        except:
+
+        except:  # noqa: E722
             # print(f"Cannot parse member {k}: {mbi_name} which is a {type(mbi_obj)}")
             # traceback.print_exc()
             v = mbi_obj
