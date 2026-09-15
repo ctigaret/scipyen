@@ -3565,7 +3565,10 @@ class ScipyenConsoleWidget(ConsoleWidget):
             startpos = cursor.selectionStart()
 
             if any(v < self._prompt_pos for v in (startpos, endpos)):
-                self._control.setReadOnly(True)
+                if startpos == endpos:
+                    self._keep_cursor_in_buffer()
+                else:
+                    self._control.setReadOnly(True)
                 # if (
                 #     event.type() == QtCore.QEvent.KeyPress
                 #     and (

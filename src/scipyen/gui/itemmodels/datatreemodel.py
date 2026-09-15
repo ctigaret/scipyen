@@ -544,12 +544,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
         objId = objDict["objId"]
         # print(f"{self.__class__.__name__}._buildBranch_{type(obj)} with ID: {objId}")
 
-        # if (
-        #     self._can_memoize_(obj)
-        #     # not issubclass(type(obj), NOTMEMOIZED + PODS)
-        #     and objId in self._visited_
-        #     and objDict["objType"] == self._visited_[objId][-1]
-        #     ):
         if self._is_memoized_(obj, objId, objDict):
             # print(f"\n\tfound visited: {visited}")
             visited = self._visited_[objId]
@@ -598,13 +592,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
         objId = objDict["objId"]
 
         # print(f"{self.__class__.__name__}._buildBranch_{type(obj)} with ID: {objId}")
-
-        # if (
-        #     self._can_memoize_(obj)
-        #     # not issubclass(type(obj), NOTMEMOIZED + PODS)
-        #     and objId in self._visited_
-        #     and objDict["objType"] == self._visited_[objId][-1]
-        #     ):
 
         if self._is_memoized_(obj, objId, objDict):
             # print(f"\n\tfound visited: {visited}")
@@ -666,7 +653,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         if (
             self._can_memoize_(obj)
-            # not issubclass(type(obj), NOTMEMOIZED + PODS)
             and objId not in self._visited_
             ):
             itemPath = f"{self._rootTitle_}{self.getPathForLeaf(objItem)}"

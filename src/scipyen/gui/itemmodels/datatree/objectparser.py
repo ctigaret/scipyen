@@ -20,11 +20,11 @@ import decimal
 import pkgutil
 import typing
 import enum
-import functools
+# import functools
 from functools import singledispatchmethod
 from collections import deque, UserDict, OrderedDict
 from dataclasses import MISSING
-import weakref
+# import weakref
 import math # noqa
 
 import qtpy # noqa
@@ -78,7 +78,7 @@ import vigra
 import meshio
 # ### END 3rd party modules
 
-from core.qtutils import qVariant #, QVariantType #, qVariants, fromQVariant, isQObjectAlive)
+# from core.qtutils import qVariant #, QVariantType #, qVariants, fromQVariant, isQObjectAlive)
 import core.datatypes as datatypes # noqa
 from core.datatypes import (is_namedtuple, TypeEnum)
 from core.prog import (scipywarn, timefunc, processtimefunc)  # noqa
@@ -122,6 +122,9 @@ import imaging.scandata # noqa
 from imaging.scandata import (ScanData, AnalysisUnit) # noqa
 
 from gui.itemmodels.roles import *
+
+NOTINTROSPECTABLE = PODS + (types.ModuleType, pkgutil.ModuleInfo,)
+
 
 class ObjectParser(QtCore.QThread):
     sig_result = Signal(dict, dict, name="sig_result")
@@ -1563,3 +1566,56 @@ class ObjectParser(QtCore.QThread):
             "readOnly": False,
             "objId": objId
             }
+
+    def _generate_dict_(self, obj, includePrivateMembers=False) -> dict:
+        if isinstance(obj, dict):
+            return obj, len(obj, len(obj))
+
+        if isDataclass(obj):
+            datafields = dataclasses.fields(obj)
+            try:
+                fieldnames = [f.name for f in datafields] #list(map(lambda f: f.name, datafields))
+                membernames = list(obj.__dict__.keys())
+                childnames = sorted(unique(membernames + fieldnames))
+                pData = {c: getFieldOrProperty(obj, c) for c in childnames}
+
+            except: # noqa
+                pData = {x.name: getField(obj,x) for x in datafields}
+
+        elif (
+            HAVE_METAARRAY
+            and hasattr(obj, "implements")
+            and obj.implements("MetaArray")
+            ):
+            pData = dict( # noqa
+                    [("data", obj.view(np.ndarray)), ("meta", obj.infoCopy())]
+                )
+
+        elif self._introspect_ and self.introspectable(obj) :
+            # self._introspect_ set by self.showIntrospection
+            pData = datatypes.inspect_members(obj, self._predicate_)
+            # indirect = True
+            # if not includePrivateMembers:
+            #     pData = self._exclude_private_members_(pData)
+            #
+            # if not self._showMethods_:
+            #     pData = self._exclude_methods_and_functions_(pData)
+
+
+        else:
+            raise NotImplementedError(f"{type(obj).__name__} are not supported")
+
+        fullCount = len(pData)
+
+        if not includePrivateMembers:
+            pData = self._exclude_private_members_(pData)
+
+        if not self._showMethods_:
+            pData = self._exclude_methods_and_functions_(pData)
+
+        if self._showValueAttributesOnly_:
+            pData = self._exclude_type_attributes_(pData)
+
+        finalCount = len(pData)
+
+        return pData, fullCount, finalCount
