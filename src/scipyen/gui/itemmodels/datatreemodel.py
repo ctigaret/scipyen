@@ -131,13 +131,19 @@ NOTMEMOIZED = (
     type(pd.NA),
     type,
     np.ndarray,
+    np.bool,
+    np.complexfloating,
+    np.floating,
+    np.integer,
+    np.ufunc,
     types.ModuleType,
     pkgutil.ModuleInfo,
     typing.Callable,
     types.FunctionType,
-    np.ufunc,
     functools.partial
 )
+
+NOTINTROSPECTABLE = PODS + (types.ModuleType, pkgutil.ModuleInfo,)
 
 FUNCTION_TYPES = (
     types.FunctionType,
@@ -509,7 +515,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
         # print(f"{self.__class__.__name__}._buildTree_(obj: {type(obj).__name__})")
         rootItem = self.invisibleRootItem()
         rootItem.setRowCount(1)
-        item = self._buildBranch_(self._privateData_, objDict, name, str, rootItem, 0)
+        item = self._buildBranch_(self._privateData_, objDict, name, str, rootItem, 0,
+                                  debug=False)
         if self.readOnly:
             item.setData(self.readOnly, ReadOnlyRole)
 
@@ -648,7 +655,8 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
                 # print(f"{self.__class__.__name__}._buildBranch_ for {key} in {objItem.data(QtCore.Qt.DisplayRole)}")
 
-                self._buildBranch_(pValue, valDict, keyName, type(key), objItem, k)
+                self._buildBranch_(pValue, valDict, keyName, type(key), objItem, k,
+                                   debug=False)
 
                 # if objKey == "adcNames":
                 #     self._buildBranch_(pValue, valDict, keyName, type(key), objItem, k, debug=True)
@@ -716,8 +724,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         mro = inspect.getmro(type(obj))
         return (all(t not in self._supportedDataTypes_ for t in mro)
                          and not inspect.isroutine(obj)
-                         and not isinstance(obj, (types.ModuleType,
-                                             pkgutil.ModuleInfo))
+                         and not isinstance(obj, NOTINTROSPECTABLE)
                          and obj is not None)
 
     def _can_memoize_(self, obj) -> bool:
@@ -830,6 +837,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         readOnlyChildren = False
 
         if isDataclass(obj):
+            # print(f"{self.__class__.__name__}._parseObject_{type(obj)}")
             pData, fullCount, nChildren = self._generate_dict_(obj, includePrivateMembers)
             indirect = True
             if includePrivateMembers:
@@ -847,6 +855,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             and hasattr(obj, "implements")
             and obj.implements("MetaArray")
             ):
+            # print(f"{self.__class__.__name__}._parseObject_{type(obj)}")
             pData, fullCount, nChildren = self._generate_dict_(obj, includePrivateMembers)
             indirect = True
             objDataAsChild = False
@@ -856,6 +865,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             # nChildren = len(pData)
 
         elif HAS_MESHIO and isinstance(obj, meshio.Mesh):
+            # print(f"{self.__class__.__name__}._parseObject_{type(obj)}")
             pData = obj
             indirect=False,
             s = " × ".join(list(map(lambda x: f"{x}", obj.points.shape))) # noqa
@@ -867,15 +877,17 @@ class DataTreeModel(QtGui.QStandardItemModel):
             readOnly = True
             readOnlyChildren = True
             nChildren = 0
+            fullCount = 0
 
         elif self._introspect_ and self.introspectable(obj):
+            # print(f"{self.__class__.__name__}._parseObject_{type(obj)} introspectable")
             # print(f"{self.__class__.__name__}._parseObject_({type(obj)}) introspectable")
             pData, fullCount, nChildren = self._generate_dict_(obj, includePrivateMembers)
             indirect = True
             objDataAsChild = False
 
-            # info = f"{nChildren} {strutils.pluralize('member', nChildren)} (of {fullCount})"
-            info = f"{nChildren} members (of {fullCount})"
+            info = f"{nChildren} {strutils.pluralize('member', nChildren)} (of {fullCount})"
+            # info = f"{nChildren} members (of {fullCount})"
             memberAccess = (".", )
             accessType = "attribute"
             readOnly = True
@@ -1830,6 +1842,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         if isinstance(obj, pq.UnitQuantity):
             info = f"{obj} {scq.unitFamilyName(obj)}"
             objDataAsChild = False
+
         else:
             if obj.size <= 1:
                 info = f"{obj}"
@@ -2373,6 +2386,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
     # @singledispatchmethod
     def _generate_dict_(self, obj, includePrivateMembers=False) -> dict:
+        if isinstance(obj, dict):
+            return obj, len(obj, len(obj))
+
         if isDataclass(obj):
             datafields = dataclasses.fields(obj)
             try:
@@ -2402,6 +2418,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
             #
             # if not self._showMethods_:
             #     pData = self._exclude_methods_and_functions_(pData)
+
 
         else:
             raise NotImplementedError(f"{type(obj).__name__} are not supported")
