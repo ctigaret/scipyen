@@ -143,7 +143,6 @@ NOTMEMOIZED = (
     functools.partial
 )
 
-NOTINTROSPECTABLE = PODS + (types.ModuleType, pkgutil.ModuleInfo,)
 
 FUNCTION_TYPES = (
     types.FunctionType,
@@ -151,6 +150,8 @@ FUNCTION_TYPES = (
     types.MethodType,
     types.BuiltinMethodType
     )
+
+NOTINTROSPECTABLE = PODS + (types.ModuleType, pkgutil.ModuleInfo) + FUNCTION_TYPES
 
 # NOTE 2026-02-05 17:48:51 TODO/FIXME
 # look at:

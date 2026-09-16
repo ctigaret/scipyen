@@ -123,6 +123,70 @@ from imaging.scandata import (ScanData, AnalysisUnit) # noqa
 
 from gui.itemmodels.roles import *
 
+# NOTE: 2026-09-16 10:22:19 fileystem-like stuff:
+# a "file" is an object that is represented in itself, i.e. NO descending into
+# its structures -- NOTINTROSPECTABLE objects
+#
+# a "directory" is an object that is EITHER a hierarchical structure by itself
+#   e.g. a dict or dict-like, OR CAN BE REPRESENTED by a dict
+#   e.g. a sequence, including namedtuple, dataclass, or any objects that is
+#   introspectable
+#
+
+
+NOTMEMOIZED = (
+    tuple,
+    type(None),
+    type(MISSING),
+    type(pd.NA),
+    type,
+    np.ndarray,
+    np.bool,
+    np.complexfloating,
+    np.floating,
+    np.integer,
+    np.ufunc,
+    types.ModuleType,
+    pkgutil.ModuleInfo,
+    typing.Callable,
+    types.FunctionType,
+    functools.partial
+)
+
+
+FUNCTION_TYPES = (
+    types.FunctionType,
+    types.BuiltinFunctionType,
+    types.MethodType,
+    types.BuiltinMethodType
+    )
+
+NOTINTROSPECTABLE = (
+                    PODS + NOTMEMOIZED +
+                    (types.ModuleType, pkgutil.ModuleInfo) +
+                    FUNCTION_TYPES
+                    )
+
+class ObjectInfo:
+
+    def isLeaf(self)-> bool:
+        return True # TODO
+
+    def isBranch(self) -> bool:
+        return not self.isLeaf()
+
+    def isReference(self) -> bool:
+        return False # TODO
+
+    def indirect(self) -> bool:
+        r"""Is this a hierarchical representation of an object
+    e.g. after introspection
+
+    A "Branch" may be an indirect representation of an object as a hierarchical
+    structure, but a "Leaf" or a "Reference" can never be such a thing.
+
+    """
+        return False
 
 class ObjectNode:
     def __init__(self, obj,  name: str = "/", parent: typing.Self | None = None):
@@ -143,4 +207,6 @@ class ObjectNode:
 
         self._isVisible_: bool = False
 
-
+    def isReference(self) -> bool:
+        r"""Is this a node for an object already references in the tree?"""
+        return False  # TODO

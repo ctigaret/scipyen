@@ -123,5 +123,154 @@ from imaging.scandata import (ScanData, AnalysisUnit) # noqa
 
 from gui.itemmodels.roles import *
 
+from gui.itemmodels.datatree import objectnode
+
 class ObjectModel(QtGui.QStandardItemModel):
-    pass
+    r"""FIXME/TODO Where possible, work with QStandardItem instead of QModelIndex!!!"""
+    sig_rootPathChanged = Signal(name="sig_rootPathChanged") # -> rootPathChanged
+    sig_objectLoaded = Signal(name="sig_objectLoaded") # -> directoryLoaded
+
+    def __init__(self, parent):
+        super().__init__(0,3, parent=parent)
+        self._nColumns_ = 3
+
+        self._root_ = objectnode.ObjectNode(None)
+
+    @singledispatchmethod
+    def index(self, x, y, idx) -> QtCore.QModelIndex:
+        raise NotImplementedError()
+
+    @index.register(int)
+    def _index_(self, row: int, column: int, parent: QtCore.QModelIndex) -> QtCore.QModelIndex:
+        if (
+            row < 0 or column < 0
+            or row >= self.rowCount(parent)
+            or column >= self.columnCount(parent)
+            ):
+            return QtCore.QModelIndex()
+
+        parentNode = self.node(parent) if self.indexValid(parent) else self.rootNode # TODO
+
+        i = self.translateVisibleLocation(parentNode, row)
+
+        if i >= len(parentNode._visibleChildren_):
+            return QtCore.QModelIndex()
+
+        childName = parentNode._visibleChildren_[i]
+        indexNode = parentNode.children[childName] # TODO
+
+        # TODO/FIXME here I should deal with QStandardItem
+        # so retrieve the QModelIndex via this emchanism (Python does not have
+        # direct access to the "internal pointer" of the item or index)
+        return super().sibling(row, column, index) # FIXME
+        return self.createIndex(row, column, indexNode)  # FIXME switch to QStandardItem API
+
+    @index.register(list)
+    def _index_(self, path: list, column: int) -> QtCore.QModelIndex:  # noqa: F811
+        # NOTE: 2026-09-16 23:15:05
+        # see TODO: 2026-09-16 23:14:53 for why path needs to be a list
+        node = self.node(path, False)
+        return self.index(node, column) # TODO
+
+    def sibling(self, row: int, colum: int, index: QtCore.QModelIndex) -> QtCore.QModelIndex:
+        # FIXME: this is QModelIndex API -> won't work here, as QStandardItemModel does not provide this method
+        # might even not be needed
+        #
+        if row == index.row() and column < self.columnCount(index.parent()):
+            return super().sibling(row, column, index)
+            # return self.createIndex(row, column, index.internalPointer()) # FIXME WILL CRAsH!
+
+
+    def objectInfo(self, index: QtCore.QModelIndex) -> dict:
+        return self.node(index).objectInfo() # TODO
+
+    def columCount(self, parent: QtCore.QModelIndex) -> int:
+        return 0 if parent.column() > 0 else self._nColumns_
+
+    def rowCount(self, parent: QtCore.QModelIndex) -> int:
+        if parent.column() > 0:
+            return 0
+
+        if not parent.isValid():
+            return len(self._root_._visibleChildren_) # TODO
+
+        parentNode = self.node(parent) # TODO
+
+        return len(parentNode._visibleChildren_) # TODO
+
+    def canFetchMore(self, parent: QtCore.QModelIndex) -> bool:
+        if not self._setRootPath_:
+            return False
+
+        indexNode = self.node(parent)
+        return not indexNode._populatedChildren_ # TODO
+
+    def fetchMore(self, parent: QtCore.QModelIndex):
+        if not self._setRootPath_:
+            return
+
+        indexNode = self.node(parent) # TODO
+
+        if indexNode._populatedChildren_:
+            return
+
+        indexNode._populatedChildren_ = True
+
+        # TODO :
+        # fileInfoGatherer -> self._objectParser_
+        # filePath -> self.objectPath (method)
+        self._objectParser_.list(self.objectPath(parent))
+
+    def objectPath(self, index: QtCore.QModelIndex) -> str:
+        pass
+
+    def remove(self, index: QtCore.QModelIndex) -> bool: # TODO
+        # NOTE: 2026-09-16 10:12:33 WARNING
+        # block changing the structure of objects -> allow this only
+        # for genuine dictionaries and SimpleNamespace objects
+        fullPath = self.objectPath(index)
+        node = self.node(index) # TODO
+
+    @property
+    def root(self) -> objectnode.ObjectNode:
+        return self._root_
+
+# ------ Private API ------
+
+    @singledispatchmethod
+    def node(self, obj, fetch:bool = False):
+        raise NotImplementedError()
+
+    @node.register(QtCore.QModelIndex)
+    def _node_(self, index: QtCore.QModelIndex, _:bool=False) -> objectnode.ObjectNode:
+        if not index.isValid():
+            return self.root
+
+        # parentIndex = index.parent()
+        # if not parentIndex.isValid():
+        #     parentNode = self.root
+        # else:
+        #     parentNode = objectnode
+
+        indexNode = objectnode.ObjectNode(index.data(DataObjectRole),
+                                          index.data(QtCore.Qt.DisplayRole))
+
+        return indexNode
+
+    @node.register(list)
+    def _node_(self, path:list, fetch: bool) -> objectnode.ObjectNode:  # noqa: F811
+        # TODO: 2026-09-16 23:14:53
+        # instead of a str, represent access path with a sequence of tuples
+        # e.g. (member_access, member_name) where member_access is alsoa tuple, see datatreemodel
+        if len(path) == 0:
+            return self.root
+
+        index_ = QtCore.QModelIndex()
+        parentNode = self.node(index_)
+
+        # TODO: finalize me
+
+
+
+
+
