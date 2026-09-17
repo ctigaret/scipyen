@@ -20,7 +20,7 @@ import decimal
 import pkgutil
 import typing
 import enum
-# import functools
+import functools
 from functools import singledispatchmethod
 from collections import deque, UserDict, OrderedDict
 from dataclasses import MISSING
@@ -123,16 +123,6 @@ from imaging.scandata import (ScanData, AnalysisUnit) # noqa
 
 from gui.itemmodels.roles import *
 
-# NOTE: 2026-09-16 10:22:19 fileystem-like stuff:
-# a "file" is an object that is represented in itself, i.e. NO descending into
-# its structures -- NOTINTROSPECTABLE objects
-#
-# a "directory" is an object that is EITHER a hierarchical structure by itself
-#   e.g. a dict or dict-like, OR CAN BE REPRESENTED by a dict
-#   e.g. a sequence, including namedtuple, dataclass, or any objects that is
-#   introspectable
-#
-
 
 NOTMEMOIZED = (
     tuple,
@@ -167,32 +157,44 @@ NOTINTROSPECTABLE = (
                     FUNCTION_TYPES
                     )
 
+@dataclasses.dataclass
 class ObjectInfo:
+    indirect: bool = False
+    nChildren: int = 0
+    objDataAsChild: bool = dataclasses.field(default = False)
+    objInfo: str = dataclasses.field(default_factory=str)
+    memberAccess: tuple[str] = dataclasses.field(default_factory=tuple)
+    accessType: str | None = None
+    objTip: str = dataclasses.field(default_factory=str)
+    objType: type | None = None
+    choices: dict = dataclasses.field(default_factory = dict)
+    readOnly: bool = True
+    objId: int | None = None
 
-    def isLeaf(self)-> bool:
-        return True # TODO
-
-    def isBranch(self) -> bool:
-        return not self.isLeaf()
-
-    def isReference(self) -> bool:
-        return False # TODO
-
-    def indirect(self) -> bool:
-        r"""Is this a hierarchical representation of an object
-    e.g. after introspection
-
-    A "Branch" may be an indirect representation of an object as a hierarchical
-    structure, but a "Leaf" or a "Reference" can never be such a thing.
-
-    """
-        return False
+    # NOTE: 2026-09-16 10:22:19 fileystem-like stuff:
+    # a "directory" is an object that is EITHER a hierarchical structure by itself
+    #   e.g. a dict or dict-like, OR CAN BE REPRESENTED by a dict
+    #   e.g. a sequence, including namedtuple, dataclass, following introspection
+    #
+    # a "file" is an object that is represented by itself, i.e. NO descending into
+    # its structure -- NOTINTROSPECTABLE objects -> indirect = True
+    #
+    # collapses QExtendedInformation and QFileInfo in one type, omits logic
+    # related to "real" file systems
 
 class ObjectNode:
-    def __init__(self, obj,  name: str = "/", parent: typing.Self | None = None):
-        self._object_ = obj
-        self._objectName_: str = name
+    def __init__(self, objInfo: ObjectInfo, name:str, parent: typing.Self | None = None):
+        self._objInfo_ = objInfo
+
+        if not isinstance(name, str) or len(name.strip()) == 0:
+            self._name_ = "/" # for the root node
+
+        else:
+            self._name_ = name
+
         self._parent_: typing.Self = parent
+
+        self._reference_: typing.Self | None = None
 
         # mapping pathKey ↦ ObjectNode
         self._children_: dict[str, typing.Self] = {}
@@ -207,6 +209,42 @@ class ObjectNode:
 
         self._isVisible_: bool = False
 
+    @property
     def isReference(self) -> bool:
         r"""Is this a node for an object already references in the tree?"""
-        return False  # TODO
+        return isinstance(self._reference_, self.__class__)
+
+    @property
+    def objectInfo(self) -> ObjectInfo:
+        return self._objInfo_
+
+    @objectInfo.setter
+    def objectInfo(self, value: ObjectInfo):
+        if not isinstance(value, ObjectInfo):
+            self._objInfo_ = ObjectInfo()
+        else:
+            self._objInfo_ = value
+
+    @property
+    def hasInformation(self) -> bool:
+        return (
+                    isinstance(self.objectInfo.objId, int)
+                    and isinstance(self.objectInfo.objType, type)
+                )
+
+    @property
+    def isBranch(self) -> bool:
+        if self.hasInformation:
+            return not self.objectInfo.indirect
+
+        return len(self._children_) > 0
+
+    @property
+    def isLeaf(self)-> bool:
+        return not self.isBranch
+
+    def visibleLocation(self, childName: str) -> int:
+        if len(self._visibleChildren_) and childName in self._visibleChildren_:
+            return self._visibleChildren_.index(childName)
+
+        return -1

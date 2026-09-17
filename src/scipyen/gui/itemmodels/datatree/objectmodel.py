@@ -130,11 +130,11 @@ class ObjectModel(QtGui.QStandardItemModel):
     sig_rootPathChanged = Signal(name="sig_rootPathChanged") # -> rootPathChanged
     sig_objectLoaded = Signal(name="sig_objectLoaded") # -> directoryLoaded
 
-    def __init__(self, parent):
+    def __init__(self, parent: QtCore.QObject):
         super().__init__(0,3, parent=parent)
         self._nColumns_ = 3
 
-        self._root_ = objectnode.ObjectNode(None)
+        self._rootNode_ = objectnode.ObjectNode(None)
 
     @singledispatchmethod
     def index(self, x, y, idx) -> QtCore.QModelIndex:
@@ -233,7 +233,10 @@ class ObjectModel(QtGui.QStandardItemModel):
 
     @property
     def root(self) -> objectnode.ObjectNode:
-        return self._root_
+        return self._rootNode_
+
+    def setRootObject(self, obj):
+        objInfo = objectnode.ObjectInfo()
 
 # ------ Private API ------
 
@@ -269,6 +272,8 @@ class ObjectModel(QtGui.QStandardItemModel):
         parentNode = self.node(index_)
 
         # TODO: finalize me
+
+
 
 
 
