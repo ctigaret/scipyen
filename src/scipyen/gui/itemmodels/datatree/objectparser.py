@@ -152,7 +152,7 @@ class ObjectParser(QtCore.QThread):
             pData, objDict = self._parseObject_(obj, self._showPrivate_, {})
             self.sig_result.emit(pData, objDict)
 
-        except:  # noqa:
+        except:    # noqa: E722
             traceback.print_exc()
 
     def _check_obj_choices_(self, choices: dict| None = None) -> dict:

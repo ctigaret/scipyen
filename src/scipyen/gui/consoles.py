@@ -3541,7 +3541,7 @@ class ScipyenConsoleWidget(ConsoleWidget):
 
     def eventFilter(self, obj, event) -> bool:
         # # NOTE: 2026-08-17 22:06:08
-        # # disallow typing in text above prompt line clicking in the window
+        # # disallow typing in text above prompt line after clicking in the window
         # # it is very annyoing!
         # # however, allow selecting text from above the input buffer, so I make
         # # this contingent on the _control not having a non-empty text selection
