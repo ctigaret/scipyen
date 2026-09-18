@@ -123,7 +123,7 @@ from imaging.scandata import (ScanData, AnalysisUnit) # noqa
 
 from gui.itemmodels.roles import *
 
-from gui.itemmodels.datatree import objectnode
+from gui.itemmodels.datatree.objectnode import (ObjectInfo, ObjectNode)
 
 class ObjectModel(QtGui.QStandardItemModel):
     r"""FIXME/TODO Where possible, work with QStandardItem instead of QModelIndex!!!"""
@@ -134,7 +134,11 @@ class ObjectModel(QtGui.QStandardItemModel):
         super().__init__(0,3, parent=parent)
         self._nColumns_ = 3
 
-        self._rootNode_ = objectnode.ObjectNode(None)
+        self._rootNode_ = objectnode.ObjectNode(dataclasses.MISSING,
+                                                objectnode.ObjectInfo(name=""))
+
+        # --- private model API ---
+        self._setRootNode_: bool = False
 
     @singledispatchmethod
     def index(self, x, y, idx) -> QtCore.QModelIndex:
@@ -235,46 +239,69 @@ class ObjectModel(QtGui.QStandardItemModel):
     def root(self) -> objectnode.ObjectNode:
         return self._rootNode_
 
-    def setRootObject(self, obj):
-        objInfo = objectnode.ObjectInfo()
+    def setRootObject(self, obj, objName:str) -> QtCore.QModelIndex:
+        if obj is dataclasses.MISSING:
+            objName = ""
+
+        self._rootNode_ = objectnode.ObjectNode(self._object_, objectnode.ObjectInfo(name=objName))
+
+        # now, must populate the node
 
 # ------ Private API ------
 
     @singledispatchmethod
-    def node(self, obj, fetch:bool = False):
+    def node(self, obj, fetch:bool = False) -> objectnode.ObjectNode:
+        r"""FINDS a node in the hierarchy"""
         raise NotImplementedError()
 
-    @node.register(QtCore.QModelIndex)
-    def _node_(self, index: QtCore.QModelIndex, _:bool=False) -> objectnode.ObjectNode:
-        if not index.isValid():
-            return self.root
+    @node.register(str)
+    def _node_(self, objPath:tuple, fetch: bool = False) -> objectnode.ObjectNode:
+        if len(objPath) == 0:
+            return self._rootNode_
 
-        # parentIndex = index.parent()
-        # if not parentIndex.isValid():
-        #     parentNode = self.root
+        if objPath in self._rootNode_.children:
+            return self._rootNode_.children[objPath]
+
         # else:
-        #     parentNode = objectnode
-
-        indexNode = objectnode.ObjectNode(index.data(DataObjectRole),
-                                          index.data(QtCore.Qt.DisplayRole))
-
-        return indexNode
-
-    @node.register(list)
-    def _node_(self, path:list, fetch: bool) -> objectnode.ObjectNode:  # noqa: F811
-        # TODO: 2026-09-16 23:14:53
-        # instead of a str, represent access path with a sequence of tuples
-        # e.g. (member_access, member_name) where member_access is alsoa tuple, see datatreemodel
-        if len(path) == 0:
-            return self.root
-
-        index_ = QtCore.QModelIndex()
-        parentNode = self.node(index_)
-
-        # TODO: finalize me
 
 
 
+
+
+        # if obj is dataclasses.MISSING:
+        #     return objectnode.ObjectNode(obj, objectnode.ObjectInfo(name=""))
+
+    @node.register(QtCore.QModelIndex)
+    def _node_(self, index: QtCore.QModelIndex, _: bool = False) -> objectnode.ObjectNode:
+        if not index.isValid():
+            return self._rootNode_
+
+        if index.column() > 0:
+            index = index.siblingAtColumn(0)
+
+        return index.data(ObjectNodeRole)
+
+    @node.register(QtGui.QStandardItem)
+    def _node_(self, item: QtGui.QStandardItem, _:bool=False) -> objectnode.ObjectNode:
+        return self.node(self.indexFromItem(item))
+
+
+    # @node.register(list)
+    # def _node_(self, path:list, fetch: bool) -> objectnode.ObjectNode:  # noqa: F811
+    #     # TODO: 2026-09-16 23:14:53
+    #     # instead of a str, represent access path with a sequence of tuples
+    #     # e.g. (member_access, member_name) where member_access is alsoa tuple, see datatreemodel
+    #     if len(path) == 0:
+    #         return self.root
+    #
+    #     index_ = QtCore.QModelIndex()
+    #     parentNode = self.node(index_)
+    #
+    #     # TODO: finalize me
+
+
+    def addNode(self, objectPath, objectInfo):
+        node = objectnode.ObjectNode
 
 
 

@@ -777,7 +777,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
             "objInfo" ↦ str
                 When ``obj`` is a scalar number or singleton array, this is a string
-                representaion of ``obj`` *value* and can be made editable, unless the
+                representation of ``obj`` *value* and can be made editable, unless the
                 model is configured to introspect all members of ``obj``.
 
                 When ``obj`` is representable as a ``dict`` (see above) **or** the model
@@ -2176,7 +2176,6 @@ class DataTreeModel(QtGui.QStandardItemModel):
     def getPathForLeaf(self: typing.Self,
                        leaf: QtCore.QModelIndex | QtGui.QStandardItem,
                        pathOnly: bool = False,
-                       # includeRoot:bool = False
                        ) -> str:
         path = self._getPathForItemOrIndex_(leaf)
         if len(path):
@@ -2214,7 +2213,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 return path
 
         # NOTE: 2026-02-10 12:22:40
-        # Code below only makes sense for items in column 0; however, when an`
+        # Code below only makes sense for items in column 0; however, when an
         # item on a higher column is passed, I need access to its sibling in
         # column 0
 

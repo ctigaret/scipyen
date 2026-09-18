@@ -123,21 +123,31 @@ from imaging.scandata import (ScanData, AnalysisUnit) # noqa
 
 from gui.itemmodels.roles import *
 
+from gui.itemmodels.datatree.objectnode import ObjectInfo
+
 NOTINTROSPECTABLE = PODS + (types.ModuleType, pkgutil.ModuleInfo,)
 
 
 class ObjectParser(QtCore.QThread):
     sig_result = Signal(dict, dict, name="sig_result")
-    def __init__(self, parent, obj, **kwargs):
+    def __init__(self, parent, obj, objName: str, objectParentInfo: ObjectInfo | None = None,
+                 **kwargs):
         QtCore.QThread.__init__(self, parent)
-        self._showPrivate_: bool = kwargs.pop("showPrivate", False)
+        self._introspect_: bool = kwargs.pop("introspect", True)
+        self._showPrivate_: bool = kwargs.pop("includePrivateMembers", False)
+        self._showCallables_: bool = kwargs.pop("includeCallables", False)
+        self._showTypeMembers_: bool = kwargs.pop("includeTypes", False)
+        self._choices_ = kwargs.pop("choices", {})
+        self._supportedDataTypes_ = kwargs.pop("supportedTypes", ())
+
         self._object_ = obj
+        self._objectName_ = objName
+        self._objectParentInfo_ = objectParentInfo
+        # if not isinstance(self._objectParentInfo_, ObjectInfo):
+        #     self._objectParentInfo_ = ObjectInfo()
+
         self._mutex_ = QtCore.QMutex()
         self._condition_ = QtCore.QWaitCondition()
-        self._objectPath_ = []
-        self._choices_ = {}
-        # self._pData_ = {}
-        # self._objDict_ = {}
 
     def run(self):
         try:
@@ -149,30 +159,16 @@ class ObjectParser(QtCore.QThread):
                 return
             locker.unlock()
             self.setTerminationEnabled(False)
-            pData, objDict = self._parseObject_(obj, self._showPrivate_, {})
-            self.sig_result.emit(pData, objDict)
+            pData, objInfo = self._parseObject_(obj, objName, self._objectParentInfo_)
+            self.sig_result.emit(pData, objInfo)
 
         except:    # noqa: E722
             traceback.print_exc()
 
-    def _check_obj_choices_(self, choices: dict| None = None) -> dict:
-        if (
-            not isinstance(choices, dict)
-            or (
-                len(choices)> 0
-                and not all(isinstance(v, objType) for v in choices.values())
-                )
-            ):
-            choices = {}
-
-        return choices
-
-
     @singledispatchmethod
-    def _parseObject_(self: typing.Self, obj: object,
-                      includePrivateMembers: bool = False,
-                      choices: dict | None = None
-                   ) -> tuple:
+    def _parseObject_(self: typing.Self, obj: object, objName: str,
+                      objParentInfo : ObjectInfo | None = None,
+                      ) -> tuple:
         r"""
         Returns:
         ========
@@ -239,14 +235,14 @@ class ObjectParser(QtCore.QThread):
         """
         # TODO 2026-03-28 16:32:58
         # configuration file to determine if instances of some user-defined types
-        # are also editable or not -> use it to deterine the readOnly flag, above
+        # are also editable or not -> use it to determine the readOnly flag, above
         indirect: bool = False
         tip: str = type(obj).__name__
         objDataAsChild: bool = False
         objType = type(obj)
         objId = id(obj)
 
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(self._choices_)
 
         readOnly = False
         readOnlyChildren = False
@@ -262,6 +258,10 @@ class ObjectParser(QtCore.QThread):
             objDataAsChild = False
             memberAccess = (".",)
             accessType = "attribute"
+            if len(objParentInfo.accessPath) == 0:
+
+
+            accessPath = objParentInfo.accessPath + memberAccess + (objName, )
             readOnly = False
 
         elif (
@@ -275,6 +275,7 @@ class ObjectParser(QtCore.QThread):
             info = ""
             memberAccess = ("[", "]")
             accessType = "index"
+            accessPath = objParentInfo.accessPath + (memberAccess[0], ) +
             # nChildren = len(pData)
 
         elif HAS_MESHIO and isinstance(obj, meshio.Mesh):
@@ -322,13 +323,14 @@ class ObjectParser(QtCore.QThread):
             accessType = None
             nChildren = 0
 
-        return pData, {
+        infoDict = {
             "indirect": indirect,
             "nChildren": nChildren,
             "objDataAsChild": objDataAsChild,
             "objInfo": info,
             "memberAccess": memberAccess,
             "accessType": accessType,
+            "accessPath": accessPath,
             "objTip": tip,
             "objType": objType,
             "choices": choices,
@@ -336,6 +338,9 @@ class ObjectParser(QtCore.QThread):
             "readOnlyChildren": readOnlyChildren,
             "objId": objId
             }
+
+        objectInfo = ObjectInfo(**infoDict)
+        return pData, objectInfo
 
     @_parseObject_.register(type(None))
     @_parseObject_.register(type(MISSING))
@@ -353,14 +358,14 @@ class ObjectParser(QtCore.QThread):
         objDataAsChild = False
         memberAccess = ()
         accessType = None
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         # TODO/FIXME: 2026-03-28 16:57:15
         # mechanism to see if a new object of another type is acceptable here, in which case call a UI c'tor'
         readOnly = True
         readOnlyChildren = True
 
-        return pData, {
+        infoDict = {
             "indirect": indirect,
             "nChildren": 0,
             "objDataAsChild": objDataAsChild,
@@ -374,6 +379,10 @@ class ObjectParser(QtCore.QThread):
             "readOnlyChildren": readOnlyChildren,
             "objId": objId
             }
+
+        objectInfo = ObjectInfo(**infoDict)
+
+        return pData, objectInfo
 
     @_parseObject_.register(datetime.datetime)
     @_parseObject_.register(datetime.date)
@@ -397,7 +406,7 @@ class ObjectParser(QtCore.QThread):
         accessType = None
         readOnly = False
 
-        return pData, {
+        infoDict = {
             "indirect": False,
             "nChildren": 0,
             "objDataAsChild": objDataAsChild,
@@ -411,6 +420,10 @@ class ObjectParser(QtCore.QThread):
             "objId": objId
             }
 
+        objectInfo = ObjectInfo(**infoDict)
+
+        return pData, objectInfo
+
     @_parseObject_.register(types.FunctionType)
     @_parseObject_.register(types.BuiltinFunctionType)
     @_parseObject_.register(types.MethodType)
@@ -423,7 +436,7 @@ class ObjectParser(QtCore.QThread):
         # print(f"{self.__class__.__name__}._parseObject_(obj: {type(obj)})")
         objType = type(obj)
         objId = id(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         tip = f"{obj}"
         word = "Function" if isinstance(obj, (types.FunctionType, types.BuiltinFunctionType)) else "Method"
@@ -437,7 +450,7 @@ class ObjectParser(QtCore.QThread):
             signature = ""
         info = f"{word} {obj.__qualname__}{signature} from module {obj.__module__}"
 
-        return obj, {
+        infoDict = {
             "indirect": False,
             "nChildren": 0,
             "objDataAsChild": False,
@@ -450,6 +463,10 @@ class ObjectParser(QtCore.QThread):
             "readOnly": False, # TODO/FIXME
             "objId": objId
             }
+
+        objectInfo = ObjectInfo(**infoDict)
+
+        return obj, objectInfo
 
     @_parseObject_.register(type)
     @_parseObject_.register(enum.EnumType)
@@ -468,7 +485,7 @@ class ObjectParser(QtCore.QThread):
         objId = id(obj)
         info = obj
         tip = str(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
         memberAccess = ()
         accessType = None
 
@@ -500,7 +517,7 @@ class ObjectParser(QtCore.QThread):
                     choices = {}
                 # readOnly = True
 
-        return obj, {
+        infoDict = {
             "indirect": False,
             "nChildren": 0,
             "objDataAsChild": False,
@@ -515,6 +532,8 @@ class ObjectParser(QtCore.QThread):
             "objId": objId
             }
 
+        return obj, objectInfo
+
     @_parseObject_.register(pkgutil.ModuleInfo)
     def __parseObject__(self: typing.Self, obj: pkgutil.ModuleInfo,   # noqa: F811
                         includePrivateMembers: bool = False,
@@ -522,12 +541,12 @@ class ObjectParser(QtCore.QThread):
         objType = type(obj)
         tip = f"{objType}.__name__"
         objId = id(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         pData = {f: getattr(obj, f, None) for f in obj._fields} # dict(map(lambda f: (f, getattr(obj, f, None)), obj._fields))
         info = f"{len(pData)} fields"
 
-        return obj, {
+        infoDict = {
             "indirect": True,
             "nChildren": 0,
             "objDataAsChild": False,
@@ -542,13 +561,17 @@ class ObjectParser(QtCore.QThread):
             "objId": objId
             }
 
+        objectInfo - objectInfo(**infoDict)
+
+        return obj, objectInfo
+
     @_parseObject_.register(bgbridge.Structure)
     def __parseObject__(self: typing.Self, obj: bgbridge.Structure,   # noqa: F811
                         includePrivateMembers: bool = False,
                         choices: dict | None = None, ) -> tuple:
         objType = type(obj)
         objId = id(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         ndx = [
             i[1]
@@ -567,7 +590,7 @@ class ObjectParser(QtCore.QThread):
 
         tip = type(obj).__name__
 
-        return pData, {
+        infoDict = {
             "indirect": indirect,
             "nChildren": len(pData),
             "objDataAsChild": False,
@@ -582,13 +605,17 @@ class ObjectParser(QtCore.QThread):
             "objId": objId
             }
 
+        objectInfo = ObjectInfo(**infoDict)
+
+        return pData, objectInfo
+
     @_parseObject_.register(taxonbridge.Taxon)
     def __parseObject__(self: typing.Self, obj: taxonbridge.Taxon, # noqa: F811
                         includePrivateMembers: bool = False,
                         choices: dict | None = None ) -> tuple:
         objType = type(obj)
         objId = id(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         pData = obj.__dict__
         indirect = True
@@ -605,7 +632,8 @@ class ObjectParser(QtCore.QThread):
         pData["wikidata_url"] = obj.wikidata_url
 
         tip = type(obj).__name__
-        return pData, {
+
+        infoDict = {
             "indirect": indirect,
             "nChildren": len(pData),
             "objDataAsChild": False,
@@ -619,6 +647,10 @@ class ObjectParser(QtCore.QThread):
             "readOnlyChildren": True,
             "objId": objId
             }
+
+        objectInfo = ObjectInfo(**infoDict)
+
+        return pData, objectInfo
 
     @_parseObject_.register(dict)
     @_parseObject_.register(types.MappingProxyType)
@@ -643,7 +675,7 @@ class ObjectParser(QtCore.QThread):
         else:
             objType = type(obj)
 
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         # NOTE: 2021-07-20 09:52:34
         # dict objects with mixed key types cannot be sorted
@@ -670,7 +702,7 @@ class ObjectParser(QtCore.QThread):
         info = f"{len(obj)} key / value {strutils.pluralize('pair', nChildren)}"
         tip = type(obj).__name__
 
-        return pData, {
+        infoDict = {
             "indirect": indirect,
             "nChildren": nChildren,
             "objDataAsChild": False,
@@ -684,6 +716,10 @@ class ObjectParser(QtCore.QThread):
             "readOnlyChildren": False,
             "objId": objId
             }
+
+        objectInfo = ObjectInfo(**infoDict)
+
+        return pData, objectInfo
 
     @_parseObject_.register(list)
     @_parseObject_.register(tuple)
@@ -701,7 +737,7 @@ class ObjectParser(QtCore.QThread):
                         choices: dict | None = None, ) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         tip = objType.__name__
         readOnly = True
@@ -738,7 +774,7 @@ class ObjectParser(QtCore.QThread):
 
         info = f"{n} {strutils.pluralize('element', n)}"
 
-        return pData, {
+        infoDict = {
             "indirect": True,
             "nChildren": n,
             "objDataAsChild": False,
@@ -753,6 +789,10 @@ class ObjectParser(QtCore.QThread):
             "objId": objId
             }
 
+        objectInfo = ObjectInfo(**infoDict)
+
+        return pData, objectInfo
+
     @_parseObject_.register(str)
     @_parseObject_.register(bytes)
     @_parseObject_.register(bytearray)
@@ -760,7 +800,7 @@ class ObjectParser(QtCore.QThread):
                         _: bool = True, choices: dict | None = None, ) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         readOnly = self.readOnly
         readOnlyChildren = self.readOnly
@@ -789,7 +829,7 @@ class ObjectParser(QtCore.QThread):
                 readOnly = True
                 readOnlyChildren = True
 
-        return  obj, {
+        infoDict =  {
             "indirect": False,
             "nChildren": 0,
             "objDataAsChild": objDataAsChild,
@@ -804,12 +844,16 @@ class ObjectParser(QtCore.QThread):
             "objId": objId
             }
 
+        objectInfo = ObjectInfo(**infoDict)
+
+        return  obj, objectInfo
+
     @_parseObject_.register(pathlib.Path)
     def __parseObject__(self: typing.Self, obj: pathlib.Path, _: bool = True,   # noqa: F811
                         choices: dict | None = None) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         # info = f"{obj}"
         info = obj.as_posix()
@@ -817,7 +861,8 @@ class ObjectParser(QtCore.QThread):
         pData = obj
         # indirect = True
         indirect = False
-        return  pData, {
+
+        infoDict = {
             "indirect": indirect,
             "nChildren": 0,
             "objDataAsChild": False,
@@ -830,6 +875,10 @@ class ObjectParser(QtCore.QThread):
             "readOnly": self.readOnly,
             "objId": objId
             }
+
+        objectInfo = ObjectInfo(*infoDict)
+
+        return  pData, objectInfo
 
     @_parseObject_.register(bool)
     @_parseObject_.register(int)
@@ -861,7 +910,8 @@ class ObjectParser(QtCore.QThread):
             choices = {}
 
         tip = objType.__name__
-        return obj, {
+
+        infoDict = {
             "indirect": False,
             "nChildren": 0,
             "objDataAsChild": False,
@@ -875,13 +925,17 @@ class ObjectParser(QtCore.QThread):
             "objId": objId
             }
 
+        objectInfo = ObjectInfo(**infoDict)
+
+        return obj, objectInfo
+
     @_parseObject_.register(types.SimpleNamespace)
     def __parseObject__(self: typing.Self, obj: types.SimpleNamespace, # noqa: F811
                 includePrivateMembers: bool = False,
                 choices: dict | None = None) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         pData = obj.__dict__
         if not includePrivateMembers:
@@ -890,7 +944,8 @@ class ObjectParser(QtCore.QThread):
         n = len(pData)
         info = f"{n} {strutils.pluralize('member', n)}"
         tip = type(obj).__name__
-        return pData, {
+
+        infoDict =  {
             "indirect": True,
             "nChildren": n,
             "objDataAsChild": False,
@@ -905,13 +960,17 @@ class ObjectParser(QtCore.QThread):
             "objId": objId
             }
 
+        objectInfo = ObjectInfo(**infoDict)
+
+        return pData, objectInfo
+
     @_parseObject_.register(types.ModuleType)
     def __parseObject__(self: typing.Self, obj: types.ModuleType, # noqa: F811
           includePrivateMembers: bool = False,
           choices: dict | None = None) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         tip = type(obj).__name__
 
@@ -933,7 +992,7 @@ class ObjectParser(QtCore.QThread):
         if not includePrivateMembers:
             pData = self._exclude_private_members_(pData)
 
-        return pData, {
+        infoDict = {
             "indirect": True,
             "nChildren": len(pData),
             "objDataAsChild": False,
@@ -947,6 +1006,10 @@ class ObjectParser(QtCore.QThread):
             "readOnlyChildren": True,
             "objId": objId
             }
+
+        objectInfo = ObjectInfo(**infoDict)
+
+        return pData, objectInfo
 
     @_parseObject_.register(vigra.filters.Kernel1D)
     @_parseObject_.register(vigra.filters.Kernel2D)
@@ -1044,7 +1107,7 @@ class ObjectParser(QtCore.QThread):
 
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         tip = type(obj).__name__
         if isinstance(obj, vigra.filters.Kernel1D):
@@ -1059,7 +1122,7 @@ class ObjectParser(QtCore.QThread):
             memberAccess = ("[", ",", "]")
             accessType = "indexes"
 
-        return obj, {
+        infoDict = {
             "indirect": False,
             "nChildren": 0,
             "objDataAsChild": False,
@@ -1069,10 +1132,12 @@ class ObjectParser(QtCore.QThread):
             "memberAccess": memberAccess,
             "accessType": accessType,
             "choices": {},
-            # "choices": choices,
             "readOnly": True, # pending a new widget for this
             "objId": objId
             }
+
+        objectInfo = ObjectInfo(**infoDict)
+        return obj, objectInfo
 
     @_parseObject_.register(pd.DataFrame)
     @_parseObject_.register(pd.Series)
@@ -1083,7 +1148,7 @@ class ObjectParser(QtCore.QThread):
                         _: bool = True, choices: dict | None = None) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         # NOTE: 2026-02-11 21:09:34
         # TableEditorWidget gives direct read-write access, so no direct access
@@ -1113,7 +1178,7 @@ class ObjectParser(QtCore.QThread):
 
         tip = type(obj).__name__
 
-        return obj, {
+        infoDict = {
             "indirect": False,
             "nChildren": 0,
             "objDataAsChild": True,
@@ -1126,6 +1191,9 @@ class ObjectParser(QtCore.QThread):
             "readOnly": True,
             "objId": objId
             }
+
+        objectInfo = ObjectInfo(**infoDict)
+        return obj, objectInfo
 
 
     @_parseObject_.register(Interval)
@@ -1142,14 +1210,13 @@ class ObjectParser(QtCore.QThread):
                 }
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         tip = type(obj).__name__
         n = len(obj)
         desc = strutils.pluralize('subinterval', n)
         info = f"Interval '{obj.name}' with {len(obj)} {desc}"
-
-        return pData, {
+        infoDict = {
             "indirect": True,
             "nChildren": len(pData),
             "objDataAsChild": False,
@@ -1163,6 +1230,8 @@ class ObjectParser(QtCore.QThread):
             "readOnlyChildren": self.readOnly,
             "objId": objId
             }
+        objectInfo = ObjectInfo(**infoDict)
+        return pData, objectInfo
 
     @_parseObject_.register(neo.Epoch)
     @_parseObject_.register(DataZone)
@@ -1170,7 +1239,7 @@ class ObjectParser(QtCore.QThread):
                         _: bool = True, choices: dict | None = None,) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         pData = {
                     "times": obj.times,
@@ -1186,7 +1255,7 @@ class ObjectParser(QtCore.QThread):
         desc = strutils.pluralize('subinterval', n)
         info = f"{klass} '{obj.name}' with {n} {desc}"
 
-        return pData, {
+        infoDict =  {
             "indirect": True,
             "nChildren": len(pData),
             "objDataAsChild": False,
@@ -1199,6 +1268,8 @@ class ObjectParser(QtCore.QThread):
             "readOnly": False,
             "objId": objId
             }
+        objectInfo = ObjectInfo(**infoDict)
+        return pData, objectInfo
 
     @_parseObject_.register(neo.Event)
     @_parseObject_.register(DataMark)
@@ -1207,7 +1278,7 @@ class ObjectParser(QtCore.QThread):
                         _: bool = True, choices: dict | None = None) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         pData = {"times": obj.times, "labels": obj.labels}
 
@@ -1223,8 +1294,7 @@ class ObjectParser(QtCore.QThread):
         n = obj.size
         desc = strutils.pluralize('subinterval', n)
         info = f"{klass} '{obj.name}' with {n} {desc}"
-
-        return pData, {
+        infoDict = {
             "indirect": True,
             "nChildren": len(pData),
             "objDataAsChild": False,
@@ -1237,6 +1307,8 @@ class ObjectParser(QtCore.QThread):
             "readOnly": False,
             "objId": objId
             }
+        objectInfo = ObjectInfo(**infoDict)
+        return pData, objectInfo
 
     @_parseObject_.register(pq.Quantity)
     def __parseObject__(self: typing.Self, obj: pq.Quantity, _: bool=True, # noqa: F811
@@ -1244,7 +1316,7 @@ class ObjectParser(QtCore.QThread):
         # print(f"{self.__class__.__name__}._parseObject_({type(obj).__name__})")
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         readOnly = False
         tip = f"{scq.unitFamilyName(obj.units)} quantity"
@@ -1262,7 +1334,7 @@ class ObjectParser(QtCore.QThread):
                 objDataAsChild = True
                 readOnly = False
 
-        objDict = {
+        infoDict = {
             "indirect": False,
             "nChildren": 0,
             "objDataAsChild": objDataAsChild,
@@ -1276,16 +1348,18 @@ class ObjectParser(QtCore.QThread):
             "objId": objId
             }
 
-        # print(f"\t-> {objDict}")
+        objectInfo = ObjectInfo(**infoDict)
 
-        return obj, objDict
+        # print(f"\t-> {infoDict}")
+
+        return obj, objectInfo
 
     @_parseObject_.register(vigra.VigraArray)
     def __parseObject__(self: typing.Self, obj: vigra.VigraArray,               # noqa: F811
                         _: bool = True, choices: dict | None = None) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         # NOTE: 2026-02-11 21:11:11
         # member access relates to metadata attributes (i.e., axistags);
@@ -1306,7 +1380,7 @@ class ObjectParser(QtCore.QThread):
 
         tip = type(obj).__name__
 
-        return pData, {
+        infoDict = {
             "indirect": True,
             "nChildren": len(pData),
             "objDataAsChild": objDataAsChild,
@@ -1319,6 +1393,8 @@ class ObjectParser(QtCore.QThread):
             "readOnly": True,
             "objId": objId
             }
+        objectInfo = ObjectInfo(**infoDict)
+        return pData, objectInfo
 
 
     @_parseObject_.register(np.ndarray)
@@ -1339,8 +1415,7 @@ class ObjectParser(QtCore.QThread):
         else:
             objDataAsChild = True
             info = f"Array with {n} {samples}, shape {s}, dtype {obj.dtype}."
-
-        return obj, {
+        infoDict =  {
             "indirect": False,
             "nChildren": 0,
             "objDataAsChild": objDataAsChild,
@@ -1353,20 +1428,22 @@ class ObjectParser(QtCore.QThread):
             "readOnly": True,
             "objId": objId
             }
+        objectInfo = ObjectInfo(**infoDict)
+        return obj, objectInfo
 
     @_parseObject_.register(vigra.AxisInfo)
     def __parseObject__(self: typing.Self, obj: vigra.AxisInfo,                 # noqa: F811
                         _: bool = False, choices: dict | None = None) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         info = f"{type(obj).__name__} ({getNameForAxisType(obj.typeFlags)}) key {obj.key}"
         tip = type(obj).__name__
         pData = {"resolution": obj.resolution, "description": obj.description,
                  "typeFlags": obj.typeFlags}
 
-        return pData, {
+        infoDict = {
             "indirect": True,
             "nChildren": len(pData),
             "objDataAsChild": False,
@@ -1380,6 +1457,10 @@ class ObjectParser(QtCore.QThread):
             "objId": objId
             }
 
+        objectInfo = ObjectInfo(**infoDict)
+
+        return pData, objectInfo
+
     @_parseObject_.register(vigra.AxisType)
     def __parseObject__(self: typing.Self, obj: vigra.AxisType,                 # noqa: F811
                         _: bool = False, __: dict | None = None) -> tuple:
@@ -1390,7 +1471,7 @@ class ObjectParser(QtCore.QThread):
         tip = type(obj).__name__
         info = f"{tip}: {getNameForAxisType(obj)} ({getValueForAxisType(obj)})"
 
-        return obj, {
+        infoDict = {
             "indirect": False,
             "nChildren":0,
             "objDataAsChild": False,
@@ -1404,19 +1485,22 @@ class ObjectParser(QtCore.QThread):
             "objId": objId
             }
 
+        objectInfo = ObjectInfo(**infoDict)
+        return obj, objectInfo
+
+
     @_parseObject_.register(AxesCalibration)
     def __parseObject__(self: typing.Self, obj: AxesCalibration, _:bool=True,  # noqa: F811
           choices: dict | None = None) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         pData = dict(enumerate(obj.calibrations))
         n = len(pData)
         info = f"{n} {strutils.pluralize('calibration', n)}"
         tip = type(obj).__name__
-
-        return pData, {
+        infoDict = {
             "indirect": True,
             "nChildren": n,
             "objDataAsChild": False,
@@ -1431,12 +1515,14 @@ class ObjectParser(QtCore.QThread):
             "objId": objId
             }
 
+        return pData, ObjectInfo(**infoDict)
+
     @_parseObject_.register(AxisCalibrationData)
     def __parseObject__(self: typing.Self, obj: AxisCalibrationData, _: bool = False,   # noqa: F811
           choices: dict | None = None) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         tip = type(obj).__name__
         indirect = True
@@ -1454,7 +1540,7 @@ class ObjectParser(QtCore.QThread):
             c = len(obj.channels)
             info = f"Channel axis calibration with {c} {strutils.pluralize('channel', c)}"
 
-        return pData, {
+        infoDict = {
             "indirect": indirect,
             "nChildren": n,
             "objDataAsChild": objDataAsChild,
@@ -1469,19 +1555,21 @@ class ObjectParser(QtCore.QThread):
             "objId": objId
             }
 
+        return pData, ObjectInfo(**infoDict)
+
     @_parseObject_.register(ChannelCalibrationData)
     def __parseObject__(self: typing.Self, obj: ChannelCalibrationData, _: bool = False,   # noqa: F811
                         choices: dict | None = None) -> tuple:
         objId =  id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         tip = f"{type(obj).__name__}"
         datafields = dataclasses.fields(obj)
         fieldnames = [f.name for f in datafields] # list(map(lambda f: f.name, datafields))
         pData = {c: getattr(obj, c) for c in fieldnames} # dict(map(lambda c: (c, getattr(obj, c)), fieldnames))
 
-        return pData, {
+        infoDict = {
             "indirect": True,
             "nChildren": len(pData),
             "objDataAsChild": False,
@@ -1495,13 +1583,14 @@ class ObjectParser(QtCore.QThread):
             "readOnlyChildren": self.readOnly,
             "objId": objId
             }
+        return pData, ObjectInfo(**infoDict)
 
     @_parseObject_.register(PVObject)
     def __parseObject__(self: typing.Self, obj: PVObject, _: bool = False, # noqa: F811
                         choices: dict | None = None) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         tip = type(obj).__name__
         info = tip
@@ -1524,8 +1613,7 @@ class ObjectParser(QtCore.QThread):
                 info = obj.description
 
         pData = obj.as_dict()
-
-        return pData, {
+        infoDict = {
             "indirect": True,
             "nChildren": len(pData),
             "objDataAsChild": False,
@@ -1539,12 +1627,14 @@ class ObjectParser(QtCore.QThread):
             "objId": objId
             }
 
+        return pData, ObjectInfo(**infoDict)
+
     @_parseObject_.register(scipy.optimize.Bounds)
     def __parseObject__(self: typing.Self, obj: scipy.optimize.Bounds, _:bool = True, # noqa: F811
                         choices: dict | None = None) -> tuple:
         objId = id(obj)
         objType = type(obj)
-        choices = self._check_obj_choices_(choices)
+        choices = self.check_obj_choices(choices)
 
         tip = type(obj).__name__
         pData = {
@@ -1553,7 +1643,7 @@ class ObjectParser(QtCore.QThread):
                     "keep_feasible": obj.keep_feasible,
                 }
         info = ""
-        return pData, {
+        infoDict = {
             "indirect": True,
             "nChildren": len(pData),
             "objDataAsChild": False,
@@ -1567,7 +1657,25 @@ class ObjectParser(QtCore.QThread):
             "objId": objId
             }
 
-    def _generate_dict_(self, obj, includePrivateMembers=False) -> dict:
+        return pData, ObjectInfo(**infoDict)
+
+    def _introspectable_(self, obj: object) -> bool:
+        mro = inspect.getmro(type(obj))
+        return (all(t not in self._supportedDataTypes_ for t in mro)
+                            and not inspect.isroutine(obj)
+                            and not isinstance(obj, NOTINTROSPECTABLE)
+                            and obj is not None)
+
+    def _exclude_private_members_(self, pDict):
+        return {i[0]:i[1] for i in pDict.items() if check_public_member(i)}
+
+    def _exclude_methods_and_functions_(self, pDict):
+        return {i[0]:i[1] for i in pDict.items() if type(i[1]) not in FUNCTION_TYPES}
+
+    def _exclude_type_attributes_(self, pDict):
+        return {i[0]:i[1] for i in pDict.items() if type not in inspect.getmro(type(i[1]))}
+
+    def _generate_dict_(self, obj) -> dict:
         if isinstance(obj, dict):
             return obj, len(obj, len(obj))
 
@@ -1591,31 +1699,43 @@ class ObjectParser(QtCore.QThread):
                     [("data", obj.view(np.ndarray)), ("meta", obj.infoCopy())]
                 )
 
-        elif self._introspect_ and self.introspectable(obj) :
+        elif self._introspect_ and self._introspectable_(obj) :
             # self._introspect_ set by self.showIntrospection
             pData = datatypes.inspect_members(obj, self._predicate_)
-            # indirect = True
-            # if not includePrivateMembers:
-            #     pData = self._exclude_private_members_(pData)
-            #
-            # if not self._showMethods_:
-            #     pData = self._exclude_methods_and_functions_(pData)
-
 
         else:
             raise NotImplementedError(f"{type(obj).__name__} are not supported")
 
         fullCount = len(pData)
 
-        if not includePrivateMembers:
+        if not self._showPrivate_:
             pData = self._exclude_private_members_(pData)
 
-        if not self._showMethods_:
+        if not self._showCallables_:
             pData = self._exclude_methods_and_functions_(pData)
 
-        if self._showValueAttributesOnly_:
+        if not self._showTypeMembers_:
             pData = self._exclude_type_attributes_(pData)
 
         finalCount = len(pData)
 
         return pData, fullCount, finalCount
+
+# ----- module-level functions
+
+def check_public_member(x: tuple):
+    # return not (isinstance(x[0], str) and not x[0].startswith("_"))
+    return (not isinstance(x[0], str) or not x[0].startswith("_"))
+
+def check_obj_choices(choices: dict| None = None) -> dict:
+    if (
+        not isinstance(choices, dict)
+        or (
+            len(choices)> 0
+            and not all(isinstance(v, objType) for v in choices.values())
+            )
+        ):
+        choices = {}
+
+    return choices
+

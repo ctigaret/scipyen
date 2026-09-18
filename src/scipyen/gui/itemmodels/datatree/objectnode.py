@@ -159,14 +159,18 @@ NOTINTROSPECTABLE = (
 
 @dataclasses.dataclass
 class ObjectInfo:
+    name: str = "/"
     indirect: bool = False
     nChildren: int = 0
     objDataAsChild: bool = dataclasses.field(default = False)
     objInfo: str = dataclasses.field(default_factory=str)
     memberAccess: tuple[str] = dataclasses.field(default_factory=tuple)
     accessType: str | None = None
-    objTip: str = dataclasses.field(default_factory=str)
+    accessPath: tuple = dataclasses.field(default_factory = tuple)
+    objTip: str = dataclasses.field(default_factory = str)
     objType: type | None = None
+    # objKey: str = dataclasses.field(default_factory = str)
+    objKeyType: type | None = None # hashable (str, int, ...) or weakref.ReferenceType - type of THIS object's key in parent'
     choices: dict = dataclasses.field(default_factory = dict)
     readOnly: bool = True
     objId: int | None = None
@@ -182,17 +186,35 @@ class ObjectInfo:
     # collapses QExtendedInformation and QFileInfo in one type, omits logic
     # related to "real" file systems
 
+    # NOTE: 2026-09-18 13:20:00
+    # about access :
+    # this is supposed to support item and attribute access, e.g.:
+    #
+    # X.Y[Z].U[T].V.W.[Q][R][S]
+    #
+    # with Y, U, V, W: str, and
+    # T, Q, R, S: hashables (including str, int)
+    #
+    # i.e., no ellipses, range, slice objects or numpy-style indexing
+    #
+    # Breaking the above example down:
+    #
+    # -> getattr(X, Y).getitem(Z) ->
+    #   -> getitem(..., )
+    #
+    # this may be contrived, wheres the current logic in datatreemodel
+    # meesa more straightforward
+
+    def isValid(self) -> bool:
+        return isinstance(objId, int)
+
 class ObjectNode:
-    def __init__(self, objInfo: ObjectInfo, name:str, parent: typing.Self | None = None):
+    def __init__(self, obj, objInfo: ObjectInfo | None = None, parent: typing.Self | None = None):
+        self._obj_ = obj
+
         self._objInfo_ = objInfo
 
-        if not isinstance(name, str) or len(name.strip()) == 0:
-            self._name_ = "/" # for the root node
-
-        else:
-            self._name_ = name
-
-        self._parent_: typing.Self = parent
+        self._parentNode_: typing.Self = parent
 
         self._reference_: typing.Self | None = None
 
@@ -201,13 +223,21 @@ class ObjectNode:
 
         self._visibleChildren_: list[str] = []
 
-        self._objDict_: dict | None = None
+        # self._objDict_: dict | None = None
 
         self._dirtyChildrenIndex_: int = -1
 
         self._populatedChildren_: bool = False
 
         self._isVisible_: bool = False
+
+    @property
+    def children(self) -> dict:
+        return self._children_
+
+    @property
+    def visibleChildren(self) -> list:
+        return self._visibleChildren_
 
     @property
     def isReference(self) -> bool:
@@ -248,3 +278,44 @@ class ObjectNode:
             return self._visibleChildren_.index(childName)
 
         return -1
+
+    def getAccessPathFromParent(self, pathOnly: bool = False) -> str:
+        path = []
+        objectBinding = self.objectInfo.name            # the "key" for this object in parent -> str (always)
+        bindingType = self.objectInfo.objKeyTypeRole    # objDict["accessType"] -> a type or None
+        parentInfo = self._parentNode_.objectInfo
+
+        if isinstance(parentInfo, ObjectInfo) and parentInfo.isValid():
+            parentAccess = parentInfo.memberAccess      # parent's objDict["memberAccess"] -> tuple (always)
+            parentAccessType = parentInfo.accessType    # parent's objDict["accessType"] -> str or None
+            parentName = parentInfo.name
+
+            if pathOnly:
+                path.append(parentName)
+            else:
+                path.append(self._parentNode_.getAccessPathFromParent(pathOnly))
+
+            if objectBinding:
+                if len(parentAccess) == 1: # (".", )
+                    # `attribute` access (`x.y`)
+                    path.append(f"{parentAccess[0]}{objectBinding}")
+
+                elif len(parentAccess) == 2:
+                    # `item` or `index` access (`x[y]`)
+                    if bindingType is weakref.ReferenceType:
+                        path.append(f"{parentAccess[0]}{objectBinding}{parentAccess[1]}")
+                    else:
+                        if bindingType is str:
+                            iB = f"{objectBinding}"
+                        else:
+                            try:
+                                # expect trouble
+                                iB = bindingType(objectBinding) # casting back to the hashable
+                            except:
+                                iB = objectBinding
+
+                        path.append(f"{parentAccess[0]}{iB}{parentaccess[1]}")
+
+        return "".join(path)
+
+
