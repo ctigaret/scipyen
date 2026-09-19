@@ -4040,6 +4040,7 @@ def unique(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Seque
         if indices:
             u, i = np.unique(seq, return_index=True)
             return i
+
         return np.unique(seq)
     
     return seq.__class__(gen_unique(seq, key=key, indices=indices, idcheck=idcheck))
@@ -4176,7 +4177,6 @@ def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
                 ret = True
                 
             return False
-            # return val not in seenlist and not __add_to_seen__(val)
             
     def __check_val__(x):
         if is_hashable(x):
@@ -4184,7 +4184,7 @@ def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
                 seenset.add(x)
                 return True
             return False
-            # return x not in seenset and not __add_to_seen__(x)
+
         else:
             if len(seenlist) == 0:
                 seenlist.append(x)
@@ -4226,6 +4226,7 @@ def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
         else:
             if inspect.isfunction(key):
                 yield from (x for x in seq if __check_fun_val_(x, key))
+
             else:
                 yield from (x for x in seq if __check_val__(key))
             

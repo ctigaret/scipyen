@@ -76,6 +76,8 @@ import scipy
 import pandas as pd
 import vigra
 import meshio
+import treelib
+from treelib import Tree, Node
 # ### END 3rd party modules
 
 # from core.qtutils import qVariant #, QVariantType #, qVariants, fromQVariant, isQObjectAlive)
@@ -160,19 +162,86 @@ NOTINTROSPECTABLE = (
 @dataclasses.dataclass
 class ObjectInfo:
     name: str = "/"
+    r"""Symbol to which this object is bount (either in its parent, or in some namespace)"""
+
     indirect: bool = False
-    nChildren: int = 0
+    r"""True if the object isinternally represented by a hierarchical structures such as a dict.
+    This happens for obejcts that are themselves a 'flavor' of dict, a sequence (tuple, list, deque)
+    a dataclass, and for introspectable objects.
+
+    For these, the internal (indirect) representation is a mapping as follows:
+
+    dict & related          => key¹ ↦ value
+
+    sequences:
+        tuple, list, deque  => index² ↦ value
+        namedtuple          => field_name³ ↦ value
+
+    dataclasses             => field_name³ ↦ value
+
+    introspectable          => attribute_name³ ↦ value
+
+.. note::
+
+    ¹ by definition these are hashable objects; mot commonly, they are str or int
+    but the language allows other types as well e.g. tuple, or any object type that
+    can generate a unique hash value.
+
+    ² sequences indexes are always int so they can be used as keys for the intermal
+    representation, but CAUTION: the language allows user-defined types where an index
+    might be anything that the usee deems useful (in theory; cannot think of an exmaple now)
+
+    ³ by definition these are symbols, hence strings (str)
+
+"""
+
     objDataAsChild: bool = dataclasses.field(default = False)
+    r"""Used for arrays, to indicate they are to be shown in a table widget and not introspected
+"""
+
+    children: tuple = dataclasses.field(default_factory = tuple)
+    r"""Symbols or indexes of the 'children' of the object.
+A child is an attribute, a key/value pair (for mappings) or an element (for sequences)
+This is always 0 for PODs, not introspectables and for objects where
+objectDataAsChild is True.
+"""
+    containerChild: str = dataclasses.field(default_factory=str)
+    r"""Name of container attribute (if any) where children are inspected.
+For the special case of objects where only a child container is introspected
+"""
+
     objInfo: str = dataclasses.field(default_factory=str)
+    r"""A very short description string. Goes into the 3rd column"""
+
     memberAccess: tuple[str] = dataclasses.field(default_factory=tuple)
+    r"""Describes the syntax for acccessing this object's members.
+This is either:
+
+* empty for objects with no access to their members,
+* the tuple ('[',']') for item access in mappings or 1D indexing in sequences, e.g. ``A[x]``
+* the tuple ('.',) for attribute access i.e., ``A.x``
+"""
+
     accessType: str | None = None
-    accessPath: tuple = dataclasses.field(default_factory = tuple)
+    r"""Type of access:
+
+* None for object that forbid access to their contents
+* "attribute" for attribute style access (see above)
+* "index" for item or index style access
+
+This field is redundant, therefore flagged for culling.
+
+"""
+    # accessPath: tuple = dataclasses.field(default_factory = tuple)
+    # r"""tuple of member access from the root of the hierarchy through the parentsm down to this object"""
+
     objTip: str = dataclasses.field(default_factory = str)
     objType: type | None = None
     # objKey: str = dataclasses.field(default_factory = str)
     objKeyType: type | None = None # hashable (str, int, ...) or weakref.ReferenceType - type of THIS object's key in parent'
     choices: dict = dataclasses.field(default_factory = dict)
     readOnly: bool = True
+    readOnlyChildren: bool = True
     objId: int | None = None
 
     # NOTE: 2026-09-16 10:22:19 fileystem-like stuff:
@@ -231,6 +300,8 @@ class ObjectNode:
 
         self._isVisible_: bool = False
 
+        self._path_ = self.getAccessPathFromParent()
+
     @property
     def children(self) -> dict:
         return self._children_
@@ -249,25 +320,23 @@ class ObjectNode:
         return self._objInfo_
 
     @objectInfo.setter
-    def objectInfo(self, value: ObjectInfo):
+    def objectInfo(self, value: ObjectInfo | None):
         if not isinstance(value, ObjectInfo):
-            self._objInfo_ = ObjectInfo()
+            self._objInfo_ = None
         else:
             self._objInfo_ = value
 
     @property
     def hasInformation(self) -> bool:
-        return (
-                    isinstance(self.objectInfo.objId, int)
-                    and isinstance(self.objectInfo.objType, type)
-                )
+        return isinstance(self.objectInfo, ObjectInfo)
 
     @property
     def isBranch(self) -> bool:
         if self.hasInformation:
             return not self.objectInfo.indirect
+        return False
 
-        return len(self._children_) > 0
+        # return len(self._children_) > 0
 
     @property
     def isLeaf(self)-> bool:
@@ -281,6 +350,8 @@ class ObjectNode:
 
     def getAccessPathFromParent(self, pathOnly: bool = False) -> str:
         path = []
+        if self.objectInfo is None:
+            return path
         objectBinding = self.objectInfo.name            # the "key" for this object in parent -> str (always)
         bindingType = self.objectInfo.objKeyTypeRole    # objDict["accessType"] -> a type or None
         parentInfo = self._parentNode_.objectInfo

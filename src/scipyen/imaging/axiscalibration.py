@@ -2300,7 +2300,7 @@ class AxesCalibration(object):
                     returns  a default AxisCalibrationData("c") with
                     ChannelCalibrationData for the 'virtual' channel 0
 
-                    This behaviour emulates that of vigra.AxisTags.
+                    This emulates the behaviour of vigra.AxisTags.
 
         NOTE
         A VigraArray (and by extension, an AxesCalibration object) can

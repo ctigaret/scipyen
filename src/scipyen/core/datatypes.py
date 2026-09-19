@@ -1138,7 +1138,7 @@ def categorize_data_frame_columns(data:pd.DataFrame, *column_names, inplace:bool
         return ret
 
 
-def inspect_members(obj:typing.Any, predicate: typing.Callable | None = None) -> dict:
+def inspect_members(obj:typing.Any, predicate: typing.Callable | None = None, symbols_only: bool = False) -> dict | tuple:
     skips = ("__class__", "__module__", "__name__", "__qualname__", "__func__",
              "__self__", "__code__", "__defaults__", "__kwdefaults__",
              "__globals__", "__builtins__", "__annotations__", "__doc__",
@@ -1172,6 +1172,9 @@ def inspect_members(obj:typing.Any, predicate: typing.Callable | None = None) ->
 
     if inspect.isfunction(predicate):
         mb = tuple(filter(lambda x: predicate(x[1]), mb))
+
+    if symbols_only:
+        return tuple(x[0] for x in mb)
 
     return dict(mb)
 

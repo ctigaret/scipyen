@@ -144,7 +144,7 @@ class KeplerLight(Style):
     # background_color = '#232629'
     background_color = "#ffffff"
     # highlight_color = '#404040'
-    highlight_color = '#384f29'
+    highlight_color = '#a5d883'
     line_number_color = '#aaaaaa'
 
     styles = {
@@ -162,47 +162,47 @@ class KeplerLight(Style):
         # Comment.Special:    'noitalic bold #e50808 bg:#520000',
         Comment.Special:    'noitalic bold #e50808 bg:#920000',
 
-        Keyword:            'bold #6ebf26',
+        Keyword:            'bold #58961e',
         Keyword.Pseudo:     'nobold',
-        Operator.Word:      'bold #6ebf26',
+        Operator.Word:      'bold #58961e',
 
-        String:             '#9a640c',
-        String.Other:       '#b37759',
+        String:             '#96610c',
+        String.Other:       '#96644b',
 
-        Number:             '#51b2fd',
+        Number:             '#306a96',
 
-        Name.Builtin:       '#2fbccd',
+        Name.Builtin:       '#228a96',
         Name.Variable:      '#289e9e',
         Name.Constant:      '#207e7e',
-        Name.Class:         'underline #71adff',
-        Name.Function:      '#71adff',
-        Name.Namespace:     'underline #71adff',
+        Name.Class:         'underline #426796',
+        Name.Function:      '#426796',
+        Name.Namespace:     'underline #426796',
         # Name.Exception:     '#bbbbbb',
-        Name.Exception:     '#ff8800',
-        Name.Tag:           'bold #6ebf26',
+        Name.Exception:     '#960000',
+        Name.Tag:           'bold #58961e',
         Name.Attribute:     '#737373',
-        Name.Decorator:     '#888800',
+        Name.Decorator:     '#646400',
 
         # Generic.Heading:    'bold #ffffff',
         Generic.Heading:    'bold #000000',
         Generic.Subheading: 'underline #000000',
         # Generic.Subheading: 'underline #ffffff',
-        Generic.Deleted:    '#ff3a3a',
-        Generic.Inserted:   '#589819',
+        Generic.Deleted:    '#962222',
+        Generic.Inserted:   '#579619',
         # Generic.Error:      '#ff3a3a',
-        Generic.Error:      '#ff6200',
+        Generic.Error:      '#963a00',
         Generic.Emph:       'italic',
         Generic.Strong:     'bold',
         Generic.EmphStrong: 'bold italic',
-        Generic.Prompt:     '#aaaaaa',
+        Generic.Prompt:     '#969696',
         # Generic.Prompt:     '#cccccc',
-        Generic.Output:     '#cccccc',
+        Generic.Output:     '#646464',
         # Generic.Output:     '#eeeeee',
         # Generic.Traceback:  '#ff3a3a',
-        Generic.Traceback:  '#ff6200',
+        Generic.Traceback:  '#963a00',
 
         # Error:              'bg:#2d1e1e #a61717',
-        Error:              'bg:#2d1e1e #a65e17',
+        Error:              'bg:#2d1e1e #824812',
         # Error:              'bg:#e3d2d2 #a61717',
         # Error:              '#a61717',
     }

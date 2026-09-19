@@ -239,6 +239,9 @@ class ObjectModel(QtGui.QStandardItemModel):
     def root(self) -> objectnode.ObjectNode:
         return self._rootNode_
 
+    def objectInfo(self, index: QtCore.QModelIndex) -> ObjectInfo:
+        return self.node(index).objectInfo
+
     def setRootObject(self, obj, objName:str) -> QtCore.QModelIndex:
         if obj is dataclasses.MISSING:
             objName = ""
@@ -262,14 +265,9 @@ class ObjectModel(QtGui.QStandardItemModel):
         if objPath in self._rootNode_.children:
             return self._rootNode_.children[objPath]
 
-        # else:
+        else:
+            return self._rootNode_
 
-
-
-
-
-        # if obj is dataclasses.MISSING:
-        #     return objectnode.ObjectNode(obj, objectnode.ObjectInfo(name=""))
 
     @node.register(QtCore.QModelIndex)
     def _node_(self, index: QtCore.QModelIndex, _: bool = False) -> objectnode.ObjectNode:

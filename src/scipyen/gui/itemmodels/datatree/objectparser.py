@@ -129,25 +129,55 @@ NOTINTROSPECTABLE = PODS + (types.ModuleType, pkgutil.ModuleInfo,)
 
 
 class ObjectParser(QtCore.QThread):
-    sig_result = Signal(dict, dict, name="sig_result")
-    def __init__(self, parent, obj, objName: str, objectParentInfo: ObjectInfo | None = None,
-                 **kwargs):
+    sig_result = Signal(dict, ObjectInfo, name="sig_result")
+    def __init__(self, parent, **kwargs): #obj, objName: str, objectParentInfo: ObjectInfo | None = None,
+
         QtCore.QThread.__init__(self, parent)
         self._introspect_: bool = kwargs.pop("introspect", True)
         self._showPrivate_: bool = kwargs.pop("includePrivateMembers", False)
         self._showCallables_: bool = kwargs.pop("includeCallables", False)
         self._showTypeMembers_: bool = kwargs.pop("includeTypes", False)
-        self._choices_ = kwargs.pop("choices", {})
         self._supportedDataTypes_ = kwargs.pop("supportedTypes", ())
 
-        self._object_ = obj
-        self._objectName_ = objName
-        self._objectParentInfo_ = objectParentInfo
+        self._object_ = dataclasses.MISSING
+        self._objectName_ = ""
+        self._objectParentInfo_ = None
+        self._valueChoices_ = {}
         # if not isinstance(self._objectParentInfo_, ObjectInfo):
         #     self._objectParentInfo_ = ObjectInfo()
 
+        # ----- Private API ----
         self._mutex_ = QtCore.QMutex()
+        # ### BEGIN protected by mutex
+        #
         self._condition_ = QtCore.QWaitCondition()
+        self._path_ = deque()
+        self._objects_ = deque()
+        #
+        # ### END   protected by mutex
+
+        # self.start(QtCore.QThread.LowPriority)
+
+    def __del__(self):
+        self.requestAbort()
+        self.wait()
+
+    # def event(self, evt: QtCore.QEvent):
+    #     if evt.type() == QtCore.QEvent.De
+
+    def requestAbort(self):
+        self.requestInterruption()
+        locker = QtCore.QMutexLocker(self.mutex)
+        self.condition.wakeAll()
+
+    def setObject(self, obj, objName:str, /, valueChoices: dict | None = None, objParentInfo: ObjectInfo | None = None):
+        self._object_ = obj
+        self._objectName_ = objName
+        self._objectParentInfo_ = objParentInfo
+        if not isinstance(choices, dict):
+            self._valueChoices_ = {}
+        else:
+            self._valueChoices_ = valueChoices
 
     def run(self):
         try:
@@ -242,7 +272,7 @@ class ObjectParser(QtCore.QThread):
         objType = type(obj)
         objId = id(obj)
 
-        choices = self.check_obj_choices(self._choices_)
+        choices = self.check_obj_choices(self._valueChoices_)
 
         readOnly = False
         readOnlyChildren = False
@@ -250,18 +280,20 @@ class ObjectParser(QtCore.QThread):
         if isDataclass(obj):
             pData, fullCount, nChildren = self._generate_dict_(obj, includePrivateMembers)
             indirect = True
+
             if includePrivateMembers:
                 readOnlyChildren = True
 
             info = f"{nChildren} {strutils.pluralize('member', nChildren)} (of {fullCount})"
             tip = f"{type(obj).__name__} (dataclass)"
             objDataAsChild = False
-            memberAccess = (".",)
+            memberAccess = (".",) # access to obj members!
             accessType = "attribute"
-            if len(objParentInfo.accessPath) == 0:
 
+            # if len(objParentInfo.objectAccessPath) == 0:
+            #     parentAccesssPath =
 
-            accessPath = objParentInfo.accessPath + memberAccess + (objName, )
+            objectAccessPath = objParentInfo.objectAccessPath + memberAccess + (objName, )
             readOnly = False
 
         elif (
@@ -275,7 +307,7 @@ class ObjectParser(QtCore.QThread):
             info = ""
             memberAccess = ("[", "]")
             accessType = "index"
-            accessPath = objParentInfo.accessPath + (memberAccess[0], ) +
+            objectAccessPath = objParentInfo.objectAccessPath + (memberAccess[0], objName, memberAccess[1])
             # nChildren = len(pData)
 
         elif HAS_MESHIO and isinstance(obj, meshio.Mesh):
@@ -323,6 +355,9 @@ class ObjectParser(QtCore.QThread):
             accessType = None
             nChildren = 0
 
+        # if len(objectParentInfo.objectAccessPath):
+        #     if len(objectParentInfo)
+
         infoDict = {
             "indirect": indirect,
             "nChildren": nChildren,
@@ -330,7 +365,7 @@ class ObjectParser(QtCore.QThread):
             "objInfo": info,
             "memberAccess": memberAccess,
             "accessType": accessType,
-            "accessPath": accessPath,
+            "objectAccessPath": objectAccessPath,
             "objTip": tip,
             "objType": objType,
             "choices": choices,
