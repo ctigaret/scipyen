@@ -123,7 +123,8 @@ from imaging.scandata import (ScanData, AnalysisUnit) # noqa
 
 from gui.itemmodels.roles import *
 
-from gui.itemmodels.datatree.objectnode import ObjectInfo
+import gui.itemmodels.datatree.objectnode as onode
+from gui.itemmodels.datatree.objectnode import ObjectInfo, ObjectNode
 
 NOTINTROSPECTABLE = PODS + (types.ModuleType, pkgutil.ModuleInfo,)
 
@@ -134,9 +135,13 @@ class ObjectParser(QtCore.QThread):
 
         QtCore.QThread.__init__(self, parent)
         self._introspect_: bool = kwargs.pop("introspect", True)
+        self._predicate_ = kwargs.pop("predicate", None)
         self._showPrivate_: bool = kwargs.pop("includePrivateMembers", False)
         self._showCallables_: bool = kwargs.pop("includeCallables", False)
-        self._showTypeMembers_: bool = kwargs.pop("includeTypes", False)
+        self._showTypeMembers_: bool = kwargs.pop("includeTypes", False)#
+        self._choices_: dict = kwargs.pop("choices", {})
+        self._readOnly_: bool = kwargs.pop("readOnly", True)
+        self._readOnlyChildren_: bool = kwargs.pop("readOnlyChildren", True)
         self._supportedDataTypes_ = kwargs.pop("supportedTypes", ())
 
         self._object_ = dataclasses.MISSING
@@ -189,8 +194,16 @@ class ObjectParser(QtCore.QThread):
                 return
             locker.unlock()
             self.setTerminationEnabled(False)
-            pData, objInfo = self._parseObject_(obj, objName, self._objectParentInfo_)
-            self.sig_result.emit(pData, objInfo)
+            objInfo = onode.parseObject(obj, objName,
+                                        introspect=self._introspect_,
+                                        predicate=self._predicate_,
+                                        includePrivate=self._showPrivate_,
+                                        includeCallables=self._showCallables_,
+                                        includeTypeMembers=self._showTypeMembers_,
+                                        choices=self._choices_,
+                                        readOnly=self._readOnly_,
+                                        readOnlyChildren=self._readOnlyChildren_)
+            self.sig_result.emit(objInfo)
 
         except:    # noqa: E722
             traceback.print_exc()

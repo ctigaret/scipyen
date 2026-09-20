@@ -122,8 +122,8 @@ import imaging.scandata # noqa
 from imaging.scandata import (ScanData, AnalysisUnit) # noqa
 
 from gui.itemmodels.roles import *
-
-from gui.itemmodels.datatree.objectnode import (ObjectInfo, ObjectNode)
+import gui.itemmodels.datatree.objectnode as onode
+from gui.itemmodels.datatree.objectnode import (ObjectInfo, ObjectNode, Tree, Node)
 
 class ObjectModel(QtGui.QStandardItemModel):
     r"""FIXME/TODO Where possible, work with QStandardItem instead of QModelIndex!!!"""
@@ -134,8 +134,9 @@ class ObjectModel(QtGui.QStandardItemModel):
         super().__init__(0,3, parent=parent)
         self._nColumns_ = 3
 
-        self._rootNode_ = objectnode.ObjectNode(dataclasses.MISSING,
-                                                objectnode.ObjectInfo(name=""))
+        self._objectTree_ = Tree()
+
+        self._rootNode_ = None
 
         # --- private model API ---
         self._setRootNode_: bool = False

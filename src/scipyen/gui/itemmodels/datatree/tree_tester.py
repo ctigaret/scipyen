@@ -8,7 +8,7 @@
 import os # noqa
 # import warnings
 import types
-import traceback
+import traceback  # noqa: F401
 # import itertools
 import inspect
 import dataclasses
@@ -124,8 +124,8 @@ from imaging.scandata import (ScanData, AnalysisUnit) # noqa
 
 from gui.itemmodels.roles import *
 
-from gui.itemmodels.datatree.objectnode import ObjectInfo #, ObjectNode
-from gui.itemmodels.datatree.objectparser import ObjectParser
+# from gui.itemmodels.datatree.objectnode import ObjectInfo #, ObjectNode
+from gui.itemmodels.datatree.objectparser import ObjectParser  # noqa: F401
 
 
 NOTMEMOIZED = (
@@ -160,25 +160,278 @@ NOTINTROSPECTABLE = PODS + (types.ModuleType, pkgutil.ModuleInfo,)
 # class Tester(QtCore.QObject):
 #     def __init__(self, parent = None):
 #         super().__init__(self, parent)
+@dataclasses.dataclass
+class ObjectInfo:
+    name: str = "/"
+    r"""Symbol to which this object is bount (either in its parent, or in some namespace)"""
+
+    indirect: bool = False
+    r"""True if the object isinternally represented by a hierarchical structures such as a dict.
+    This happens for obejcts that are themselves a 'flavor' of dict, a sequence (tuple, list, deque)
+    a dataclass, and for introspectable objects.
+
+    For these, the internal (indirect) representation is a mapping as follows:
+
+    dict & related          => key¹ ↦ value
+
+    sequences:
+        tuple, list, deque  => index² ↦ value
+        namedtuple          => field_name³ ↦ value
+
+    dataclasses             => field_name³ ↦ value
+
+    introspectable          => attribute_name³ ↦ value
+
+.. note::
+
+    ¹ by definition these are hashable objects; mot commonly, they are str or int
+    but the language allows other types as well e.g. tuple, or any object type that
+    can generate a unique hash value.
+
+    ² sequences indexes are always int so they can be used as keys for the intermal
+    representation, but CAUTION: the language allows user-defined types where an index
+    might be anything that the usee deems useful (in theory; cannot think of an exmaple now)
+
+    ³ by definition these are symbols, hence strings (str)
+
+"""
+
+    objDataAsChild: bool = dataclasses.field(default = False)
+    r"""Used for arrays, to indicate they are to be shown in a table widget and not introspected
+"""
+
+    children: tuple = dataclasses.field(default_factory = tuple)
+    r"""Symbols or indexes of the 'children' of the object.
+A child is an attribute, a key/value pair (for mappings) or an element (for sequences)
+This is always 0 for PODs, not introspectables and for objects where
+objectDataAsChild is True.
+"""
+    containerChild: str = dataclasses.field(default_factory=str)
+    r"""Name of container attribute (if any) where children are inspected.
+For the special case of objects where only a child container is introspected
+"""
+
+    objInfo: str = dataclasses.field(default_factory=str)
+    r"""A very short description string. Goes into the 3rd column"""
+
+    memberAccess: tuple[str] = dataclasses.field(default_factory=tuple)
+    r"""Describes the syntax for acccessing this object's members.
+This is either:
+
+* empty for objects with no access to their members,
+* the tuple ('[',']') for item access in mappings or 1D indexing in sequences, e.g. ``A[x]``
+* the tuple ('.',) for attribute access i.e., ``A.x``
+"""
+
+    accessType: str | None = None
+    r"""Type of access:
+
+* None for object that forbid access to their contents
+* "attribute" for attribute style access (see above)
+* "index" for item or index style access
+
+This field is redundant, therefore flagged for culling.
+
+"""
+    # accessPath: tuple = dataclasses.field(default_factory = tuple)
+    # r"""tuple of member access from the root of the hierarchy through the parentsm down to this object"""
+
+    objTip: str = dataclasses.field(default_factory = str)
+    objType: type | None = None
+    # objKey: str = dataclasses.field(default_factory = str)
+    objKeyType: type | None = None # hashable (str, int, ...) or weakref.ReferenceType - type of THIS object's key in parent'
+    choices: dict = dataclasses.field(default_factory = dict)
+    readOnly: bool = True
+    readOnlyChildren: bool = True
+    objId: int | None = None
+
+    # NOTE: 2026-09-16 10:22:19 fileystem-like stuff:
+    # a "directory" is an object that is EITHER a hierarchical structure by itself
+    #   e.g. a dict or dict-like, OR CAN BE REPRESENTED by a dict
+    #   e.g. a sequence, including namedtuple, dataclass, following introspection
+    #
+    # a "file" is an object that is represented by itself, i.e. NO descending into
+    # its structure -- NOTINTROSPECTABLE objects -> indirect = True
+    #
+    # collapses QExtendedInformation and QFileInfo in one type, omits logic
+    # related to "real" file systems
+
+    # NOTE: 2026-09-18 13:20:00
+    # about access :
+    # this is supposed to support item and attribute access, e.g.:
+    #
+    # X.Y[Z].U[T].V.W.[Q][R][S]
+    #
+    # with Y, U, V, W: str, and
+    # T, Q, R, S: hashables (including str, int)
+    #
+    # i.e., no ellipses, range, slice objects or numpy-style indexing
+    #
+    # Breaking the above example down:
+    #
+    # -> getattr(X, Y).getitem(Z) ->
+    #   -> getitem(..., )
+    #
+    # this may be contrived, wheres the current logic in datatreemodel
+    # meesa more straightforward
+
+    def isValid(self) -> bool:
+        return isinstance(objId, int)
+
+    def __hash__(self) -> int:
+        field_values = tuple(getattr(self, f.name) for f in dataclasses.fields(self))
+        return hash(field_values)
 
 class ObjectNode(Node):
-    def __init__(self, tag, identifier, objInfo: ObjectInfo | None = None):
-        super().__init__(tag, identifier)
+    def __init__(self, tag: str | None = None, identifier: str | None = None,
+                 data: typing.Any = dataclasses.MISSING,
+                 objInfo: ObjectInfo | None = None,
+                 ):
+        # print(f"{self.__class__.__init__}(tag={tag}, identifier={identifier}, data={data}, objInfo={objInfo})")
+        # super().__init__(tag, identifier)
+        if data is not dataclasses.MISSING:
+            super().__init__(tag, identifier, data=data)
+        else:
+            super().__init__(tag, identifier)
+
         self._objectInfo_ = objInfo
-        self._initialized_ = isinstance(self._objectInfo_, ObjectInfo)
 
     @property
     def objectInfo(self) -> ObjectInfo:
         return self._objectInfo_
 
-@singledispatch
-def parseObject(obj: object, objName: str, /,
+    @property
+    def intialized(self) -> bool:
+        return isinstance(self._objectInfo_, ObjectInfo)
+
+
+def populate(tree: Tree, node: ObjectNode,
                 introspect: bool = False,
                 predicate = None,
                 includePrivate: bool = False,
                 includeCallables : bool = False,
-                includeTypeMembers: bool = False
+                includeTypeMembers: bool = False,
                 choices: dict | None = None,
+                readOnly: bool = False,
+                readOnlyChildren: bool = False):
+    def getitem(obj, item, default=None):
+        try:
+            return obj.__getitem__(item)
+        except:  # noqa: E722
+            return default
+
+    accessor = None
+
+    assert isinstance(node, ObjectNode), f"Expecting an ObjectNode instance; instead got a {type(node).__name__}"
+
+    if node.identifier not in tree:
+        raise ValueError(f"The node {node.tag} with identifier {node.identifier} does not belong to the tree {tree.identifier}")
+
+    # if node.is_root:
+    if node.data is None:
+        scipywarn(f"The root node ({node.tag} with identifier {node.identifier}) does not associate any data; please set data first")
+        return
+
+    else:
+        if (
+            len(node.objectInfo.children) == 0
+            or not node.objectInfo.indirect
+            or node.objectInfo.objDataAsChild
+            or len(node.objectInfo.memberAccess) == 0
+            ):
+            return
+
+        if (
+            node.objectInfo.memberAccess == (".", )
+            and node.objectInfo.accessType == "attribute"
+            ):
+            accessor = getattr
+
+        elif(
+            node.objectInfo.memberAccess == ("[","]")
+            and node.objectInfo.accessType == "index"
+            ):
+            accessor = getitem
+
+        else:
+            scipywarn(f"Unclear access method for children of data for node {node.tag} with {node.identifier}")
+            return
+
+        if accessor is None:
+            return
+
+        for child in node.objectInfo.children:
+            obj = accessor(node.data, child, None)
+            oInfo = parseObject(obj, child, introspect=introspect,
+                                predicate=predicate, includePrivate=includePrivate,
+                                includeCallables=includeCallables,
+                                includeTypeMembers=includeTypeMembers,
+                                choices=choices,
+                                readOnly=readOnly,
+                                readOnlyChildren=readOnlyChildren)
+
+            childNode = ObjectNode(tag=oInfo.name, data=obj, objInfo=oInfo)
+            tree.add_node(childNode, parent=node)
+
+
+        # if self.data is None:
+        #     if self._initial_tree_id is None:
+        #         scipywarn(f"This node ({self.tag} with identifier {self.identifier}) is not associated with a tree and does not associate any data")
+        #     else:
+        #         data =
+        # else:
+
+def createNode(obj, objName: str, /,
+               storeData: bool = True,
+               introspect: bool = False,
+               predicate = None,
+               includePrivate: bool = False,
+               includeCallables : bool = False,
+               includeTypeMembers: bool = False,
+               choices: dict | None = None,
+               readOnly: bool = False,
+               readOnlyChildren: bool = False
+               ) -> ObjectNode:
+
+
+    objectInfo = parseObject(obj, objName,
+                             introspect=introspect,
+                             predicate=predicate,
+                             includePrivate=includePrivate,
+                             includeCallables=includeCallables,
+                             includeTypeMembers=includeTypeMembers,
+                             choices=choices,
+                             readOnly=readOnly,
+                             readOnlyChildren=readOnlyChildren)
+
+    # identifier = f"{objectInfo.objId}"
+    nodeName = objectInfo.name
+    # NOTE: 2026-09-20 13:34:34
+    # treelib.node.Node API:
+    # Node(tag: str, identifier: str,
+    #       expanded: bool,
+    #       data: Any = None)
+    #
+    # with identifier being unique (in the Tree's context)
+
+    if storeData:
+        return ObjectNode(tag=nodeName, data = obj, objInfo = objectInfo)
+
+    else:
+        return ObjectNode(tag=objName, objInfo = objectInfo)
+
+
+@singledispatch
+def parseObject(obj: object,
+                objName: str, /,
+                introspect: bool = False,
+                predicate = None,
+                includePrivate: bool = False,
+                includeCallables : bool = False,
+                includeTypeMembers: bool = False,
+                choices: dict | None = None,
+                readOnly: bool = False,
+                readOnlyChildren: bool = False
                 ) -> ObjectInfo:
     r""" TODO Documentation
     """
@@ -194,7 +447,7 @@ def parseObject(obj: object, objName: str, /,
     readOnlyChildren = False
     children = ()
 
-    choices = check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     if isDataclass(obj):
         children = introspectObject(obj, predicate = predicate,
@@ -203,7 +456,7 @@ def parseObject(obj: object, objName: str, /,
                   includeTypeMembers = includeTypeMembers)
         indirect = True
 
-        if includePrivateMembers:
+        if includePrivate:
             readOnlyChildren = True
 
         n = len(children)
@@ -219,10 +472,12 @@ def parseObject(obj: object, objName: str, /,
         and hasattr(obj, "implements")
         and obj.implements("MetaArray")
         ):
-        children = introspectObject(obj, predicate = predicate,
-                  includePrivate = includePrivate,
-                  includeCallables = includeCallables,
-                  includeTypeMembers = includeTypeMembers)
+        if introspect:
+            children = introspectObject(obj, predicate = predicate,
+                    includePrivate = includePrivate,
+                    includeCallables = includeCallables,
+                    includeTypeMembers = includeTypeMembers)
+
         indirect = True
         objDataAsChild = False
         info = ""
@@ -295,23 +550,30 @@ def parseObject(obj: object, objName: str, /,
     return ObjectInfo(**infoDict)
     # return pData, objectInfo
 
-@parseObject.register(type(None))
+@parseObject.register(types.NoneType)
 @parseObject.register(type(MISSING))
 @parseObject.register(type(pd.NA))
-def _parseObject_(self: typing.Self, obj: typing.Union[type(None),        # noqa: UP007
-                                                            type(MISSING),
-                                                            type(pd.NA)],
-                    _:bool = False, choices: dict | None = None, ) -> tuple:
+def _parseObject_(obj: types.NoneType | type(MISSING) | type(pd.NA),
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     objType = type(obj)
     objId = id(obj)
-    pData = obj
+    # pData = obj
     indirect = False
     info = f"{obj}"
     tip = f"{obj}"
     objDataAsChild = False
     memberAccess = ()
     accessType = None
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     # TODO/FIXME: 2026-03-28 16:57:15
     # mechanism to see if a new object of another type is acceptable here, in which case call a UI c'tor'
@@ -319,8 +581,8 @@ def _parseObject_(self: typing.Self, obj: typing.Union[type(None),        # noqa
     readOnlyChildren = True
 
     infoDict = {
+        "name": objName,
         "indirect": indirect,
-        "nChildren": 0,
         "objDataAsChild": objDataAsChild,
         "objInfo": info,
         "memberAccess": memberAccess,
@@ -333,25 +595,33 @@ def _parseObject_(self: typing.Self, obj: typing.Union[type(None),        # noqa
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(**infoDict)
-
-    return pData, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(datetime.datetime)
 @parseObject.register(datetime.date)
 @parseObject.register(datetime.time)
 @parseObject.register(datetime.timedelta)
 @parseObject.register(datetime.timezone)
-def _parseObject_(self: typing.Self, obj: typing.Union[datetime.datetime,   # noqa: F811,UP007
-                                            datetime.date,
-                                            datetime.time,
-                                            datetime.timedelta,
-                                            datetime.timezone],
-        __:bool = False, _: dict | None = None, ) -> tuple:
+def _parseObject_(obj: typing.Union[datetime.datetime,   # noqa: F811,UP007
+                                    datetime.date,
+                                    datetime.time,
+                                    datetime.timedelta,
+                                    datetime.timezone],
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
+    # NOTE: 2026-09-20 11:37:16
+    # NEVER introspected
 
     objType = type(obj)
     objId = id(obj)
-    pData = obj
     info = f"{obj}"
     tip = f"{obj}"
     objDataAsChild = False
@@ -360,8 +630,9 @@ def _parseObject_(self: typing.Self, obj: typing.Union[datetime.datetime,   # no
     readOnly = False
 
     infoDict = {
+        "name": objName,
         "indirect": False,
-        "nChildren": 0,
+        "children": (),
         "objDataAsChild": objDataAsChild,
         "objInfo": info,
         "memberAccess": memberAccess,
@@ -373,23 +644,30 @@ def _parseObject_(self: typing.Self, obj: typing.Union[datetime.datetime,   # no
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(**infoDict)
-
-    return pData, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(types.FunctionType)
 @parseObject.register(types.BuiltinFunctionType)
 @parseObject.register(types.MethodType)
 @parseObject.register(types.BuiltinMethodType)
-def _parseObject_(self: typing.Self, obj: typing.Union[types.FunctionType,  # noqa: F811,UP007
-                                            types.BuiltinFunctionType,
-                                            types.MethodType,
-                                            types.BuiltinMethodType],
-                    _:bool = False, choices: dict | None = None) -> tuple:
+def _parseObject_(obj: typing.Union[types.FunctionType,  # noqa: F811,UP007
+                                    types.BuiltinFunctionType,
+                                    types.MethodType,
+                                    types.BuiltinMethodType],
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     # print(f"{self.__class__.__name__}.parseObject(obj: {type(obj)})")
     objType = type(obj)
     objId = id(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     tip = f"{obj}"
     word = "Function" if isinstance(obj, (types.FunctionType, types.BuiltinFunctionType)) else "Method"
@@ -401,11 +679,12 @@ def _parseObject_(self: typing.Self, obj: typing.Union[types.FunctionType,  # no
 
     except: # noqa
         signature = ""
+
     info = f"{word} {obj.__qualname__}{signature} from module {obj.__module__}"
 
     infoDict = {
+        "name": objName,
         "indirect": False,
-        "nChildren": 0,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -417,9 +696,7 @@ def _parseObject_(self: typing.Self, obj: typing.Union[types.FunctionType,  # no
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(**infoDict)
-
-    return obj, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(type)
 @parseObject.register(enum.EnumType)
@@ -427,18 +704,29 @@ def _parseObject_(self: typing.Self, obj: typing.Union[types.FunctionType,  # no
 @parseObject.register(enum.IntEnum)
 @parseObject.register(enum.Flag)
 @parseObject.register(TypeEnum)
-def _parseObject_(self: typing.Self, obj: typing.Union[type, enum.EnumType, # noqa: F811,UP007
-                                                            enum.Enum,
-                                                            enum.Flag,
-                                                            TypeEnum],
-        includePrivateMembers: bool = False, choices: dict | None = None) -> tuple:
+def _parseObject_(obj: typing.Union[type, enum.EnumType, # noqa: F811,UP007
+                                    enum.Enum,
+                                    enum.Flag,
+                                    TypeEnum],
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
+    # NOTE: 2026-09-20 11:47:13
+    # NEVER introspected
     readOnly = True
     readOnlyChildren = True
     objType = type(obj)
     objId = id(obj)
     info = obj
     tip = str(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
     memberAccess = ()
     accessType = None
 
@@ -468,11 +756,10 @@ def _parseObject_(self: typing.Self, obj: typing.Union[type, enum.EnumType, # no
             except: # noqa
                 scipywarn(f"Cannot access enumeration values for {type(obj).__name__}")
                 choices = {}
-            # readOnly = True
 
     infoDict = {
+        "name": objName,
         "indirect": False,
-        "nChildren": 0,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -485,23 +772,36 @@ def _parseObject_(self: typing.Self, obj: typing.Union[type, enum.EnumType, # no
         "objId": objId
         }
 
-    return obj, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(pkgutil.ModuleInfo)
-def _parseObject_(self: typing.Self, obj: pkgutil.ModuleInfo,   # noqa: F811
-                    includePrivateMembers: bool = False,
-                    choices: dict | None = None, ) -> tuple:
+def _parseObject_(obj: pkgutil.ModuleInfo, # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     objType = type(obj)
     tip = f"{objType}.__name__"
     objId = id(obj)
-    choices = self.check_obj_choices(choices)
-
-    pData = {f: getattr(obj, f, None) for f in obj._fields} # dict(map(lambda f: (f, getattr(obj, f, None)), obj._fields))
-    info = f"{len(pData)} fields"
+    choices = check_obj_choices(objType, choices)
+    if introspect:
+        children = tuple(obj._fields)
+        info = f"{len(children)} fields"
+        indirect = True
+    else:
+        children = ()
+        info = ""
+        indirect = False
 
     infoDict = {
-        "indirect": True,
-        "nChildren": 0,
+        "name": objName,
+        "indirect": indirect,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -514,22 +814,23 @@ def _parseObject_(self: typing.Self, obj: pkgutil.ModuleInfo,   # noqa: F811
         "objId": objId
         }
 
-    objectInfo = objectInfo(**infoDict)
-
-    return obj, objectInfo
+    return objectInfo(**infoDict)
 
 @parseObject.register(bgbridge.Structure)
-def _parseObject_(obj: bgbridge.Structure, objName: str, /,
-                introspect: bool = False,
-                predicate = None,
-                includePrivate: bool = False,
-                includeCallables : bool = False,
-                includeTypeMembers: bool = False
-                choices: dict | None = None,
-                ) -> tuple:
+def _parseObject_(obj: bgbridge.Structure,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     objType = type(obj)
     objId = id(obj)
-    choices = check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     if introspect:
         children = introspectObject(
@@ -539,12 +840,13 @@ def _parseObject_(obj: bgbridge.Structure, objName: str, /,
             includeCallables = includeCallables,
             includeTypeMembers = includeTypeMembers
             )
+        indirect = True
 
     else:
         children = ()
+        indirect = False
 
 
-    indirect = True
     info = f"{type(obj).__name__} ID: {obj['id']}, {obj['name']} ({obj['acronym']})"
 
     tip = type(obj).__name__
@@ -567,33 +869,38 @@ def _parseObject_(obj: bgbridge.Structure, objName: str, /,
 
     return ObjectInfo(**infoDict)
 
-@parseObject.register(taxonbridge.Taxon)
-def _parseObject_(self: typing.Self, obj: taxonbridge.Taxon, # noqa: F811
-                    includePrivateMembers: bool = False,
-                    choices: dict | None = None ) -> tuple:
+@parseObject.register(ephys_protocol.ElectrophysiologyProtocol)
+def _parseObject_(obj: ephys_protocol.ElectrophysiologyProtocol,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     objType = type(obj)
     objId = id(obj)
-    choices = self.check_obj_choices(choices)
+    # choices = check_obj_choices(objType, choices)
 
-    pData = obj.__dict__
-    indirect = True
-    info = f"{obj}"
+    if introspect:
+        children = introspectObject(obj,
+                            includePrivate = includePrivate,
+                            includeCallables = includeCallables,
+                            includeTypeMembers = includeTypeMembers)
+        indirect = True
+    else:
+        children = ()
+        indirect = False
 
-    if not includePrivateMembers:
-        pData = self.exclude_private_members(pData)
-
-    pData["common_name"] = obj.common_name
-    pData["rank"] = obj.rank
-    pData["scientific_name"] = obj.scientific_name
-    pData["url"] = obj.url
-    pData["wikidata_id"] = obj.wikidata_id
-    pData["wikidata_url"] = obj.wikidata_url
-
+    info = obj.name
     tip = type(obj).__name__
-
     infoDict = {
+        "name": objName,
         "indirect": indirect,
-        "nChildren": len(pData),
+        "children": children,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -606,63 +913,100 @@ def _parseObject_(self: typing.Self, obj: taxonbridge.Taxon, # noqa: F811
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(**infoDict)
+    return ObjectInfo(**infoDict)
 
-    return pData, objectInfo
+@parseObject.register(taxonbridge.Taxon)
+def _parseObject_(obj: taxonbridge.Taxon,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
+    objType = type(obj)
+    objId = id(obj)
+    choices = check_obj_choices(objType, choices)
+
+    if introspect:
+        children = introspectObject(obj,
+                                includePrivate = includePrivate,
+                                includeCallables = includeCallables,
+                                includeTypeMembers = includeTypeMembers)
+        indirect = True
+    else:
+        children = ()
+        indirect = False
+
+    info = f"{obj}"
+
+    tip = type(obj).__name__
+
+    infoDict = {
+        "name": objName,
+        "indirect": indirect,
+        "children": children,
+        "objDataAsChild": False,
+        "objInfo": info,
+        "objType": objType,
+        "objTip": tip,
+        "memberAccess": (".",),
+        "accessType": "attribute",
+        "choices": choices,
+        "readOnly": True,
+        "readOnlyChildren": True,
+        "objId": objId
+        }
+
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(dict)
 @parseObject.register(types.MappingProxyType)
 @parseObject.register(UserDict)
 @parseObject.register(OrderedDict)
-def _parseObject_(self: typing.Self, obj: typing.Union[dict,              # noqa: F811,UP007
-                                            types.MappingProxyType,
-                                            UserDict,
-                                            OrderedDict],
-                    includePrivateMembers: bool = False,
-                    choices: dict | None = None, ) -> tuple:
-    # CAUTION: 2026-02-13 21:54:18
-    # this might be the private data, NOT the original model data!
-
-    # print(f"{self.__class__.__name__}.parseObject({type(obj)})")
-
+def _parseObject_(obj: typing.Union[dict,              # noqa: F811,UP007
+                                    types.MappingProxyType,
+                                    UserDict,
+                                    OrderedDict],
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     objId = id(obj)
-
-    if obj is self._privateData_:
-        objType = type(self._modelData_)
-
-    else:
-        objType = type(obj)
-
-    choices = self.check_obj_choices(choices)
+    objType = type(obj)
+    choices = check_obj_choices(objType, choices)
 
     # NOTE: 2021-07-20 09:52:34
-    # dict objects with mixed key types cannot be sorted
+    # cannot sort te keys in dict objects with mixed key types
     # therefore we resort to an indexing vector
     ndx = [
         i[1]
         for i in sorted(
-            (str(k[0]), k[1])
-            for k in zip(obj.keys(), range(len(obj)))
-        )
-    ]
+                        (str(k[0]), k[1])
+                        for k in zip(obj, range(len(obj)))
+                        )
+        ]
 
-    if isinstance(obj, UserDict):
-        # print(f"{self.__class__.__name__}.parseObject({type(obj)})")
-        pData = obj
-        indirect = False
+    keys = tuple(obj.keys())
 
-    else:
-        items = [i for i in obj.items()]
-        pData = dict([items[k] for k in ndx])
-        indirect = False
+    children = tuple(keys[k] for k in ndx) # the actual mapping keys sorted by their string representation
 
-    nChildren = len(pData) # CAUTION: this might include private members !!!
-    info = f"{len(obj)} key / value {strutils.pluralize('pair', nChildren)}"
+    info = f"{len(obj)} key / value {strutils.pluralize('pair', len(children))}"
     tip = type(obj).__name__
 
     infoDict = {
-        "indirect": indirect,
-        "nChildren": nChildren,
+        "name": objName,
+        "indirect": False,
+        "children": children,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -675,9 +1019,7 @@ def _parseObject_(self: typing.Self, obj: typing.Union[dict,              # noqa
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(**infoDict)
-
-    return pData, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(list)
 @parseObject.register(tuple)
@@ -686,55 +1028,82 @@ def _parseObject_(self: typing.Self, obj: typing.Union[dict,              # noqa
 @parseObject.register(set)
 @parseObject.register(frozenset)
 @parseObject.register(os.stat_result)
-def _parseObject_(self: typing.Self, obj: typing.Union[list, tuple, deque,  # noqa: UP007,F811
-                                                        set,
-                                                        NeoObjectList,
-                                                        frozenset,
-                                                        os.stat_result],
-                    includePrivateMembers: bool = False,
-                    choices: dict | None = None, ) -> tuple:
+def _parseObject_(obj: typing.Union[list, tuple, deque,  # noqa: UP007,F811
+                                    set,
+                                    NeoObjectList,
+                                    frozenset,
+                                    os.stat_result],
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     tip = objType.__name__
     readOnly = True
     readOnlyChildren = False
 
-    if isinstance(obj, (tuple, frozenset)) or self.readOnly:
+    if isinstance(obj, (tuple, frozenset)) or readOnly:
         readOnly = True
         readOnlyChildren = True
 
     if is_namedtuple(obj):
-        pData = obj._asDict() if hasattr(obj, "_asDict") else obj._asdict()
+        if introspect:
+            oDict = obj._asDict() if hasattr(obj, "_asDict") else obj._asdict()
+            children = tuple(oDict)
+            indirect = True
+        else:
+            children = ()
+            indirect = False
+        # pData = obj._asDict() if hasattr(obj, "_asDict") else obj._asdict()
         tip += "(namedtuple)"
         memberAccess = (".",)
         accessType = "attribute"
         readOnlyChildren = True
 
     elif isinstance(obj, os.stat_result):
-        pData = dict(filter(lambda t: any(t[0].startswith(s) for s in ("n_", "st_")), inspect.getmembers(obj)))
+        if introspect:
+            children = introspectObject(obj, predicate=predicate,
+                                        includePrivate=includePrivate,
+                                        includeCallables=includeCallables,
+                                        includeTypeMembers=includeTypeMembers)
+            indirect = True
+        else:
+            children = ()
+            indirect = False
+        # pData = dict(filter(lambda t: any(t[0].startswith(s) for s in ("n_", "st_")), inspect.getmembers(obj)))
         tip += "(stat result)"
         memberAccess = (".",)
         accessType = "attribute"
         readOnlyChildren = True
 
     else:
-        pData = dict(enumerate(obj))
+        if introspect:
+            children = tuple(range(len(obj)))
+            indirect = True
+        else:
+            children = ()
+            introspect = False
+
         memberAccess = ("[","]")
         accessType = "index"
-        # readOnlyChildren = True
 
-    if not includePrivateMembers:
-        pData = self.exclude_private_members(pData)
-
-    n = len(pData)
+    n = len(children)
 
     info = f"{n} {strutils.pluralize('element', n)}"
 
     infoDict = {
-        "indirect": True,
-        "nChildren": n,
+        "name": objName,
+        "indirect": indirect,
+        "children": children,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -747,21 +1116,29 @@ def _parseObject_(self: typing.Self, obj: typing.Union[list, tuple, deque,  # no
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(**infoDict)
-
-    return pData, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(str)
 @parseObject.register(bytes)
 @parseObject.register(bytearray)
-def _parseObject_(self: typing.Self, obj: typing.Union[str, bytes, bytearray],   # noqa: UP007,F811
-                    _: bool = True, choices: dict | None = None, ) -> tuple:
+def _parseObject_(obj: str | bytes | bytearray,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
+    # NOTE: 2026-09-20 11:37:16
+    # NEVER introspected
+
     objId = id(obj)
     objType = type(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
-    readOnly = self.readOnly
-    readOnlyChildren = self.readOnly
     objDataAsChild = False
     tip = objType.__name__
 
@@ -783,13 +1160,13 @@ def _parseObject_(self: typing.Self, obj: typing.Union[str, bytes, bytearray],  
         else:
             info = obj if isinstance(obj, str) else obj.decode()
 
-        if isinstance(obj, (bytes, bytearray)) or self.readOnly:
+        if isinstance(obj, (bytes, bytearray)) or readOnly:
             readOnly = True
             readOnlyChildren = True
 
     infoDict =  {
+        "name": objName,
         "indirect": False,
-        "nChildren": 0,
         "objDataAsChild": objDataAsChild,
         "objInfo": info,
         "objType": objType,
@@ -802,27 +1179,36 @@ def _parseObject_(self: typing.Self, obj: typing.Union[str, bytes, bytearray],  
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(**infoDict)
+    return ObjectInfo(**infoDict)
 
-    return  obj, objectInfo
+    return  objectInfo
 
 @parseObject.register(pathlib.Path)
-def _parseObject_(self: typing.Self, obj: pathlib.Path, _: bool = True,   # noqa: F811
-                    choices: dict | None = None) -> tuple:
+def _parseObject_(obj: pathlib.Path,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
+    # NOTE: 2026-09-20 11:37:16
+    # NEVER introspected
     objId = id(obj)
     objType = type(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     # info = f"{obj}"
     info = obj.as_posix()
     tip = objType.__name__
-    pData = obj
-    # indirect = True
     indirect = False
 
     infoDict = {
+        "name": objName,
         "indirect": indirect,
-        "nChildren": 0,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -830,13 +1216,11 @@ def _parseObject_(self: typing.Self, obj: pathlib.Path, _: bool = True,   # noqa
         "memberAccess": (),
         "accessType": None,
         "choices": choices,
-        "readOnly": self.readOnly,
+        "readOnly": readOnly,
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(*infoDict)
-
-    return  pData, objectInfo
+    return ObjectInfo(*infoDict)
 
 @parseObject.register(bool)
 @parseObject.register(int)
@@ -848,30 +1232,33 @@ def _parseObject_(self: typing.Self, obj: pathlib.Path, _: bool = True,   # noqa
 @parseObject.register(np.integer)
 @parseObject.register(np.floating)
 @parseObject.register(np.complexfloating)
-def _parseObject_(self: typing.Self, obj: typing.Union[bool, int, float, complex,   # noqa: UP007,F811,PYI041
-                                            fractions.Fraction,
-                                            decimal.Decimal,
-                                            numbers.Number,
-                                            np.integer, np.floating,
-                                            np.complexfloating],
-                        _: bool=True, choices: dict | None = None,) -> tuple:
+def _parseObject_(obj: typing.Union[bool, int, float, complex,   # noqa: UP007,F811,PYI041
+                                    fractions.Fraction,
+                                    decimal.Decimal,
+                                    numbers.Number,
+                                    np.integer, np.floating,
+                                    np.complexfloating],
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
+    # NOTE: 2026-09-20 11:37:16
+    # NEVER introspected
     objId = id(obj)
     objType = type(obj)
-
-    # objInfo = obj
-
-    if (
-        not isinstance(choices, dict)
-        and len(choices)> 0
-        and not all(isinstance(v, objType) for v in choices.values())
-        ):
-        choices = {}
+    choices = check_obj_choices(objType, choices)
 
     tip = objType.__name__
 
     infoDict = {
+        "name": objName,
         "indirect": False,
-        "nChildren": 0,
         "objDataAsChild": False,
         "objInfo": obj,
         "objType": objType,
@@ -879,33 +1266,45 @@ def _parseObject_(self: typing.Self, obj: typing.Union[bool, int, float, complex
         "memberAccess": (),
         "accessType": None,
         "choices": choices,
-        "readOnly": self.readOnly,
+        "readOnly": readOnly,
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(**infoDict)
-
-    return obj, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(types.SimpleNamespace)
-def _parseObject_(self: typing.Self, obj: types.SimpleNamespace, # noqa: F811
-            includePrivateMembers: bool = False,
-            choices: dict | None = None) -> tuple:
+def _parseObject_(obj: types.SimpleNamespace, # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
-    pData = obj.__dict__
-    if not includePrivateMembers:
-        pData = self.exclude_private_members(pData)
+    if introspect:
+        children = introspectObject(obj, predicate=predicate,
+                                    includePrivate=includePrivate,
+                                    includeCallables=includeCallables,
+                                    includeTypeMembers=includeTypeMembers)
+        n = len(children)
+        info = f"{n} {strutils.pluralize('member', n)}"
+    else:
+        children = ()
+        info = ""
 
-    n = len(pData)
-    info = f"{n} {strutils.pluralize('member', n)}"
     tip = type(obj).__name__
 
     infoDict =  {
+        "name": objName,
         "indirect": True,
-        "nChildren": n,
+        "children": children,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -918,41 +1317,60 @@ def _parseObject_(self: typing.Self, obj: types.SimpleNamespace, # noqa: F811
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(**infoDict)
-
-    return pData, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(types.ModuleType)
-def _parseObject_(self: typing.Self, obj: types.ModuleType, # noqa: F811
-        includePrivateMembers: bool = False,
-        choices: dict | None = None) -> tuple:
+def _parseObject_(obj: types.ModuleType, # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     tip = type(obj).__name__
 
-    if hasattr(obj, "__name__"):
-        mname = f" {obj.__name__}"
+    mname = getattr(obj, "__name__", None)
+
+    mfile = getattr(obj, "__file__", None)
+
+    if isinstance(mname, str) and len(mname.strip()):
+        if objName != mname:
+            alias = f" (aliased as {objname})"
+        else:
+            alias = ""
     else:
         mname = ""
+        alias = f" (aliased as {objName})"
 
-    if hasattr(obj, "__file__"):
-        mfile = " from file " + obj.__file__
+    if isinstance(mfile, str) and len(mfile.strip()):
+        mfile = " from file " + mfile
     else:
         mfile = ""
 
-    mname = getattr(obj, "__name__", None)
-    info = f"Module{mname}{mfile}"
+    info = f"Module{mname}{mfile}{alias}"
 
-    pData = obj.__dict__
-
-    if not includePrivateMembers:
-        pData = self.exclude_private_members(pData)
+    if introspect:
+        children = introspectObject(obj, predicate=predicate,
+                                    includePrivate=includePrivate,
+                                    includeCallables=includeCallables,
+                                    includeTypeMembers=includeTypeMembers)
+        indirect = True
+    else:
+        children = ()
+        indirect = False
 
     infoDict = {
-        "indirect": True,
-        "nChildren": len(pData),
+        "name": objName,
+        "indirect": indirect,
+        "children": children,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -965,14 +1383,21 @@ def _parseObject_(self: typing.Self, obj: types.ModuleType, # noqa: F811
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(**infoDict)
-
-    return pData, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(vigra.filters.Kernel1D)
 @parseObject.register(vigra.filters.Kernel2D)
-def _parseObject_(self: typing.Self, obj: vigra.filters.Kernel1D | vigra.filters.Kernel2D,  # noqa: F811
-                    _: bool = True, choices: dict | None = None) -> tuple:
+def _parseObject_(obj: vigra.filters.Kernel1D | vigra.filters.Kernel2D, # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     # ### BEGIN NOTE: 2026-02-08 21:20:00 TODO/FIXME
     #
     # enable representation of the kernel as: (think hard & choose one)
@@ -1065,14 +1490,16 @@ def _parseObject_(self: typing.Self, obj: vigra.filters.Kernel1D | vigra.filters
 
     objId = id(obj)
     objType = type(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     tip = type(obj).__name__
+
     if isinstance(obj, vigra.filters.Kernel1D):
         n = int(obj.size())
         info = f"with {n} {strutils.pluralize('sample', n)}"
         memberAccess = ("[","]")
         accessType = "index"
+
     else:
         h = int(obj.height())
         w = int(obj.width())
@@ -1081,8 +1508,8 @@ def _parseObject_(self: typing.Self, obj: vigra.filters.Kernel1D | vigra.filters
         accessType = "indexes"
 
     infoDict = {
+        "name": objName,
         "indirect": False,
-        "nChildren": 0,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -1094,19 +1521,31 @@ def _parseObject_(self: typing.Self, obj: vigra.filters.Kernel1D | vigra.filters
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(**infoDict)
-    return obj, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(pd.DataFrame)
 @parseObject.register(pd.Series)
 @parseObject.register(pd.Index)
-def _parseObject_(self: typing.Self, obj: typing.Union[pd.DataFrame,      # noqa: F811,UP007
-                                                            pd.Series,
-                                                            pd.Index],
-                    _: bool = True, choices: dict | None = None) -> tuple:
+def _parseObject_(obj: typing.Union[pd.DataFrame,      # noqa: F811,UP007
+                                    pd.Series,
+                                    pd.Index],
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
+    # NOTE: 2026-09-20 11:37:16
+    # NEVER introspected
+    # NOTE: 2026-09-20 11:40:40
+    # ALWAYS as a child object (to be shown in its own table widget)
     objId = id(obj)
     objType = type(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     # NOTE: 2026-02-11 21:09:34
     # TableEditorWidget gives direct read-write access, so no direct access
@@ -1137,8 +1576,8 @@ def _parseObject_(self: typing.Self, obj: typing.Union[pd.DataFrame,      # noqa
     tip = type(obj).__name__
 
     infoDict = {
+        "name": objName,
         "indirect": False,
-        "nChildren": 0,
         "objDataAsChild": True,
         "objInfo": info,
         "objType": objType,
@@ -1150,33 +1589,34 @@ def _parseObject_(self: typing.Self, obj: typing.Union[pd.DataFrame,      # noqa
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(**infoDict)
-    return obj, objectInfo
+    return ObjectInfo(**infoDict)
 
 
 @parseObject.register(Interval)
-def _parseObject_(self: typing.Self, obj: Interval, _: bool = True,   # noqa: F811
-                    choices: dict | None = None) -> tuple:
-    pData = {
-                "t0": obj.t0,
-                "t1": obj.t1,
-                "durations": obj.durations,
-                "extent": obj.extent,
-                "labels": obj.labels,
-                "annotations": obj.annotations,
-                "description": obj.description,
-            }
+def _parseObject_(obj: Interval, # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
+    children = ("t0", "t1", "durations", "extent", "labels", "annotations", "description")
     objId = id(obj)
     objType = type(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     tip = type(obj).__name__
     n = len(obj)
     desc = strutils.pluralize('subinterval', n)
     info = f"Interval '{obj.name}' with {len(obj)} {desc}"
     infoDict = {
+        "name": objName,
         "indirect": True,
-        "nChildren": len(pData),
+        "children": children,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -1184,28 +1624,29 @@ def _parseObject_(self: typing.Self, obj: Interval, _: bool = True,   # noqa: F8
         "memberAccess": (".", ),
         "accessType": "attribute",
         "choices": choices,
-        "readOnly": self.readOnly,
-        "readOnlyChildren": self.readOnly,
+        "readOnly": readOnly,
+        "readOnlyChildren": readOnlyChildren,
         "objId": objId
         }
-    objectInfo = ObjectInfo(**infoDict)
-    return pData, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(neo.Epoch)
 @parseObject.register(DataZone)
-def _parseObject_(self: typing.Self, obj: neo.Epoch | DataZone,           # noqa: F811
-                    _: bool = True, choices: dict | None = None,) -> tuple:
+def _parseObject_(obj: neo.Epoch | DataZone, # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
-    choices = self.check_obj_choices(choices)
-
-    pData = {
-                "times": obj.times,
-                "durations": obj.durations,
-                "labels": obj.labels,
-                "annotations": obj.annotations,
-                "description": obj.description,
-            }
+    choices = check_obj_choices(objType, choices)
+    children = ("times", "durations", "labels", "annotations", "description")
 
     tip = type(obj).__name__
     n = obj.size
@@ -1214,8 +1655,9 @@ def _parseObject_(self: typing.Self, obj: neo.Epoch | DataZone,           # noqa
     info = f"{klass} '{obj.name}' with {n} {desc}"
 
     infoDict =  {
+        "name": objName,
         "indirect": True,
-        "nChildren": len(pData),
+        "children": children,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -1223,27 +1665,35 @@ def _parseObject_(self: typing.Self, obj: neo.Epoch | DataZone,           # noqa
         "memberAccess": (".", ),
         "accessType": "attribute",
         "choices": choices,
-        "readOnly": False,
+        "readOnly": readOnly,
         "objId": objId
         }
-    objectInfo = ObjectInfo(**infoDict)
-    return pData, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(neo.Event)
 @parseObject.register(DataMark)
 @parseObject.register(TriggerEvent)
-def _parseObject_(self: typing.Self, obj: neo.Event | DataMark | TriggerEvent, # noqa: F811
-                    _: bool = True, choices: dict | None = None) -> tuple:
+def _parseObject_(obj: neo.Event | DataMark | TriggerEvent,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
-    pData = {"times": obj.times, "labels": obj.labels}
+    children = ("times", "labels")
 
     if isinstance(obj, (DataMark, TriggerEvent)):
-        pData.update({"type": obj.type, "relative": obj.relative})
+        children += ("type", "relative")
 
-    pData.update({"annotations": obj.annotations, "description": obj.description})
+    children += ("annotations", "description")
 
     tip = type(obj).__name__
 
@@ -1253,8 +1703,9 @@ def _parseObject_(self: typing.Self, obj: neo.Event | DataMark | TriggerEvent, #
     desc = strutils.pluralize('subinterval', n)
     info = f"{klass} '{obj.name}' with {n} {desc}"
     infoDict = {
+        "name": objName,
         "indirect": True,
-        "nChildren": len(pData),
+        "children": children,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -1262,25 +1713,37 @@ def _parseObject_(self: typing.Self, obj: neo.Event | DataMark | TriggerEvent, #
         "memberAccess": (".", ),
         "accessType": "attribute",
         "choices": choices,
-        "readOnly": False,
+        "readOnly": readOnly,
         "objId": objId
         }
-    objectInfo = ObjectInfo(**infoDict)
-    return pData, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(pq.Quantity)
-def _parseObject_(self: typing.Self, obj: pq.Quantity, _: bool=True, # noqa: F811
-                    choices: dict | None = None) -> tuple:
-    # print(f"{self.__class__.__name__}.parseObject({type(obj).__name__})")
+def _parseObject_(obj: pq.Quantity,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
+    # NOTE: 2026-09-20 11:49:26
+    # NEVER introspected
+    # NOTE: 2026-09-20 11:49:34
+    # as a child object ONLY if an array,
     objId = id(obj)
     objType = type(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     readOnly = False
     tip = f"{scq.unitFamilyName(obj.units)} quantity"
     if isinstance(obj, pq.UnitQuantity):
         info = f"{obj} {scq.unitFamilyName(obj)}"
         objDataAsChild = False
+
     else:
         if obj.size <= 1:
             info = f"{obj}"
@@ -1293,8 +1756,8 @@ def _parseObject_(self: typing.Self, obj: pq.Quantity, _: bool=True, # noqa: F81
             readOnly = False
 
     infoDict = {
+        "name": objName,
         "indirect": False,
-        "nChildren": 0,
         "objDataAsChild": objDataAsChild,
         "objInfo": info,
         "objType": objType,
@@ -1306,18 +1769,26 @@ def _parseObject_(self: typing.Self, obj: pq.Quantity, _: bool=True, # noqa: F81
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(**infoDict)
-
-    # print(f"\t-> {infoDict}")
-
-    return obj, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(vigra.VigraArray)
-def _parseObject_(self: typing.Self, obj: vigra.VigraArray,               # noqa: F811
-                    _: bool = True, choices: dict | None = None) -> tuple:
+def _parseObject_(obj: vigra.VigraArray,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
+    # NOTE: 2026-09-20 11:51:46
+    # array data as object child if array size > 1
+    # axistags as subtree (if introspected)
     objId = id(obj)
     objType = type(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     # NOTE: 2026-02-11 21:11:11
     # member access relates to metadata attributes (i.e., axistags);
@@ -1328,36 +1799,56 @@ def _parseObject_(self: typing.Self, obj: vigra.VigraArray,               # noqa
     c = obj.channels
     axtags = ", ".join([f"'{t.key}'" for t in obj.axistags])
     objDataAsChild = False
+
     if obj.size <= 1:
         info = obj
     else:
         objDataAsChild = True
         info = f"Vigra Array with {n} {samples}; shape {s}; axistags: {axtags}; {c} channels; dtype {obj.dtype}."
 
-    pData = dict(enumerate(obj.axistags))
+    if introspect:
+        children = tuple(obj.axistags)
+        indirect = True
+    else:
+        children = ()
+        indirect = False
 
     tip = type(obj).__name__
 
     infoDict = {
-        "indirect": True,
-        "nChildren": len(pData),
+        "name": objName,
+        "indirect": indirect,
+        "children": children,
         "objDataAsChild": objDataAsChild,
         "objInfo": info,
         "objType": objType,
         "objTip": tip,
-        "memberAccess": (".", ),
-        "accessType": "attribute",
+        "memberAccess": ("[","]", ),
+        "accessType": "index",
         "choices": choices,
         "readOnly": True,
-        "objId": objId
+        "objId": objId,
+        "containerChild": "axistags"
         }
-    objectInfo = ObjectInfo(**infoDict)
-    return pData, objectInfo
+    return ObjectInfo(**infoDict)
 
 
 @parseObject.register(np.ndarray)
-def _parseObject_(self: typing.Self, obj: np.ndarray, _: bool = True,   # noqa: F811
-                    choices: dict | None = None) -> tuple:
+def _parseObject_(obj: np.ndarray,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
+    # NOTE: 2026-09-20 11:37:16
+    # NEVER introspected
+    # NOTE: 2026-09-20 11:40:40
+    # Large arrays shown as a child object (in its own table widget)
     objId = id(obj)
     objType = type(obj)
 
@@ -1368,14 +1859,16 @@ def _parseObject_(self: typing.Self, obj: np.ndarray, _: bool = True,   # noqa: 
     s = f"{obj.shape}"
     samples = strutils.pluralize('sample', n)
     objDataAsChild = False
+
     if obj.size <= 1:
         info = obj
     else:
         objDataAsChild = True
         info = f"Array with {n} {samples}, shape {s}, dtype {obj.dtype}."
+
     infoDict =  {
+        "name": objName,
         "indirect": False,
-        "nChildren": 0,
         "objDataAsChild": objDataAsChild,
         "objInfo": info,
         "objType": objType,
@@ -1386,24 +1879,38 @@ def _parseObject_(self: typing.Self, obj: np.ndarray, _: bool = True,   # noqa: 
         "readOnly": True,
         "objId": objId
         }
-    objectInfo = ObjectInfo(**infoDict)
-    return obj, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(vigra.AxisInfo)
-def _parseObject_(self: typing.Self, obj: vigra.AxisInfo,                 # noqa: F811
-                    _: bool = False, choices: dict | None = None) -> tuple:
+def _parseObject_(obj: vigra.AxisInfo,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     info = f"{type(obj).__name__} ({getNameForAxisType(obj.typeFlags)}) key {obj.key}"
     tip = type(obj).__name__
-    pData = {"resolution": obj.resolution, "description": obj.description,
-                "typeFlags": obj.typeFlags}
+
+    if introspect:
+        children = ("resolution", "description", "typeFlags")
+        indirect = True
+    else:
+        children = ()
+        indirect = False
 
     infoDict = {
-        "indirect": True,
-        "nChildren": len(pData),
+        "name": objName,
+        "indirect": indirect,
+        "children": children,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -1415,23 +1922,31 @@ def _parseObject_(self: typing.Self, obj: vigra.AxisInfo,                 # noqa
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(**infoDict)
-
-    return pData, objectInfo
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(vigra.AxisType)
-def _parseObject_(self: typing.Self, obj: vigra.AxisType,                 # noqa: F811
-                    _: bool = False, __: dict | None = None) -> tuple:
+def _parseObject_(obj: vigra.AxisType,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     # NOTE: 2026-02-08 22:54:09 TODO
     # Don't really want to edit this via GUI, so no member access for now
+    # hence NEVER introspected
     objId = id(obj)
     objType = type(obj)
     tip = type(obj).__name__
     info = f"{tip}: {getNameForAxisType(obj)} ({getValueForAxisType(obj)})"
 
     infoDict = {
+        "name": objName,
         "indirect": False,
-        "nChildren":0,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -1443,34 +1958,41 @@ def _parseObject_(self: typing.Self, obj: vigra.AxisType,                 # noqa
         "objId": objId
         }
 
-    objectInfo = ObjectInfo(**infoDict)
-    return obj, objectInfo
+    return ObjectInfo(**infoDict)
 
 
 @parseObject.register(AxesCalibration)
-def _parseObject_(obj: AxesCalibration, objName: str, /,
-                introspect: bool = False,
-                predicate = None,
-                includePrivate: bool = False,
-                includeCallables : bool = False,
-                includeTypeMembers: bool = False
-                choices: dict | None = None,
+def _parseObject_(obj: AxesCalibration,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
                 ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
-    choices = check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
-    # pData = dict(enumerate(obj.calibrations))
-    # n = len(pData)
-    # children = tuple(range(len(obj.calibrations)))
-    children = tuple(obj.axiskeys())
-    n = len(children)
-    info = f"{n} {strutils.pluralize('calibration', n)}"
+    if introspect:
+        children = tuple(obj.axiskeys())
+        n = len(children)
+        info = f"{n} {strutils.pluralize('calibration', n)}"
+        indirect = True
+    else:
+        children = ()
+        info = ""
+        indirect = False
+
     tip = type(obj).__name__
+
     infoDict = {
         "name": objName,
-        "indirect": True,
-        "children": n,
+        "indirect": indirect,
+        "children": children,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -1478,53 +2000,53 @@ def _parseObject_(obj: AxesCalibration, objName: str, /,
         "memberAccess": ("[","]", ),
         "accessType": "index", # calls __getitem__ for obtain an AxisCalibrationData
         "choices": choices,
-        "readOnly": False,
-        "readOnlyChildren": False,
+        "readOnly": readOnly,
+        "readOnlyChildren": readOnlyChildren,
         "objId": objId,
         }
 
     return ObjectInfo(**infoDict)
-    # return pData, ObjectInfo(**infoDict)
 
 @parseObject.register(AxisCalibrationData)
-def _parseObject_(obj: AxisCalibrationData, objName: str, /,
-                introspect: bool = False,
-                predicate = None,
-                includePrivate: bool = False,
-                includeCallables : bool = False,
-                includeTypeMembers: bool = False
-                choices: dict | None = None,
+def _parseObject_(obj: AxisCalibrationData,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
                 ) -> tuple:
     objId = id(obj)
     objType = type(obj)
-    choices = check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     tip = type(obj).__name__
-    indirect = True
     objDataAsChild = False
 
-    children = introspectObject(obj, predicate = predicate,
-                includePrivate = includePrivate,
-                includeCallables = includeCallables,
-                includeTypeMembers = includeTypeMembers)
-
-    # datafields = dataclasses.fields(obj)
-    # fieldnames = [f.name for f in datafields]
-    # pData = {c: getattr(obj, c) for c in fieldnames if c != "channel"} # dict(map(lambda c: (c, getattr(obj, c)), filter(lambda f: f != "channel", fieldnames)))
-    # n = len(pData)
-    if not obj.isChannels:
-        # pData = {c: getattr(obj, c) for c in fieldnames if c != "channel"} # dict(map(lambda c: (c, getattr(obj, c)), filter(lambda f: f != "channel", fieldnames)))
-        # pData = dict(map(lambda c: (c, getattr(obj, c)), filter(lambda f: f != "channel", fieldnames)))
-        info = f"Axis calibration for axis {obj.index} (type {obj.type}; key {obj.key}); size {obj.size}"
+    if introspect:
+        children = introspectObject(obj, predicate = predicate,
+                    includePrivate = includePrivate,
+                    includeCallables = includeCallables,
+                    includeTypeMembers = includeTypeMembers)
+        indirect = True
     else:
-        # pData = {c: getattr(obj, c) for c in fieldnames} # dict(map(lambda c: (c, getattr(obj, c)), fieldnames))
+        children = ()
+        indirect = False
+
+    if not obj.isChannels:
+        info = f"Axis calibration for axis {obj.index} (type {obj.type}; key {obj.key}); size {obj.size}"
+
+    else:
         c = len(obj.channels)
         info = f"Channel axis calibration with {c} {strutils.pluralize('channel', c)}"
 
     infoDict = {
         "name": objName,
         "indirect": indirect,
-        "children": len(children),
+        "children": children,
         "objDataAsChild": objDataAsChild,
         "objInfo": info,
         "objType": objType,
@@ -1532,37 +2054,46 @@ def _parseObject_(obj: AxisCalibrationData, objName: str, /,
         "memberAccess": (".", ),
         "accessType": "attribute",
         "choices": False,
-        "readOnly": False,
-        "readOnlyChildren": False,
+        "readOnly": readOnly,
+        "readOnlyChildren": readOnlyChildren,
         "objId": objId
         }
 
     return pData, ObjectInfo(**infoDict)
 
 @parseObject.register(ChannelCalibrationData)
-def _parseObject_(self: typing.Self, obj: ChannelCalibrationData, objName: str, /,
-                introspect: bool = False,
-                predicate = None,
-                includePrivate: bool = False,
-                includeCallables : bool = False,
-                includeTypeMembers: bool = False
-                choices: dict | None = None,
+def _parseObject_(obj: ChannelCalibrationData,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
                 ) -> ObjectInfo:
     objId =  id(obj)
     objType = type(obj)
-    choices = check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     tip = f"{type(obj).__name__}"
-    children = introspectObject(obj, predicate = predicate,
-            includePrivate = includePrivate,
-            includeCallables = includeCallables,
-            includeTypeMembers = includeTypeMembers
-            )
+
+    if introspect:
+        children = introspectObject(obj, predicate = predicate,
+                includePrivate = includePrivate,
+                includeCallables = includeCallables,
+                includeTypeMembers = includeTypeMembers
+                )
+        indirect = True
+    else:
+        children = ()
+        indirect = False
 
     infoDict = {
         "name": objName,
-        "indirect": True,
-        "nChildren": children,
+        "indirect": indirect,
+        "children": children,
         "objDataAsChild": False,
         "objInfo": obj.description,
         "objType": objType,
@@ -1570,18 +2101,28 @@ def _parseObject_(self: typing.Self, obj: ChannelCalibrationData, objName: str, 
         "memberAccess": (".", ),
         "accessType": "attribute",
         "choices": choices,
-        "readOnly": True,
-        "readOnlyChildren": self.readOnly,
+        "readOnly": readOnly,
+        "readOnlyChildren": readOnlyChildren,
         "objId": objId
         }
-    return pData, ObjectInfo(**infoDict)
+
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(PVObject)
-def _parseObject_(self: typing.Self, obj: PVObject, _: bool = False, # noqa: F811
-                    choices: dict | None = None) -> tuple:
+def _parseObject_(obj: PVObject,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     tip = type(obj).__name__
     info = tip
@@ -1603,10 +2144,17 @@ def _parseObject_(self: typing.Self, obj: PVObject, _: bool = False, # noqa: F81
             ):
             info = obj.description
 
-    pData = obj.as_dict()
+    if introspect:
+        children = tuple(obj.as_dict())
+        indirect = True
+    else:
+        children = ()
+        indirect = False
+
     infoDict = {
-        "indirect": True,
-        "nChildren": len(pData),
+        "name": objName,
+        "indirect": indirect,
+        "children": children,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -1618,25 +2166,36 @@ def _parseObject_(self: typing.Self, obj: PVObject, _: bool = False, # noqa: F81
         "objId": objId
         }
 
-    return pData, ObjectInfo(**infoDict)
+    return ObjectInfo(**infoDict)
 
 @parseObject.register(scipy.optimize.Bounds)
-def _parseObject_(self: typing.Self, obj: scipy.optimize.Bounds, _:bool = True, # noqa: F811
-                    choices: dict | None = None) -> tuple:
+def _parseObject_(obj: scipy.optimize.Bounds,  # noqa: F811
+                  objName: str, /,
+                  introspect: bool = False,
+                  predicate = None,
+                  includePrivate: bool = False,
+                  includeCallables : bool = False,
+                  includeTypeMembers: bool = False,
+                  choices: dict | None = None,
+                  readOnly: bool = False,
+                  readOnlyChildren: bool = False
+                ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
-    choices = self.check_obj_choices(choices)
+    choices = check_obj_choices(objType, choices)
 
     tip = type(obj).__name__
-    pData = {
-                "lb": obj.lb,
-                "ub": obj.ub,
-                "keep_feasible": obj.keep_feasible,
-            }
+    if introspect:
+        children = ("lb", "ub", "keep_feasible")
+        indirect = True
+    else:
+        children = ()
+        indirect = False
     info = ""
     infoDict = {
-        "indirect": True,
-        "nChildren": len(pData),
+        "name": objName,
+        "indirect": indirect,
+        "children": children,
         "objDataAsChild": False,
         "objInfo": info,
         "objType": objType,
@@ -1648,7 +2207,7 @@ def _parseObject_(self: typing.Self, obj: scipy.optimize.Bounds, _:bool = True, 
         "objId": objId
         }
 
-    return pData, ObjectInfo(**infoDict)
+    return ObjectInfo(**infoDict)
 
 def introspectable(obj: object, supportedDataTypes: tuple = ()) -> bool:
     mro = inspect.getmro(type(obj))
@@ -1668,7 +2227,7 @@ def exclude_type_attributes(pDict):
 
 def generate_node(obj, objName, /,
                   introspect: bool = False,
-                  predicate: bool = None,
+                  predicate = None,
                   includePrivate: bool = False,
                   includeCallables: bool = False,
                   includeTypeMembers: bool = False,
@@ -1681,7 +2240,7 @@ def generate_node(obj, objName, /,
                   includeTypeMembers = includeTypeMembers,
                   choices = choices)
 
-    node = ObjectNode(tag=objName, identifier = f"{objId}", objInfo)
+    node = ObjectNode(tag=objName, identifier = f"{objId}", objInfo = objInfo)
 
     return node
 
@@ -1700,10 +2259,7 @@ def filterAttribute(attrName, obj,
     if not includeCallables and type(value) in FUNCTION_TYPES:
         return False
 
-    if not includeTypeMembers and type in inspect.getmro(type(value)):
-        return False
-
-    return True
+    return not (not includeTypeMembers and type in inspect.getmro(type(value)))
 
 @singledispatch
 def introspectObject(obj, /,
@@ -1735,7 +2291,7 @@ def introspectObject(obj, /,
             childnames = tuple(sorted(unique(fullmembers)))
             selected = tuple(filter(fcn, childnames))
 
-        except:
+        except: # noqa: E722
             childnames = tuple(fieldnames)
             selected = tuple(filter(fcn, childnames))
 
@@ -1749,13 +2305,13 @@ def introspectObject(obj, /,
 
     elif introspectable(obj):
         fieldnames = tuple(datatypes.inspect_members(obj, predicate, symbols_only = True))
-        return = tuple(filter(fcn, fieldnames))
+        return tuple(filter(fcn, fieldnames))
 
     else:
         raise NotImplementedError()
 
 @introspectObject.register(AxisCalibrationData)
-def _introspectObject_(obj: AxisCalibrationData/,
+def _introspectObject_(obj: AxisCalibrationData, /,
                      predicate = None,
                      includePrivate = False,
                      includeCallables = False,
@@ -1768,7 +2324,7 @@ def _introspectObject_(obj: AxisCalibrationData/,
     return fields
 
 @introspectObject.register(bgbridge.Structure)
-def _introspectObject_(obj: bgbridge.Structure, /,
+def _introspectObject_(obj: bgbridge.Structure, /, # noqa: F811
                      predicate = None,
                      includePrivate = False,
                      includeCallables = False,
@@ -1784,6 +2340,51 @@ def _introspectObject_(obj: bgbridge.Structure, /,
 
     keys = tuple(obj.keys())
     return tuple(keys[k] for k in ndx)
+
+@introspectObject.register(taxonbridge.Taxon)
+def _introspectObject_(obj: taxonbridge.Taxon, /, # noqa: F811
+                     predicate = None,
+                     includePrivate = False,
+                     includeCallables = False,
+                     includeTypeMembers = False) -> tuple:
+    fcn = functools.partial(filterAttribute,
+                            obj = obj,
+                            includePrivate = includePrivate,
+                            includeCallables = includeCallables,
+                            includeTypeMembers = includeTypeMembers)
+
+    children = tuple(key for key in obj.__dict__ if fcn(getattr(obj, key)))
+
+    children += ("common_name", "rank", "scientific_name", "url", "wikidata_id", "wikidata_url")
+
+    return children
+
+@introspectObject.register(os.stat_result)
+def _introspectObject_(obj: os.stat_result, /, # noqa: F811
+                     predicate = None,
+                     includePrivate = False,
+                     includeCallables = False,
+                     includeTypeMembers = False) -> tuple:
+    oDict = inspect.getmembers(obj)
+
+    return tuple(t for t in oDict if any(t.startswith(s) for s in ("n_", "st_")))
+
+@introspectObject.register(types.ModuleType)
+@introspectObject.register(types.SimpleNamespace)
+def _introspectObject_(obj: types.ModuleType | types.SimpleNamespace, /, # noqa: F811
+                     predicate = None,
+                     includePrivate = False,
+                     includeCallables = False,
+                     includeTypeMembers = False) -> tuple:
+
+    fcn = functools.partial(filterAttribute,
+                            obj = obj,
+                            includePrivate = includePrivate,
+                            includeCallables = includeCallables,
+                            includeTypeMembers = includeTypeMembers)
+
+    return tuple(key for key in obj.__dict__ if fcn(getattr(obj, key)))
+
 
 def generate_dict(obj, /, predicate = None,
                     introspect = False,
@@ -1841,7 +2442,7 @@ def check_public_member(x: tuple):
     # return not (isinstance(x[0], str) and not x[0].startswith("_"))
     return (not isinstance(x[0], str) or not x[0].startswith("_"))
 
-def check_obj_choices(choices: dict| None = None) -> dict:
+def check_obj_choices(objType, choices: dict| None = None) -> dict:
     if (
         not isinstance(choices, dict)
         or (
