@@ -232,7 +232,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         self._inlineTables_: bool = kwargs.pop("inlineTables", False)
         self._showValueAttributesOnly_ = kwargs.pop("valuesOnly", True)
 
-        self.setHorizontalHeaderLabels(["Object", "Type", "Value / Information"])
+        self.setHorizontalHeaderLabels(["Object", "Type", "Information or Value"])
 
         self.endResetModel()
 

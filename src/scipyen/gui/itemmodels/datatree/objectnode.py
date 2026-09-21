@@ -125,7 +125,7 @@ from imaging.scandata import (ScanData, AnalysisUnit) # noqa
 from gui.itemmodels.roles import *
 
 # from gui.itemmodels.datatree.objectnode import ObjectInfo #, ObjectNode
-# from gui.itemmodels.datatree.objectparser import ObjectParser  # noqa: F401
+# from gui.itemmodels.datatree.objectparser import ObjectParser
 
 
 NOTMEMOIZED = (
@@ -155,11 +155,8 @@ FUNCTION_TYPES = (
     types.BuiltinMethodType
     )
 
-NOTINTROSPECTABLE = PODS + (types.ModuleType, pkgutil.ModuleInfo,)
+NOTINTROSPECTABLE = PODS + (types.ModuleType, pkgutil.ModuleInfo,) + FUNCTION_TYPES
 
-# class Tester(QtCore.QObject):
-#     def __init__(self, parent = None):
-#         super().__init__(self, parent)
 @dataclasses.dataclass
 class ObjectInfo:
     name: str = "/"
@@ -238,7 +235,7 @@ This field is redundant, therefore flagged for culling.
 
     objTip: str = dataclasses.field(default_factory = str)
     objType: type | None = None
-    # objKey: str = dataclasses.field(default_factory = str)
+    objKey: str = dataclasses.field(default_factory = str)
     objKeyType: type | None = None # hashable (str, int, ...) or weakref.ReferenceType - type of THIS object's key in parent'
     choices: dict = dataclasses.field(default_factory = dict)
     readOnly: bool = True
@@ -291,6 +288,7 @@ class ObjectNode(Node):
         # super().__init__(tag, identifier)
         if data is not dataclasses.MISSING:
             super().__init__(tag, identifier, data=data)
+
         else:
             super().__init__(tag, identifier)
 
@@ -305,7 +303,23 @@ class ObjectNode(Node):
         return isinstance(self._objectInfo_, ObjectInfo)
 
 
-def populate(tree: Tree, node: ObjectNode,
+@timefunc
+def findObjectNodes(tree: Tree, **kwargs):
+    def _checkNodeInfoAttribute_(info, **kwargs):
+        return all(getattr(info, item[0], None) == item[1] for item in kwargs.items())
+
+    yield from tree.filter_nodes(lambda node: isinstance(node, ObjectNode) and _checkNodeInfoAttribute_(node, **kwargs))
+
+@timefunc
+def nodesWithTag(tree: Tree, tag: str):
+    yield from tree.filter_nodes(lambda node: node.tag == tag)
+
+@timefunc
+def nodesWithPayload(tree: Tree, payload: typing.Any = None):
+    yield from tree.filter_nodes(lambda node: node.data is payload)
+
+@timefunc
+def populateNode(tree: Tree, node: ObjectNode,
                 introspect: bool = False,
                 predicate = None,
                 includePrivate: bool = False,
@@ -327,10 +341,16 @@ def populate(tree: Tree, node: ObjectNode,
     if node.identifier not in tree:
         raise ValueError(f"The node {node.tag} with identifier {node.identifier} does not belong to the tree {tree.identifier}")
 
-    # if node.is_root:
-    if node.data is None:
+    if node.is_root(tree.identifier) and node.data is None:
         scipywarn(f"The root node ({node.tag} with identifier {node.identifier}) does not associate any data; please set data first")
         return
+
+    # elif node.data is None:
+    #     nodeAccessPath = []
+    #     parentNode = node.predecessor(tree.identifier)
+    #     assert isinstance(parentNode, ObjectNode), f"The node {node.tag} with identifier {node.identifier} has no predecessor, yet it not a root node"
+    #     accessToThisNode = (parentNode.objectInfo.memberAccess, node.objectInfo.name)
+
 
     else:
         if (
@@ -338,7 +358,12 @@ def populate(tree: Tree, node: ObjectNode,
             or not node.objectInfo.indirect
             or node.objectInfo.objDataAsChild
             or len(node.objectInfo.memberAccess) == 0
+            or len(node.successors(tree.identifier)) > 0
             ):
+            # TODO: 2026-09-21 14:16:58
+            # check if ALL children in objectInfo hve a corresponding successor
+            # node in this node; else, add missing nodes up to max number of children
+            # we want to "populate"
             return
 
         if (
@@ -361,25 +386,44 @@ def populate(tree: Tree, node: ObjectNode,
             return
 
         for child in node.objectInfo.children:
+            print(f"inspecting '{child}' of node '{node.tag}'")
+            keyType = type(child)
+            key = f"{child}"
             obj = accessor(node.data, child, None)
-            oInfo = parseObject(obj, child, introspect=introspect,
-                                predicate=predicate, includePrivate=includePrivate,
-                                includeCallables=includeCallables,
-                                includeTypeMembers=includeTypeMembers,
-                                choices=choices,
-                                readOnly=readOnly,
-                                readOnlyChildren=readOnlyChildren)
+            # visited = list(tree.filter_nodes(lambda n: n.data is obj))
+            visited = list(nodesWithPayload(tree, obj))
+            if len(visited):
+                existingNode = visited[0]
+                print(f"\tfound existing '{existingNode.tag}' sharing data with '{node.tag}'")
+                oInfo = ObjectInfo(name=child,
+                                   children=(),
+                                   objInfo = f"Reference to {existingNode.objectInfo.name}",
+                                   memberAccess = (),
+                                   objTip = existingNode.objectInfo.objTip,
+                                   objType = existingNode.objectInfo.objType,
+                                   objKey = key,
+                                   objKeyType = keyType,
+                                   objId = existingNode.objectInfo.objId)
+                childNode = ObjectNode(tag=oInfo.name, objInfo=oInfo)
 
-            childNode = ObjectNode(tag=oInfo.name, data=obj, objInfo=oInfo)
+            else:
+                oInfo = parseObject(obj, child, introspect=introspect,
+                                    predicate=predicate, includePrivate=includePrivate,
+                                    includeCallables=includeCallables,
+                                    includeTypeMembers=includeTypeMembers,
+                                    choices=choices,
+                                    readOnly=readOnly,
+                                    readOnlyChildren=readOnlyChildren,
+                                    objKey = key,
+                                    objKeyType = keyType,
+                                   )
+
+                # oInfo.objKey = key
+                # oInfo.objKeyType = keyType
+
+                childNode = ObjectNode(tag=oInfo.name, data=obj, objInfo=oInfo)
+
             tree.add_node(childNode, parent=node)
-
-
-        # if self.data is None:
-        #     if self._initial_tree_id is None:
-        #         scipywarn(f"This node ({self.tag} with identifier {self.identifier}) is not associated with a tree and does not associate any data")
-        #     else:
-        #         data =
-        # else:
 
 def createNode(obj, objName: str, /,
                storeData: bool = True,
@@ -390,7 +434,9 @@ def createNode(obj, objName: str, /,
                includeTypeMembers: bool = False,
                choices: dict | None = None,
                readOnly: bool = False,
-               readOnlyChildren: bool = False
+               readOnlyChildren: bool = False,
+               objKey: str | None = None,
+               objKeyType: type | None = None
                ) -> ObjectNode:
 
 
@@ -402,7 +448,9 @@ def createNode(obj, objName: str, /,
                              includeTypeMembers=includeTypeMembers,
                              choices=choices,
                              readOnly=readOnly,
-                             readOnlyChildren=readOnlyChildren)
+                             readOnlyChildren=readOnlyChildren,
+                             objKey = objKey,
+                             objKeyType = objKeyType)
 
     # identifier = f"{objectInfo.objId}"
     nodeName = objectInfo.name
@@ -431,7 +479,9 @@ def parseObject(obj: object,
                 includeTypeMembers: bool = False,
                 choices: dict | None = None,
                 readOnly: bool = False,
-                readOnlyChildren: bool = False
+                readOnlyChildren: bool = False,
+                objKey: str | None = None,
+                objKeyType: type | None = None
                 ) -> ObjectInfo:
     r""" TODO Documentation
     """
@@ -544,6 +594,8 @@ def parseObject(obj: object,
         "readOnly": readOnly,
         "readOnlyChildren": readOnlyChildren,
         "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         # "containerChild": ""
         }
 
@@ -562,7 +614,9 @@ def _parseObject_(obj: types.NoneType | type(MISSING) | type(pd.NA),
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objType = type(obj)
     objId = id(obj)
@@ -592,7 +646,9 @@ def _parseObject_(obj: types.NoneType | type(MISSING) | type(pd.NA),
         "choices": choices,
         "readOnly": readOnly,
         "readOnlyChildren": readOnlyChildren,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -615,7 +671,9 @@ def _parseObject_(obj: typing.Union[datetime.datetime,   # noqa: F811,UP007
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     # NOTE: 2026-09-20 11:37:16
     # NEVER introspected
@@ -641,7 +699,9 @@ def _parseObject_(obj: typing.Union[datetime.datetime,   # noqa: F811,UP007
         "objType": objType,
         "choices": {},
         "readOnly": readOnly,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -662,7 +722,9 @@ def _parseObject_(obj: typing.Union[types.FunctionType,  # noqa: F811,UP007
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     # print(f"{self.__class__.__name__}.parseObject(obj: {type(obj)})")
     objType = type(obj)
@@ -693,7 +755,9 @@ def _parseObject_(obj: typing.Union[types.FunctionType,  # noqa: F811,UP007
         "accessType": None,
         "choices": choices,
         "readOnly": False, # TODO/FIXME
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -716,7 +780,9 @@ def _parseObject_(obj: typing.Union[type, enum.EnumType, # noqa: F811,UP007
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     # NOTE: 2026-09-20 11:47:13
     # NEVER introspected
@@ -769,7 +835,9 @@ def _parseObject_(obj: typing.Union[type, enum.EnumType, # noqa: F811,UP007
         "choices": choices,
         "readOnly": readOnly,
         "readOnlyChildren": readOnlyChildren,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -784,7 +852,9 @@ def _parseObject_(obj: pkgutil.ModuleInfo, # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objType = type(obj)
     tip = f"{objType}.__name__"
@@ -811,7 +881,9 @@ def _parseObject_(obj: pkgutil.ModuleInfo, # noqa: F811
         "choices": choices,
         "readOnly": True,
         "readOnlyChildren": True,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return objectInfo(**infoDict)
@@ -826,7 +898,9 @@ def _parseObject_(obj: bgbridge.Structure,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objType = type(obj)
     objId = id(obj)
@@ -864,7 +938,9 @@ def _parseObject_(obj: bgbridge.Structure,  # noqa: F811
         "choices": choices,
         "readOnly": True,
         "readOnlyChildren": True,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -879,7 +955,9 @@ def _parseObject_(obj: ephys_protocol.ElectrophysiologyProtocol,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objType = type(obj)
     objId = id(obj)
@@ -910,7 +988,9 @@ def _parseObject_(obj: ephys_protocol.ElectrophysiologyProtocol,  # noqa: F811
         "choices": choices,
         "readOnly": True,
         "readOnlyChildren": True,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -925,7 +1005,9 @@ def _parseObject_(obj: taxonbridge.Taxon,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objType = type(obj)
     objId = id(obj)
@@ -958,7 +1040,9 @@ def _parseObject_(obj: taxonbridge.Taxon,  # noqa: F811
         "choices": choices,
         "readOnly": True,
         "readOnlyChildren": True,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -979,7 +1063,9 @@ def _parseObject_(obj: typing.Union[dict,              # noqa: F811,UP007
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
@@ -1016,7 +1102,9 @@ def _parseObject_(obj: typing.Union[dict,              # noqa: F811,UP007
         "choices": choices,
         "readOnly": True,
         "readOnlyChildren": False,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -1041,7 +1129,9 @@ def _parseObject_(obj: typing.Union[list, tuple, deque,  # noqa: UP007,F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
@@ -1113,7 +1203,9 @@ def _parseObject_(obj: typing.Union[list, tuple, deque,  # noqa: UP007,F811
         "choices": choices,
         "readOnly": readOnly,
         "readOnlyChildren": readOnlyChildren,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -1130,7 +1222,9 @@ def _parseObject_(obj: str | bytes | bytearray,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     # NOTE: 2026-09-20 11:37:16
     # NEVER introspected
@@ -1176,7 +1270,9 @@ def _parseObject_(obj: str | bytes | bytearray,  # noqa: F811
         "choices": choices,
         "readOnly": readOnly,
         "readOnlyChildren": readOnlyChildren,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -1193,7 +1289,9 @@ def _parseObject_(obj: pathlib.Path,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     # NOTE: 2026-09-20 11:37:16
     # NEVER introspected
@@ -1217,7 +1315,9 @@ def _parseObject_(obj: pathlib.Path,  # noqa: F811
         "accessType": None,
         "choices": choices,
         "readOnly": readOnly,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(*infoDict)
@@ -1246,7 +1346,9 @@ def _parseObject_(obj: typing.Union[bool, int, float, complex,   # noqa: UP007,F
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     # NOTE: 2026-09-20 11:37:16
     # NEVER introspected
@@ -1260,14 +1362,16 @@ def _parseObject_(obj: typing.Union[bool, int, float, complex,   # noqa: UP007,F
         "name": objName,
         "indirect": False,
         "objDataAsChild": False,
-        "objInfo": obj,
+        "objInfo": f"{obj}",
         "objType": objType,
         "objTip": tip,
         "memberAccess": (),
         "accessType": None,
         "choices": choices,
         "readOnly": readOnly,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -1282,7 +1386,9 @@ def _parseObject_(obj: types.SimpleNamespace, # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
@@ -1314,7 +1420,9 @@ def _parseObject_(obj: types.SimpleNamespace, # noqa: F811
         "choices": choices,
         "readOnly": True,
         "readOnlyChildren": False,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -1329,7 +1437,9 @@ def _parseObject_(obj: types.ModuleType, # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
@@ -1380,7 +1490,9 @@ def _parseObject_(obj: types.ModuleType, # noqa: F811
         "choices": choices,
         "readOnly": True,
         "readOnlyChildren": True,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -1396,7 +1508,9 @@ def _parseObject_(obj: vigra.filters.Kernel1D | vigra.filters.Kernel2D, # noqa: 
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     # ### BEGIN NOTE: 2026-02-08 21:20:00 TODO/FIXME
     #
@@ -1518,7 +1632,9 @@ def _parseObject_(obj: vigra.filters.Kernel1D | vigra.filters.Kernel2D, # noqa: 
         "accessType": accessType,
         "choices": {},
         "readOnly": True, # pending a new widget for this
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -1537,7 +1653,9 @@ def _parseObject_(obj: typing.Union[pd.DataFrame,      # noqa: F811,UP007
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     # NOTE: 2026-09-20 11:37:16
     # NEVER introspected
@@ -1586,7 +1704,9 @@ def _parseObject_(obj: typing.Union[pd.DataFrame,      # noqa: F811,UP007
         "accessType": None,
         "choices": choices,
         "readOnly": True,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -1602,7 +1722,9 @@ def _parseObject_(obj: Interval, # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     children = ("t0", "t1", "durations", "extent", "labels", "annotations", "description")
     objId = id(obj)
@@ -1626,7 +1748,9 @@ def _parseObject_(obj: Interval, # noqa: F811
         "choices": choices,
         "readOnly": readOnly,
         "readOnlyChildren": readOnlyChildren,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
     return ObjectInfo(**infoDict)
 
@@ -1641,7 +1765,9 @@ def _parseObject_(obj: neo.Epoch | DataZone, # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
@@ -1666,7 +1792,9 @@ def _parseObject_(obj: neo.Epoch | DataZone, # noqa: F811
         "accessType": "attribute",
         "choices": choices,
         "readOnly": readOnly,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
     return ObjectInfo(**infoDict)
 
@@ -1682,7 +1810,9 @@ def _parseObject_(obj: neo.Event | DataMark | TriggerEvent,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
@@ -1714,7 +1844,9 @@ def _parseObject_(obj: neo.Event | DataMark | TriggerEvent,  # noqa: F811
         "accessType": "attribute",
         "choices": choices,
         "readOnly": readOnly,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
     return ObjectInfo(**infoDict)
 
@@ -1728,7 +1860,9 @@ def _parseObject_(obj: pq.Quantity,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     # NOTE: 2026-09-20 11:49:26
     # NEVER introspected
@@ -1766,7 +1900,9 @@ def _parseObject_(obj: pq.Quantity,  # noqa: F811
         "accessType": "attribute",
         "choices": choices,
         "readOnly": readOnly,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -1781,7 +1917,9 @@ def _parseObject_(obj: vigra.VigraArray,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     # NOTE: 2026-09-20 11:51:46
     # array data as object child if array size > 1
@@ -1828,6 +1966,8 @@ def _parseObject_(obj: vigra.VigraArray,  # noqa: F811
         "choices": choices,
         "readOnly": True,
         "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType,
         "containerChild": "axistags"
         }
     return ObjectInfo(**infoDict)
@@ -1843,7 +1983,9 @@ def _parseObject_(obj: np.ndarray,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     # NOTE: 2026-09-20 11:37:16
     # NEVER introspected
@@ -1877,7 +2019,9 @@ def _parseObject_(obj: np.ndarray,  # noqa: F811
         "accessType": None,
         "choices": {},
         "readOnly": True,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
     return ObjectInfo(**infoDict)
 
@@ -1891,7 +2035,9 @@ def _parseObject_(obj: vigra.AxisInfo,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
@@ -1919,7 +2065,9 @@ def _parseObject_(obj: vigra.AxisInfo,  # noqa: F811
         "accessType": "attribute",
         "choices": choices,
         "readOnly": False,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -1934,7 +2082,9 @@ def _parseObject_(obj: vigra.AxisType,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     # NOTE: 2026-02-08 22:54:09 TODO
     # Don't really want to edit this via GUI, so no member access for now
@@ -1955,7 +2105,9 @@ def _parseObject_(obj: vigra.AxisType,  # noqa: F811
         "accessType": None,
         "choices":  {vigra.AxisType.names},
         "readOnly": False,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -1971,7 +2123,9 @@ def _parseObject_(obj: AxesCalibration,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
@@ -2003,6 +2157,8 @@ def _parseObject_(obj: AxesCalibration,  # noqa: F811
         "readOnly": readOnly,
         "readOnlyChildren": readOnlyChildren,
         "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -2017,7 +2173,9 @@ def _parseObject_(obj: AxisCalibrationData,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> tuple:
     objId = id(obj)
     objType = type(obj)
@@ -2056,7 +2214,9 @@ def _parseObject_(obj: AxisCalibrationData,  # noqa: F811
         "choices": False,
         "readOnly": readOnly,
         "readOnlyChildren": readOnlyChildren,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return pData, ObjectInfo(**infoDict)
@@ -2071,7 +2231,9 @@ def _parseObject_(obj: ChannelCalibrationData,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objId =  id(obj)
     objType = type(obj)
@@ -2103,7 +2265,9 @@ def _parseObject_(obj: ChannelCalibrationData,  # noqa: F811
         "choices": choices,
         "readOnly": readOnly,
         "readOnlyChildren": readOnlyChildren,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -2118,7 +2282,9 @@ def _parseObject_(obj: PVObject,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
@@ -2163,7 +2329,9 @@ def _parseObject_(obj: PVObject,  # noqa: F811
         "accessType": "attribute",
         "choices": choices,
         "readOnly": False,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
@@ -2178,7 +2346,9 @@ def _parseObject_(obj: scipy.optimize.Bounds,  # noqa: F811
                   includeTypeMembers: bool = False,
                   choices: dict | None = None,
                   readOnly: bool = False,
-                  readOnlyChildren: bool = False
+                  readOnlyChildren: bool = False,
+                  objKey: str | None = None,
+                  objKeyType: type | None = None
                 ) -> ObjectInfo:
     objId = id(obj)
     objType = type(obj)
@@ -2204,7 +2374,9 @@ def _parseObject_(obj: scipy.optimize.Bounds,  # noqa: F811
         "accessType": "attribute",
         "choices": choices,
         "readOnly": False,
-        "objId": objId
+        "objId": objId,
+        "objKey": objKey,
+        "objKeyType": objKeyType
         }
 
     return ObjectInfo(**infoDict)
