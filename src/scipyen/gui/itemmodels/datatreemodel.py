@@ -380,9 +380,9 @@ class DataTreeModel(QtGui.QStandardItemModel):
 
         # for user's benefit — good to know the type of the object is represented
         # in this row.
-        objetTypeItem = QtGui.QStandardItem(typeName)
-        objetTypeItem.setData(typeName, QtCore.Qt.DisplayRole)
-        objetTypeItem.setData(qVariant(0), ObjectChildrenCountRole)
+        objectTypeItem = QtGui.QStandardItem(typeName)
+        objectTypeItem.setData(typeName, QtCore.Qt.DisplayRole)
+        objectTypeItem.setData(qVariant(0), ObjectChildrenCountRole)
         # either:
         #
         # a) display some object info for the user's benefit; this can be:
@@ -432,7 +432,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
         readOnlyFont.setItalic(True)
         readOnlyBrush = palette.brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
 
-        for k, item in enumerate((objectItem, objetTypeItem, objectInfoValueItem)):
+        for k, item in enumerate((objectItem, objectTypeItem, objectInfoValueItem)):
             item.setData(readOnly, ReadOnlyRole) # star import from gui.itemmodels.roles
             item.setData(readOnlyChildren, ReadOnlyChildrenRole) # star import from gui.itemmodels.roles
             if k == 2:
@@ -457,7 +457,7 @@ class DataTreeModel(QtGui.QStandardItemModel):
                 item.setData(font, QtCore.Qt.FontRole)
                 item.setFlags(readOnlyFlags)
 
-        return (objectItem, objetTypeItem, objectInfoValueItem)
+        return (objectItem, objectTypeItem, objectInfoValueItem)
 
     # @timefunc
     def populateModel(self, obj: object, rootTitle: str = "",

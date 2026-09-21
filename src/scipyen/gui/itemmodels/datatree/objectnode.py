@@ -241,6 +241,7 @@ This field is redundant, therefore flagged for culling.
     readOnly: bool = True
     readOnlyChildren: bool = True
     objId: int | None = None
+    referenceInfo: typing.Self | None = None
 
     # NOTE: 2026-09-16 10:22:19 fileystem-like stuff:
     # a "directory" is an object that is EITHER a hierarchical structure by itself
@@ -303,18 +304,18 @@ class ObjectNode(Node):
         return isinstance(self._objectInfo_, ObjectInfo)
 
 
-@timefunc
+# @timefunc
 def findObjectNodes(tree: Tree, **kwargs):
     def _checkNodeInfoAttribute_(info, **kwargs):
         return all(getattr(info, item[0], None) == item[1] for item in kwargs.items())
 
     yield from tree.filter_nodes(lambda node: isinstance(node, ObjectNode) and _checkNodeInfoAttribute_(node, **kwargs))
 
-@timefunc
+# @timefunc
 def nodesWithTag(tree: Tree, tag: str):
     yield from tree.filter_nodes(lambda node: node.tag == tag)
 
-@timefunc
+# @timefunc
 def nodesWithPayload(tree: Tree, payload: typing.Any = None):
     yield from tree.filter_nodes(lambda node: node.data is payload)
 
@@ -393,8 +394,9 @@ def populateNode(tree: Tree, node: ObjectNode,
             # visited = list(tree.filter_nodes(lambda n: n.data is obj))
             visited = list(nodesWithPayload(tree, obj))
             if len(visited):
+                print([n.tag for n in visited])
                 existingNode = visited[0]
-                print(f"\tfound existing '{existingNode.tag}' sharing data with '{node.tag}'")
+                print(f"\t'{child}' shares data with existing node '{existingNode.tag}'")
                 oInfo = ObjectInfo(name=child,
                                    children=(),
                                    objInfo = f"Reference to {existingNode.objectInfo.name}",
@@ -404,6 +406,7 @@ def populateNode(tree: Tree, node: ObjectNode,
                                    objKey = key,
                                    objKeyType = keyType,
                                    objId = existingNode.objectInfo.objId)
+                oInfo.referenceInfo = existingNode.objectInfo
                 childNode = ObjectNode(tag=oInfo.name, objInfo=oInfo)
 
             else:

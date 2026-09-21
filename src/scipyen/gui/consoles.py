@@ -3560,15 +3560,17 @@ class ScipyenConsoleWidget(ConsoleWidget):
                     or event.type() == QtCore.QEvent.KeyPress
                 )
             ):
+            # promptCursor = self._get_prompt_cursor()
             cursor = self._control.textCursor()
             endpos = cursor.selectionEnd()
             startpos = cursor.selectionStart()
 
             if any(v < self._prompt_pos for v in (startpos, endpos)):
-                if startpos == endpos:
-                    self._keep_cursor_in_buffer()
-                else:
-                    self._control.setReadOnly(True)
+                self._control.setReadOnly(True)
+                if startpos == endpos and not self._in_buffer(endpos):
+                    self._control.ensureCursorVisible()
+                    # self._keep_cursor_in_buffer()
+                # else:
 
             else:
                 self._control.setReadOnly(False)

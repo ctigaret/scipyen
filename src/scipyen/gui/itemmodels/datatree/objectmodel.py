@@ -309,9 +309,90 @@ class ObjectModel(QtGui.QStandardItemModel):
         objectItem.setData(objectNode.objectInfo.name, QtCore.Qt.DisplayRole)
         objectItem.setData(objectNode.objectInfo.objTip, QtCore.Qt.ToolTipRole)
 
+        if objectNode.objectInfo.objDataAsChild:
+            editExternally = not self._inlineTables_
+            objectItem.setData(editExternally, ObjectDataEditExternallyRole)
+            if self._inlineTables_:
+                dataItem = QtGui.QStandardItem("")
+                dataItem.setData(qVariant(True), StandaloneEditorWidgetRole)
+                dataItem.setRowCount(0)
+
+                objectItem.setRowCount(1)
+                objectItem.setChild(0, dataItem)
+                objectItem.setData(qVariant(1), ObjectChildrenCountRole)
+            else:
+                objectItem.setRowCount(0)
+                objectItem.setData(qVariant(0), ObjectChildrenCountRole)
+
+        else:
+            nChildren = len(objectNode.objectInfo.children)
+            objectItem.setRowCount(nChildren)
+            objectItem.setData(qVariant(nChildren), ObjectChildrenCountRole)
+
+        if isinstance(objectNode.objectInfo.referenceInfo, ObjectInfo):
+            typeName = objectNode.objectInfo.referenceInfo.objType.__name__
+        else:
+            typeName = objectNode.objectInfo.objType.__name__
+
+        objectTypeItem = QtGui.QStandardItem(typeName)
+        objectTypeItem.setData(typeName, QtCore.Qt.DisplayRole)
+        objectTypeItem.setData(qVariant(0), ObjectChildrenCountRole)
+
+        objectInfoValueItem = QtGui.QStandardItem(objectNode.objectInfo.objInfo)
+        if isinstance(objectNode.data, pathlib.Path):
+            if __has_PySide6__:
+                objectInfoValueItem.setData(obj, ObjectDataRole)
+                objectInfoValueItem.setData(info, QtCore.Qt.EditRole)
+            else:
+                objectInfoValueItem.setData(obj, QtCore.Qt.EditRole)
+        else:
+            objectInfoValueItem.setData(info, QtCore.Qt.EditRole)
+
+        objectInfoValueItem.setData(objectNode.objectInfo.choices, DataChoicesRole)
+        objectInfoValueItem.setData(qVariant(0), ObjectChildrenCountRole)
         # also not needed? (stored in objectInfo)
         # objectItem.setData(qVariant(memberAccess), ObjectDataAccessRole)
         # objectItem.setData(qVariant(accessType), ObjectDataAccessTypeRole)
+
+        flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
+        readOnlyFlags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
+
+        readOnly = objectNode.objectInfo.readOnly is True or self.readOnly
+        readOnlyChildren = objectNode.objectInfo.readOnlyChildren is True or self.readOnly
+
+        palette = QtWidgets.QApplication.palette()
+        font = QtWidgets.QApplication.font()
+        brush = palette.brush(QtGui.QPalette.Active, QtGui.QPalette.Text)
+        readOnlyFont = QtGui.QFont(font)
+        readOnlyFont.setItalic(True)
+        readOnlyBrush = palette.brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
+
+        for k, item in enumerate((objectItem, objectTypeItem, objectInfoValueItem)):
+            item.setData(readOnly, ReadOnlyRole) # star import from gui.itemmodels.roles
+            item.setData(readOnlyChildren, ReadOnlyChildrenRole) # star import from gui.itemmodels.roles
+            if k == 2:
+                if readOnly or (
+                                    (
+                                        objectNode.objectInfo.indirect is True
+                                        or objectNode.objectInfo.objDataAsChild is True
+                                    )
+                                    and len(objectNode.objectInfo.choices) == 0
+                                ):
+                    item.setData(readOnlyBrush, QtCore.Qt.ForegroundRole)
+                    item.setData(readOnlyFont, QtCore.Qt.FontRole)
+                    item.setFlags(readOnlyFlags)
+
+                else:
+                    item.setData(brush, QtCore.Qt.ForegroundRole)
+                    item.setData(font, QtCore.Qt.FontRole)
+                    item.setFlags(flags)
+            else:
+                # prohibit editing in columns 0 and 1
+                item.setData(brush, QtCore.Qt.ForegroundRole)
+                item.setData(font, QtCore.Qt.FontRole)
+                item.setFlags(readOnlyFlags)
+
+        return (objectItem, objectTypeItem, objectInfoValueItem)
 
     def _makeObjectRow_(self: typing.Self, objNode: ObjectNode, /,
                        objDict: dict, objKey: object,
@@ -410,9 +491,9 @@ class ObjectModel(QtGui.QStandardItemModel):
 
         # for user's benefit — good to know the type of the object is represented
         # in this row.
-        objetTypeItem = QtGui.QStandardItem(typeName)
-        objetTypeItem.setData(typeName, QtCore.Qt.DisplayRole)
-        objetTypeItem.setData(qVariant(0), ObjectChildrenCountRole)
+        objectTypeItem = QtGui.QStandardItem(typeName)
+        objectTypeItem.setData(typeName, QtCore.Qt.DisplayRole)
+        objectTypeItem.setData(qVariant(0), ObjectChildrenCountRole)
         # either:
         #
         # a) display some object info for the user's benefit; this can be:
@@ -462,7 +543,7 @@ class ObjectModel(QtGui.QStandardItemModel):
         readOnlyFont.setItalic(True)
         readOnlyBrush = palette.brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
 
-        for k, item in enumerate((objectItem, objetTypeItem, objectInfoValueItem)):
+        for k, item in enumerate((objectItem, objectTypeItem, objectInfoValueItem)):
             item.setData(readOnly, ReadOnlyRole) # star import from gui.itemmodels.roles
             item.setData(readOnlyChildren, ReadOnlyChildrenRole) # star import from gui.itemmodels.roles
             if k == 2:
@@ -487,7 +568,7 @@ class ObjectModel(QtGui.QStandardItemModel):
                 item.setData(font, QtCore.Qt.FontRole)
                 item.setFlags(readOnlyFlags)
 
-        return (objectItem, objetTypeItem, objectInfoValueItem)
+        return (objectItem, objectTypeItem, objectInfoValueItem)
 
     # @timefunc
     def populateModel(self, obj: object, rootTitle: str = "",
