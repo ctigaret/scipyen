@@ -1,4 +1,4 @@
-# $Id: datatreeview.py $
+# $Id: objectview.py $
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -73,6 +73,7 @@ from gui.delegates import PythonItemDelegate
 from gui.workspacegui import WorkspaceGuiMixin
 from gui.itemmodels.roles import *
 from gui.itemmodels.datatreemodel import DataTreeModel
+from gui.itemmodels.datatree.objectmodel import ObjectModel
 from gui import quickdialog
 
 if "darwin" in sys.platform:
@@ -82,7 +83,7 @@ else:
     altKeyDescr = "<ALT>"
     ctrlKeyDescr = "<CTRL>"
 
-class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
+class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     sig_itemDoubleClicked = Signal(QtGui.QStandardItem, name="sig_itemDoubleClicked")
     sig_dataChanged = Signal(QtCore.QModelIndex, QtCore.QModelIndex, name="sig_dataChanged")
     sig_modelDataChanged = Signal(name = "sig_modelDataChanged")
@@ -115,9 +116,12 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         # NOTE: 2026-04-01 10:41:46
         self.setExpandsOnDoubleClick(False)
         # print(f"\n\t-> initialising sourceModel")
-        self.sourceModel = DataTreeModel(showMethods = self._showCallables_,
+        self.sourceModel = ObjectModel(showMethods = self._showCallables_,
                                        valuesOnly = self._showValuesOnly_,
                                        parent=self)
+        # self.sourceModel = DataTreeModel(showMethods = self._showCallables_,
+        #                                valuesOnly = self._showValuesOnly_,
+        #                                parent=self)
 
         self.sourceModel.dataChanged.connect(self.sig_dataChanged)
         if hasattr(self.sourceModel, "sig_modelDataChanged"):
@@ -262,20 +266,22 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     @Slot()
     @safewrapper
     def slot_copyPaths(self: typing.Self):
-        if self._scipyenMainWindow_ is None:
-            return
-
-        item_paths = self.getSelectedPaths()
-        self._exportPathsToClipboard_(item_paths)
+        return
+        # if self._scipyenMainWindow_ is None:
+        #     return
+        #
+        # item_paths = self.getSelectedPaths()
+        # self._exportPathsToClipboard_(item_paths)
 
     @Slot()
     def slot_exportToConsole(self: typing.Self):
-        if self._scipyenMainWindow_ is None:
-            return
-
-        item_paths = self.getSelectedPaths()
-        self._exportPathsToClipboard_(item_paths)
-        self._scipyenMainWindow_.console.paste()
+        return
+        # if self._scipyenMainWindow_ is None:
+        #     return
+        #
+        # item_paths = self.getSelectedPaths()
+        # self._exportPathsToClipboard_(item_paths)
+        # self._scipyenMainWindow_.console.paste()
 
     @Slot()
     @safewrapper
@@ -690,7 +696,7 @@ class DataTreeView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
     # @prog.timefunc
     def setData(self: typing.Self, obj: object,
-                name: typing.Optional[str] = None,
+                name: str | None = None,
                 showPrivate: bool = False,
                 valuesOnly: bool = True,
                 inlineTables: bool = False,

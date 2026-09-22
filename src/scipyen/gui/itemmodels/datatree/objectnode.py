@@ -392,6 +392,96 @@ def populateNode(tree: Tree, node: ObjectNode,
             key = f"{child}"
             obj = accessor(node.data, child, None)
             # visited = list(tree.filter_nodes(lambda n: n.data is obj))
+            oInfo = parseObject(obj, child, introspect=introspect,
+                                predicate=predicate, includePrivate=includePrivate,
+                                includeCallables=includeCallables,
+                                includeTypeMembers=includeTypeMembers,
+                                choices=choices,
+                                readOnly=readOnly,
+                                readOnlyChildren=readOnlyChildren,
+                                objKey = key,
+                                objKeyType = keyType,
+                                )
+
+            # oInfo.objKey = key
+            # oInfo.objKeyType = keyType
+
+            childNode = ObjectNode(tag=oInfo.name, data=obj, objInfo=oInfo)
+
+            tree.add_node(childNode, parent=node)
+
+def populateNode2(tree: Tree, node: ObjectNode,
+                introspect: bool = False,
+                predicate = None,
+                includePrivate: bool = False,
+                includeCallables : bool = False,
+                includeTypeMembers: bool = False,
+                choices: dict | None = None,
+                readOnly: bool = False,
+                readOnlyChildren: bool = False):
+    def getitem(obj, item, default=None):
+        try:
+            return obj.__getitem__(item)
+        except:  # noqa: E722
+            return default
+
+    accessor = None
+
+    assert isinstance(node, ObjectNode), f"Expecting an ObjectNode instance; instead got a {type(node).__name__}"
+
+    if node.identifier not in tree:
+        raise ValueError(f"The node {node.tag} with identifier {node.identifier} does not belong to the tree {tree.identifier}")
+
+    if node.is_root(tree.identifier) and node.data is None:
+        scipywarn(f"The root node ({node.tag} with identifier {node.identifier}) does not associate any data; please set data first")
+        return
+
+    # elif node.data is None:
+    #     nodeAccessPath = []
+    #     parentNode = node.predecessor(tree.identifier)
+    #     assert isinstance(parentNode, ObjectNode), f"The node {node.tag} with identifier {node.identifier} has no predecessor, yet it not a root node"
+    #     accessToThisNode = (parentNode.objectInfo.memberAccess, node.objectInfo.name)
+
+
+    else:
+        if (
+            len(node.objectInfo.children) == 0
+            or not node.objectInfo.indirect
+            or node.objectInfo.objDataAsChild
+            or len(node.objectInfo.memberAccess) == 0
+            or len(node.successors(tree.identifier)) > 0
+            ):
+            # TODO: 2026-09-21 14:16:58
+            # check if ALL children in objectInfo hve a corresponding successor
+            # node in this node; else, add missing nodes up to max number of children
+            # we want to "populate"
+            return
+
+        if (
+            node.objectInfo.memberAccess == (".", )
+            and node.objectInfo.accessType == "attribute"
+            ):
+            accessor = getattr
+
+        elif(
+            node.objectInfo.memberAccess == ("[","]")
+            and node.objectInfo.accessType == "index"
+            ):
+            accessor = getitem
+
+        else:
+            scipywarn(f"Unclear access method for children of data for node {node.tag} with {node.identifier}")
+            return
+
+        if accessor is None:
+            return
+
+        for child in node.objectInfo.children:
+            print(f"inspecting '{child}' of node '{node.tag}'")
+            keyType = type(child)
+            key = f"{child}"
+            obj = accessor(node.data, child, None)
+            # visited = list(tree.filter_nodes(lambda n: n.data is obj))
             visited = list(nodesWithPayload(tree, obj))
             if len(visited):
                 print([n.tag for n in visited])
