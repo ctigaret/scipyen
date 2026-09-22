@@ -6567,7 +6567,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         self.varNameFilterFinderComboBox.currentTextChanged[str].connect(
             self.slot_filterSelectVarNames)
 
-        self.varNameFilterFinderComboBox.lineEdit().returnPressed.connect(self.slot_addVarNameToFinderHistory)
+        self.varNameFilterFinderComboBox.lineEdit().returnPressed.connect(self.slot_varNameFilterFinderComboBoxReturnPressed)
         self.varNameFilterFinderComboBox.currentIndexChanged[int].connect(self.slot_filterSelectVarNamesIndexChanged)
         self.varNameFilterFinderComboBox.lineEdit().setClearButtonEnabled(True)
         self.varNameFilterFinderComboBox.lineEdit().undoAvailable = True
@@ -7849,13 +7849,14 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
     @Slot()
     @safewrapper
-    def slot_addVarNameToFinderHistory(self):
+    def slot_varNameFilterFinderComboBoxReturnPressed(self):
         varTxt = self.varNameFilterFinderComboBox.lineEdit().text()
         if len(varTxt.strip()) > 0 :
             if varTxt not in self._recentVariablesList:
                 self._recentVariablesList.appendleft(varTxt)
             self._lastVariableFind = varTxt
             self.slot_filterSelectVarNames(varTxt)
+        self.workspaceView.setFocus(QtCore.Qt.MouseFocusReason)
 
     @Slot(int)
     def slot_filterSelectVarNamesIndexChanged(self, val:int):
