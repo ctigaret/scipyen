@@ -244,7 +244,7 @@ class ObjectModel(QtGui.QStandardItemModel):
     #     return False if parentIndex.isValid() else parentIndex.rowCount() <
 
     @Slot(QtCore.QModelIndex)
-    def slot_indexExpanded(self, index: QtCore.QModelIndex):
+    def _slot_indexExpanded_(self, index: QtCore.QModelIndex):
         if not index.isValid() or index.column() !=0:
             return
 
@@ -283,7 +283,8 @@ class ObjectModel(QtGui.QStandardItemModel):
         item.setRowCount(len(objectChildren))
 
         # self.beginInsertRow()
-        for row, node in enumerate(successors):
+        for row, nid in enumerate(successors):
+            node = self._tree_.nodes[nid]
             childRow = self._makeRowForNode_(node)
             for col in range(len(childRow)):
                 item.setChild(row, col, childRow[col])

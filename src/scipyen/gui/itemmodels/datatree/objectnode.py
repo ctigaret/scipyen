@@ -356,7 +356,7 @@ def populateNode(tree: Tree, node: ObjectNode,
     else:
         if (
             len(node.objectInfo.children) == 0
-            or not node.objectInfo.indirect
+            # or not node.objectInfo.indirect
             or node.objectInfo.objDataAsChild
             or len(node.objectInfo.memberAccess) == 0
             or len(node.successors(tree.identifier)) > 0
@@ -387,7 +387,7 @@ def populateNode(tree: Tree, node: ObjectNode,
             return
 
         for child in node.objectInfo.children:
-            print(f"inspecting '{child}' of node '{node.tag}'")
+            # print(f"inspecting '{child}' of node '{node.tag}'")
             keyType = type(child)
             key = f"{child}"
             obj = accessor(node.data, child, None)
@@ -1191,7 +1191,7 @@ def _parseObject_(obj: typing.Union[dict,              # noqa: F811,UP007
         "objType": objType,
         "objTip":tip,
         "memberAccess": ("[", "]"),
-        "accessType": "key",
+        "accessType": "index",
         "choices": choices,
         "readOnly": True,
         "readOnlyChildren": False,

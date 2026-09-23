@@ -120,15 +120,16 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self.sourceModel = ObjectModel(showMethods = self._showCallables_,
                                        valuesOnly = self._showValuesOnly_,
                                        parent=self)
+        self.expanded.connect(self.sourceModel._slot_indexExpanded_)
         # self.sourceModel = DataTreeModel(showMethods = self._showCallables_,
         #                                valuesOnly = self._showValuesOnly_,
         #                                parent=self)
 
         self.sourceModel.dataChanged.connect(self.sig_dataChanged)
-        if hasattr(self.sourceModel, "sig_modelDataChanged"):
-            self.sourceModel.sig_modelDataChanged.connect(self.sig_modelDataChanged)
+        self.sourceModel.sig_modelDataChanged.connect(self.sig_modelDataChanged)
+        # if hasattr(self.sourceModel, "sig_modelDataChanged"):
 
-        if self._useProxyModel_ is true:
+        if self._useProxyModel_ is True:
             self.proxyModel = QtCore.QSortFilterProxyModel(self)
             self.proxyModel.setSourceModel(self.sourceModel)
 
@@ -807,7 +808,7 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         # WARNING: delegates are handled by the viewer owner of this model!
 
     def selectedItems(self: typing.Self) -> typing.Sequence:
-        if self._useProxyModel_ is true:
+        if self._useProxyModel_ is True:
             return [self.sourceModel.itemFromIndex(self.proxyModel.mapToSource(i)) for i in self.selectedIndexes() if i.column() == 0]
         else:
             return [self.model().itemFromIndex(i) for i in self.selectedIndexes() if i.column() == 0]
@@ -849,9 +850,9 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
 
         if self._useProxyModel_ is True:
-            l_getName = lambda i: self.sourceModel.getPathForLeaf(self.proxyModel.mapToSource(i)) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
+            l_getName = lambda i: self.sourceModel.getPathForLeaf(self.proxyModel.mapToSource(i)) if fullPathAsName else i.data(QtCore.Qt.DisplayRole)
         else:
-            l_getName = lambda i: self.sourceModel.getPathForLeaf(i) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
+            l_getName = lambda i: self.sourceModel.getPathForLeaf(i) if fullPathAsName else i.data(QtCore.Qt.DisplayRole)
 
         selection = list( # noqa
                         map(
@@ -930,13 +931,18 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
     def mouseDoubleClickEvent(self: typing.Self, evt: QtGui.QMouseEvent):
         pos = evt.position().toPoint()
-        if self._useProxyModel_ is true:
+        if self._useProxyModel_ is True:
             index = self.proxyModel.mapToSource(self.indexAt(pos))
         else:
             index = self.indexAt(pos)
-        # item = self.sourceModel.itemFromIndex(index)
+
+        if not index.isValid():
+            return
+
+        item = self.sourceModel.itemFromIndex(index)
         if item.column() == 0:
             self.sig_itemDoubleClicked.emit(item)
+
         super().mouseDoubleClickEvent(evt)
         evt.setAccepted(True)
 
