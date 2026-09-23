@@ -108,6 +108,7 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         assert (isinstance(autoResizeColumns, set) and all((isinstance(v, int) and v in range(3)) for v in autoResizeColumns)), f"Invalid value for 'autoResizeColumns'; expecting a set of ints, each in range(3); instead, got {autoResizeColumns}"
         self.autoResizeColumns: set[int] = kwargs.pop("autoResizeColumns", set())
 
+        self._useProxyModel_ = kwargs.pop("useSortingProxy", False)
         # self._alwaysSortRows_: bool = False
 
         # NOTE: 2026-03-31 22:47:04
@@ -127,12 +128,15 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         if hasattr(self.sourceModel, "sig_modelDataChanged"):
             self.sourceModel.sig_modelDataChanged.connect(self.sig_modelDataChanged)
 
-        self.proxyModel = QtCore.QSortFilterProxyModel(self)
-        self.proxyModel.setSourceModel(self.sourceModel)
+        if self._useProxyModel_ is true:
+            self.proxyModel = QtCore.QSortFilterProxyModel(self)
+            self.proxyModel.setSourceModel(self.sourceModel)
 
-        super().setModel(self.proxyModel)
-        # super().setModel(self.sourceModel)
-        self.setSortingEnabled(True)
+            super().setModel(self.proxyModel)
+            self.setSortingEnabled(True)
+        else:
+            self.proxyModel = None
+            super().setModel(self.sourceModel)
 
         self._defaultDelegate_ = self.itemDelegate()
         self._delegate_ = PythonItemDelegate(parent = self)
@@ -649,8 +653,10 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                             flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
                             # NOTE: 2026-04-01 11:03:24
                             # this sets the child in row 0 to span all columns
-                            self.setFirstColumnSpanned(0, self.proxyModel.mapFromSource(item.index()), True)
-                            # self.setFirstColumnSpanned(0, item.index(), True)
+                            if self._useProxyModel_:
+                                self.setFirstColumnSpanned(0, self.proxyModel.mapFromSource(item.index()), True)
+                            else:
+                                self.setFirstColumnSpanned(0, item.index(), True)
 
                             # self.setItemDelegateForColumn(childItem.column(), self._delegate_)
                             # self.setItemDelegateForRow(childItem.row(), self._delegate_)
@@ -673,9 +679,10 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
                                     elif hasattr(editorWidget, "setReadOnly") and isinstance(type(editorWidget).setReadOnly, (types.FunctionType, types.MethodType)):
                                         editorWidget.setReadOnly(True)
-
-                                self.setIndexWidget(self.proxyModel.mapFromSource(childItem.index()), editorWidget)
-                                # self.setIndexWidget(childItem.index(), editorWidget)
+                                if self._useProxyModel_ is True:
+                                    self.setIndexWidget(self.proxyModel.mapFromSource(childItem.index()), editorWidget)
+                                else:
+                                    self.setIndexWidget(childItem.index(), editorWidget)
 
                             # ### END   2026-04-01 10:52:25 Too slow, but working; DO NOT DELETE
 
@@ -708,9 +715,9 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         # print(f"\n\tcall self.sourceModel.beginResetModel()")
         # NOTE: 2026-06-28 11:51:12
         # I think I need these here to notify the viewer.
-        self.sourceModel.beginResetModel()
+        # self.sourceModel.beginResetModel()
         # print(f"\n\tcall self.sourceModel.endResetModel()")
-        self.sourceModel.endResetModel()
+        # self.sourceModel.endResetModel()
         self.sourceModel.populateModel(obj, rootTitle=name,
                                        showPrivate=showPrivate,
                                        introspect=introspect,
@@ -727,25 +734,27 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         # WARNING: 2026-06-28 11:45:39
         # DO NOT call begin/endResetMdoel on the proxyModel here
         # see also WARNING: 2026-06-28 11:43:14 in itemmodels.datatreemodel.DataTreeModel
-        self.proxyModel.setSourceModel(self.sourceModel)
+        if self._useProxyModel_ is True:
+            self.proxyModel.setSourceModel(self.sourceModel)
 
-        root = self.sourceModel.invisibleRootItem()
-        if root.hasChildren():
-            # NOTE: 2026-02-08 15:23:06
-            # there is exactly one of these and it is the visible "root" of the
-            # tree; all of objects "internals" are child rows of it.
-            objItem = root.child(0,0)
-            self._setupChildDataItem_(objItem)
-            if self._initialExpandDepth_ == 0 and self._currentExpansionDepth_ == 0:
-                self.collapseAll()
-            else:
-                self.expandToDepth(max(self._initialExpandDepth_, self._currentExpansionDepth_-1))
+            root = self.sourceModel.invisibleRootItem()
+            if root.hasChildren():
+                # NOTE: 2026-02-08 15:23:06
+                # there is exactly one of these and it is the visible "root" of the
+                # tree; all of objects "internals" are child rows of it.
+                # objItem = root.child(0,0)
+                # self._setupChildDataItem_(objItem)
 
-            for col in self.autoResizeColumns:
-                if col >=0 and col < 3:
-                    self.resizeColumnToContents(col)
+                # if self._initialExpandDepth_ == 0 and self._currentExpansionDepth_ == 0:
+                #     self.collapseAll()
+                # else:
+                #     self.expandToDepth(max(self._initialExpandDepth_, self._currentExpansionDepth_-1))
+                #
+                # for col in self.autoResizeColumns:
+                #     if col >=0 and col < 3:
+                #         self.resizeColumnToContents(col)
 
-            self.proxyModel.sort(-1)
+                self.proxyModel.sort(-1)
 
     def setRootName(self, value: str):
         # print(f"{self.__class__.__name__}.setRootName({value})")
@@ -762,7 +771,9 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         for col in self.autoResizeColumns:
             if col >=0 and col < 3:
                 self.resizeColumnToContents(col)
-        self.proxyModel.sort(-1)
+
+        if self._useProxyModel_ is True:
+            self.proxyModel.sort(-1)
 
     @property
     def hasData(self) -> bool:
@@ -796,8 +807,10 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         # WARNING: delegates are handled by the viewer owner of this model!
 
     def selectedItems(self: typing.Self) -> typing.Sequence:
-        # return [self.model().itemFromIndex(i) for i in self.selectedIndexes() if i.column() == 0]
-        return [self.sourceModel.itemFromIndex(self.proxyModel.mapToSource(i)) for i in self.selectedIndexes() if i.column() == 0]
+        if self._useProxyModel_ is true:
+            return [self.sourceModel.itemFromIndex(self.proxyModel.mapToSource(i)) for i in self.selectedIndexes() if i.column() == 0]
+        else:
+            return [self.model().itemFromIndex(i) for i in self.selectedIndexes() if i.column() == 0]
 
     def getDataForItems(self: typing.Self,
                         items: typing.Sequence[QtGui.QStandardItem] = []
@@ -835,8 +848,10 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             fullPathAsName = True
 
 
-        # l_getName = lambda i: self.sourceModel.getPathForLeaf(i) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
-        l_getName = lambda i: self.sourceModel.getPathForLeaf(self.proxyModel.mapToSource(i)) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
+        if self._useProxyModel_ is True:
+            l_getName = lambda i: self.sourceModel.getPathForLeaf(self.proxyModel.mapToSource(i)) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
+        else:
+            l_getName = lambda i: self.sourceModel.getPathForLeaf(i) if fullPathAsName else i.data(QtCore.Qt.DisplayRole) # noqa
 
         selection = list( # noqa
                         map(
@@ -915,8 +930,10 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
     def mouseDoubleClickEvent(self: typing.Self, evt: QtGui.QMouseEvent):
         pos = evt.position().toPoint()
-        index = self.indexAt(pos)
-        index = self.proxyModel.mapToSource(self.indexAt(pos))
+        if self._useProxyModel_ is true:
+            index = self.proxyModel.mapToSource(self.indexAt(pos))
+        else:
+            index = self.indexAt(pos)
         # item = self.sourceModel.itemFromIndex(index)
         if item.column() == 0:
             self.sig_itemDoubleClicked.emit(item)
