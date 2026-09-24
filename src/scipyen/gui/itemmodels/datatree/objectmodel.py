@@ -220,11 +220,11 @@ class ObjectModel(QtGui.QStandardItemModel):
         self.beginResetModel()
         # self._dataTypeStr_: str = ""
         # self._visited_: dict = {}
-        # self._visited_: set = set()
+        self._visited_: set = set()
         # self._hasDynamicPrivate_: bool = False
         # self._privateData_: dict | None = None
         # self._hideRoot_: bool = False
-        # self._topObjectItem_: QtGui.QStandardItem | None = None
+        self._topObjectItem_: QtGui.QStandardItem | None = None
 
 
         # self._sortedRows_: bool = False
@@ -246,6 +246,7 @@ class ObjectModel(QtGui.QStandardItemModel):
     @Slot(QtCore.QModelIndex)
     def _slot_indexExpanded_(self, index: QtCore.QModelIndex):
         if not index.isValid() or index.column() !=0:
+            print(f"{self.__class__.__name__}._slot_indexExpanded_ index is invalid")
             return
 
         item = self.itemFromIndex(index)
@@ -255,10 +256,14 @@ class ObjectModel(QtGui.QStandardItemModel):
         # potential role for self.canFetchMore() and self.fetchMore()
 
         itemNode = item.data(ObjectDataRole)
+        # print(f"{self.__class__.__name__}._slot_indexExpanded_ itemNode = {itemNode}")
+
+        assert isinstance(itemNode, ObjectNode), f"{item.data()} does not associate an ObjectNode"
+
         objectChildren = itemNode.objectInfo.children
 
         if len(objectChildren) == 0:
-            # should NOT happen: child-less objectNodes shuld correspond to
+            # should NOT happen: child-less objectNodes should correspond to
             # items with rowCount==0
             return
 
@@ -269,7 +274,8 @@ class ObjectModel(QtGui.QStandardItemModel):
         if len(objectChildren) == item.rowCount() and len(objectChildren) == len(successors):
             return
 
-        onode.populateNode(self._tree_, itemNode,
+        childNodes = itemNode.populate(self._tree_,
+                                        # storeData = True,
                            introspect=self.showIntrospection,
                            predicate=self._predicate_,
                            includePrivate=self.showPrivateMembers,
@@ -277,6 +283,20 @@ class ObjectModel(QtGui.QStandardItemModel):
                            includeTypeMembers=not self.showValuesOnly,
                            choices={},
                            )
+        # print(f"\t=> {len(childNodes)} child nodes")
+
+        # FIXME: 2026-09-24 11:58:27
+        # for childNode in childNodes:
+        #     if (
+        #         isinstance(childNode.data, Node)
+        #         and isinstance(self.topObjectItem.data(ObjectDataRole), Tree)
+        #         and
+        #         ):
+        #         # NOTE: This Node might actually belong to a tree
+        #         # If the tree is the data associated with the topObjectItem
+        #         # then check if this childNode is contained by it and report
+        #         # its successors
+        #         subChildren = childNode.data.successors
 
         # pre-allocates rows, but would this be compatible with
         # canFetchMore/fetchMore (if I decide to implement it)?
@@ -315,12 +335,20 @@ class ObjectModel(QtGui.QStandardItemModel):
         return self.indexFromItem(self.topObjectItem)
 
     @property
-    def rootItem(self):
+    def rootItem(self) -> QtGui.QStandardItem:
         return self.invisibleRootItem()
 
     @property
-    def rootIndex(self):
+    def rootIndex(self) -> QtCore.QModelIndex:
         return self.indexFromItem(self.rootItem)
+
+    @property
+    def rootNode(self) -> ObjectNode | None:
+        return self._rootNode_
+
+    @property
+    def tree(self) -> Tree:
+        return self._tree_
 
     @property
     def inlineTables(self) -> bool:
@@ -710,187 +738,14 @@ class ObjectModel(QtGui.QStandardItemModel):
         for ki, item in enumerate(rowItems):
             rootItem.setChild(0, ki, item)
 
+        self._topObjectItem_ = rowItems[0]
 
-        # needs calling again because beginResetModel() was called
+        # line below needed because beginResetModel() was called
         self.setHorizontalHeaderLabels(["Object", "Type", "Information or Value"])
-
-        # pData, objDict = self._parseObject_(obj, self._showPrivate_, {})
 
         self.setRowCount(1) #objDict["nChildren"])
 
-        # self._privateData_ = pData
-
-        # self._topObjectItem_ = self._buildTree_(self._privateData_, objDict, self._rootTitle_)
-
-        # print(f"\n\t-> call self.endResetModel()")
         self.endResetModel()
-
-    # def _buildTree_(self: typing.Self, obj: object, objDict: dict, name: str = "") -> QtGui.QStandardItem:
-    #
-    #     # 1. get the top object symbol, type and some information, as items to
-    #     # go as the first (and only) top-level row in the model
-    #
-    #     # print(f"{self.__class__.__name__}._buildTree_(obj: {type(obj).__name__})")
-    #     rootItem = self.invisibleRootItem()
-    #     rootItem.setRowCount(1)
-    #     item = self._buildBranch_(self._privateData_, objDict, name, str, rootItem, 0,
-    #                               debug=False)
-    #     if self.readOnly:
-    #         item.setData(self.readOnly, ReadOnlyRole)
-    #
-    #     return item
-
-
-    # @Slot(int, tuple, QtGui.QStandardItem)
-    # def _slot_branchLoaded(self, row: int, items: tuple[QtGui.QStandardItem],
-    #                        parentItem: QtGui.QStandardItem, ):
-    #     parentItem.insertRow(row, items)
-
-    # @singledispatchmethod
-    # def _buildBranch_(self: typing.Self, obj: object, objDict: dict,
-    #                   objKey: object, objKeyType: type,
-    #                   parentItem: QtGui.QStandardItem,
-    #                   row: int, debug: bool=False) -> QtGui.QStandardItem:
-    #     # NOTE: 2026-09-12 11:06:13
-    #     # parentItem row count MUST set before calling this method
-    #     # NOTE: this might be done in _makeObjectRow_
-    #
-    #     if debug:
-    #         print(f"_buildBranch_{type(obj)}(obj={obj}, objDict={objDict}, objKey={objKey}, objKeyType={objKeyType}, parentItem={parentItem.data(QtCore.Qt.DisplayRole)}, row={row})")
-    #
-    #     visited = ()
-    #     objId = objDict["objId"]
-    #     # print(f"{self.__class__.__name__}._buildBranch_{type(obj)} with ID: {objId}")
-    #
-    #     if self._is_memoized_(obj, objId, objDict):
-    #         # print(f"\n\tfound visited: {visited}")
-    #         visited = self._visited_[objId]
-    #
-    #     if debug:
-    #         print(f"\tvisited: {visited}")
-    #
-    #     rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType, visited)
-    #
-    #     objItem = rowItems[0] # objItem row count already set by _makeObjectRow_
-    #
-    #     for ki, item in enumerate(rowItems):
-    #         parentItem.setChild(row, ki, item)
-    #
-    #     if len(visited):
-    #         objItem.setRowCount(0)
-    #         return objItem
-    #
-    #     if debug:
-    #         print(f"\tparentItem.hasChildren: {parentItem.hasChildren()}")
-    #
-    #     if (
-    #         self._can_memoize_(obj)
-    #         and objId not in self._visited_
-    #         ):
-    #         itemPath = f"{self._rootTitle_}{self.getPathForLeaf(objItem)}"
-    #         self._memoize_(obj, itemPath, objDict)
-    #
-    #     return objItem
-
-    # @_buildBranch_.register(dict)
-    # @_buildBranch_.register(UserDict)
-    # @_buildBranch_.register(types.MappingProxyType)
-    # @_buildBranch_.register(OrderedDict)
-    # def __buildBranch_(self: typing.Self, obj: dict |types.MappingProxyType | UserDict | OrderedDict,
-    #       objDict: dict, objKey: object, objKeyType: type,
-    #       parentItem: QtGui.QStandardItem, row: int, debug: bool=False) -> QtGui.QStandardItem:
-    #     # NOTE: 2026-09-12 11:29:44 WARNING
-    #     # ALL objects represented as dict in self._privateData_ WILL be passed here
-    #     #
-    #
-    #     if debug:
-    #         print(f"_buildBranch_{type(obj)}(obj={obj}, objDict={objDict}, objKey={objKey}, objKeyType={objKeyType}, parentItem={parentItem.data(QtCore.Qt.DisplayRole)}, row={row})")
-    #
-    #     visited = ()
-    #     objId = objDict["objId"]
-    #
-    #     # print(f"{self.__class__.__name__}._buildBranch_{type(obj)} with ID: {objId}")
-    #
-    #     if self._is_memoized_(obj, objId, objDict):
-    #         # print(f"\n\tfound visited: {visited}")
-    #         visited = self._visited_[objId]
-    #
-    #     rowItems = self._makeObjectRow_(obj, objDict, objKey, objKeyType, visited)
-    #
-    #     for ki, item in enumerate(rowItems):
-    #         parentItem.setChild(row, ki, item)
-    #
-    #     objItem = rowItems[0]
-    #
-    #     if len(visited):
-    #         # NOTE: 2026-09-10 14:46:36
-    #         # if this was visited already then return it;
-    #         # else, proceed with populating its own subtree (see NOTE: 2026-09-10 14:47:10)
-    #         # self._sig_branchLoaded.emit(row, rowItems, parentItem)
-    #         objItem.setRowCount(0)
-    #         return objItem
-    #
-    #     # showInline = (objDict["objDataAsChild"] and not self._inlineTables_) or not objDict["objDataAsChild"]
-    #
-    #     if not objDict["objDataAsChild"]:
-    #         # return objItem
-    #         # NOTE: 2026-09-10 14:47:10
-    #         # populate the object's subtree
-    #
-    #         # if objKey == "adcNames":
-    #         #     print(f"adcNames {len(obj)}")
-    #
-    #         for k, (key, value) in enumerate(obj.items()):
-    #             if isinstance(key, str):
-    #                 keyName = key
-    #
-    #             else:
-    #                 keyName = f"{key}"
-    #
-    #             # TODO/FIXME: 2026-03-28 17:13:47
-    #             # try and read the object's options for this member ("value")
-    #             # and create choices accordingly
-    #             pValue, valDict = self._parseObject_(value, self._showPrivate_, {})
-    #
-    #             # if debug:
-    #             #     print(f"\t{k} -> {key} -> {value} -> {pValue}")
-    #
-    #             if (objDict.get("readOnlyChildren", False) is True) or self.readOnly:
-    #                 valDict["readOnly"] = True
-    #
-    #             # print(f"{self.__class__.__name__}._buildBranch_ for {key} in {objItem.data(QtCore.Qt.DisplayRole)}")
-    #
-    #             self._buildBranch_(pValue, valDict, keyName, type(key), objItem, k,
-    #                                debug=False)
-    #
-    #             # if objKey == "adcNames":
-    #             #     self._buildBranch_(pValue, valDict, keyName, type(key), objItem, k, debug=True)
-    #             # else:
-    #             #     self._buildBranch_(pValue, valDict, keyName, type(key), objItem, k)
-    #
-    #
-    #     if (
-    #         self._can_memoize_(obj)
-    #         and objId not in self._visited_
-    #         ):
-    #         itemPath = f"{self._rootTitle_}{self.getPathForLeaf(objItem)}"
-    #         self._memoize_(obj, itemPath, objDict)
-    #
-    #     # # NOTE: 2026-09-12 14:14:02
-    #     # # now add this object to its parent, as child
-    #     # if isinstance(parentItem, QtGui.QStandardItem):
-    #     #     # parentItem.setRowCount(len(obj))
-    #     #     # NOTE: 2026-09-10 14:45:25
-    #     #     # FIRST populate the row of items (three columns),
-    #     #     # THEN memoize if needed (and possible)
-    #     #     for ki, item in enumerate(rowItems):
-    #     #         parentItem.setChild(row, ki, item)
-    #
-    #
-    #
-    #     # self._sig_branchLoaded.emit(row, rowItems, parentItem)
-    #
-    #     return objItem
 
     @property
     def showCallables(self) -> bool:

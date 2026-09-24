@@ -744,7 +744,7 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                 # there is exactly one of these and it is the visible "root" of the
                 # tree; all of objects "internals" are child rows of it.
                 # objItem = root.child(0,0)
-                # self._setupChildDataItem_(objItem)
+                self._setupChildDataItem_(objItem)
 
                 # if self._initialExpandDepth_ == 0 and self._currentExpansionDepth_ == 0:
                 #     self.collapseAll()

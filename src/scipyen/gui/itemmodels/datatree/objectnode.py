@@ -101,6 +101,7 @@ from core.scipyendataclasses import (isDataclass, getField, getFieldOrProperty)
 from core.datatypes import PODS
 
 from ephys import ephys_protocol
+from ephys import ephys_pathways
 
 # print(f"has brain globe: {bgbridge.hasBrainGlobe}")
 
@@ -303,6 +304,111 @@ class ObjectNode(Node):
     def intialized(self) -> bool:
         return isinstance(self._objectInfo_, ObjectInfo)
 
+    def populate(self, tree: Tree,
+                 # storeData: bool = True,
+                 introspect: bool = False,
+                 predicate = None,
+                 includePrivate: bool = False,
+                 includeCallables : bool = False,
+                 includeTypeMembers: bool = False,
+                 choices: dict | None = None,
+                 readOnly: bool = False,
+                 readOnlyChildren: bool = False) -> list[typing.Self]:
+
+        def getitem(obj, item, default=None):
+            try:
+                return obj.__getitem__(item)
+            except:  # noqa: E722
+                return default
+
+        accessor = None
+
+        if self.identifier not in tree:
+            raise ValueError(f"This node ('{self.tag}' with identifier '{self.identifier}') does not belong to the tree {tree.identifier}")
+
+        if self.is_root(tree.identifier) and self.data is None:
+            scipywarn(f"This node ('{self.tag}' with identifier '{self.identifier}') does not associate any data; please set data first")
+            return []
+
+        if (
+            len(self.objectInfo.children) == 0
+            # or not node.objectInfo.indirect
+            or self.objectInfo.objDataAsChild
+            or len(self.objectInfo.memberAccess) == 0
+            or len(self.successors(tree.identifier)) > 0
+            ):
+            # TODO: 2026-09-21 14:16:58
+            # check if ALL children in objectInfo hve a corresponding successor
+            # node in this node; else, add missing nodes up to max number of children
+            # we want to "populate"
+            return []
+
+        if (
+            self.objectInfo.memberAccess == (".", )
+            and self.objectInfo.accessType == "attribute"
+            ):
+            accessor = getattr
+
+        elif(
+            self.objectInfo.memberAccess == ("[","]")
+            and self.objectInfo.accessType == "index"
+            ):
+            accessor = getitem
+
+        else:
+            scipywarn(f"Unclear access method for children of data for this node ('{self.tag}' with '{self.identifier}')")
+            return []
+
+        if accessor is None:
+            return []
+
+        result = []
+
+        # print(f"{self.__class__.__name__}.populate()")
+        for child in self.objectInfo.children:
+            # print(f"inspecting '{child}' of node '{node.tag}'")
+            keyType = type(child)
+            if isinstance(child, ephys_pathways.SynapticPathway):
+                key = child.name
+            else:
+                key = f"{child}"
+
+            if isinstance(self.data, Tree):
+                nodes = list(self.data.filter_nodes(lambda n: n.tag == key))  # noqa: B023
+                if nodes == 0:
+                    continue
+                subNode = nodes[0]
+                # if subNode.identifier in self._visited_:
+                #     continue
+                obj = self.data[subNode.identifier] # a Node
+
+            else:
+                obj = accessor(self.data, child, None)
+
+
+            # print(f"\tgot child '{key}' object {type(obj).__name__}")
+            # visited = list(tree.filter_nodes(lambda n: n.data is obj))
+            oInfo = parseObject(obj, key,
+                                introspect=introspect,
+                                predicate=predicate, includePrivate=includePrivate,
+                                includeCallables=includeCallables,
+                                includeTypeMembers=includeTypeMembers,
+                                choices=choices,
+                                readOnly=readOnly,
+                                readOnlyChildren=readOnlyChildren,
+                                objKey = key,
+                                objKeyType = keyType,
+                                )
+
+            childNode = ObjectNode(tag=oInfo.name, data=obj, objInfo=oInfo)
+
+            tree.add_node(childNode, parent=self)
+
+            result.append(childNode)
+            # self._visited_.add(childNode.identifier)
+        return result
+
+
 
 # @timefunc
 def findObjectNodes(tree: Tree, **kwargs):
@@ -328,7 +434,7 @@ def populateNode(tree: Tree, node: ObjectNode,
                 includeTypeMembers: bool = False,
                 choices: dict | None = None,
                 readOnly: bool = False,
-                readOnlyChildren: bool = False):
+                readOnlyChildren: bool = False) -> list[ObjectNode]:
     def getitem(obj, item, default=None):
         try:
             return obj.__getitem__(item)
@@ -344,7 +450,7 @@ def populateNode(tree: Tree, node: ObjectNode,
 
     if node.is_root(tree.identifier) and node.data is None:
         scipywarn(f"The root node ({node.tag} with identifier {node.identifier}) does not associate any data; please set data first")
-        return
+        return []
 
     # elif node.data is None:
     #     nodeAccessPath = []
@@ -365,7 +471,7 @@ def populateNode(tree: Tree, node: ObjectNode,
             # check if ALL children in objectInfo hve a corresponding successor
             # node in this node; else, add missing nodes up to max number of children
             # we want to "populate"
-            return
+            return []
 
         if (
             node.objectInfo.memberAccess == (".", )
@@ -381,18 +487,37 @@ def populateNode(tree: Tree, node: ObjectNode,
 
         else:
             scipywarn(f"Unclear access method for children of data for node {node.tag} with {node.identifier}")
-            return
+            return []
 
         if accessor is None:
-            return
+            return []
+
+        result = []
 
         for child in node.objectInfo.children:
             # print(f"inspecting '{child}' of node '{node.tag}'")
             keyType = type(child)
-            key = f"{child}"
-            obj = accessor(node.data, child, None)
+            if isinstance(child, ephys_pathways.SynapticPathway):
+                key = child.name
+            else:
+                key = f"{child}"
+
+            if isinstance(node.data, Tree):
+                nodes = list(node.data.filter_nodes(lambda n: n.tag == key))  # noqa: B023
+                if nodes == 0:
+                    continue
+                subNode = nodes[0]
+                # if subNode.identifier in self._visited_:
+                #     continue
+                obj = node.data[subNode.identifier] # a Node
+
+            else:
+                obj = accessor(node.data, child, None)
+
+
+            print(f"\tgot child '{key}' object {type(obj).__name__}")
             # visited = list(tree.filter_nodes(lambda n: n.data is obj))
-            oInfo = parseObject(obj, child, introspect=introspect,
+            oInfo = parseObject(obj, key, introspect=introspect,
                                 predicate=predicate, includePrivate=includePrivate,
                                 includeCallables=includeCallables,
                                 includeTypeMembers=includeTypeMembers,
@@ -409,6 +534,10 @@ def populateNode(tree: Tree, node: ObjectNode,
             childNode = ObjectNode(tag=oInfo.name, data=obj, objInfo=oInfo)
 
             tree.add_node(childNode, parent=node)
+
+            result.append(childNode)
+            # self._visited_.add(childNode.identifier)
+        return result
 
 def populateNode2(tree: Tree, node: ObjectNode,
                 introspect: bool = False,
@@ -586,8 +715,8 @@ def parseObject(obj: object,
     objDataAsChild: bool = False
     objType = type(obj)
     objId = id(obj)
-    readOnly = False
-    readOnlyChildren = False
+    # readOnly = False
+    # readOnlyChildren = False
     children = ()
 
     choices = check_obj_choices(objType, choices)
@@ -599,8 +728,8 @@ def parseObject(obj: object,
                   includeTypeMembers = includeTypeMembers)
         indirect = True
 
-        if includePrivate:
-            readOnlyChildren = True
+        # if includePrivate:
+        #     readOnlyChildren = True
 
         n = len(children)
         info = f"{n} {strutils.pluralize('member', n)}"
@@ -608,7 +737,7 @@ def parseObject(obj: object,
         objDataAsChild = False
         memberAccess = (".",) # access to obj members!
         accessType = "attribute"
-        readOnly = False
+        # readOnly = False
 
     elif (
         HAVE_METAARRAY
@@ -631,7 +760,7 @@ def parseObject(obj: object,
         # pData = obj
         indirect=False,
         s = " × ".join(list(map(lambda x: f"{x}", obj.points.shape))) # noqa
-        info = f"{obj.points.size} points ({s})"
+        info = f"{obj.points.size} {strutils.pluralize('point', n)} ({s})"
         tip = type(obj).__name__
         objDataAsChild = False
         memberAccess = ()
@@ -639,6 +768,61 @@ def parseObject(obj: object,
         readOnly = True
         readOnlyChildren = True
         children = ()
+
+    elif isinstance(obj, Tree) and not introspect:
+        indirect = True
+        tip = type(obj).__name__
+        n = len(obj)
+        d = obj.depth()
+        info = f"{n} {strutils.pluralize('node', n)} and depth {d}"
+        objDataAsChild = False
+        memberAccess = ("[","]")
+        accessType = "index"
+        children = tuple(obj[nid].tag for nid in obj.nodes)
+        readOnly = True
+        readOnlyChildren = True
+
+    elif isinstance(obj, Node) and not introspect:
+        # NOTE: cannot determine successors without a tree that contains
+        # this node; even if _initial_tree_id was present, I'd still need
+        # the actual tree object to retrieve the successor node tags for display
+        # purposes
+        #
+        # Mind you, on its own, a Node is not that useful...
+        #
+        indirect = False
+        tip = type(obj).__name__
+        objDataAsChild = False
+        if obj._initial_tree_id is not None:
+            nSubNodes = len(obj.successors(obj._initial_tree_id))
+            contents = f"{nSubNodes} {strutils.pluralize('node', nSubNodes)}"
+        else:
+            contents = " unknown content"
+
+        tag = f" with tag: '{obj.tag}' " if isinstance(obj.tag, str) and len(obj.tag.strip()) else " "
+
+        if obj.is_root():
+            if obj.is_leaf():
+                nType = " (Root, leaf) "
+            else:
+                nType = " (Root) "
+
+        elif obj.is_leaf():
+            nType = " (Leaf) "
+
+        else:
+            nType = " "
+
+        payload = "" if obj.data is None else f" with data payload: {type(obj.data)} and {contents}"
+
+        info = f"{tip}{tag}{nType}{payload}"
+        readOnly = True
+        readOnlyChildren = True
+        children = ()
+        memberAccess = ()
+        accessType = None
+        readOnly = True
+        readOnlyChildren = True
 
     elif introspect and introspectable(obj):
         # print(f"{self.__class__.__name__}.parseObject({type(obj)}) introspectable")
@@ -655,8 +839,9 @@ def parseObject(obj: object,
         info = f"{n} {strutils.pluralize('member', n)}"
         memberAccess = (".", )
         accessType = "attribute"
-        readOnly = True
-        readOnlyChildren = True
+        if isinstance(obj, (Tree, Node)):
+            readOnly = True
+            readOnlyChildren = True
 
     else:
         # pData = obj
@@ -666,11 +851,6 @@ def parseObject(obj: object,
         objDataAsChild = False
         memberAccess = ()
         accessType = None
-        # nChildren = 0
-        # nVisibleChildren = 0
-
-    # if len(objectParentInfo.objectAccessPath):
-    #     if len(objectParentInfo)
 
     infoDict = {
         "name": objName,
@@ -1139,6 +1319,25 @@ def _parseObject_(obj: taxonbridge.Taxon,  # noqa: F811
         }
 
     return ObjectInfo(**infoDict)
+
+# @parseObject.register(ephys_pathways.PathwayTrials)
+# def _parseObject_(obj: ephys_pathways.PathwayTrials,
+#                   objName: str, /,
+#                   introspect: bool = False,
+#                   predicate = None,
+#                   includePrivate: bool = False,
+#                   includeCallables : bool = False,
+#                   includeTypeMembers: bool = False,
+#                   choices: dict | None = None,
+#                   readOnly: bool = False,
+#                   readOnlyChildren: bool = False,
+#                   objKey: str | None = None,
+#                   objKeyType: type | None = None
+#                 ) -> ObjectInfo:
+#     objId = id(obj)
+#     objType = type(obj)
+#     choices = check_obj_choices(objType, choices)
+#     keys = tuple(kobj.keys())
 
 @parseObject.register(dict)
 @parseObject.register(types.MappingProxyType)
