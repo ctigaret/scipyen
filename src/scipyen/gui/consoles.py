@@ -3352,6 +3352,8 @@ class ScipyenConsoleWidget(ConsoleWidget):
         #     self.kernel_manager.kernel.eventloop = None
         self.ipkernel = self.kernel_manager.kernel
 
+        self._cursorOutsideBuffer_: bool = False
+
         # NOTE: 2025-06-23 23:18:10
         # see NOTE: 2025-06-23 23:16:11 below
         # self.ipkernel.gui = "qt"
@@ -3539,79 +3541,73 @@ class ScipyenConsoleWidget(ConsoleWidget):
 
         evt.accept()
 
-    # def eventFilter(self, obj, event) -> bool:
-    #     # # NOTE: 2026-08-17 22:06:08
-    #     # # disallow typing in text above prompt line after clicking in the window
-    #     # # it is very annyoing!
-    #     # # however, allow selecting text from above the input buffer, so I make
-    #     # # this contingent on the _control not having a non-empty text selection
-    #     # #
-    #     # # this BUG seems to have crept in qtconsole using more recent Qt6 (v.11?)
-    #     # # regardless of the python binding (it happens with either PyQt or PySide)
-    #     # #
-    #
-    #     # if (__has_PyQt6__ or __has_PySide6__):
-    #     #     if (
-    #     #         isinstance(event, QtGui.QMouseEvent)
-    #     #         and event.type() == QtCore.QEvent.MouseButtonRelease
-    #     #         ):
-    #     #
-    #     #         cursor = self._control.textCursor()
-    #     #         endpos = cursor.selectionEnd()
-    #     #         startpos = cursor.selectionStart()
-    #     #         if any(v < self._prompt_pos for v in (startpos, endpos)):
-    #     #             self._control.setReadOnly(True)
-    #     #             if startpos == endpos and not self._in_buffer(endpos):
-    #     #                 self._control.ensureCursorVisible()
-    #     #
-    #     #         else:
-    #     #             self._control.setReadOnly(False)
-    #     #
-    #     #     elif (
-    #     #         event.type() == QtCore.QEvent.KeyPress
-    #     #         and QtWidgets.QApplication.keyboardModifiers() == QtCore.Qt.NoModifier
-    #     #         ):
-    #     #             cursor = self._control.textCursor()
-    #     #             endpos = cursor.selectionEnd()
-    #     #             startpos = cursor.selectionStart()
-    #     #             if any(v < self._prompt_pos for v in (startpos, endpos)):
-    #     #                 self._keep_cursor_in_buffer()
-    #
-    #
-    #
-    #     if (
-    #         (__has_PyQt6__ or __has_PySide6__)
-    #         and (
-    #                 (
-    #                     isinstance(event, QtGui.QMouseEvent)
-    #                     and event.type() == QtCore.QEvent.MouseButtonRelease
-    #                 )
-    #
-    #                 or event.type() == QtCore.QEvent.KeyPress
-    #             )
-    #         ):
-    #         # promptCursor = self._get_prompt_cursor()
-    #         cursor = self._control.textCursor()
-    #         endpos = cursor.selectionEnd()
-    #         startpos = cursor.selectionStart()
-    #
-    #         if any(v < self._prompt_pos for v in (startpos, endpos)):
-    #             self._control.setReadOnly(True)
-    #             if startpos == endpos and not self._in_buffer(endpos):
-    #                 if (
-    #                     event.type() == QtCore.QEvent.KeyPress
-    #                     and QtWidgets.QApplication.keyboardModifiers() == QtCore.Qt.NoModifier
-    #                     ):
-    #                     self._keep_cursor_in_buffer()
-    #                 else:
-    #                     self._control.ensureCursorVisible()
-    #
-    #
-    #         else:
-    #             self._control.setReadOnly(False)
-    #
-    #     return super().eventFilter(obj, event)
-    #
+    def eventFilter(self, obj, event) -> bool:
+        # # NOTE: 2026-08-17 22:06:08
+        # # disallow typing in text above prompt line after clicking in the window
+        # # it is very annyoing!
+        # # however, allow selecting text from above the input buffer, so I make
+        # # this contingent on the _control not having a non-empty text selection
+        # #
+        # # this BUG seems to have crept in qtconsole using more recent Qt6 (v.11?)
+        # # regardless of the python binding (it happens with either PyQt or PySide)
+        # #
+        # if (
+        #     (__has_PyQt6__ or __has_PySide6__)
+        #     and isinstance(event, QtGui.QMouseEvent)
+        #     and event.type() == QtCore.QEvent.MouseButtonRelease
+        #     ):
+        #     cursor = self._control.textCursor()
+        #     endpos = cursor.selectionEnd()
+        #     startpos = cursor.selectionStart()
+        #
+        #     if any(v < self._prompt_pos for v in (startpos, endpos)):
+        #         self._control.setReadOnly(True)
+        #         if startpos == endpos and not self._in_buffer(endpos):
+        #             self._control.ensureCursorVisible()
+        #
+        #     else:
+        #         self._control.setReadOnly(False)
+
+        if (__has_PyQt6__ or __has_PySide6__):
+            if (
+                isinstance(event, QtGui.QMouseEvent)
+                and event.type() == QtCore.QEvent.MouseButtonRelease
+                ):
+
+                cursor = self._control.textCursor()
+                endpos = cursor.selectionEnd()
+                startpos = cursor.selectionStart()
+
+                if any(v < self._prompt_pos for v in (startpos, endpos)):
+                    self._control.setReadOnly(True)
+                    if startpos == endpos and not self._in_buffer(endpos):
+                        self._control.ensureCursorVisible()
+                        self._cursorOutsideBuffer_ = True
+
+                else:
+                    self._control.setReadOnly(False)
+                    self._cursorOutsideBuffer_ = False
+
+                return True
+
+            elif event.type() == QtCore.QEvent.KeyPress:
+                cursor = self._control.textCursor()
+                endpos = cursor.selectionEnd()
+                startpos = cursor.selectionStart()
+                key = event.key()
+                # print(f"{self.__class__.__name__}.eventFilter")
+                # print(f"\n\t_control_key_down: {self._control_key_down(event.modifiers())}")
+                # print(f"\n\tkey in _ctrl_down_remap: {key in self._ctrl_down_remap}")
+                # print(f"\n\tkey -> {key}")
+                if not (self._control_key_down(event.modifiers())
+                        or key in self._ctrl_down_remap):
+                    if self._cursorOutsideBuffer_ or not all(self._in_buffer(pos) for pos in (startpos, endpos)):
+                        self._keep_cursor_in_buffer()
+                        self._cursorOutsideBuffer_ = False
+                    self._control.setReadOnly(False)
+
+        return super().eventFilter(obj, event)
+
 
     @safewrapper
     def __write_text_in_console_buffer__(self, text):

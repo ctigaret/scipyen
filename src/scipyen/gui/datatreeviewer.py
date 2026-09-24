@@ -103,6 +103,7 @@ from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
 from gui.pictgui import WorkerThread
 from gui.widgets.datatreeview import DataTreeView
+from gui.widgets.objectview import ObjectView
 from gui.itemmodels.roles import *
 
 
@@ -205,6 +206,7 @@ A lot of things copied from there, EXCEPT that it now uses
         *args, **kwargs ⇒ passed on to ScipyenViewer superclass.
 
         """
+        self._useObjectView_: bool = kwargs.pop("useObjectView", True)
         self._showMethods_:bool=kwargs.get("showMethods", False)
         self._showPrivateMembers_:bool = kwargs.get("showPrivate", False)
         self._showIntrospection_: bool = kwargs.get("introspect", False)
@@ -272,10 +274,16 @@ A lot of things copied from there, EXCEPT that it now uses
         self.autoResizeColumnsAction.triggered.connect(self._slot_setAutoResizeColumns)
         self.settingsMenu.addAction(self.autoResizeColumnsAction)
         # self.menuBar.addAction(self.settingsAction)
-        self.treeView = DataTreeView(parent = self,
-                                     supported_data_types = tuple(self.viewer_for_types),
-                                     initialExpandDepth = self._initialExpandDepth_,
+        if self._useObjectView_:
+            self.treeView = ObjectView(parent = self,
+                                     # supported_data_types = tuple(self.viewer_for_types),
+                                     # initialExpandDepth = self._initialExpandDepth_,
                                      autoResizeColumns = self._autoResizeColumns_)
+        else:
+            self.treeView = DataTreeView(parent = self,
+                                        supported_data_types = tuple(self.viewer_for_types),
+                                        initialExpandDepth = self._initialExpandDepth_,
+                                        autoResizeColumns = self._autoResizeColumns_)
 
         self.model = self.treeView.sourceModel
         self.model.sig_modelDataChanged.connect(self.sig_modelDataChanged)

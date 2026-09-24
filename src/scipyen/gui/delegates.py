@@ -61,6 +61,8 @@ from core import scipyendataclasses as sdc
 # from core import scipyen_quantities as scq
 from gui import guiutils
 from gui.itemmodels.roles import *
+from gui.itemmodels.datatree.objectnode import ObjectInfo, ObjectNode
+from gui.itemmodels.datatree import objectnode as onode
 from gui.widgets import small_widgets as smw
 from gui.widgets import neo_widgets as neow
 from gui.widgets import inlinefiledirchooser as ifdc
@@ -425,6 +427,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         super().__init__(parent=parent)
         # self._model_ = None
         self._useObjectDataRole_: bool = False
+        self._dataInObjectNode_: bool = False
+        self._currentObjectNode_: ObjectNode | None = None
+
         self._currentModelIndex_: typing.Optional[QtCore.QModelIndex] = None
 
         self._enforceFloat_:bool = enforceFloat
@@ -1215,6 +1220,13 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         if data is not None:
             self._useObjectDataRole_ = True
+            if isinstance(data, ObjectNode):
+                self._currentObjectNode_ = data
+                data = OjectNode.data
+                self._dataInObjectNode_ = True
+            else:
+                self._dataInObjectNode_ = False
+                self._currentObjectNode_ = None
 
         else:
             data = index.data(QtCore.Qt.EditRole)
@@ -1259,6 +1271,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 if index.column() in immutableColumns :
                     # print(f"\t-> immutable column")
                     return
+
                 elif index.row() in immutableRows:
                     # print(f"\t-> immutable row")
                     return

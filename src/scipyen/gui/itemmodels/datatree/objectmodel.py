@@ -274,15 +274,14 @@ class ObjectModel(QtGui.QStandardItemModel):
         if len(objectChildren) == item.rowCount() and len(objectChildren) == len(successors):
             return
 
-        childNodes = itemNode.populate(self._tree_,
-                                        # storeData = True,
-                           introspect=self.showIntrospection,
-                           predicate=self._predicate_,
-                           includePrivate=self.showPrivateMembers,
-                           includeCallables=self.showCallables,
-                           includeTypeMembers=not self.showValuesOnly,
-                           choices={},
-                           )
+        itemNode.populate(self._tree_,
+                          introspect=self.showIntrospection,
+                          predicate=self._predicate_,
+                          includePrivate=self.showPrivateMembers,
+                          includeCallables=self.showCallables,
+                          includeTypeMembers=not self.showValuesOnly,
+                          choices={},
+                        )
         # print(f"\t=> {len(childNodes)} child nodes")
 
         # FIXME: 2026-09-24 11:58:27
@@ -396,11 +395,8 @@ class ObjectModel(QtGui.QStandardItemModel):
         #  • one must gain access to the rootNode up the hierarchy and build up
         # the access expression «on the fly»
 
-        # objectItem.setData(qVariant(obj), objectNode)
-        # objectItem.setData(qVariant(objectNode.objectInfo), ObjectDataRole) ## keep this slim
-        # objectItem.setData(qVariant(objectNode.data), ObjectDataRole) ## this expects all Node instances to have a payload!
         objectItem.setData(qVariant(objectNode), ObjectDataRole) ## how about this !?
-
+        # objectItem.setData(qVariant(objectNode.data), QtCore.Qt.EditRole)
         objectItem.setData(objectNode.objectInfo.name, QtCore.Qt.DisplayRole)
         objectItem.setData(objectNode.objectInfo.objTip, QtCore.Qt.ToolTipRole)
 
@@ -812,35 +808,149 @@ class ObjectModel(QtGui.QStandardItemModel):
         return [item.child(k, 0) for k in range(item.rowCount())]
         # return list(map(lambda k: item.child(k, 0), range(item.rowCount())))
 
-    def getDataObjectForLeaf(self: typing.Self,
-                             leaf: QtCore.QModelIndex | QtGui.QStandardItem,
-                             byPath: bool = True,
-                             ) -> object:
 
+    def getDataObjectForLeaf(self, leaf: QtCore.QModelIndex | QtGui.QStandardItem,
+                             byPath: bool = False) -> object:
         if byPath:
             path = self._getPathForItemOrIndex_(leaf)
-            # print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> path = {path}")
-            if len(path):
-                if path[-1] == self._topObjectItem_.data(QtCore.Qt.DisplayRole):
-                    path[-1] = "self._modelData_"
+            path[-1] = "self._modelData_"
+            accessExpr = "".join(list(reversed(path)))
+            return eval(accessExpr)
 
-                accessExpr = "".join(list(reversed(path)))
-                # print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> accessExpr = {accessExpr}")
-                return eval(accessExpr)
-
+        if isinstance(leaf, QtCore.QModelIndex):
+            item = self.itemFromIndex(leaf)
         else:
-            return leaf.data(ObjectDataRole)
+            item = leaf
+
+        node = item.data(ObjectDataRole)
+        return node.data
+
+    # def data(self, index = QtCore.QModelIndex, role: QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole):
+    #     if self._modelData_ is None:
+    #         return qVariant()
+    #
+    #     if role in (QtCore.Qt.EditRole, ObjectDataRole):
+    #         item = self.itemFromIndex(index)
+    #
+    #         if item.column() == 2 and role == ObjectDataRole:
+    #             # make sure we work on the sibling in column 0
+    #             parentItem = item.parent()
+    #             if not parentItem:
+    #                 return qVariant()
+    #
+    #             item = parentItem.child(item.row(), 0)
+    #
+    #         if role == QtCore.Qt.EditRole:
+    #             return item.data(role)
+    #
+    #         node = item.data(ObjectDataRole)
+    #
+    #         return qVariant(node.data)
+    #
+    #     return super().data(index, role)
+
+    def setData(self: typing.Self, modelIndex: QtCore.QModelIndex,
+                value: object, role = QtCore.Qt.EditRole) -> bool:
+        if self._modelData_ is None:
+            return False
+
+        item = self.itemFromIndex(modelIndex)
+
+        if item.column() == 2 and role == ObjectDataRole:
+            # make sure we work on the sibling in column 0
+            parentItem = item.parent()
+            if not parentItem:
+                return False
+
+            item = parentItem.child(item.row(), 0)
+
+        node = item.data(ObjectDataRole)
+
+        if item.data(ReadOnlyRole) is True or node.objectInfo.readOnly:
+            return
+
+        path = self._getPathForItemOrIndex_(item)
+        # I think this should always be so
+        path[-1] = "self._modelData_"
+
+        # if path[-1] == self.topObjectItem.data(QtCore.Qt.DisplayRole):
+        #     # I think this should always be so
+        #     path[-1] = "self._modelData_"
+
+        accexpr = "".join(reversed(path))
+        setexpr = accexpr + " = value"
+        OK = False
+        try:
+            # print(f"{self.__class__.__name__}.setData: setexpr = {setexpr}")
+            exec(setexpr) # noqa
+            newVal = eval(accexpr)
+            OK = True
+            node.data = newVal
+            self.dataChanged.emit(modelIndex, modelIndex)
+            self.sig_modelDataChanged.emit()
+
+        except: # noqa
+            traceback.print_exc()
+
+        return OK
+
+    # def getDataObjectForLeaf(self: typing.Self,
+    #                          leaf: QtCore.QModelIndex | QtGui.QStandardItem,
+    #                          byPath: bool = True,
+    #                          ) -> object:
+    #
+    #     if byPath:
+    #         path = self._getPathForItemOrIndex_(leaf)
+    #         # print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> path = {path}")
+    #         if len(path):
+    #             if path[-1] == self._topObjectItem_.data(QtCore.Qt.DisplayRole):
+    #                 path[-1] = "self._modelData_"
+    #
+    #             accessExpr = "".join(list(reversed(path)))
+    #             # print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> accessExpr = {accessExpr}")
+    #             return eval(accessExpr)
+    #
+    #     else:
+    #         return leaf.data(ObjectDataRole)
 
     def getPathForLeaf(self: typing.Self,
                        leaf: QtCore.QModelIndex | QtGui.QStandardItem,
                        pathOnly: bool = False,
+                       omitRoot: bool = False
                        ) -> str:
+        r"""Returns the access path to the object behind the model index or item, as a string.
+    Parameters:
+    ===========
+    :leaf: model index or item
+
+    :pathOnly: when ``True``, returns the access path **up to** and *excluding** the object itself. Default is ``False``
+
+    :omitRoot: when ``True``, returns the access path **excluding** the root object
+
+    """
         path = self._getPathForItemOrIndex_(leaf)
         if len(path):
             if pathOnly:
                 return "".join(list(reversed(path[1:])))
+            elif omitRoot:
+                return "".join(list(reversed(path[:-1])))
             return "".join(list(reversed(path)))
         return ""
+
+    def _getParentNode_(self, item: QtGui.QStandardItem) -> ObjectNode | None:
+        node = item.data(ObjectDataRole)
+        #
+        # if not isinstance(node, ObjectNode):
+        #     return
+
+        if node.is_root():
+            return
+
+        parentNid = node.predecessor(self.tree.identifier)
+
+        return self.tree.nodes[parentNid]
+
+
 
     def _getPathForItemOrIndex_(
         self: typing.Self,
@@ -870,58 +980,123 @@ class ObjectModel(QtGui.QStandardItemModel):
             if item is None:
                 return path
 
-        # NOTE: 2026-02-10 12:22:40
+        # ### BEGIN NOTE: 2026-02-10 12:22:40
+        #
         # Code below only makes sense for items in column 0; however, when an
         # item on a higher column is passed, I need access to its sibling in
         # column 0
-
         parentItem = item.parent()
 
         if parentItem:
-            # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: parent of {item.data(QtCore.Qt.DisplayRole)} -> {parentItem.data(QtCore.Qt.DisplayRole)}")
             if item.column() == 0:
                 targetItem = item
+
             else:
                 # get the item's sibling in column 0
                 targetItem = parentItem.child(item.row(), 0)
+        #
+        # ### END   NOTE: 2026-02-10 12:22:40
 
-            parentAccess = parentItem.data(ObjectDataAccessRole)
-            bindingType = targetItem.data(ObjectKeyTypeRole)
-            itemBinding = targetItem.data(ObjectKeyRole)
-            # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: bindingType for {targetItem.data(QtCore.Qt.DisplayRole)} -> {bindingType}")
-            # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: itemBinding -> {itemBinding}")
+        node = targetItem.data(ObjectDataRole)
 
-            if itemBinding:
-                if len(parentAccess) == 1:
-                    # print(f"{self.__class__.__name__}._getPathForItemOrIndex_ -> add access {parentAccess[0]}{itemBinding}")
-                    path.append(f"{parentAccess[0]}{itemBinding}")
+        if node.identifier not in self.tree:
+            return path
 
-                elif len(parentAccess) == 2:
-                    # print(f"{self.__class__.__name__}_getPathForItemOrIndex_: bindingType = {bindingType} for itemBinding {itemBinding}")
-                    if bindingType is weakref.ReferenceType:
-                        path.append(f"{parentAccess[0]}{itemBinding}{parentAccess[1]}")
+        if node==self.rootNode:
+            path.append(node.tag)
+            return path
+
+        parentNode = None
+
+        while node is not self.rootNode:
+            parentNid = node.predecessor(self.tree.identifier)
+            parentNode = self.tree.nodes[parentNid]
+            parentAccess = parentNode.objectInfo.memberAccess
+            bindingType = node.objectInfo.objKeyType
+            objectBindingInParent = node.tag
+
+            if len(parentAccess) == 1:
+                path.append(f"{parentAccess[0]}{objectBindingInParent}")
+
+            elif len(parentAccess) == 2:
+                if bindingType is weakref.ReferenceType:
+                    path.append(f"{parentAccess[0]}{objectBindingInParent}{parentAccess[1]}")
+
+                else:
+                    if bindingType is str:
+                        oB = f"'{objectBindingInParent}'"
                     else:
-                        if bindingType is str:
-                            iB = f"'{itemBinding}'"
-                        else:
-                            try:
-                                iB = bindingType(itemBinding) # hedging my bets...
-                            except: # noqa
-                                iB = itemBinding
+                        try:
+                            oB = bindingType(objectBindingInParent) # hedging my bets...
+                        except: #noqa
+                            oB = objectBindingInParent
 
+                    path.append(f"{parentAccess[0]}{oB}{parentAccess[1]}")
 
-                        path.append(f"{parentAccess[0]}{iB}{parentAccess[1]}")
+            node = parentNode
 
-            path += self._getPathForItemOrIndex_(parentItem)
-
-        elif item == self._topObjectItem_:
-            # NOTE: 2026-02-10 12:26:33
-            # this one is in column 0 by design
-            path += [self._topObjectItem_.data(QtCore.Qt.DisplayRole)]
+        path.append(self.rootNode.tag)
 
         return path
 
-    def setData(self: typing.Self, modelIndex: QtCore.QModelIndex,
+        # rootAccess = self.rootNode.objectInfo.memberAccess
+        # bindingType = self.rootNode.objectInfo.objKeyType
+        #
+        # if len(rootAccess) == 1:
+        #     path.append(f"{self.rootNode.tag}{rootAccess[0]}{objectBindingInParent}")
+        #
+        # elif len(rootAccess) == 2:
+        #     if bindingType is weakref.ReferenceType:
+        #         path.append(f"{self.rootNode.tag}{parentAccess[0]}{objectBindingInParent}{parentAccess[1]}")
+        #     else:
+        #         if bindingType is str:
+        #             oB = f"'{objectBindingInParent}'"
+        #         else:
+        #             try:
+        #                 oB = bindingType(objectBindingInParent) # hedging my bets...
+        #             except: #noqa
+        #                 oB = objectBindingInParent
+        #
+        #         path.append(f"{self.rootNode.tag}{parentAccess[0]}{oB}{parentAccess[1]}")
+
+
+            # parentAccess = parentItem.data(ObjectDataAccessRole)
+            # bindingType = targetItem.data(ObjectKeyTypeRole)
+            # itemBinding = targetItem.data(ObjectKeyRole)
+            # # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: bindingType for {targetItem.data(QtCore.Qt.DisplayRole)} -> {bindingType}")
+            # # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: itemBinding -> {itemBinding}")
+            #
+            # if itemBinding:
+            #     if len(parentAccess) == 1:
+            #         # print(f"{self.__class__.__name__}._getPathForItemOrIndex_ -> add access {parentAccess[0]}{itemBinding}")
+            #         path.append(f"{parentAccess[0]}{itemBinding}")
+            #
+            #     elif len(parentAccess) == 2:
+            #         # print(f"{self.__class__.__name__}_getPathForItemOrIndex_: bindingType = {bindingType} for itemBinding {itemBinding}")
+            #         if bindingType is weakref.ReferenceType:
+            #             path.append(f"{parentAccess[0]}{itemBinding}{parentAccess[1]}")
+            #         else:
+            #             if bindingType is str:
+            #                 iB = f"'{itemBinding}'"
+            #             else:
+            #                 try:
+            #                     iB = bindingType(itemBinding) # hedging my bets...
+            #                 except: # noqa
+            #                     iB = itemBinding
+            #
+            #
+            #             path.append(f"{parentAccess[0]}{iB}{parentAccess[1]}")
+
+            # path += self._getPathForItemOrIndex_(parentItem)
+
+        # elif item == self._topObjectItem_:
+        #     # NOTE: 2026-02-10 12:26:33
+        #     # this one is in column 0 by design
+        #     path += [self._topObjectItem_.data(QtCore.Qt.DisplayRole)]
+
+        # return path
+
+    def setData_old(self: typing.Self, modelIndex: QtCore.QModelIndex,
                 value: object, role = QtCore.Qt.EditRole) -> bool:
         if self._modelData_ is None:
             return False

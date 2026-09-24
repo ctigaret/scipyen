@@ -97,12 +97,12 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self._readOnly_ = False
         self._defaultEditTriggers_ = self.editTriggers()
 
-        initialExpandDepth = kwargs.pop("initialExpandDepth", 1)
+        # initialExpandDepth = kwargs.pop("initialExpandDepth", 1)
         self._showCallables_: bool = kwargs.get("showCallables", False)
         self._showValuesOnly_: bool = kwargs.get("showValuesOnly", True)
 
-        assert isinstance(initialExpandDepth, int) and initialExpandDepth >=0, f"Invalid value for 'initialExpandDepth': expecting an int >=0 ; got {initialExpandDepth} instead"
-        self._initialExpandDepth_: int = initialExpandDepth
+        # assert isinstance(initialExpandDepth, int) and initialExpandDepth >=0, f"Invalid value for 'initialExpandDepth': expecting an int >=0 ; got {initialExpandDepth} instead"
+        # self._initialExpandDepth_: int = initialExpandDepth
 
         autoResizeColumns = kwargs.pop("autoResizeColumns", {0,1})
         assert (isinstance(autoResizeColumns, set) and all((isinstance(v, int) and v in range(3)) for v in autoResizeColumns)), f"Invalid value for 'autoResizeColumns'; expecting a set of ints, each in range(3); instead, got {autoResizeColumns}"
@@ -121,9 +121,6 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                                        valuesOnly = self._showValuesOnly_,
                                        parent=self)
         self.expanded.connect(self.sourceModel._slot_indexExpanded_)
-        # self.sourceModel = DataTreeModel(showMethods = self._showCallables_,
-        #                                valuesOnly = self._showValuesOnly_,
-        #                                parent=self)
 
         self.sourceModel.dataChanged.connect(self.sig_dataChanged)
         self.sourceModel.sig_modelDataChanged.connect(self.sig_modelDataChanged)
@@ -175,14 +172,14 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             if len(allWindows):
                 self._scipyenMainWindow_ = allWindows[0]
 
-    @property
-    def initialExpandDepth(self) -> int:
-        return self._initialExpandDepth_
-
-    @initialExpandDepth.setter
-    def initialExpandDepth(self, val:int):
-        assert isinstance(val, int) and val >= 0, f"Invalid value for 'initialExpandDepth': expecting an int >=0 ; got {val} instead"
-        self._initialExpandDepth_ = val
+    # @property
+    # def initialExpandDepth(self) -> int:
+    #     return self._initialExpandDepth_
+    #
+    # @initialExpandDepth.setter
+    # def initialExpandDepth(self, val:int):
+    #     assert isinstance(val, int) and val >= 0, f"Invalid value for 'initialExpandDepth': expecting an int >=0 ; got {val} instead"
+    #     self._initialExpandDepth_ = val
 
     @property
     def currentExpansionDepth(self) -> int:
@@ -271,22 +268,20 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     @Slot()
     @safewrapper
     def slot_copyPaths(self: typing.Self):
-        return
-        # if self._scipyenMainWindow_ is None:
-        #     return
-        #
-        # item_paths = self.getSelectedPaths()
-        # self._exportPathsToClipboard_(item_paths)
+        if self._scipyenMainWindow_ is None:
+            return
+
+        item_paths = self.getSelectedPaths()
+        self._exportPathsToClipboard_(item_paths)
 
     @Slot()
     def slot_exportToConsole(self: typing.Self):
-        return
-        # if self._scipyenMainWindow_ is None:
-        #     return
-        #
-        # item_paths = self.getSelectedPaths()
-        # self._exportPathsToClipboard_(item_paths)
-        # self._scipyenMainWindow_.console.paste()
+        if self._scipyenMainWindow_ is None:
+            return
+
+        item_paths = self.getSelectedPaths()
+        self._exportPathsToClipboard_(item_paths)
+        self._scipyenMainWindow_.console.paste()
 
     @Slot()
     @safewrapper
@@ -747,9 +742,12 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                 self._setupChildDataItem_(objItem)
 
                 # if self._initialExpandDepth_ == 0 and self._currentExpansionDepth_ == 0:
-                #     self.collapseAll()
-                # else:
-                #     self.expandToDepth(max(self._initialExpandDepth_, self._currentExpansionDepth_-1))
+                if self._currentExpansionDepth_ == 0:
+                    self.collapseAll()
+                else:
+                    self.expandToDepth(max(0, self._currentExpansionDepth_))
+                    # self.expandToDepth(max(self._initialExpandDepth_, self._currentExpansionDepth_-1))
+
                 #
                 # for col in self.autoResizeColumns:
                 #     if col >=0 and col < 3:
@@ -764,10 +762,10 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self.sourceModel.beginResetModel()
         self.sourceModel.topObjectItem.setData(value, QtCore.Qt.DisplayRole)
         self.sourceModel.endResetModel()
-        if self._initialExpandDepth_ == 0:
-            self.collapseAll()
-        else:
-            self.expandToDepth(self._initialExpandDepth_)
+        # if self._initialExpandDepth_ == 0:
+        #     self.collapseAll()
+        # else:
+        #     self.expandToDepth(self._initialExpandDepth_)
 
         for col in self.autoResizeColumns:
             if col >=0 and col < 3:
@@ -822,14 +820,14 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                     map(
                         lambda i: (
                                     i.data(QtCore.Qt.DisplayRole),
-                                    self.sourceModel.getDataObjectForLeaf(i)
-                                    # self.model().getDataObjectForLeaf(i)
+                                    item.data(ObjectDataRole).data
+                                    # self.sourceModel.getDataObjectForLeaf(i)
                                     ),
                         list(
                             filter(
                                 (
                                     lambda i: i.column() == 0
-                                    and not i.data(StandaloneEditorWidgetRole) # noqa
+                                    and not i.data(StandaloneEditorWidgetRole)
                                 ),
                                 items
                                 )
@@ -892,10 +890,10 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
     def update(self):
         super().update()
-        if self._initialExpandDepth_ == 0:
-            self.collapseAll()
-        else:
-            self.expandToDepth(self._initialExpandDepth_)
+        # if self._initialExpandDepth_ == 0:
+        #     self.collapseAll()
+        # else:
+        #     self.expandToDepth(self._initialExpandDepth_)
         for col in self.autoResizeColumns:
             if col >=0 and col < 3:
                 self.resizeColumnToContents(col)
@@ -954,14 +952,15 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         evt.setAccepted(True)
 
     def mouseMoveEvent(self: typing.Self, evt: QtGui.QMouseEvent):
-        if evt.buttons() & QtCore.Qt.LeftButton:
-            if isinstance(self._dragStartPosition_, QtCore.QPoint):
-                items = self.selectedItems()
-                if (
-                    len(items)
-                    and
-                    (evt.pos() - self._dragStartPosition_).manhattanLength() >=  QtWidgets.QApplication.startDragDistance()
-                    ):
-                    drag = QtGui.QDrag(self)
-                    mimeData = QtCore.QMimeData()
+        if (evt.buttons() & QtCore.Qt.LeftButton
+            and isinstance(self._dragStartPosition_, QtCore.QPoint)
+            ):
+            items = self.selectedItems()
+            if (
+                len(items)
+                and
+                (evt.pos() - self._dragStartPosition_).manhattanLength() >=  QtWidgets.QApplication.startDragDistance()
+                ):
+                drag = QtGui.QDrag(self)
+                mimeData = QtCore.QMimeData()
 
