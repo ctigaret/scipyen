@@ -108,7 +108,11 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         assert (isinstance(autoResizeColumns, set) and all((isinstance(v, int) and v in range(3)) for v in autoResizeColumns)), f"Invalid value for 'autoResizeColumns'; expecting a set of ints, each in range(3); instead, got {autoResizeColumns}"
         self.autoResizeColumns: set[int] = kwargs.pop("autoResizeColumns", set())
 
+        # NOTE: 2026-09-25 14:35:25
+        # consider dropping this
         self._useProxyModel_ = kwargs.pop("useSortingProxy", False)
+
+
         # self._alwaysSortRows_: bool = False
 
         # NOTE: 2026-03-31 22:47:04
@@ -303,12 +307,7 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             depth += 1
             parent = parent.parent()
 
-        # print(f"{self.__class__.__name__}._slot_indexExpanded -> epxansion depth = {depth}")
-
         self._currentExpansionDepth_ = max(depth, self._currentExpansionDepth_)
-
-
-        # print(f"{self.__class__.__name__}._slot_indexExpanded -> {type(item)}")
 
     @Slot(QtCore.QModelIndex)
     def _slot_indexCollapsed(self, index: QtCore.QModelIndex):
@@ -703,7 +702,8 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                 showPrivate: bool = False,
                 valuesOnly: bool = True,
                 inlineTables: bool = False,
-                introspect: bool = False):
+                introspect: bool = False,
+                predicate: types.FunctionType | None = None):
         # print(f"{self.__class__.__name__}.setData({type(obj)})")
         # signalBlocker = QtCore.QSignalBlocker(self.model()) #noqa
         # model = self.model()
@@ -718,8 +718,10 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                                        showPrivate=showPrivate,
                                        introspect=introspect,
                                        inlineTables=inlineTables,
-                                       valuesOnly=valuesOnly)
+                                       valuesOnly=valuesOnly,
+                                       predicate=predicate)
         self.sourceModel.readOnly = self.readOnly
+
         if self.readOnly:
             self.setItemDelegate(self._defaultDelegate_)
             self.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
@@ -730,30 +732,25 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         # WARNING: 2026-06-28 11:45:39
         # DO NOT call begin/endResetMdoel on the proxyModel here
         # see also WARNING: 2026-06-28 11:43:14 in itemmodels.datatreemodel.DataTreeModel
+        root = self.sourceModel.invisibleRootItem()
+
+        if root.hasChildren():
+            # NOTE: 2026-02-08 15:23:06
+            # there is exactly one of these and it is the visible "root" of the
+            # tree; all of objects "internals" are child rows of it.
+            # objItem = root.child(0,0)
+            # self._setupChildDataItem_(self.sourceModel.topObjectItem)
+
+            # if self._initialExpandDepth_ == 0 and self._currentExpansionDepth_ == 0:
+            if self._currentExpansionDepth_ == 0:
+                self.collapseAll()
+            else:
+                self.expandToDepth(max(0, self._currentExpansionDepth_))
+
         if self._useProxyModel_ is True:
             self.proxyModel.setSourceModel(self.sourceModel)
+            self.proxyModel.sort(-1)
 
-            root = self.sourceModel.invisibleRootItem()
-            if root.hasChildren():
-                # NOTE: 2026-02-08 15:23:06
-                # there is exactly one of these and it is the visible "root" of the
-                # tree; all of objects "internals" are child rows of it.
-                # objItem = root.child(0,0)
-                self._setupChildDataItem_(objItem)
-
-                # if self._initialExpandDepth_ == 0 and self._currentExpansionDepth_ == 0:
-                if self._currentExpansionDepth_ == 0:
-                    self.collapseAll()
-                else:
-                    self.expandToDepth(max(0, self._currentExpansionDepth_))
-                    # self.expandToDepth(max(self._initialExpandDepth_, self._currentExpansionDepth_-1))
-
-                #
-                # for col in self.autoResizeColumns:
-                #     if col >=0 and col < 3:
-                #         self.resizeColumnToContents(col)
-
-                self.proxyModel.sort(-1)
 
     def setRootName(self, value: str):
         # print(f"{self.__class__.__name__}.setRootName({value})")
@@ -919,8 +916,10 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         valuesOnly = what.get("valuesOnly", True)
         inlineTables = what.get("inlineTables", False)
         introspect = what.get("introspect", False)
+        predicate = what.get("predicate", None)
 
-        self.setData(data, root_title, showPrivate, valuesOnly, inlineTables, introspect)
+        self.setData(data, root_title, showPrivate, valuesOnly,
+                     inlineTables, introspect, predicate)
 
     def clear(self: typing.Self):
         # self.sourceModel.beginResetModel()

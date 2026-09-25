@@ -3584,11 +3584,12 @@ class ScipyenConsoleWidget(ConsoleWidget):
                         self._control.ensureCursorVisible()
                         self._cursorOutsideBuffer_ = True
 
+                    return True
+
                 else:
                     self._control.setReadOnly(False)
                     self._cursorOutsideBuffer_ = False
-
-                return True
+                    return super().eventFilter(obj, event)
 
             elif event.type() == QtCore.QEvent.KeyPress:
                 cursor = self._control.textCursor()

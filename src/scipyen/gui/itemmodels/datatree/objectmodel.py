@@ -403,6 +403,7 @@ class ObjectModel(QtGui.QStandardItemModel):
         if objectNode.objectInfo.objDataAsChild:
             editExternally = not self._inlineTables_
             objectItem.setData(editExternally, ObjectDataEditExternallyRole)
+
             if self._inlineTables_:
                 dataItem = QtGui.QStandardItem("")
                 dataItem.setData(qVariant(True), StandaloneEditorWidgetRole)
@@ -411,6 +412,7 @@ class ObjectModel(QtGui.QStandardItemModel):
                 objectItem.setRowCount(1)
                 objectItem.setChild(0, dataItem)
                 objectItem.setData(qVariant(1), ObjectChildrenCountRole)
+
             else:
                 objectItem.setRowCount(0)
                 objectItem.setData(qVariant(0), ObjectChildrenCountRole)
@@ -430,7 +432,13 @@ class ObjectModel(QtGui.QStandardItemModel):
         objectTypeItem.setData(typeName, QtCore.Qt.DisplayRole)
         objectTypeItem.setData(qVariant(0), ObjectChildrenCountRole)
 
-        objectInfoValueItem = QtGui.QStandardItem(objectNode.objectInfo.objInfo)
+        try:
+            objectInfoValueItem = QtGui.QStandardItem(objectNode.objectInfo.objInfo)
+
+        except: #noqa
+            traceback.print_exc()
+            objectInfoValueItem = QtGui.QStandardItem(objectNode.tag)
+
         if isinstance(objectNode.data, pathlib.Path):
             if __has_PySide6__:
                 objectInfoValueItem.setData(objectNode.data, ObjectDataRole) # expects Node payload
@@ -849,6 +857,14 @@ class ObjectModel(QtGui.QStandardItemModel):
     #
     #     return super().data(index, role)
 
+    def getMasterItem(self, item: QtGui.QStandardItem):
+        if item.column() == 0:
+            return item
+
+        parentItem = item.parent()
+        if parentItem:
+            return parentItem.child(item.row(), 0)
+
     def setData(self: typing.Self, modelIndex: QtCore.QModelIndex,
                 value: object, role = QtCore.Qt.EditRole) -> bool:
         if self._modelData_ is None:
@@ -856,43 +872,88 @@ class ObjectModel(QtGui.QStandardItemModel):
 
         item = self.itemFromIndex(modelIndex)
 
-        if item.column() == 2 and role == ObjectDataRole:
-            # make sure we work on the sibling in column 0
-            parentItem = item.parent()
-            if not parentItem:
-                return False
+        if role == ObjectDataRole:
+            if item.column() != 0:
+                parentItem = item.parent()
+                if not parentItem:
+                    return False
+                item = parentItem.child(item.row(), 0)
 
-            item = parentItem.child(item.row(), 0)
+            node = item.data(role)
 
-        node = item.data(ObjectDataRole)
+            if item.data(ReadOnlyRole) is True or node is None or node.objectInfo.readOnly:
+                return
 
-        if item.data(ReadOnlyRole) is True or node.objectInfo.readOnly:
-            return
+            path = self._getPathForItemOrIndex_(item)
+            # I think this should always be so
+            path[-1] = "self._modelData_"
 
-        path = self._getPathForItemOrIndex_(item)
-        # I think this should always be so
-        path[-1] = "self._modelData_"
+            accexpr = "".join(reversed(path))
+            setexpr = accexpr + " = value"
+            OK = False
+            try:
+                # print(f"{self.__class__.__name__}.setData: setexpr = {setexpr}")
+                exec(setexpr) # noqa
+                newVal = eval(accexpr)
+                OK = True
+                node.data = newVal
+                self.dataChanged.emit(modelIndex, modelIndex)
+                self.sig_modelDataChanged.emit()
 
-        # if path[-1] == self.topObjectItem.data(QtCore.Qt.DisplayRole):
-        #     # I think this should always be so
-        #     path[-1] = "self._modelData_"
+            except: # noqa
+                traceback.print_exc()
+                OK = False
 
-        accexpr = "".join(reversed(path))
-        setexpr = accexpr + " = value"
-        OK = False
-        try:
-            # print(f"{self.__class__.__name__}.setData: setexpr = {setexpr}")
-            exec(setexpr) # noqa
-            newVal = eval(accexpr)
-            OK = True
-            node.data = newVal
-            self.dataChanged.emit(modelIndex, modelIndex)
-            self.sig_modelDataChanged.emit()
+            return OK
 
-        except: # noqa
-            traceback.print_exc()
+        else:
+            try:
+                item.setData(value, role)
+                OK = True
 
-        return OK
+            except: # noqa
+                traceback.print_exc()
+                OK = False
+
+            return OK
+
+        # if item.column() == 2 and role == ObjectDataRole:
+        #     # make sure we work on the sibling in column 0
+        #     parentItem = item.parent()
+        #     if not parentItem:
+        #         return False
+        #
+        #     item = parentItem.child(item.row(), 0)
+
+        # node = item.data(ObjectDataRole)
+        #
+        # if item.data(ReadOnlyRole) is True or node is None or node.objectInfo.readOnly:
+        #     return
+        #
+        # path = self._getPathForItemOrIndex_(item)
+        # # I think this should always be so
+        # path[-1] = "self._modelData_"
+        #
+        # # if path[-1] == self.topObjectItem.data(QtCore.Qt.DisplayRole):
+        # #     # I think this should always be so
+        # #     path[-1] = "self._modelData_"
+        #
+        # accexpr = "".join(reversed(path))
+        # setexpr = accexpr + " = value"
+        # OK = False
+        # try:
+        #     # print(f"{self.__class__.__name__}.setData: setexpr = {setexpr}")
+        #     exec(setexpr) # noqa
+        #     newVal = eval(accexpr)
+        #     OK = True
+        #     node.data = newVal
+        #     self.dataChanged.emit(modelIndex, modelIndex)
+        #     self.sig_modelDataChanged.emit()
+        #
+        # except: # noqa
+        #     traceback.print_exc()
+
+        # return OK
 
     # def getDataObjectForLeaf(self: typing.Self,
     #                          leaf: QtCore.QModelIndex | QtGui.QStandardItem,

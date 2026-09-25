@@ -63,6 +63,7 @@ from gui import guiutils
 from gui.itemmodels.roles import *
 from gui.itemmodels.datatree.objectnode import ObjectInfo, ObjectNode
 from gui.itemmodels.datatree import objectnode as onode
+from gui.itemmodels.datatree.objectmodel import ObjectModel
 from gui.widgets import small_widgets as smw
 from gui.widgets import neo_widgets as neow
 from gui.widgets import inlinefiledirchooser as ifdc
@@ -387,10 +388,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     # decide how to handle the case where the combo box is editable (and its
     # currentText() is not among the combo box items)
 
-    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
-                 columnChoices: typing.Optional[dict[int,
-                                                     dict[typing.Sequence,
-                                                          bool]]] = None,
+    def __init__(self, parent: QtWidgets.QWidget | None = None,
+                 columnChoices: dict[int, dict[typing.Sequence, bool]] | None= None,
                  enforceFloat: bool = False,
                  decimals: int | None = None):
         r"""Instantiates a PythonItemDelegate.
@@ -425,12 +424,13 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         jointImmutability:
         """
         super().__init__(parent=parent)
-        # self._model_ = None
+
+        self._usingObjectTreeModel_: bool = False
         self._useObjectDataRole_: bool = False
         self._dataInObjectNode_: bool = False
         self._currentObjectNode_: ObjectNode | None = None
 
-        self._currentModelIndex_: typing.Optional[QtCore.QModelIndex] = None
+        self._currentModelIndex_: QtCore.QModelIndex | None = None
 
         self._enforceFloat_:bool = enforceFloat
 
@@ -438,10 +438,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             self._columnChoices_ = columnChoices
 
         else:
-            self._columnChoices_ = dict() # always keep it as a dict, even when empty
+            self._columnChoices_ = {} # always keep it as a dict, even when empty
 
-        self._currentData_:typing.Optional[typing.Any] = None
-        self._externalDataEditor_: typing.Optional[QtWidgets.QWidget] = None
+        self._currentData_: typing.Any | None = None
+        self._externalDataEditor_: QtWidgets.QWidget | None = None
 
         if isinstance(decimals, int) and decimals >= 0:
             self._decimals_ = decimals
@@ -1197,49 +1197,19 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                      index:QtCore.QModelIndex) -> QtWidgets.QWidget | None:
         r"""Overrides QStyledItemDelegate.createEditor
     """
-        self._currentModelIndex_ = index
-        # NOTE: 2025-09-27 10:29:14 ATTENTION
-        # editor data, although it can also be set here, it should be set through
-        # self.setEditorData(), overridden below
-        #
-        # NOTE: 2025-10-28 12:44:09 FIXME
-        # somewhere to provide interconversion between types and string
-        # to be shown in the combo box, e.g.:
-        # convert to string:                    convert from string
-        # int -> str()
-        # str -> as is
-        # Enum -> 'name' property
-        # unit quantity -> str()
+        if not index.isValid():
+            return
 
-        # WARNING: combo boxes can only deal with strings!
-        # one should restrict everything to string, in the custom item model, as
-        # as this cannot cover every possibility
-        #
+        model, data, dataChoices, _ = self._retrieveIndexData_(index)
+        if any (o is None for o in (model, data)):
+            return
 
-        data = index.data(ObjectDataRole) # noqa
-
-        if data is not None:
-            self._useObjectDataRole_ = True
-            if isinstance(data, ObjectNode):
-                self._currentObjectNode_ = data
-                data = OjectNode.data
-                self._dataInObjectNode_ = True
-            else:
-                self._dataInObjectNode_ = False
-                self._currentObjectNode_ = None
-
-        else:
-            data = index.data(QtCore.Qt.EditRole)
-            self._useObjectDataRole_ = False
+        print(f"\t -> {type(data).__name__}")
 
         # print(f"{self.__class__.__name__}.createEditor -> data is {type(data).__name__}")
 
         # print(f"{self.__class__.__name__}.createEditor for {type(data).__name__} at row ({index.row()}), col {index.column()}")
 
-        # disp = index.data(QtCore.Qt.DisplayRole)
-        # CAUTION: Standard item model and standard items treat DisplayRole and
-        # DisplayRole as being the same; in such case I need a custom role
-        dataChoices = index.data(DataChoicesRole)
 
         if isinstance(data, enum.Enum) and dataChoices is None:
             dataChoices = dict(map(lambda x: (x.name, x.value), type(data))) # noqa
@@ -1252,7 +1222,6 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         # employs two pythonic properties of the item model: 'immutableColumns' and
         # 'immutableRows', which I use below
         #
-        model = index.model()
 
         if isinstance(getattr(model, "immutability", None), dict):
             # print(f"{self.__class__.__name__}.createEditor for column {index.column()} and row {index.row()}")
@@ -1281,6 +1250,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             and hasattr(model, "_modelDataColumnHeaders_")
             and model._useExternalDataEditor_ is True
             ):
+            # such as in the case of TabularDataModel
+
             if model._modelDataColumnHeaders_[index.column()] == "Edit":
                 widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "", parent)
 
@@ -1311,14 +1282,15 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         choices = list()
 
         if (
-            isinstance(dataChoices, typing.Sequence)
-            and all(isinstance(v, (enum.Enum, str)) for v in dataChoices)
-            ):
-            choices = dataChoices
-
-        elif (
-            isinstance(dataChoices, dict)
-            and all(isinstance(key, str) for key in dataChoices.keys())
+                (
+                isinstance(dataChoices, typing.Sequence)
+                and all(isinstance(v, (enum.Enum, str)) for v in dataChoices)
+                )
+                or
+                (
+                isinstance(dataChoices, dict)
+                and all(isinstance(key, str) for key in dataChoices)
+                )
             ):
             choices = dataChoices
 
@@ -1327,13 +1299,79 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 scipywarn(f"{self.__class__.__name__}.createEditor: data type ({type(data).__name__}) is not supported for combo box")
                 return
 
-            # self.endResetModel() # why this here ?!?
-
             choices = self._columnChoices_[index.column()]["choices"]
 
         w = self.createWidget(data, choices, True, parent)
 
         return w
+
+    def _retrieveIndexData_(self, index: QtCore.QModelIndex,
+                            # role: QtCore.Qt.ItemDataRole = ObjectDataRole
+                            ) -> tuple:
+        if not index.isValid():
+            return (None, None)
+
+        model = index.model() # this should never be a proxy model (in case the view uses one)
+
+        self._usingObjectTreeModel_ = isinstance(model, ObjectModel)
+        self._currentModelIndex_ = index
+
+        # CAUTION: Standard item model and standard items treat DisplayRole and
+        # DisplayRole as being the same; in such case I need a custom role
+        # dataChoices = index.data(DataChoicesRole)
+
+        # NOTE: 2025-09-27 10:29:14 ATTENTION
+        # editor data, although it can also be set here, it should be set through
+        # self.setEditorData(), overridden below
+        #
+        # NOTE: 2025-10-28 12:44:09 FIXME
+        # somewhere to provide interconversion between types and string
+        # to be shown in the combo box, e.g.:
+        # convert to string:                    convert from string
+        # int -> str()
+        # str -> as is
+        # Enum -> 'name' property
+        # unit quantity -> str()
+
+        # WARNING: combo boxes can only deal with strings!
+        # one should restrict everything to string, in the custom item model, as
+        # as this cannot cover every possibility
+        #
+
+        src = index
+
+        txt = index.data(QtCore.Qt.DisplayRole)
+        col = index.column()
+        row = index.row()
+        print(f"{self.__class__.__name__}._retrieveIndexData_(index: '{txt}', at row {row}, column {col})")
+
+        if self._usingObjectTreeModel_:
+            src = model.itemFromIndex(index)
+
+            if src.column() != 0:
+                src = model.getMasterItem(src)
+
+        disp = f"{src.data(QtCore.Qt.DisplayRole)}"
+
+        data = src.data(ObjectDataRole)
+
+        if data is not None:
+            self._useObjectDataRole_ = True
+            if isinstance(data, ObjectNode):
+                self._currentObjectNode_ = data
+                dataChoices = data.objectInfo.choices
+                data = data.data
+                self._dataInObjectNode_ = True
+            else:
+                self._dataInObjectNode_ = False
+                self._currentObjectNode_ = None
+                dataChoices = src.data(DataChoicesRole)
+        else:
+            data = src.data(QtCore.Qt.EditRole)
+            dataChoices = index.data(DataChoicesRole)
+            self._useObjectDataRole_ = False
+
+        return model, data, dataChoices, disp
 
     def setEditorData(self, editor: QtWidgets.QWidget,
                       index: QtCore.QModelIndex):
@@ -1341,20 +1379,28 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     Overrides QStyledItemDelegate.setEditorData
     """
         from gui.widgets.tableeditorwidget import TableEditorWidget
-        data = index.data(ObjectDataRole) # noqa
+
+        if not index.isValid():
+            return
+
+        model, data, disp, dataChoices = self._retrieveIndexData_(index)
+        if any (o is None for o in (model, data)):
+            return
+
+        # data = index.data(ObjectDataRole) # noqa
 
         # print(f"{self.__class__.__name__}.setEditorData({editor}, index -> data = {data})")
 
-        if data is not None:
-            self._useObjectDataRole_ = True
-        else:
-            data = index.data(QtCore.Qt.EditRole)
-            self._useObjectDataRole_ = False
+        # if data is not None:
+        #     self._useObjectDataRole_ = True
+        # else:
+        #     data = index.data(QtCore.Qt.EditRole)
+        #     self._useObjectDataRole_ = False
 
         # NOTE: 2026-02-10 09:48:29
         # because for QStandardItems EditRole and DisplayRole do the same thing
-        disp = f"{index.data(QtCore.Qt.DisplayRole)}"
-        dataChoices = index.data(DataChoicesRole) # noqa
+        # disp = f"{index.data(QtCore.Qt.DisplayRole)}"
+        # dataChoices = index.data(DataChoicesRole) # noqa
 
         if dataChoices:
             choices = dataChoices
@@ -1363,7 +1409,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             choices = self._columnChoices_[index.column()]["choices"]
 
         else:
-            choices = list()
+            choices = []
 
         if isinstance(editor, QtWidgets.QComboBox):
             # case where we use a QComboBox
@@ -1377,7 +1423,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 and all(isinstance(v, (enum.Enum, str)) for v in choices)
                 ) or (
                     isinstance(choices, dict)
-                    and all(isinstance(k, str) for k in choices.keys())
+                    and all(isinstance(k, str) for k in choices)
                     ):
                 if isinstance(choices, dict):
                     entries = list(choices.keys())
@@ -1521,6 +1567,9 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                      model: QtCore.QAbstractItemModel,
                      index: QtCore.QModelIndex):
         r"""Sets data back into the QModelIndex"""
+
+        # FIXME 2026-09-25 16:19:52 TODO
+        # adapt to the ObjectNode paradigm
         originalData = index.data(ObjectDataRole) # noqa
 
         if originalData is not None:

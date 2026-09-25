@@ -1063,18 +1063,25 @@ def _parseObject_(obj: typing.Union[type, enum.EnumType, # noqa: F811,UP007
     readOnlyChildren = True
     objType = type(obj)
     objId = id(obj)
-    info = obj
+    info = f"{obj}"
     tip = str(obj)
     choices = check_obj_choices(objType, choices)
     memberAccess = ()
     accessType = None
 
-    if isinstance(obj, (
+    if isinstance(obj, type):
+        info = obj.__name__
+        tip = str(obj)
+        readOnly = True
+        readOnlyChildren = True
+        choices = {}
+
+    elif isinstance(obj, (
         enum.EnumType, TypeEnum, enum.Enum, enum.IntEnum, enum.Flag)):
         memberAccess = (".", )
         accessType = "attribute"
-        readOnly = False
-        readOnlyChildren = False
+        # readOnly = False
+        # readOnlyChildren = False
 
         if isinstance(obj, (enum.Enum, enum.IntEnum, TypeEnum, enum.Flag)):
             info = obj.name
@@ -1095,6 +1102,10 @@ def _parseObject_(obj: typing.Union[type, enum.EnumType, # noqa: F811,UP007
             except: # noqa
                 scipywarn(f"Cannot access enumeration values for {type(obj).__name__}")
                 choices = {}
+
+    else:
+        choices = check_obj_choices(objType, choices)
+
 
     infoDict = {
         "name": objName,
