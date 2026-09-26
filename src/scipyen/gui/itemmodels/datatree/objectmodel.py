@@ -1,4 +1,4 @@
-# $Id: datatreemodel.py $
+# $Id: objectmodel.py $
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -155,12 +155,10 @@ class ObjectModel(QtGui.QStandardItemModel):
     sequenceTypes = (typing.Sequence, tuple, list, deque, bytes)
     iterableCollectionTypes = sequenceTypes + mappingTypes
 
-    # _sig_branchLoaded = Signal(int, tuple, QtGui.QStandardItem, name="_sig_branchLoaded")
-
     sig_editCompleted = Signal([pd.DataFrame], [pd.Series], [np.ndarray], name="sig_editCompleted")
     sig_modelDataChanged = Signal(name="sig_modelDataChanged")
+    sig_standaloneEditorChildExpanded = Signal(QtGui.QStandardItem, name="sig_standaloneEditorChildExpanded")
 
-    # def _check_public_member_(x: object, y: object | None = None):
     @staticmethod
     def _check_public_member_(x: tuple):
         # return not (isinstance(x[0], str) and not x[0].startswith("_"))
@@ -193,30 +191,12 @@ class ObjectModel(QtGui.QStandardItemModel):
             self._supportedDataTypes_ = ()
 
         self.beginResetModel()
-        # self._dataTypeStr_: str = ""
-        # self._visited_: dict = {}
-        self._visited_: set = set()
-        # self._hasDynamicPrivate_: bool = False
-        # self._privateData_: dict | None = None
-        # self._hideRoot_: bool = False
+        self._visited_: set = set() # FIXME: 2026-09-27 00:10:19 NOT USED
         self._topObjectItem_: QtGui.QStandardItem | None = None
-
-
-        # self._sortedRows_: bool = False
-
-
-        # self._readOnly_ =
-
-
 
         self.setHorizontalHeaderLabels(["Object", "Type", "Information or Value"])
 
         self.endResetModel()
-
-        # self._sig_branchLoaded.connect(self._slot_branchLoaded)
-
-    # def canFetchMore(self, parentIndex: QtCore.QModelIndex) -> bool:
-    #     return False if parentIndex.isValid() else parentIndex.rowCount() <
 
     @Slot(QtCore.QModelIndex)
     def _slot_indexExpanded_(self, index: QtCore.QModelIndex):
@@ -237,62 +217,57 @@ class ObjectModel(QtGui.QStandardItemModel):
 
         objectChildren = itemNode.objectInfo.children
 
-        if len(objectChildren) == 0:
+        if len(objectChildren) == 0 and not itemNode.objectInfo.objDataAsChild:
             # should NOT happen: child-less objectNodes should correspond to
             # items with rowCount==0
             return
 
-        successors = itemNode.successors(self._tree_.identifier)
+        if itemNode.objectInfo.objDataAsChild:
+            childItem = item.child(0, 0)
+            self.sig_standaloneEditorChildExpanded.emit(childItem)
 
-        # CAUTION: 2026-09-22 23:23:46
-        # this is fragile -> better write a version of populateNode to take into account the ``item``
-        if len(objectChildren) == item.rowCount() and len(objectChildren) == len(successors):
-            return
+        else:
+            successors = itemNode.successors(self._tree_.identifier)
 
-        itemNode.populate(self._tree_,
-                          introspect=self.showIntrospection,
-                          predicate=self._predicate_,
-                          includePrivate=self.showPrivateMembers,
-                          includeCallables=self.showCallables,
-                          includeTypeMembers=not self.showValuesOnly,
-                          choices={},
-                          readOnly=self.readOnly,
-                          readOnlyChildren=self.readOnlyChildren,
-                        )
-        # print(f"\t=> {len(childNodes)} child nodes")
+            # CAUTION: 2026-09-22 23:23:46
+            # this is fragile -> better write a version of populateNode to take into account the ``item``
+            if len(objectChildren) == item.rowCount() and len(objectChildren) == len(successors):
+                return
 
-        # FIXME: 2026-09-24 11:58:27
-        # for childNode in childNodes:
-        #     if (
-        #         isinstance(childNode.data, Node)
-        #         and isinstance(self.topObjectItem.data(ObjectDataRole), Tree)
-        #         and
-        #         ):
-        #         # NOTE: This Node might actually belong to a tree
-        #         # If the tree is the data associated with the topObjectItem
-        #         # then check if this childNode is contained by it and report
-        #         # its successors
-        #         subChildren = childNode.data.successors
+            itemNode.populate(self._tree_,
+                            introspect=self.showIntrospection,
+                            predicate=self._predicate_,
+                            includePrivate=self.showPrivateMembers,
+                            includeCallables=self.showCallables,
+                            includeTypeMembers=not self.showValuesOnly,
+                            choices={},
+                            readOnly=self.readOnly,
+                            readOnlyChildren=self.readOnlyChildren,
+                            )
+            # print(f"\t=> {len(childNodes)} child nodes")
 
-        # pre-allocates rows, but would this be compatible with
-        # canFetchMore/fetchMore (if I decide to implement it)?
-        item.setRowCount(len(objectChildren))
+            # FIXME: 2026-09-24 11:58:27
+            # for childNode in childNodes:
+            #     if (
+            #         isinstance(childNode.data, Node)
+            #         and isinstance(self.topObjectItem.data(ObjectDataRole), Tree)
+            #         and
+            #         ):
+            #         # NOTE: This Node might actually belong to a tree
+            #         # If the tree is the data associated with the topObjectItem
+            #         # then check if this childNode is contained by it and report
+            #         # its successors
+            #         subChildren = childNode.data.successors
 
-        # self.beginInsertRow()
-        for row, nid in enumerate(successors):
-            node = self._tree_.nodes[nid]
-            childRow = self._makeRowForNode_(node)
-            for col in range(len(childRow)):
-                item.setChild(row, col, childRow[col])
-        # self.endInsertRow()
+            # pre-allocates rows, but would this be compatible with
+            # canFetchMore/fetchMore (if I decide to implement it)?
+            item.setRowCount(len(objectChildren))
 
-
-
-
-
-
-
-
+            for row, nid in enumerate(successors):
+                node = self._tree_.nodes[nid]
+                childRow = self._makeRowForNode_(node)
+                for col in range(len(childRow)):
+                    item.setChild(row, col, childRow[col])
 
     @property
     def maxRows(self) -> int:
@@ -479,11 +454,6 @@ class ObjectModel(QtGui.QStandardItemModel):
 
         objectItem.setData(qVariant(objectNode), ObjectDataRole) ## how about this !?
         objectItem.setData(qVariant(objectNode.objectInfo), ObjectInfoRole) ## how about this !?
-        # objectItem.setData(qVariant(objectNode.data), QtCore.Qt.EditRole)
-        # if objectNode.objectInfo.objKeyType is not str:
-        #     objectItem.setData(f"'{objectNode.objectInfo.name}'", QtCore.Qt.DisplayRole)
-        # else:
-        #     objectItem.setData(objectNode.objectInfo.name, QtCore.Qt.DisplayRole)
         objectItem.setData(objectNode.objectInfo.name, QtCore.Qt.DisplayRole)
 
         objectItemTip = f"Key type: {objectNode.objectInfo.objKeyType.__name__} -> {objectNode.objectInfo.objTip} object"
@@ -496,6 +466,8 @@ class ObjectModel(QtGui.QStandardItemModel):
             if self._inlineTables_:
                 dataItem = QtGui.QStandardItem("")
                 dataItem.setData(qVariant(True), StandaloneEditorWidgetRole)
+                flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
+                dataItem.setFlags(flags)
                 dataItem.setRowCount(0)
 
                 objectItem.setRowCount(1)
@@ -512,10 +484,6 @@ class ObjectModel(QtGui.QStandardItemModel):
             objectItem.setData(qVariant(nChildren), ObjectChildrenCountRole)
 
         typeName = objectNode.objectInfo.objType.__name__ # check with ObjectNode and objectnode.populateNode if we use references or not
-        # if isinstance(objectNode.objectInfo.referenceInfo, ObjectInfo):
-        #     typeName = objectNode.objectInfo.referenceInfo.objType.__name__
-        # else:
-        #     typeName = objectNode.objectInfo.objType.__name__
 
         objectTypeItem = QtGui.QStandardItem(typeName)
         objectTypeItem.setData(typeName, QtCore.Qt.DisplayRole)
@@ -541,9 +509,6 @@ class ObjectModel(QtGui.QStandardItemModel):
 
         objectInfoValueItem.setData(objectNode.objectInfo.choices, DataChoicesRole)
         objectInfoValueItem.setData(qVariant(0), ObjectChildrenCountRole)
-        # also not needed? (stored in objectInfo)
-        # objectItem.setData(qVariant(memberAccess), ObjectDataAccessRole)
-        # objectItem.setData(qVariant(accessType), ObjectDataAccessTypeRole)
 
         flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
         readOnlyFlags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
@@ -585,182 +550,6 @@ class ObjectModel(QtGui.QStandardItemModel):
                 item.setFlags(readOnlyFlags)
 
         return (objectItem, objectTypeItem, objectInfoValueItem)
-
-    # def _makeObjectRow_(self: typing.Self, objNode: ObjectNode, /,
-    #                    objDict: dict, objKey: object,
-    #                    objKeyType: type, visited:tuple=()) -> tuple:
-    #     # NOTE: 2026-09-12 11:16:59
-    #     # also sets the row count for the item in column 0
-    #     # ATTENTION: make sure you don't do this twice!
-    #
-    #     typeName = objDict["objType"].__name__
-    #
-    #     info = objDict["objInfo"]
-    #
-    #     # if isinstance(info, (bool, np.floating, np.integer, np.complexfloating)):
-    #     #     info = f"{info}"
-    #
-    #     memberAccess = objDict["memberAccess"]
-    #     accessType = objDict.get("accessType", None)
-    #
-    #     if isinstance(objKey, str):
-    #         objName = objKey
-    #
-    #     elif is_hashable(objKey):
-    #         objName = f"{objKey}"
-    #
-    #     else:
-    #         objName = ""
-    #
-    #     if len(objName.strip()) == 0:
-    #         objName = "/"
-    #
-    #     # print(f"{self.__class__.__name__}._makeObjectRow_: objName -> {objName}")
-    #
-    #     objectItem = QtGui.QStandardItem(objName)
-    #     objectItem.setData(qVariant(False), PopulatedChildrenRole)
-    #     # NOTE: 2026-02-09 21:47:38
-    #     # reference to the actual Python object
-    #     objectItem.setData(qVariant(obj), ObjectDataRole)
-    #
-    #     objectItem.setData(objName, QtCore.Qt.DisplayRole)
-    #     objectItem.setData(objDict["objType"], ObjectTypeRole)
-    #     objectItem.setData(objDict["objType"].__name__, QtCore.Qt.ToolTipRole)
-    #
-    #     # NOTE: 2026-02-09 21:47:57
-    #     # reference to the object's binding in its parent: i.e.
-    #     # • the symbol of an attribute or field (↦ str),
-    #     # • the index into sequences (↦ int),
-    #     # • the key in a mapping (↦ a hashable)
-    #     objectItem.setData(qVariant(objKey), ObjectKeyRole)
-    #
-    #     # NOTE: 2026-09-12 11:12:06
-    #     # the type of the key inside the obj (str, int, or other hashable)
-    #     objectItem.setData(qVariant(objKeyType), ObjectKeyTypeRole)
-    #
-    #     # NOTE: 2026-02-09 21:47:10
-    #     # used to construct the acess path to the object for this item
-    #     objectItem.setData(qVariant(memberAccess), ObjectDataAccessRole)
-    #     objectItem.setData(qVariant(accessType), ObjectDataAccessTypeRole)
-    #
-    #     editExternally = objDict["objDataAsChild"] and not self._inlineTables_
-    #     objectItem.setData(editExternally, ObjectDataEditExternallyRole) # star import from gui.itemmodels.roles
-    #
-    #     if objDict["objDataAsChild"] and self._inlineTables_:
-    #         # NOTE: 2026-09-12 11:07:38
-    #         # dataItem holds the widget for the object data (i.e. a table or text editor)
-    #         dataItem = QtGui.QStandardItem("")
-    #         dataItem.setData(qVariant(True), StandaloneEditorWidgetRole)
-    #         dataItem.setRowCount(0)
-    #
-    #         objectItem.setRowCount(1)
-    #         objectItem.setChild(0, dataItem)
-    #         objectItem.setData(qVariant(1), ObjectChildrenCountRole)
-    #
-    #     elif len(visited):
-    #         objectItem.setRowCount(0)
-    #         objectItem.setData(qVariant(0), ObjectChildrenCountRole)
-    #
-    #     else:
-    #         # NOTE: 2026-09-12 11:08:32
-    #         # rows of objectItem to be populated within _buildBranch_(…)
-    #         objectItem.setRowCount(objDict["nChildren"])
-    #         objectItem.setData(qVariant(objDict["nChildren"]), ObjectChildrenCountRole)
-    #
-    #
-    #     # NOTE: 2026-02-09 21:49:05
-    #     # object "bindings" are are int for sequences, any hashable object type
-    #     # (including str and int) for mappings, str for attributes & fields.
-    #     #
-    #     # iterators are NOT supported (they're used to yield elements of a
-    #     # collection dynamically, anyway, and a reason for using them is a
-    #     # "lazy" evaluation of the collection's contents - in itself for a good
-    #     # reason) ; therefore, I apply the same philosophy here
-    #     #
-    #
-    #     if len(visited):
-    #         typeName = visited[-1].__name__
-    #
-    #     # for user's benefit — good to know the type of the object is represented
-    #     # in this row.
-    #     objectTypeItem = QtGui.QStandardItem(typeName)
-    #     objectTypeItem.setData(typeName, QtCore.Qt.DisplayRole)
-    #     objectTypeItem.setData(qVariant(0), ObjectChildrenCountRole)
-    #     # either:
-    #     #
-    #     # a) display some object info for the user's benefit; this can be:
-    #     #
-    #     #   a.1) a string representation of the object's value — can be edited
-    #     #        if required, see below
-    #     #
-    #     #   a.2) additional information such as size, shape, dtype, for tabular
-    #     #       data (arrays, pandas objects) — these are editable via an editor
-    #     #       in the first child of item 0 when needed, to be set up by the
-    #     #       client user of this model
-    #     #
-    #     # b) offer a delegate editor widget so that user can modify the value
-    #     #
-    #     # "choices" goes as item data with objectDataRole for THIS item
-    #     if visited:
-    #         targetPath = visited[2]
-    #         objectInfoValueItem = QtGui.QStandardItem(f"<reference to {targetPath}>")
-    #
-    #     else:
-    #         objectInfoValueItem = QtGui.QStandardItem(f"{info}")
-    #
-    #         if isinstance(obj, pathlib.Path):
-    #             if __has_PySide6__:
-    #                 objectInfoValueItem.setData(obj, ObjectDataRole)
-    #                 objectInfoValueItem.setData(info, QtCore.Qt.EditRole)
-    #             else:
-    #                 objectInfoValueItem.setData(obj, QtCore.Qt.EditRole)
-    #         else:
-    #             objectInfoValueItem.setData(info, QtCore.Qt.EditRole)
-    #
-    #         choices = objDict.get("choices", {})
-    #         objectInfoValueItem.setData(choices, DataChoicesRole)
-    #
-    #     objectInfoValueItem.setData(qVariant(0), ObjectChildrenCountRole)
-    #
-    #     flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
-    #     readOnlyFlags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
-    #
-    #     readOnly = objDict.get("readOnly", False) is True or self.readOnly
-    #     readOnlyChildren = objDict.get("readOnlyChildren", False) is True or self.readOnly
-    #
-    #     palette = QtWidgets.QApplication.palette()
-    #     font = QtWidgets.QApplication.font()
-    #     brush = palette.brush(QtGui.QPalette.Active, QtGui.QPalette.Text)
-    #     readOnlyFont = QtGui.QFont(font)
-    #     readOnlyFont.setItalic(True)
-    #     readOnlyBrush = palette.brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
-    #
-    #     for k, item in enumerate((objectItem, objectTypeItem, objectInfoValueItem)):
-    #         item.setData(readOnly, ReadOnlyRole) # star import from gui.itemmodels.roles
-    #         item.setData(readOnlyChildren, ReadOnlyChildrenRole) # star import from gui.itemmodels.roles
-    #         if k == 2:
-    #             if readOnly or (
-    #                                 (
-    #                                     objDict.get("indirect", False) is True
-    #                                     or objDict.get("objDataAsChild", False) is True
-    #                                 )
-    #                                 and len(objDict.get("choices", {})) == 0
-    #                             ):
-    #                 item.setData(readOnlyBrush, QtCore.Qt.ForegroundRole)
-    #                 item.setData(readOnlyFont, QtCore.Qt.FontRole)
-    #                 item.setFlags(readOnlyFlags)
-    #
-    #             else:
-    #                 item.setData(brush, QtCore.Qt.ForegroundRole)
-    #                 item.setData(font, QtCore.Qt.FontRole)
-    #                 item.setFlags(flags)
-    #         else:
-    #             # prohibit editing in columns 0 and 1
-    #             item.setData(brush, QtCore.Qt.ForegroundRole)
-    #             item.setData(font, QtCore.Qt.FontRole)
-    #             item.setFlags(readOnlyFlags)
-    #
-    #     return (objectItem, objectTypeItem, objectInfoValueItem)
 
     # @timefunc
     def populateModel(self, obj: object, rootTitle: str = "",

@@ -64,7 +64,7 @@ mammal lion     80.5     run
 """
 
 # TODO: 2026-02-12 23:35:16 FIXME
-# harmonize with DataTreeModel
+# harmonize with ObjectModel
 
 
 #NOTE: 2021-10-12 09:29:38

@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""
-New data viewer widget, based on datatreemodel
+New data viewer widget, based on objectmodel
 """
 from __future__ import print_function
 

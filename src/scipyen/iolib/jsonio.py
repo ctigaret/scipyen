@@ -154,7 +154,7 @@ Decided to stick with Python's own JSON as this provides (non-standard JSON)
 """
 
 # TODO: 2026-02-12 23:35:16 FIXME
-# harmonize with DataTreeModel
+# harmonize with ObjectModel
 
 import sys, traceback, typing, collections, inspect, types, dataclasses, math
 import datetime, zoneinfo

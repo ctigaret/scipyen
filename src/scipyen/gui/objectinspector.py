@@ -118,8 +118,6 @@ else:
 
 class ObjectInspector(ScipyenViewer):
     r"""Replacement for DataViewer.
-A lot of things copied from there, EXCEPT that it now uses
-``DataTreeview`` and ``DataTreeModel`` from ``gui.widgets.datatreeview`` module.
 """
     # sig_activated = Signal(int)
     sig_activated = Signal()

@@ -271,8 +271,6 @@ This field is redundant, therefore flagged for culling.
     # -> getattr(X, Y).getitem(Z) ->
     #   -> getitem(..., )
     #
-    # this may be contrived, wheres the current logic in datatreemodel
-    # meesa more straightforward
 
     def isValid(self) -> bool:
         return isinstance(objId, int)

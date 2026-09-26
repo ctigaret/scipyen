@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""
-New data viewer widget, based on datatreemodel
+New data viewer widget, based on objectmodel
 """
 # from __future__ import print_function
 
@@ -72,7 +72,6 @@ from core import strutils
 from gui.delegates import PythonItemDelegate
 from gui.workspacegui import WorkspaceGuiMixin
 from gui.itemmodels.roles import *
-from gui.itemmodels.datatreemodel import DataTreeModel
 from gui.itemmodels.datatree.objectmodel import ObjectModel
 from gui import quickdialog
 
@@ -124,7 +123,6 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         self.sourceModel = ObjectModel(showMethods = self._showCallables_,
                                        valuesOnly = self._showValuesOnly_,
                                        parent=self)
-        self.expanded.connect(self.sourceModel._slot_indexExpanded_)
 
         self.sourceModel.dataChanged.connect(self.sig_dataChanged)
         self.sourceModel.sig_modelDataChanged.connect(self.sig_modelDataChanged)
@@ -158,8 +156,11 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             )
 
         self.sig_itemDoubleClicked[QtGui.QStandardItem].connect(self.slot_itemDoubleClicked)
+
+        self.expanded.connect(self.sourceModel._slot_indexExpanded_)
         self.expanded.connect(self._slot_indexExpanded)
         self.collapsed.connect(self._slot_indexCollapsed)
+        self.sourceModel.sig_standaloneEditorChildExpanded.connect(self._slot_standaloneEditorChildExpanded)
 
         self.setAlternatingRowColors(True)
         self.setItemDelegate(self._delegate_)
@@ -616,11 +617,13 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             painter.drawText(self.viewport().rect(), QtCore.Qt.AlignCenter, elided_text)
             painter.restore()
 
-    # @prog.timefunc
-    def _setupChildDataItem_(self: typing.Self, item: QtGui.QStandardItem): #,
-                             # objData: typing.Optional[typing.Any] = None):
-        r"""Sets up the editor widgets for the items in the tree model.
+    @Slot(QtGui.QStandardItem)
+    def _slot_standaloneEditorChildExpanded(self, item: QtGui.QStandardItem):
+        self._setupStandAloneEditorForitem_(item)
 
+    # @prog.timefunc
+    def _setupStandAloneEditorForitem_(self: typing.Self, item: QtGui.QStandardItem):
+        r"""Sets up the standalone editor widgets for the items in the tree model.
     """
         # NOTE: 2026-02-09 21:41:40
         # Python sequence, mappings, and set types are treated as hierarchical data
@@ -633,68 +636,41 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             return
 
         model = self.sourceModel
-        # model = self.model()
-        # index = item.index()
-        objData = item.data(ObjectDataRole)
-        objType = item.data(ObjectTypeRole)
+        objData = item.parent().data(ObjectDataRole) # NOTE: 2026-09-26 23:54:52 this is an ObjectNode
 
-        if item.column() == 0 and item.hasChildren():
-            for row in range(item.rowCount()):
-                childItem = item.child(row, 0)
-                if childItem:
-                    if row == 0:
-                        hasEditorWidgetChild = childItem.data(StandaloneEditorWidgetRole)
-                        if hasEditorWidgetChild is True:
-                            flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
-                            # NOTE: 2026-04-01 11:03:24
-                            # this sets the child in row 0 to span all columns
-                            if self._useProxyModel_:
-                                self.setFirstColumnSpanned(0, self.proxyModel.mapFromSource(item.index()), True)
-                            else:
-                                self.setFirstColumnSpanned(0, item.index(), True)
+        hasEditorWidgetChild = item.data(StandaloneEditorWidgetRole)
+        if hasEditorWidgetChild is True:
+            # NOTE: 2026-04-01 11:03:24
+            # set the item to span all columns
+            if self._useProxyModel_:
+                self.setFirstColumnSpanned(0, self.proxyModel.mapFromSource(item.index()).parent(), True)
 
-                            # self.setItemDelegateForColumn(childItem.column(), self._delegate_)
-                            # self.setItemDelegateForRow(childItem.row(), self._delegate_)
-                            childItem.setFlags(flags)
+            else:
+                self.setFirstColumnSpanned(0, item.index().parent(), True)
 
-                            # childIndex = item.child(0).index()
-                            # ### BEGIN 2026-04-01 10:52:25 Too slow, but working; DO NOT DELETE
-                            #
+            # self.setItemDelegateForColumn(childItem.column(), self._delegate_)
+            # self.setItemDelegateForRow(childItem.row(), self._delegate_)
 
-                            if hasattr(model, "_inlineTables_") and model._inlineTables_:
-                                # print(f"{self.__class__.__name__}._setupChildDataItem_ for _inlineTables_")
-                                editorWidget = self._delegate_.createWidget(objData,
-                                                                            choices = [],
-                                                                            inModel = False,
-                                                                            parent = self)
-                                # if self.model().readOnly or item.data(ReadOnlyRole) is True:
-                                if model.readOnly or item.data(ReadOnlyRole) is True:
-                                    if hasattr(editorWidget,  "readOnly") and type(editorWidget).readOnly.__name__ == "property":
-                                        editorWidget.readOnly = True
 
-                                    elif hasattr(editorWidget, "setReadOnly") and isinstance(type(editorWidget).setReadOnly, (types.FunctionType, types.MethodType)):
-                                        editorWidget.setReadOnly(True)
-                                if self._useProxyModel_ is True:
-                                    self.setIndexWidget(self.proxyModel.mapFromSource(childItem.index()), editorWidget)
-                                else:
-                                    self.setIndexWidget(childItem.index(), editorWidget)
+            if hasattr(model, "_inlineTables_") and model._inlineTables_:
+                # print(f"{self.__class__.__name__}._setupStandAloneEditorForitem_ for _inlineTables_")
+                editorWidget = self._delegate_.createWidget(objData.data,
+                                                            choices = [],
+                                                            inModel = False,
+                                                            parent = self)
+                if model.readOnly or item.data(ReadOnlyRole) is True:
+                    if hasattr(editorWidget,  "readOnly") and type(editorWidget).readOnly.__name__ == "property":
+                        editorWidget.readOnly = True
 
-                            # ### END   2026-04-01 10:52:25 Too slow, but working; DO NOT DELETE
+                    elif hasattr(editorWidget, "setReadOnly") and isinstance(type(editorWidget).setReadOnly, (types.FunctionType, types.MethodType)):
+                        editorWidget.setReadOnly(True)
 
-                            continue
+                if self._useProxyModel_ is True:
+                    self.setIndexWidget(self.proxyModel.mapFromSource(item.index()), editorWidget)
 
-                    self._setupChildDataItem_(childItem)
+                else:
+                    self.setIndexWidget(item.index(), editorWidget)
 
-                infoItem = item.child(row, 2)
-                if infoItem:
-                    self._setupChildDataItem_(infoItem) #, objData)
-
-        elif item.column() == 2:
-            signalBlocker = QtCore.QSignalBlocker(self.model()) # noqa
-            parentItem = item.parent()
-            if parentItem:
-                objItem = parentItem.child(item.row(), 0)
-                objType = objItem.data(ObjectTypeRole) # noqa
 
     # @prog.timefunc
     def setData(self: typing.Self, obj: object,
@@ -734,7 +710,6 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
         # WARNING: 2026-06-28 11:45:39
         # DO NOT call begin/endResetMdoel on the proxyModel here
-        # see also WARNING: 2026-06-28 11:43:14 in itemmodels.datatreemodel.DataTreeModel
         root = self.sourceModel.invisibleRootItem()
 
         if root.hasChildren():
@@ -742,11 +717,11 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             # there is exactly one of these and it is the visible "root" of the
             # tree; all of objects "internals" are child rows of it.
             # objItem = root.child(0,0)
-            # self._setupChildDataItem_(self.sourceModel.topObjectItem)
 
             # if self._initialExpandDepth_ == 0 and self._currentExpansionDepth_ == 0:
             if self._currentExpansionDepth_ == 0:
                 self.collapseAll()
+
             else:
                 self.expandToDepth(max(0, self._currentExpansionDepth_))
 
@@ -792,11 +767,13 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     def readOnly(self: typing.Self, val: bool):
         self._readOnly_ = val is True
         # self.model().readonly = self._readOnly_
-        if isinstance(self.sourceModel, DataTreeModel):
+        if isinstance(self.sourceModel, ObjectModel):
             self.sourceModel.readOnly = self._readOnly_
+
         if self._readOnly_:
             self.setItemDelegate(self._defaultDelegate_)
             self.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+
         else:
             self.setItemDelegate(self._delegate_)
             self.setEditTriggers(self._defaultEditTriggers_)
