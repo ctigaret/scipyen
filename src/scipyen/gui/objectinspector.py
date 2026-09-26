@@ -1,5 +1,5 @@
 # __scipyen_plugin__
-# $Id: ${datatreeviewer} $
+# $Id: ${objectinspector.py} $
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -18,13 +18,13 @@ Qt-based viewer window for dict and subclasses.
 from __future__ import print_function  # noqa
 
 import os, sys, warnings, types, traceback, itertools, inspect # noqa
-import typing, dataclasses, numbers
+import typing, dataclasses #, numbers
 #### END core python modules
 
 #### BEGIN 3rd party modules
 import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+from qtpy import (QtCore, QtGui, QtWidgets) #, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot) # , Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
@@ -100,7 +100,6 @@ from ephys import ephys_protocol
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
 from gui import quickdialog
 from gui.pictgui import WorkerThread
-from gui.widgets.datatreeview import DataTreeView
 from gui.widgets.objectview import ObjectView
 from gui.itemmodels.roles import *
 from gui.itemmodels.datatree import objectnode as onode
@@ -117,7 +116,7 @@ else:
     altKeyDescr = "<ALT>"
     ctrlKeyDescr = "<CTRL>"
 
-class DataTreeViewer(ScipyenViewer):
+class ObjectInspector(ScipyenViewer):
     r"""Replacement for DataViewer.
 A lot of things copied from there, EXCEPT that it now uses
 ``DataTreeview`` and ``DataTreeModel`` from ``gui.widgets.datatreeview`` module.
@@ -206,7 +205,6 @@ A lot of things copied from there, EXCEPT that it now uses
 
         """
         self._useObjectView_: bool = kwargs.pop("useObjectView", True)
-        self._showMethods_:bool=kwargs.get("showMethods", False)
         self._showPrivateMembers_:bool = kwargs.get("showPrivate", False)
         self._showIntrospection_: bool = kwargs.get("introspect", False)
         self._showCallables_: bool = kwargs.get("showCallables", False)
@@ -222,12 +220,12 @@ A lot of things copied from there, EXCEPT that it now uses
             autoResizeColumns = {0,1}
 
         if inspect.isfunction(predicate):
-            if not self._showMethods_:
+            if not self._showCallables_:
                 self.predicate = lambda x: predicate(x) and not inspect.ismethod(x)
             else:
                 self.predicate = predicate
         else:
-            if not self._showMethods_:
+            if not self._showCallables_:
                 self.predicate = lambda x: not inspect.ismethod(x)
             else:
                 self.predicate = None
@@ -385,9 +383,8 @@ A lot of things copied from there, EXCEPT that it now uses
     @Slot(bool)
     @safewrapper
     def slot_showCallables(self, value: bool):
-        # print(f"{self.__class__.__name__},slot_showCallables({value})")
-        self.model.showMethods = value is True
-        self.slot_refreshDataDisplay()
+        # print(f"{self.__class__.__name__}.slot_showCallables({value})")
+        self.showCallables = value is True
 
     @Slot(bool)
     @safewrapper
@@ -573,10 +570,13 @@ A lot of things copied from there, EXCEPT that it now uses
                     "introspect": self.showIntrospection,
                     "showPrivate": self.showPrivateMembers,
                     "valuesOnly": self.showValuesOnly,
+                    "callables":self.showCallables,
                     "inlineTables": self.showInlineTables,
                     "readOnly": self.readOnly,
                     }
             # print(f"\n\temit self._sig_setTreeViewData_")
+            # NOTE: 2026-09-26 22:22:20
+            # connected to treeView.slot_setData
             self._sig_setTreeViewData_.emit(what)
 
     @Slot()
@@ -699,13 +699,12 @@ A lot of things copied from there, EXCEPT that it now uses
     @showInlineTables.setter
     def showInlineTables(self, val: bool):
         self._showInlineTables_ = val is True
-        sigBlock = QtCore.QSignalBlocker(self.inlineTablesAction)
-        self.inlineTablesAction.setChecked(self._showInlineTables_)
+        with qtutils.SignalBlocker(self.inlineTablesAction):
+            self.inlineTablesAction.setChecked(self._showInlineTables_)
+
         if self._data_ is not None and val != self.model.inlineTables:
             self.model.inlineTables = self._showInlineTables_
             self.slot_refreshDataDisplay()
-            # self.slot_setInlineTables(self._showInlineTables_)
-            # self.showInlineTables = self._showInlineTables_
 
     @property
     def initialExpandDepth(self) -> int:
@@ -767,8 +766,8 @@ A lot of things copied from there, EXCEPT that it now uses
         if self.model.showPrivateMembers != self._showPrivateMembers_:
             self.model.showPrivateMembers = self._showPrivateMembers_
             self.slot_refreshDataDisplay()
-        signalBlockers = QtCore.QSignalBlocker(self.showPrivateMembersAction) # noqa
-        self.showPrivateMembersAction.setChecked(self._showPrivateMembers_)
+        with qtutils.SignalBlocker(self.showPrivateMembersAction):
+            self.showPrivateMembersAction.setChecked(self._showPrivateMembers_)
 
     @property
     def showIntrospection(self) -> bool:
@@ -781,8 +780,8 @@ A lot of things copied from there, EXCEPT that it now uses
         if self.model.showIntrospection != self._showIntrospection_:
             self.model.showIntrospection = self._showIntrospection_
             self.slot_refreshDataDisplay()
-        signalBlockers = QtCore.QSignalBlocker(self.showIntrospectAction) # noqa
-        self.showIntrospectAction.setChecked(self._showIntrospection_)
+        with qtutils.SignalBlocker(self.showIntrospectAction):
+            self.showIntrospectAction.setChecked(self._showIntrospection_)
 
     @property
     def showValuesOnly(self) -> bool:
@@ -795,12 +794,9 @@ A lot of things copied from there, EXCEPT that it now uses
         if self.model.showValuesOnly != self._showValuesOnly_:
             self.model.showValuesOnly = val is True
             self.slot_refreshDataDisplay()
-        signalBlockers = QtCore.QSignalBlocker(self.showValuesOnlyAction) # noqa
-        self.showValuesOnlyAction.setChecked(self._showValuesOnly_)
 
-        # if self._data_ is not None:
-        #     self.slot_showValuesOnly(self._showValuesOnly_)
-
+        with qtutils.SignalBlocker(self.showValuesOnlyAction):
+            self.showValuesOnlyAction.setChecked(self._showValuesOnly_)
 
     @property
     def showCallables(self) -> bool:
@@ -810,10 +806,11 @@ A lot of things copied from there, EXCEPT that it now uses
     @showCallables.setter
     def showCallables(self, value: bool):
         self._showCallables_ = value is True
-        signalBlockers = QtCore.QSignalBlocker(self.showCallablesAction)
-        self.showCallablesAction.setChecked(self._showCallables_)
+        with qtutils.SignalBlocker(self.showCallablesAction):
+            self.showCallablesAction.setChecked(self._showCallables_)
 
-        if self._data_ is not None:
-            self.slot_showCallables(self._showCallables_)
+        if self.model.showCallables != self._showCallables_:
+            self.model.showCallables = self._showCallables_ is True
+            self.slot_refreshDataDisplay()
 
 

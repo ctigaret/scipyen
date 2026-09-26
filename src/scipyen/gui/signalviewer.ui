@@ -385,7 +385,7 @@
    <widget class="QWidget" name="dockWidgetContents_2">
     <layout class="QGridLayout" name="gridLayout_3">
      <item row="0" column="0">
-      <widget class="DataTreeView" name="annotationsViewer" native="true"/>
+      <widget class="ObjectView" name="annotationsViewer" native="true"/>
      </item>
     </layout>
    </widget>
@@ -1048,9 +1048,9 @@
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>DataTreeView</class>
+   <class>ObjectView</class>
    <extends>QWidget</extends>
-   <header location="global">gui.widgets.datatreeview</header>
+   <header location="global">gui.widgets.objectview</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

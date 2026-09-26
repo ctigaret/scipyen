@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'signalviewer.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.11.1
+## Created by: Qt User Interface Compiler version 6.11.2
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDockWidget,
     QMenuBar, QPlainTextEdit, QSizePolicy, QSpacerItem,
     QStatusBar, QToolBar, QVBoxLayout, QWidget)
 
-from gui.widgets.datatreeview import DataTreeView
+from gui.widgets.objectview import ObjectView
 from gui.widgets.spinboxslider import SpinBoxSlider
 
 class Ui_SignalViewerWindow(object):
@@ -389,7 +389,7 @@ class Ui_SignalViewerWindow(object):
         self.dockWidgetContents_2.setObjectName(u"dockWidgetContents_2")
         self.gridLayout_3 = QGridLayout(self.dockWidgetContents_2)
         self.gridLayout_3.setObjectName(u"gridLayout_3")
-        self.annotationsViewer = DataTreeView(self.dockWidgetContents_2)
+        self.annotationsViewer = ObjectView(self.dockWidgetContents_2)
         self.annotationsViewer.setObjectName(u"annotationsViewer")
 
         self.gridLayout_3.addWidget(self.annotationsViewer, 0, 0, 1, 1)

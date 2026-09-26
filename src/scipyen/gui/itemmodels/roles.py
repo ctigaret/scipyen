@@ -45,7 +45,8 @@ ReadOnlyChildrenRole = QtCore.Qt.UserRole + 400
 ObjectDataEditExternallyRole = QtCore.Qt.UserRole + 410
 ObjectChildrenCountRole = QtCore.Qt.UserRole + 420
 PopulatedChildrenRole = QtCore.Qt.UserRole + 430
-ObjectNodeRole = QtCore.Qt.UserRole + 440 # used in objectmodel
+ObjectNodeRole = QtCore.Qt.UserRole + 440 # to be used in objectmodel (but not yet?)
+ObjectInfoRole = QtCore.Qt.UserRole + 450 # used in objectmodel
 
 
 __all__ = (
@@ -55,6 +56,7 @@ __all__ = (
     "ObjectDataAccessTypeRole",
     "ObjectDataEditExternallyRole",
     "ObjectDataRole",
+    "ObjectInfoRole",
     "ObjectKeyRole",
     "ObjectKeyTypeRole",
     "ObjectNodeRole",

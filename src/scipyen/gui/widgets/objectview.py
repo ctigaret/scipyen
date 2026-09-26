@@ -8,29 +8,29 @@ New data viewer widget, based on datatreemodel
 """
 # from __future__ import print_function
 
-import os, sys
+import os, sys  # noqa: I001
 # import warnings
 import types
 import traceback
 # import itertools
-import inspect
+# import inspect
 import dataclasses
-import numbers
-import pathlib
-import datetime
-import fractions
-import decimal
-import pkgutil
+# import numbers
+# import pathlib
+# import datetime
+# import fractions
+# import decimal
+# import pkgutil
 import typing
-import enum
-import pickle
-from functools import (singledispatch, singledispatchmethod)
-from collections import deque
-from dataclasses import MISSING
-import math
+# import enum
+# import pickle
+# from functools import (singledispatch, singledispatchmethod)
+# from collections import deque
+# from dataclasses import MISSING
+# import math
 # import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+from qtpy import (QtCore, QtGui, QtWidgets) #, QtXml, QtSvg, QtNetwork, )
+from qtpy.QtCore import (Signal, Slot) #, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
 # __has_sip__ = False
@@ -54,19 +54,19 @@ else:
     QShortcut = QtWidgets.QShortcut
     # __has_sip__ = True
 
-import neo
-if neo.__version__ >= '0.13.0':
-    from neo.core.objectlist import ObjectList as NeoObjectList
-import quantities as pq
-import numpy as np
+# import neo
+# if neo.__version__ >= '0.13.0':
+#     from neo.core.objectlist import ObjectList as NeoObjectList
+# import quantities as pq
+# import numpy as np
 # import scipy
-import pandas as pd
+# import pandas as pd
 # import vigra
 # ### END 3rd party modules
 
 # from core.workspacefunctions import (validate_varname, user_workspace)
-from core import prog
-from core.prog import safewrapper
+# from core import prog
+from core.prog import safewrapper  # noqa: I001
 from core import strutils
 
 from gui.delegates import PythonItemDelegate
@@ -196,10 +196,10 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
         if len(item_paths) > 1:
             if bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier):
-                QtWidgets.QApplication.clipboard().setText(",\n".join(["""%s""" % i for i in item_paths]))
+                QtWidgets.QApplication.clipboard().setText(",\n".join(["""%s""" % i for i in item_paths]))  # noqa: UP031
                 # self._scipyenMainWindow_.app.clipboard().setText(",\n".join(["""%s""" % i for i in item_paths]))
             else:
-                QtWidgets.QApplication.clipboard().setText(", ".join(["""%s""" % i for i in item_paths]))
+                QtWidgets.QApplication.clipboard().setText(", ".join(["""%s""" % i for i in item_paths]))  # noqa: UP031
                 # self._scipyenMainWindow_.app.clipboard().setText(", ".join(["""%s""" % i for i in item_paths]))
 
         elif len(item_paths) == 1:
@@ -216,7 +216,7 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         handler_specs = VTH.get_handler_spec(type(obj))
 
         tableEdit = list(filter(lambda x: "TableEditor" in x, handler_specs))
-        dataTreeEdit = list(filter(lambda x: "DataTreeViewer" in x, handler_specs))
+        dataTreeEdit = list(filter(lambda x: "ObjectInspector" in x, handler_specs))
         textEdit = list(filter(lambda x: "TextViewer" in x, handler_specs))
 
         winType = None
@@ -232,7 +232,7 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
         # print(f"\twinType = {winType}")
 
-        if winType:
+        if winType:  # noqa: SIM102
             if not self._scipyenMainWindow_.viewObject(obj, name, winType=winType,
                                     newWindow=True,
                                     askForParams=askForParams):
@@ -246,7 +246,7 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
 
     @Slot(QtGui.QStandardItem)
     def slot_itemDoubleClicked(self: typing.Self, item:QtGui.QStandardItem):
-        from gui.datatreeviewer import DataTreeViewer
+        from gui.objectinspector import ObjectInspector
         askForParams = bool(
             QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
 
@@ -254,17 +254,17 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             return
 
         if item.column() == 0:
-            readOnly = item.data(ReadOnlyRole) is True # noqa
+            readOnly = item.data(ReadOnlyRole) is True
             obj = self.sourceModel.getDataObjectForLeaf(item)
             if obj is None:
                 return
             name = item.data(QtCore.Qt.DisplayRole)
-            if item.data(ObjectDataEditExternallyRole) is True: # noqa
+            if item.data(ObjectDataEditExternallyRole) is True:
                 self._editExternally_(obj, name, askForParams)
 
             else:
                 self.readOnly = readOnly
-                if isinstance(self.parent(), DataTreeViewer):
+                if isinstance(self.parent(), ObjectInspector):
                     self.parent().view(obj, doc_title = name)
                 else:
                     self._showInConsole_(obj)
@@ -383,9 +383,9 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             self._obj_to_view_ = (obj, name)
 
             viewItemData = cm.addAction("View/Edit")
-            viewItemData.setToolTip(f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
-            viewItemData.setStatusTip(f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
-            viewItemData.setWhatsThis(f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.setToolTip(f"View using generic ObjectInspector; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.setStatusTip(f"View using generic ObjectInspector; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+            viewItemData.setWhatsThis(f"View using generic ObjectInspector; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
             viewItemData.triggered.connect(self.slot_viewItem)
 
             if not issubclass(type(obj), QtWidgets.QWidget):
@@ -535,7 +535,7 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     @Slot()
     @safewrapper
     def slot_viewItem(self: typing.Self):
-        from gui.datatreeviewer import DataTreeViewer
+        from gui.objectinspector import ObjectInspector
         # from core.utilities import get_nested_value
         # print(f"{self.__class__.__name__}.slot_viewItem")
         # print(f"\t{self._obj_to_view_}")
@@ -571,7 +571,7 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                                     askForParams=askForParams):
                 self._showInConsole_(variable)
         else:
-            if isinstance(self.parent(), DataTreeViewer):
+            if isinstance(self.parent(), ObjectInspector):
                 if isinstance(variable, tuple(self.parent().viewer_for_types.keys())):
                     self.parent().view(variable, doc_title = varname)
                 else:
@@ -595,12 +595,12 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
             self._scipyenMainWindow_.assignToWorkspace("____", obj)
             self._scipyenMainWindow_.console.execute("____", hidden=False, interactive=False)#, store_history=False)
             self._scipyenMainWindow_.console.execute("del ____", hidden=True, interactive=False)#, store_history=False)
-        except:
+        except:  # noqa: E722
             traceback.print_exc()
 
     def setModel(self: typing.Self, model: QtCore.QAbstractItemModel):
         r"""Overrides QtCore.QAbstractItemModel.setModel() to disallow changing the model"""
-        pass
+        return
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -699,14 +699,14 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
     # @prog.timefunc
     def setData(self: typing.Self, obj: object,
                 name: str | None = None,
-                showPrivate: bool = False,
-                valuesOnly: bool = True,
                 inlineTables: bool = False,
                 introspect: bool = False,
-                predicate: types.FunctionType | None = None):
-        # print(f"{self.__class__.__name__}.setData({type(obj)})")
-        # signalBlocker = QtCore.QSignalBlocker(self.model()) #noqa
-        # model = self.model()
+                predicate: types.FunctionType | None = None,
+                showPrivate: bool = False,
+                valuesOnly: bool = True,
+                callables: bool = False,
+                readOnly: bool = True,
+                ):
 
         # print(f"\n\tcall self.sourceModel.beginResetModel()")
         # NOTE: 2026-06-28 11:51:12
@@ -715,11 +715,14 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         # print(f"\n\tcall self.sourceModel.endResetModel()")
         # self.sourceModel.endResetModel()
         self.sourceModel.populateModel(obj, rootTitle=name,
-                                       showPrivate=showPrivate,
-                                       introspect=introspect,
                                        inlineTables=inlineTables,
+                                       introspect=introspect,
+                                       predicate=predicate,
+                                       showPrivate=showPrivate,
                                        valuesOnly=valuesOnly,
-                                       predicate=predicate)
+                                       callables=callables,
+                                       readOnly=readOnly,
+                                       )
         self.sourceModel.readOnly = self.readOnly
 
         if self.readOnly:
@@ -859,7 +862,7 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
                                 filter(
                                     (
                                         lambda i: i.column() == 0
-                                        and not i.data(StandaloneEditorWidgetRole) # noqa
+                                        and not i.data(StandaloneEditorWidgetRole)
                                     ),
                                     items
                                     )
@@ -916,10 +919,15 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         valuesOnly = what.get("valuesOnly", True)
         inlineTables = what.get("inlineTables", False)
         introspect = what.get("introspect", False)
+        callables = what.get("callables", False)
         predicate = what.get("predicate", None)
 
-        self.setData(data, root_title, showPrivate, valuesOnly,
-                     inlineTables, introspect, predicate)
+        self.setData(data, name=root_title, inlineTables=inlineTables,
+                     introspect=introspect, predicate=predicate,
+                     showPrivate=showPrivate, valuesOnly=valuesOnly,
+                     callables=callables,
+                     readOnly=self.readOnly
+                     )
 
     def clear(self: typing.Self):
         # self.sourceModel.beginResetModel()
@@ -951,6 +959,7 @@ class ObjectView(QtWidgets.QTreeView, WorkspaceGuiMixin):
         evt.setAccepted(True)
 
     def mouseMoveEvent(self: typing.Self, evt: QtGui.QMouseEvent):
+        # TODO: 2026-09-26 22:10:14 Finalize me !!!
         if (evt.buttons() & QtCore.Qt.LeftButton
             and isinstance(self._dragStartPosition_, QtCore.QPoint)
             ):

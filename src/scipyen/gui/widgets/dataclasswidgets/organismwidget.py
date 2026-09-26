@@ -55,7 +55,7 @@ from core import scipyendataclasses as sdc
 from core import desktoputils
 from core import taxonbridge
 from core import qtutils
-from gui import datatreeviewer
+from gui import ObjectInspector
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
@@ -305,8 +305,8 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget, QtWidgets.QWidget):
         # win_title = f"Taxon Details of {getattr(self._data_, 'name', type(self._data_).__name__)}"
         doc_title =  "taxon"
         if taxonbridge.hasTaxoniq and isinstance(self._data_.taxon, taxonbridge.Taxon):
-            if not isinstance(self.taxonDetailsViewer, datatreeviewer.DataTreeViewer):
-                self.taxonDetailsViewer= datatreeviewer.DataTreeViewer(
+            if not isinstance(self.taxonDetailsViewer, ObjectInspector.ObjectInspector):
+                self.taxonDetailsViewer= ObjectInspector.ObjectInspector(
                     parent=self,
                     doc_title=doc_title,
                     # title="Detailed view"

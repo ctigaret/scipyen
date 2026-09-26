@@ -58,8 +58,8 @@ from core.prog import scipywarn # noqa
 from core import scipyendataclasses as sdc
 # from core import scipyen_quantities as scq
 from core import qtutils
-# from gui import guiutils, textviewer, datatreeviewer
-from gui.datatreeviewer import DataTreeViewer
+# from gui import guiutils, textviewer, ObjectInspector
+from gui.objectinspector import ObjectInspector
 # from gui.textviewer import TextViewer
 # from gui.widgets.dataclasswidgets.dataexchangewidget import DataExchangeWidget
 from gui.widgets.anchoringcollapsiblewidget import AnchoringCollapsibleWidget
@@ -196,7 +196,7 @@ class DataClassWidget(AnchoringCollapsibleWidget):
                     self.nameDescriptionWidget.symbol = self._objSymbol_
                     self.nameDescriptionWidget.dataDescription = self._data_.description
 
-                if (isinstance(self.nameDescriptionWidget.detailsViewer, DataTreeViewer)
+                if (isinstance(self.nameDescriptionWidget.detailsViewer, ObjectInspector)
                     and self.nameDescriptionWidget.detailsViewer.isVisible()):
                     self.nameDescriptionWidget.detailsViewer.view(self._data_,
                                                                 doc_title = self._objSymbol_,

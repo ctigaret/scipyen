@@ -53,7 +53,7 @@ from core.prog import scipywarn # noqa
 from core import scipyendataclasses as sdc
 # from core import scipyen_quantities as scq
 # from core import taxonbridge
-# from gui import datatreeviewer
+# from gui import ObjectInspector
 # from gui.widgets import small_widgets as smw
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 # from gui.workspacegui import WorkspaceGuiMixin

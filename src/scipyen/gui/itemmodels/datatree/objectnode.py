@@ -82,7 +82,7 @@ from treelib import (Tree, Node)
 # from core.qtutils import qVariant #, QVariantType #, qVariants, fromQVariant, isQObjectAlive)
 import core.datatypes as datatypes # noqa
 from core.datatypes import (is_namedtuple, TypeEnum)
-from core.prog import (scipywarn, timefunc, processtimefunc)  # noqa
+from core.prog import (scipywarn, timefunc, processtimefunc, is_hashable)  # noqa
 from core import taxonbridge
 from core import bgbridge
 from core.triggerprotocols import TriggerProtocol # noqa
@@ -300,6 +300,10 @@ class ObjectNode(Node):
     def objectInfo(self) -> ObjectInfo:
         return self._objectInfo_
 
+    @objectInfo.setter
+    def objectInfo(self, value: ObjectInfo):
+        self._objectInfo_ = value
+
     @property
     def intialized(self) -> bool:
         return isinstance(self._objectInfo_, ObjectInfo)
@@ -364,7 +368,7 @@ class ObjectNode(Node):
 
         result = []
 
-        # print(f"{self.__class__.__name__}.populate()")
+        # print(f"{self.__class__.__name__}<'{self.tag}'>.populate()")
         for child in self.objectInfo.children:
             # print(f"inspecting '{child}' of node '{node.tag}'")
             keyType = type(child)
@@ -386,7 +390,7 @@ class ObjectNode(Node):
                 obj = accessor(self.data, child, None)
 
 
-            # print(f"\tgot child '{key}' object {type(obj).__name__}")
+            # print(f"\t -> got child '{key}' ({keyType.__name__}) ↦ {type(obj).__name__} object")
             # visited = list(tree.filter_nodes(lambda n: n.data is obj))
             oInfo = parseObject(obj, key,
                                 introspect=introspect,

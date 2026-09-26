@@ -336,7 +336,7 @@ except: # noqa
 # from gui import signalviewer as sv # noqa
 # from gui import matrixviewer as matview # noqa
 # from gui import imageviewer as iv # noqa
-# from gui import datatreeviewer as dv # noqa
+# from gui import ObjectInspector as dv # noqa
 # # from gui.pythonhelpwidget import PythonHelpWidget
 #
 # from .consoles import styles, pstyles # noqa

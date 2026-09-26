@@ -8,8 +8,7 @@ import os, sys
 import matplotlib as mpl
 
 from .scipyenviewer import (ScipyenViewer, ScipyenFrameViewer,)
-# from .dataviewer import DataViewer
-from .datatreeviewer import DataTreeViewer
+from .objectinspector import ObjectInspector
 from .matrixviewer import MatrixViewer
 from .imageviewer import ImageViewer
 from .signalviewer import SignalViewer

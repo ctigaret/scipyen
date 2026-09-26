@@ -307,19 +307,19 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
 
     @Slot()
     def slot_viewProtocolDetails(self):
-        from gui import datatreeviewer
+        from gui import ObjectInspector
         if self._protocol_ is None:
             return
 
         doc_title = self._protocol_.name
-        if not isinstance(self.protocolViewer, datatreeviewer.DataTreeViewer):
+        if not isinstance(self.protocolViewer, ObjectInspector.ObjectInspector):
             topWindow = self.getHighestAncestor()
             if topWindow is self:
                 appWindow = None
             else:
                 appWindow = topWindow
 
-            self.protocolViewer = datatreeviewer.DataTreeViewer(
+            self.protocolViewer = ObjectInspector.ObjectInspector(
                 parent=self,
                 doc_title=doc_title,
                 appWindow = appWindow,
@@ -508,7 +508,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
             self.nFramesSpinBox.setValue(self._nFrames_)
 
     def setValue(self, val: typing.Optional[ephys_pathways.RecordingEpisode] = None):
-        from gui import datatreeviewer
+        from gui import ObjectInspector
         # print(f"{self.__class__.__name__}.setValue({val}) <{type(val).__name__}>")
         if isinstance(val, ephys_pathways.RecordingEpisode):
             self._data_ = val
@@ -519,7 +519,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
             self._end_ = self._data_.end
             self._episodeType_ = self._data_.type
             if isinstance(self._data_.stimulusLayout, ephys_pathways.PathwaysStimulationLayout):
-                if (isinstance(self.stimulusLayoutViewer, datatreeviewer.DataTreeViewer)
+                if (isinstance(self.stimulusLayoutViewer, ObjectInspector.ObjectInspector)
                     and self.stimulusLayoutViewer.isVisible()
                     and qtutils.isQObjectAlive(self.stimulusLayoutViewer)
                     ):
@@ -533,7 +533,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
             self._stimulusLayout_ = self._data_.stimulusLayout
 
             if isinstance(self._data_.protocol, ephys_protocol.ElectrophysiologyProtocol):
-                if (isinstance(self.protocolViewer, datatreeviewer.DataTreeViewer)
+                if (isinstance(self.protocolViewer, ObjectInspector.ObjectInspector)
                     and self.protocolViewer.isvisible()
                     and qtutils.isQObjectAlive(self.protocolViewer)
                     ):
@@ -558,14 +558,14 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
             self._nFrames_ = 0
             self._protocol_ = None
             self._stimulusLayout_ = None
-            if (isinstance(self.stimulusLayoutViewer, datatreeviewer.DataTreeViewer)
+            if (isinstance(self.stimulusLayoutViewer, ObjectInspector.ObjectInspector)
                 and qtutils.isQObjectAlive(self.stimulusLayoutViewer)
                 ):
                 self.stimulusLayoutViewer.close()
                 self.stimulusLayoutViewer.deleteLater()
                 self.stimulusLayoutViewer = None
 
-            if (isinstance(self.protocolViewer, datatreeviewer.DataTreeViewer)
+            if (isinstance(self.protocolViewer, ObjectInspector.ObjectInspector)
                 and qtutils.isQObjectAlive(self.protocolViewer)
                 ):
                 self.protocolViewer.close()

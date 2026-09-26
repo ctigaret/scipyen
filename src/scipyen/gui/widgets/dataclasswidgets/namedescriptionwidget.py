@@ -38,7 +38,7 @@ from core.prog import scipywarn #noqa
 from core import qtutils
 from iolib import pictio as pio
 
-from gui import textviewer, datatreeviewer
+from gui import textviewer, ObjectInspector
 # from gui.workspacegui import WorkspaceGuiMixin
 from gui.widgets.dataclasswidgets.dataexchangewidget import DataExchangeWidget
 from gui.widgets.anchoringcollapsiblewidget import AnchoringCollapsibleWidget
@@ -206,7 +206,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
             self._dataName_ = val.name
             self.nameLineEdit.setText(self._dataName_)
 
-        if isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):# and self.detailsViewer.isVisible():
+        if isinstance(self.detailsViewer, ObjectInspector.ObjectInspector):# and self.detailsViewer.isVisible():
             # print(f"\n\t-> call self.detailsViewer.view({val},\n{self.symbol})")
             self.detailsViewer.view(val, doc_title=self.symbol, autoRaise=False)
             self.detailsViewer.slot_refreshDataDisplay()
@@ -258,13 +258,13 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
         doc_title =  varName if len(varName.strip()) else getattr(obj, 'name', type(obj).__name__)
         # win_title = f"Details of {varName}"
         # win_title = "Details"
-        if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
+        if not isinstance(self.detailsViewer, ObjectInspector.ObjectInspector):
             topWindow = self.getHighestAncestor()
             if topWindow is self:
                 appWindow = None
             else:
                 appWindow = topWindow
-            self.detailsViewer = datatreeviewer.DataTreeViewer(
+            self.detailsViewer = ObjectInspector.ObjectInspector(
                 parent=self,
                 doc_title=doc_title,
                 appWindow = appWindow,
@@ -285,7 +285,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
 
     @Slot()
     def _slot_dataChangedInDetailsViewer(self):
-        r"""Captures changes in the details viewer (a DataTreeViewer)"""
+        r"""Captures changes in the details viewer (a ObjectInspector)"""
         self.sig_detailsChanged.emit()
 
     @Slot()
@@ -355,7 +355,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
         if isinstance(val, str) and len(val.strip()):
             self._objSymbol_ = val
             if (
-                isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer)
+                isinstance(self.detailsViewer, ObjectInspector.ObjectInspector)
                 and qtutils.isQObjectAlive(self.detailsViewer)
                 ):
                 self.detailsViewer.setRootName(self._objSymbol_)
@@ -419,7 +419,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
             self.descriptionEditor.deleteLater()
             self.descriptionEditor = None
 
-        if isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
+        if isinstance(self.detailsViewer, ObjectInspector.ObjectInspector):
             self.detailsViewer.close()
             self.detailsViewer.deleteLater()
             self.detailsViewer = None

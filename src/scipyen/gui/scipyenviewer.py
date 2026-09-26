@@ -71,7 +71,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
     Derived classes:
     -----------------
-    DataTreeViewer, MatrixViewer, ScipyenFrameViewer, TableEditor, TextViewer, XMLViewer
+    ObjectInspector, MatrixViewer, ScipyenFrameViewer, TableEditor, TextViewer, XMLViewer
 
     Developer information:
     -----------------------
@@ -157,12 +157,12 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     attribute of the viewer classes; the names of these menu items are set by
     the value of the "view_action_name" attribute.
 
-    DataTreeViewer has a special place. It has been designed to display tree-like
+    ObjectInspector has a special place. It has been designed to display tree-like
     data structures (e.g. dict and derived types) but can also display any python
     object that has a "__dict__" attribute. Therefore, the dict and derived types
-    shuld be the first elements in DataTreeViewer.viewer_for_types. In this way, other
+    shuld be the first elements in ObjectInspector.viewer_for_types. In this way, other
     data types for which there exists a specialized viewer will be displayed,
-    by default, in that specialized viewer, instead of DataTreeViewer.
+    by default, in that specialized viewer, instead of ObjectInspector.
     """
     sig_activated           = Signal(name="sig_activated")
     sig_closeMe             = Signal()
@@ -633,7 +633,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # print(f"{self.__class__.__name__}.setData uiParamsPrompt")
 
         if len(args):
-            if "DataTreeViewer" not in self.__class__.__name__:
+            if "ObjectInspector" not in self.__class__.__name__:
                 if len(self.viewer_for_types) and not any([self._check_supports_parameter_type_(a) for a in args]):
                     raise TypeError("Expecting one of the supported types: %s" % " ".join([s.__name__ for s in self.viewer_for_types]))
 

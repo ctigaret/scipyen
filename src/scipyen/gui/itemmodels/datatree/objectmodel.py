@@ -10,19 +10,19 @@ import os # noqa
 import types
 import traceback
 # import itertools
-import inspect
-import dataclasses
-import numbers
+# import inspect
+# import dataclasses
+# import numbers
 import pathlib
-import datetime
-import fractions
-import decimal
+# import datetime
+# import fractions
+# import decimal
 import pkgutil
 import typing
-import enum
+# import enum
 import functools
-from functools import singledispatchmethod
-from collections import deque, UserDict, OrderedDict
+from functools import singledispatchmethod  # noqa: F401
+from collections import deque #, UserDict, OrderedDict
 from dataclasses import MISSING
 import weakref
 import math # noqa
@@ -53,77 +53,52 @@ else:
     QShortcut = QtWidgets.QShortcut
     # __has_sip__ = True
 
-try:
-    from pyqtgraph.widgets.DataTreeWidget import HAVE_METAARRAY
-except Exception: # noqa
-    HAVE_METAARRAY = None
-
-HAS_MESHIO = False
-try:
-    import meshio
-    HAS_MESHIO = True
-except: # noqa
-    pass
-
-# from pyqtgraph import (DataTreeWidget, TableWidget, )
-
-import neo # noqa
-if neo.__version__ >= '0.13.0':
-    from neo.core.objectlist import ObjectList as NeoObjectList
-import quantities as pq # noqa
-import numpy as np
-import scipy
+import numpy as np  # noqa: I001
 import pandas as pd
-import vigra
-import meshio
-from treelib import Tree, Node
+from treelib import Tree #, Node
 # ### END 3rd party modules
 
 from core.qtutils import qVariant #, QVariantType #, qVariants, fromQVariant, isQObjectAlive)
 import core.datatypes as datatypes # noqa
-from core.datatypes import (is_namedtuple, TypeEnum)
+# from core.datatypes import (is_namedtuple, TypeEnum)
 from core.prog import (scipywarn, timefunc, processtimefunc)  # noqa
-from core import taxonbridge
-from core import bgbridge
+# from core import taxonbridge
+# from core import bgbridge
 from core.triggerprotocols import TriggerProtocol # noqa
 from core.triggerevent import (DataMark, TriggerEvent, TriggerEventType) # noqa
 import core.datasignal as datasignal # noqa
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal) # noqa
 import core.datazone as datazone # noqa
-from core.datazone import (DataZone, Interval)
 from core import xmlutils, strutils # noqa
-from core import scipyen_quantities as scq
-from core.utilities import unique
 from core.prog import (safewrapper, safeguiwrapper, print_styled, # noqa
                        is_hashable)
 from core.traitcontainers import (DataBag, DataBagTraitsObserver,) # noqa
-from core.scipyendataclasses import (isDataclass, getField, getFieldOrProperty)
+# from core.scipyendataclasses import (isDataclass, getField, getFieldOrProperty)
 from core.datatypes import PODS
 
-from ephys import ephys_protocol
+# from ephys import ephys_protocol
 
 # print(f"has brain globe: {bgbridge.hasBrainGlobe}")
 
 # NOTE: 2026-02-07 09:14:19 FIXME/TODO
 # to break cycling dependencies in systems.PrairieView, which needs this for the
 # importer gui, MOVE the latter to a separate module
-from systems.PrairieView import *
-
-from imaging import vigrautils # noqa
-import imaging.axiscalibration
-from imaging.axiscalibration import (
-    AxesCalibration,
-    AxisCalibrationData,
-    ChannelCalibrationData,
-)
-from imaging.axisutils import (axisTypeStrings, # noqa
-                               getValueForAxisType,
-                               getNameForAxisType)
-import imaging.scandata # noqa
-from imaging.scandata import (ScanData, AnalysisUnit) # noqa
+# from systems.PrairieView import *
+#
+# from imaging import vigrautils
+# import imaging.axiscalibration
+# from imaging.axiscalibration import (
+#     AxesCalibration,
+#     AxisCalibrationData,
+#     ChannelCalibrationData,
+# )
+# from imaging.axisutils import (axisTypeStrings,
+#                                getValueForAxisType,
+#                                getNameForAxisType)
+# import imaging.scandata
+# from imaging.scandata import (ScanData, AnalysisUnit)
 
 from gui.itemmodels.roles import *
-
 from gui.itemmodels.datatree import objectnode as onode
 from gui.itemmodels.datatree.objectnode import ObjectNode, ObjectInfo
 
@@ -281,6 +256,8 @@ class ObjectModel(QtGui.QStandardItemModel):
                           includeCallables=self.showCallables,
                           includeTypeMembers=not self.showValuesOnly,
                           choices={},
+                          readOnly=self.readOnly,
+                          readOnlyChildren=self.readOnlyChildren,
                         )
         # print(f"\t=> {len(childNodes)} child nodes")
 
@@ -374,6 +351,111 @@ class ObjectModel(QtGui.QStandardItemModel):
     def readOnlyChildren(self: typing.Self, val: bool):
         self._readOnlyChildren_ = val is True
 
+    def _updateRowForNode_(self, item:QtGui.QStandardItem, objectNode: ObjectNode):
+        r"""Updates data representation based on the objectNode"""
+        # print(f"{self.__class__.__name__}._updateRowForNode_(item = {item.data(QtCore.Qt.DisplayRole)} at row {item.row()}, col {item.column()}, objectNode = {objectNode})")
+        if item.column() == 0:
+            objectItem = item
+            objectTypeItem = self.getItemSibling(item, 1)
+            objectInfoValueItem = self.getItemSibling(item, 2)
+
+        elif item.column() == 1:
+            objectItem = self.getItemSibling(item, 0)
+            objectTypeItem = item
+            objectInfoValueItem = self.getItemSibling(item, 2)
+
+        elif item.column() == 2:
+            objectItem = self.getItemSibling(item, 0)
+            objectTypeItem = self.getItemSibling(item, 1)
+            objectInfoValueItem = item
+
+        else:
+            return
+
+        objectItem.setData(qVariant(objectNode), ObjectDataRole)
+        objectItem.setData(qVariant(objectNode.objectInfo), ObjectInfoRole)
+        objectItem.setData(objectNode.objectInfo.name, QtCore.Qt.DisplayRole)
+        objectItem.setData(objectNode.objectInfo.objTip, QtCore.Qt.ToolTipRole)
+
+        if objectNode.objectInfo.objDataAsChild:
+            editExternally = not self._inlineTables_
+            objectItem.setData(editExternally, ObjectDataEditExternallyRole)
+
+            if self._inlineTables_:
+                dataItem = objectItem.child(0, 0)
+                dataItem.setData(qVariant(True), StandaloneEditorWidgetRole)
+                objectItem.setData(qVariant(1), ObjectChildrenCountRole)
+
+            else:
+                objectItem.setData(qVariant(0), ObjectChildrenCountRole)
+
+        else:
+            nChildren = len(objectNode.objectInfo.children)
+            objectItem.setRowCount(nChildren)
+            objectItem.setData(qVariant(nChildren), ObjectChildrenCountRole)
+
+        typeName = objectNode.objectInfo.objType.__name__
+        objectTypeItem.setData(typeName, QtCore.Qt.DisplayRole)
+        objectTypeItem.setData(qVariant(0), ObjectChildrenCountRole)
+
+        if isinstance(objectNode.data, pathlib.Path):
+            if __has_PySide6__:
+                objectInfoValueItem.setData(objectNode.data, ObjectDataRole) # expects Node payload
+                objectInfoValueItem.setData(objectNode.objectInfo.objInfo, QtCore.Qt.EditRole)
+
+            else:
+                objectInfoValueItem.setData(objectNode.data, QtCore.Qt.EditRole) # expects Node payload
+        else:
+            objectInfoValueItem.setData(objectNode.objectInfo.objInfo, QtCore.Qt.EditRole)
+            objectInfoValueItem.setData(objectNode.objectInfo.choices, DataChoicesRole)
+            objectInfoValueItem.setData(qVariant(0), ObjectChildrenCountRole)
+
+        flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsEditable
+        readOnlyFlags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsEnabled
+
+        readOnly = objectNode.objectInfo.readOnly is True or self.readOnly
+        readOnlyChildren = objectNode.objectInfo.readOnlyChildren is True or self.readOnly
+
+        palette = QtWidgets.QApplication.palette()
+        font = QtWidgets.QApplication.font()
+        brush = palette.brush(QtGui.QPalette.Active, QtGui.QPalette.Text)
+        readOnlyFont = QtGui.QFont(font)
+        readOnlyFont.setItalic(True)
+        readOnlyBrush = palette.brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
+
+        indexes = []
+
+        for itm in (objectItem, objectTypeItem, objectInfoValueItem):
+            itm.setData(readOnly, ReadOnlyRole) # star import from gui.itemmodels.roles
+            itm.setData(readOnlyChildren, ReadOnlyChildrenRole) # star import from gui.itemmodels.roles
+            if itm.column() == 2:
+                if readOnly or (
+                                    (
+                                        objectNode.objectInfo.indirect is True
+                                        or objectNode.objectInfo.objDataAsChild is True
+                                    )
+                                    and len(objectNode.objectInfo.choices) == 0
+                                ):
+                    itm.setData(readOnlyBrush, QtCore.Qt.ForegroundRole)
+                    itm.setData(readOnlyFont, QtCore.Qt.FontRole)
+                    itm.setFlags(readOnlyFlags)
+
+                else:
+                    itm.setData(brush, QtCore.Qt.ForegroundRole)
+                    itm.setData(font, QtCore.Qt.FontRole)
+                    itm.setFlags(flags)
+            else:
+                # prohibit editing in columns 0 and 1
+                itm.setData(brush, QtCore.Qt.ForegroundRole)
+                itm.setData(font, QtCore.Qt.FontRole)
+                itm.setFlags(readOnlyFlags)
+
+            index = self.indexFromItem(itm)
+            assert(index.isValid()), f"Invalid index for item {itm.data(QtCore.Qt.DisplayRole)} at {itm.row()}, {itm.column()}"
+            indexes.append(index)
+
+        self.dataChanged.emit(indexes[0], indexes[-1])
+
     def _makeRowForNode_(self, objectNode: ObjectNode):#, parentItem: QtGui.QStandardItem) -> tuple:
         objectItem = QtGui.QStandardItem(objectNode.objectInfo.name)
 
@@ -396,9 +478,16 @@ class ObjectModel(QtGui.QStandardItemModel):
         # the access expression «on the fly»
 
         objectItem.setData(qVariant(objectNode), ObjectDataRole) ## how about this !?
+        objectItem.setData(qVariant(objectNode.objectInfo), ObjectInfoRole) ## how about this !?
         # objectItem.setData(qVariant(objectNode.data), QtCore.Qt.EditRole)
+        # if objectNode.objectInfo.objKeyType is not str:
+        #     objectItem.setData(f"'{objectNode.objectInfo.name}'", QtCore.Qt.DisplayRole)
+        # else:
+        #     objectItem.setData(objectNode.objectInfo.name, QtCore.Qt.DisplayRole)
         objectItem.setData(objectNode.objectInfo.name, QtCore.Qt.DisplayRole)
-        objectItem.setData(objectNode.objectInfo.objTip, QtCore.Qt.ToolTipRole)
+
+        objectItemTip = f"Key type: {objectNode.objectInfo.objKeyType.__name__} -> {objectNode.objectInfo.objTip} object"
+        objectItem.setData(objectItemTip, QtCore.Qt.ToolTipRole)
 
         if objectNode.objectInfo.objDataAsChild:
             editExternally = not self._inlineTables_
@@ -468,6 +557,7 @@ class ObjectModel(QtGui.QStandardItemModel):
         readOnlyFont = QtGui.QFont(font)
         readOnlyFont.setItalic(True)
         readOnlyBrush = palette.brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
+        # readOnlyBrush = palette.brush(QtGui.QPalette.Disabled, QtGui.QPalette.Text)
 
         for k, item in enumerate((objectItem, objectTypeItem, objectInfoValueItem)):
             item.setData(readOnly, ReadOnlyRole) # star import from gui.itemmodels.roles
@@ -683,23 +773,23 @@ class ObjectModel(QtGui.QStandardItemModel):
                         choices: dict | None = None,
                         readOnly: bool = False,
                         readOnlyChildren: bool = False,
-                        # hideRoot: bool = False,
                     ):
         # print(f"{self.__class__.__name__}.populateModel({type(obj)}, rootTitle: {rootTitle})")
         # print(f"\n\t-> call self.clear()")
         # ### BEGIN WARNING: 2026-06-28 11:43:14
         # this calls beginResetModel() ... endResetModel() already,
         # therefore it MUST NOT follow an isolated call to beginResetModel
-        self.clear()
         # ### END   WARNING: 2026-06-28 11:43:14
         # print(f"\n\t-> call self.beginResetModel()")
-        self.beginResetModel()
+
+        self.clear()
+
         # self._visited_.clear()
         # self._hideRoot_ = hideRoot is True
         self._introspect_ = introspect is True
         self._predicate_ = predicate
         self._showPrivate_ = showPrivate is True
-        self._showCallables_ = callables is True,
+        self._showCallables_ = callables is True
         self._showValueAttributesOnly_ = valuesOnly is True
         self._inlineTables_ = inlineTables is True
         self._readOnly_ = readOnly is True
@@ -727,12 +817,15 @@ class ObjectModel(QtGui.QStandardItemModel):
                                            includeTypeMembers = not self._showValueAttributesOnly_,
                                            choices = choices,
                                            readOnly = self._readOnly_,
-                                           readOnlyChildren = self._readOnly_)
+                                           readOnlyChildren = self._readOnly_,
+                                           objKey=self._rootTitle_,
+                                           objKeyType=type(self._rootTitle_))
 
         self._tree_.add_node(self._rootNode_)
         # print(f"\n\t-> assign to self._modelData_")
         self._modelData_ = self._rootNode_.data
 
+        self.beginResetModel()
         rowItems = self._makeRowForNode_(self._rootNode_)
 
         rootItem = self.invisibleRootItem()
@@ -757,6 +850,7 @@ class ObjectModel(QtGui.QStandardItemModel):
 
     @showCallables.setter
     def showCallables(self, val:bool):
+        # print(f"{self.__class__.__name__}.showCallables({val})")
         self._showCallables_ = val is True
 
     @property
@@ -774,6 +868,14 @@ class ObjectModel(QtGui.QStandardItemModel):
     @showIntrospection.setter
     def showIntrospection(self, val: bool):
         self._introspect_ = val is True
+
+    @property
+    def predicate(self) -> types.FunctionType | None:
+        return self._predicate_
+
+    @predicate.setter
+    def predicate(self, value: types.FunctionType | None):
+        self._predicate_ = value
 
     @property
     def showValuesOnly(self) -> bool:
@@ -808,12 +910,12 @@ class ObjectModel(QtGui.QStandardItemModel):
     #         idx = len(self._visited_)
     #         self._visited_[objId] = (idx, type(obj), path, realtype)
 
-    def itemChildren(self: typing.Self,
-                     item: QtGui.QStandardItem) -> list:
-        if not item.hasChildren():
-            return []
-
-        return [item.child(k, 0) for k in range(item.rowCount())]
+    # def itemChildren(self: typing.Self,
+    #                  item: QtGui.QStandardItem) -> list:
+    #     if not item.hasChildren():
+    #         return []
+    #
+    #     return [item.child(k, 0) for k in range(item.rowCount())]
         # return list(map(lambda k: item.child(k, 0), range(item.rowCount())))
 
 
@@ -827,6 +929,7 @@ class ObjectModel(QtGui.QStandardItemModel):
 
         if isinstance(leaf, QtCore.QModelIndex):
             item = self.itemFromIndex(leaf)
+
         else:
             item = leaf
 
@@ -865,24 +968,51 @@ class ObjectModel(QtGui.QStandardItemModel):
         if parentItem:
             return parentItem.child(item.row(), 0)
 
+    def getItemSibling(self, item: QtGui.QStandardItem, column: int) -> QtGui.QStandardItem | None:
+        index = self.indexFromItem(item)
+        if not index.isValid():
+            return
+
+        sibling = index.sibling(index.row(), column)
+
+        if sibling.isValid():
+            return self.itemFromIndex(sibling)
+
+    def getMasterIndex(self, index: QtCore.QModelIndex) -> QtCore.QModelIndex:
+        r"""The "master" index is the one in column 0, and associates the node with payload"""
+        if not index.isValid():
+            return QtCore.QModelIndex() # invalid index
+
+        return index.sibling(index.row(), 0)
+
     def setData(self: typing.Self, modelIndex: QtCore.QModelIndex,
                 value: object, role = QtCore.Qt.EditRole) -> bool:
+        # print(f"{self.__class__.__name__}.setData({modelIndex}, {value}, {role})")
         if self._modelData_ is None:
             return False
 
         item = self.itemFromIndex(modelIndex)
 
-        if role == ObjectDataRole:
+        if role in (ObjectDataRole, QtCore.Qt.EditRole):
             if item.column() != 0:
                 parentItem = item.parent()
                 if not parentItem:
                     return False
                 item = parentItem.child(item.row(), 0)
 
-            node = item.data(role)
+            node = item.data(ObjectDataRole)
 
             if item.data(ReadOnlyRole) is True or node is None or node.objectInfo.readOnly:
                 return
+
+            originalObjectInfo = node.objectInfo
+
+            # NOTE: 2026-09-26 10:33:25
+            # find nodes that share this object info - they point to references
+            # to the original dataChanged
+            # these do not exist unless  their parent node was expanded
+            # sharedNodes = list(self.tree.filter_nodes(
+            #     lambda n: n.objectInfo == originalObjectInfo and n != node))
 
             path = self._getPathForItemOrIndex_(item)
             # I think this should always be so
@@ -895,9 +1025,33 @@ class ObjectModel(QtGui.QStandardItemModel):
                 # print(f"{self.__class__.__name__}.setData: setexpr = {setexpr}")
                 exec(setexpr) # noqa
                 newVal = eval(accexpr)
-                OK = True
+                objectInfo = onode.parseObject(newVal, node.tag,
+                                            introspect=self.showIntrospection,
+                                            predicate=self.predicate,
+                                            includePrivate=self.showPrivateMembers,
+                                            includeCallables=self.showCallables,
+                                            includeTypeMembers=not self.showValuesOnly,
+                                            choices=node.objectInfo.choices,
+                                            readOnly=self.readOnly,
+                                            readOnlyChildren=self.readOnlyChildren,
+                                            objKey=node.objectInfo.objKey,
+                                            objKeyType=node.objectInfo.objKeyType)
+
+                node.objectInfo = objectInfo
                 node.data = newVal
+                self._updateRowForNode_(item, node)
                 self.dataChanged.emit(modelIndex, modelIndex)
+
+                for sharedItem in filter(lambda i: i is not item,
+                                      self.findItems("info", originalObjectInfo)):
+                    sharedItemNode = sharedItem.data(ObjectDataRole)
+                    sharedItemNode.objectInfo = objectInfo
+                    sharedItemNode.data = newVal
+                    self._updateRowForNode_(sharedItem, sharedItemNode)
+                    sharedIndex = self.indexFromItem(sharedItem)
+                    self.dataChanged.emit(sharedIndex, sharedIndex)
+
+                OK = True
                 self.sig_modelDataChanged.emit()
 
             except: # noqa
@@ -916,63 +1070,6 @@ class ObjectModel(QtGui.QStandardItemModel):
                 OK = False
 
             return OK
-
-        # if item.column() == 2 and role == ObjectDataRole:
-        #     # make sure we work on the sibling in column 0
-        #     parentItem = item.parent()
-        #     if not parentItem:
-        #         return False
-        #
-        #     item = parentItem.child(item.row(), 0)
-
-        # node = item.data(ObjectDataRole)
-        #
-        # if item.data(ReadOnlyRole) is True or node is None or node.objectInfo.readOnly:
-        #     return
-        #
-        # path = self._getPathForItemOrIndex_(item)
-        # # I think this should always be so
-        # path[-1] = "self._modelData_"
-        #
-        # # if path[-1] == self.topObjectItem.data(QtCore.Qt.DisplayRole):
-        # #     # I think this should always be so
-        # #     path[-1] = "self._modelData_"
-        #
-        # accexpr = "".join(reversed(path))
-        # setexpr = accexpr + " = value"
-        # OK = False
-        # try:
-        #     # print(f"{self.__class__.__name__}.setData: setexpr = {setexpr}")
-        #     exec(setexpr) # noqa
-        #     newVal = eval(accexpr)
-        #     OK = True
-        #     node.data = newVal
-        #     self.dataChanged.emit(modelIndex, modelIndex)
-        #     self.sig_modelDataChanged.emit()
-        #
-        # except: # noqa
-        #     traceback.print_exc()
-
-        # return OK
-
-    # def getDataObjectForLeaf(self: typing.Self,
-    #                          leaf: QtCore.QModelIndex | QtGui.QStandardItem,
-    #                          byPath: bool = True,
-    #                          ) -> object:
-    #
-    #     if byPath:
-    #         path = self._getPathForItemOrIndex_(leaf)
-    #         # print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> path = {path}")
-    #         if len(path):
-    #             if path[-1] == self._topObjectItem_.data(QtCore.Qt.DisplayRole):
-    #                 path[-1] = "self._modelData_"
-    #
-    #             accessExpr = "".join(list(reversed(path)))
-    #             # print(f"{self.__class__.__name__}.getDataObjectForLeaf: -> accessExpr = {accessExpr}")
-    #             return eval(accessExpr)
-    #
-    #     else:
-    #         return leaf.data(ObjectDataRole)
 
     def getPathForLeaf(self: typing.Self,
                        leaf: QtCore.QModelIndex | QtGui.QStandardItem,
@@ -1000,9 +1097,6 @@ class ObjectModel(QtGui.QStandardItemModel):
 
     def _getParentNode_(self, item: QtGui.QStandardItem) -> ObjectNode | None:
         node = item.data(ObjectDataRole)
-        #
-        # if not isinstance(node, ObjectNode):
-        #     return
 
         if node.is_root():
             return
@@ -1011,7 +1105,15 @@ class ObjectModel(QtGui.QStandardItemModel):
 
         return self.tree.nodes[parentNid]
 
+    def _getItemForNode(self, node: ObjectNode) -> QtGui.QStandardItem | None:
+        if not isinstance(node, ObjectNode):
+            raise TypeError(f"Expecting an ObjectNode; got a {type(node).__name__} instead")
 
+        if not isinstance(self.tree, Tree):
+            return
+
+        if node.identifier not in self.tree:
+            raise KeyError(f"Node with tag {node.tag} and identifier {node.identifier} does not exist")
 
     def _getPathForItemOrIndex_(
         self: typing.Self,
@@ -1046,15 +1148,12 @@ class ObjectModel(QtGui.QStandardItemModel):
         # Code below only makes sense for items in column 0; however, when an
         # item on a higher column is passed, I need access to its sibling in
         # column 0
-        parentItem = item.parent()
+        if item.column() > 0:
+            targetItem = self.getMasterItem(item)
+            assert(targetItem is not None), f"Cannot get the targetItem for item {item.data(QtCore.Qt.DisplayRole)} at row {item.row()}, column {item.column()}"
 
-        if parentItem:
-            if item.column() == 0:
-                targetItem = item
-
-            else:
-                # get the item's sibling in column 0
-                targetItem = parentItem.child(item.row(), 0)
+        else:
+            targetItem = item
         #
         # ### END   NOTE: 2026-02-10 12:22:40
 
@@ -1100,153 +1199,20 @@ class ObjectModel(QtGui.QStandardItemModel):
 
         return path
 
-        # rootAccess = self.rootNode.objectInfo.memberAccess
-        # bindingType = self.rootNode.objectInfo.objKeyType
-        #
-        # if len(rootAccess) == 1:
-        #     path.append(f"{self.rootNode.tag}{rootAccess[0]}{objectBindingInParent}")
-        #
-        # elif len(rootAccess) == 2:
-        #     if bindingType is weakref.ReferenceType:
-        #         path.append(f"{self.rootNode.tag}{parentAccess[0]}{objectBindingInParent}{parentAccess[1]}")
-        #     else:
-        #         if bindingType is str:
-        #             oB = f"'{objectBindingInParent}'"
-        #         else:
-        #             try:
-        #                 oB = bindingType(objectBindingInParent) # hedging my bets...
-        #             except: #noqa
-        #                 oB = objectBindingInParent
-        #
-        #         path.append(f"{self.rootNode.tag}{parentAccess[0]}{oB}{parentAccess[1]}")
-
-
-            # parentAccess = parentItem.data(ObjectDataAccessRole)
-            # bindingType = targetItem.data(ObjectKeyTypeRole)
-            # itemBinding = targetItem.data(ObjectKeyRole)
-            # # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: bindingType for {targetItem.data(QtCore.Qt.DisplayRole)} -> {bindingType}")
-            # # print(f"{self.__class__.__name__}._getPathForItemOrIndex_: itemBinding -> {itemBinding}")
-            #
-            # if itemBinding:
-            #     if len(parentAccess) == 1:
-            #         # print(f"{self.__class__.__name__}._getPathForItemOrIndex_ -> add access {parentAccess[0]}{itemBinding}")
-            #         path.append(f"{parentAccess[0]}{itemBinding}")
-            #
-            #     elif len(parentAccess) == 2:
-            #         # print(f"{self.__class__.__name__}_getPathForItemOrIndex_: bindingType = {bindingType} for itemBinding {itemBinding}")
-            #         if bindingType is weakref.ReferenceType:
-            #             path.append(f"{parentAccess[0]}{itemBinding}{parentAccess[1]}")
-            #         else:
-            #             if bindingType is str:
-            #                 iB = f"'{itemBinding}'"
-            #             else:
-            #                 try:
-            #                     iB = bindingType(itemBinding) # hedging my bets...
-            #                 except: # noqa
-            #                     iB = itemBinding
-            #
-            #
-            #             path.append(f"{parentAccess[0]}{iB}{parentAccess[1]}")
-
-            # path += self._getPathForItemOrIndex_(parentItem)
-
-        # elif item == self._topObjectItem_:
-        #     # NOTE: 2026-02-10 12:26:33
-        #     # this one is in column 0 by design
-        #     path += [self._topObjectItem_.data(QtCore.Qt.DisplayRole)]
-
-        # return path
-
-    def setData_old(self: typing.Self, modelIndex: QtCore.QModelIndex,
-                value: object, role = QtCore.Qt.EditRole) -> bool:
-        if self._modelData_ is None:
-            return False
-        # print(f"{self.__class__.__name__}.setData {value}\n\tfor index {modelIndex.data(QtCore.Qt.DisplayRole)},\n\trow {modelIndex.row()}\n")
-
-        item = self.itemFromIndex(modelIndex)
-
-        # print(f"{self.__class__.__name__}.setData: item at column {item.column()} -> edit data: {item.data(QtCore.Qt.EditRole)}")
-        # print(f"{self.__class__.__name__}.setData: item at column {item.column()} -> read only: {item.data(ReadOnlyRole)}")
-
-        if item.data(ReadOnlyRole) is True:
-            return
-
-        # NOTE: 2026-02-10 09:18:53
-        # don't change data for this kind of item; this is done directly by the
-        # table editor delegate
-        #
-        # Also NOTE: I use avoid editing any item in column 0 as this refers to
-        # the symbol, in the parent object, to which the child object is bound;
-        # changing this symbol would effectively mean changing the structure of
-        # the parent object (its "class") for regular objects, whereas for
-        # collections, this would mean chaning the "keys" in a mapping or the
-        # "indexes" in a sequence, etc. For collections, there IS a way to alter
-        # the "keys" in a dictionary or the **order** of elements in a sequence,
-        # but that is too convoluted to implement in this model and is beyond
-        # its scope, anyway.
-        #
-
-        objItem = item
-
-        # if isinstance(value, (enum.Enum, enum.IntEnum, enum.Flag, TypeEnum)):
-        #     print(f"setting value as {value}")
-
-        # print(f"{self.__class__.__name__}.setData {value}\n\tfor objItem {objItem.data(QtCore.Qt.DisplayRole)},\n\trow {item.row()}\n")
-
-        if item.column() == 2 and role == ObjectDataRole:
-            parentItem = item.parent()
-            if not parentItem:
-                return False
-            objItem = parentItem.child(item.row(), 0)
-
-        objItem.setData(qVariant(value), ObjectDataRole)
-
-        path = self._getPathForItemOrIndex_(objItem)
-        # print(f"\taccess to objItem: {path}")
-
-        if path[-1] == self._topObjectItem_.data(QtCore.Qt.DisplayRole):
-            path[-1] = "self._modelData_"
-
-        accexpr = "".join(reversed(path))
-        setexpr = accexpr + " = value"
-        OK = False
-        try:
-            # print(f"{self.__class__.__name__}.setData: setexpr = {setexpr}")
-            exec(setexpr) # noqa
-            newVal = eval(accexpr)
-            OK = True
-
-        except: # noqa
-            traceback.print_exc()
-
-        if OK:
-            objType = objItem.data(ObjectTypeRole)
-
-            if objType is pathlib.Path and not isinstance(newVal, pathlib.Path):
-                newVal = pathlib.Path(newVal)
-
-            objItem.setData(newVal, ObjectDataRole)
-
-            if item != objItem:
-                if isinstance(newVal, (enum.Enum, enum.IntEnum, enum.Flag, TypeEnum)):
-                    item.setData(qVariant(newVal.name), QtCore.Qt.DisplayRole)
-                elif isinstance(newVal, bool):
-                    item.setData(qVariant(str(newVal)), QtCore.Qt.DisplayRole)
-                else:
-                    item.setData(qVariant(newVal), QtCore.Qt.DisplayRole)
-                item.setData(newVal, ObjectDataRole)
-
-            self.dataChanged.emit(modelIndex, modelIndex)
-            self.sig_modelDataChanged.emit()
-
-        return OK
-
+    # NOTE: 2026-09-26 14:33:57
+    # does not work from the "Qt side" when using the singledispatchmethod approach
+    # @singledispatchmethod
+    # def hasChildren(self, obj) -> bool:
+    #     raise NotImplementedError()
+    #
+    # @hasChildren.register(QtCore.QModelIndex)
     def hasChildren(self, index:QtCore.QModelIndex) -> bool:
         # NOTE: 2026-09-10 12:06:10
         # the invisible root item has an invalid index (by default)
         # and calling self.itemFromIndex() on an invalid index returns None!
         item = self.itemFromIndex(index)
         if item:
+            # return item.hasChildren()
             nChildren = item.data(ObjectChildrenCountRole)
             return isinstance(nChildren, int) and nChildren > 0
 
@@ -1255,19 +1221,112 @@ class ObjectModel(QtGui.QStandardItemModel):
 
         return False
 
+    # NOTE: see NOTE: 2026-09-26 14:33:57
+    # @hasChildren.register(QtGui.QStandardItem)
+    # def _hasChildren_(self, item: QtGui.QStandardItem) -> bool:  # noqa: F811,RUF100
+    #     return item.hasChildren()
+
+    def _childrenOfItem_(self, item: QtGui.QStandardItem):
+        r"""Generator for iterating through the existing child items.
+    Reports the items in column 0 of the model.
+    In this model, an item advertises its maximum number of children via the
+    data associated with ObjectChildrenCountRole role. However, these children
+    are displayed in the tree view ONLY when the item is expanded ("lazy loading").
+
+    An item that has never been expanded since its creation, will therefore appear
+    without any children even if item.hasChildren() is True, until the after the
+    first time the item was expanded.
+
+
+    """
+        if isinstance(item, QtGui.QStandardItem):
+            yield from (item.child(k, 0) for k in range(item.rowCount()))
+
+    def findItems(self, property: str, value: object, mode: int = Tree.WIDTH):
+        if property not in ("data", "info"):
+            raise ValueError(f"Invalid property {property}; expected one of 'data' or 'info'")
+
+        if property == "data":
+            yield from filter(lambda i: i.data(ObjectDataRole).data is value,
+                              self.objectItems(mode=mode))
+
+        else:
+            assert isinstance(value, ObjectInfo), f"When 'property' is 'info', value' is expected to be an ObjectInfo instance; instead got {type(value).__name__}"
+            yield from filter(lambda i: i.data(ObjectInfoRole) == value,
+                              self.objectItems(mode=mode))
+
+    def objectItems(self, mode: int = Tree.WIDTH):
+        r"""Iteates through the existing QStandardItem in the first column"""
+        yield from self.filterObjectItems(mode=mode)
+
+    def filterObjectItems(self, item: QtGui.QStandardItem | None = None, /,
+                          mode: int = Tree.WIDTH,
+                          filter: types.FunctionType | None = None):
+        r"""Adapted from treelib.Tree.expand_tree(…)
+    WARNING: filtering needs more work -- better apply a filter to the output of self.objectItems
+    """
+        #NOTE: this is too clever !
+        # filter = (lambda x: True) if filter is None else filter
+        # basicFilter = lambda x: isinstance(x, QtGui.QStandardItem)
+        # filter = basicFilter if filter is None else (lambda x: basicFilter and filter(x))
+
+        filter = (lambda x: True) if filter is None else filter
+        # fltFn = (lambda x: isinstance(x, QtGui.QStandardItem)) if filter is None else (lambda x: isinstance(x, QtGui.QStandardItem) and filter(x))
+
+        if not isinstance(item, QtGui.QStandardItem):
+            item = self.topObjectItem
+
+        if isinstance(item, QtGui.QStandardItem):
+            if filter(item):
+                yield item
+
+            queue = [i for i in self._childrenOfItem_(item) if isinstance(i, QtGui.QStandardItem) and filter(i)]
+            # queue = [i for i in self._childrenOfItem_(self.topObjectItem) if isinstance(i, QtGui.QStandardItem)]
+            # queue = [i for i in self._childrenOfItem_(self.topObjectItem) if filter(i)]
+
+            if mode in [Tree.WIDTH, Tree.DEPTH]:
+                while(queue):
+                    yield queue[0]
+                    # expansion = [i for i in self._childrenOfItem_(queue[0]) if isinstance(i, QtGui.QStandardItem)]
+                    expansion = [i for i in self._childrenOfItem_(queue[0]) if isinstance(i, QtGui.QStandardItem) and filter(i)]
+                    # expansion = [i for i in self._childrenOfItem_(queue[0]) if filter(i)]
+
+                    if mode is Tree.WIDTH:
+                        queue = expansion + queue[1:]
+
+                    elif mode is Tree.DEPTH:
+                        queue = queue[1:] + expansion
+
+            elif mode is Tree.ZIGZAG:
+                stack_fw = []
+                queue.reverse()
+                stack = stack_bw = queue
+                direction = False
+                while stack:
+                    # expansion = [i for i in self._childrenOfItem_(stack[0]) if isinstance(i, QtGui.QStandrdItem)]
+                    expansion = [i for i in self._childrenOfItem_(stack[0]) if isinstance(i, QtGui.QStandrdItem) and filter(i)]
+                    # expansion = [i for i in self._childrenOfItem_(stack[0]) if filter(i)]
+
+                yield stack.pop(0)
+
+                if direction:
+                    expansion.reverse()
+                    stack_bw = expansion + stack_bw
+                else:
+                    stack_fw = expansion + stack_fw
+
+                if not stack:
+                    direction = not direction
+                    stack = stack_fw if direction else stack_bw
+
+            else:
+                raise ValueError(f"Unsupported traversal mode {mode}")
+
+
 #     def canFetchMore(self, parent: QtCore.QModelIndex) -> bool:
 #         if not parent.isValid():
 #             return False
 #
 #         item = self.itemFromIndex(parent)
 #         if item.hasChildren():
-
-
-
-
-    # @_generate_dict_.register(AxesCalibration)
-    # def __generate_dict__(self, obj: AxesCalibration):
-    #     pData = dict(enumerate(obj.calibrations))
-    #     n = len(pData)
-    #     return pData, n, n
 

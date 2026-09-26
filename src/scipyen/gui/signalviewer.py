@@ -257,8 +257,7 @@ from gui import scipyen_colormaps as colormaps
 
 from gui.scipyenviewer import (ScipyenFrameViewer,Bunch)
 # from gui.dataviewer import (InteractiveTreeWidget, DataViewer,)
-from gui.datatreeviewer import DataTreeViewer
-from gui.widgets.datatreeview import DataTreeView
+from gui.objectinspector import ObjectInspector
 from gui import cursors as guicursors
 from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes, cursors2epoch)
 from gui.widgets.colorwidgets import ColorSelectionWidget, quickColorDialog
@@ -1199,7 +1198,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.annotationsViewer.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.annotationsViewer.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
         self.annotationsViewer.setDragEnabled(True)
-        # self.annotationsViewer.setSupportedDataTypes(tuple(DataTreeViewer.viewer_for_types))
+        # self.annotationsViewer.setSupportedDataTypes(tuple(ObjectInspector.viewer_for_types))
         #### END set up annotations dock widget
 
         #### BEGIN set up coordinates dock widget - defined in the UI file

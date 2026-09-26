@@ -61,8 +61,8 @@ from core import scipyendataclasses as sdc
 # from core import scipyen_quantities as scq
 from gui import guiutils
 from gui.itemmodels.roles import *
-from gui.itemmodels.datatree.objectnode import ObjectInfo, ObjectNode
-from gui.itemmodels.datatree import objectnode as onode
+from gui.itemmodels.datatree.objectnode import ObjectNode
+# from gui.itemmodels.datatree import objectnode as onode
 from gui.itemmodels.datatree.objectmodel import ObjectModel
 from gui.widgets import small_widgets as smw
 from gui.widgets import neo_widgets as neow
@@ -425,7 +425,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         """
         super().__init__(parent=parent)
 
-        self._usingObjectTreeModel_: bool = False
+        self._usingObjectModel_: bool = False
         self._useObjectDataRole_: bool = False
         self._dataInObjectNode_: bool = False
         self._currentObjectNode_: ObjectNode | None = None
@@ -550,11 +550,11 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
     def setColumnChoices(
         self,
-        choicesDict: typing.Optional[dict[int, dict[typing.Sequence,
+        choicesDict: typing.Optional[dict[int, dict[typing.Sequence,  # noqa: UP045
                                                     bool]]] = None
         ):
         if choicesDict is None:
-            self._columnChoices_ = dict() # wipes out current column choices
+            self._columnChoices_ = {} # wipes out current column choices
 
         elif self._checkColumnChoiceDict_(choicesDict): # may wipe out the choices if parameter is empty
             self._columnChoices_ = choicesDict
@@ -563,13 +563,11 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 f"{self.__class__.__name__}.setColumnChoices: inappropriate value"
                 )
 
-    def setChoicesForColumn(
-        self: typing.Self, /,
-        col: typing.Optional[int] = None,
-        choiceData: typing.Optional[typing.Union[dict,
+    def setChoicesForColumn( self: typing.Self, /, col: int | None = None,
+        choiceData: typing.Optional[typing.Union[dict,  # noqa: UP045,UP007
                                                     typing.Sequence,
                                                     bool]] = None,
-        editable: typing.Optional[bool] = None
+        editable: bool | None = None
                     ):
         r"""Alter the choices for a specific column.
         Keyword-only parameters:
@@ -642,10 +640,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 scipywarn(f"{self.__class__.__name__}.setChoicesForColumn: invalid choiceData: {choiceData}")
 
     def createWidget(self, data:typing.Any,
-        choices: typing.Optional[
-                                typing.Union[
+        choices: typing.Optional[  # noqa: UP045
+                                typing.Union[  # noqa: UP007
                                     typing.Sequence[
-                                        typing.Union[enum.Enum,
+                                        typing.Union[enum.Enum,  # noqa: UP007
                                                      enum.IntEnum,
                                                      enum.Flag,
                                                      TypeEnum,
@@ -654,7 +652,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                                     dict]
                                 ] = None,
         inModel: bool=True,
-        parent: typing.Optional[QtWidgets.QWidget] = None
+        parent: QtWidgets.QWidget | None = None
                      ) -> QtWidgets.QWidget:
         r"""Work around for use independently of an item model.
 
@@ -662,7 +660,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         QModelIndex API
 
     """
-        from gui.widgets.tableeditorwidget import TableEditorWidget # import here to avoid circular imports (delegates is imported by tableeditorwidget as well)
+        from gui.widgets.tableeditorwidget import TableEditorWidget # import here to avoid circular imports (delegates is imported by tableeditorwidget as well)  # noqa: I001
         # from gui.itemmodels.tabulardatamodel import TabularDataModel
         widget = None
 
@@ -727,8 +725,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     entries = list(choices.keys())
                     values = list(choices.values())
                 else:
-                    entries = list(map(lambda x: x.name if isinstance(x, enum.Enum) else x, choices))
-                    values = list(map(lambda x: x.value if isinstance(x, enum.Enum) else choices.index(x), choices))
+                    entries = list(map(lambda x: x.name if isinstance(x, enum.Enum) else x, choices))  # noqa: C417
+                    values = list(map(lambda x: x.value if isinstance(x, enum.Enum) else choices.index(x), choices))  # noqa: C417
 
                 if data in values:
                     ndx = values.index(data)
@@ -936,7 +934,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             widget.sig_dispatchAction.connect(self._slot_dispatchedAction_)
 
         elif isinstance(data, (str, np.character, bytes, bytearray)):
-            if isinstance(data, str):
+            if isinstance(data, str):  # noqa: SIM102
                 if (
                     (
                     isinstance(choices, typing.Sequence)
@@ -947,8 +945,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                         entries = list(choices.keys())
                         values = list(choices.values())
                     else:
-                        entries = list(map(lambda x: x.name if isinstance(x, enum.Enum) else x, choices))
-                        values = list(map(lambda x: x.value if isinstance(x, enum.Enum) else entries.index(x), choices))
+                        entries = list(map(lambda x: x.name if isinstance(x, enum.Enum) else x, choices))  # noqa: C417
+                        values = list(map(lambda x: x.value if isinstance(x, enum.Enum) else entries.index(x), choices))  # noqa: C417
 
                     if data in entries:
                         ndx = entries.index(data)
@@ -1025,8 +1023,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     @Slot(partial)
     @Slot(types.FunctionType)
     @Slot(object)
-    def _slot_dispatchedAction_(self,
-                                fn: typing.Union[partial, types.FunctionType]):
+    def _slot_dispatchedAction_(self, fn: partial | types.FunctionType):
         sender = self.sender()
         ret = fn()
         if isinstance(ret, tuple):
@@ -1200,11 +1197,13 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         if not index.isValid():
             return
 
-        model, data, dataChoices, _ = self._retrieveIndexData_(index)
+        # print(f"{self.__class__.__name__}.createEditor")
+
+        model, data, dataChoices, _ = self._inspectIndex_(index)
         if any (o is None for o in (model, data)):
             return
 
-        print(f"\t -> {type(data).__name__}")
+        # print(f"\t -> {type(data).__name__}")
 
         # print(f"{self.__class__.__name__}.createEditor -> data is {type(data).__name__}")
 
@@ -1225,8 +1224,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         if isinstance(getattr(model, "immutability", None), dict):
             # print(f"{self.__class__.__name__}.createEditor for column {index.column()} and row {index.row()}")
-            immutableColumns = model.immutability.get("columns", list())
-            immutableRows = model.immutability.get("rows", list())
+            immutableColumns = model.immutability.get("columns", [])
+            immutableRows = model.immutability.get("rows", [])
             jointImmutability = model.immutability.get("joint", False)
 
             # print(f"\t-> joint immutability: {jointImmutability}")
@@ -1279,7 +1278,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 widget.clicked.connect(self._slot_editDataAttributeExternally)
                 return widget
 
-        choices = list()
+        choices = []
 
         if (
                 (
@@ -1305,7 +1304,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         return w
 
-    def _retrieveIndexData_(self, index: QtCore.QModelIndex,
+    def _inspectIndex_(self, index: QtCore.QModelIndex,
                             # role: QtCore.Qt.ItemDataRole = ObjectDataRole
                             ) -> tuple:
         if not index.isValid():
@@ -1313,7 +1312,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         model = index.model() # this should never be a proxy model (in case the view uses one)
 
-        self._usingObjectTreeModel_ = isinstance(model, ObjectModel)
+        self._usingObjectModel_ = isinstance(model, ObjectModel)
         self._currentModelIndex_ = index
 
         # CAUTION: Standard item model and standard items treat DisplayRole and
@@ -1340,12 +1339,12 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         src = index
 
-        txt = index.data(QtCore.Qt.DisplayRole)
-        col = index.column()
-        row = index.row()
-        print(f"{self.__class__.__name__}._retrieveIndexData_(index: '{txt}', at row {row}, column {col})")
+        # txt = index.data(QtCore.Qt.DisplayRole)
+        # col = index.column()
+        # row = index.row()
+        # print(f"{self.__class__.__name__}._inspectIndex_(index: '{txt}', at row {row}, column {col})")
 
-        if self._usingObjectTreeModel_:
+        if self._usingObjectModel_:
             src = model.itemFromIndex(index)
 
             if src.column() != 0:
@@ -1371,6 +1370,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             dataChoices = index.data(DataChoicesRole)
             self._useObjectDataRole_ = False
 
+        # print(f"\t -> {data}\n\t -> {type(data).__name__}")
+
         return model, data, dataChoices, disp
 
     def setEditorData(self, editor: QtWidgets.QWidget,
@@ -1383,24 +1384,10 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         if not index.isValid():
             return
 
-        model, data, disp, dataChoices = self._retrieveIndexData_(index)
+        model, data, disp, dataChoices = self._inspectIndex_(index)
+
         if any (o is None for o in (model, data)):
             return
-
-        # data = index.data(ObjectDataRole) # noqa
-
-        # print(f"{self.__class__.__name__}.setEditorData({editor}, index -> data = {data})")
-
-        # if data is not None:
-        #     self._useObjectDataRole_ = True
-        # else:
-        #     data = index.data(QtCore.Qt.EditRole)
-        #     self._useObjectDataRole_ = False
-
-        # NOTE: 2026-02-10 09:48:29
-        # because for QStandardItems EditRole and DisplayRole do the same thing
-        # disp = f"{index.data(QtCore.Qt.DisplayRole)}"
-        # dataChoices = index.data(DataChoicesRole) # noqa
 
         if dataChoices:
             choices = dataChoices
@@ -1430,8 +1417,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     values = list(choices.values())
 
                 else:
-                    entries = list(map(lambda x: x.name if isinstance(x, enum.Enum) else x, choices))
-                    values = list(map(lambda x: x.value if isinstance(x, enum.Enum) else choices.index(x), choices))
+                    entries = list(map(lambda x: x.name if isinstance(x, enum.Enum) else x, choices))  # noqa: C417
+                    values = list(map(lambda x: x.value if isinstance(x, enum.Enum) else choices.index(x), choices))  # noqa: C417
 
                 if (
                         (
@@ -1567,10 +1554,11 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                      model: QtCore.QAbstractItemModel,
                      index: QtCore.QModelIndex):
         r"""Sets data back into the QModelIndex"""
+        # print(f"{self.__class__.__name__}.setModelData()")
+        if not index.isValid():
+            return False
 
-        # FIXME 2026-09-25 16:19:52 TODO
-        # adapt to the ObjectNode paradigm
-        originalData = index.data(ObjectDataRole) # noqa
+        originalData = index.data(ObjectDataRole)
 
         if originalData is not None:
             self._useObjectDataRole_ = True
@@ -1579,6 +1567,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             originalData = index.data(QtCore.Qt.EditRole)
             self._useObjectDataRole_ = False
 
+        # print(f"\t -> using ObjectDataRole: {self._useObjectDataRole_}")
 
         if isinstance(editor, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox,
                                smw.QuantitySpinBox, smw.ComplexSpinBox,
@@ -1605,16 +1594,17 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
             else:
                 scipywarn(f"Index data ({type(originalData).__name__}) is not supported by a combo box")
-                return
+                return False
 
         elif isinstance(editor, QtWidgets.QDateTimeEdit):
             qDateTime = editor.dateTime()
             if not qDateTime.isNull() and qDateTime.isValid():
                 qDate = qDateTime.date()
                 qTime = qDateTime.time()
+
                 if isinstance(originalData, datetime.datetime):
                     if qDate.isValid() and qTime.isValid():
-                        data = datetime.datetime(
+                        data = datetime.datetime(  # noqa: DTZ001
                             qDate.year(), qDate.month(), qDate.day(),
                             qTime.hour(), qTime.minute(), qTime.second(),
                             qTime.msec() * 1000)
@@ -1633,19 +1623,21 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     data = qDateTime.toString()
 
                 else:
-                    return
+                    return False
 
         elif isinstance(editor, QtWidgets.QCheckBox):
             data = editor.isChecked()
 
         else:
-            return
+            return False
 
-        role = ObjectDataRole if self._useObjectDataRole_ else QtCore.Qt.EditRole  # noqa
-        # print(f"{self.__class__.__name__}.setModelData -> editor: {type(editor).__name__}, row = {index.row()}, column = {index.column()}, data = {data} for role = {role}")
-        model.setData(index, data, role)
+        role = ObjectDataRole if self._useObjectDataRole_ else QtCore.Qt.EditRole
+        OK = model.setData(index, data, role)
+
         if isinstance(self._currentModelIndex_, QtCore.QModelIndex):
             self._currentModelIndex_ = None
+
+        return OK
 
     @property
     def decimals(self) -> int | None:

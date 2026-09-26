@@ -348,7 +348,7 @@ from . import tableeditor as te # noqa
 from . import signalviewer as sv # noqa
 from . import matrixviewer as matview # noqa
 from . import imageviewer as iv # noqa
-from . import datatreeviewer as dv # noqa
+from . import ObjectInspector as dv # noqa
 # from gui.pythonhelpwidget import PythonHelpWidget
 
 from .consoles import styles, pstyles # noqa
@@ -3388,7 +3388,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             The only acceptable sip.wrappertype objects are the ones loaded by
             slot_loadPlugins:
 
-            DataTreeViewer, MatrixViewer, ImageViewer, SignalViewer, TableEditor,
+            ObjectInspector, MatrixViewer, ImageViewer, SignalViewer, TableEditor,
             TextViewer, XMLViewer.
 
             When a str the ony acceptable ones are the string verison of the
@@ -5468,24 +5468,24 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
                             f"View using {handler_spec[1]}; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                         action.triggered.connect(self.slot_autoSelectViewer)
 
-                    if "DataTreeViewer" not in [h[0].__name__ for h in handler_specs]:
-                        act = specialViewMenu.addAction("DataTreeViewer")
+                    if "ObjectInspector" not in [h[0].__name__ for h in handler_specs]:
+                        act = specialViewMenu.addAction("ObjectInspector")
                         act.setToolTip(
-                            f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                            f"View using generic ObjectInspector; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                         act.setStatusTip(
-                            f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                            f"View using generic ObjectInspector; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                         act.setWhatsThis(
-                            f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                            f"View using generic ObjectInspector; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                         act.triggered.connect(self.slot_useDataViewer)
 
                 else:
-                    act1 = cm.addAction("Show in DataTreeViewer")
+                    act1 = cm.addAction("Show in ObjectInspector")
                     act1.setToolTip(
-                        f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        f"View using generic ObjectInspector; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                     act1.setStatusTip(
-                        f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        f"View using generic ObjectInspector; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                     act1.setWhatsThis(
-                        f"View using generic DataTreeViewer; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
+                        f"View using generic ObjectInspector; press {altKeyDescr} to use a new viewer window; press {ctrlKeyDescr} to prompt for configuration dialog ")
                     act1.triggered.connect(self.slot_useDataViewer)
 
         else:
@@ -10362,7 +10362,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
         vartype = type(variable)
 
         viewers = [v for v in self.viewers.keys() if v.__name__ ==
-                   "DataTreeViewer"]
+                   "ObjectInspector"]
 
         if len(viewers):
             viewer = viewers[0]

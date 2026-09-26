@@ -55,7 +55,7 @@ from core.prog import scipywarn # noqa
 # from core import taxonbridge
 from core import bgbridge
 from core import qtutils
-from gui import datatreeviewer
+from gui import ObjectInspector
 from gui.widgets import small_widgets as smw
 from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
 # from gui.workspacegui import WorkspaceGuiMixin
@@ -118,7 +118,7 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
         self.detailsToolButton.clicked.connect(self._slot_showDetails)
 
     def _setup_UIFields(self):
-        # BUG: 2026-07-06 11:10:34 FIXME in DataTreeViewer TODO
+        # BUG: 2026-07-06 11:10:34 FIXME in ObjectInspector TODO
         # do NOT block signals from this one as it will prevent updating itself
         #
         self.structureIDAcroNameLabel.setText(self._structureIdentityText_)
@@ -232,9 +232,9 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
         if not isinstance(self._containerWidget_, DataClassWidget):
             return
 
-        if not isinstance(self.detailsViewer, datatreeviewer.DataTreeViewer):
+        if not isinstance(self.detailsViewer, ObjectInspector.ObjectInspector):
             scipyenWindow = getattr(self.containerWidget, "scipyenWindow", None)
-            self.detailsViewer = datatreeviewer.DataTreeViewer(
+            self.detailsViewer = ObjectInspector.ObjectInspector(
                 scipyenWindow = scipyenWindow,
                 readOnly=True
                 )
