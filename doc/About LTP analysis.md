@@ -183,7 +183,7 @@ path1_baseline = neoutils.concatenate_blocks(baseline_blocks, segments = 1, anal
 
 * create epochs:
 
-### 4. View the [`ltp_data`](#gen_ltp_dict) (double-click in the `User Variables` table to open it in a `DataTreeViewer`).
+### 4. View the [`ltp_data`](#gen_ltp_dict) (double-click in the `User Variables` table to open it in a `ObjectInspector`).
 
 Expand the tree and right-click on, say, the `Control/Baseline` then select `View` to view this in a `SignalViewer` window.
 

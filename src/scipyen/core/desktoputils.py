@@ -4,6 +4,12 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""Utilities for Linux desktop integration"""
+
+# TODO: 2026-08-03 10:33:25 FIXME
+# clear up the mess with:
+# • standard locations and PyQt6 v PySide6
+# • DBus UDIsks jobs!
+
 # ### BEGIN internal comments
 # NOTE: 2025-01-03 17:37:47
 # Command line tools for desktpp integration (since KDE Frameworks 6 has become
@@ -58,65 +64,74 @@ r"""Utilities for Linux desktop integration"""
 
 # ### END internal comments
 
-import sys, os, pathlib, urllib, typing, warnings, subprocess, traceback, json
+import sys, os, pathlib, urllib, typing, warnings, subprocess, traceback, json # noqa
+# import shutil
 import inspect
 import platform
 import dataclasses
 from dataclasses import dataclass
-import core.xmlutils as xmlutils
+import core.xmlutils as xmlutils # noqa
 import iolib.pictio as pio
-from enum import Enum, IntEnum
-from functools import singledispatch, singledispatchmethod
+from enum import Enum, IntEnum # noqa
+from functools import singledispatch, singledispatchmethod, partial # noqa
 from traitlets.utils.bunch import Bunch
 
 # import xml.etree.ElementTree as ET
-from xml.dom import minidom
+from xml.dom import minidom # noqa
 
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
-from qtpy.QtCore import (Signal, Slot, Property)
+# import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg) # noqa
+from qtpy.QtCore import (Signal, Slot, Property) # noqa
 
 __has_PySide6__ = False
 __has_PyQt6__ = False
-__has_sip__ = False
+# __has_sip__ = False
+
 if os.environ["QT_API"] == "pyside6":
-    __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    # import PySide6 # nodqa
+    # from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
+    __has_PySide6__ = True
+
 else:
-    if os.environ["QT_API"] == "pyqt6":
-        __has_PyQt6__ = True
-        
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    # from qtpy import sip # noqa
+    # from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
-    __has_sip__ = True
-    
 
-__has_qtdbus__ = False
-try:
-    from qtpy import QtDBus
-    __has_qtdbus__ = True
-except:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+    # __has_sip__ = True
+    
+if sys.platform == "linux":
     __has_qtdbus__ = False
+
+    try:
+        from qtpy import QtDBus
+        __has_qtdbus__ = True
+
+    except: # noqa
+        __has_qtdbus__ = False
 
 # import pyudev
 import quantities as pq
 import numpy as np
 
+from core.platformutils import *
+
+from core.prog import timefunc, scipywarn
 from iolib.navigation import filesystems
-from iolib.navigation.filesystems import pathStrLen, pathLen, pathToQUrl, urlToPath
+from iolib.navigation.filesystems import (urlToPath, pathToQUrl, # noqa
+                                          pathStrLen, pathLen)
 
 SCHEMAS = ("file", "recentlyused", "remote", "search", "tags", "timeline", "trash")
 
-hiddenLocations = [
+HIDDEN_LOCATIONS = [
     "TempLocation",
     "RuntimeLocation",
     "CacheLocation",
@@ -132,41 +147,177 @@ hiddenLocations = [
     "RuntimeLocation",
 ]
 
-systemLocations = ["FontsLocation", "RuntimeLocation", "TempLocation"]
+SYSTEM_LOCATIONS = ["FontsLocation", "RuntimeLocation", "TempLocation"]
+
+if __has_PySide6__:
+    HIDDEN_LOCATIONS.extend(
+        [
+            QtCore.QStandardPaths.StandardLocation.AppConfigLocation,
+            QtCore.QStandardPaths.StandardLocation.AppDataLocation,
+            QtCore.QStandardPaths.StandardLocation.AppLocalDataLocation,
+            QtCore.QStandardPaths.StandardLocation.ApplicationsLocation,
+            QtCore.QStandardPaths.StandardLocation.CacheLocation,
+            QtCore.QStandardPaths.StandardLocation.ConfigLocation,
+            QtCore.QStandardPaths.StandardLocation.FontsLocation,
+            QtCore.QStandardPaths.StandardLocation.GenericCacheLocation,
+            QtCore.QStandardPaths.StandardLocation.GenericConfigLocation,
+            QtCore.QStandardPaths.StandardLocation.GenericDataLocation,
+            QtCore.QStandardPaths.StandardLocation.GenericStateLocation,
+            QtCore.QStandardPaths.StandardLocation.RuntimeLocation,
+            QtCore.QStandardPaths.StandardLocation.StateLocation,
+            QtCore.QStandardPaths.StandardLocation.TemplatesLocation,
+        ]
+        )
+
+    SYSTEM_LOCATIONS.extend(
+        [
+            QtCore.QStandardPaths.StandardLocation.FontsLocation,
+            QtCore.QStandardPaths.StandardLocation.RuntimeLocation,
+            QtCore.QStandardPaths.StandardLocation.GenericConfigLocation,
+            QtCore.QStandardPaths.StandardLocation.GenericDataLocation,
+        ]
+        )
+
+
+
+# STANDARD_PLACES_ICONS = {
+#     "desktop+": "folder-destkop",
+#     "desktop": "user-desktop",
+#     "documents": "folder-documents",
+#     "applicatins": "folder-appimage",
+#     "music": "folder-music",
+#     "movies": "folder-videos",
+#     "pictures": "folder-pictures",
+#     "temp": "folder-temp",
+#     "cache": "folder-temp",
+#     "runtime": "folder-temp",
+#     "home": "user-home",
+#     "data":
+#     }
 
 
 def standardIconName(locationName: str, all_folder_icons: bool = False) -> str:
     ln = locationName.lower()
     if "desktop" in ln:
         return "folder-desktop" if all_folder_icons else "user-desktop"
+
     elif "documents" in ln:
         return "folder-documents"
+
     elif "applications" in ln:
         return "folder-appimage"
+
     elif "music" in ln:
         return "folder-music"
+
     elif "movies" in ln:
         return "folder-videos"
+
     elif "pictures" in ln:
         return "folder-pictures"
+
     elif "temp" in ln:
         return "folder-temp"
+
     elif "cache" in ln:
         return "folder-temp"
+
     elif "runtime" in ln:
         return "folder-temp"
+
     elif "home" in ln:
         return "user-home"
+
     elif "data" in ln:
         return "folder-database"
+
     elif "config" in ln:
         return "folder-log"
+
     elif "download" in ln:
         return "folder-download"
+
     elif "pulic" in ln:
         return "folder-public"
+
     else:
         return "folder"
+
+def testFilesystemMountUnmountOperation(x:object) -> bool:
+    r"""CAUTION: Only works in PyQt6"""
+    return (
+            isinstance(x, dict)
+            and isinstance(x.get('org.freedesktop.UDisks2.Job', None), dict)
+            and x['org.freedesktop.UDisks2.Job'].get('Operation', '') in ('filesystem-mount', 'filesystem-unmount')
+            )
+
+def parseUDIsksFSMountOperationJobs(msg: object) -> list:
+    if __has_qtdbus__:
+        if __has_PySide6__:
+            ret = list()
+            # msg_str = str(msg)
+
+            arguments = msg.arguments()
+
+            for k, argument in enumerate(arguments):
+                print(f"argument {k} -> {argument}")
+
+            if isinstance(arguments[0], QtDBus.QDBusObjectPath):
+                print(arguments[0].path())
+                if "/org/freedesktop/UDisks2/jobs" in arguments[0].path():
+                    ret.append(0)
+
+            return ret
+
+        else:
+            if isinstance(msg, QtDBus.QDBusMessage):
+                msg_args = msg.arguments()
+
+            elif isinstance(msg, str):
+                msg_args = msg
+
+            print(f"desktoputils.parseUDIsksFSMountOperationJobs -> {msg}")
+
+            print(f'\n\tsignature: {msg.signature()!r},\n\targuments: {msg_args!r}')
+
+            return list(filter(lambda a: testFilesystemMountUnmountOperation(a), msg_args))
+
+    return list()
+
+def isUDIsksFSMountOperationJobs(msg: object) -> bool:
+    if __has_qtdbus__:
+        if __has_PySide6__:
+            arguments = msg.arguments()
+
+            if (
+                isinstance(arguments[0], QtDBus.QDBusObjectPath)
+                and "/org/freedesktop/UDisks2/jobs" in arguments[0].path()
+                and "filesystem-" in str(msg)
+                ):
+                return True
+
+            return False
+
+        else:
+            if isinstance(msg, QtDBus.QDBusMessage):
+                msg_args = msg.arguments()
+
+            elif isinstance(msg, str):
+                msg_args = msg
+
+            return len(list(filter(lambda a: testFilesystemMountUnmountOperation(a), msg_args))) > 0
+
+    else:
+        return False
+
+
+def _partitionPredicate_(x, devices, drivePlaces):
+    return (
+        "boot" not in x.mountpoint
+        and "subvol" not in x.opts
+        and x.device in list(map(lambda d: d.get("DEVNAME"), devices))
+        and x.device.replace("/dev/", "") not in list(map(lambda p: p.name, drivePlaces))
+        )
 
 
 def isUnixHiddenLocation(p: typing.Union[pathlib.Path, QtCore.QUrl, str]) -> bool:
@@ -182,10 +333,10 @@ def isUnixHiddenLocation(p: typing.Union[pathlib.Path, QtCore.QUrl, str]) -> boo
         if p.scheme() != "file":
             raise ValueError("Expecting a local path url")
 
-        p = pathlib.Path(p.path()).resolve
+        p = pathlib.Path(p.path()).resolve()
 
     elif not isinstance(p, pathlib.Path):
-        raise TypeError(f"Expecting a path string, Url or ")
+        raise TypeError(f"Expecting a path string, Url or pathlib.Path; instead, got {p}")
 
     return any(v.startswith(".") for v in p.parts)
 
@@ -206,7 +357,7 @@ def isUnixSystemLocation(p: typing.Union[pathlib.Path, QtCore.QUrl, str]) -> boo
         p = pathlib.Path(p.path()).resolve
 
     elif not isinstance(p, pathlib.Path):
-        raise TypeError(f"Expecting a path string, Url or ")
+        raise TypeError("Expecting a path string, Url or ")
 
     if sys.platform == "win32":
         return any(
@@ -247,11 +398,11 @@ class DEPlace:
     app: typing.Optional[str] = dataclasses.field(default_factory=str)
     separator: bool = dataclasses.field(default=False)
 
-    def urlPath(self) -> pathlib.Path:
+    def urlPath(self) -> pathlib.Path | None:
         return urlToPath(self.url)
 
     @classmethod
-    def separator(cls, name: typing.Optional[str] = None):
+    def separator(cls, name: typing.Optional[str] = None): # noqa
         if not isinstance(name, str) or len(name.strip()) == 0:
             name == "separator"
         return cls(name, QtCore.QUrl(), separator=True)
@@ -286,15 +437,15 @@ class StandardLocationInfo:
         self._paths_ = QtCore.QStandardPaths.standardLocations(location)
         self._name_ = QtCore.QStandardPaths.displayName(location)
         self._iconName_ = standardIconName(self._name_, all_folder_icons)
-        self._system_ = location in systemLocations or any(
+        self._system_ = location in SYSTEM_LOCATIONS or any(
             isUnixSystemLocation(v) for v in self._paths_
         )
-        self._hidden_ = location in hiddenLocations or any(
+        self._hidden_ = location in HIDDEN_LOCATIONS or any(
             isUnixHiddenLocation(v) for v in self._paths_
         )
 
     def __repr__(self) -> str:
-        ret = f"{self.__class__.__name__}: name: {self._name_}, icon: {self._iconName_}"
+        ret = f"{self.__class__.__name__}: name: {self._name_}, location: {self._location_}, icon: {self._iconName_}"
         ret += f" system: {self._system_}, hidden: {self._hidden_},\n\twith paths:"
 
         ret = [ret]
@@ -328,7 +479,22 @@ class StandardLocationInfo:
     def hidden(self) -> bool:
         return self._hidden_
 
-if __has_PyQt6__ or __has_PySide6__:
+if __has_PySide6__:
+    StandardDesktopLocationsQt = tuple(
+        sorted(
+                list(
+                    map(
+                        lambda locType: StandardLocationInfo(locType, False),
+                        QtCore.QStandardPaths.StandardLocation
+                        )
+                    ),
+                key = lambda x: x.name
+            )
+        )
+
+    StandardDesktopLocationQtInfos = StandardDesktopLocationsQt
+
+elif __has_PyQt6__:
     StandardDesktopLocationsQt = tuple(
         sorted(
             inspect.getmembers(
@@ -338,6 +504,14 @@ if __has_PyQt6__ or __has_PySide6__:
             key=lambda x: x[1].value,
         )
     )
+
+    StandardDesktopLocationQtInfos = tuple(
+        map(
+            lambda x: StandardLocationInfo(getattr(QtCore.QStandardPaths, x[0])),
+            StandardDesktopLocationsQt,
+        )
+    )
+
 else:
     StandardDesktopLocationsQt = tuple(
         sorted(
@@ -350,12 +524,13 @@ else:
     )
 
 
-StandardDesktopLocationQtInfos = tuple(
-    map(
-        lambda x: StandardLocationInfo(getattr(QtCore.QStandardPaths, x[0])),
-        StandardDesktopLocationsQt,
+    StandardDesktopLocationQtInfos = tuple(
+        map(
+            lambda x: StandardLocationInfo(getattr(QtCore.QStandardPaths, x[0])),
+            StandardDesktopLocationsQt,
+        )
     )
-)
+
 
 # desktop integration - according to freedesktop.org (XDG)
 # ATTENTION: DO NOT install xdg as it will mess up pyxdg
@@ -367,88 +542,88 @@ try:
 
     HAS_PYXDG = True
 
-except:
+except: # noqa
     pass
 
 
-def get_wm():
-    r"""Retrieves the name of the window manager, on Linux platforms.
-    On any other platforms returns None.
-    Somewhat redundant to get_desktop()
-    """
-    # NOTE: 2023-01-07 16:08:36
-    # From
-    # https://stackoverflow.com/questions/3333243/how-can-i-check-with-python-which-window-manager-is-running
-    if not sys.platform.startswith("linux"):
-        return
+# def get_wm():
+#     r"""Retrieves the name of the window manager, on Linux platforms.
+#     On any other platforms returns None.
+#     Somewhat redundant to get_desktop()
+#     """
+#     # NOTE: 2023-01-07 16:08:36
+#     # From
+#     # https://stackoverflow.com/questions/3333243/how-can-i-check-with-python-which-window-manager-is-running
+#     if not sys.platform.startswith("linux"):
+#         return
+#
+#     # wmctrl = which("wmctrl")
+#     wmctrl = shutil.which("wmctrl")
+#
+#     if len(wmctrl):
+#         wmctrl = os.path.basename(wmctrl)
+#
+#         out = subprocess.run(
+#             [wmctrl, "-m"], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+#         )
+#
+#         if len(out.stdout) == 0:
+#             print(out.stderr)
+#             return
+#
+#         wmname = [s for s in out.stdout.split("\n") if s.startswith("Name: ")]
+#
+#         if len(wmname):
+#             return wmname[0].strip("Name: ")
+#
+#     else:
+#         inxi = shutil.which("inxi")
+#         if len(inxi):
+#             inxi = os.path.basename(inxi)
+#             out = subprocess.run(
+#                 [inxi, "-Sxx", "-y", "1", "--indents", "0"],
+#                 text=True,
+#                 stdout=subprocess.PIPE,
+#                 stderr=subprocess.PIPE,
+#             )
+#
+#             if len(out.stdout) == 0:
+#                 print(out.stderr)
+#                 return
+#
+#             inxiout = dict(
+#                 filter(
+#                     lambda x: len(x) == 2,
+#                     (tuple(s.split(": ")) for s in out.stdout.split("\n")),
+#                 )
+#             )
+#
+#             if len(inxiout) == 0:
+#                 return
+#
+#             # desktop = inxiout.get("Desktop", None)
+#             # tk = inxiout.get("tk", None)
+#             wm = inxiout.get("wm", None)
+#
+#             return wm
 
-    # wmctrl = which("wmctrl")
-    wmctrl = shutil.which("wmctrl")
 
-    if len(wmctrl):
-        wmctrl = os.path.basename(wmctrl)
-
-        out = subprocess.run(
-            [wmctrl, "-m"], text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-
-        if len(out.stdout) == 0:
-            print(out.stderr)
-            return
-
-        wmname = [s for s in out.stdout.split("\n") if s.startswith("Name: ")]
-
-        if len(wmname):
-            return wmname[0].strip("Name: ")
-
-    else:
-        inxi = shutil.which("inxi")
-        if len(inxi):
-            inxi = os.path.basename(inxi)
-            out = subprocess.run(
-                [inxi, "-Sxx", "-y", "1", "--indents", "0"],
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-
-            if len(out.stdout) == 0:
-                print(out.stderr)
-                return
-
-            inxiout = dict(
-                filter(
-                    lambda x: len(x) == 2,
-                    (tuple(s.split(": ")) for s in out.stdout.split("\n")),
-                )
-            )
-
-            if len(inxiout) == 0:
-                return
-
-            desktop = inxiout.get("Desktop", None)
-            tk = inxiout.get("tk", None)
-            wm = inxiout.get("wm", None)
-
-            return wm
-
-
-def get_desktop(what: str = "desktop"):
-    r"""Somewhat redundant to get_wm()"""
-    if sys.platform.startswith("linux"):
-        if what == "wm":
-            return os.environ.get("WINDOWMANAGER", None)
-
-        elif what == "session":
-            return os.environ.get("XDG_SESSION_TYPE", None)
-
-        else:
-            return os.environ.get(
-                "XDG_CURRENT_DESKTOP", os.environ.get("XDG_SESSION_DESKTOP", None)
-            )
-
-    else:
-        return sys.platform
+# def get_desktop(what: str = "desktop"):
+#     r"""Somewhat redundant to get_wm()"""
+#     if sys.platform.startswith("linux"):
+#         if what == "wm":
+#             return os.environ.get("WINDOWMANAGER", None)
+#
+#         elif what == "session":
+#             return os.environ.get("XDG_SESSION_TYPE", None)
+#
+#         else:
+#             return os.environ.get(
+#                 "XDG_CURRENT_DESKTOP", os.environ.get("XDG_SESSION_DESKTOP", None)
+#             )
+#
+#     else:
+#         return sys.platform
 
 
 def get_cloud_storage_path(service_name):
@@ -516,88 +691,95 @@ def get_dbus_service_names(what: str = "session"):
 
     return busConnection.interface().registeredServiceNames().value()
 
+# def is_x11() -> bool:
+#     return get_desktop("session").lower() == "x11"
+#
+# def is_kde_x11() -> bool:
+#     if platform.system() != "Linux":
+#         return False
+#
+#     return get_desktop("session").lower() == "x11" and get_desktop() == "KDE"
+#
+# def is_gnome_x11() -> bool:
+#     if platform.system() != "Linux":
+#         return False
+#
+#     return get_desktop("session").lower() == "x11" and get_desktop() == "GNOME"
+#
+#
+# def is_kde_wayland() -> bool:
+#     if platform.system() != "Linux":
+#         return False
+#
+#     return get_desktop("session").lower() == "wayland" and get_desktop() == "KDE"
+#
+# def is_gnome_wayland() -> bool:
+#     if platform.system() != "Linux":
+#         return False
+#
+#     return get_desktop("session").lower() == "wayland" and get_desktop() == "GNOME"
+#
+# def is_wayland() -> bool:
+#     return get_desktop("session").lower() == "wayland"
+#
+# def is_kde() -> bool:
+#     if platform.system() != "Linux":
+#         return False
+#
+#     return (
+#         get_desktop("session").lower() in ("x11", "wayland") and get_desktop() == "KDE"
+#     )
+#
+# def is_gnome() -> bool:
+#     if platform.system() != "Linux":
+#         return False
+#
+#     return (
+#         get_desktop("session").lower() in ("x11", "wayland") and get_desktop() == "GNOME"
+#     )
 
-def is_kde_x11():
-    if platform.system() != "Linux":
+def _fileSystemPlaceRejectPredicate_(x):
+    if isinstance(x, str):
+        return not x.startswith("file")
+
+    elif isinstance(x, QtCore.QUrl):
+        return not x.scheme.startswith("file")
+
+    else:
         return False
 
-    return get_desktop("session").lower() == "x11" and get_desktop() == "KDE"
-
-def is_gnome_x11():
-    if platform.system() != "Linux":
-        return False
-
-    return get_desktop("session").lower() == "x11" and get_desktop() == "GNOME"
-
-
-def is_kde_wayland():
-    if platform.system() != "Linux":
-        return False
-
-    return get_desktop("session").lower() == "wayland" and get_desktop() == "KDE"
-
-def is_gnome_wayland():
-    if platform.system() != "Linux":
-        return False
-
-    return get_desktop("session").lower() == "wayland" and get_desktop() == "GNOME"
-
-def is_kde():
-    if platform.system() != "Linux":
-        return False
-
-    return (
-        get_desktop("session").lower() in ("x11", "wayland") and get_desktop() == "KDE"
-    )
-
-def is_gnome():
-    if platform.system() != "Linux":
-        return False
-
-    return (
-        get_desktop("session").lower() in ("x11", "wayland") and get_desktop() == "GNOME"
-    )
-
-
-def get_local_filesystem_places(placesDict: typing.Optional[dict] = None) -> dict:
+# @timefunc
+def get_local_filesystem_places(placesDict: typing.Optional[PlacesMap] = None) -> dict:
     r"""
     Get special directories (KDE Plasma5/6 specific)
     """
-    if not isinstance(placesDict, dict):
+    if not isinstance(placesDict, PlacesMap):
+        # print("desktoputils.get_local_filesystem_places calls get_desktop_places")
         placesDict = get_desktop_places()
 
-    filterFunc = (
-        lambda x: not x.startswith("file")
-        if isinstance(x, str)
-        else not x.scheme().startswith("file")
-        if isinstance(x, QtCore.QUrl)
-        else False
-    )
-
     if len(placesDict):
-        # result = dict((k,v) for k,v in ret.items() if not k.startswith("file:///"))
-        result = dict((k, v) for k, v in placesDict.items() if not filterFunc(k))
+        result = dict((k, v) for k, v in placesDict.items() if not _fileSystemPlaceRejectPredicate_(k))
 
         return result
 
     return placesDict
 
 
-def get_my_desktop_session():
-    env = dict(
-        (k, v)
-        for k, v in os.environ.items()
-        if any(s in k.lower() for s in ("desktop", "session", "xdg"))
-    )
-    if len(env) == 0:
-        return
-
-    xdg_session_desktop = env.get("XDG_SESSION_DESKTOP", "")
-    return xdg_session_desktop
-
+# def get_my_desktop_session():
+#     env = dict(
+#         (k, v)
+#         for k, v in os.environ.items()
+#         if any(s in k.lower() for s in ("desktop", "session", "xdg"))
+#     )
+#     if len(env) == 0:
+#         return
+#
+#     xdg_session_desktop = env.get("XDG_SESSION_DESKTOP", "")
+#     return xdg_session_desktop
+#
 
 def get_trash_icon_name():
-    if get_my_desktop_session() == "KDE":
+    if get_my_desktop_session() == "KDE": # noqa star imported from core.platformutils
         try:
             trashproc = subprocess.run(
                 ["kioclient", "stat", "trash:/"], capture_output=True
@@ -610,12 +792,12 @@ def get_trash_icon_name():
             )
 
             return trashstat.get("ICON_NAME", "user-trash")
-        except:
+
+        except: # noqa
             # traceback.print_exc()
             return "user-trash"
 
     return "user-trash"
-
 
 def get_system_terminal_executable():
     # TODO: 2023-09-28 12:41:32 FIXME
@@ -633,30 +815,37 @@ def get_system_terminal_executable():
     #   on linux:   xterm, konsole, gnome-terminal, qterminal, lxterminal, rxvt, rxvt-unicode.
     if sys.platform.startswith("win32"):
         return "cmd"
+
     elif sys.platform.startswith("linux"):
         if os.getenv("XDG_SESSION_DESKTOP").startswith("KDE"):
             return "konsole"  # MY OWN default, for now
+
         else:
             return "xterm"
+
     elif sys.platform.startswith("darwin"):
         return "/System/Applications/Utilities/Terminal.app"
+
     else:
-        warnings.warn(f"{sys.platform} platform is not yet supported")
+        scipywarn(f"{sys.platform} platform is not yet supported")
 
-
+# @timefunc
 def get_standard_desktop_places(all_folder_icons: bool = False) -> PlacesMap:
     r"""Platform-independent Desktop places.
     These are defined in the Qt toolkit
     """
-    locations = tuple(
-        map(
-            lambda x: StandardLocationInfo(
-                getattr(QtCore.QStandardPaths, x[0]),
-                standardIconName(x[0], all_folder_icons),
-            ),
-            StandardDesktopLocationsQt,
+    if __has_PySide6__:
+        locations = StandardDesktopLocationsQt
+    else:
+        locations = tuple(
+            map(
+                lambda x: StandardLocationInfo(
+                    getattr(QtCore.QStandardPaths, x[0]),
+                    standardIconName(x[0], all_folder_icons),
+                ),
+                tuple(filter(lambda x: not x._hidden_, StandardDesktopLocationsQt)),
+            )
         )
-    )
     ret = PlacesMap()
     for k, loc in enumerate(locations):
         if len(loc.paths) == 0:
@@ -672,10 +861,6 @@ def get_standard_desktop_places(all_folder_icons: bool = False) -> PlacesMap:
             else list()
         )
 
-        # if asQUrl:
-        #     key = QtCore.QUrl(place_uri)
-        # else:
-        #     key = place_uri
         key = place_uri
 
         if key in ret:
@@ -693,14 +878,350 @@ def get_standard_desktop_places(all_folder_icons: bool = False) -> PlacesMap:
 
     return ret
 
+# def get_partition_places(schema: str,  ret: PlacesMap): # not used yet!
+#     from gui.guiutils import getIcon
+#     # ### BEGIN Resolve disk partitions
+#     #
+#     partitions = filesystems.get_disk_partitions()
+#
+#     if sys.platform.startswith("linux"):
+#         import pyudev
+#
+#         if HAS_PYXDG:
+#             xbel = "user-places.xbel"
+#             xbel_file = os.path.join(xdg.BaseDirectory.xdg_data_home, xbel)
+#             # if not os.path.exists(xbel_file):
+#             #     return ret
+#             if os.path.exists(xbel_file):
+#                 xbel_places = pio.loadXMLFile(xbel_file)
+#
+#                 if "xbel" in xbel_places.documentElement.tagName.lower():
+#                     bookmark_nodes = xbel_places.getElementsByTagName("bookmark")
+#
+#                     if isinstance(schema, str) and len(schema):
+#                         bookmark_nodes = list(
+#                             filter(
+#                                 lambda x: x.getAttribute("href").startswith(schema),
+#                                 bookmark_nodes,
+#                             )
+#                         )
+#
+#                     for k, b in enumerate(bookmark_nodes):
+#                         place_uri = b.getAttribute("href")
+#                         # NOTE: 2025-01-22 11:41:26 apply schema filter if any
+#                         # print(f"place_uri: {place_uri}")
+#                         # if isinstance(schema, str) and len(schema) and not place_uri.startswith(schema):
+#                         #     continue
+#
+#                         place_name = (
+#                             b.getElementsByTagName("title")[0].childNodes[0].data
+#                         )
+#
+#                         if len(place_name) == 0 or len(place_uri) == 0:
+#                             continue
+#
+#                         info_node = b.getElementsByTagName("info")[0]
+#                         info_metadata_nodes = info_node.getElementsByTagName("metadata")
+#
+#                         place_icon_name = (
+#                             info_metadata_nodes[0]
+#                             .getElementsByTagName("bookmark:icon")[0]
+#                             .getAttribute("name")
+#                         )
+#
+#                         systemitem_nodes = info_metadata_nodes[1].getElementsByTagName(
+#                             "isSystemItem"
+#                         )
+#                         hidden_nodes = info_metadata_nodes[1].getElementsByTagName(
+#                             "isHidden"
+#                         )
+#                         app_nodes = info_metadata_nodes[1].getElementsByTagName(
+#                             "OnlyInApp"
+#                         )
+#
+#                         if len(systemitem_nodes):
+#                             is_system_place = (
+#                                 systemitem_nodes[0].childNodes[0].data.lower() == "true"
+#                             )
+#                         else:
+#                             is_system_place = False
+#
+#                         if not include_system and is_system_place:
+#                             continue
+#
+#                         if len(hidden_nodes):
+#                             is_hidden = (
+#                                 hidden_nodes[0].childNodes[0].data.lower() == "true"
+#                             )
+#                         else:
+#                             is_hidden = False
+#
+#                         if not include_hidden and is_hidden:
+#                             continue
+#
+#                         if len(app_nodes):
+#                             app_info = app_nodes[0].childNodes
+#                             if len(app_info):
+#                                 app = app_info[0].data
+#                             else:
+#                                 app = str()
+#                         else:
+#                             app = str()
+#
+#                         place_url = QtCore.QUrl(place_uri)
+#
+#                         key = place_uri
+#
+#                         if key in ret and isinstance(ret[key], DEPlace):
+#                             ret[key].name_aliases.append(place_name)
+#                         else:
+#                             ret[key] = DEPlace(
+#                                 place_name,
+#                                 place_url,  # always as QUrl regardless of asQUrl
+#                                 icon=place_icon_name,  # can be a system icon name or a path/file name
+#                                 system=is_system_place,
+#                                 hidden=is_hidden,
+#                                 app=app,
+#                                 separator=False,
+#                             )
+#
+#         # create desktop places for non-standard partitions or removable media
+#         # NOTE: 2025-03-03 21:14:26 FIXME/TODO
+#         # this is quite contrived because it seeks to avoid adding places ot btrfs snapshots and other
+#         # paritions such as /boot/EFI
+#         # -> must streamline this !
+#         context = pyudev.Context()
+#         devices = list(context.list_devices(subsystem="block", DEVTYPE="partition"))
+#         disks = list(context.list_devices().match_property("DEVTYPE", "disk"))
+#
+#         lbl = (
+#             "Removable Disks"
+#             if sys.platform.startswith("win32")
+#             else "Removable Devices"
+#         )
+#         rmDriveSep = DEPlace.separator(lbl)
+#
+#         drivePlaces = [rmDriveSep] + sorted(
+#             list(
+#                 map(
+#                     lambda x: DEPlace(
+#                         x.device.replace("/dev/", ""),
+#                         QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
+#                         icon=getIcon("device-notifier-symbolic"),
+#                         # icon=getIcon(x.icon),
+#                         separator=False,
+#                     ),
+#                     list(filter(lambda x: "/run/media/" in x.mountpoint, partitions)),
+#                 )
+#             ),
+#             key=lambda x: x.name,
+#         )
+#
+#         ret_paths = list(map(lambda x: urlToPath(x.url), ret.values()))
+#
+#         # check for custom (fixed) partitions mounts outside /run/media, and add them
+#         #
+#         # I need partitions because the pyudev does NOT offer information about
+#         # where is the device mounted in the file system, while psutil does.
+#         # This is needed to capture mounted removable media (I'm sure Solid
+#         # framework does a much better job than this)
+#         #
+#         # The down side is that it also includes partitions that are NOT needed, such as
+#         # /boot/EFI
+#         # various btrfs snapshots
+#         #
+#         # filter: select a "partition" where the value of the 'device' attribute
+#         # exists in the list of device names in 'devices' (not in 'disks' because we end up with all the 'loop' devices)
+#         # but is absent from the list of drivePlaces names
+#         #
+#         # we will search for the parition among the mountpoint in 'disks' to capture
+#         # any inserted oprical disc
+#
+#         # partitionPredicate = (
+#         #     lambda x: x.device in list(map(lambda d: d.get("DEVNAME"), devices))
+#         #     and x.device.replace("/dev/", "")
+#         #     not in list(map(lambda p: p.name, drivePlaces))
+#         #     and "subvol" not in x.opts
+#         #     and "boot" not in x.mountpoint
+#         # )
+#
+#         partitionPredicate = partial(_partitionPredicate_, devices=devices,
+#                                      drivePlaces=drivePlaces)
+#
+#         # non-standard partitions - typically user-defined
+#         # NOTE: 2025-03-03 22:25:12
+#         # these might not be necessary, as they can always be accessed from the root filesystem
+#         # through their mount point 😃
+#         #
+#         fixedPartitions = list(filter(partitionPredicate, partitions))
+#         internalDrivePlaces = list()
+#
+#         if len(fixedPartitions):
+#             lbl = "Fixed Disks" if sys.platform.startswith("win32") else "Devices"
+#             fpDevSep = DEPlace.separator(lbl)
+#             internalDrivePlaces = [fpDevSep] + sorted(
+#                 list(
+#                     map(
+#                         lambda x: DEPlace(
+#                             x.device.replace("/dev/", ""),
+#                             QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
+#                             icon=getIcon("drive"),
+#                             separator=False,
+#                         ),
+#                         fixedPartitions,
+#                     )
+#                 ),
+#                 key=lambda x: x.name,
+#             )
+#             drivePlaces = internalDrivePlaces + drivePlaces
+#
+#         if len(drivePlaces):
+#             # curateDevicePlacesUnix(drivePlaces)
+#             for place in drivePlaces:
+#                 if not place.isSeparator():
+#                     # print(f"found separator: {place.name}")
+#                     # continue
+#                     # print(f"\nplace: {place}")
+#                     deviceLabel = place.name
+#
+#                     # find the device for this place, in 'devices'
+#                     devicesForPlace = list(
+#                         filter(lambda x: x.sys_name == place.name, devices)
+#                     )
+#                     if len(devicesForPlace) == 0:
+#                         # a device for the place was not found -> also check in disks - contains mounted optical media
+#                         devicesForPlace = list(
+#                             filter(lambda x: x.sys_name == place.name, disks)
+#                         )
+#
+#                     if len(devicesForPlace):
+#                         # a udev device for this place was found
+#                         placeDevice = devicesForPlace[0]
+#                         deviceName = placeDevice.get("DEVNAME")
+#                         # print(f"\tfound device: {placeDevice} (name: {deviceName}) for place: {place}")
+#
+#                         # get the partition for this device, in the list of extra partitions, if found
+#                         partitionsForDevice = list(
+#                             filter(lambda x: x.device == deviceName, fixedPartitions)
+#                         )
+#
+#                         if len(partitionsForDevice):
+#                             partitionForDevice = partitionsForDevice[0]
+#                             # partitionMountPointUrl = QtCore.QUrl("file://" + partitionForDevice.mountpoint)
+#                             partitionMountPointUrl = QtCore.QUrl(
+#                                 pathlib.Path(partitionForDevice.mountpoint).as_uri()
+#                             )
+#                             # print(f"\t\tpartition: {partitionForDevice} with mount point url: {partitionMountPointUrl}")
+#                             if partitionMountPointUrl in list(
+#                                 map(lambda x: x.url, drivePlaces)
+#                             ):
+#                                 deviceName = f"{deviceName.replace('/dev/', '')} ({partitionForDevice.mountpoint})"
+#
+#                         # check for device type, change place icon if necessary
+#                         mediaType = "Internal Drive"
+#                         if placeDevice.get("ID_CDROM") is not None:
+#                             place.icon = "drive-optical-symbolic"
+#                             mediaType = "Removable Media"
+#
+#                         elif placeDevice.get("ID_USB_TYPE") is not None:
+#                             place.icon = "drive-removable-media-usb-symbolic"
+#                             mediaType = "Removable Media"
+#
+#                         partitionSize = (
+#                             int(devicesForPlace[0].get("ID_FS_SIZE")) * pq.byte
+#                         )
+#                         pwr = np.log10(partitionSize.magnitude)
+#                         if pwr < 3:
+#                             partitionSize = partitionSize.magnitude.round(1)
+#                             symbol = "bytes"
+#                         elif pwr < 6:
+#                             partitionSize = partitionSize.rescale(
+#                                 pq.KiB
+#                             ).magnitude.round(1)
+#                             symbol = "KiB"
+#                         elif pwr < 9:
+#                             partitionSize = partitionSize.rescale(
+#                                 pq.MiB
+#                             ).magnitude.round(1)
+#                             symbol = "MiB"
+#                         elif pwr < 12:
+#                             partitionSize = partitionSize.rescale(
+#                                 pq.GiB
+#                             ).magnitude.round(1)
+#                             symbol = "GiB"
+#                         elif pwr < 15:
+#                             partitionSize = partitionSize.rescale(
+#                                 pq.TiB
+#                             ).magnitude.round(1)
+#                             symbol = "TiB"
+#                         elif pwr < 19:
+#                             partitionSize = partitionSize.rescale(
+#                                 pq.PiB
+#                             ).magnitude.round(1)
+#                             symbol = "PiB"
+#                         elif pwr < 22:
+#                             partitionSize = partitionSize.rescale(
+#                                 pq.EiB
+#                             ).magnitude.round(1)
+#                             symbol = "EiB"
+#                         elif pwr < 25:
+#                             partitionSize = partitionSize.rescale(
+#                                 pq.ZiB
+#                             ).magnitude.round(1)
+#                             symbol = "ZiB"
+#                         else:
+#                             partitionSize = partitionSize.rescale(
+#                                 pq.YiB
+#                             ).magnitude.round(1)
+#                             symbol = "YiB"
+#
+#                         # check for device label, change place name if necessary
+#                         deviceLabel = placeDevice.get(
+#                             "ID_FS_LABEL", "unlabeled partition"
+#                         )
+#                         # print(f"\t\tdeviceLabel: {deviceLabel}")
+#                         if deviceLabel == "unlabeled partition":
+#                             if mediaType == "Internal Drive":
+#                                 deviceLabel = (
+#                                     f"{deviceName} {partitionSize} {symbol} {mediaType}"
+#                                 )
+#                             else:
+#                                 deviceLabel = f"{partitionSize} {symbol} {mediaType}"
+#
+#                         else:
+#                             if mediaType == "Internal Drive":
+#                                 deviceLabel += f": {deviceName} {partitionSize} {symbol} {mediaType}"
+#                             else:
+#                                 deviceLabel += f": {partitionSize} {symbol} {mediaType}"
+#
+#                     place.name = deviceLabel
+#
+#     elif sys.platform.startswith("win32"):
+#         drivePlaces = sorted(
+#             list(
+#                 map(
+#                     lambda x: DEPlace(
+#                         x.mountpoint.replace("\\", ""),
+#                         QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
+#                         icon=getIcon("drive"),
+#                     ),
+#                     partitions,
+#                 )
+#             ),
+#             key=lambda x: x.name,
+#         )
+#     #
+#     # ### END   Resolve disk partitions
+#
+#     return ret
 
-def get_desktop_places(
-    schema: typing.Optional[str] = None,
-    all_folder_icons: bool = False,
-    include_hidden: bool = False,
-    include_system: bool = True,
-    intKeys: bool = False,
-) -> PlacesMap:
+# @timefunc
+def get_desktop_places(schema: typing.Optional[str] = None,
+                       all_folder_icons: bool = False,
+                       include_hidden: bool = False,
+                       include_system: bool = True,
+                       intKeys: bool = False,
+                       ) -> PlacesMap:
     r"""Collect user places as defined in the freedesktop.org XDG framework.
     Useful for xdg-compliant Linux desktops.
 
@@ -722,6 +1243,8 @@ def get_desktop_places(
 
 
     """
+    from gui.guiutils import getIcon
+
     # NOTE: 2025-02-08 10:07:51 TODO:
     # This is static: whenever a place, or the places repository, is altered
     # this won't be captured until a new Scipyen session is launched.
@@ -767,11 +1290,6 @@ def get_desktop_places(
     # </bookmark>
     # </xbel>
 
-    getIcon = (
-        lambda x: "folder-remote-symbolic"
-        if "remote" in x.opts
-        else "drive-harddisk-symbolic"
-    )
 
     # ### BEGIN Resolve disk partitions
     #
@@ -900,7 +1418,8 @@ def get_desktop_places(
                     lambda x: DEPlace(
                         x.device.replace("/dev/", ""),
                         QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
-                        icon=getIcon(x),
+                        icon=getIcon("device-notifier-symbolic"),
+                        # icon=getIcon(x.icon),
                         separator=False,
                     ),
                     list(filter(lambda x: "/run/media/" in x.mountpoint, partitions)),
@@ -929,13 +1448,16 @@ def get_desktop_places(
         # we will search for the parition among the mountpoint in 'disks' to capture
         # any inserted oprical disc
 
-        partitionPredicate = (
-            lambda x: x.device in list(map(lambda d: d.get("DEVNAME"), devices))
-            and x.device.replace("/dev/", "")
-            not in list(map(lambda p: p.name, drivePlaces))
-            and "subvol" not in x.opts
-            and "boot" not in x.mountpoint
-        )
+        # partitionPredicate = (
+        #     lambda x: x.device in list(map(lambda d: d.get("DEVNAME"), devices))
+        #     and x.device.replace("/dev/", "")
+        #     not in list(map(lambda p: p.name, drivePlaces))
+        #     and "subvol" not in x.opts
+        #     and "boot" not in x.mountpoint
+        # )
+
+        partitionPredicate = partial(_partitionPredicate_, devices=devices,
+                                     drivePlaces=drivePlaces)
 
         # non-standard partitions - typically user-defined
         # NOTE: 2025-03-03 22:25:12
@@ -953,7 +1475,7 @@ def get_desktop_places(
                         lambda x: DEPlace(
                             x.device.replace("/dev/", ""),
                             QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
-                            icon=getIcon(x),
+                            icon=getIcon("drive"),
                             separator=False,
                         ),
                         fixedPartitions,
@@ -1091,7 +1613,7 @@ def get_desktop_places(
                     lambda x: DEPlace(
                         x.mountpoint.replace("\\", ""),
                         QtCore.QUrl(pathlib.Path(x.mountpoint).as_uri()),
-                        icon=getIcon(x),
+                        icon=getIcon("drive"),
                     ),
                     partitions,
                 )
@@ -1262,7 +1784,8 @@ def get_recent_places(intKeys: bool = True) -> BookmarksMap:
                     app["count"] = ba.getAttribute("count")
                     bookmark["applications"].append(app)
 
-                key = k if intKeys else QtCore.QUrl(url) if asQUrl else url
+                # key = k if intKeys else QtCore.QUrl(url) if asQUrl else url
+                key = k if intKeys else url
                 ret[key] = bookmark
 
     return ret
@@ -1283,6 +1806,8 @@ def iconForStandardPath(localdirectory: str) -> str:
 
 
 def iconNameForUrl(url: QtCore.QUrl):
+    from gui.guiutils import getIcon
+
     if len(url.scheme()) == 0:
         return "unknown"
 
@@ -1301,7 +1826,8 @@ def iconNameForUrl(url: QtCore.QUrl):
 
     else:
         if url.scheme().startswith("http"):
-            iconName = favIconForUrl(url)
+            iconName = getIcon("internet-services")
+            # iconName = favIconForUrl(url)
 
         elif url.scheme() == "trash":
             if len(url.path()) <= 1:
@@ -1326,7 +1852,7 @@ def iconNameForUrl(url: QtCore.QUrl):
 
                     iconName = kiostat.get("ICON_NAME", "")
 
-                except:
+                except: # noqa
                     pass
 
     if len(iconName) == 0:
@@ -1427,7 +1953,7 @@ def removeAcceleratorMarker(label: str):
 
         try:
             p = label.index("&", p)
-        except:
+        except: # noqa
             traceback.print_exc()
             break
 
@@ -1516,7 +2042,7 @@ def get_editor() -> str:
                                     # get rid of argument placeholders:
                                     editor = cmd.split()[0]
 
-        except:
+        except: # noqa
             traceback.print_exc()
             # return editor
 
@@ -1527,6 +2053,24 @@ def get_editor() -> str:
 
     return editor
 
+def _pathForUrlPredicate_(u0: DEPlace, u1: pathlib.Path):
+    # print(f"_pathForUrlPredicate_(\nu0 = {u0},\nu1={u1})")
+    # print(f"\n\t -> u0 path: {u0.urlPath()}\n\t u1.path: {u1}")
+    # print(f"\n\t -> u1 is u0 url path: {u1 == u0.urlPath()}")
+    if not isinstance(u0.urlPath(), pathlib.Path):
+        return False
+
+    if not isinstance(u1, pathlib.Path):
+        return False
+
+    if u1 == u0.urlPath():
+        return True
+
+    # print(f"\n\t -> u1 is relative to u0 url path: {u1.is_relative_to(u0.urlPath())}")
+    if u1.is_relative_to(u0.urlPath()):
+        return True
+    # print(f"\n\t -> predicate returns {False}")
+    return False
 
 def closestPlace(
     url: QtCore.QUrl, places: typing.Optional[PlacesMap] = None
@@ -1538,7 +2082,7 @@ def closestPlace(
     if not isinstance(places, PlacesMap):
         places = get_desktop_places(schema)  # , True)
 
-    # fallback = DEPlace(str(), url, icon = iconNameForUrl(url))#, app=None)
+    fallback = DEPlace(str(), url, icon = iconNameForUrl(url))#, app=None)
 
     if len(places) == 0:
         return fallback
@@ -1546,9 +2090,12 @@ def closestPlace(
     pathForUrl = urlToPath(url)
 
     # predicate1 = lambda x: pathForUrl == x.urlPath()
-    predicate = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(
-        x.urlPath()
-    )
+    # predicate = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(
+    #     x.urlPath()
+    # )
+
+    predicate = partial(_pathForUrlPredicate_, u1 = pathForUrl)
+
     # if sys.platform.startswith("win32"):
     #     predicate = lambda x: pathForUrl == x.urlPath() or pathForUrl.is_relative_to(x.urlPath()) or len(pathForUrl.parts) == len*()
 
@@ -1662,18 +2209,23 @@ def fractionalWindowSize(w:float, h:float, inches:bool=False):
     new_h = geometry.height() * h
     
     if inches:
-        return windowSizeToInches(new_w, new_h)
+        return sizeToInches(new_w, new_h)
     
     return int(new_w), int(new_h)
 
-def windowSizeToInches(w, h):
+def sizeToInches(w, h) -> tuple:
     r"""Converts window size (width, height) from pixels to inches.
 Useful for matplotlib figures
 """
-    # desktop = QtWidgets.QApplication.desktop()
-    # # geometry = desktop.screenGeometry(desktop.primaryScreen())
-    # screen = QtWidgets.QApplication.screens()[desktop.primaryScreen()]
+    from gui import guiutils
     screen = guiutils.getDesktopScreen()
     return w/screen.logicalDotsPerInchX(), h/screen.logicalDotsPerInchY()
+
+def inchesToSize(w: float, h: float) -> tuple:
+    from gui import guiutils
+    screen = guiutils.getDesktopScreen()
+    return screen.logicalDotsPerInchX() * w, screen.logicalDotsPerInchY() * h
+
+
 
 DEFAULT_EDITOR = get_editor()

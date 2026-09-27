@@ -189,17 +189,12 @@
      <addaction name="actionLeft_Axis_Spacer"/>
      <addaction name="actionEnable_Auto_Range"/>
     </widget>
-    <widget class="QMenu" name="menuType_Here">
-     <property name="title">
-      <string>Type Here</string>
-     </property>
-    </widget>
     <addaction name="actionShow_Legends"/>
     <addaction name="actionIgnore_empty_spike_trains"/>
     <addaction name="actionShow_Cursor_Edit_Dialog_When_Created"/>
+    <addaction name="setCursorsShowValue"/>
     <addaction name="menuView"/>
     <addaction name="menuAxes"/>
-    <addaction name="menuType_Here"/>
    </widget>
    <widget class="QMenu" name="cursorsMenu">
     <property name="title">
@@ -390,7 +385,7 @@
    <widget class="QWidget" name="dockWidgetContents_2">
     <layout class="QGridLayout" name="gridLayout_3">
      <item row="0" column="0">
-      <widget class="DataTreeView" name="annotationsViewer" native="true"/>
+      <widget class="ObjectView" name="annotationsViewer" native="true"/>
      </item>
     </layout>
    </widget>
@@ -431,6 +426,7 @@
    <addaction name="actionCrosshair_Cursor"/>
    <addaction name="actionHorizontal_Cursor"/>
    <addaction name="actionRemove_Cursor"/>
+   <addaction name="actionRemove_All_Cursors"/>
   </widget>
   <widget class="QToolBar" name="triggersToolBar">
    <property name="windowTitle">
@@ -453,6 +449,7 @@
    </attribute>
    <addaction name="actionDetect_Triggers"/>
    <addaction name="actionRemoveTriggers"/>
+   <addaction name="actionRemoveAllEvents"/>
   </widget>
   <widget class="QToolBar" name="epochsToolBar">
    <property name="windowTitle">
@@ -544,7 +541,7 @@
     <string>Remove Cursor...</string>
    </property>
    <property name="toolTip">
-    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Removes the currently selected cursor.&lt;/p&gt;&lt;p&gt;Use the &lt;span style=&quot; text-decoration: underline;&quot;&gt;Cursors menu&lt;/span&gt; to remove &lt;span style=&quot; font-weight:700; font-style:italic;&quot;&gt;all&lt;/span&gt; cursors.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Removes the currently &lt;span style=&quot; text-decoration: underline;&quot;&gt;selected&lt;/span&gt; cursor.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
   </action>
   <action name="actionSVG">
@@ -612,11 +609,17 @@
    <property name="checked">
     <bool>false</bool>
    </property>
+   <property name="icon">
+    <iconset theme="draw-number"/>
+   </property>
    <property name="text">
-    <string>Cursors Show Value</string>
+    <string>Cursor Label Shows Value</string>
    </property>
   </action>
   <action name="setCursorsLabelPrecisionAction">
+   <property name="icon">
+    <iconset theme="format-precision-more"/>
+   </property>
    <property name="text">
     <string>Cursor Label Precision...</string>
    </property>
@@ -1025,6 +1028,17 @@
     <enum>QAction::MenuRole::NoRole</enum>
    </property>
   </action>
+  <action name="actionRemove_All_Cursors">
+   <property name="icon">
+    <iconset theme="delete"/>
+   </property>
+   <property name="text">
+    <string>Remove Cursor...</string>
+   </property>
+   <property name="toolTip">
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remove &lt;span style=&quot; text-decoration: underline;&quot;&gt;all&lt;/span&gt; cursors.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
@@ -1034,9 +1048,9 @@
    <container>1</container>
   </customwidget>
   <customwidget>
-   <class>DataTreeView</class>
+   <class>ObjectView</class>
    <extends>QWidget</extends>
-   <header location="global">gui.widgets.datatreeview</header>
+   <header location="global">gui.widgets.objectview</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

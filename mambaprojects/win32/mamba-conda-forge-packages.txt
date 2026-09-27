@@ -1,0 +1,78 @@
+vigra
+pyqtgraph
+treelib
+pyxdg
+ipyparallel
+pywavelets
+qimage2ndarray
+sympy
+scipy
+python-neo
+cmocean
+pandas
+pandas-flavor
+pyserial
+termcolor2
+opencv
+shapely
+seaborn
+pingouin
+scikit-image
+scikit-bio
+inflect
+dill
+pynwb
+sphinx
+markdown
+docrepr
+restructuredtext_lint
+marko
+jupyterthemes
+jupyter_qtconsole_colorschemes
+meshio
+
+# # matplotlib # needs pyside6 ?!? + pyside6, qt6-main => NEEDS to be installed via uv pip !!!
+# jupyterthemes
+# jupyter_qtconsole_colorschemes
+# pyqtgraph
+# pyqt6
+# pyqt6-charts
+# pyqt6-webengine
+# confuse
+# sphinx # also installs inter alia (+): pygments, colorama, docutils, markupsafe
+# isodate
+# cmasher # + qhull, numpy, pillow, pyparsing, colorspacious, contourpy, matplotlib-base
+# more-itertools
+# docrepr
+# markdown
+# restructuredtext_lint
+# pyxdg
+# marko
+# ipyparallel # + tqdm
+# sympy # + mpmath
+# python-neo # + quantities
+# seaborn # + patsy, scipy, pandas, statsmodels
+# cmocean
+# pyserial
+# termcolor2 # + termcolor
+# pandas-flavor # + xarray
+# shapely # + geos
+# vigra # + fftw, glpk, hdf5, imath, libboost, openexr, openjph, vs2015_runtime
+# qimage2ndarray
+# opencv # + py-opencv,
+# pingouin # + scikit-learn
+# scikit-image # + imageio, imagecodecs, tiffile, zip
+# scikit-bio # + h5py
+# pywavelets
+# pynwb
+# inflect
+# dill
+# researchpy
+# pickleshare
+# pyinstaller
+# libNeuroML
+# drawsvg
+# brainglobe-atlasapi # + CAUTION reinstalls vigra, vtk*, libboost, opencv, pytables (but same versions ?!?)
+# brainglobe-napari-io # + napari, bokeh, numba, numpydocs, superqt, vispy CAUTION reinstalls/downgrades ipykernel
+# brainglobe-segmentation
+# brainrender-napari

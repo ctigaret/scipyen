@@ -1,13 +1,22 @@
-# -*- coding: utf-8 -*-
 # $Id: delegates.py $
 # SPDX-FileCopyrightText: 2025 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-r"""
+r"""Delegates for Scipyen's item viewers
 """
 import os, sys, typing, types, math, pathlib, enum, datetime # noqa
-from functools import partial
+from functools import (partial, singledispatchmethod)
+from collections import deque
+import dataclasses
+import numpy as np
+import vigra
+import quantities as pq
+import pandas as pd
+import neo
+from neo.core.objectlist import ObjectList as NeoObjectList
+from tribool import Tribool
+
 import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,) # noqa
@@ -16,10 +25,10 @@ __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
+    import PySide6 # noqa
     from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -27,8 +36,8 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    from qtpy import sip # noqa
+    # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -39,28 +48,300 @@ __has_qtdbus__ = False
 try:
     from qtpy import QtDBus # noqa
     __has_qtdbus__ = True
-except:
+except: # noqa
     __has_qtdbus__ = False
 
+# from core import datatypes
 from core.datatypes import (is_namedtuple, TypeEnum) # noqa
 from core.prog import (safewrapper, safeguiwrapper, scipywarn, print_styled) # noqa
 from core.sysutils import adapt_ui_path # noqa
+# from core import strutils
+from core import scipyendataclasses as sdc
 
-__module_path__ = os.path.abspath(os.path.dirname(__file__))
-
-import numpy as np
-import vigra
-import quantities as pq
-import pandas as pd
-import neo
 # from core import scipyen_quantities as scq
-from core import strutils as strutils
+from gui import guiutils
+from gui.itemmodels.roles import *
+from gui.itemmodels.datatree.objectnode import ObjectNode
+# from gui.itemmodels.datatree import objectnode as onode
+from gui.itemmodels.datatree.objectmodel import ObjectModel
 from gui.widgets import small_widgets as smw
 from gui.widgets import neo_widgets as neow
 from gui.widgets import inlinefiledirchooser as ifdc
 # from gui import quickdialog as qd
 # from core import typeenum
-from gui.itemmodels.roles import * # noqa
+from ephys import (ephys_pathways, ephys_protocol)
+
+__module_path__ = os.path.abspath(os.path.dirname(__file__))
+
+
+class ExternalEditorDelegate(QtWidgets.QMainWindow):
+    r"""For use with external editing in PythonItemDelegate.
+
+
+NOTE: To be used with Scipyen's custom itemmodels only
+
+
+"""
+    sig_valueChanged            = Signal(object)
+    sig_closing                 = Signal()
+    sig_indexChanged            = Signal(QtCore.QModelIndex, name="sig_indexChanged")
+    sig_indexRowColChanged      = Signal(int, int, name="sig_indexRowColChanged")
+
+    def __init__(self, data: object = None,
+                 parent = None,
+                 lazy: bool = False,
+                 **kwargs):
+        r"""
+    CAUTION: The underlying central widget may call another instance of this !
+
+    If ``lazy`` is True, then UI changes will not update the internal data
+    representation until after the window is closed.
+"""
+        QtWidgets.QMainWindow.__init__(self, parent=parent)
+
+        self._pendingChange_: bool = False
+        self._lazy_ = lazy is True
+
+        self._decimals_ = kwargs.pop("decimals", None)
+
+        if not isinstance(self._decimals_, int) or self._decimals_ < 0:
+            self._decimals_ = None
+
+        self._data_ = data
+        self._widget_ = self.chooseEditor()
+
+        if hasattr(self._widget_, "decimals"):
+            self._widget_.decimals = self._decimals_
+
+        # print (f"{self.__class__.__name__}.__init__ -> widget is {type(self._widget_).__name__}")
+
+        if isinstance(self._widget_, QtWidgets.QWidget):
+            self.setCentralWidget(self._widget_)
+            self.resize(-1,-1)
+
+        if not self._lazy_:
+            self.show()
+
+    @property
+    def lazy(self) -> bool:
+        return self._lazy_
+
+    @lazy.setter
+    def lazy(self, val: bool):
+        self._lazy_ = val is True
+
+    def closeEvent(self, evt):
+        # print(f"{self.__class__.__name__}[{self.objectName()}].closeEvent:")
+        self._pendingChange_ = False
+        # store data from underlying central widget
+        if isinstance(self._widget_, QtWidgets.QWidget) and hasattr(self._widget_, "value"):
+            self._data_ = self._widget_.value()
+
+        self.sig_valueChanged.emit(self._data_)
+        # self._widget_.close()
+        # self._widget_.deleteLater()
+        # self._widget_ = None
+        self.sig_closing.emit()
+
+        evt.accept()
+
+    @singledispatchmethod
+    def _makeWidget_(self, obj, name: str) -> QtWidgets.QWidget | None:
+        scipywarn(f"{type(obj).__name__} object are not yet supported")
+
+    @_makeWidget_.register(ephys_pathways.SynapticStimulusChannel)
+    def __makeWidget__(self, obj: ephys_pathways.SynapticStimulusChannel, name: str) -> QtWidgets.QWidget | None:
+        from gui.widgets.dataclasswidgets import synapticstimuluswidget
+        widget = synapticstimuluswidget.SynapticStimulusChannelWidget(
+                parent=self, obj = obj,)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(ephys_pathways.AuxiliaryInput)
+    @_makeWidget_.register(ephys_pathways.AuxiliaryOutput)
+    def __makeWidget__(self, obj: ephys_pathways.AuxiliaryInput | ephys_pathways.AuxiliaryOutput, # noqa
+                       name: str) -> QtWidgets.QWidget | None:
+        from gui.widgets import auxiliaryiowidget
+        if isinstance(obj, ephys_pathways.AuxiliaryInput):
+            widget = auxiliaryiowidget.AuxiliaryInputWidget(self, obj)
+        else:
+            widget = auxiliaryiowidget.AuxiliaryOutputWidget(self, obj)
+
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(ephys_pathways.SynapticPathway)
+    def __makeWidget__(self, obj: ephys_pathways.SynapticPathway, # noqa
+                       name:str) -> QtWidgets.QWidget | None:
+        from gui.widgets.dataclasswidgets import synapticpathwaywidget
+        widget = synapticpathwaywidget.SynapticPathwayWidget(parent=self, obj=obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(ephys_pathways.RecordingEpisode)
+    def __makeWidget__(self, obj: ephys_pathways.RecordingEpisode, # noqa
+                       name: str) -> QtWidgets.QWidget | None:
+        from gui.widgets.dataclasswidgets import recordingepisodewidget
+        widget = recordingepisodewidget.RecordingEpisodeWidget(self, obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(ephys_pathways.RecordingSource)
+    def __makeWidget__(self, obj: ephys_pathways.RecordingSource, # noqa
+                       name: str) -> QtWidgets.QWidget | None:
+        from gui.widgets.dataclasswidgets import recordingsourcewidget
+        widget = recordingsourcewidget.RecordingSourceWidget(self, obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(ephys_pathways.RecordingSchedule)
+    def __makeWidget__(self, obj: ephys_pathways.RecordingSchedule, # noqa
+                       name:str) -> QtWidgets.QWidget | None:
+        from gui.widgets import tableeditorwidget
+        widget = tableeditorwidget.TableEditorWidget(self)
+        widget.setData(obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(sdc.Schedule)
+    def __makeWidget__(self, obj: sdc.Schedule, # noqa
+                       name:str) -> QtWidgets.QWidget | None:
+        from gui.widgets import tableeditorwidget
+        widget = tableeditorwidget.TableEditorWidget(self)
+        widget.setData(obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(sdc.Procedure)
+    def __makeWidget__(self, obj: sdc.Procedure, name: str) -> QtWidgets.QWidget | None: # noqa
+        from gui.widgets.dataclasswidgets import procedurewidget
+        widget = procedurewidget.SimpleProcedureWidget(self, obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(sdc.PPLProcedure)
+    def __makeWidget__(self, obj: sdc.PPLProcedure, name: str) -> QtWidgets.QWidget | None: # noqa
+        from gui.widgets.dataclasswidgets import procedurewidget
+        widget = procedurewidget.ProcedureWidget(self, obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(sdc.PPLProtocol)
+    @_makeWidget_.register(sdc.PPLProtocolStep)
+    def __makeWidget__(self, obj: sdc.PPLProtocol, name: str) -> QtWidgets.QWidget | None: # noqa
+        from gui.widgets.dataclasswidgets.asruwidgets import pplprotocolstepwidget
+        widget = pplprotocolstepwidget.PPLProtocolStepWidget(self, obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(sdc.PIL)
+    @_makeWidget_.register(sdc.PPL)
+    def __makeWidget__(self, obj: (sdc.PIL, sdc.PPL), name: str) -> QtWidgets.QWidget | None: # noqa
+        from gui.widgets.dataclasswidgets.aswruwidgets import asruwidget
+        widget = asruwidget.ASRUWidget(self, obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(ephys_protocol.ElectrophysiologyProtocol)
+    @_makeWidget_.register(ephys_pathways.PathwaysStimulationLayout)
+    def __makeWidget__(self, obj: ephys_protocol.ElectrophysiologyProtocol | ephys_pathways.PathwaysStimulationLayout, name: str) -> QtWidgets.QWidget | None: # noqa
+        from gui.widgets import datatreeview
+        widget = datatreeview.DataTreeView(parent=self)
+        widget.setData(obj)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    @_makeWidget_.register(list)
+    @_makeWidget_.register(tuple)
+    @_makeWidget_.register(deque)
+    @_makeWidget_.register(NeoObjectList)
+    def __makeWidget__(self, obj: (list, tuple, deque, NeoObjectList), # noqa
+                       name: str) -> QtWidgets.QWidget | None:
+        from gui.widgets import tableeditorwidget
+        widget = tableeditorwidget.TableEditorWidget(self)
+        widget.setData(obi)
+        widget.setObjectName(f"{name}_Widget")
+        return widget
+
+    def chooseEditor(self) -> QtWidgets.QWidget:
+        from gui.widgets import tableeditorwidget
+        widget = None
+        editorName = f"{type(self._data_).__name__} Editor"
+        self.setWindowTitle(editorName)
+
+        widget = self._makeWidget_(self._data_, editorName.replace(" ", "_"))
+
+        if isinstance(widget, QtWidgets.QWidget) and hasattr(widget, "sig_valueChanged"):
+            # print(f"{self.__class__.__name__}.chooseEditor -> widget is a {type(widget).__name__}:")
+            if isinstance(widget, tableeditorwidget.TableEditorWidget):
+                widget.sig_dataChanged.connect(self.slot_dataChanged)
+                widget.sig_indexChanged.connect(self.sig_indexChanged)
+                widget.sig_indexChanged[QtCore.QModelIndex].connect(self.sig_indexChanged[QtCore.QModelIndex])
+            else:
+                widget.sig_valueChanged.connect(self.slot_valueChanged)
+
+        return widget
+
+    @Slot()
+    def _slot_externalEditorClosing(self): # --?!? what's this doing ?!?
+        self._pendingChange_ = False
+
+    @Slot()
+    def slot_dataChanged(self):
+        obj = self.sender().value()
+        if self._pendingChange_:
+            return
+        self._data_ = obj
+        self.sig_valueChanged.emit(self._data_)
+
+    @Slot(object)
+    def slot_valueChanged(self, val):
+        # print(f"{self.__class__.__name__}[{self.objectName()}].slot_valueChanged({val})")
+        if self._pendingChange_:
+            return
+
+        self._data_ = val
+
+        self.sig_valueChanged.emit(self._data_)
+
+    @Slot()
+    def slot_Launch(self):
+        if isinstance(self._widget_, QtWidgets.QWidget):
+            if self.lazy:
+                self._pendingChange_ = True
+            else:
+                self._pendingChange_ = False
+            self.show()
+            self.resize(-1, -1)
+
+    def setValue(self, data: object):
+        self._data_ = data
+        newWidget = self.chooseEditor()
+        if isinstance(newWidget, QtWidgets.QWidget):
+            oldWidget = self.takeCentralWidget()
+            oldWidget.sig_valueChanged.disconnect()
+            self._widget_ = newWidget
+            oldWidget.close()
+            self.setCentralWidget(self._widget_)
+            self._widget_.sig_valueChanged.connect(self.slot_valueChanged)
+
+    def value(self) -> object:
+        return self._data_
+
+    @property
+    def decimals(self) -> int | None:
+        return self._decimals_
+
+    @decimals.setter
+    def decimals(self, val: int | None = None):
+        if isinstance(val, int) and val >= 0:
+            self._decimals_ = val
+        else:
+            self._decimals_ = None
+
+        if isinstance(self._widget_, QtWidgets.QWidget) and hasattr(self._widget_, "decimals"):
+            self._widget_.decimals = self._decimals_
+
 
 class CutFileSystemItemDelegate(QtWidgets.QStyledItemDelegate):
     # WARNING: 2026-01-25 22:25:36 TODO
@@ -100,53 +381,56 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 """
     sig_dataChanged = Signal(QtWidgets.QWidget, name = "sig_dataChanged")
     sig_contentsChanged = Signal(name="sig_contentsChanged")
-
+    sig_editExternally = Signal(QtWidgets.QWidget, QtCore.QModelIndex, name = "sig_editExternally")
+    sig_indexRowColChanged = Signal(int, int, name="sig_indexRowColChanged")
+    sig_indexChanged = Signal(QtCore.QModelIndex, name="sig_indexChanged")
     # TODO/FIXME: 2025-10-28 12:57:09
     # decide how to handle the case where the combo box is editable (and its
     # currentText() is not among the combo box items)
 
-    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
-                 columnChoices: typing.Optional[dict[int,
-                                                     dict[typing.Sequence,
-                                                          bool]]] = None,
-                 immutableColumns: typing.Optional[typing.Sequence[int]] = None,
-                 immutableRows: typing.Optional[typing.Sequence[int]] = None,
-                 enforceFloat: bool = False):
+    def __init__(self, parent: QtWidgets.QWidget | None = None,
+                 columnChoices: dict[int, dict[typing.Sequence, bool]] | None= None,
+                 enforceFloat: bool = False,
+                 decimals: int | None = None):
         r"""Instantiates a PythonItemDelegate.
 
-    Parameters:
-    ===========
-    parent: parent QWidget; optional, default is None
+        Parameters:
+        ===========
+        parent: parent QWidget; optional, default is None
 
-    columnChoices: dict; sets up the delegate editor to be a QComboBox for specific
-        table columns:
+        columnChoices: dict; sets up the delegate editor to be a QComboBox for specific
+            table columns:
 
-        column index:int ↦ data:dict with key:str ↦ sequence or bool as below:
-                            — "choices": typing.Sequence[str]
-                            — "editable": bool; when True, the combo box is editable
-                              WARNING: this is not currently supported, and by default
-                                this is False
+            column index:int ↦ data:dict with key:str ↦ sequence or bool as below:
+                                — "choices": typing.Sequence[str]
+                                — "editable": bool; when True, the combo box is editable
+                                WARNING: this is not currently supported, and by default
+                                    this is False
 
-        NOTE: The choices are always strings, and the data assocated with the EditRole
-        of a model index MUST be a string that is present among the choices
+            NOTE: The choices are always strings, and the data assocated with the EditRole
+            of a model index MUST be a string that is present among the choices
 
 
-        Example (setting choices for columns 0 and 3):
+            Example (setting choices for columns 0 and 3):
 
-        {0: {   "choices": ["1","2","3"],
-                "editable": False},
-         3: {   "choices": ["test", "me", "now"],
-                "editable": True}}
+            {0: {   "choices": ["1","2","3"],
+                    "editable": False},
+            3: {   "choices": ["test", "me", "now"],
+                    "editable": True}}
 
-        NOTE: the "choices" field in the column sub-dictionary cannot be empty!
+            NOTE: the "choices" field in the column sub-dictionary cannot be empty!
 
-    immutableColumns, immutableRows: columns/rows of model indexes that are uneditable
-
-    """
+        immutableColumns, immutableRows: columns/rows of model indexes that are uneditable
+        jointImmutability:
+        """
         super().__init__(parent=parent)
-        # self._model_ = None
+
+        self._usingObjectModel_: bool = False
         self._useObjectDataRole_: bool = False
-        self._currentModelIndex_: typing.Optional[QtCore.QModelIndex] = None
+        self._dataInObjectNode_: bool = False
+        self._currentObjectNode_: ObjectNode | None = None
+
+        self._currentModelIndex_: QtCore.QModelIndex | None = None
 
         self._enforceFloat_:bool = enforceFloat
 
@@ -154,19 +438,18 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             self._columnChoices_ = columnChoices
 
         else:
-            self._columnChoices_ = dict() # always keep it as a dict, even when empty
+            self._columnChoices_ = {} # always keep it as a dict, even when empty
 
-        if isinstance(immutableColumns, typing.Sequence) and len(immutableColumns) > 0 and all(isinstance(v, int) for v in immutableColumns):
-            self._immutableColumns_ = immutableColumns
+        self._currentData_: typing.Any | None = None
+        self._externalDataEditor_: QtWidgets.QWidget | None = None
+
+        if isinstance(decimals, int) and decimals >= 0:
+            self._decimals_ = decimals
+
         else:
-            self._immutableColumns_ = list()
+            self._decimals_  = None
 
-        if isinstance(immutableRows, typing.Sequence) and len(immutableRows) > 0 and all(isinstance(v, int) for v in immutableRows):
-            self._immutableRows_ = immutableRows
-        else:
-            self._immutableRows_ = list()
-
-        self._currentData_:typing.Optional[typing.Any] = None
+        # self.sig_contentsChanged.connect(self._slot_sendToExternalEditor)
 
     def _checkColumnChoiceDict_(self, d:dict) -> bool:
         if not isinstance(d, dict):
@@ -184,13 +467,72 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             return False
 
         checkSubKeys = lambda v: all(k in ("editable", "choices") for k in v.keys()) # noqa
-        checkChoices = lambda v: isinstance(v["choices"], typing.Sequence) and len(v["choices"]) > 0 and all(isinstance(o, str) for o in v["choices"]) # noqa
-        checkEditable= lambda v: isinstance(v["editable"], bool) # noqa
+        checkChoices = lambda v: isinstance(v["choices"], typing.Sequence) and len(v["choices"]) > 0 and all(isinstance(o, str) for o in v["choices"])
+        checkEditable= lambda v: isinstance(v["editable"], bool)
 
-        if not all(isinstance(v, dict) and checkSubKeys(v) and checkChoices(v) and checkEditable(v) for v in values):
-            return False
+        return not all(isinstance(v, dict) and checkSubKeys(v) and checkChoices(v) and checkEditable(v) for v in values)
 
-        return True
+    # @property
+    # def immutability(self) -> dict:
+    #     r"""Mapping row & col indexes where cell contents CANNOT be altered.
+    # E.g.: {"columns": [2,3], "rows": [0,1], "joint":False}
+    # """
+    #     return self._immutability_
+    #
+    # @immutability.setter
+    # def immutability(self, value:dict):
+    #     # d = {"columns":list(), "rows": list(), "joint":False}
+    #     if not isinstance(value, dict):
+    #         self._immutability_ = {"columns":list(), "rows": list(), "joint":False}
+    #     else:
+    #         if "columns" in value and isinstance(value["columns"], typing.Sequence):
+    #             if len(value["columns"]) == 0 or not all(isinstance(v, int) for v in value["columns"]):
+    #                 self._immutability_["columns"] = list()
+    #
+    #             else:
+    #                 self._immutability_["columns"] = list(value["columns"])
+    #
+    #         if "rows" in value and isinstance(value["rows"], typing.Sequence):
+    #             if len(value["rows"]) == 0 or not all(isinstance(v, int) for v in value["rows"]):
+    #                 self._immutability_["rows"] = list()
+    #
+    #             else:
+    #                 self._immutability_["rows"] = list(value["rows"])
+    #
+    #         if "joint" in value:
+    #             if isinstance(value["joint"], bool):
+    #                 self._immutability_["value"] = value["joint"]
+    #             else:
+    #                 self._immutability_["value"] = False
+
+    # @property
+    # def jointImmutability(self) -> bool:
+    #     return self._immutability_["joint"]
+    #
+    # @jointImmutability.setter
+    # def jointImmutability(self, value:bool):
+    #     self._jointImmutability_ = value is True
+    #     self._immutability_["joint"] = self._jointImmutability_
+    #
+    # @property
+    # def immutableColumns(self) -> typing.Sequence[int]:
+    #     r"""Indexes of columns where the contents CANNOT be changed"""
+    #     return self._immutability_["columns"]
+    #
+    # @immutableColumns.setter
+    # def immutableColumns(self, value:typing.Sequence[int]):
+    #     self._immutableColumns_ = value
+    #     self._immutability_["columns"] = self._immutableColumns_
+    #
+    # @property
+    # def immutableRows(self) -> typing.Sequence[int]:
+    #     r"""Indexes of rows where the contents CANNOT be changed"""
+    #     return self._immutability_["rows"]
+    #
+    # @immutableRows.setter
+    # def immutableRows(self, value:typing.Sequence[int]):
+    #     self._immutableRows_ = value
+    #     self._immutability_["rows"] = self._immutableRows_
 
     @property
     def enforceFloat(self) -> bool:
@@ -208,11 +550,11 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
     def setColumnChoices(
         self,
-        choicesDict: typing.Optional[dict[int, dict[typing.Sequence,
+        choicesDict: typing.Optional[dict[int, dict[typing.Sequence,  # noqa: UP045
                                                     bool]]] = None
         ):
         if choicesDict is None:
-            self._columnChoices_ = dict() # wipes out current column choices
+            self._columnChoices_ = {} # wipes out current column choices
 
         elif self._checkColumnChoiceDict_(choicesDict): # may wipe out the choices if parameter is empty
             self._columnChoices_ = choicesDict
@@ -221,13 +563,11 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 f"{self.__class__.__name__}.setColumnChoices: inappropriate value"
                 )
 
-    def setChoicesForColumn(
-        self: typing.Self, /,
-        col: typing.Optional[int] = None,
-        choiceData: typing.Optional[typing.Union[dict,
+    def setChoicesForColumn( self: typing.Self, /, col: int | None = None,
+        choiceData: typing.Optional[typing.Union[dict,  # noqa: UP045,UP007
                                                     typing.Sequence,
                                                     bool]] = None,
-        editable: typing.Optional[bool] = None
+        editable: bool | None = None
                     ):
         r"""Alter the choices for a specific column.
         Keyword-only parameters:
@@ -258,14 +598,15 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             if not isinstance(col, int) or col < 0:
                 scipywarn(f"{self.__class__.__name__}.setChoicesForColumn: incorrect column specification: col = {col}")
                 return
+
             if isinstance(choiceData, dict):
                 # may be a choices subdictionary
-                if all(k in ("choices", "editable") for k in choiceData.keys()) and isinstance(choiceData["choices"], typing.Sequence) and len(choiceData["choices"]) > 0 and all(isinstance(o, str) for o in choiceData["choices"]) and isinstance(choiceData["editable"], bool):
+                if all(k in ("choices", "editable") for k in choiceData) and isinstance(choiceData["choices"], typing.Sequence) and len(choiceData["choices"]) > 0 and all(isinstance(o, str) for o in choiceData["choices"]) and isinstance(choiceData["editable"], bool):
                     self._columnChoices_[col] = choiceData
 
-                elif len(choiceData) == 0: # empty dict -> wipe out the choices for a specific column
-                    if col in self._columnChoices_:
-                        self._columnChoices_.pop(col)
+                elif len(choiceData) == 0 and col in self._columnChoices_:
+                    # empty dict -> wipe out the choices for a specific column
+                    self._columnChoices_.pop(col)
 
             elif isinstance(choiceData, typing.Sequence): # create or remove choices for a column
                 if len(choiceData) == 0: # also wipes out the choices for specified column
@@ -299,19 +640,19 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 scipywarn(f"{self.__class__.__name__}.setChoicesForColumn: invalid choiceData: {choiceData}")
 
     def createWidget(self, data:typing.Any,
-        choices: typing.Optional[
-                                typing.Union[
+        choices: typing.Optional[  # noqa: UP045
+                                typing.Union[  # noqa: UP007
                                     typing.Sequence[
-                                        typing.Union[enum.Enum,
+                                        typing.Union[enum.Enum,  # noqa: UP007
                                                      enum.IntEnum,
                                                      enum.Flag,
                                                      TypeEnum,
                                                      str]
                                                     ],
-                                    typing.Dict]
+                                    dict]
                                 ] = None,
         inModel: bool=True,
-        parent: typing.Optional[QtWidgets.QWidget] = None
+        parent: QtWidgets.QWidget | None = None
                      ) -> QtWidgets.QWidget:
         r"""Work around for use independently of an item model.
 
@@ -319,15 +660,23 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         QModelIndex API
 
     """
-        from gui.widgets.tableeditorwidget import TableEditorWidget # import here to avoid circular imports (delegates is imported by tableeditorwidget as well)
+        from gui.widgets.tableeditorwidget import TableEditorWidget # import here to avoid circular imports (delegates is imported by tableeditorwidget as well)  # noqa: I001
+        # from gui.itemmodels.tabulardatamodel import TabularDataModel
         widget = None
 
         if isinstance(data, (bool, np.bool)):# or "bool" in type(data).__name__:
             widget = QtWidgets.QCheckBox(parent)
-            widget.setChecked(data is True)
-            # if not inModel:
-            #     widget.setChecked(data is True)
+            # widget.setChecked(data is True)
+            if not inModel:
+                widget.setChecked(data is True)
             widget.toggled.connect(self.slot_dataChanged)
+
+        elif isinstance(data, Tribool):
+            widget = smw.GenericInputWidget(parent)
+            if not inModel:
+                widget.setValue(data)
+
+            widget.sig_valueChanged.connect(self.slot_dataChanged)
 
         elif isinstance(data, (datetime.datetime, datetime.date, datetime.time)):
             if isinstance(data, datetime.datetime):
@@ -336,32 +685,48 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                                     int(np.round(data.microsecond/1000, 3)))
                 qDateTime = QtCore.QDateTime(qDate, qTime)
                 widget = QtWidgets.QDateTimeEdit(qDateTime, parent)
+                if not inModel:
+                    widget.setDateTime(qDateTime)
+
+                widget.dateTimeChanged.connect(self.slot_dataChanged)
 
             elif isinstance(data, datetime.date):
                 qDate = QtCore.QDate(data.year, data.month, data.day)
                 widget = QtWidgets.QDateEdit(qDate, parent)
+                if not inModel:
+                    widget.setDate(qDate)
+
+                widget.dateChanged.connect(self.slot_dataChanged)
 
             else:
                 qTime = QtCore.QTime(data.hour, data.minute, data.second,
                                     int(np.round(data.microsecond/1000, 3)))
                 widget = QtWidgets.QTimeEdit(qTime, parent)
 
+                if not inModel:
+                    widget.setTime(qTime)
+
+                widget.timeChanged.connect(self.slot_dataChanged)
+
         elif isinstance(data, (int, float, np.floating, np.integer)):
             if (
-                isinstance(choices, typing.Sequence)
-                and len(choices) > 0
-                and all(isinstance(v, (enum.Enum, str)) for v in choices)
-                ) or (
+                (
+                    isinstance(choices, typing.Sequence)
+                    and len(choices) > 0
+                    and all(isinstance(v, (enum.Enum, str)) for v in choices)
+                )
+                or (
                     isinstance(choices, dict)
                     and len(choices) > 0
-                    and all(isinstance(k, str) for k in choices.keys())
-                    ):
+                    and all(isinstance(k, str) for k in choices)
+                    )
+                ):
                 if isinstance(choices, dict):
                     entries = list(choices.keys())
                     values = list(choices.values())
                 else:
-                    entries = list(map(lambda x: x.name if isinstance(x, enum.Enum) else x, choices))
-                    values = list(map(lambda x: x.value if isinstance(x, enum.Enum) else choices.index(x), choices))
+                    entries = list(map(lambda x: x.name if isinstance(x, enum.Enum) else x, choices))  # noqa: C417
+                    values = list(map(lambda x: x.value if isinstance(x, enum.Enum) else choices.index(x), choices))  # noqa: C417
 
                 if data in values:
                     ndx = values.index(data)
@@ -375,47 +740,60 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
                     widget.setAutoFillBackground(True)
 
+                    widget.currentIndexChanged.connect(self.slot_valueChanged)
+
                     return widget
 
                 else:
                     scipywarn(f"Data ({data}) is not in the supplied choices ({choices})")
                     return
-
-            if self._enforceFloat_:
-                widget = smw.QuantitySpinBox(parent, data)
-                widget.setMinimum(-math.inf)
-                widget.setMaximum(math.inf)
-                # widget.setSingleStep(1)
-                widget.setValue(data)
-                widget.sig_valueChanged.connect(self.slot_valueChanged)
-
             else:
-                if isinstance(data, (int, np.integer)):
-                    widget = QtWidgets.QSpinBox(parent)
-                    widget.setMinimum(-9999)
-                    widget.setMaximum(9999)
-                    widget.setValue(data)
-                    widget.valueChanged.connect(self.slot_valueChanged)
-
-                elif isinstance(data, (float, np.floating)):
-                    widget = smw.QuantitySpinBox(parent, data)
+                if self._enforceFloat_:
+                    # widget = smw.QuantitySpinBox(parent, data)
+                    widget = QtWidgets.QDoubleSpinBox(parent, data)
                     widget.setMinimum(-math.inf)
                     widget.setMaximum(math.inf)
-                    # widget.setSingleStep(1)
-                    widget.setValue(data)
-                    widget.sig_valueChanged.connect(self.slot_valueChanged)
 
-            # if widget:
-            #     widget.setValue(data)
-            # if widget and not inModel:
-            #     widget.setValue(data)
+                    if isinstance(self._decimals_, int):
+                        widget.setDecimals(self._decimals_)
+
+                    # widget.setSingleStep(1)
+                    if not inModel:
+                        widget.setValue(data)
+
+                    widget.valueChanged.connect(self.slot_valueChanged)
+
+                else:
+                    if isinstance(data, (int, np.integer)):
+                        widget = QtWidgets.QSpinBox(parent)
+                        widget.setMinimum(-9999)
+                        widget.setMaximum(9999)
+                        if not inModel:
+                            widget.setValue(data)
+
+                        widget.valueChanged.connect(self.slot_valueChanged)
+
+                    elif isinstance(data, (float, np.floating)):
+                        widget = smw.QuantitySpinBox(parent)
+                        # widget = QtWidgets.QDoubleSpinBox(parent)
+                        widget.setMinimum(-math.inf)
+                        widget.setMaximum(math.inf)
+                        if isinstance(self._decimals_, int):
+                            widget.setDecimals(self._decimals_)
+                        # widget.setSingleStep(1)
+                        if not inModel:
+                            widget.setValue(data)
+
+                        widget.valueChanged.connect(self.slot_valueChanged)
+                        # widget.sig_valueChanged.connect(self.slot_valueChanged)
 
         elif isinstance(data, (complex, np.complexfloating)):
             widget = smw.ComplexSpinBox(parent, data)
-            widget.setValue(data)
+            # widget.setValue(data)
+            if not inModel:
+                widget.setValue(data)
+
             widget.sig_valueChanged.connect(self.slot_valueChanged)
-            # if not inModel:
-            #     widget.setValue(data)
             # TODO: 2026-02-03 09:31:21
             # set up other properties as well...
 
@@ -423,95 +801,140 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             # print(f"{self.__class__.__name__}.createWidget({type(data).__name__})")
             if isinstance(data, pq.UnitQuantity): # unlikely, but here we go...
                 widget = smw.QuantityChooserWidget(parent, data)
-                widget.setValue(data)
+                # widget.setValue(data)
+                if not inModel:
+                    widget.setValue(data)
+
                 widget.unitChanged.connect(self.slot_valueChanged)
-                # if not inModel:
-                #     widget.setValue(data)
+
             else:
                 if isinstance(data, neo.Event):
                     widget = neow.SimpleTriggerEventWidget(parent, data)
+                    if not inModel:
+                        widget.setValue(data)
+
+                    widget.sig_valueChanged.connect(self.slot_valueChanged)
+
                 else:
                     isComplex = issubclass(data.dtype.type, np.complexfloating)
                     if data.ndim == 0 or (data.ndim == 1 and data.size == 1):
                         if isComplex:
                             widget = smw.ComplexSpinBox(parent, data, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
+
                         else:
                             widget = smw.QuantitySpinBox(parent, data, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
+
                         widget.setMinimum(-math.inf * data.units)
                         widget.setMaximum(math.inf * data.units)
                         widget.setSingleStep(1.0  * data.units)
                         widget.disableUnitChange = True
-                        widget.setValue(data)
-                        widget.sig_valueChanged.connect(self.slot_valueChanged)
 
-                        # if not inModel:
-                        #     widget.setValue(data)
+                        # widget.setValue(data)
+                        if not inModel:
+                            widget.setValue(data)
+
+                        widget.sig_valueChanged.connect(self.slot_valueChanged)
 
                     else:
                         widget = TableEditorWidget(parent, readOnly=False)
-                        widget.setData(data)
-                        widget.sig_dataChanged.connect(self.slot_dataChanged)
-                        # if not inModel:
-                        #     widget.setData(data)
-                        #     # widget = TableEditorWidget(parent, readOnly=False)
-                        #     widget.sig_dataChanged.connect(self.slot_dataChanged)
+                        if not inModel:
+                            widget.setData(data)
 
-            # print(f"\t-> widget: {type(widget).__name__}")
+                        widget.sig_dataChanged.connect(self.slot_dataChanged)
+                        widget.sig_indexChanged.connect(self.sig_indexChanged) # connect signal 2 signal directly
+                        widget.sig_indexRowColChanged.connect(self.sig_indexRowColChanged) # connect signal 2 signal directly
 
         elif isinstance(data, np.ndarray):
             if data.ndim == 0 or (data.ndim ==1 and data.size == 1):
-                widget = smw.QuantitySpinBox(parent, data, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
-                widget.setMinimum(-math.inf * data.units)
-                widget.setMaximum(math.inf * data.units)
-                widget.setSingleStep(1.0  * data.units)
-                widget.disableUnitChange = True
-                widget.setValue(data)
-                widget.sig_valueChanged.connect(self.slot_valueChanged)
+                if issubclass(data.dtype.type, np.floating):
+                    if isinstance(data, pq.Quantity):
+                        widget = smw.QuantitySpinBox(parent, data, enforceImmutableUnits=True) # disallow units change for individual data points in a Quantity
+                        widget.setMinimum(-math.inf * data.units)
+                        widget.setMaximum(math.inf * data.units)
+                        widget.setSingleStep(1.0  * data.units)
+                        widget.disableUnitChange = True
+                        if not inModel:
+                            widget.setValue(data)
 
-                # if not inModel:
-                #     widget.setValue(data)
+                        widget.sig_valueChanged.connect(self.slot_valueChanged)
+
+                    else:
+                        widget = QtWidgets.QDoubleSpinBox(parent, data)
+                        widget.setMinimum(-math.inf)
+                        widget.setMaximum(math.inf)
+                        if not inModel:
+                            widget.setValue(data)
+
+                        widget.valueChanged.connect(self.slot_valueChanged)
+
+                elif issubclass(data.dtype.type, np.complexfloating):
+                    widget = smw.ComplexSpinBox(parent, data)
+                    if not inModel:
+                        widget.setValue(data)
+
+                    widget.sig_valueChanged.connect(self.slot_valueChanged)
+
+                elif issubclass(data.dtype.type, np.integer):
+                    widget = QtWidgets.QSpinBox(parent)
+                    widget.setMinimum(-9999)
+                    widget.setMaximum(9999)
+                    if not inModel:
+                        widget.setValue(data)
+
+                    widget.valueChanged.connect(self.slot_valueChanged)
+
+                elif issubclass(data.dtype.type, np.character):
+                    widget = smw.LineEdit(data, parent=parent, lazy=True)
+                    widget.undoAvailable = True
+                    widget.redoAvailable = True
+                    widget.setClearButtonEnabled(True)
+                    # widget = smw.LazyLineEdit(parent)
+                    if not inModel:
+                        widget.setValue(data)
+                        # widget.setText(data)
+
+                    widget.sig_textChanged.connect(self.slot_dataChanged)
 
             else:
                 widget = TableEditorWidget(parent, readOnly=False)
                 widget.setData(data)
+                if not inModel:
+                    widget.setData(data)
+
                 widget.sig_dataChanged.connect(self.slot_dataChanged)
-                # if not inModel:
-                #     widget.setData(data)
-                #     widget.sig_dataChanged.connect(self.slot_dataChanged)
+                widget.sig_indexChanged.connect(self.sig_indexChanged)
+                widget.sig_indexRowColChanged.connect(self.sig_indexRowColChanged)
 
         elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
             widget = TableEditorWidget(parent, readOnly=False)
             widget.setData(data)
+            if not inModel:
+                widget.setData(data)
+
             widget.sig_dataChanged.connect(self.slot_dataChanged)
-            # if not inModel:
-            #     widget.setData(data)
-            #     widget.sig_dataChanged.connect(self.slot_dataChanged)
+            widget.sig_indexChanged.connect(self.sig_indexChanged)
+            widget.sig_indexRowColChanged.connect(self.sig_indexRowColChanged)
 
         elif isinstance(data, pathlib.Path):
             if data.is_dir():
                 widget = ifdc.InlineDirChooserWidget(
                     initial=data, parent=parent, asDelegate=True)
+
             elif data.is_file():
                 widget = ifdc.InlineFileChooserWidget(
                     initial=data, parent=parent, asDelegate=True)
 
-            widget.setValue(data)
-            widget.sig_dataChanged.connect(self.slot_dataChanged)
-            # if not inModel:
-            #     widget.setValue(data)
-            #     widget.sig_dataChanged.connect(self.slot_dataChanged)
-
             if hasattr(widget, "setFrame"):
                 widget.setFrame(False)
 
+            if not inModel:
+                widget.setValue(data)
+
+            widget.sig_dataChanged.connect(self.slot_dataChanged)
             widget.sig_dispatchAction.connect(self._slot_dispatchedAction_)
-            # else:
-            # widget.setAutoFillBackground(True)
-            # # widget.sig_dataChanged.connect(self.slot_commitAndCloseEditor)
-            # return widget
 
         elif isinstance(data, (str, np.character, bytes, bytearray)):
-            if isinstance(data, str):
+            if isinstance(data, str):  # noqa: SIM102
                 if (
                     (
                     isinstance(choices, typing.Sequence)
@@ -522,8 +945,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                         entries = list(choices.keys())
                         values = list(choices.values())
                     else:
-                        entries = list(map(lambda x: x.name if isinstance(x, enum.Enum) else x, choices))
-                        values = list(map(lambda x: x.value if isinstance(x, enum.Enum) else entries.index(x), choices))
+                        entries = list(map(lambda x: x.name if isinstance(x, enum.Enum) else x, choices))  # noqa: C417
+                        values = list(map(lambda x: x.value if isinstance(x, enum.Enum) else entries.index(x), choices))  # noqa: C417
 
                     if data in entries:
                         ndx = entries.index(data)
@@ -536,16 +959,16 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                             widget.setFrame(False)
                         widget.setAutoFillBackground(True)
 
-                        widget.setValue(data)
-                        # if not inModel:
-                        #     widget.setValue(data)
+                        # widget.setValue(data)
+                        if not inModel:
+                            widget.setValue(data)
 
                         return widget
 
                     else:
                         scipywarn(f"Data ({data}) is not in the supplied choices ({choices})")
                         return
-
+            # else:
             if len(data) > 100:
                 txt = data if isinstance(data, str) else data.decode()
                 widget = QtWidgets.QPlainTextEdit(txt, parent)
@@ -553,30 +976,38 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 widget.setPlainText(txt)
                 if isinstance(data, str):
                     widget.setReadOnly(False)
+
                     widget.textChanged.connect(self.slot_dataChanged)
+
                 else:
                     widget.setReadOnly(True)
 
             else:
-                if isinstance(data, str):
+                if isinstance(data, (str, np.character)):
                     # widget = QtWidgets.QLineEdit(parent)
-                    widget = smw.LineEdit(data, parent=parent, lazy=True)
+                    widget = smw.LineEdit(parent, data, lazy=True)
                     widget.undoAvailable = True
                     widget.redoAvailable = True
                     widget.setClearButtonEnabled(True)
                     # widget = smw.LazyLineEdit(parent)
                     # widget.setText(data)
-                    widget.setValue(data)
-                    widget.sig_enterPressed.connect(self.slot_dataChanged)
-                    # if not inModel:
-                    #     widget.setValue(data)
+                    # widget.setValue(data)
+                    if not inModel:
+                        widget.setValue(data)
+
+                    widget.sig_textChanged.connect(self.slot_dataChanged)
+
                 else:
                     return
 
         elif isinstance(data, (pd.DataFrame, pd.Series, pd.MultiIndex, pd.Index)):
             widget = TableEditorWidget(parent, readOnly=False)
-            widget.setData(data)
+            if not inModel:
+                widget.setData(data)
+
             widget.sig_dataChanged.connect(self.slot_dataChanged)
+            widget.sig_indexChanged.connect(self.sig_indexChanged)
+            widget.sig_indexRowColChanged.connect(self.sig_indexRowColChanged)
 
         else: # TODO: 2025-09-23 16:16:56 FIXME use a pushbutton to open a complex viewer/editor
             return
@@ -584,13 +1015,15 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         if hasattr(widget, "setFrame"):
             widget.setFrame(False)
         widget.setAutoFillBackground(True)
+        widget.setObjectName(f"{type(widget).__name__}_delegate")
+
 
         return widget
 
     @Slot(partial)
     @Slot(types.FunctionType)
-    def _slot_dispatchedAction_(self,
-                                fn: typing.Union[partial, types.FunctionType]):
+    @Slot(object)
+    def _slot_dispatchedAction_(self, fn: partial | types.FunctionType):
         sender = self.sender()
         ret = fn()
         if isinstance(ret, tuple):
@@ -618,6 +1051,91 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         self._currentModelIndex_ = None
 
     @Slot()
+    def _slot_editDataExternally(self):
+        # NOTE: 2026-06-07 11:56:17
+        # external editor NEEDS a separate QMainWindow!
+        # self.sig_editExternally.emit(self.sender(), index)
+        sender = self.sender()
+        if (
+            isinstance(sender, QtWidgets.QPushButton)
+            and isinstance(self._currentModelIndex_, QtCore.QModelIndex)
+            and self._currentModelIndex_.isValid()
+            ):
+            model = self._currentModelIndex_.model()
+            modelData = getattr(model, "_modelData_", None)
+
+            # CAUTION 2026-06-09 19:08:50
+            # this is supposed to edit the python object represented by the
+            # entire model data row!!!
+            if isinstance(modelData, typing.Iterable):
+                self._externalDataEditor_ = ExternalEditorDelegate(modelData[self._currentModelIndex_.row()])
+                self._externalDataEditor_.sig_valueChanged.connect(self._slot_dataEditedExternally)
+                self._externalDataEditor_.sig_closing.connect(self._slot_externalEditorClosing)
+
+    @Slot()
+    def _slot_editDataAttributeExternally(self):
+        # NOTE: 2026-06-07 11:56:17
+        # external editor NEEDS a separate QMainWindow!
+        # self.sig_editExternally.emit(self.sender(), index)
+        sender = self.sender()
+        if (
+            isinstance(sender, QtWidgets.QPushButton)
+            and isinstance(self._currentModelIndex_, QtCore.QModelIndex)
+            and self._currentModelIndex_.isValid()
+            ):
+            model = self._currentModelIndex_.model()
+            if not hasattr(model, "_useExternalDataEditor_") or not hasattr(model, "_modelDataColumnHeaders_"):
+                return
+            modelData = getattr(model, "_modelData_", None)
+            if isinstance(modelData, typing.Iterable):
+                data = modelData[self._currentModelIndex_.row()]
+                attributeName = model._modelDataColumnHeaders_[self._currentModelIndex_.column()]
+                attributeObj = getattr(data, attributeName)
+                self._externalDataEditor_ = ExternalEditorDelegate(attributeObj)
+                self._externalDataEditor_.sig_valueChanged.connect(self._slot_dataAttributeEditedExternally)
+                self._externalDataEditor_.sig_closing.connect(self._slot_externalEditorClosing)
+
+    @Slot()
+    def _slot_externalEditorClosing(self):
+        self._externalDataEditor_.deleteLater()
+        self._externalDataEditor_ = None
+
+    @Slot(object)
+    def _slot_dataAttributeEditedExternally(self, val):
+        from gui.itemmodels.tabulardatamodel import TabularDataModel
+        if isinstance(self._currentModelIndex_, QtCore.QModelIndex):
+            model = self._currentModelIndex_.model()
+            modelData = getattr(model, "_modelData_", None)
+            if isinstance(model, TabularDataModel) and isinstance(modelData, typing.Iterable):
+                row = self._currentModelIndex_.row()
+                col = self._currentModelIndex_.column()
+                attributeName = model._modelDataColumnHeaders_[col]
+                data = modelData[row]
+                setattr(data, attributeName, val)
+                topLeft = model.index(row, 0)
+                bottomRight = model.index(row, model.columnCount()-1)
+                model.dataChanged.emit(topLeft, bottomRight)
+
+            self.sig_indexChanged.emit(self._currentModelIndex_)
+
+    @Slot(object)
+    def _slot_dataEditedExternally(self, val):
+        from gui.itemmodels.tabulardatamodel import TabularDataModel
+        # print(f"{self.__class__.__name__}._slot_dataEditedExternally -> {val}")
+        if isinstance(self._currentModelIndex_, QtCore.QModelIndex):
+            model = self._currentModelIndex_.model()
+            modelData = getattr(model, "_modelData_", None)
+            if (isinstance(model, TabularDataModel)
+                and isinstance(modelData, typing.Iterable)):
+                row = self._currentModelIndex_.row()
+                modelData[row] = val
+                topLeft = model.index(row, 0)
+                bottomRight = model.index(row, model.columnCount()-1)
+                model.dataChanged.emit(topLeft, bottomRight)
+
+            self.sig_indexChanged.emit(self._currentModelIndex_)
+
+    @Slot()
     def slot_commitAndCloseEditor(self):
         editor = self.sender()
         self.commitData.emit(editor)
@@ -626,20 +1144,187 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     @Slot()
     def slot_dataChanged(self):#, o:typing.Any):
         # print(f"{self.__class__.__name__}.slot_dataChanged({o})")
-        # o = self.sender().getValue()
-        # self._currentData_ = o
+        if hasattr(self.sender(), "getValue"):
+            obj = self.sender().getValue()
+
+        elif hasattr(self.sender(), "value"):
+            obj = self.sender().value()
+
+        else:
+            obj = dataclasses.MISSING
+
+        if (
+            (
+                isinstance(obj, (bool, np.bool, Tribool,
+                            datetime.datetime, datetime.date, datetime.time,
+                            int, float, np.floating, np.integer,
+                            complex, np.complexfloating,
+                            vigra.filters.Kernel1D, vigra.filters.Kernel2D,
+                            str, np.character,
+                            # bytes, bytearray,
+                            ))
+                or (
+                    isinstance(obj, (pq.Quantity, np.ndarray))
+                    and (obj.ndim==0 or (obj.ndim==1 and obj.size==1))
+                    )
+            )
+            and isinstance(self._currentModelIndex_, QtCore.QModelIndex)
+            ):
+            self.sig_indexChanged.emit(self._currentModelIndex_)
+            # self.sig_indexRowColChanged.emit(self._currentModelIndex_.row(), self._currentModelIndex_.column())
+
         self.sig_dataChanged.emit(self.sender())
+        self.sig_contentsChanged.emit()
 
     @Slot(object)
+    @Slot(int)
+    @Slot(float)
+    @Slot(complex)
+    @Slot(str)
+    @Slot(np.floating)
+    @Slot(np.complexfloating)
+    @Slot(np.character)
+    @Slot(bool)
     def slot_valueChanged(self, o:object):
-        # print(f"{self.__class__.__name__}.slot_dataChanged({o})")
-        # o = self.sender().getValue()
-        # self._currentData_ = o
+        # print(f"{self.__class__.__name__}.slot_valueChanged({o})")
         self.sig_dataChanged.emit(self.sender())
+        self.sig_contentsChanged.emit()
 
     def createEditor(self, parent:QtWidgets.QWidget, option:int,
                      index:QtCore.QModelIndex) -> QtWidgets.QWidget | None:
+        r"""Overrides QStyledItemDelegate.createEditor
+    """
+        if not index.isValid():
+            return
+
+        # print(f"{self.__class__.__name__}.createEditor")
+
+        model, data, _, dataChoices = self._inspectIndex_(index)
+        if any (o is None for o in (model, data)):
+            return
+
+        # print(f"\t -> {type(data).__name__}")
+
+        # print(f"{self.__class__.__name__}.createEditor -> data is {type(data).__name__}")
+
+        # print(f"{self.__class__.__name__}.createEditor for {type(data).__name__} at row ({index.row()}), col {index.column()}")
+
+
+        if isinstance(data, enum.Enum) and dataChoices is None:
+            dataChoices = dict(map(lambda x: (x.name, x.value), type(data))) # noqa
+
+        # NOTE: 2025-09-27 11:06:52
+        # some models may be able to prevent editing indexes with certain rows
+        # and/or columns; AFAIK, this functionality is not provided by stock Qt
+        # item models and must be implemented in my custom QAbstractItemModel
+        # subclasses (e.g. TabularDataModel in tableeditorwidget.py). My implementation
+        # employs two pythonic properties of the item model: 'immutableColumns' and
+        # 'immutableRows', which I use below
+        #
+
+        if isinstance(getattr(model, "immutability", None), dict):
+            # print(f"{self.__class__.__name__}.createEditor for column {index.column()} and row {index.row()}")
+            immutableColumns = model.immutability.get("columns", [])
+            immutableRows = model.immutability.get("rows", [])
+            jointImmutability = model.immutability.get("joint", False)
+
+            # print(f"\t-> joint immutability: {jointImmutability}")
+
+            if jointImmutability :
+                if (index.column() in immutableColumns and index.row() in immutableRows):
+                    # print(f"\t-> jointly immutable")
+                    return
+
+            else:
+                if index.column() in immutableColumns :
+                    # print(f"\t-> immutable column")
+                    return
+
+                elif index.row() in immutableRows:
+                    # print(f"\t-> immutable row")
+                    return
+
+        if (
+            hasattr(model, "_useExternalDataEditor_")
+            and hasattr(model, "_modelDataColumnHeaders_")
+            and model._useExternalDataEditor_ is True
+            ):
+            # such as in the case of TabularDataModel
+
+            if model._modelDataColumnHeaders_[index.column()] == "Edit":
+                widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "", parent)
+
+                if hasattr(widget, "setFrame"):
+                    widget.setFrame(False)
+                    widget.setToolTip("Click to edit the object represented in this row")
+
+                widget.setAutoFillBackground(True)
+                widget.setObjectName(f"{type(widget).__name__}_LaunchExternalEdit_delegate")
+                widget.clicked.connect(self._slot_editDataExternally)
+
+                return widget
+
+            elif isinstance(data, (ephys_protocol.ElectrophysiologyProtocol,
+                                    sdc.Procedure,
+                                    ephys_pathways.PathwaysStimulationLayout)):
+                # for these types call the external editor!
+                widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "", parent)
+                if hasattr(widget, "setFrame"):
+                    widget.setFrame(False)
+                    widget.setToolTip("Click to edit or view the object represented in this cell")
+
+                widget.setAutoFillBackground(True)
+                widget.setObjectName(f"{type(widget).__name__}_LaunchExternal{type(data).__name__}Edit_delegate")
+                widget.clicked.connect(self._slot_editDataAttributeExternally)
+                return widget
+
+        choices = []
+
+        if (
+                (
+                isinstance(dataChoices, typing.Sequence)
+                and all(isinstance(v, (enum.Enum, str)) for v in dataChoices)
+                )
+                or
+                (
+                isinstance(dataChoices, dict)
+                and all(isinstance(key, str) for key in dataChoices)
+                )
+            ):
+            choices = dataChoices
+
+        elif index.column() in self._columnChoices_:
+            if not isinstance(data, str):
+                scipywarn(f"{self.__class__.__name__}.createEditor: data type ({type(data).__name__}) is not supported for combo box")
+                return
+
+            choices = self._columnChoices_[index.column()]["choices"]
+
+        w = self.createWidget(data, choices, True, parent)
+
+        return w
+
+    def _inspectIndex_(self, index: QtCore.QModelIndex,
+                            # role: QtCore.Qt.ItemDataRole = ObjectDataRole
+                            ) -> tuple:
+        r"""Returns the tuple (model, data, disp, choices), where:
+    :model: the item model associated with the index
+    :data:  index payload
+    :disp:  string representation of the payload
+    :choices: dictionary of name -> values that the payload may take; can be empty
+    """
+        if not index.isValid():
+            return (None, None, None, None)
+
+        model = index.model() # this should never be a proxy model (in case the view uses one)
+
+        self._usingObjectModel_ = isinstance(model, ObjectModel)
         self._currentModelIndex_ = index
+
+        # CAUTION: Standard item model and standard items treat DisplayRole and
+        # DisplayRole as being the same; in such case I need a custom role
+        # dataChoices = index.data(DataChoicesRole)
+
         # NOTE: 2025-09-27 10:29:14 ATTENTION
         # editor data, although it can also be set here, it should be set through
         # self.setEditorData(), overridden below
@@ -654,90 +1339,67 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         # unit quantity -> str()
 
         # WARNING: combo boxes can only deal with strings!
-
         # one should restrict everything to string, in the custom item model, as
         # as this cannot cover every possibility
+        #
 
-        data = index.data(ObjectDataRole) # noqa
+        src = index
+
+        # txt = index.data(QtCore.Qt.DisplayRole)
+        # col = index.column()
+        # row = index.row()
+        # print(f"{self.__class__.__name__}._inspectIndex_(index: '{txt}', at row {row}, column {col})")
+
+        if self._usingObjectModel_:
+            src = model.itemFromIndex(index)
+
+            if src.column() != 0:
+                src = model.getMasterItem(src)
+
+        # NOTE: 2026-09-27 09:07:23
+        # this is/should be common to all item models in Scipyen
+        disp = f"{src.data(QtCore.Qt.DisplayRole)}"
+
+        data = src.data(ObjectDataRole)
+
         if data is not None:
             self._useObjectDataRole_ = True
+            if isinstance(data, ObjectNode):
+                self._currentObjectNode_ = data
+                dataChoices = data.objectInfo.choices
+                data = data.data
+                self._dataInObjectNode_ = True
 
+            else:
+                self._dataInObjectNode_ = False
+                self._currentObjectNode_ = None
+                dataChoices = src.data(DataChoicesRole)
         else:
-            data = index.data(QtCore.Qt.EditRole)
+            data = src.data(QtCore.Qt.EditRole)
+            dataChoices = index.data(DataChoicesRole)
             self._useObjectDataRole_ = False
 
-        # print(f"{self.__class__.__name__}.createEditor for {type(data).__name__} at row ({index.row()}), col {index.column()}")
-
-        # disp = index.data(QtCore.Qt.DisplayRole)
-        # CAUTION: Standard item model and standard items treat DisplayRole and
-        # DisplayRole as being the same; in such case I need a custom role
-        dataChoices = index.data(DataChoicesRole) # noqa
+        # print(f"\t -> {data}\n\t -> {type(data).__name__}")
+        # print(f"\t -> disp = {disp}")
+        # print(f"\t -> choicess = {dataChoices}")
 
 
-        # NOTE: 2025-09-27 11:06:52
-        # some models may be able to prevent editing indexes with certain rows
-        # and/or columns; AFAIK, this functionality is not provided by stock Qt
-        # item models and must be implemented in my custom QAbstractItemModel
-        # subclasses (e.g. TabularDataModel in tableeditorwidget.py). My implementation
-        # employs two pythonic properties of the item model: 'immutableColumns' and
-        # 'immutableRows', which I use below
-        model = index.model()
-
-        # print(f"{self.__class__.__name__}.createEditor:\n\t data type: {type(data).__name__}")
-        if isinstance(getattr(model, "immutability", None), dict):
-            immutableColumns = model.immutability.get("columns", list())
-            immutableRows = model.immutability.get("rows", list())
-            jointImmutability = model.immutability.get("joint", False)
-
-            if jointImmutability and (index.column() in immutableColumns and index.row() in immutableRows):
-                return
-
-            elif index.column() in immutableColumns or index.row() in immutableRows:
-                return
-
-        choices = list()
-
-        if (
-            isinstance(dataChoices, typing.Sequence)
-            and all(isinstance(v, (enum.Enum, str)) for v in dataChoices)
-            ):
-            choices = dataChoices
-
-        elif (
-            isinstance(dataChoices, dict)
-            and all(isinstance(key, str) for key in dataChoices.keys())
-            ):
-            choices = dataChoices
-
-        elif index.column() in self._columnChoices_:
-            if not isinstance(data, str):
-                scipywarn(f"{self.__class__.__name__}.createEditor: data type ({type(data).__name__}) is not supported for combo box")
-                return
-
-            choices = self._columnChoices_[index.column()]["choices"]
-
-        w = self.createWidget(data, choices, True, parent)
-        # print(f"{self.__class__.__name__}.createEditor() -> {type(w).__name__}")
-        return w
+        return model, data, disp, dataChoices
 
     def setEditorData(self, editor: QtWidgets.QWidget,
                       index: QtCore.QModelIndex):
-        r"""Sets the value of the editor widget based on the EditRole data in the QModelIndex"""
+        r"""Sets the value of the editor widget based on the EditRole data in the QModelIndex.
+    Overrides QStyledItemDelegate.setEditorData
+    """
         from gui.widgets.tableeditorwidget import TableEditorWidget
-        data = index.data(ObjectDataRole) # noqa
 
-        # print(f"{self.__class__.__name__}.setEditorData({editor}, index -> data = {data})")
+        if not index.isValid():
+            return
 
-        if data is not None:
-            self._useObjectDataRole_ = True
-        else:
-            data = index.data(QtCore.Qt.EditRole)
-            self._useObjectDataRole_ = False
+        model, data, disp, dataChoices = self._inspectIndex_(index)
 
-        # NOTE: 2026-02-10 09:48:29
-        # because for QStandardItems EditRole and DisplayRole do the same thing
-        disp = f"{index.data(QtCore.Qt.DisplayRole)}"
-        dataChoices = index.data(DataChoicesRole) # noqa
+        if any (o is None for o in (model, data)):
+            return
 
         if dataChoices:
             choices = dataChoices
@@ -746,7 +1408,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             choices = self._columnChoices_[index.column()]["choices"]
 
         else:
-            choices = list()
+            choices = []
 
         if isinstance(editor, QtWidgets.QComboBox):
             # case where we use a QComboBox
@@ -760,15 +1422,15 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 and all(isinstance(v, (enum.Enum, str)) for v in choices)
                 ) or (
                     isinstance(choices, dict)
-                    and all(isinstance(k, str) for k in choices.keys())
+                    and all(isinstance(k, str) for k in choices)
                     ):
                 if isinstance(choices, dict):
                     entries = list(choices.keys())
                     values = list(choices.values())
 
                 else:
-                    entries = list(map(lambda x: x.name if isinstance(x, enum.Enum) else x, choices))
-                    values = list(map(lambda x: x.value if isinstance(x, enum.Enum) else choices.index(x), choices))
+                    entries = list(map(lambda x: x.name if isinstance(x, enum.Enum) else x, choices))  # noqa: C417
+                    values = list(map(lambda x: x.value if isinstance(x, enum.Enum) else choices.index(x), choices))  # noqa: C417
 
                 if (
                         (
@@ -810,15 +1472,21 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             elif isinstance(data, float) or "float" in type(data).__name__:
                 assert isinstance(editor, QtWidgets.QDoubleSpinBox), f"Incompatible editor widget type ({type(editor).__name__}) for floating point data"
                 # NOTE: 2025-09-27 10:31:43
-                # figure out how many decimals we've got here, see also NOTE: 2025-09-27 10:31:23
-                # if "." in disp:
-                #     decimals = len(disp[disp.index("."):])
-                # else:
-                #     decimals = 0
+                # figure out how many decimals we've got here, according to
+                # the DisplayRole, if DisplayRole is a representation of a
+                # float; when there is no decimal point, leave ``decimals``
+                # property as per default
+                # see also NOTE: 2025-09-27 10:31:23
+                if "." in disp:
+                    decimals = len(disp[disp.index("."):])
+
                 if isinstance(editor, smw.QuantitySpinBox):
                     editor.keepDimensionless = True
                     editor.forceDimensionless = True
-                # editor.setDecimals(decimals)
+
+                if "." in disp:
+                    editor.setDecimals(decimals)
+
                 editor.setValue(data)
 
             elif isinstance(data, complex) or "complex" in type(data).__name__:
@@ -849,25 +1517,18 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     #     return
 
                     # NOTE: 2025-09-27 10:31:23
-                    # figure out how many decimals are shown — needed to set up the "decimals" property of the spin box
-                    # (NOTE: the actual number of decimals displayed in the spin box depends on the column width,
-                    #        but at least we avoid scientific notation which can hide the visual of the value)
-                    # below, 's0' is the string representation of the Quantity's magnitude (as a float)
-#                     units_str = data.units.dimensionality.unicode
-#
-#                     if units_str in disp:
-#                         s0 = disp.strip(units_str).strip()
-#
-#                     else:
-#                         s0 = disp.split(" ")[0].strip()
+                    if "." in disp:
+                        decimals = len(disp[disp.index("."):])
 
-                    # if "." in s0:
-                    #     decimals = len(s0[s0.index(".")-1:]) # count the dot as well
-                    # else:
-                    #     decimals = 0
+                    if isinstance(editor, (smw.QuantitySpinBox, smw.ComplexSpinBox)):
+                        if isinstance(data, neo.core.dataobject.DataObject):
+                            editor.disableUnitChange = True
+                        # editor.keepDimensionless = True
+                        # editor.forceDimensionless = True
+                        editor.setSingleStep(1.0  * data.units)
 
-                    # editor.setDecimals(decimals)
-                    # editor.setSingleStep(1.0  * data.units)
+                        if "." in disp:
+                            editor.setDecimals(decimals)
 
                 editor.setValue(data)
 
@@ -905,24 +1566,25 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                      model: QtCore.QAbstractItemModel,
                      index: QtCore.QModelIndex):
         r"""Sets data back into the QModelIndex"""
-        originalData = index.data(ObjectDataRole) # noqa
+        # print(f"{self.__class__.__name__}.setModelData()")
+        if not index.isValid():
+            return False
+
+        originalData = index.data(ObjectDataRole)
+
+        if originalData is not None:
+            self._useObjectDataRole_ = True
+
+        else:
+            originalData = index.data(QtCore.Qt.EditRole)
+            self._useObjectDataRole_ = False
+
+        # print(f"\t -> using ObjectDataRole: {self._useObjectDataRole_}")
 
         if isinstance(editor, (QtWidgets.QSpinBox, QtWidgets.QDoubleSpinBox,
                                smw.QuantitySpinBox, smw.ComplexSpinBox,
                                neow.SimpleTriggerEventWidget)):
             data = editor.value()
-
-            # print(f"{self.__class__.__name__}.setModelData got editor data: {data}")
-
-            # if hasattr(editor, "_magnitude_"):
-            #     print(f"\tmagnitude: {editor._magnitude_}")
-
-
-
-        # elif isinstance(editor, ifdc.InlineFileDirChooserWidget):
-        #     if not editor._pendingChange_:
-        #         return
-        #     data = editor.value()
 
         elif isinstance(editor, QtWidgets.QLineEdit):
             data = editor.text()
@@ -930,6 +1592,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
         elif isinstance(editor, QtWidgets.QComboBox):
             textValue = editor.currentText()
             ndxValue = editor.currentIndex()
+            # print(f"{self.__class__.__name__}.setModelData from {type(editor).__name__}: textValue {textValue} -> ndxValue {ndxValue}, for originalData {originalData} ({type(originalData).__name__})")
             # originalData = index.data(ObjectDataRole)
 
             if isinstance(originalData, enum.Enum):
@@ -943,16 +1606,17 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
             else:
                 scipywarn(f"Index data ({type(originalData).__name__}) is not supported by a combo box")
-                return
+                return False
 
         elif isinstance(editor, QtWidgets.QDateTimeEdit):
             qDateTime = editor.dateTime()
             if not qDateTime.isNull() and qDateTime.isValid():
                 qDate = qDateTime.date()
                 qTime = qDateTime.time()
+
                 if isinstance(originalData, datetime.datetime):
                     if qDate.isValid() and qTime.isValid():
-                        data = datetime.datetime(
+                        data = datetime.datetime(  # noqa: DTZ001
                             qDate.year(), qDate.month(), qDate.day(),
                             qTime.hour(), qTime.minute(), qTime.second(),
                             qTime.msec() * 1000)
@@ -971,16 +1635,29 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                     data = qDateTime.toString()
 
                 else:
-                    return
+                    return False
 
         elif isinstance(editor, QtWidgets.QCheckBox):
             data = editor.isChecked()
 
         else:
-            return
+            return False
 
-        role = ObjectDataRole if self._useObjectDataRole_ else QtCore.Qt.EditRole  # noqa
-        # print(f"{self.__class__.__name__}.setModelData -> editor: {type(editor).__name__}, row = {index.row()}, column = {index.column()}, data = {data} for role = {role}")
-        model.setData(index, data, role)
+        role = ObjectDataRole if self._useObjectDataRole_ else QtCore.Qt.EditRole
+        OK = model.setData(index, data, role)
+
         if isinstance(self._currentModelIndex_, QtCore.QModelIndex):
             self._currentModelIndex_ = None
+
+        return OK
+
+    @property
+    def decimals(self) -> int | None:
+        return self._decimals_
+
+    @decimals.setter
+    def decimals(self, val: int | None = None):
+        if isinstance(val, int) and val >= 0:
+            self._decimals_ = val
+        else:
+            self._decimals_ = None

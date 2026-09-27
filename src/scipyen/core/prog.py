@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""
 Helper functions and classes for programming, including:
-package/module management, decorators, context managers, and 
+package/module management, decorators, context managers, and
 descriptor validators.
 
 
@@ -13,26 +12,26 @@ descriptor validators.
 
 # print("{}: {}".format(__file__, __name__))
 
-import pprint
+# import pprint
 
 from abc import ABC, abstractmethod
 import importlib, inspect, pathlib, warnings, operator, functools
 from importlib import abc as importlib_abc
 import pkgutil
-import enum, io, os, re, itertools, sys, time, traceback, types, typing
-from types import SimpleNamespace
+import enum, io, os, re, itertools, sys, time, traceback, types, typing # noqa
+# from types import SimpleNamespace
 import collections
 from collections import (deque, namedtuple)
 from warnings import WarningMessage
 from inspect import Parameter, Signature
 from IPython.core.interactiveshell import InteractiveShell
-from IPython.core import magic, oinspect, page, prefilter, ultratb
-from IPython.core.oinspect import (UnformattedBundle, Bundle, InfoDict)
+from IPython.core import oinspect #,  magic, page, prefilter, ultratb
+# from IPython.core.oinspect import (UnformattedBundle, Bundle, InfoDict)
 
 from functools import (
     singledispatch,
-    singledispatchmethod,
-    update_wrapper,
+    # singledispatchmethod,
+    # update_wrapper,
     wraps,
 )
 from contextlib import (
@@ -51,42 +50,34 @@ import pandas as pd
 
 import colorama
 
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets) # noqa, QtCore) #, QtXml, QtSvg, QtNetwork, )
+# from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
+
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    from qtpy import sip # noqa
+    # from qtpy.uic import loadUiType
+
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-
-
-# try:
-#     import mypy
-# except:
-#     print("Please install mypy first")
-#     raise
-
-# from . import workspacefunctions
-# from .workspacefunctions import debug_scipyen
 from .strutils import InflectEngine
 
 CALLABLE_TYPES = (
@@ -99,19 +90,18 @@ CALLABLE_TYPES = (
     types.MethodDescriptorType,
     types.ClassMethodDescriptorType,
 )
-TYPING_TYPES = (typing._GenericAlias, 
-                typing._SpecialGenericAlias, 
+
+TYPING_TYPES = (typing._GenericAlias,
+                typing._SpecialGenericAlias,
                 typing._UnionGenericAlias,
                 types.UnionType, types.GenericAlias)
 
-class Versiontuple3: pass  # to be picked up in Kate editor's symbolviewer plugin
+class Versiontuple3: pass  # to be picked up in Kate editor's symbolviewer plugin # noqa
 VersionTuple3 = namedtuple("VersionTuple3", ["major", "minor", "micro"])
-class Versiontuple4: pass  # to be picked up in Kate editor's symbolviewer plugin
+class Versiontuple4: pass  # to be picked up in Kate editor's symbolviewer plugin # noqa
 VersionTuple4 = namedtuple("VersionTuple4", ["major", "minor", "micro","dot"])
 
-
-class ModSpec: pass # to be picked up in Kate editor's symbolviewer plugin
-ModSpec = importlib.machinery.ModuleSpec  # saves me some typing
+ModSpec = importlib.machinery.ModuleSpec  # saves me some typing # noqa
 
 class NoData:
     r"""Empty placeholder class that signifies lack of any data.
@@ -126,6 +116,29 @@ class NoData:
     def __repr__(self):
         return "NoData"
 
+class TypesSpec(typing.NamedTuple):
+    object_types: type | tuple[type | typing.Self]
+    key_types: type | tuple[type | typing.Self]
+    value_types: type | tuple[type | typing.Self]
+    element_types: type | tuple[type | typing.Self]
+
+    def check_type(self, t: typing.Union[type, typing.Self]):
+        result = any(t_ in self.object_types for t_ in t.object_types) if isinstance(t, self.__class__) else t in self.object_types if isinstance(t, type) else False
+
+        if result:
+            t_spec = unravel_types(t)
+            result &= len(self.key_types) > 0 and len(t_spec.key_types) > 0 and all(t_ in self.key_types for t_ in t_spec.key_types)
+            result &= len(self.value_types) > 0 and len(t_spec.value_types) > 0 and all(t_ in self.value_types for t_ in t_spec.value_types)
+            result &= len(self.element_types) > 0 and len(t_spec.element_types) > 0 and all(t_ in self.element_types for t_ in t_spec.element_types)
+        return result
+
+    def add(self, x:typing.Self) -> typing.Self:
+        if isinstance(self.object_types, (type, self.__class__)):
+            new_object_types = (self.object_types, x)
+        else:
+            new_object_types = self.object_types + (x, )
+        return self.__class__(new_object_types,
+                              self.key_types, self.value_types, self.element_types)
 
 class ArgumentError(Exception):
     pass
@@ -276,7 +289,8 @@ class DescriptorValidatorABC(ABC):
         # a) as the instance attribute 'preset_hook' of this descriptor
         # (initialized in the c'tor)
         if hasattr(self, "preset_hook"):
-            if isinstance(self.preset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(self.preset_hook, "__call__", None)):
+            # if isinstance(self.preset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(self.preset_hook, "__call__", None)):
+            if isinstance(self.preset_hook, (types.MethodType, types.FunctionType)) or callable(self.preset_hook):
                 # above checxk includes a generic way to check for a callable; AttributeAdapter is but one example
                 preset_func = self.preset_hook
 
@@ -289,28 +303,32 @@ class DescriptorValidatorABC(ABC):
         # NOTE: this is old code;
         elif hasattr(obj, "_preset_hooks_") and isinstance(obj._preset_hooks_, dict):
             obj_preset_hook = obj._preset_hooks_.get(self.public_name, None)
-            if isinstance(obj_preset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(obj_preset_hook, "__call__", None)):
+
+            # if isinstance(obj_preset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(obj_preset_hook, "__call__", None)):
+            if isinstance(obj_preset_hook, (types.MethodType, types.FunctionType)) or callable(obj_preset_hook):
                 preset_func = obj_preset_hook
 
         if preset_func is not None:
             # print(f"{print_styled(f'\n\twill call preset_hook {preset_func}', color='yellow')}")
-            
+
             # check callable definition to see how many arguments (positional parameters) the callable expects
             # the invoke the callable
             if isinstance(preset_func, types.MethodType):
                 args = inspect.getfullargspec(preset_func).args[1:]
-                
+
             elif isinstance(preset_func, types.FunctionType):
                 args = inspect.getfullargspec(preset_func).args
-                
+
             else:
                 args = inspect.getfullargspec(preset_func.__call__).args[1:]
 
             # print(f"{self.__class__.__name__}<DescriptorValidatorABC> preset function for {self.public_name} in {type(obj).__name__}: {preset_func} with {len(args)} parameters")
             if len(args) == 1:
                 preset_func(obj)
+
             elif len(args) == 2:
                 preset_func(obj, value)
+
             else:
                 scipywarn(f"Ignoring the preset function {preset_func} for {self.public_name} attribute of {type(obj).__name__}, as it is expecting {len(args)} positional parameters")
 
@@ -328,24 +346,21 @@ class DescriptorValidatorABC(ABC):
         postset_func = None
 
         if hasattr(self, "postset_hook"):
-            if isinstance(self.postset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(self.postset_hook, "__call__", None)):
+            if isinstance(self.postset_hook, (types.MethodType, types.FunctionType)) or callable(self.postset_hook):
                 postset_func = self.postset_hook
 
         elif hasattr(obj, "_postset_hooks_") and isinstance(obj._postset_hooks_, dict):
             obj_postset_hook = obj._postset_hooks_.get(self.public_name, None)
-            if isinstance(obj_postset_hook, (types.MethodType, types.FunctionType)) or inspect.ismethod(getattr(obj_postset_hook, "__call__", None)):
+            if isinstance(obj_postset_hook, (types.MethodType, types.FunctionType)) or callable(obj_postset_hook):
                 postset_func = obj_postset_hook
 
         if postset_func is not None:
-            # print(f"{print_styled(f'\n\twill call postset_hook {postset_func}', color='yellow')}")
-            # print(f"postset {postset_func} for {self.public_name}")
-
             if isinstance(postset_func, types.MethodType):
                 args = inspect.getfullargspec(postset_func).args[1:]
-                
+
             elif isinstance(postset_func, types.FunctionType):
                 args = inspect.getfullargspec(postset_func).args
-                
+
             else:
                 args = inspect.getfullargspec(postset_func.__call__).args[1:]
 
@@ -354,8 +369,10 @@ class DescriptorValidatorABC(ABC):
 
             elif len(args) == 1:
                 postset_func(obj)
+
             elif len(args) == 2:
                 postset_func(obj, value)
+
             else:
                 scipywarn(f"Ignoring the postset function {postset_func} for {self.public_name} attribute of {type(obj).__name__}, as it is expecting {len(args)} positional parameters")
 
@@ -384,14 +401,10 @@ class BaseDescriptorValidator(DescriptorValidatorABC):
     def __init__(
         self,
         name: str,
-        default: typing.Optional[typing.Any] = None,
+        default: object | None = None,
         use_private: bool = True,
-        preset_hook: typing.Optional[
-            typing.Union[collections.abc.Callable, types.MethodType, types.FunctionType]
-        ] = None,
-        postset_hook: typing.Optional[
-            typing.Union[collections.abc.Callable, types.MethodType, types.FunctionType]
-        ] = None,
+        preset_hook: collections.abc.Callable | types.MethodType | types.FunctionType | None = None,
+        postset_hook: collections.abc.Callable | types.MethodType | types.FunctionType | None = None,
     ):
         self.use_private = use_private
         self.public_name = name
@@ -399,7 +412,7 @@ class BaseDescriptorValidator(DescriptorValidatorABC):
         self.default = default
 
         self.preset_hook = None
-        
+
         if isinstance(
             preset_hook,
             (collections.abc.Callable, types.MethodType, types.FunctionType),
@@ -407,7 +420,7 @@ class BaseDescriptorValidator(DescriptorValidatorABC):
             self.preset_hook = preset_hook
 
         self.postset_hook = None
-        
+
         if isinstance(
             postset_hook,
             (collections.abc.Callable, types.MethodType, types.FunctionType),
@@ -416,6 +429,7 @@ class BaseDescriptorValidator(DescriptorValidatorABC):
 
     def validate(self, value:typing.Any):
         r"""Generic validation: anything is valid"""
+        # return value
         pass  # validates everything
 
 
@@ -479,7 +493,7 @@ class OneOf(BaseDescriptorValidator):
 
 class DescriptorTypeValidator(BaseDescriptorValidator):
     def __init__(self, name: str, /, *types):
-        self.types = set(t for t in types if isinstance(t, type))
+        self.types = {t for t in types if isinstance(t, type)}
 
     def validate(self, value):
         if not isinstance(value, tuple(self.types)):
@@ -489,16 +503,23 @@ class DescriptorTypeValidator(BaseDescriptorValidator):
 
 
 class DescriptorGenericValidator(BaseDescriptorValidator):
+    r"""Generic descriptor with validation for value type.
+
+.. caution ::
+    Buggy when used with types that do have a default constructor, as descriptor for a dataclass field
+
+"""
     def __init__(self, name: str, defval: typing.Any, /, *args, **kwargs):
         r"""Generic validator for descriptors
 
-Parameters:
-=========
-    name: `public` name of the descriptor
+    Parameters:
+    ===========
 
-    defval: default value (may be None if allow_none)
+    :name: `public` name of the descriptor
 
-    args: tuple of types or unary predicates;
+    :defval: default value (may be None if allow_none)
+
+    :args: tuple of types or unary predicates;
 
         NOTE: unary predicates are functions that expect a Python object as
             the first (only) argument and return a bool.
@@ -513,7 +534,7 @@ Parameters:
 
     kwargs: currently two keywords are supported:
         "allow_none": bool (default True) ↦ allow None as a descriptor value
-        "dcriteria": dict (default empty) ↦ specified additional criteria for
+        "dcriteria": dict (default empty) ↦ specifies additional criteria for
             descriptor values that are collection-like or array-like
             Use with CAUTION.
 
@@ -531,9 +552,9 @@ Parameters:
     container of a nested data structure.
 
     Table with type-related properties in the dcriteria dict:
-    key         value is always a nested dict — an empty dict here mean no
-    (a type)        criteria are defined and the descriptor value is validated
-                    based on 'name' and types or predicates in 'args'
+    key         ↦  value is always a nested dict; an empty dict here means no
+    (a type)       criteria are defined and the descriptor value is validated
+                   based on 'name' and types or predicates in 'args'
 
     ========================================================================
                 Nested dict key:str ↦ value;
@@ -710,44 +731,49 @@ Parameters:
     def validate(self, value):
         r"""Validate `value` against the criteria set in __init__"""
 
-        # NOTE: 2024-08-01 10:46:58 Explannation of what is being done here
+        # NOTE: 2024-08-01 10:46:58 Explanation of what is being done here
         #
-        # 1) check if there are contraints on the range of acceptable object
+        # 1) check if there are constraints on the range of acceptable object
         #   types that the descriptor can accept (self.types); if there are,
         #   then check that the supplied value is of one of these types (or
         #   inherits from them)
         #
-        #    optionally, allow a None to be passed (is self.allow_none)
+        #    optionally, allow a None to be passed (if self.allow_none is True)
         #
         #    also, if the value to be validate is actually a `type`, then check
         #    if it inherits from any of the self.types
 
         value_type = type(value)
+        # print(f"{self.__class__.__name__}.validate({value})")
 
         if len(self.types):
             comparand = tuple(self.types)
+
             if self.allow_none:
                 comparand = comparand + (type(None),)
 
-            if isinstance(value, type):
-                if not issubclass(value, comparand):
-                    raise AttributeError(
-                        f"{self.__class__.__name__}: For {self.private_name} a subclass of: {comparand} was expected; got {value.__name__} instead"
-                    )
+            # print(f"\n\t{value} vs comparand {comparand} => {isinstance(value, comparand)}")
 
-            if not isinstance(value, comparand):
+            if isinstance(value, type) and not issubclass(value, comparand):
                 raise AttributeError(
-                    f"{self.__class__.__name__}: For descriptor '{self.public_name}' ('{self.private_name}') one of the types: {comparand} was expected; got {type(value).__name__} instead"
+                    f"{self.__class__.__name__}: For {self.private_name} a subclass of: {comparand} was expected; got {value.__name__} instead"
+                )
+
+            elif (
+                not isinstance(value, comparand)
+                or not any(isinstance(value, t) for t in comparand)
+                ):
+                raise AttributeError(
+                    f"{self.__class__.__name__}: For descriptor '{self.public_name}' ('{self.private_name}') value type is expected one of: {comparand} was expected; got {type(value)} instead"
                 )
 
         # NOTE: 2021-11-30 10:42:08
         # it makes sense to validate further, only when allow_none is False
-        if not self.allow_none:
-            if len(self.predicates):
-                if not functools.reduce(operator.and_, self.predicates, True):
-                    raise AttributeError(
-                        f"{self.__class__.__name__}: Unexpected value for {self.private_name}: {value}"
-                    )
+        if not self.allow_none and len(self.predicates):
+            if not functools.reduce(operator.and_, self.predicates, True):
+                raise AttributeError(
+                    f"{self.__class__.__name__}: Unexpected value for {self.private_name}: {value}"
+                )
 
             if len(self.dcriteria):
                 # check to see if type of value is a key in criteria
@@ -994,12 +1020,12 @@ class SpecFinder(importlib_abc.MetaPathFinder):
         if self._verbose:
             print(f"{self.__class__.__name__}.find_spec (fullname = {fullname}, path = {path}, target = {target}):\n")
             if len(self.path_map):
-                
+
                 print(f"\t*** {self.__class__.__name__}.path_map:\n")
                 for k,v in self.path_map.items():
                     print(f"\t{k}: {v}")
                 print("\n\t***\n\n")
-                
+
         if fullname in self.path_map:
             path = pathlib.Path(self.path_map[fullname])
             if path.is_dir():
@@ -1019,7 +1045,7 @@ class SpecFinder(importlib_abc.MetaPathFinder):
     @property
     def verbose(self) -> bool:
         return self._verbose
-    
+
     @verbose.setter
     def verbose(self,val:bool):
         self._verbose = isinstance(val, bool) and val == True
@@ -1029,10 +1055,10 @@ class SpecFinder(importlib_abc.MetaPathFinder):
 
 def signature_as_dict(
     sig,
-    name: typing.Optional[str] = None,
-    qualname: typing.Optional[str] = None,
-    module: typing.Optional[str] = None,
-    allstr: typing.Optional[bool] = False,
+    name: str | None = None,
+    qualname: str | None = None,
+    module: str | None = None,
+    allstr: bool | None = False,
 ) -> Bunch:
     r"""A dictionary-like presentation of an inspect.Signature object.
 
@@ -1251,7 +1277,7 @@ def signature_as_dict(
 
 
 def makeSignature(dct: Bunch) -> Signature:
-    parameters = list()
+    parameters = []
     for p, val in dct.positional.items():
         # no default value for these ones
         parameters.append(Parameter(p, Parameter.POSITIONAL_ONLY, annotation=val))
@@ -1323,9 +1349,40 @@ def signature_as_str(
     return "".join(func)
 
 
-def print_styled(s: str, color: str = "yellow", bright: bool = True):
-    c = getattr(colorama.Fore, color.upper())
-    pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
+def print_styled(s: str, color: str = "yellow", bright: bool = True,
+                 back: typing.Optional[str] = None, **kwargs):
+    r"""Colorful printing using the ``colorama`` package.
+
+For a list of colors and styles, call
+
+::
+
+    import colorama
+    dir(colorama.Fore) # -> available ANSI colors
+    dir(colorama.Style) # -> available ANSI styles
+"""
+    if color.lower().startswith("light") and not color.lower().endswith("_ex"):
+        color = f"{color.lower()}_ex"
+
+    c = getattr(
+                    colorama.Fore,
+                    color.upper(),
+                    colorama.Fore.YELLOW
+        )
+
+    style = kwargs.pop("style", "bright" if bright else "normal")
+
+    st = getattr(colorama.Style,
+                 style.upper(),
+                 colorama.Style.BRIGHT if bright else colorama.Style.NORMAL)
+
+    # pre = f"{c}{colorama.Style.BRIGHT}" if bright else c
+    pre = f"{c}{st}" if bright else c
+
+    if isinstance(back, str) and len(back.strip()):
+        b = getattr(colorama.Back, back.upper(), colorama.Back.RESET)
+        pre = f"{pre}{b}"
+
     return f"{pre}{s}{colorama.Style.RESET_ALL}"
 
 def print_traceback(exc = None) -> str:
@@ -1341,7 +1398,9 @@ def print_traceback(exc = None) -> str:
 
     return ret
 
-def scipywarn(message, category=None, stacklevel=1, source=None, out=None):
+def scipywarn(message, category=None, stacklevel=1, source=None, out=None,
+              with_traceback: bool = False,
+              *, skip_file_prefixes=()):
     from warnings import filters, defaultaction
 
     if isinstance(message, Warning):
@@ -1356,7 +1415,7 @@ def scipywarn(message, category=None, stacklevel=1, source=None, out=None):
             )
         )
     try:
-        if stacklevel <= 1 or _is_internal_frame(sys._getframe(1)):
+        if stacklevel <= 1 or warnings._is_internal_frame(sys._getframe(1)):
             # If frame is too small to care or if the warning originated in
             # internal code, then do not try to hide any frames.
             frame = sys._getframe(stacklevel)
@@ -1364,7 +1423,10 @@ def scipywarn(message, category=None, stacklevel=1, source=None, out=None):
             frame = sys._getframe(1)
             # Look for one frame less since the above line starts us off.
             for x in range(stacklevel - 1):
-                frame = _next_external_frame(frame)
+                frame = warnings._next_external_frame(
+                    frame,
+                    skip_file_prefixes=skip_file_prefixes
+                    )
                 if frame is None:
                     raise ValueError
     except ValueError:
@@ -1450,7 +1512,10 @@ def scipywarn(message, category=None, stacklevel=1, source=None, out=None):
     # ### END
 
     # Print message and context
+    if with_traceback:
+        traceback.print_stack(file=out)
     msg = WarningMessage(message, category, filename, lineno, file=out, source=source)
+
     _myshowarning(msg)
 
 
@@ -1470,7 +1535,6 @@ def _myshowarning(
         s = f"In {msg.filename}, line {msg.lineno}: \n{category} {msg.message}\n"
     else:
         s = f"In {msg.filename}, line {msg.lineno}: \n\x1b[0;33m{category}\x1b[0m: {msg.message}\n"
-    # s =  f"{msg.filename}:{msg.lineno}:\n\x1b[0;33;47m{category}\x1b[0m:\n {msg.message}\n"
     try:
         file.write(s)
     except:
@@ -1509,16 +1573,6 @@ def showwarning(message, category, filename, lineno, file=None, line=None):
     except OSError:
         # the file (probably stderr) is invalid - this warning gets lost.
         pass
-    # return text
-
-
-# def formatwarning(message, category, filename, lineno, line=None):
-#     r"""To replace stock Python warnings.formatwarning
-#     TODO
-#     Do NOT use yet
-#     """
-#     s =  f"{filename}:{lineno}: {category}: {message}\n"
-#     return s
 
 
 def term_has_colors():
@@ -1546,6 +1600,7 @@ def test_ANSI():
 def warn_with_traceback(message, category, filename, lineno, file=None, line=None):
     log = file if hasattr(file, "write") else sys.stderr
     traceback.print_stack(file=log)
+    # scipywarn(message, category)
     log.write(warnings.formatwarning(message, category, filename, lineno, line))
 
 
@@ -1578,21 +1633,21 @@ def get_func_param_types(func: typing.Callable, report_components:bool=False):
     func: an annotated function
     report_components: when True, also report the types qualifiers of parameters
         parameters of 'func' that are of Sequence or Mapping type
-    
+
         Default is False
 
     NOTE:
     type.UnionType  is reported as a set of component types
-    
+
     When report_components is True:
-    
+
     typing.Sequence is reported as the tuple (Sequence, set of specified element types)
     typing.Mapping  is reported as a dict (mapping) of key type ↦ value type
         either of which may be annotated as Union of types, with the constraint
         that key types must be Hashable — this is NOT checked here
 
     """
-    
+
     if isinstance(func, functools.partial):
         fn = func.func
         pargtypes = tuple(type(a) for a in func.args)
@@ -1618,7 +1673,7 @@ def get_func_param_types(func: typing.Callable, report_components:bool=False):
             isinstance(t, type) for t in ptype
         ):
             t = tuple(ptype)
-            
+
         elif isinstance(ptype, TYPING_TYPES):
             # print(f"ptype {ptype} in TYPING_TYPES")
             if isinstance(ptype, types.UnionType):
@@ -1639,14 +1694,14 @@ def get_func_param_types(func: typing.Callable, report_components:bool=False):
                             # t = ptype_args
                         else:
                             t = ptype_origin
-            
+
         elif isinstance(type(ptype), TYPING_TYPES):
             # print(f"ptype's type ({type(ptype)}) in TYPING_TYPES")
             t = typing.get_origin(type(ptype))
             if isinstance(t, TYPING_TYPES) and hasattr(t, "__args__"):
                 t = typing.get_args(t)
-            
-            
+
+
 
         # elif type(ptype).__name__ in dir(typing) or type(ptype).__name__ in dir(types):
         #     # NOTE: UnionType is actually in the types module
@@ -1657,7 +1712,7 @@ def get_func_param_types(func: typing.Callable, report_components:bool=False):
         else:
             scipywarn(f"Cannot parse the type of {name} parameter")
             continue
-        
+
         # if name=="x":
         #     print(f"resolved = {t}")
 
@@ -1862,7 +1917,7 @@ def filter_attr(
 
     if indices_only is True:
         indices = True
-        
+
     # print("prog.filter_attr:")
     # print(f"  iterable: {type(iterable).__name__}")
     # print(f"  op: {op}")
@@ -2129,40 +2184,52 @@ def unwind_type_sig(x, include_x:bool=False):
     return unwind_type(x, include_x, visited)
 
 # def unwind_type(x, include_x:bool=False, visited:set = set()):
-def unwind_type(x, include_x:bool=False, visited: typing.Optional[set] = None):
+def unwind_type(x, include_x:bool=False, use_mro:bool = False,
+                visited: typing.Optional[set] = None) -> set:
     r"""Unwinds a type to its component types.
-This includes special aliases defined in the ``types`` and ``typing`` standard 
+This includes special aliases defined in the ``types`` and ``typing`` standard
 library modules.
-    
+
     Parameters:
     ===========
     x: a type or a special type | type alias (e.g. types.Uniontype, types.GenericAlias)
         or a list | tuple of such
-        
+
         Typically this is found when inspecting a function annotation.
-    
+
     visited: a set
-    
+
     Returns:
     ========
     visited - a set
-    
+
     The function places the individual types inside the ```visited`` argument
     which should be present in the caller's namespace (and is passed here by reference
     as are all containers in Python).
-    
+
     Side effects:
     =============
     Populates ``visited`` with the "elementary" types found.
 """
+
     if not isinstance(visited, set):
         visited = set()
-    
+
+    t_set = t_keys = t_vals = t_elems = set()
+
+
     if isinstance(x, type):
         visited.add(x)
+        t_set = set(inspect.getmro(x)) if use_mro else {x}
         return visited
-    
-    elif isinstance(x, TYPING_TYPES):
+
+    elif isinstance(x, (tuple, list, set)) and all(isinstance(t_, type) for t_ in x):
+        # sequence of types
+        t_set = set(itertools.chain_from_iterable([inspect.getmro(t_) for t_ in x])) if use_mro else set(x)
+
+    elif isinstance(x, TYPING_TYPES) or type(x).__module__ == "typing":
+        t_origin = typing.get_origin(x)
+
         if hasattr(x, "__args__"):
             unwind_type(x.__args__, visited=visited)
 
@@ -2170,37 +2237,37 @@ library modules.
             visited.add(x)
 
         return visited
-    
+
     elif not isinstance(x, (tuple, list)):
         return visited
-    
+
     ret = list()
-    
+
     for v in x:
         visited.add(v)
-        
+
         if isinstance(v, type):
             visited.add(v)
-            
+
         elif isinstance(v, (tuple, list)):
             unwind_type(v, include_x=include_x, visited=visited)
-            
+
         elif isinstance(v, TYPING_TYPES):
             if hasattr(v, "__args__"):
                 unwind_type(v.__args__, visited=visited)
             if include_x:
                 visited.add(v)
-            
+
     return visited
 
 def get_positional_named_annotations(f:typing.Union[types.FunctionType, types.MethodType]) -> list:
-    compress_annot = lambda x: x[0] if len(x) else MISSING
+    compress_annot = lambda x: x[0] if len(x) else MISSING # noqa
     funcSignature = signature_as_dict(f)
     if not isinstance(f, (types.FunctionType, types.MethodType)):
         raise TypeError(f"Expecting a function or method; got {type(f).__name__} instead")
     return list(map(lambda i: (i[0], i[1]), funcSignature["positional"].items())) + \
             list(map(lambda i: (i[0], compress_annot(tuple(set(i[1])-{inspect._empty}))), funcSignature["named"].items()))
-        
+
 def parent_types(data):
     r"""Returns a tuple of the immediate ancestor types of data.
     The order is as specified in the data type's definition, if data is an
@@ -2266,7 +2333,7 @@ def safewrapper(f, *args, **kwargs):
         try:
             return f(*args, **kwargs)
 
-        except Exception as e:
+        except Exception as e: # noqa
             stars = "".join(["*"] * len(f.__name__))
             print("\n%s\nIn function %s:\n%s" % (stars, f.__name__, stars))
             traceback.print_exc()
@@ -2280,12 +2347,12 @@ def safeguiwrapper(f, *args, **kwargs):
         try:
             return f(*args, **kwargs)
 
-        except Exception as e:
+        except Exception as e: # noqa
             s = io.StringIO()
             sei = sys.exc_info()
             traceback.print_exception(file=s, *sei)
-            msgbox = QMessageBox()
-            msgbox.setIcon(QMessageBox.Critical)
+            msgbox = QtWidgets.QMessageBox()
+            msgbox.setIcon(QtWidgets.QMessageBox.Critical)
             msgbox.setWindowTitle(sei[0].__class__.__name__)
             msgbox.setText(sei[0].__class__.__name__)
             msgbox.setDetailedText(s.getvalue())
@@ -2305,11 +2372,29 @@ def timefunc(func):
         start = time.perf_counter()
         r = func(*args, **kwargs)
         end = time.perf_counter()
-        print("{}.{} : {} s".format(func.__module__, func.__name__, end - start))
+        print(f"{func.__module__}.{func.__name__} : {end-start} s") #.format(func.__module__, func.__name__, end - start))
         return r
 
     return wrapper
 
+def timemethod(func):
+    r"""Decorator for timing function execution
+    Recipe 14.13 "Profiling and Timing Your Programs"
+    From Python Cookbook 3rd Ed. 2013
+    """
+
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        start = time.perf_counter()
+        r = func(self, *args, **kwargs)
+        end = time.perf_counter()
+        selfName = ""
+        if isinstance(self, QtCore.QObject) and hasattr(self, "objectName"):
+            selfName = f"<{self.objectName()}>"
+        print(f"{self.__class__.__module__}{self.__class__.__name__}{selfName}.{func.__name__} : {end-start} s") #.format(func.__module__, func.__name__, end - start))
+        return r
+
+    return wrapper
 
 def processtimefunc(func):
     r"""Recipe 14.13 "Profiling and Timing Your Programs"
@@ -2366,11 +2451,11 @@ def is_predicate(x:typing.Any, n:int=1) -> bool:
     ret = isinstance(x, types.FunctionType)
     if ret:
         ret &= len(inspect.signature(x).parameters) == n
-    
+
     if ret:
         annots = inspect.get_annotations(x)
         ret &= len(annots) and annots["return"] == bool
-        
+
     return ret
 
 def is_hashable(x) -> bool:
@@ -2387,39 +2472,67 @@ def is_hashable(x) -> bool:
     return ret
 
 def unravel_types(x) -> set:
-    ret = set()
+    obj_types = key_types = val_types = elem_types = tuple()
     origin = typing.get_origin(x)
+    args = typing.get_args(x)
+    # print(f"prog.unravel_types({x}: {type(x).__name__}):\n\torigin = {origin}: {type(origin).__name__}\n\targs = {args}")
     if origin is None:
         if isinstance(x, type):
-            ret.add(x)
-        elif isinstance(x, (typing.Sequence, typing.Set)):
-            if all(isinstance(v, type) for v in x):
-                ret |= set(x)
-            else:
-                ret.add(type(x))
-                
+            obj_types = (x, )
+
+        elif (isinstance(x, (typing.Sequence, typing.Set))
+              and all(
+                    (
+                        isinstance(v, type)
+                        or type(v).__module__ in ("typing", "builtins", "types")
+                     )
+                    for v in x)
+              ):
+            obj_types = tuple(map(lambda x_: unravel_types(x_), x))
+
         else:
-            ret.add(type(x))
-            
+            obj_types = (type(x), )
+
+    elif origin in (types.UnionType, typing.Union):
+            # print(f"\tUnionType")
+            obj_types = tuple(map(lambda a_: unravel_types(a_), args))
+
+    elif isinstance(origin,type):
+        if issubclass(origin, (dict, collections.abc.Mapping)):
+            assert len(args) == 2, f"Invalid type arguments: {args} for origin {origin} of {x}: {type(x).__name__}"
+            obj_types = (origin, )
+            key_types, val_types = tuple(map(lambda a_: unravel_types(a_), args))
+            # print(f"\t -> key_types: {key_types}\n\t -> val_types: {val_types}")
+
+        elif issubclass(origin, (list, tuple, set, frozentset, collections.deque, collections.abc.Sequence)):
+            assert len(args) <=1, f"Invalid type arguments: {args} for origin {origin} of {x}: {type(x).__name__}"
+            obj_types = (origin, )
+            elem_types = tuple(map(lambda t_: unravel_types(t_), args[0]))
+            # print(f"\t -> elem_types: {elem_types}")
+
+        else:
+            obj_types = (x, )
+
     else:
-        args = unravel_types(typing.get_args(x))
-        ret |= args
-        
-    return ret
-            
+        obj_types = (origin, )
+
+    # print(f"\n\tobj_types -> {obj_types}\n\tkey_types -> {key_types}\n\tval_types -> {val_types}\n\telem_types -> {elem_types}")
+
+    return TypesSpec(obj_types, key_types, val_types, elem_types)
+
 def is_type_or_subclass(x: typing.Any, y:typing.Union[type, typing._Final]) -> bool:
     if not isinstance(y, (type, typing._Final)):
         raise TypeError(f"Second argument must be a type; instead, got {type(y).__name__}")
-    
+
     if isinstance(y, type):
         if isinstance(x, type):
             return issubclass(x, y)
 
         return isinstance(x, y)
-    
+
     else:
         return False
-    
+
 def __check_array_attribute__(rt, param) -> None:
     import vigra
     from core.scipyen_quantities import unitsConvertible
@@ -2621,7 +2734,7 @@ def __check_array_attribute__(rt, param) -> None:
 #     return False
 
 def decorator(func):
-    ''' Allow to use decorator either with arguments or not. 
+    ''' Allow to use decorator either with arguments or not.
     Taken from https://wiki.python.org/moin/PythonDecoratorLibrary#Creating_decorator_with_optional_arguments
 '''
 
@@ -2717,108 +2830,117 @@ def is_module_loaded(m: types.ModuleType):
 
 
 @singledispatch
-def get_loaded_module(m):
+def get_loaded_module(obj) -> types.ModuleType | None:
     r"""Check that sys.modules contains module ``m`` or a module with spec ``m``"""
     raise NotImplementedError(
-        f"This function is not implemented for {type(m).__name__} objects"
+        f"This function is not implemented for {type(obj).__name__} objects"
     )
 
 
 @get_loaded_module.register(types.ModuleType)
-def _(m: types.ModuleType):
-    r"""Returns a reference to module `m` in sys.modules.
+def __get_loaded_module__(obj: types.ModuleType) -> types.ModuleType | None:
+    r"""Returns a reference to module ``obj`` in sys.modules.
 
-    If `m` has not been loaded at all (even as an alias) returns None.
+    If ``obj`` has not been loaded at all (even as an alias) returns ``None``.
 
-    Identity check is performed on the `origin` attribute of the module's
-    __spec__ attribute. A module's __spec__ attribute is an instance of
+    Identity check is performed on the ``origin`` attribute of the module's
+    ``__spec__`` attribute. A module's ``__spec__`` attribute is an instance of
     `importlib.machinery.ModuleSpec`.
 
-    Two modules with the same `__spec__.origin` are considered identical even if
-    they are mapped to different symbols (keys) in the `sys.modules` dictionary.
+    Two modules with the same ``__spec__.origin`` are considered identical even
+    if they are mapped to different symbols (keys) in ``sys.modules``.
+
     """
     # NOTE: 2022-12-25 00:11:46
     # The following modules are example of modules where __spec__ is None, yet
     # they are present in sys.modules:
     # • The REPL main module (__main__)
-    # • cython_runtime, valrious _cython* modules, pyexpat submodules
-    # • the __main__module excuted by python runtime from source file (e.g. the
+    # • cython_runtime, various _cython* modules, pyexpat submodules
+    # • the __main__ module excuted by python runtime from source file (e.g. the
     #   __main__ module generated by python upon running 'scipyen.py')
     #
     # In addition, all but the last in the above exampke DO NOT have a __file__
     # attribute; this is useful to distinguish between "pure" runtime modules
     # and runtime modules created from a python source file.
     #
-    # ModSpec = importlib.machinery.ModuleSpec  # saves me some typing
-    sysmodules = [v for v in sys.modules.values()]  # saves me some typing
-    modname = m.__name__
-    modspec = getattr(m, "__spec__", None)
-    modfile = getattr(m, "__file__", None)
+    # sysmodules = [v for v in sys.modules.values()]  # saves me some typing
+    modname = obj.__name__
+    modspec = getattr(obj, "__spec__", None)
 
-    if not isinstance(modspec, ModSpec):
-        modules = list(filter(lambda x: x == m, [v for v in sysmodules]))
-        if len(modules):
-            return modules[0]
+    if isinstance(modspec, ModSpec):
+        # module has a __spec__
+
+        # 1. look it up my module name; may not find it because name may have
+        # been prefixed with package path (e.g. x.y.modulename) by the import
+        # machinery
+        if modname in sys.modules:
+            # found a module by name - but it is the same as obj ?!?
+            module = sys.modules[modname]
+
+            # check that the __spec__ of the named module in sys.modules
+            # is the same as that of obj
+            if (
+                inspect.ismodule(module)
+                and isinstance(getattr(module, "__spec__", None), ModSpec)
+                and module.__spec__.origin == modspec.origin
+            ):
+                return obj
+
+            else:
+                return
+
+        else:
+            # obj.__name__ NOT found in sys.modules
+            # check by identity in sys.modules.values()
+            if obj in sys.modules.values():
+                return obj
+            else:
+                return
+
+            # modules = filter(lambda x: x == obj, sys.modules.values())
+            # if len(modules):
+            #     return modules[0]
+
+            # modules = filter(
+            #     lambda x: inspect.ismodule(x)
+            #     and isinstance(getattr(x, "__spec__", None), ModSpec)
+            #     and getattr(x.__spec__, "origin", None) == modspec.origin,
+            #     sysmodules,
+            # )
+            # if len(modules):
+            #     return modules[0]
+
+    else:
+        # obj does not have a spec
+        if obj in sys.modules.values():
+            return obj
+
         else:
             return
 
-    if modname in sys.modules:
-        module = sys.modules[modname]
-        if (
-            inspect.ismodule(module)
-            and isinstance(getattr(module, "__spec__", None), ModSpec)
-            and module.__spec__.origin == modspec.origin
-        ):
-            return m
-
-    else:
-        modules = filter(lambda x: x == m, sysmodules)
-        if len(modules):
-            return modules[0]
-
-        modules = filter(
-            lambda x: inspect.ismodule(x)
-            and isinstance(getattr(x, "__spec__", None), ModSpec)
-            and getattr(x.__spec__, "origin", None) == modspec.origin,
-            sysmodules,
-        )
-        if len(modules):
-            return modules[0]
-
-
 @get_loaded_module.register(importlib.machinery.ModuleSpec)
-def _(spec: importlib.machinery.ModuleSpec):
-    ModSpec = importlib.machinery.ModuleSpec  # saves me some typing
-    sysmodules = [v for v in sys.modules.values()]  # saves me some typing
-    modname = spec.name
-    modorigin = spec.origin
-
-    # print(f"get_loaded_module(spec) modname {modname} spec {spec} origin {spec.origin}")
-
-    if modname in sys.modules:
-        module = sys.modules[modname]
+def __get_loaded_module__(spec: importlib.machinery.ModuleSpec): # noqa
+    if spec.name in sys.modules:
+        module = sys.modules[spec.name]
         if (
             inspect.ismodule(module)
             and isinstance(getattr(module, "__spec__", None), ModSpec)
-            and module.__spec__.origin == modorigin
+            and module.__spec__.origin == spec.origin
         ):
             return module
 
-    modules = list(
-        filter(
-            lambda x: inspect.ismodule(x)
-            and isinstance(x.__spec__, ModSpec)
-            and x.__spec__.origin == modorigin,
-            sysmodules,
-        )
-    )
+    else:
+        modules = [m for m in sys.modules.values()
+                   if (inspect.ismodule(m)
+                       and isinstance(getattr(m, "__spec__", None), ModSpec)
+                       and m.__spec__.origin == spec.origin)]
 
-    if len(modules):
-        return modules[0]
+        if len(modules):
+            return modules[0]
 
 
 @get_loaded_module.register(str)
-def _(modname: str):
+def __get_loaded_module__(modname: str): # noqa
     if not isinstance(modname, str) or len(modname.strip()) == 0:
         return
 
@@ -2836,14 +2958,15 @@ def _(modname: str):
                 return sysm
 
 
-def is_class_defined_in_module(x: typing.Any, m: types.ModuleType):
+def is_class_defined_in_module(x: typing.Any, mobj: types.ModuleType):
     r"""Checks if 'x' is a class or instance of a class defined in module 'm'."""
 
     if not inspect.isclass(x):
         x = type(x)
 
-    if not inspect.ismodule(m):
-        warnings.warn(f"Expecting a module; got {type(m).__name__} instead")
+    if not inspect.ismodule(mobj):
+        # warnings.warn(f"Expecting a module; got {type(m).__name__} instead")
+        scipywarn(f"Expecting a module; got {type(mobj).__name__} instead")
         return False
 
     x_module = get_loaded_module(x.__module__)
@@ -2851,7 +2974,7 @@ def is_class_defined_in_module(x: typing.Any, m: types.ModuleType):
     if x_module is None:
         return False
 
-    module = get_loaded_module(m)
+    module = get_loaded_module(mobj)
 
     if module is None:
         return False
@@ -2864,8 +2987,8 @@ def is_class_defined_in_module(x: typing.Any, m: types.ModuleType):
         xmod = x.__module__
         if isinstance(xmod, types.ModuleType): # if this happens, the problem is somwehere up the call stack
             xmod = xmod.__name__
-        # print(f"core.prog.is_class_defined_in_module: x.__module__ = {x.__module__} ({type(x.__module__).__name__})")
         x_rev_module_path = list(reversed(x.__module__.split(".")))
+
         for p in x_rev_module_path:
             if p in sys.modules:
                 x_module = sys.modules[p]
@@ -2877,11 +3000,11 @@ def is_class_defined_in_module(x: typing.Any, m: types.ModuleType):
         # dynamically generated - in which case it would NOT have been found in
         # any of th currently importd modules anyway
         return False
-    
+
     elif x_module.__spec__ is None:
         return False
 
-    return x_module.__spec__.origin == m.__spec__.origin
+    return x_module.__spec__.origin == mobj.__spec__.origin
 
 def get_module_version(p:typing.Union[types.ModuleType, str]) -> str:
     # print(f"prog.get_module_version: {p}")
@@ -2890,23 +3013,23 @@ def get_module_version(p:typing.Union[types.ModuleType, str]) -> str:
             p = sys.modules[p]
         else:
             try:
-                p = importlib.import_module(p) 
+                p = importlib.import_module(p)
             except:
                 traceback.print_exc()
                 return ""
-            
+
     elif isinstance(p, types.ModuleType):
         if p.__name__ in sys.modules:
             p = sys.modules[p.__name__]
         else:
             try:
-                p = importlib.import_module(p) 
+                p = importlib.import_module(p)
             except:
                 traceback.print_exc()
                 return ""
     else:
         raise TypeError(f"Expecting a module or a module name; instead, got {type(p).__name__}")
-    
+
     if hasattr(p, "version"):
         if isinstance(p.version, types.ModuleType):
             if hasattr(p.version, "full_version"):
@@ -2915,20 +3038,18 @@ def get_module_version(p:typing.Union[types.ModuleType, str]) -> str:
                 return str(p.version.version)
             else:
                 return ""
-            
+
         else:
             return str(p.version)
-        
+
     else:
-        # return str(p.__version__) if hasattr(p,"__version__") else ""
-        # print(f"\tversion {p.__version__}")
         return getattr(p,"__version__", "")
-    
+
 
 def get_qt_api_for_python(module:types.ModuleType) -> str:
     r"""Introspection of the Qt API for help purposes, NOT to guide GUI code"""
     hasPg = False
-    try: 
+    try:
         pg = importlib.import_module("pyqtgraph")
         hasPg = True
     except:
@@ -2939,7 +3060,7 @@ def get_qt_api_for_python(module:types.ModuleType) -> str:
             module = importlib.import_module(module.__name__)
 
         # version = getattr(module, "__version__", "")
-        
+
         if module.__name__ == "qtpy":
             QtCore = importlib.import_module("qtpy.QtCore")
             qtVersion = QtCore.qVersion()
@@ -2951,7 +3072,7 @@ def get_qt_api_for_python(module:types.ModuleType) -> str:
             pyqtAPI = getattr(module, "API", os.environ.get("QT_API", "pyqt5").lower())
             if hasPg:
                 pyqtAPI = getattr(pg.Qt, pyqtAPI.upper(), pyqtAPI)
-                
+
             if pyqtAPI.lower() in ("pyqt5", "pyqt6"):
                 pyqtAPIver = f" {pyqtAPI} {QtCore.PYQT_VERSION_STR}, Qt {qtVersion}"
             elif pyqtAPI.lower() in ("PySide2", "PySide6"):
@@ -2962,29 +3083,29 @@ def get_qt_api_for_python(module:types.ModuleType) -> str:
                     pyqtAPIver = f" Qt {qtVersion}"
             else:
                 pyqtAPIver = f" Qt {qtVersion}"
-                
+
         elif any(module.__name__.lower().startswith(s) for s in ("pyside", "pyqt")):
             QtCore = importlib.import_module(f"{module.__name__}.QtCore")
             qtVersion = QtCore.qVersion()
-                
+
             if module.__name__.lower().startswith("pyside"):
                 pyqtAPIver = f" {module.__name__} {module.__version__}, Qt {qtVersion}"
-                
+
             elif module.__name__.lower().startswith("pyqt"):
                 QtCore = importlib.import_module(f"{module.__name__}.QtCore")
                 pyqtAPIver = f" {module.__name__} {QtCore.PYQT_VERSION_STR}, Qt {qtVersion}"
-                        
+
             else:
                 pyqtAPIver = f" Qt {qtVersion}"
         else:
             pyqtAPIver = f" Qt {qtVersion}"
-            
+
         return pyqtAPIver
-            
+
     except:
         traceback.print_exc()
         return ""
-    
+
 def parse_module_class_path(x: str) -> typing.Union[type, types.ModuleType]:
     from core.utilities import unique
 
@@ -3033,27 +3154,28 @@ class with_doc:
 
     """
 
-    def __init__(
-        self,
-        method: typing.Union[
-            typing.Type,
-            typing.Callable,
-            typing.Sequence[typing.Union[typing.Type, typing.Callable]],
-        ],
-        use_header=True,
-        header_str: typing.Optional[str] = None,
-        indent: str = "   ",
-        indent_factor: int = 1,
-    ):
+    def __init__(self, method: typing.Union[
+                                            typing.Type,
+                                            typing.Callable,
+                                            typing.Sequence[typing.Union[typing.Type, typing.Callable]],
+                                           ],
+                                            use_header=True,
+                                            header_str: typing.Optional[str] = None,
+                                            indent: str = "   ",
+                                            indent_factor: int = 1,
+                ):
         # self.method = method
         if isinstance(
             method, (tuple, list)
-        ):  # and all(isinstance(v, typing.Callable) for v in method) or all(isinstance(v, typing.Type) for v in method):
+            ):  # and all(isinstance(v, typing.Callable) for v in method) or all(isinstance(v, typing.Type) for v in method):
             self.method = tuple(method)
+
         elif isinstance(method, typing.Callable):
             self.method = (method,)
+
         elif isinstance(method, typing.Type):
             self.method = tuple()
+
         else:
             self.method = tuple()
 
@@ -3061,8 +3183,10 @@ class with_doc:
             if len(self.method):
                 if all(isinstance(v, typing.Type) for v in self.method):
                     header_str = f"inherits from the {InflectEngine.plural('class', len(self.method))}:"
+
                 elif all(isinstance(v, typing.Callable) for v in self.method):
                     header_str = f"calls the {InflectEngine.plural('function', len(self.method))}:"
+
                 else:
                     header_str = "Notes:"
             else:
@@ -3147,7 +3271,7 @@ def get_top_level_modules(path:typing.Optional[typing.Union[str, pathlib.Path,ty
     infos = list(pkgutil.iter_modules(path))
     packages = list(filter(lambda i: i.ispkg, infos))
     nonpackages = list(filter(lambda i: not i.ispkg, infos))
-    
+
     return packages, nonpackages
 
 @singledispatch
@@ -3159,18 +3283,18 @@ def locate_obj_by_identifier(where:object, n:str) -> object:
         n = p.rpartition('.')[-1]
     if n in where.__dict__:
         return where.__dict__[n]
-    
+
     elif dataclasses.is_dataclass(where):
         flds = datalasses.fields(where)
-        fldnames = list(map(lambda f: f.name, flds)) 
+        fldnames = list(map(lambda f: f.name, flds))
         if n in fldnames:
             return flds[fldnames.index(n)]
-        
+
     else:
         members = dict(inspect.getmembers(where))
         if n in members:
             return members[n]
-        
+
 # @locate_obj_by_identifier.register(types.ModuleType)
 # def _(where:types.ModuleType, n:str) -> object:
 #     if not (isinstance(value, str) and all(isidentifier(a) for a in value.split("."))):
@@ -3179,13 +3303,13 @@ def locate_obj_by_identifier(where:object, n:str) -> object:
 #         n = p.rpartition('.')[-1]
 
 @locate_obj_by_identifier.register(types.NoneType)
-def _(where:types.NoneType, n:str) -> object:
+def __locate_obj_by_identifier__(where:types.NoneType, n:str) -> object:
     if not (isinstance(value, str) and all(isidentifier(a) for a in value.split("."))):
         raise ValueError("A valid identifier string or dotted path was expected")
-    
+
     if '.' in n:
         n = p.rpartition('.')[-1]
-    
+
     modules = list()
     in_modules = list()
     nl_modules = list()
@@ -3197,7 +3321,7 @@ def _(where:types.NoneType, n:str) -> object:
             o = locate_obj_by_identifier(m, n)
             if o:
                 in_modules.append(o)
-        
+
     if len(modules) == 0 and len(in_modules) == 0:
         nlmodinfos = get_not_loaded_modules()
         nn = list(filter(lambda i: i.name == n, nlmodinfos))
@@ -3209,9 +3333,9 @@ def _(where:types.NoneType, n:str) -> object:
                     spec.loader.exec_module(m)
                     if m:
                         nl_modules.append(m)
-                except:
+                except: # noqa
                     traceback.print_exc()
-                    
+
         else:
             for mi in nlmodinfos:
                 try:
@@ -3221,9 +3345,9 @@ def _(where:types.NoneType, n:str) -> object:
                     o = locate_obj_by_identifier(m, n)
                     if o:
                         in_nlmodules.append(o)
-                except:
+                except: # noqa
                     traceback.print_exc()
-        
+
 
 def get_loaded_modules(path:typing.Optional[typing.Union[str, pathlib.Path,typing.Sequence[str|pathlib.Path]]]=None) -> list:
     r"""This is redundant, since we always have direct access to sys.modules...
@@ -3242,7 +3366,7 @@ def get_modules(path:typing.Optional[typing.Union[str, pathlib.Path,typing.Seque
     packages = list(filter(lambda i: i.ispkg, infos))
     nonpackages = list(filter(lambda i: not i.ispkg, infos))
     return packages, nonpackages
-    
+
 def get_specs(infos:list) -> list:
     r"""Returns a list of module specs using the ModuleInfo in infos."""
     return list(map(lambda i: importlib.util.find_spec(i.name), infos))
@@ -3259,7 +3383,7 @@ def _find_in_sys_modules(head:str, rest:list, shell:typing.Optional[InteractiveS
     ismagic=False
     isalias=False
     ospace=None
-    
+
     for module in sys.modules.values():
         if not isinstance(module, types.ModuleType):
             continue
@@ -3280,14 +3404,14 @@ def _find_in_sys_modules(head:str, rest:list, shell:typing.Optional[InteractiveS
             # as 'parent' when in fact it is not
             # — what I'm after is the actual point where the module is defined
             # if isinstance(obj, types.ModuleType):
-                
+
             for idx, part in enumerate(rest):
                 # print(f"\tlooking for part {idx}: {part} in {obj}")
                 try:
                     parent = obj
 #                     if isinstance(parent, types.ModuleType):
 #                         # print(f"\t\tparent: {parent.__name__}, from {parent.__spec__.origin}")
-#                         
+#
 #                         opath.append(parent.__name__.split(".")[-1])
                     if idx == len(rest) - 1:
                         obj = shell._getattr_property(obj, part)
@@ -3310,7 +3434,7 @@ def _find_in_sys_modules(head:str, rest:list, shell:typing.Optional[InteractiveS
                 ospace = None # this is bettern as it reflects the fact that whatever is found does not belong to a namespace
                 # msg = ""
                 break  # modules loop
-    
+
     return oinspect.OInfo(
         obj=obj,
         found=found,
@@ -3334,7 +3458,7 @@ def _check_is_magic(oname, shell:typing.Optional[InteractiveShell]=None) -> tupl
     found = False
     ismagic=False
     isalias=False
-    
+
     if oname.startswith(ESC_MAGIC2):
         oname = oname.lstrip(ESC_MAGIC2)
         obj = shell.find_cell_magic(oname)
@@ -3351,13 +3475,13 @@ def _check_is_magic(oname, shell:typing.Optional[InteractiveShell]=None) -> tupl
         ospace = 'IPython internal'
         ismagic = True
         isalias = isinstance(obj, Alias)
-    
+
     return found, obj, ospace, ismagic, isalias
 
 def _get_pyobj_name_(obj:typing.Union[types.ModuleType, types.FunctionType, types.MethodType, type]) -> str:
     return obj.__qualname__ if isinstance(obj, (types.FunctionType, types.MethodType, type)) else obj.__name__ if isinstance(obj, types.ModuleType) else ""
 
-def _check_oname_alias_(obj:typing.Union[types.ModuleType, types.FunctionType, types.MethodType, type], 
+def _check_oname_alias_(obj:typing.Union[types.ModuleType, types.FunctionType, types.MethodType, type],
                         oname:str, shell:typing.Optional[InteractiveShell]=None) -> bool:
     r"""Returns ``True`` if *obj* is an alias to an object with original name *oname*.
 
@@ -3404,7 +3528,7 @@ WARNING: Potentially problematic...
                         ]
     if not isinstance(shell, InteractiveShell):
         shell = guiutils.getScipyenConsoleShell()
-        
+
     candidates = list()
     aliases = list()
     for nsname,ns in namespaces:
@@ -3424,9 +3548,9 @@ WARNING: Potentially problematic...
                 if oname in parts and ooname not in aliases: # NOTE: 2026-01-06 10:21:39 not the same as oname in ooname !!!
                     cinfo = shell._object_find(ooname, namespaces=[(nsname, ns)])
                     candidates.append((ooname, cinfo))
-                
+
     return aliases, candidates
-    
+
 def object_inspect(oname=str, detail_level:int=0,
                    shell:typing.Optional[InteractiveShell]=None) -> oinspect.InfoDict:
     r"""Emulates shell.object_inspect"""
@@ -3434,18 +3558,18 @@ def object_inspect(oname=str, detail_level:int=0,
     from gui import guiutils
     if not isinstance(shell, InteractiveShell):
         shell = guiutils.getScipyenConsoleShell()
-    # NOTE: 2026-01-02 14:28:47 
+    # NOTE: 2026-01-02 14:28:47
     # ``info`` is an oinspect.OInfo object
     info = object_find(oname, shell=shell)
-    
+
     # NOTE: 2026-01-02 14:29:21
     # either branch below produces an oinspect.InfoDict object (effectively, a dict)
     if info.found:
         # create an oinspect.InfoDict based on ``info``
-        return helputils.hinfo(info.obj, oname, info=info, detail_level=detail_level, shell=shell) 
+        return helputils.hinfo(info.obj, oname, info=info, detail_level=detail_level, shell=shell)
     else:
         # create a generic oinspect.InfoDict based on ``oname``
-        return oinspect.object_info(name=oname, found=False) 
+        return oinspect.object_info(name=oname, found=False)
 
 def object_find(oname=str, namespaces=None,
                 shell:typing.Optional[InteractiveShell]=None,
@@ -3456,11 +3580,11 @@ def object_find(oname=str, namespaces=None,
     from IPython.core.alias import Alias, AliasManager
     from core import strutils, utilities
     from gui import guiutils
-    
-    
+
+
     if not isinstance(shell, InteractiveShell):
         shell = guiutils.getScipyenConsoleShell()
-        
+
     foundinfos = list()
 
     candidates = list()
@@ -3476,40 +3600,40 @@ def object_find(oname=str, namespaces=None,
         if not with_candidates:
             return info, ""
         foundinfos.append(info)
-    
+
     if not info.found:
         # 0) try pkgutil
         try:
             obj = pkgutil.resolve_name(oname)
-            oinfo = oinspect.OInfo(obj=obj, found=True, ismagic=False, isalias=False, 
+            oinfo = oinspect.OInfo(obj=obj, found=True, ismagic=False, isalias=False,
                                    namespace=None, parent=None)
-            parentinfo = oinspect.OInfo(obj=None, found=False, ismagic=False, isalias=False, 
+            parentinfo = oinspect.OInfo(obj=None, found=False, ismagic=False, isalias=False,
                                    namespace=None, parent=None)
             objname = _get_pyobj_name_(obj)
 
             if isinstance(obj, (types.FunctionType, types.MethodType, type)):
                 parentinfo, _ = object_find(obj.__module__)
-            
+
             elif isinstance(obj, types.ModuleType):
                 pok, pp = shell._find_parts(objname)
                 if len(pp)>1:
                     parentinfo, _ = object_find(".".join([pp[:-1]]))
-                    
+
             if parentinfo.found:
                 oinfo.parent = parentinfo.obj
                 oinfo.namespace = f"module {oinfo.parent.__name__}"
-                
+
             if not with_candidates:
                 return oinfo, ""
             if len(foundinfos) == 0:
                 foundinfos.append(oinfo)
             else:
                 candidates.append((objname, oinfo))
-                
+
         except:
             # traceback.print_exc()
             pass
-        
+
         #
         # 1) the object might exist in the namespaces, but has been imported under an alias
         aliases, cnds = _find_by_alias(oname, namespaces, shell=shell)
@@ -3588,7 +3712,7 @@ def object_find(oname=str, namespaces=None,
                         sims = list(map(lambda k: strutils.jaccard(k, parts[-1]), members))
                         acc = list(filter(lambda s: s > 0.5, sims))
                         if len(acc):
-                            candidates.extend(list(map(lambda s: 
+                            candidates.extend(list(map(lambda s:
                                                            make_name_info(subname, s, sinfo.obj, sinfo.obj.__dict__[members[sims.index(s)]]),  acc)))
 
         # 3) the object has not been imported in any of the namespaces
@@ -3692,7 +3816,7 @@ def object_find(oname=str, namespaces=None,
                         foundinfos.append(cinfo)
                     else:
                         candidates.append((cname, cinfo))
-                
+
             info.obj    = None
             info.parent = None
             info.ismagic=False
@@ -3724,14 +3848,14 @@ def walk_packages(path:typing.Optional[typing.Union[str, pathlib.Path,typing.Seq
 
     if isinstance(path, (str, pathlib.Path)):
         path = [path]
-        
+
     elif isinstance(path, typing.Sequence):
         paths = list(filter(lambda p: isinstance(p, (str, pathlib.Path)), path))
         if len(paths) == 0:
             path = None
         else:
             path = paths
-        
+
     for info in pkgutil.iter_modules(path, prefix):
         yield info
         if info.ispkg:
@@ -3739,6 +3863,3 @@ def walk_packages(path:typing.Optional[typing.Union[str, pathlib.Path,typing.Seq
             path = [p for p in path if not seen(p)]
             yield from walk_packages(path, info.name+".")
 
-def qVariants(*args) -> typing.List[QtCore.QVariant]:
-    r"""Creates ans returns a list of QVariant objects wrapping each element in args"""
-    return list(map(lambda o: o if isinstance(o, QtCore.QVariant) else QtCore.QVariant(o), args))

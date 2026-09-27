@@ -6,94 +6,53 @@
 
 r"""
 """
-from abc import ABC, ABCMeta, abstractmethod
+# from abc import ABC, ABCMeta, abstractmethod
 import collections
-from collections import deque, namedtuple
-from functools import (singledispatch, singledispatchmethod)
+# from collections import deque, namedtuple
+from functools import singledispatchmethod
 import itertools
 import datetime
 from enum import (Enum, IntEnum, EnumMeta, Flag, auto) #noqa
 import inspect
-import numbers
-import math
+# import numbers
+# import math
 import dataclasses
-from dataclasses import (dataclass, KW_ONLY, MISSING, field)
-import sys, os
-import time, datetime
-import traceback
+from dataclasses import (dataclass, KW_ONLY)
+# import sys, os
+# import time, datetime
+# import traceback
 import typing
 import types
-import warnings
-import weakref
+# import warnings
+# import weakref
 import h5py
-import treelib
+import treelib # noqa
 import pathlib
-from copy import (deepcopy, copy,)
+from copy import (deepcopy, copy,) # noqa
 
 #### END core python modules
 
 #### BEGIN 3rd party modules
-# import qtpy
-# from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-# from qtpy.QtCore import (Signal, Slot, Property,)
-# __has_PySide6__ = False
-# __has_PyQt6__ = False
-# __has_sip__ = False
-# if os.environ["QT_API"] == "pyside6":
-#     __has_PySide6__ = True
-#     import PySide6
-#     from PySide6 import Shiboken
-#     # from PySide6.QtCore import (Signal, Slot, Property,)
-#     from PySide6.QtUiTools import loadUiType # -- A-HA!
-#     QAction = QtGui.QAction
-#     QActionGroup = QtGui.QActionGroup
-#     QShortcut = QtGui.QShortcut
-# else:
-#     if os.environ["QT_API"] == "pyqt6":
-#         __has_PyQt6__ = True
-#
-#     from qtpy import sip
-#     from qtpy.uic import loadUiType
-#     QAction = QtWidgets.QAction
-#     QActionGroup = QtWidgets.QActionGroup
-#     QShortcut = QtWidgets.QShortcut
-#     __has_sip__ = True
-
-# import qtpy
-# qtpy.API = os.environ["QT_API"]
-# if os.environ["QT_API"] == "pyside6":
-#     import PySide6
-#     from PySide6 import (QtGui, QtCore, QtWidgets,)
-# else:
-#     from qtpy import (QtGui, QtCore, QtWidgets,)
-import numpy as np
-from numpy import ndarray
-import numpy.matlib as mlib
 import pandas as pd
 import quantities as pq
-from core.vigra_patches import vigra
-import neo
-from neo.core import (baseneo, basesignal, container,)
-from neo.core.dataobject import (DataObject, ArrayDict,)
-
 
 #### END 3rd party modules
 
 #### BEGIN pict.core.modules
+# from core import utilities
 from core import scipyen_quantities as scq
-from core import xmlutils
-from core import strutils
-from core.prog import (safewrapper, is_hashable, is_type_or_subclass,
-                       ImmutableDescriptor, scipywarn, NoData, print_styled)
+# from core import xmlutils
+# from core import strutils
+from core.prog import (ImmutableDescriptor, scipywarn)
 # from core.datazone import DataZone
-from core.datasignal import (_new_DataSignal, _new_IrregularlySampledDataSignal, DataSignal, IrregularlySampledDataSignal)
+# from core.datasignal import (_new_DataSignal, _new_IrregularlySampledDataSignal, DataSignal, IrregularlySampledDataSignal)
 # from core import bgbridge
 # from core.bgbridge import (BGStructureDescriptor, BrainGlobeAtlas)
-from core import taxonbridge
-from core.taxonbridge import(Taxon, TaxonDescriptor)
+# from core import taxonbridge
+from core.taxonbridge import TaxonDescriptor
 from core.typeenum import TypeEnum
-from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE,
-                            EQUAL_NAN, GENOTYPES)
+from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, # noqa
+                            EQUAL_NAN, GENOTYPES) # noqa
 
 #### END pict.core.modules
 
@@ -108,7 +67,7 @@ class DoseDescriptor:
             return #self._default
         return getattr(obj, self._name, None)
 
-    def __set__(self, obj:object, value:typing.Optional[pq.Quantity] = None):
+    def __set__(self, obj:object, value: pq.Quantity | None = None):
         if isinstance(value, pq.Quantity):
             if not scq.checkDosageUnits(value):
                 raise ValueError(f"Expecting dosage units; instead got {value.units}")
@@ -129,11 +88,10 @@ class ModelFunctionDescriptor:
             return #self._default
         return getattr(obj, self._name, None)
 
-    def __set__(self, obj:object, value:typing.Optional[pq.Quantity] = None):
+    def __set__(self, obj:object, value: pq.Quantity | None = None):
         from core import models
-        if isinstance(value, types.FunctionType):
-            if not models.isModelFunction(value):
-                raise ValueError(f"Expecting a model function; instead, {value.__name__} is an ordinary function")
+        if isinstance(value, types.FunctionType) and not models.isModelFunction(value):
+            raise ValueError(f"Expecting a model function; instead, {value.__name__} is an ordinary function")
 
         elif value is not None:
             raise ValueError(f"Expecting a model function; instead, {value.__name__} is an ordinary function")
@@ -152,18 +110,12 @@ class FileOriginDescriptor:
             return #self._default
         return getattr(obj, self._name, None)
 
-    def __set__(
-        self,
-        obj:object,
-        value:typing.Optional[
-            typing.Union[str, pathlib.Path,
-                         typing.Sequence[typing.Union[str, pathlib.Path]]]
-            ] = None):
+    def __set__(self, obj: object, value: str | pathlib.Path | typing.Sequence[str | pathlib.Path] | None = None):
         from iolib.navigation.filesystems import getFileCreationDateTime
         if isinstance(value, typing.Sequence) and all (isinstance(v, (str, pathlib.Path)) for v in value):
             setattr(obj, self._name, value)
             if hasattr(obj, "file_datetime"):
-                obj.file_datetime = list(map(lambda f: getFileCreationDateTime(f), value))
+                obj.file_datetime = list(map(lambda f: getFileCreationDateTime(f), value)) # noqa
 
         elif isinstance(value, (str, pathlib.Path)):
             setattr(obj, self._name, value)
@@ -178,9 +130,6 @@ class FileOriginDescriptor:
         else:
             raise TypeError(f"Expecting a str, pathlib.Path object, or a sequence of these; instead, got a {type(value).__name__}")
 
-
-
-
 @dataclass
 class ScipyenDataclass:
     r"""Ancestor of Scipyen data classes.
@@ -194,21 +143,23 @@ class ScipyenDataclass:
         if other.__class__ != self.__class__:
             raise TypeError(f"Expecting an object of type {self.__class__.__name__}; instead, got {type(other).__name__}")
 
-
-        fields = tuple(map(lambda f: (f.name, getattr(self, f.name), getattr(other, f.name)), dataclasses.fields(self.__class__)))
+        fields = tuple(map(lambda f: (f.name, getattr(self, f.name), getattr(other, f.name)), dataclasses.fields(self.__class__))) # noqa
 
         diff_fields = tuple(filter(lambda f: type(f[1]) is not type(f[2]) or not safe_identity_test(f[1], f[2]), fields))
 
         if showValues:
-            return dict(map(lambda f: (f[0], (f[1], f[2])), diff_fields))
+            return dict(map(lambda f: (f[0], (f[1], f[2])), diff_fields)) # noqa
 
-        return tuple(map(lambda f: f[0], diff_fields))
+        return tuple(map(lambda f: f[0], diff_fields)) # noqa
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, self.__class__):
             return False
 
         return len(self.diff(other)) == 0
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.description))
 
     def __contains__(self, val:str) -> bool:
         r"""Test the existence of a field name in this instance
@@ -221,27 +172,8 @@ class ScipyenDataclass:
     =======
     True if a field with name suplied by `val` exists in this instance.
     """
-        return val in map(lambda f: f.name, dataclasses.fields(self))
-
-    def merge(self, *others) -> typing.Self:
-        if len(others) == 0:
-            return self
-
-        if not all(isDataclass(o) for o in others):
-            raise TypeError("Expecting instances of ScipyenDataclass")
-
-        of = tuple(itertools.chain.from_iterable(tuple(map(lambda o: tuple(map(lambda f: (o, f.name), dataclasses.fields(o))),
-                                                        (parameters, *extra_params)))))
-
-        invalid_field_names = tuple(filter(lambda x: x[1] not in self))
-
-        if len(invalid_field_names):
-            raise TypeError(f"Arguments contain the following fields which are invalid for this {type(self).__name__} instance: {invalid_field_names}")
-
-        for (o, fname) in of:
-            setattr(self, fname, getattr(o, fname))
-
-        return self
+        return val in (f.name for f in dataclasses.fields(self))
+        # return val in map(lambda f: f.name, dataclasses.fields(self))
 
     def toHDF5(self, group:h5py.Group, name:str, oname:str,
                        compression:str, chunks:bool, track_order:bool,
@@ -263,8 +195,6 @@ class ScipyenDataclass:
         cached_entity = h5io.getCachedEntity(entity_cache, self)
         if isinstance(cached_entity, h5py.Dataset):
             group[target_name] = cached_entity
-            # print(f"{self.__class__.__name__}.toHDF5 found entity {cached_entity}")
-            # print(f"### END {self.__class__.__name__}.toHDF5 \n\n")
             return cached_entity
 
         if isinstance(name, str) and len(name.strip()):
@@ -279,7 +209,8 @@ class ScipyenDataclass:
         dataclass_fields = list(filter(lambda f: dataclasses.is_dataclass(getattr(self, f.name)), dataclasses.fields(self)))
 
         # then assign these back into the dictionary from above:
-        data.update(dict(map(lambda f: (f.name, getattr(self, f.name)), dataclass_fields)))
+        data.update({f.name: getattr(self, f.name) for f in dataclass_fields})
+        # data.update(dict(map(lambda f: (f.name, getattr(self, f.name)), dataclass_fields)))
 
         # NOTE: 2024-12-12 15:41:25
         # instead of creating a nested hf5 group, just populate this one with
@@ -292,7 +223,8 @@ class ScipyenDataclass:
             if isinstance(cached_entity, (h5py.Group, h5py.Dataset)):
                 entity[name] = cached_entity
             else:
-                element_entity = h5io.toHDF5(value, entity, name=name,
+                # element_entity = h5io.toHDF5(value, entity, name=name,
+                h5io.toHDF5(value, entity, name=name,
                                              compression=compression,
                                              chunks=chunks,
                                              track_order=track_order,
@@ -308,38 +240,29 @@ class ScipyenDataclass:
 #                     print(msg)
                 # ### END   for debugging
 
-        # print(f"### END {self.__class__.__name__}.toHDF5 \n\n")
         return entity
 
     @classmethod
-    def fromHDF5(cls, entity:h5py.Group,
-                attrs:typing.Optional[dict] = None, cache:dict = dict()):
+    def fromHDF5(cls, entity: h5py.Group, attrs: dict | None = None,
+                 cache: dict = dict()): # noqa
         from iolib import h5io
-
-        # print(f"\n\n### BEGIN {cls.__name__}.fromHDF5 ")
 
         if entity in cache:
             val = cache[entity]
-            # print(f"{cls.__name__}.fromHDF5 got cached entity {type(val).__name__}")
             return val
 
         attrs = h5io.attrs2dict(entity.attrs)
 
-        # print(f"{cls.__name__}.fromHDF5: attrs = {attrs}")
-
-        # assert attrs["python_class"] == str(cls).strip("<").strip(">").strip("class").strip()[1:-1], \
         assert attrs["python_class"] == cls, f"Object has unexpected class: {attrs['python_class']}"
 
         attrs_as_entities = [a for a in cls.__match_args__ if a not in attrs]
 
-        kwargs = dict()
+        kwargs = {}
 
         for a in attrs_as_entities:
-            if a in entity.keys():
+            if a in entity():
                 kwargs[a] = h5io.fromHDF5(entity[a], cache=cache)
-                # print(f"{cls.__name__}.fromHDF5: got field '{a}' with type: {type(kwargs[a]).__name__}\n")
 
-        # print(f"### END {cls.__name__}.fromHDF5 \n\n")
         return cls(**kwargs)
 
     @classmethod
@@ -353,159 +276,13 @@ class ScipyenDataclass:
     =======
     True if a field with name suplied by `val` exists in this class.
     """
-        return val in map(lambda f: f.name, dataclasses.fields(cls))
-
-class NeuronType(TypeEnum):
-    r"""Generic classification of neurons beyond that of NeuroMorpho.org
-(pyramidal, non-pyramidal principal, and interneurons).
-"""
-    undefined = 0
-    pyramidal = auto()
-    stellate = auto()
-    granule = auto()
-    msn = auto()
-    drg = auto()
-    nonpyramidal = sum(
-            (
-                stellate,
-                granule,
-                msn,
-                drg
-            )
-        )
-    principal = pyramidal + nonpyramidal
-    interneuron = auto()
-    inhibitory = auto()
-    other = auto()
-
-class CellCompartmentType(TypeEnum):
-    r"""Insipired by SWC/CNIC specification at
-    http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
-
-    Refers to "gross" compartments; for a more granular types see AxonalCompartment
-    DendriticCompartment ChemicalSynapseCompartment
-    """
-    undefined = 0
-    cell = undefined
-    organelle = auto()
-    cilium = auto()
-    flagellum = auto()
-    microvillus = auto()
-    filopodium = auto()
-    lamellipodium = auto()
-
-class NeuronCompartmentType(TypeEnum):
-    undefined = 0
-    cell = undefined
-    organelle = auto()
-    soma = auto()
-    axon = auto()
-    dendrite = auto()
-    chemical_synapse = auto()
-
-class AxonalCompartmentType(TypeEnum):
-    undefined = 0
-    initial = auto() # axon initial segment
-    node = auto() # Ranvier's node
-    internode = auto() # axon segment between two consecutive Ranvier nodes
-    myelin = auto() # myelin sheath
-    bouton = auto() # axonal bouton, "en passant"
-    terminal_bouton = auto()
-    arborization = auto()
-    collateral = auto()
-    other = auto()
-
-class DendriticCompartmentType(TypeEnum):
-    undefined = 0
-    basal = auto() # basal dendrite, shaft
-    apical = auto()# apical dendrite, shaft
-    fork = auto()# dendritic branch point
-    end = auto()# dendritic end point
-    tuft = auto()# apical tuft
-    shaft = auto()
-    spine = auto()
-    spine_head = auto()
-    spine_neck = auto()
-    spine_apparatus = auto()
-    other = auto()
-
-class ChemicalSynapseUltrastructureElementType(TypeEnum):
-    undefined = 0
-    presynaptic_membrane = auto()
-    presynaptic_cytoskeleton = auto()
-    presynaptic_vesicle = auto()
-    presynaptic_docked = auto()
-    rrp = presynaptic_docked
-    presynaptic_recycling_pool = auto()
-    presynaptic_reserve_pool = auto()
-    presynaptic_vesicles = sum(
-            (
-                presynaptic_vesicle,
-                presynaptic_docked,
-                presynaptic_recycling_pool,
-                presynaptic_reserve_pool
-            )
-        )
-    active_zone = auto() # presynaptic active zone
-    presynaptic_compartment = sum(
-            (
-                presynaptic_membrane,
-                presynaptic_cytoskeleton,
-                presynaptic_vesicles,
-                active_zone
-            )
-        )
-    postsynaptic_membrane = auto()
-    postsynaptic_cytoskeleton = auto()
-    psd = auto() # postsynaptic density
-    postsynaptic_compartment = sum(
-            (
-                postsynaptic_membrane,
-                postsynaptic_cytoskeleton,
-                psd
-            )
-        )
-    perisynaptic = auto()
-    extrasynaptic = auto()
-    cleft = auto()
-
-class ChemicalSynapseMorphologicalType(TypeEnum):
-    undefined = 0
-    symmetrical = auto()
-    asymmetrical = auto()
-    glomerulus = auto() # cerebellar glomerulus
-    mossy = auto() # hippocampal mossy fibre synapse
-    calyx = auto() # calyx of Held
-    nmj = auto() # neuromuscular junction
-    other = auto()
-
-class PostsynapticEntityType(TypeEnum):
-    undefined = 0
-    soma = auto()
-    dendrite = auto()
-    spine = auto()
-    axon = auto()
-
-class ChemicalSynapseFunctionalType(TypeEnum):
-    undefined = 0
-    excitatory = auto()
-    inhibitory = auto()
-
-class PlasmaMembraneSpecializationType(TypeEnum):
-    undefined = 0
-    chemical_synapse = auto()
-    neural_synapse = chemical_synapse
-    gap_junction = auto() # electrical synapse
-    electrical_synapse = gap_junction
-    zonula_occludens = auto()
-    zonula_adherens = auto()
-    synapse = auto() # generic synapse including immunological synapse
-    caveolae = auto()
+        return val in (f.name for f in dataclasses.fields(cls))
+        # return val in map(lambda f: f.name, dataclasses.fields(cls))
 
 class UltrastructureElementType(TypeEnum):
     r"""Organelles, etc.
-Excludes chemical synapse components e.g. postsynaptic density
-"""
+    Excludes chemical synapse components e.g. postsynaptic density
+    """
     undefined = 0
     plasmalemma = auto()
     cytosol = auto()
@@ -616,45 +393,6 @@ class GeneticSex(TypeEnum):
     female = 1
     male = 2
 
-class BioSourceType(TypeEnum):
-    undefined   = 0
-    insilico    = auto()    # biological/biophysical/mathematical model
-    exvivo      = auto()    # tissue or organ sample from organism
-    invitro     = auto()    # culture system, homogenate
-    invivo      = auto()    # e.g. in vivo imaging, electrophysiology, etc
-    organism    = auto()    # for behaviour and systemic measurements (temperature, mass, motor function, etc)
-    organ       = auto()    # e.g. isolated hear, aorta, ileum, 33
-    tissue      = auto()    # e.g. aortic strip, teania caeci/coli, etc
-    # marrow      = auto() # this is an organ!
-    cell        = auto()
-    thrombocyte = auto()
-    platelet    = thrombocyte
-    compartment = auto()
-    ultrastructure = auto()
-    serum       = auto()
-    plasma      = auto()
-    homogenate  = auto()
-    monolayer   = invitro | cell # dissociated cells, cultured, possibly confluent
-    culture     = monolayer
-    acute_slice = exvivo | tissue # e.g. acute brain slice = exvivo | tissue = 17
-    organtypic  = invitro | tissue # e.g. "organotypic" slice culture = invitro | tissue  = 18
-    organoid    = invitro | organ
-    assembloid  = organoid # i.e, 34
-    blood       = sum(
-            (
-                serum,
-                plasma,
-                cell,
-                thrombocyte
-            )
-        )
-    secretion   = auto()
-    urine       = auto()
-    faeces      = auto()
-    excretion   = (urine + faeces)
-    exudate     = auto()
-    pus         = auto()
-
 class ProcedureType(TypeEnum):
     null = 0
     mating = auto()
@@ -663,13 +401,13 @@ class ProcedureType(TypeEnum):
     surgery = auto()
     biopsy = auto()
     postop = auto()
-    recovery = postop
+    recovery = auto()
     tagging = auto()
     weaning = auto()
     cull = auto()
     other = auto()
 
-class OrganismStage(TypeEnum):
+class DevelopmentalStage(TypeEnum):
     undefined   = 0
     zygote      = auto()
     morula      = auto()
@@ -728,14 +466,291 @@ class AdministrationRoute(Flag):
     other = auto()
     custom = other
 
-# @dataclass
-# class NeuralChemicalSynapse(ScipyenDataclass):
-#     synapseType: ChemicalSynapseType = ChemicalSynapseType.undefined
-#     synapseComponent: ChemicalSynapseCompartment = ChemicalSynapseCompartment.undefined
+class BioSourceType(TypeEnum):
+    undefined   = 0
+    insilico    = auto()    # biological/biophysical/mathematical model
+    exvivo      = auto()    # tissue or organ sample from organism
+    invitro     = auto()    # culture system, homogenate
+    invivo      = auto()    # e.g. in vivo imaging, electrophysiology, etc
+    # organism    = auto()    # for behaviour and systemic measurements (temperature, mass, motor function, etc)
+    organ       = auto()    # e.g. isolated heart, aorta, ileum, 33
+    organoid    = invitro | organ
+    assembloid  = organoid # i.e, 34
+    tissue      = auto()    # e.g. aortic strip, teania caeci/coli, etc
+    acute_slice = exvivo | tissue # e.g. acute brain slice = exvivo | tissue = 17
+    organotypic = invitro | tissue # e.g. "organotypic" slice culture = invitro | tissue  = 18
+    cell        = auto()
+    monolayer   = invitro | cell # dissociated cells, cultured, possibly confluent
+    culture     = monolayer
+    thrombocyte = auto()
+    platelet    = thrombocyte
+    compartment = auto()
+    ultrastructure = auto()
+    product     = auto()
 
-# @dataclass
-# class CompartmentSpecification(ScipyenDataclass):
-#     compartmentType: CellCompartmentType = CellCompartmentType.undefined
+# NOTE 2026-07-11 17:26:11
+# Note to self: BioSourceType ↦ Specimen types -> parent types:
+# insilico ↦ ~ any
+#
+# exvivo ↦ Organism
+#        ↦ Organ   -> Organism
+#        ↦ Tissue  -> Organ -> Organism
+#        ↦ NervousSystem -> Organism
+#
+#        ↦ Cell -> Organ -> Organism
+#               -> Tissue -> Organ -> Organism
+#
+#        ↦ Neuron -> NervousSystem -> Organism
+#                 -> Tissue -> Organ -> Organism
+#                 -> Organ -> Organism
+#
+# invitro ↦ BiologicalProduct -> Organism
+#                             -> Organ -> Organism
+#                             -> Tissue -> Organ -> Organism
+#                             -> Cell -> Organ -> Organism
+#                                     -> Tissue -> Organ -> Organism
+#                             -> Neuron -> NervousSystem -> Organism
+#                                       -> Tissue -> Organ -> Organism
+#                                       -> Organ -> Organism
+#         ↦ Cell -> Organ -> Organism
+#                -> Tissue -> Organ -> Organism
+#
+#         ↦ Neuron -> NervousSystem -> Organism
+#                  -> Tissue -> Organ -> Organism
+#                  -> Organ -> Organism
+#
+# invivo  ↦ BiologicalProduct -> Organism
+#                             -> Organ -> Organism
+#                             -> Tissue -> Organ -> Organism
+#                             -> Cell -> Organ -> Organism
+#                                     -> Tissue -> Organ -> Organism
+#                             -> Neuron -> NervousSystem -> Organism
+#                                       -> Tissue -> Organ -> Organism
+#                                       -> Organ -> Organism
+#         ↦ Cell -> Organ -> Organism
+#                -> Tissue -> Organ -> Organism
+#
+#         ↦ Neuron -> NervousSystem -> Organism
+#                  -> Tissue -> Organ -> Organism
+#                  -> Organ -> Organism
+#
+# organism ↦ Organism
+#
+# organ    ↦ Organ -> Organism
+#
+# tissue   ↦ Tissue -> Organ -> Organism
+#
+# cell     ↦ Cell -> Organ -> Organism
+#                -> Tissue -> Organ -> Organism
+#
+#          ↦ Neuron -> NervousSystem -> Organism
+#                   -> Tissue -> Organ -> Organism
+#                   -> Organ -> Organism
+# compartment ↦ CellCompartment -> Cell -> Tissue -> Organ -> Organism
+#                                       -> Organ -> Organism
+#
+#             ↦ NeuronCompartment -> Neuron -> NervousSystem -> Organism
+#                                           -> Tissue -> Organ -> Organism
+#                                           -> Organ -> Organism
+#
+#             ↦ ChemicalSynapse -> NervousSystem -> Organism
+#                               -> Tissue -> Organ -> Organism
+#                               -> Organ
+#
+# ultrastructure ↦ UltrastructureElement -> Cell -> ...
+#                                        -> Neuron -> ...
+#
+# product ↦ BiologicalProduct
+
+# class Organism :
+#     pass
+
+class BioProductType(TypeEnum):
+    undefined = 0
+    homogenate  = auto()
+    cell_fraction = auto()
+    serum       = auto()
+    plasma      = auto()
+    blood       = serum | plasma
+    secretion   = auto()
+    urine       = auto()
+    faeces      = auto()
+    excretion   = urine | faeces
+    exudate     = auto()
+    pus         = auto()
+
+class NeuronType(TypeEnum):
+    r"""Generic classification of neurons beyond that of NeuroMorpho.org
+    (pyramidal, non-pyramidal principal, and interneurons).
+    """
+    undefined = 0
+    pyramidal = auto()
+    stellate = auto()
+    granule = auto()
+    msn = auto()
+    drg = auto()
+    nonpyramidal = sum(
+            (
+                stellate,
+                granule,
+                msn,
+                drg
+            )
+        )
+    principal = pyramidal + nonpyramidal
+    interneuron = auto()
+    inhibitory = auto()
+    other = auto()
+
+class CellCompartmentType(TypeEnum):
+    r"""Inspired by SWC/CNIC specification at
+    http://www.neuronland.org/NLMorphologyConverter/MorphologyFormats/SWC/Spec.html
+
+    Refers to "gross" compartments; for a more granular types see
+    NeuronCompartment, AxonalCompartment and DendriticCompartment
+    """
+    undefined = 0
+    cell = undefined
+    organelle = auto()
+    cilium = auto()
+    flagellum = auto()
+    microvillus = auto()
+    filopodium = auto()
+    lamellipodium = auto()
+    body = auto()
+
+class NeuronCompartmentType(TypeEnum):
+    undefined = 0
+    cell = undefined
+    organelle = auto()
+    soma = auto()
+    axon = auto()
+    dendrite = auto()
+    chemical_synapse = auto()
+
+class AxonalCompartmentType(TypeEnum):
+    undefined = 0
+    initial = auto() # axon initial segment
+    node = auto() # Ranvier's node
+    internode = auto() # axon segment between two consecutive Ranvier nodes
+    myelin = auto() # myelin sheath
+    bouton = auto() # axonal bouton, "en passant"
+    terminal_bouton = auto()
+    arborization = auto()
+    collateral = auto()
+    other = auto()
+
+class DendriticCompartmentType(TypeEnum):
+    undefined = 0
+    basal = auto() # basal dendrite, shaft
+    apical = auto()# apical dendrite, shaft
+    fork = auto()# dendritic branch point
+    end = auto()# dendritic end point
+    tuft = auto()# apical tuft
+    shaft = auto()
+    spine = auto()
+    spine_head = auto()
+    spine_neck = auto()
+    spine_apparatus = auto()
+    other = auto()
+
+class ChemicalSynapseUltrastructureElementType(TypeEnum):
+    undefined = 0
+    presynaptic_membrane = auto()
+    presynaptic_cytoskeleton = auto()
+    presynaptic_vesicle = auto()
+    presynaptic_docked = auto()
+    rrp = presynaptic_docked
+    presynaptic_recycling_pool = auto()
+    presynaptic_reserve_pool = auto()
+    presynaptic_vesicles = sum(
+            (
+                presynaptic_vesicle,
+                presynaptic_docked,
+                presynaptic_recycling_pool,
+                presynaptic_reserve_pool
+            )
+        )
+    active_zone = auto() # presynaptic active zone
+    presynaptic_compartment = sum(
+            (
+                presynaptic_membrane,
+                presynaptic_cytoskeleton,
+                presynaptic_vesicles,
+                active_zone
+            )
+        )
+    postsynaptic_membrane = auto()
+    postsynaptic_cytoskeleton = auto()
+    psd = auto() # postsynaptic density
+    postsynaptic_compartment = sum(
+            (
+                postsynaptic_membrane,
+                postsynaptic_cytoskeleton,
+                psd
+            )
+        )
+    perisynaptic = auto()
+    extrasynaptic = auto()
+    cleft = auto()
+
+# class PostsynapticEntityType(TypeEnum):
+#     undefined = 0
+#     soma = auto()
+#     dendrite = auto()
+#     spine = auto()
+#     axon = auto()
+
+class ChemicalSynapseFunctionalType(TypeEnum):
+    undefined = 0
+    excitatory = auto()
+    inhibitory = auto()
+
+class ChemicalSynapseMorphologicalType(TypeEnum):
+    undefined = 0
+    symmetrical = auto()
+    asymmetrical = auto()
+    glomerulus = auto() # cerebellar glomerulus
+    mossy = auto() # hippocampal mossy fibre synapse
+    calyx = auto() # calyx of Held
+    nmj = auto() # neuromuscular junction
+    volume = auto()
+    other = auto()
+
+class Neurotransmitter(TypeEnum):
+    undefined = 0
+    Glutamate = auto()
+    Glycine = auto()
+    GABA = auto()
+    Acetylcholine = auto()
+    Adrenaline = auto()
+    Epinephrine = Adrenaline
+    Noradrenaline = auto()
+    Norepinephrine = Noradrenaline
+    Dopamine = auto()
+    Histamine = auto()
+    Serotonin = auto()
+    Tyramine = auto()
+    Octopamine = auto()
+    Endorphins = auto()
+    Endocannabinoids = auto()
+    Neuropeptide = auto()
+    SubstanceP = Neuropeptide
+    ATP = auto()
+    Purines = ATP
+    NO = auto()
+    EDRF = NO
+
+# class PlasmaMembraneSpecializationType(TypeEnum):
+#     undefined = 0
+#     chemical_synapse = auto()
+#     neural_synapse = chemical_synapse
+#     gap_junction = auto() # electrical synapse
+#     electrical_synapse = gap_junction
+#     zonula_occludens = auto()
+#     zonula_adherens = auto()
+#     synapse = auto() # generic synapse including immunological synapse
+#     caveolae = auto()
 
 @dataclass
 class Biometrics(ScipyenDataclass):
@@ -751,7 +766,7 @@ class Biometrics(ScipyenDataclass):
     geneticSex: GeneticSex = GeneticSex.undefined
     # ID of source sex (where appropriate); one of "f", "m", "na" (case-insensitive)
     #
-    stage: OrganismStage = OrganismStage.postnatal
+    stage: DevelopmentalStage = DevelopmentalStage.postnatal
 
     age: typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
@@ -764,8 +779,11 @@ class Biometrics(ScipyenDataclass):
     height:typing.Union[pq.Quantity, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t") # noqa
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
+        # indent = lambda x: x.replace("\n", "\n\t") # noqa
+        # repr_attr = lambda x: (f": {type(x).__name__} → '{x}'" if isinstance(x, str)
+        #                        else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x))
+        #                        else f": {type(x).__name__} → {x.name} ({x})" if isinstance(x, Enum)
+        #                        else f": {type(x).__name__} → {x}") # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -782,8 +800,8 @@ class Organism(ScipyenDataclass):
     ID: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA)
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t") # noqa
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x.name}" if isinstance(x, Enum) else f": {type(x).__name__} → {x}" # noqa
+        # indent = lambda x: x.replace("\n", "\n\t") # noqa
+        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x.name}" if isinstance(x, Enum) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -836,12 +854,12 @@ class Organism(ScipyenDataclass):
             return self.biometrics.stage
 
     @stage.setter
-    def stage(self, val: typing.Optional[OrganismStage]):
+    def stage(self, val: typing.Optional[DevelopmentalStage]):
         if isinstance(self.biometrics, Biometrics):
-            if isinstance(val, OrganismStage):
+            if isinstance(val, DevelopmentalStage):
                 self.biometrics.stage = val
             else:
-                self.biometrics.stage = OrganismStage.undefined
+                self.biometrics.stage = DevelopmentalStage.undefined
 
 
     @property
@@ -870,10 +888,73 @@ class Organism(ScipyenDataclass):
             else:
                 self.biometrics.height = pd.NA
 
+    def getOrganism(self) -> typing.Self:
+        return self
+
+    def setOrganism(self, value: typing.Self):
+        return
+
+@dataclass
+class BiologicalProduct(ScipyenDataclass):
+    r"""Biological product (not cell, tissue, organ or organism)"""
+    parentType: typing.ClassVar[
+                typing.Tuple[ScipyenDataclass]
+        ] = (Organism, )
+
+    type: BioProductType = dataclasses.field(default = BioProductType.undefined)
+
+    parent: Organism = dataclasses.field(default_factory = Organism)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
+
+    def getOrganism(self):
+        return self.parent
+
+    def setOrganism(self, value: Organism | None):
+        if isinstance(value, Organism):
+            self.parent = value
+        else:
+            self.parent = Organism()
 
 @dataclass
 class Organ(ScipyenDataclass):
+    parentTypes: typing.ClassVar[
+                typing.Tuple[ScipyenDataclass]
+        ] = (Organism, )
+
+    parent: Organism = dataclasses.field(default_factory = Organism)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
+
+    def getOrganism(self) -> Organism:
+        if isinstance(self.parent, Organism):
+            return self.parent
+        return Organism()
+
+    def setOrganism(self, value: Organism):
+        # print(f"{self.__class__.__name__}.setOrganism({value})")
+        if isinstance(value, Organism):
+            self.parent=value
+        else:
+            self.parent=Organism()
+
+@dataclass
+class NervousSystem(Organ):
+    r"""
+    Nervous system.
+
+    The name of this class is slightly misleading, as it encompasses ANY anatomical
+    structure defined in a BrainGlobeAtlas, including those OUTSIDE the brain itself,
+    e.g., spinal cord, etc.
+    """
     from core.bgbridge import BGStructureDescriptor
+
+    parentTypes: typing.ClassVar[
+            typing.Tuple[ScipyenDataclass]
+        ] = (Organism, )
+
     # Specific organ structure, if relevant.
     #
     # For now, only brain atlas api (brainglobe_atlasapi.structure) is supported;
@@ -898,64 +979,109 @@ class Organ(ScipyenDataclass):
     #   for equality using only these two attributes (or rather elements of the
     #   source underlying dictionary)
     atlasName: typing.Union[str, type(pd.NA)] = pd.NA
+
     structure: BGStructureDescriptor = BGStructureDescriptor()
+
     parent: Organism = dataclasses.field(default_factory = Organism)
 
-    def getOrganism(self):
-        if isinstance(self.parent, Organism):
-            return self.parent
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
 
-    def setOrganism(self, o:Organism):
-        if isinstance(o, Organism):
-            self.organism = o
-        else:
-            self.organism = Organism()
+    @property
+    def name(self) -> str:
+        return "NervousSystem"
+
+    @name.setter
+    def name(self, val:str):
+        return
+
+    def __hash__(self) -> int:
+        return hash((self.atlasName))
+
+Brain = NervousSystem # alias for backward copmatibility
 
 @dataclass
 class Tissue(ScipyenDataclass):
     r"""Tissue"""
-    parent: Organ = dataclasses.field(default_factory = Organ)
+    parentTypes: typing.ClassVar[
+                typing.Tuple[ScipyenDataclass]
+        ] = (Organ, NervousSystem)
+
+    parent: typing.Union[Organ, NervousSystem] = dataclasses.field(default_factory = Organ)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
 
     def getOrganism(self):
-        if isinstance(self.parent, Organ):
-            return self.parent.getOrganism()
+        return self.parent.getOrganism()
 
-    def setOrganism(self, o:Organism):
-        if isinstance(self.parent, Organ):
-            self.parent.setOrganism(o)
-
+    def setOrganism(self, value: Organism):
+        # print(f"{self.__class__.__name__}.setOrganism({value})")
+        if isinstance(value, Organism):
+            self.parent.setOrganism(value)
+        else:
+            self.parent.setOrganism(Organism())
 
 @dataclass
 class Cell(ScipyenDataclass):
+    parentTypes: typing.ClassVar[
+                typing.Tuple[ScipyenDataclass]
+        ] = (Organ, Tissue, NervousSystem)
+
     cellType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g., "neuron", "glia", etc
+
     cellSubType: typing.Union[str, type(pd.NA)] = dataclasses.field(default=pd.NA) # e.g."pyramidal", "astrocyte", "microglia", "muscle_fibre", etc
 
-    parent: typing.Optional[typing.Union[Organ, Tissue]] = dataclasses.field(default_factory = Tissue)
+    parent: typing.Union[Organ, Tissue] = dataclasses.field(default_factory = Tissue)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
 
     def getOrganism(self):
-        if isinstance(self.parent, (Organ, Tissue)):
-            return self.parent.getOrganism()
+        return self.parent.getOrganism()
 
-    def setOrganism(self, o:Organism):
-        if isinstance(self.parent, (Organ, Tissue)):
-            self.parent.setOrganism(o)
+    def setOrganism(self, value: Organism):
+        # print(f"{self.__class__.__name__}.setOrganism({value})")
+        if isinstance(value, Organism):
+            self.parent.setOrganism(value)
+        else:
+            self.parent.setOrganism(Organism())
 
 @dataclass
 class Neuron(Cell):
+    parentTypes: typing.ClassVar[
+            typing.Tuple[ScipyenDataclass]
+        ] = (Organ, Tissue, NervousSystem)
+
     cellSubType: NeuronType = NeuronType.undefined
 
+    parent: typing.Optional[typing.Union[Organ, Tissue, NervousSystem]] = dataclasses.field(default_factory = NervousSystem)
+
     def __post_init__(self: typing.Self):
-        assert isinstance (self.cellSubType, NeuronType), f"Wrong subtype {self.cellSubType} for Neuron"
-        self.cellType = "neuron"
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
+
+    @property
+    def cellType(self) -> str:
+        return "Neuron"
+
+    @cellType.setter
+    def cellType(self, val:str):
+        return
 
 @dataclass
 class CellCompartment(ScipyenDataclass):
+    parentTypes: typing.ClassVar[
+            typing.Tuple[ScipyenDataclass]
+        ] = (Cell, )
+
     compartmentType: CellCompartmentType = CellCompartmentType.undefined
+
     parent: Cell = dataclasses.field(default_factory = Cell)
 
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
+
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t") # noqa
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -963,29 +1089,30 @@ class CellCompartment(ScipyenDataclass):
         return super().__eq__(other)
 
     def getOrganism(self):
-        if isinstance(self.parent, Cell):
-            return self.parent.getOrganism()
+        return self.parent.getOrganism()
 
-    def setOrganism(self, o:Organism):
-        if isinstance(self.parent, Cell):
-            self.parent.setOrganism(o)
-
+    def setOrganism(self, value: Organism):
+        # print(f"{self.__class__.__name__}.setOrganism({value})")
+        if isinstance(value, Organism):
+            self.parent.setOrganism(value)
+        else:
+            self.parent.setOrganism(Organism())
 
 @dataclass
 class NeuronCompartment(CellCompartment):
+    parentTypes: typing.ClassVar[
+            typing.Tuple[ScipyenDataclass]
+        ] = (Neuron, )
+
     compartmentType: NeuronCompartmentType = NeuronCompartmentType.undefined
+
     parent: Neuron = dataclasses.field(default_factory = Neuron)
 
     def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
         assert isinstance(self.compartmentType, NeuronCompartmentType), f"Wrong compartment type: {self.compartmentType}"
-        assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
-        # super().__init__(self, compartmentType = self.compartmentType,
-        #                  compartmentID = self.compartmentID,
-        #                  parent = self.parent)
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t") # noqa
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -994,60 +1121,108 @@ class NeuronCompartment(CellCompartment):
 
 @dataclass
 class AxonalCompartment(NeuronCompartment):
+    parentTypes: typing.ClassVar[
+            typing.Tuple[ScipyenDataclass]
+        ] = (Neuron, )
+
     compartmentType: AxonalCompartmentType = AxonalCompartmentType.undefined
+
     parent: Neuron = dataclasses.field(default_factory = Neuron)
 
     def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
         assert isinstance(self.compartmentType, AxonalCompartmentType), f"Wrong compartment type: {self.compartmentType}"
-        assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
 
 @dataclass
 class DendriticCompartment(NeuronCompartment):
+    parentTypes: typing.ClassVar[
+            typing.Tuple[ScipyenDataclass]
+        ] = (Neuron, )
+
     compartmentType: DendriticCompartmentType = DendriticCompartmentType.undefined
+
     parent: Neuron = dataclasses.field(default_factory = Neuron)
 
     def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
         assert isinstance(self.compartmentType, DendriticCompartmentType), f"Wrong compartment type: {self.compartmentType}"
-        assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
+
+class UltrastructureElement:
+    pass
 
 @dataclass
 class ChemicalSynapse(ScipyenDataclass):
+    parentTypes: typing.ClassVar[
+            typing.Tuple[ScipyenDataclass]
+        ] = (CellCompartment, UltrastructureElement)
+
     morphologicalType : ChemicalSynapseMorphologicalType = ChemicalSynapseMorphologicalType.undefined
     functionalType: ChemicalSynapseFunctionalType = ChemicalSynapseFunctionalType.undefined
-    postsynapticEntityType: PostsynapticEntityType = PostsynapticEntityType.undefined
-    preSynapticParent: Neuron = dataclasses.field(default_factory = Neuron)
-    postSynapticParent: Neuron = dataclasses.field(default_factory = Neuron)
+    # postsynapticEntityType: PostsynapticEntityType = PostsynapticEntityType.undefined
+    postsynaptic: typing.Union[CellCompartment, UltrastructureElement] = dataclasses.field(default_factory = NeuronCompartment)
+    presynaptic: typing.Union[CellCompartment, UltrastructureElement] = dataclasses.field(default_factory = NeuronCompartment)
+    transmitter: Neurotransmitter = Neurotransmitter.undefined
+    retrograde: bool = False
 
     def __post_init__(self: typing.Self):
-        assert isinstance(self.parent, Neuron), f"Wrong parent: {type(self.parent).__name__}"
+        assert isinstance(self.presynaptic, self.parentTypes), f"Wrong presynaptic component: {type(self.presynaptic).__name__}"
+        assert isinstance(self.postsynaptic, self.parentTypes), f"Wrong postsynaptic component: {type(self.postsynaptic).__name__}"
 
     def getOrganism(self):
-        parents = (self.preSynapticParent, self.postSynapticParent)
-        if all(isinstance(p, Neuron) and all(p.parent == self.preSynapticParent.parent) for p in parents):
-            return self.preSynapticParent.getOrganism()
+        if all(isinstance(p, (CellCompartment, NeuronCompartment)) for p in (self.postsynaptic, self.presynaptic)):
+            organisms = tuple(map(lambda p: p.getOrganism(), (self.postsynaptic, self.presynaptic)))
+            if organisms[0] == organisms[1]:
+                return organisms[0]
 
-    def setOrganism(self, o:Organism):
-        parents = (self.preSynapticParent, self.postSynapticParent)
-        if all(isinstance(p, Neuron) for p in parents):
-            p.setOrganism(o)
+    def setOrganism(self, organism: Organism):
+        # print(f"{self.__class__.__name__}.setOrganism({organism})")
+        if not isinstance(organism, Organism):
+            organism = Organism()
+
+        for parent in (self.preSynapticParent, self.postSynapticParent):
+            parent.setOrganism(organism)
 
 @dataclass
 class UltrastructureElement(ScipyenDataclass):
+    parentTypes: typing.ClassVar[
+            typing.Tuple[ScipyenDataclass]
+        ] = (Cell, Neuron, NeuronCompartment, AxonalCompartment,
+             DendriticCompartment,
+             CellCompartment,
+             ChemicalSynapse, Tissue, Organ)
+
     elementType: UltrastructureElementType = UltrastructureElementType.undefined
-    parent: Cell = dataclasses.field(default_factory = Cell)
+
+    parent: typing.Union[Cell, Neuron, NeuronCompartment, AxonalCompartment,
+             DendriticCompartment,
+             CellCompartment,
+             ChemicalSynapse, Tissue, Organ] = dataclasses.field(default_factory = Cell)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
 
     def getOrganism(self):
-        if isinstance(self.parent, (Cell, ChemicalSynapse)):
-            return self.parent.getOrganism()
+        return self.parent.getOrganism()
 
-    def setOrganism(self, o:Organism):
-        if isinstance(self.parent, (Cell, ChemicalSynapse)):
-            self.parent.setOrganism(o)
+    def setOrganism(self, value: Organism):
+        # print(f"{self.__class__.__name__}.setOrganism({value})")
+        if isinstance(value, Organism):
+            self.parent.setOrganism(value)
+        else:
+            self.parent.setOrganism(Organism())
 
 @dataclass
 class ChemicalSynapseUltrastructureElement(UltrastructureElement):
+    parentTypes: typing.ClassVar[
+            typing.Tuple[ScipyenDataclass]
+        ] = (ChemicalSynapse,)
+
     elementType: ChemicalSynapseUltrastructureElementType = ChemicalSynapseUltrastructureElementType.undefined # noqa
+
     parent: ChemicalSynapse = dataclasses.field(default_factory = ChemicalSynapse)
+
+    def __post_init__(self: typing.Self):
+        assert isinstance(self.parent, self.parentTypes), f"Wrong parent: {type(self.parent).__name__}"
 
 @dataclass
 class BiologicalSource(ScipyenDataclass):
@@ -1057,7 +1232,6 @@ class BiologicalSource(ScipyenDataclass):
     This may be an entire organism, an organ, tissue, individual cell, or
     subcellular compartment.
     """
-    # TODO: 2024-11-17 21:11:13 : locate and use neuronal taxonomy API
 
     # The organism of this source.
     # Contains the data related to the taxon, species, subspecies, strain, and
@@ -1065,6 +1239,172 @@ class BiologicalSource(ScipyenDataclass):
     # See Organism class in this module
     # organism:Organism = dataclasses.field(default=Organism("rat"))
     # organism:Organism = dataclasses.field(default_factory = Organism)
+
+    # specimenTypes: typing.ClassVar[
+    #             typing.Tuple[ScipyenDataclass]
+    #     ] = (
+    #             Organism,
+    #             Organ,
+    #             NervousSystem,
+    #             Tissue,
+    #             Cell,
+    #             Neuron,
+    #             CellCompartment,
+    #             NeuronCompartment,
+    #             AxonalCompartment,
+    #             DendriticCompartment,
+    #             ChemicalSynapse,
+    #             UltrastructureElement,
+    #             ChemicalSynapseUltrastructureElement,
+    #             BiologicalProduct,
+    #         )
+
+
+    # NOTE: 2026-07-12 13:46:12 TODO
+    # preparing API for being more selective to what Python type of
+    # specimen is allowed, contingent on the sourceType field according to the
+    # class variable sourceSpecimenTypeMap.
+    #
+    # ATTENTION: Not implemented yet.
+    # Needs (TODO):
+    # 1) specimen field redefined as a descriptor field, where
+    # the Python type of specimen object is checked against the
+    # value of the sourceType field.
+    #
+    # 2) sourceType field redefined as descriptor field, where
+    # the setter would also check the Python type of the specimen
+    # optionally prompting to a change (or instantiate a default
+    # specimen compliant with the sourceSpecimenTypeMap)
+    #
+    # CAUTION: Until the above is implemented, all code assumes that all specimen
+    # Python types are admissible, as if sourceType was BioSourceType.undefined
+    #
+
+
+    sourceSpecimenTypeMap: typing.ClassVar[
+        dict[BioSourceType, typing.Tuple[type]]
+        ] = {
+            BioSourceType.undefined: (
+                                        Organism,
+                                        Organ,
+                                        NervousSystem,
+                                        Tissue,
+                                        Cell,
+                                        Neuron,
+                                        CellCompartment,
+                                        NeuronCompartment,
+                                        AxonalCompartment,
+                                        DendriticCompartment,
+                                        ChemicalSynapse,
+                                        UltrastructureElement,
+                                        ChemicalSynapseUltrastructureElement,
+                                        BiologicalProduct,
+                                    ),
+            BioSourceType.insilico: (
+                                        Organism,
+                                        Organ,
+                                        NervousSystem,
+                                        Tissue,
+                                        Cell,
+                                        Neuron,
+                                        CellCompartment,
+                                        NeuronCompartment,
+                                        AxonalCompartment,
+                                        DendriticCompartment,
+                                        ChemicalSynapse,
+                                        UltrastructureElement,
+                                        ChemicalSynapseUltrastructureElement,
+                                        BiologicalProduct,
+                                    ),
+            BioSourceType.exvivo: (Organ, NervousSystem, Tissue,
+                                   Cell, Neuron,
+                                   CellCompartment,
+                                   NeuronCompartment,
+                                   AxonalCompartment,
+                                   DendriticCompartment,
+                                   ChemicalSynapse,
+                                   UltrastructureElement,
+                                   ChemicalSynapseUltrastructureElement,
+                                   BiologicalProduct
+                                   ),
+
+            BioSourceType.invitro: (Organ, Tissue, Cell, Neuron,
+                                    CellCompartment, NeuronCompartment,
+                                    AxonalCompartment, DendriticCompartment,
+                                    ChemicalSynapse,
+                                    UltrastructureElement,
+                                    ChemicalSynapseUltrastructureElement,
+                                    BiologicalProduct
+                                    ),
+
+            BioSourceType.invivo: (Organism, Organ,
+                                   NervousSystem,
+                                   Tissue,
+                                   Cell,
+                                   Neuron,
+                                   ),
+
+            BioSourceType.organ: (Organ,
+                                  NervousSystem
+                                  ),
+            BioSourceType.organoid: (Organ,
+                                     NervousSystem
+                                     ),
+            BioSourceType.assembloid: (Organ,
+                                       NervousSystem
+                                       ),
+            BioSourceType.tissue: (Organ,
+                                   NervousSystem,
+                                   Tissue
+                                   ),
+            BioSourceType.acute_slice: (Organ,
+                                        NervousSystem,
+                                        Tissue,
+                                        Cell,
+                                        Neuron,
+                                        CellCompartment,
+                                        NeuronCompartment,
+                                        AxonalCompartment,
+                                        DendriticCompartment,
+                                        ChemicalSynapse
+                                        ),
+            BioSourceType.organotypic: (Organ,
+                                        NervousSystem,
+                                        Tissue,
+                                        Cell,
+                                        Neuron,
+                                        CellCompartment,
+                                        NeuronCompartment,
+                                        AxonalCompartment,
+                                        DendriticCompartment,
+                                        ChemicalSynapse
+                                        ),
+            BioSourceType.cell: (Cell,
+                                 Neuron,
+                                 CellCompartment,
+                                 NeuronCompartment,
+                                 AxonalCompartment,
+                                 DendriticCompartment,
+                                 ChemicalSynapse,
+                                 ChemicalSynapseUltrastructureElement,
+                                 UltrastructureElement,
+                                 ),
+
+            BioSourceType.thrombocyte: (Cell,),
+            BioSourceType.platelet: (Cell,),
+            BioSourceType.compartment: (ChemicalSynapse,
+                                        CellCompartment,
+                                        NeuronCompartment,
+                                        AxonalCompartment,
+                                        DendriticCompartment,
+                                        UltrastructureElement,
+                                        ChemicalSynapseUltrastructureElement
+                                        ),
+            BioSourceType.ultrastructure: (UltrastructureElement,
+                                           ChemicalSynapseUltrastructureElement,
+                                           ),
+            BioSourceType.product: (BiologicalProduct, ),
+            }
 
     # Type of source: ex vivo, in vitro, culture, whole organism, see BioSourceType
     # Default: BioSourceType.exvivo
@@ -1079,19 +1419,24 @@ class BiologicalSource(ScipyenDataclass):
     specimen: typing.Union[
         Organism,
         Organ,
+        NervousSystem,
         Tissue,
         Cell,
         CellCompartment,
         ChemicalSynapse,
         UltrastructureElement,
-        ChemicalSynapseUltrastructureElement
+        ChemicalSynapseUltrastructureElement,
+        BiologicalProduct,
         ] = dataclasses.field(
                 default_factory = Cell
             )
 
+    def __post_init__(self: typing.Self):
+        # NOTE: 2026-07-12 13:32:00
+        # below, keep it general
+        assert isinstance(self.specimen, self.sourceSpecimenTypeMap[BioSourceType.undefined]), f"Wrong specimen: {type(self.specimen).__name__}"
+
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t") # noqa
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -1099,34 +1444,88 @@ class BiologicalSource(ScipyenDataclass):
         return super().__eq__(other)
 
     def getOrganism(self):
-        if isinstance(self.specimen,
-                            (
-                                Organism,
-                                Organ,
-                                Tissue,
-                                Cell,
-                                CellCompartment,
-                                ChemicalSynapse,
-                                UltrastructureElement,
-                                ChemicalSynapseUltrastructureElement
-                            )
-                        ):
-            return self.specimen.getOrganism()
+        return self.specimen.getOrganism()
 
-    def setOrganism(val, o:Organism):
-        if isinstance(self.specimen,
-                            (
-                                Organism,
-                                Organ,
-                                Tissue,
-                                Cell,
-                                CellCompartment,
-                                ChemicalSynapse,
-                                UltrastructureElement,
-                                ChemicalSynapseUltrastructureElement
-                            )
-                        ):
-            self.specimen.setOrganism(o)
+    def setOrganism(self, value: Organism):
+        if not isinstance(value, Organism):
+            value = Organism()
+
+        if isinstance(self.specimen, Organism):
+            self.specimen = value
+
+        else:
+            self.specimen.setOrganism(value)
+
+    @property
+    def specimenTypes(self) -> tuple[type]:
+        r"""For backward compatibility"""
+        return self.sourceSpecimenTypeMap[BioSourceType.undefined]
+
+# ------------------------------------------------------------------------------
+
+class PPLProtocol: pass # noqa
+class PPLProtocolStep: pass # noqa
+
+@dataclass
+class PPL(ScipyenDataclass):
+    ID: str = ""
+    holderName: str = ""
+    holderEmail: str = ""
+    protocols: list[PPLProtocol] = dataclasses.field(default_factory=list)
+
+    def __eq__(self, other) -> bool:
+        return super().__eq__(other)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.ID, self.holderName, self.holderEmail))
+
+@dataclass
+class PIL(ScipyenDataclass):
+    ID: str = ""
+    holderName: str = ""
+    holderEmail: str = ""
+
+    def __eq__(self, other) -> bool:
+        return super().__eq__(other)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.ID, self.holderName, self.holderEmail))
+
+@dataclass
+class PPLProtocol(ScipyenDataclass):
+    ID: str = dataclasses.field(default_factory = str)
+    parent: PPL = dataclasses.field(default_factory = PPL)
+    steps: list[PPLProtocolStep] = dataclasses.field(default_factory=list)
+
+    def __post_init__(self):
+        # check that the instance is among the authorized protocols of the parent
+        # (a PPL)
+        if len(self.parent.protocols) and self not in self.parent.protocols:
+            scipywarn(f"This PPL Protocol ({self.name}, ID: {self.ID}) does not appear to be authorized in the PPL {self.parent.name} (ID: {self.parent.ID})")
+
+    def __eq__(self, other) -> bool:
+        return super().__eq__(other)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.ID, self.parent))
+
+
+@dataclass
+class PPLProtocolStep(ScipyenDataclass):
+    ID: str = dataclasses.field(default_factory = str)
+    parent: PPLProtocol = dataclasses.field(default_factory = PPLProtocol)
+
+    def __post_init__(self):
+        # check that the instance is among the authorized steps of the parent
+        # (a PPLProtocol)
+        if len(self.parent.steps) and self not in self.parent.steps:
+            scipywarn(f"This PPL Protocol Step ({self.name}, ID: {self.ID}) does not appear to be authorized in the protocol {self.parent.name} (ID: {self.parent.ID})")
+
+    def __eq__(self, other) -> bool:
+        return super().__eq__(other)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.ID, self.parent))
 
 
 @dataclass
@@ -1141,20 +1540,41 @@ class Procedure(ScipyenDataclass):
 
     """
     # name:str = ""
-    _:KW_ONLY
     procedureType: ProcedureType = ProcedureType.null
-    # description: str = ""
 
-    # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("type", ) )) # "name" and "description" inherited from ScipyenDataclass
+    def __post_init__(self):
+        self.regulated=False
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        # indent = lambda x: x.replace("\n", "\n\t")
+        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.procedureType, self.parent))
+
+@dataclass
+class PPLProcedure(Procedure):
+    r"""Procedure reulated under appropriate legislation"""
+    ppl: PPL = dataclasses.field(default_factory=PPL)
+    pil: PIL = dataclasses.field(default_factory=PIL)
+    protocol: PPLProtocol = dataclasses.field(default_factory=PPLProtocol)
+    protocolStep: PPLProtocolStep = dataclasses.field(default_factory=PPLProtocolStep)
+    framework: str="ASPA 1986"
+    # procedure: Procedure = dataclasses.field(default_factory = Procedure)
+
+    def __post_init__(self):
+        self.regulated = True
+
+    def __eq__(self, other) -> bool:
+        return super().__eq__(other)
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.ppl, self.pil, self.protocol, self.protocolStep, self.procedure))
 
 @dataclass
 class SubstanceDosage(ScipyenDataclass):
@@ -1177,8 +1597,8 @@ class SubstanceDosage(ScipyenDataclass):
     __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("dose", )))
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        # indent = lambda x: x.replace("\n", "\n\t")
+        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
@@ -1198,7 +1618,7 @@ class Treatment(Procedure):
     # Required for interconversion with HDF5
     __match_args__ = tuple(set(Procedure.__match_args__ + ("substance", "route", "type")))
     _:KW_ONLY
-    substance:typing.Union[SubstanceDosage, typing.Sequence[SubstanceDosage]] = field(default_factory=SubstanceDosage)
+    substance:typing.Union[SubstanceDosage, typing.Sequence[SubstanceDosage]] = dataclasses.field(default_factory=SubstanceDosage)
     # allow combination of compounds
     route:AdministrationRoute = AdministrationRoute.null
 
@@ -1215,67 +1635,86 @@ class Treatment(Procedure):
 @dataclass
 class Episode(ScipyenDataclass):
     r"""Generic episode for frame-based data.
-        NOTE: The `beginFrame` and `endFrame` fields are inclusive indices.
-        To use them in indexing a sequence (or frames), add 1 (one) to the
-        `endFrame` field, e.g.:
-        range(data.beginFrame, data.endFrame +1)
-        An Episode is an elementary part of a Schedule, and is logically associated
-        with a Procedure.
+        An Episode is an elementary part of a Schedule, and is logically
+        associated with a Procedure.
 
-        The defining attributes are: `name`, `begin`, `end`, `beginFrame`, `endFrame`
-        and `procedure`.
+        The defining attributes are: `name`, `begin`, `end`,
+        `beginFrame`, `nFrames`, and `procedure`.
 
         In addition, the `description` attribute (a str) has an informative role
         without affecting the identity of an Episode
     """
-    # name:str = ""
+    name: str = dataclasses.field(default="episode")
     _: KW_ONLY
-    begin:datetime.datetime = datetime.datetime.now()
-    end:datetime.datetime = datetime.datetime.now()
+    begin:datetime.datetime = datetime.datetime.now() # noqa
+    end:datetime.datetime = datetime.datetime.now() # noqa
     beginFrame:int = 0
-    endFrame:int = 0
-    # description:str = ""
-    procedure:typing.Optional[Procedure] = field(default = None)
+    nFrames:int = 0
+    procedure: Procedure = dataclasses.field(default_factory = Procedure)
 
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        # indent = lambda x: x.replace("\n", "\n\t")
+        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
+
+    def __hash__(self) -> int:
+        return hash(
+                (
+                    self.name,
+                    self.description,
+                    self.begin,
+                    self.end,
+                    self.beginFrame,
+                    self.nFrames,
+                    self.procedure
+                )
+            )
 
 @dataclass
 class Schedule(ScipyenDataclass):
-    r"""Logical grouping of a sequence of episodes.
-        A Schedule can be logically considered a "protocol", where any of its
-        constituent episodes may associate a Procedure.
+    r"""Logical grouping of a sequence of non-overlapping, episodes.
+        The episodes are contiguous from the point of view of their data "frames"
+        (sweeps, image "slices", etc).
+        A Schedule is logically equivalent to an experimental "protocol",
+        consisting of the sequence of procedures associated with its episodes.
+
+    When changing the episodes inside the schedule (adding, removing, or modifying
+    an episode's number of frames), the "beginFrame" attribute of the episodes
+    MIGHT be adjusted to enforce contiguity (depending on the position of the
+    added/removed/modified episode) in the schedule.
+
+    CAUTION: Episodes are stored by reference. This means that the adjustments
+    described above WILL be reflected in the episodes contained by other sequences
+    or schedules.
+
+    If this is NOT intended, then pass DEEP COPIES of the episodes/sequence of episodes/
+    schedule to methods like __add__, __iadd__, append, extend
+
+    Deep copies can be obtained through the ``deepcopy`` function in the standard
+    library module ``copy``.
+
     """
     # name:str = ""
     _:KW_ONLY
-    episodes:typing.Sequence[Episode] = field(default_factory = lambda : list())
+    episodes:typing.Sequence[Episode] = dataclasses.field(default_factory = lambda : list())
 
-    # __match_args__ = tuple(set(ScipyenDataclass.__match_args__ + ("episodes",)))
+    allowed_contents: typing.ClassVar = (Episode, )
 
     def __repr__(self):
-        indent = lambda x: x.replace("\n", "\n\t")
-        repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
+        # indent = lambda x: x.replace("\n", "\n\t")
+        # repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}"
         ret = [f"{self.__class__.__name__}:"] + sorted([f"\t{a}{repr_attr(getattr(self, a))}" for a in self.__match_args__])
         return "\n".join(ret)
 
+    def __hash__(self) -> int:
+        return hash((self.name, self.description, self.episodes))
+
     def __eq__(self, other) -> bool:
         return super().__eq__(other)
-
-#         if not isinstance(other, self.__class__):
-#             return False
-#
-#         ret = len(self.episodes) == len(other.episodes)
-#
-#         if ret:
-#             return all(e==e1 for (e,e1) in zip(self.episodes, other.episodes))
-#
-#         return ret
 
     def __len__(self)->int:
         return len(self.episodes)
@@ -1284,18 +1723,20 @@ class Schedule(ScipyenDataclass):
         if isinstance(key, int):
             if key >= len(self.episodes) or key < -1 * len(self.episodes):
                 raise IndexError(f"Index {key} out of range for {len(self.episodes)} episodes")
+
             return self.episodes[key]
 
         elif isinstance(key, str):
             if len(self.episodes) == 0:
-                raise KeyError(f"Episode named {key} not found")
+                raise KeyError(f"{self.allowed_contents[0].__name__} named {key} not found")
 
             ret = list(filter(lambda x:x.name == key, self.episodes))
 
             if len(ret) == 0:
-                raise KeyError(f"Episode named {key} not found")
+                raise KeyError(f"{self.allowed_contents[0].__name__} named {key} not found")
+
             elif len(ret) > 1:
-                scipywarn(f"Duplicate episode name ({key}) found")
+                scipywarn(f"Duplicate {self.allowed_contents[0].__name__} name ({key}) found")
 
             return ret
 
@@ -1322,85 +1763,136 @@ class Schedule(ScipyenDataclass):
         else:
             raise TypeError(f"Invalid indexing key type {type(key).__name__}")
 
-    def __setitem__(self, key:typing.Union[int, slice, range, tuple, list, collections.deque],
+    def __setitem__(self, key:typing.Union[int, slice, range, tuple,
+                                           list, collections.deque],
                     value:typing.Union[Episode, typing.Iterable[Episode]]):
+        from core.utilities import unique
+
         if isinstance(key, int):
             if key >= len(self.episodes) or key < -1 * len(self.episodes):
                 raise IndexError(f"Index {key} out of range for {len(self.episodes)} episodes")
-            if not isinstance(value, Episode):
-                raise TypeError(f"Expecting an Episode; instead, got {type(value).__name__}")
+
+            if not isinstance(value, self.allowed_contents):
+                raise TypeError(f"Expecting an {self.allowed_contents[0].__name__} object; instead, got {type(value).__name__}")
+
+            value = deepcopy(value)
+
+            if key < len(self.episodes)-1:
+                nFramesBefore = sum([e.nFrames for e in self.episodes[:key]])
+                self.__adjustEpisodeBeginFrame__(value, nFramesBefore)
+
+                if self.episodes[key].nFrames != value.nFrames:
+                    delta = value.nFrames - self.episodes[key].nFrames
+                    for episode in self.episodes[key+1:]:
+                        episode.beginFrame += delta
 
             self.episodes[key] = value
 
         elif isinstance(key, slice):
             if not isinstance(value, typing.Iterable):
                 raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
-            if not all(isinstance(v, Episode) for v in value):
-                raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique((type(v).__name__ for v in value))}")
+
+            if not all(isinstance(v, self.allowed_contents) for v in value):
+                raise TypeError(f"The RHS iterable must contain only {self.allowed_contents[0].__name__} objects; instead got {unique((type(v).__name__ for v in value))}")
+
+            value = list(map(deepcopy, value))
+
             l_indices = len(range(*key.indices(len(self.episodes))))
+
             if l_indices < len(value):
                 raise ValueError(f"Too many RHS elements ({l_indices}); expecting {len(key)}")
+
             if l_indices > len(value):
                 raise ValueError(f"Too few RHS elements ({l_indices}); expecting {len(key)}")
 
-            self.episodes[key] = value
+            for k, index in enumerate(l_indices):
+                self.__setitem__(index, value[k])
 
         elif isinstance(key, range):
             if not isinstance(value, typing.Iterable):
                 raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
+
             if not all(isinstance(v, Episode) for v in value):
                 raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique((type(v).__name__ for v in value))}")
+
             if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
                 raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
+
             if len(key) < len(value):
                 raise ValueError(f"Too many RHS elements ({l_indices}); expecting {len(key)}")
+
             if len(key) > len(value):
                 raise ValueError(f"Too few RHS elements ({l_indices}); expecting {len(key)}")
 
             for k in key:
-                self.episodes[k] = value[k]
+                self.__setitem__(k, value[k])
 
         elif isinstance(key, (tuple, list, collections.deque)):
             if len(key) == 0:
                 return
+
             elif all(isinstance(k, int) for k in key):
                 if not isinstance(value, typing.Iterable):
                     raise TypeError(f"The RHS of the assignment must be an iterable; instead, got {type(value).__name__}")
-                if not all(isinstance(v, Episode) for v in value):
-                    raise TypeError(f"The RHS iterable must contain only Episode objects; instead got {unique((type(v).__name__ for v in value))}")
+
+                if not all(isinstance(v, self.allowd_contents) for v in value):
+                    raise TypeError(f"The RHS iterable must contain only {self.allowed_contents[0].__name__} objects; instead got {unique((type(v).__name__ for v in value))}")
+
                 if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
-                    raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
-                if len(values) > len(key):
+                    raise IndexError(f"Index {k} out of range for {len(self.episodes)} episodes")
+
+                if len(value) > len(key):
                     raise ValueError(f"Too many RHS elements ({l_indices}); expecting {len(key)}")
-                if len(values) < len(key):
+
+                if len(value) < len(key):
                     raise ValueError(f"Too few RHS elements ({l_indices}); expecting {len(key)}")
 
+                value = list(map(deepcopy, value))
+
                 for k in key:
-                    self.episodes[k] = value[k]
+                    self.__setitem__(k, value[k])
+
             else:
                 raise KeyError("All indices must be int")
 
         else:
             raise TypeError(f"Invalid indexing key type {type(key).__name__}")
 
-    def __delitem__(self, key:typing.Union[int, slice, range, tuple, list, collections.deque, str]):
+    def __delitem__(self, key:typing.Union[int, slice, range,
+                                           tuple, list, collections.deque,
+                                           str]):
         if isinstance(key, int):
             if key >= len(self.episodes) or key < -1 * len(self.episodes):
                 raise IndexError(f"Index {key} out of range for {len(self.episodes)} episodes")
+
+            if key < len(self.episodes)-1:
+                nFramesBefore = sum([e.nFrames for e in self.episodes[:key]])
+                for episode in self.episodes[key+1:]:
+                    self.__adjustEpisodeBeginFrame__(episode, nFramesBefore)
 
             del self.episodes[key]
 
         elif isinstance(key, str):
             if len(self.episodes) == 0:
-                raise KeyError(f"Episode named {key} not found")
+                raise KeyError(f"{self.allowed_contents[0].__name__} named {key} not found")
 
             ret = list(filter(lambda x:x.name == key, self.episodes))
 
             if len(ret) == 0:
-                raise KeyError(f"Episode named {key} not found")
+                raise KeyError(f"{self.allowed_contents[0].__name__} named {key} not found")
 
             elif len(ret) > 1:
-                scipywarn(f"Duplicate episode name ({key}) found")
+                scipywarn(f"Duplicate {self.allowed_contents[0].__name__} name ({key}) found")
+
+            episode = ret[0]
+
+            ndx = self.episodes.index(episode)
+
+            if ndx < len(self.episodes)-1:
+                nFramesBefore = sum([e.nFrames for e in self.episodes[:ndx]])
+
+                for ep in self.episodes[ndx+1:]:
+                    self.__adjustEpisodeBeginFrame__(ep, nFramesBefore)
 
             keep  = [e for e in self.episodes if e.name != key]
 
@@ -1424,123 +1916,195 @@ class Schedule(ScipyenDataclass):
                 if any(k >= len(self.episodes) or k < -1 * len(self.episodes) for k in key):
                     raise IndexError(f"Index out of range for {len(self.episodes)} episodes")
 
-                keep  = [self.episodes[k] for k in range(len(self.episodes)) if k not in key]
-                self.episodes[:] = keep
-
-            # elif all(isinstance(k, str) for k in key):
-            #     keep  = [self.episodes[k] for k in range(len(self.episodes)) if k not in key]
-            #     self.episodes[:] = keep
-
-            else:
+            elif not all(isinstance(k, str) for k in key):
                 raise KeyError("All indices must be int or str")
+
+            for k in key:
+                try:
+                    self.__delitem__(k)
+
+                except: # noqa
+                    continue
 
         else:
             raise TypeError(f"Invalid indexing key type {type(key).__name__}")
 
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator:
         return self.episodes.__iter__()
 
-    def __reversed__(self):
+    def __reversed__(self) -> typing.Iterator:
+        r"""CAUTION: iterates episodes in reversed order WITHOUT adjustments to their beginFrame"""
         return self.episodes.__reversed__()
 
     def __add__(self, other):
         if isinstance(other, self.__class__):
-            newepisodes = self.episodes.__add__(other.episodes)
-            return self.__class__(name=self.name, episodes = newepisodes)
+            newepisodes = self.episodes.__add__(list(map(deepcopy, other.episodes)))
+
+            ret = self.__class__(name=self.name, description=self.description,
+                                  episodes=newepisodes)
 
         elif isinstance(other, typing.Sequence):
-            if len(other) and not all(isinstance(e, Episode)):
-                raise TypeError("Can only add a sequence of Episodes")
-            newepisodes = self.episodes.__add__(other)
-            return self.__class__(name=self.name, episodes = newepisodes)
+            if len(other) and not all(isinstance(e, self.allowed_contents) for e in other):
+                raise TypeError(f"Can only add a sequence of {self.allowed_contents[0].__name__} objects")
+
+            newepisodes = self.episodes.__add__(list(map(deepcopy, other)))
+
+            ret = self.__class__(name=self.name, description=self.description,
+                                  episodes=newepisodes)
 
         else:
             raise TypeError(f"Invalid argument type ({type(other).__name__})")
+
+        ret.__adjustBeginFrameAllEpisodes__()
+
+        return ret
 
     def __iadd__(self, other):
         if isinstance(other, self.__class__):
-            self.episodes.__iadd__(other.episodes)
-            return self
+            self.episodes.__iadd__(list(map(deepcopy, other.episodes)))
 
         elif isinstance(other, typing.Sequence):
-            if len(other) and not all(isinstance(e, Episode)):
-                raise TypeError("Can only add a sequence of Episodes")
-            self.episodes.__iadd__(other)
-            return self
+            if len(other) and not all(isinstance(e, self.allowed_contents) for e in other):
+                raise TypeError(f"Can only add a sequence of {self.allowed_contents[0].__name__} objects")
+            self.episodes.__iadd__(list(map(deepcopy, other)))
 
         else:
             raise TypeError(f"Invalid argument type ({type(other).__name__})")
 
+        self.__adjustBeginFrameAllEpisodes__()
+
+        return self
+
     def __mul__(self, value:int):
-        return self.__class__(name=self.name, episodes = self.episodes.__mul__(value))
+        ret = self.__class__(name=self.name, description=self.description,
+                             episodes = self.episodes.__mul__(value))
+        ret.__adjustBeginFrameAllEpisodes__()
+        return ret
 
     def __imul__(self, value:int):
         self.episodes.__imul__(value)
+        self.__adjustBeginFrameAllEpisodes__()
         return self
 
     def __contains__(self, value:Episode):
         return value in self.episodes
 
-    def append(self, value:Episode):
-        if not isinstance(value, Episode):
-            raise TypeError("A Schedule can only contain Episodes")
+    @property
+    def nFrames(self) -> int:
+        return sum([e.nFrames for e in self.episodes])
+
+    def append(self, value: Episode):
+        if not isinstance(value, self.allowed_contents):
+            raise TypeError(f"A {self.__class__.__name__} can only contain {self.allowed_contents[0].__name__} objects")
+
+        value=deepcopy(value)
+
+        if len(self.episodes):
+            frameOffset=self.nFrames
+            value.beginFrame = frameOffset
 
         self.episodes.append(value)
 
-    def insert(self, index:int, value:Episode):
-        if not isinstance(value, Episode):
-            raise TypeError("A Schedule can only contain Episodes")
+    def insert(self, index: int, value: Episode):
+        if not isinstance(value, self.allowed_contents):
+            raise TypeError(f"A {self.__class__.__name__} can only contain {self.allowed_contents[0].__name__} objects")
 
-        self.episodes.insert(index, value)
+        value = deepcopy(value)
+
+        if len(self.episodes) == 0:
+            self.episodes.append(value) # will adapt value.beginFrame
+
+        else:
+            if index >= len(self.episodes):
+                self.episodes.append(value)# will adapt value.beginFrame
+
+            else:
+                # list.insert(index, obj) -> inserts object BEFORE index
+                if index == 0 or index <= -len(self.episodes):
+                    value.beginFrame = 0 # this becomes the first episode
+
+                else:
+                    episodesBefore = self.episodes[:index] # up to and EXCLUDING episode at index
+                    value.beginFrame = sum([e.nFrames for e in episodesBefore])
+
+                self.episodes.insert(index, value)
+                # how many frames, now, up to and INCUDING index (where the new episode sits)?
+                # nFramesBefore = sum([e.nFrames for e in self.episodes[:index+1]])
+                # now, adapt beginFrames for ALL Episode after this new one
+                # for episode in self.episodes[index+1:]:
+                    # episode.beginFrame += nFramesBefore
+
+        self.__adjustBeginFrameAllEpisodes__()
 
     def pop(self, index:int=-1) -> Episode:
+        # adjust the episodes AFTER the one to be removed
+        obj = self.episodes[index]
+        for episode in self.episodes[index+1:]:
+            episode.beginFrame -= obj.nFrames
+        # now remove the one at index and return it
         return self.episodes.pop(index)
 
     def remove(self, value:Episode):
-        if not isinstance(value, Episode):
-            raise TypeError("A Schedule can only contain Episodes")
+        if value not in self.episodes:
+            return
+        ndx = self.episodes.index(value)
+        for episodes in self.episodes[ndx+1:]:
+            episodes.beginFrame -= value.nFrames
 
         self.episodes.remove(value)
 
     def reverse(self):
         self.episodes.reverse()
 
+        self.__adjustBeginFrameAllEpisodes__()
+
     def sort(self, *args, **kwargs):
-        self.episodes.sort(*argsm **kwargs)
+        self.episodes.sort(*args, **kwargs)
+        self.__adjustBeginFrameAllEpisodes__()
+
+    def update(self):
+        r"""Call this after individual changes to an episode frame boundaries in this schedule"""
+        self.__adjustBeginFrameAllEpisodes__()
 
     def extend(self, value):
         if isinstance(value, self.__class__):
-            self.episodes.append(value.episodes)
+            self.episodes.extend(list(map(deepcopy, value.episodes)))
 
         elif isinstance(value, typing.Sequence):
             if len(value):
-                if all(isinstance(v, Episode) for v in value):
-                    self.episodes.append(value)
+                if all(isinstance(v, self.allowed_contents) for v in value):
+                    self.episodes.extend(list(map(deepcopy, value)))
+
                 else:
-                    raise TypeError("A Schedule can only contain Episodes")
+                    raise TypeError(f"A {self.__class__.__name__} object can only contain {self.allowed_contents[0].__name__} objects")
 
         else:
-            raise TypeError(f"Can only append a Schedule or a sequence of Episodes")
+            raise TypeError(f"Can only append a {self.__class__.__name__} or a sequence of {self.allowed_contents[0].__name__} objects")
+
+        self.__adjustBeginFrameAllEpisodes__()
 
     def index(self, episode:Episode):
-        if not isinstance(episode, Episode):
-            raise TypeError("A Schedule can only contain Episodes")
+        if not isinstance(episode, self.allowed_contents):
+            raise TypeError(f"A {self.__class__.__name__} object can only contain {self.allowed_contents[0].__name__} objects")
+
         if episode not in self.episodes:
-            raise ValueError("Episode is not contained in this Schedule")
+            raise ValueError(f"The specified {self.allowed_contents[0].__name__} object is not contained in this {self.__class__.__name__}")
 
         ndx = [k for k in range(len(self.episodes)) if self.episodes[k] == episode]
 
         return ndx[0]
 
-    def count(self, episode:Episode):
-        if not isinstance(episode, Episode):
-            raise TypeError("A Schedule can only contain Episodes")
+    def clear(self):
+        self.episodes.clear()
+
+    def count(self, episode: Episode):
+        if not isinstance(episode, self.allowed_contents):
+            raise TypeError(f"A {self.__class__.__name__} object can only contain {self.allowed_contents[0].__name__} objects")
 
         if episode not in self.episodes:
             return 0
 
         return len(e for e in self.episodes if e == episode)
-
 
     def toHDF5(self, group, name, oname, compression, chunks, track_order,
                        entity_cache) -> h5py.Group:
@@ -1552,7 +2116,7 @@ class Schedule(ScipyenDataclass):
             group[target_name] = cached_entity
             return cached_entity
 
-        attrs = {"name": getattr(self, "name")}
+        attrs = {"name": getattr(self, "name", ""), "description": getattr(self, "description", "")}
 
         objattrs = h5io.makeAttrDict(**attrs)
         obj_attrs.update(objattrs)
@@ -1580,46 +2144,59 @@ class Schedule(ScipyenDataclass):
         attrs = h5io.attrs2dict(entity.attrs)
 
         name = attrs["name"]
+        description = attrs.get("description", "")
 
         episodes = h5io.fromHDF5(entity["episodes"], cache)
 
-        return cls(name, episodes=episodes)
+        return cls(name=name, description=description, episodes=episodes)
 
     @singledispatchmethod
     def episode(self, ndx) -> Episode:
         raise NotImplementedError(f"Wrong index type: {type(ndx).__name__}")
 
     @episode.register(int)
-    def _(self, ndx:int) -> Episode:
+    def __episode__(self, ndx:int) -> Episode:
         if ndx >= len(self.episodes) or ndx < -1 * len(self.episodes):
             raise IndexError(f"Invalid episode index {ndx} for {len(self.episodes)}")
 
         return self.episodes[ndx]
 
     @episode.register(str)
-    def _(self, name:str) -> Episode:
+    def __episode__(self, name:str) -> Episode: # noqa
         episodes = [e for e in self.episodes if e.name == name]
         if len(episodes):
             return episodes[0]
         else:
             raise IndexError(f"Episode name {name} does not exist")
 
+    def __adjustBeginFrameAllEpisodes__(self):
+        nFrames = 0
+
+        for k, episode in enumerate(self.episodes):
+            if k == 0:
+                if episode.beginFrame != 0:
+                    episode.beginFrame = 0
+
+            else:
+                if episode.beginFrame != nFrames:
+                    episode.beginFrame = nFrames
+
+            nFrames += episode.nFrames
+
+    def __adjustEpisodeBeginFrame__(self, episode: Episode, nFramesBefore: int):
+        if episode.beginFrame < nFramesBefore:
+            newBeginFrame = nFramesBefore - episode.beginFrame
+            episode.beginFrame = newBeginFrame
+
+        elif episode.beginFrame > nFramesBefore:
+            episode.beginFrame = nFramesBefore
+
+    @property
     def episodeNames(self) -> list[str]:
         return [e.name for e in self.episodes]
 
-    def epsodeIndex(self, name:str) -> int:
+    def episodeIndex(self, name:str) -> int:
         return self.episodeNames.index(name)
-
-    def addEpisode(self, episode:Episode):
-        if episode not in self.episodes:
-            self.episodes.append(episode)
-
-    def addEpisodes(self, episodes:typing.Sequence[Episode]):
-        self.episodes.extend([e for e in episodes if e not in self.episodes])
-
-    def removeEpisode(self, episode):
-        if episode in self.episodes:
-            self.episodes.remove(episode)
 
     @property
     def procedures(self):
@@ -1628,7 +2205,7 @@ class Schedule(ScipyenDataclass):
 def isDataclass(o:object):
     r"""Calls dataclasses.is_dataclass(o)
     In case you forget there is such a function 😃
-"""
+    """
     if not isinstance(o, type):
         o = type(o)
 
@@ -1636,81 +2213,81 @@ def isDataclass(o:object):
 
 def mergeDataclasses(typename:str, *args, **kwargs) -> type:
     r"""
-Factory function for dynamic dataclass creation.
+    Factory function for dynamic dataclass creation.
 
-Purpose:
-========
+    Purpose:
+    ========
 
-The function creates a new dataclass-like type and, optionally, an instance of
-it, by merging fields from the dataclass elements in ``*args``. The elements may
-be either dataclass types or instances thereof.
+    The function creates a new dataclass-like type and, optionally, an instance of
+    it, by merging fields from the dataclass elements in ``*args``. The elements may
+    be either dataclass types or instances thereof.
 
-Use as a convenience to pack parameters as a new dataclass type on-the-fly,
-before instantiating it and passing the instance as parameter to a function that
-expects it.
+    Use as a convenience to pack parameters as a new dataclass type on-the-fly,
+    before instantiating it and passing the instance as parameter to a function that
+    expects it.
 
-ATTENTION: The new class is dynamically created, with the implication that, when
-the function is called at the console or in script that is NOT imported as a
-module (i.e., a "merged" dataclass type is generated "on the go"), while it MAY
-be possible to save an instance of the new class to disk as HDF5 file, or to
-serialise it as pickle, reading it back in a subsequent session WILL FAIL
-(simply because the new type is not available yet, unless the exact same
-type is defined by calling this function BEFORE loading the saved instance from
-HDF5 or pickle file)
+    ATTENTION: The new class is dynamically created, with the implication that, when
+    the function is called at the console or in script that is NOT imported as a
+    module (i.e., a "merged" dataclass type is generated "on the go"), while it MAY
+    be possible to save an instance of the new class to disk as HDF5 file, or to
+    serialise it as pickle, reading it back in a subsequent session WILL FAIL
+    (simply because the new type is not available yet, unless the exact same
+    type is defined by calling this function BEFORE loading the saved instance from
+    HDF5 or pickle file)
 
-NOTE: This is not a problem for "merged" dataclass types defined in one of the
-Scipyen's module automatically imported at the launch, or in a Scipyen plugin
-(the "plugin" modules are always imported at the start of a Scipyen session).
+    NOTE: This is not a problem for "merged" dataclass types defined in one of the
+    Scipyen's module automatically imported at the launch, or in a Scipyen plugin
+    (the "plugin" modules are always imported at the start of a Scipyen session).
 
-However, any changes made to the definition of the merged dataclass (e.g.
-change of field names) will invalidate the saved data. In this case, the
-merged dataclass will need to be instantiated again and the new "version"
-pickled, or saved to HDF5, to overwrite the old pickle/HDF5 file.
+    However, any changes made to the definition of the merged dataclass (e.g.
+    change of field names) will invalidate the saved data. In this case, the
+    merged dataclass will need to be instantiated again and the new "version"
+    pickled, or saved to HDF5, to overwrite the old pickle/HDF5 file.
 
-WARNING: All dataclasses that are merged MUST have their field annotated.
+    WARNING: All dataclasses that are merged MUST have their field annotated.
 
-Parameters:
-===========
-    typename:str — name of the new type. Must not be empty, and must be a valid
-        Python identifier; it will be capitalized if necessary.
+    Parameters:
+    ===========
+        typename:str — name of the new type. Must not be empty, and must be a valid
+            Python identifier; it will be capitalized if necessary.
 
-    args: two or more dataclass types or instances
+        args: two or more dataclass types or instances
 
-Var-keyword parameters:
-=======================
-    These are passed to the dataclasses.make_dataclass() function, see Python
-documentation for details.
-When empty, these parameter get their dfault values as per
-``dataclasses.make_dataclass``.
+    Var-keyword parameters:
+    =======================
+        These are passed to the dataclasses.make_dataclass() function, see Python
+    documentation for details.
+    When empty, these parameter get their dfault values as per
+    ``dataclasses.make_dataclass``.
 
-Typically one would use the `module` keyword parameter (with a str value) to
-assign a module to the new type, other than the default ``scipyendataclasses``
-so that instances of the new type can be serialized (i.e., pickled and unpickled)
-or exported to / loaded from HDF5 files (see above).
+    Typically one would use the `module` keyword parameter (with a str value) to
+    assign a module to the new type, other than the default ``scipyendataclasses``
+    so that instances of the new type can be serialized (i.e., pickled and unpickled)
+    or exported to / loaded from HDF5 files (see above).
 
-Returns:
-=======
-A tuple containing:
-• the new type
-• an instance of the new type, if the new type can be instantiated (i.e. all its
-fields have default values), else None, in whch case the new type MUST be
-instantiated separately, after "merging"
+    Returns:
+    =======
+    A tuple containing:
+    • the new type
+    • an instance of the new type, if the new type can be instantiated (i.e. all its
+    fields have default values), else None, in whch case the new type MUST be
+    instantiated separately, after "merging"
 
-If any of the args are INSTANCES of a dataclass type, then the values of their
-parameters will be propagated in the returned instance of the new type.
+    If any of the args are INSTANCES of a dataclass type, then the values of their
+    parameters will be propagated in the returned instance of the new type.
 
-Therefore one may avoid the need to instantiate the new type separately after
-"merging" by supplying instances of the original dataclasses, instead of their
-types, in args.
+    Therefore one may avoid the need to instantiate the new type separately after
+    "merging" by supplying instances of the original dataclasses, instead of their
+    types, in args.
 
-CAUTION: The dataclasses in args MUST have distinct field names. Fields in
-subequent elements of 'args', that have the same name as fields in args[0] will
-be silently ignored. This means that this function can only be used to augment
-the dataclass in args[0] with non-duplicate fields from the subsequent elements
-of 'args'.
+    CAUTION: The dataclasses in args MUST have distinct field names. Fields in
+    subequent elements of 'args', that have the same name as fields in args[0] will
+    be silently ignored. This means that this function can only be used to augment
+    the dataclass in args[0] with non-duplicate fields from the subsequent elements
+    of 'args'.
 
-"""
-    from copy import deepcopy
+    """
+    # from copy import deepcopy
     from core.utilities import unique
 
     if not isinstance(typename, str):
@@ -1776,11 +2353,114 @@ of 'args'.
     # #                            weakref_slot=False,
     # #                            module=None)
 
+def repr_attr(x):
+    indent = lambda x: x.replace("\n", "\n\t")
+
+    if isinstance(x, str):
+        return f": {type(x).__name__} → '{x}'"
+
+    elif dataclasses.is_dataclass(type(x)):
+        return f": {type(x).__name__} → {indent(x.__repr__())}"
+
+    elif isinstance(x, Enum):
+        return f": {type(x).__name__} →  '{x.name}' ({x})"
+
+    else:
+        return f": {type(x).__name__} → {x}"
+
+def getField(obj, field: dataclasses.Field) -> typing.Any:
+    r"""Returns the value of a field of a dataclass instance.
+
+    If the dataclass instance lacks an attribute named after the field, returns
+    the default value defined in the field signature.
+
+    When 'field' is a name, it is looked up in the fields of the dataclass; if
+    not found, it is looked up among the properties of the object 'obj'.
+
+    WARNING: This function makes field access insensitive to API change (i.e.
+    to changes where the definition of a dataclass type would make it impossible
+    to use data created with the old API)
+    """
+    if not isDataclass(obj):
+        raise TypeError(f"'obj' expected to be a dataclass; instead, got a {type(obj).__name__}")
+
+    if not isinstance(field, dataclasses.Field):
+        raise TypeError(f"'field' expected to be a dataclass Field; instead, got a {type(field).__name__}")
+
+    # finally, return the field value taking account its default
+    return getattr(obj, field.name, field.default_factory() if field.default is dataclasses.MISSING else field.default)
 
 
+def getFieldOrProperty(obj, field:typing.Union[dataclasses.Field, str],
+             default: typing.Any = dataclasses.MISSING) -> typing.Any:
+    r"""Returns the value of a field of a dataclass instance.
 
-# __all__ = ("AdministrationRoute", "BiologicalSource", "Biometrics",
-#            "BioSourceType", "Cell", "CellCompartment","CellCompartmentType", "Episode",
-#            "Organ", "Organism", "OrganismStage", "Procedure", "ProcedureType",
-#            "Schedule", "SubstanceDosage", "Tissue", "Treatment",
-#            "isDataclass", "mergeDataclasses", "ScipyenDataclass")
+    If the dataclass instance lacks an attribute named after the field, returns
+    the default value defined in the field signature.
+
+    When 'field' is a name, it is looked up in the fields of the dataclass; if
+    not found, it is looked up among the properties of the object 'obj'.
+
+    WARNING: This function makes field access insensitive to API change (i.e.
+    to changes where the definition of a dataclass type would make it impossible
+    to use data created with the old API)
+
+    CAUTION: When 'field' is a string it MAY return the value of a property;
+    when 'field' resolves to a dynamic property of 'obj' this WILL result in
+    code execution .
+    """
+    if not isDataclass(obj):
+        raise TypeError(f"'obj' expected to be a dataclass; instead, got a {type(obj).__name__}")
+
+    if isinstance(field, str):
+        # resolve field by name
+        if len(field.strip()) == 0:
+            raise ValueError("'field' argument cannot be an empty string")
+
+        # is there a dataclasses.Field named after 'field'?
+        fields = list(filter(lambda f: f.name == field, dataclasses.fields(obj)))
+
+        if len(fields) == 0:
+            # no dataclaasses Field found -> check if it is a property
+            properties = list(
+                filter(
+                        lambda x: x[0] == field,
+                        inspect.getmembers_static(obj,
+                                                  lambda x: isinstance(x, property))
+                      )
+                )
+            if len(properties):
+                field = properties[0][0]
+                if default is dataclasses.MISSING:
+                    # default MISSING signals we don't want to shoehorn it if
+                    # field not found
+                    if not hasattr(obj, field):
+                        raise AttributeError(f"The {type(obj).__name__} object does not have a '{field}' attribute or property")
+                    return getattr(obj, field)
+
+                else:
+                    # retrieve the field if found, else return the default
+                    return getattr(obj, field, default)
+            else:
+                raise ValueError(f"The {type(obj).__name__} object does not have a field or property named '{field}'")
+
+        else:
+            # a dataclasses.Field with nme after field argument WAS found
+            field = fields[0]
+
+    if not isinstance(field, dataclasses.Field):
+        raise TypeError(f"'field' expected to be a dataclass Field or str; instead, got a {type(field).__name__}")
+
+    # finally, return the field value taking account its default
+    ret = getattr(obj, field.name, dataclasses.MISSING)
+    if ret is dataclasses.MISSING:
+        if field.default_factory is not dataclasses.MISSING:
+            return field.default_factory()
+        elif field.default is not dataclasses.MISSING:
+            return field.default
+        else:
+            return None
+    else:
+        return ret
+
+    # ret = getattr(obj, field.name, field.default_factory if field.default is dataclasses.MISSING else field.default)

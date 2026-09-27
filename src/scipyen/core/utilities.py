@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -10,11 +9,12 @@ Various utilities
 '''
 import traceback, re, itertools, functools, time, typing, types, warnings
 import operator, inspect, random, math, pprint, datetime, pathlib, sys, os
+import enum
 import collections, collections.abc, dataclasses
 import numbers
-from numbers import Number
+from numbers import Number # noqa
 from sys import (getsizeof, stderr)
-from copy import (copy, deepcopy,)
+from copy import (copy, deepcopy,) # noqa
 from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
                      isgeneratorfunction, iscoroutinefunction,
                      iscoroutine, isawaitable, isasyncgenfunction,
@@ -23,17 +23,19 @@ from inspect import (getmro, ismodule, isclass, isbuiltin, isfunction,
                      isgetsetdescriptor, ismemberdescriptor,
                      signature,
                      )
-from functools import (partial, partialmethod, reduce, singledispatch)
+from functools import (partial, partialmethod, reduce, singledispatch) # noqa
 from itertools import chain
-from collections import deque, OrderedDict
+from collections import deque, OrderedDict # noqa
 from dataclasses import MISSING
 import numpy as np
+import pandas as pd
+import quantities as pq
 import sympy
 import PIL
 from PIL.Image import Image as PILImage
 from IPython.display import Image as IPImage
 import neo
-from neo.core.dataobject import DataObject as NeoDataObject
+from neo.core.dataobject import DataObject as NeoDataObject # noqa
 from neo.core.container import Container as NeoContainer
 
 __has_graphviz__:bool = False
@@ -41,34 +43,33 @@ try:
     import graphviz
     GraphSource:typing.TypeAlias = graphviz.Source
     __has_graphviz__ = True
-except:
+except: # noqa
     GraphSource:typing.TypeAlias = types.NoneType
 
 # NOTE: SpikeTrainList is a ObjectList in recent nwo versions
 if neo.__version__ >= '0.13.0':
     from neo.core.objectlist import ObjectList as NeoObjectList
-    
+
 else:
     NeoObjectList = list # alias for backward compatibility :(
-import pandas as pd
-import quantities as pq
-from core.vigra_patches import vigra
-import pyqtgraph # for their own eq operator
-import matplotlib as mpl
+from core.vigra_patches import vigra # noqa
+import pyqtgraph  # noqa # for their own eq operator
+import matplotlib as mpl # noqa
+from tribool import Tribool # noqa
 #import language_tool_python
 
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
-    # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
+    from PySide6.QtCore import (Signal, Slot, Property,) # noqa
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -76,26 +77,19 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
         
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    from qtpy import sip # noqa
+    # from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
     
 
-# import qtpy
-# qtpy.API = os.environ["QT_API"]
-# if os.environ["QT_API"] == "pyside6":
-#     import PySide6
-#     from PySide6 import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, Shiboken)
-# else:
-#     from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg,)
-
 from core import prog
-from .prog import safewrapper, deprecation, with_doc, is_hashable, scipywarn
+from core import qtutils
+from .prog import safewrapper, deprecation, with_doc, is_hashable, scipywarn # noqa
 
-from .strutils import get_int_sfx
+from .strutils import get_int_sfx # noqa
 from .scipyen_quantities import unitsConvertible
 # from .datazone import DataZone
 
@@ -141,14 +135,14 @@ class SafeComparator(object):
     # operator.le ge lt gt accept ONLY numeric values hence MAY not work with
     # either numpy array or pandas objects
     
-    def __init__(comp=pyqtgraph.eq):
+    def __init__(self, comp = pyqtgraph.eq):
         self.comp = comp
         
     def __call__(self, x, y):
         try:
             ret = True
             
-            ret &= type(x) == type(y)
+            ret &= type(x) is type(y)
             
             if not ret:
                 return ret
@@ -214,7 +208,7 @@ class SafeComparator(object):
             
             return ret ## good fallback, though potentially expensive
         
-        except Exception as e:
+        except Exception: # noqa
             #traceback.print_exc()
             #print("x:", x)
             #print("y:", y)
@@ -353,7 +347,7 @@ def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbe
     ret = len(x) == len(y)
     
     if ret:
-        ret &= reduce(operator.and_, (comparator(x_, y_) for (x,y) in zip(x,y)))
+        ret &= reduce(operator.and_, (comparator(x_, y_) for (x_, y_) in zip(x,y)))
         
     return ret
 
@@ -363,7 +357,7 @@ def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbe
     
     # use for comparisons between mapping values
     simp_fun = partial(is_same_as, rtol=rtol, atol=atol, 
-                       use_math=use_math, equal_nan=eual_nan,
+                       use_math=use_math, equal_nan=equal_nan,
                        comparator = comparator)
         
     if comparator is isclose:
@@ -489,11 +483,8 @@ def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbe
         y = y.magnitude
 
     if use_math:
-        if all(v is math.nan or v is np.nan for v in (x,y)):
-            return True
-        
-        return False
-    
+        return all(math.isnan(v) or np.isnan(v) for v in (x,y))
+
     return f_isclose(x,y)
 
 @isclose.register(pq.Quantity)
@@ -522,10 +513,8 @@ def _(x,y, rtol:typing.Optional[numbers.Number]=None, atol:typing.Optional[numbe
     if use_math:
         # emulate equal_nan for math.isclose
         # NOTE: math.isclose operates only on scalars x and y
-        if all(v in (math.nan, np.nan) for v in (x,y)):
-            if equal_nan:
-                return True
-            return False
+        ret = all(math.isnan(v) or np.isnan(v) for v in (x,y))
+        return ret and equal_nan
     
     return f_isclose(x,y)
 
@@ -563,7 +552,7 @@ def hashiterable(x:typing.Iterable[typing.Any]) -> int:
         
     """
     if not hasattr(x, "__iter__"):
-        raise TypeError("Expecting an iterable; got %s instead" % type(x).__name__)
+        raise TypeError(f"Expecting an iterable; got {type(x).__name__} instead")
     
     # NOTE: 2021-08-21 10:02:46 FIXME
     # ATTENTION:
@@ -3291,6 +3280,9 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
                                 sequence_types, sequence_typenames, 
                                 set_types, set_typenames, signal_types, is_namedtuple, 
                                 UnitTypes, )
+
+    from gui.guiutils import getIcon
+
     # NOTE: 2021-07-19 10:41:55
     # FIXME for the above 2021-07-19 10:01:35:
     # eliding is now created in gui.WorkspaceModel._get_item_for_object
@@ -3306,7 +3298,8 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
         #TODO construct handlers for other object types as well including 
         #Qt objects (maybe)
             
-    icon = QtGui.QIcon.fromTheme("object")
+    # icon = QtGui.QIcon.fromTheme("object")
+    icon = getIcon("object", "object-group")
     
     result = dict(map(lambda x: (x, {"display":"", "tooltip":""}), standard_obj_summary_headers))
     
@@ -3323,10 +3316,14 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
     # ttip = ".".join([module_name, typename])
     ttip = f"{typename}"
     
-    if isinstance(obj, (QtWidgets.QMainWindow, mpl.figure.Figure)):
-        icon = QtGui.QIcon.fromTheme("window")
-        if isinstance(obj, QtWidgets.QMainWindow):
-            ttip = "\n".join([f"Window: {obj.windowTitle()}", ttip])
+    if isinstance(obj, (QtWidgets.QWidget, mpl.figure.Figure)):
+        icon = getIcon("window")
+        # icon = QtGui.QIcon.fromTheme("window")
+        if isinstance(obj, QtWidgets.QWidget):
+            if qtutils.isQObjectAlive(obj):
+                ttip = "\n".join([f"{obj.windowTitle()}", ttip])
+            else:
+                ttip = "Deleted Qt (C++) object"
         
     # if typename == "module":
     #     icon = QtGui.QIcon.fromTheme("class-or-package")
@@ -3343,20 +3340,25 @@ def summarize_object_properties(objname:str, obj:typing.Any, namespace="Internal
     
     if tt == "instance":
         tt = abbreviated_type_names.get(clsname, clsname)
-        icon = QtGui.QIcon.fromTheme("class")
+        icon = getIcon("class")
+        # icon = QtGui.QIcon.fromTheme("class")
         
     if tt == "function" or "function" in tt or "method" in tt:
-        icon = QtGui.QIcon.fromTheme("code-function")
+        icon = getIcon("code-function")
+        # icon = QtGui.QIcon.fromTheme("code-function")
 
     if tt == "module":
-        icon = QtGui.QIcon.fromTheme("class-or-package")
+        icon = getIcon("class-or-package")
+        # icon = QtGui.QIcon.fromTheme("class-or-package")
         
     if tt.lower() == "macro":
-        icon = QtGui.QIcon.fromTheme("component")
+        icon = getIcon("component")
+        # icon = QtGui.QIcon.fromTheme("component")
         
     if objtype is type or type in inspect.getmro(objtype):
         tt += f" <{obj.__name__}>"
-        icon = QtGui.QIcon.fromTheme("datatype") if obj.__name__ in builtins.__dict__ else QtGui.QIcon.fromTheme("class")
+        icon = getIcon("datatype") if obj.__name__ in builtins.__dict__ else getIcon("class")
+        # icon = QtGui.QIcon.fromTheme("datatype") if obj.__name__ in builtins.__dict__ else QtGui.QIcon.fromTheme("class")
         
     ttip = tt
         
@@ -3673,28 +3675,35 @@ def augment_obj_prop_dict(prop_dict):
     if 'Icon' not in prop_dict.keys(): # don't overwrite what summarize_object_properties did
         tt = prop_dict["Object Type"]["display"]
         
-        icon = QtGui.QIcon.fromTheme("object")
+        icon = getIcon("object", "object-group")
+        # icon = QtGui.QIcon.fromTheme("object")
         
         if "<" in tt and ">" in tt:
             tt, dundername = tt.split(" ")
-            icon = QtGui.QIcon.fromTheme("datatype") if dundername in builtins.__dict__ else QtGui.QIcon.fromTheme("class")
+            icon = getIcon("datatype") if dundername in builtins.__dict__ else getIcon("class")
+            # icon = QtGui.QIcon.fromTheme("datatype") if dundername in builtins.__dict__ else QtGui.QIcon.fromTheme("class")
             
         
         elif tt == "type":
-            icon = QtGui.QIcon.fromTheme("class")
+            icon = getIcon("class")
+            # icon = QtGui.QIcon.fromTheme("class")
         
         if "instance" in tt == "instance":
             tt = abbreviated_type_names.get(clsname, clsname)
-            icon = QtGui.QIcon.fromTheme("class")
+            icon = getIcon("class")
+            # icon = QtGui.QIcon.fromTheme("class")
             
         if tt == "function" or "function" in tt or "method" in tt:
-            icon = QtGui.QIcon.fromTheme("code-function")
+            icon = getIcon("code-function")
+            # icon = QtGui.QIcon.fromTheme("code-function")
 
         if tt == "module":
-            icon = QtGui.QIcon.fromTheme("class-or-package")
+            icon = getIcon("class-or-package")
+            # icon = QtGui.QIcon.fromTheme("class-or-package")
             
         if tt.lower() == "macro":
-            icon = QtGui.QIcon.fromTheme("component")
+            icon = getIcon("component")
+            # icon = QtGui.QIcon.fromTheme("component")
         
         
         prop_dict["Icon"] = icon
@@ -4031,6 +4040,7 @@ def unique(seq, key=None, indices:bool=False, idcheck:bool=True) -> typing.Seque
         if indices:
             u, i = np.unique(seq, return_index=True)
             return i
+
         return np.unique(seq)
     
     return seq.__class__(gen_unique(seq, key=key, indices=indices, idcheck=idcheck))
@@ -4167,7 +4177,6 @@ def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
                 ret = True
                 
             return False
-            # return val not in seenlist and not __add_to_seen__(val)
             
     def __check_val__(x):
         if is_hashable(x):
@@ -4175,7 +4184,7 @@ def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
                 seenset.add(x)
                 return True
             return False
-            # return x not in seenset and not __add_to_seen__(x)
+
         else:
             if len(seenlist) == 0:
                 seenlist.append(x)
@@ -4217,6 +4226,7 @@ def gen_unique(seq, key=None, indices:bool=False, idcheck:bool=True):
         else:
             if inspect.isfunction(key):
                 yield from (x for x in seq if __check_fun_val_(x, key))
+
             else:
                 yield from (x for x in seq if __check_val__(key))
             
@@ -5228,3 +5238,116 @@ def sympygraph(s:sympy.Basic) -> GraphSource:
     
     return GraphSource(sympy.dotprint(s))
     
+
+@singledispatch
+def repr_val(val,  decimals: int | None = None, scientific: bool = False):
+    return f"{val}"
+
+@repr_val.register(bool)
+def _repr_val_(val: bool, _: int | None = None, __: bool = False):
+    return "True" if val is True else "False"
+
+@repr_val.register(Tribool)
+def _repr_val_(val: Tribool, _: int | None = None, __: bool = False): # noqa
+    return "True" if val.value is True else "False" if val.value is False else ""
+
+@repr_val.register(float)
+@repr_val.register(np.floating)
+def _repr_val_(val: float | np.floating,  # noqa
+               decimals: int | None = None, scientific: bool = False):
+    if decimals is None:
+        if scientific is True:
+            return np.format_float_scientific(val)
+        else:
+            return np.format_float_positional(val)
+    else:
+        if scientific is True:
+            return np.format_float_scientific(val, precision=decimals, unique=False)
+        else:
+            return np.format_float_positional(val, precision=decimals, unique=False)
+
+@repr_val.register(complex)
+@repr_val.register(np.complexfloating)
+def _repr_val_(val: complex | np.complexfloating,  # noqa
+               decimals: int | None = None, scientific: bool = False):
+    if decimals is None:
+        if scientific is True:
+            rval = np.format_float_scientific(val.real)
+            ival = np.format_float_scientific(val.imag)
+        else:
+            rval = np.format_float_positional(val.real)
+            ival = np.format_float_positional(val.imag)
+
+    else:
+        if scientific is True:
+            rval = np.format_float_scientific(val.real, precision=decimals, unique=False)
+            ival = np.format_float_scientific(val.imag, precision=decimals, unique=False)
+        else:
+            rval = np.format_float_positional(val.real, precision=decimals, unique=False)
+            ival = np.format_float_positional(val.imag, precision=decimals, unique=False)
+
+    return f"{rval}+{ival}j"
+
+@repr_val.register(datetime.datetime)
+def _repr_val_(val: datetime.datetime, _: int | None = None, __: bool = False): # noqa
+    return val.isoformat(" ")
+
+@repr_val.register(datetime.date)
+@repr_val.register(datetime.time)
+def _repr_val_(val: (datetime.date, datetime.time), _: int | None = None, __: bool = False): # noqa
+    return val.isoformat()
+
+@repr_val.register(enum.Enum)
+def _repr_val_(val: enum.Enum, _: int | None = None, __: bool = False): # noqa
+    return f"{val.name}"
+
+@repr_val.register(neo.Event)
+def _repr_val_(val: neo.Event,  # noqa
+               decimals: int | None = None, scientific: bool = False):
+    from core.scipyen_quantities import quantity2str
+    return quantity2str(val.times, decimals, scientific)
+
+@repr_val.register(pq.Quantity)
+def _repr_val_(val: pq.Quantity,  # noqa
+               decimals: int | None = None, scientific: bool= False):
+    from core.scipyen_quantities import quantity2str
+    return quantity2str(val, decimals, scientific)
+
+@repr_val.register(np.ndarray)
+def _repr_val_(val: np.ndarray, # noqa
+               decimals: int | None = None, scientific: bool = False):
+    if val.size == 1:
+        # because a 0-dimensional array is still a ndarray,
+        # not a numpy number type!
+        # however, being 0-dimensional, one cannot use array indexing to get to
+        # the first (and only) element; hence it needs to be flattened thus gaining
+        # one dimension, thus allowing index access to the 1st element.
+        val = val.flatten()[0] # now, this MIGHT BE, e.g., a np.floatxx etc
+
+
+        # NOTE: 2026-08-23 17:03:05
+        # can I use the local context statement like next line?
+        # with np.printoptions(nanstr="NaN", infstr="Inf")
+        #
+        if np.isnan(val):
+            return "NaN"
+
+        if np.isinf(val):
+            return "-Inf" if val < 0 else "Inf"
+
+        return repr_val(val, decimals, scientific)
+
+    else:
+        if decimals is None:
+            with np.printoptions(floatmode="unique"):
+                return np.array2string(val)
+        else:
+            with np.printoptions(floatmode="fixed", precision=decimals):
+                return np.array2string(val)
+
+@repr_val.register(type(pd.NA))
+def _repr_val_(val, _ = None, __ = False): # noqa
+    return "NA"
+
+
+

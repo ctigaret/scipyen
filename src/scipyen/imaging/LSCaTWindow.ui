@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>834</width>
+    <width>838</width>
     <height>649</height>
    </rect>
   </property>
@@ -2855,8 +2855,8 @@ Integral values are in the interval [0,5]
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>834</width>
-     <height>27</height>
+     <width>838</width>
+     <height>28</height>
     </rect>
    </property>
    <widget class="QMenu" name="fileMenu">
@@ -3666,7 +3666,7 @@ and also the data-wide analysis unit descriptors (Distance from soma, etc...)</s
   <customwidget>
    <class>BaseScipyenDataWidget</class>
    <extends>QWidget</extends>
-   <header location="global">gui.widgets.basescipyendatawidget</header>
+   <header location="global">gui.widgets.dataclasswidgets.basescipyendatawidget</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

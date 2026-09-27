@@ -132,24 +132,24 @@ b) use KDE framework - this would "tie" Scipyen into KDE too much:
 # Completion -> UrlCompletion
 
 
-import typing, pathlib, functools, os, itertools, sys, traceback
+import typing, pathlib, functools, os, itertools, sys, traceback # noqa
 from functools import singledispatch, singledispatchmethod
-from urllib.parse import urlparse, urlsplit
-from collections import namedtuple, deque
+from urllib.parse import urlparse, urlsplit # noqa
+from collections import namedtuple, deque # noqa
 from dataclasses import MISSING
-from enum import Enum, IntEnum
+from enum import Enum, IntEnum # noqa
 
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg)
-from qtpy.QtCore import (Signal, Slot, Property,)
+# import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__  = False
-__has_sip__ = False
+# __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # import PySide6 # noqa
+    # from PySide6 import Shiboken # noqa
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     # QtType = typing.TypeVar("QtType", bound = "Shiboken.Object")
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
@@ -158,31 +158,33 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-    from qtpy import sip
-    ____has_sip____ = True
+    # from qtpy import sip # noqa
+    # __has_sip__ = True
     # QtType = typing.TypeVar("QtType", bound = "sip.wrappertype")
-    from qtpy.uic import loadUiType
+    # from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     QKeyboardModifiers = QtCore.Qt.KeyboardModifier
 
 __has_qtdbus__ = False
-try:
-    from qtpy import QtDBus
+if sys.platform == "linux":
+    try:
+        from qtpy import QtDBus # noqa
 
-    __has_qtdbus__ = True
-except:
-    pass
+        __has_qtdbus__ = True
+    except: # noqa
+        pass
 
 from traitlets.utils.bunch import Bunch
 
 from core import desktoputils as dutils
 from core import qtutils
 
-from core.prog import (safewrapper, print_styled)
+from core.prog import (safewrapper, print_styled) # noqa
 from gui.guiutils import (DisplayHint, getDesktopHeight, csqueeze)
 from iolib import pictio
+from iolib.navigation.filesystems import urlToPath
 
 # TODO finalize this
 # TODO/FIXME: 2023-05-06 23:12:19
@@ -262,7 +264,7 @@ class ApplyUrlMethod(IntEnum):
     ActiveTab = 4
     NewWindow = 8
 
-class UrlNavigator: pass # fwd decl
+class UrlNavigator: pass # fwd decl # noqa
 
 class LocationData:
     r"""
@@ -344,7 +346,7 @@ def pathToLocation(o:typing.Any, state:typing.Optional[QtCore.QByteArray]=None):
     raise NotImplementedError
 
 @pathToLocation.register(str)
-def _(o:str, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
+def __pathToLocation__(o:str, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
     path = pathlib.Path(o)
     return LocationData(QtCore.QUrl(path.as_uri()), state)
     # if path.is_dir() and path.is_absolute():
@@ -353,11 +355,11 @@ def _(o:str, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
     #     raise ValueError(f"{o} is not an absolute path to existing directory")
 
 @pathToLocation.register(pathlib.Path)
-def _(o:pathlib.Path, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
-    return LocationData(QtCore.QUrl(path.as_uri()), state)
+def __pathToLocation__(o:pathlib.Path, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData: # noqa
+    return LocationData(QtCore.QUrl(o.as_uri()), state)
 
 @pathToLocation.register(QtCore.QUrl)
-def _(o:QtCore.QUrl, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData:
+def __pathToLocation__(o:QtCore.QUrl, state:typing.Optional[QtCore.QByteArray]=None) -> LocationData: # noqa
     return LocationData(o, state)
 
 def findProtocol(protocol:str):
@@ -422,13 +424,11 @@ def upUrl(url:QtCore.QUrl):
     if url.hasFragment():
         u.setFragment("")
 
-    if os.environ["QT_API"] == "pyside6":
-        # url = QtCore.QUrl(newUrl.adjusted(QtCore.QUrl.FullyDecoded))
-        # adjustedLastUrl = lastUrl.adjusted(QtCore.QUrl.FullyDecoded)
-        # adjustedCurrentUrl = currentUrl.adjusted(QtCore.QUrl.FullyDecoded)
-        # parentDir = pathlib.Path(u.adjusted(QtCore.QUrl.FullyDecoded)).parent
+    if __has_PySide6__:
         parentDir = pathlib.Path(u.toLocalFile()).parent
-        return QtCore.QUrl(parentDir.as_posix())
+        ret = QtCore.QUrl(parentDir.as_posix())
+        ret.setScheme("file")
+        return ret
 
     return u.adjusted(QtCore.QUrl.StripTrailingSlash).adjusted(QtCore.QUrl.RemoveFilename)
 
@@ -493,7 +493,7 @@ class UrlComboBox(QtWidgets.QComboBox):
         self._completer_.setModelSorting(QtWidgets.QCompleter.CaseSensitivelySortedModel)
         self._completer_.setCaseSensitivity(QtCore.Qt.CaseSensitive)
 
-        self.setEditable(rw==True)
+        self.setEditable(rw is True)
         self.lineEdit().setCompleter(self._completer_)
         self.lineEdit().setClearButtonEnabled(True)
         self.lineEdit().undoAvailable=True
@@ -578,12 +578,12 @@ class UrlComboBox(QtWidgets.QComboBox):
                 if checkDefaultURLs:
                     self.defaultList[:] = lst
 
-        signalBlocker = QtCore.QSignalBlocker(self)
+        with qtutils.SignalBlocker(self):
+            self.setDefaults()
 
-        self.setDefaults()
+            for item in self.itemList:
+                self.insertUrlItem(item)
 
-        for item in self.itemList:
-            self.insertUrlItem(item)
 
     def urls(self):
         ulist = list()
@@ -659,61 +659,61 @@ class UrlComboBox(QtWidgets.QComboBox):
         if url.isEmpty():
             return
 
-        signalBlocker = QtCore.QSignalBlocker(self)
-
-        if os.environ["QT_API"] == "pyside6":
-            urlToInsert = url.toString(QtCore.QUrl.PrettyDecoded)
-        else:
-            urlToInsert = url.toString(QtCore.QUrl.StripTrailingSlash)
-
-        # checks for duplicates
-        for k, v in self.itemMapper.items():
-            # if urlToInsert == v.toString(QtCore.QUrl.StripTrailingSlash):
-            # WARNING: 2025-01-19 20:20:46
-            # v is a UrlComboItem which here is a namedtuple
+        with qtutils.SignalBlocker(self):
             if os.environ["QT_API"] == "pyside6":
-                v_str = v.url.toString(QtCore.QUrl.PrettyDecoded)
+                urlToInsert = url.toString(QtCore.QUrl.PrettyDecoded)
             else:
-                v_str = v.url.toString(QtCore.QUrl.StripTrailingSlash)
-            if urlToInsert == v_str:
-                self.setCurrentIndex(k) # NOTE: 2025-01-19 20:22:50 self inherits QComboBox !!!
+                urlToInsert = url.toString(QtCore.QUrl.StripTrailingSlash)
 
-                if self._mode_ == UrlComboMode.Directories:
-                    self.updateItem(v, k, self._opendirIcon_)
+            # checks for duplicates
+            for k, v in self.itemMapper.items():
+                # if urlToInsert == v.toString(QtCore.QUrl.StripTrailingSlash):
+                # WARNING: 2025-01-19 20:20:46
+                # v is a UrlComboItem which here is a namedtuple
+                if os.environ["QT_API"] == "pyside6":
+                    v_str = v.url.toString(QtCore.QUrl.PrettyDecoded)
+                else:
+                    v_str = v.url.toString(QtCore.QUrl.StripTrailingSlash)
 
-                return
+                if urlToInsert == v_str:
+                    self.setCurrentIndex(k) # NOTE: 2025-01-19 20:22:50 self inherits QComboBox !!!
 
-        if self._urlAdded_:
+                    if self._mode_ == UrlComboMode.Directories:
+                        self.updateItem(v, k, self._opendirIcon_)
+
+                    return
+
+            if self._urlAdded_:
+                if len(self.itemList):
+                    self.itemList = self.itemList[:-1]
+                    self._urlAdded_ = False
+
+            self.setDefaults()
+
+            offset = max(0, len(self.itemList) + len(self.defaultList) - self._maximum_)
+
+            for k in range(offset, len(self.itemList)):
+                self.insertUrlItem(self.itemList[k])
+
+            icon = self.getIcon(url)
+            item = UrlComboItem(url, icon)
+
+            ndx = self.count()
+            text = self.textForItem(item)
+
+            if self._mode_ == UrlComboMode.Directories:
+                self.insertItem(ndx, self._opendirIcon_, text)
+            else:
+                self.insertItem(ndx, item.icon, text)
+
+            self.itemMapper[ndx] = item
+
+            self.itemList.append(item)
+
+            self.setCurrentIndex(ndx)
+
             if len(self.itemList):
-                self.itemList = self.itemList[:-1]
-                self._urlAdded_ = False
-
-        self.setDefaults()
-
-        offset = max(0, len(self.itemList) + len(self.defaultList) - self._maximum_)
-
-        for k in range(offset, len(self.itemList)):
-            self.insertUrlItem(self.itemList[k])
-
-        icon = self.getIcon(url)
-        item = UrlComboItem(url, icon)
-
-        ndx = self.count()
-        text = self.textForItem(item)
-
-        if self._mode_ == UrlComboMode.Directories:
-            self.insertItem(ndx, self._opendirIcon_, text)
-        else:
-            self.insertItem(ndx, item.icon, text)
-
-        self.itemMapper[ndx] = item
-
-        self.itemList.append(item)
-
-        self.setCurrentIndex(ndx)
-
-        if len(self.itemList):
-            self._urlAdded_ = True
+                self._urlAdded_ = True
 
     @Slot(int)
     def slot_activated(self, ndx:int):
@@ -1192,26 +1192,40 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         if len(adjustedText) == 0:
             adjustedText = self._url_.scheme()
 
-        adjustedText.replace("\n", " ")
-        super().setText(text)
+        adjustedText = adjustedText.replace("\n", " ")
+
+        # parts = adjustedText.split("&&")
+        #
+        # new_parts = list(map(lambda p: p.replace("&", "&&"), parts))
+        #
+        # adjustedText = "&&".join(new_parts)
+
+        # print(f"{self.__class__.__name__}.setText: text {text} -> adjustedText {adjustedText}")
+
+        super().setText(adjustedText)
 
         self.updateMinimumWidth()
 
         self._pendingTextChange_ = False
 
     def plainText(self):
-        source = self.text()
-        sourceLength = len(source)
-
-        dest = list()
-
-        for c in source:
-            if c == '&':
-                continue
-
-            dest.append(c)
-
-        return "".join(dest)
+        return self.text()
+        # source = self.text()
+        # # sourceLength = len(source)
+        #
+        # parts = source.split("&&")
+        # new_parts = list(map(lambda p: p.replace("&", "&&"), parts))
+        # return "&&".join(new_parts)
+        # # dest = list()
+        # #
+        # # for c in source:
+        # #     if c == '&':
+        # #         dest.append('&&')
+        # #         # continue
+        # #     else:
+        # #         dest.append(c)
+        # #
+        # # return "".join(dest)
 
     def arrowWidth(self):
         width = 0
@@ -1267,8 +1281,9 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         menu.triggered.connect(self.slot_menuActionTriggered) # keybard activation of menu entry
         menu.sig_urlDropped.connect(self.slot_urlsDropped) # TODO: drag'ndrop not yet implemented
 
-        if isinstance(menu.parent(), self.__class__):
-            menu.sig_closed.connect(self.slot_navMenuClosed)
+        menu.sig_closed.connect(self.slot_navMenuClosed)
+        # if isinstance(menu.parent(), self.__class__):
+        #     menu.sig_closed.connect(self.slot_navMenuClosed)
 
         menu.setLayoutDirection(QtCore.Qt.LeftToRight)
 
@@ -1280,7 +1295,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         maxIndex = startIndex + maxItems  # (max 30 items shown in the menu)
         # maxIndex = startIndex + 30  # (max 30 items shown in the menu)
 
-        subDirs = sorted(self._subDirs_)
+        # subDirs = sorted(self._subDirs_)
 
         nSubDirs = len(self._subDirs_)
 
@@ -1288,7 +1303,8 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
 
         subDirsNames = list(map(lambda x: x.name, self._subDirs_[startIndex : lastIndex]))
 
-        subDirsActions = list(map(lambda x: QAction(csqueeze(x.replace('&', '&&'), 60), self), subDirsNames))
+        # subDirsActions = list(map(lambda x: QAction(csqueeze(x.replace('&', '&&'), 60), self), subDirsNames))
+        subDirsActions = list(map(lambda x: QAction(csqueeze(x, 60), self), subDirsNames))
 
         if self._subDir_ in subDirsNames:
             currentIndex = subDirsNames.index(self._subDir_)
@@ -1301,6 +1317,8 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
             # action carries <int> data which is the index of the subdirectory
             # pointed to by this action, in self._subDirs_ !!!
             subDirsActions[k].setData(i)
+            subDirsActions[k].setText(subDirsNames[k].replace('&', '&&'))
+
             menu.addAction(subDirsActions[k])
 
         if nSubDirs > maxIndex: # NOTE: 2025-01-21 09:03:03 generates the overspill menu
@@ -1605,7 +1623,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         url = upUrl(self._url_) if self._replaceButton_ else self._url_
 
         navigator = self.parent()
-        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        assert qtutils.isQObjectAlive(navigator), "Parent object was deleted"
 
         self._subDirsJob_ = ListDirsJob(url, self)
         self._subDirs_.clear()
@@ -1638,6 +1656,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         path = self._subDirs_[result]
         url = QtCore.QUrl(path.as_uri())
         self.navigatorButtonActivated.emit(url, QtCore.Qt.LeftButton, QtCore.Qt.NoModifier)
+        self._subDirsMenu_.close()
         self.update()
 
     @Slot(QAction, QtCore.Qt.MouseButton)
@@ -1655,9 +1674,10 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         result = action.data()
         buttonPath = self.path()
         path = pictio.concatPaths(buttonPath, self._subDirs_[result])   # the path to the subdirectory pointed to by the action
-        print()
+        # print()
         url = QtCore.QUrl(path.absolute().as_uri())
         self.navigatorButtonActivated.emit(url, button, QtCore.Qt.NoModifier)
+        self._subDirsMenu_.close()
         self.update()
 
     @Slot()
@@ -1697,7 +1717,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         currentIndex = self._subDirs_.index(path)
 
         navigator = self.parent()
-        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        assert qtutils.isQObjectAlive(navigator), "Parent object was deleted"
         targetIndex = currentIndex - self._wheelSteps_
         if targetIndex < 0:
             targetIndex = 0
@@ -1728,7 +1748,7 @@ class UrlNavigatorButton(UrlNavigatorButtonBase):
         if len(self._subDirs_) == 0:
             return
         navigator = self.parent()
-        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        assert qtutils.isQObjectAlive(navigator), "Parent object was deleted"
 
         # updates the button looks
         self.setDisplayHintEnabled(DisplayHint.PopupActiveHint, True)
@@ -1857,6 +1877,7 @@ class PlacesMenu(QtWidgets.QMenu):
         else:
             assert(isinstance(parent, (QtWidgets.QWidget, type(None))))
             super().__init__(parent=parent)
+
         self._initialMousePosition = QtGui.QCursor.pos()
         self._mouseMoved_ = False
         self.setAcceptDrops(True)
@@ -1885,7 +1906,7 @@ class PlacesButton(UrlNavigatorButtonBase):
     def setIcon(self, icon:QtGui.QIcon):
         self._icon_ = icon
 
-    def keyPressEvent(evt:QtGui.QKeyEvent):
+    def keyPressEvent(self, evt:QtGui.QKeyEvent):
         if evt.key() == QtCore.Qt.Key_Down:
             self.clicked.emit()
 
@@ -1924,19 +1945,49 @@ class PlacesButton(UrlNavigatorButtonBase):
                     'Configuration',
                     'Shared Cache',
                     'Application Configuration'
+                    "Shared State",
+                    "State",
+                    "Templates"
                     ]
-        places = dict(filter(lambda x: x[1].name not in ignored, dutils.get_desktop_places("file").items())) # I only use file:// locations, for now, but see below
+
+        # NOTE: 2026-05-01 09:26:55
+        # I only use file:// locations, for now, but see below
+        # print(f"{self.__class__.__name__}.slot_openPlacesMenu: parent -> {self.parent()}")
+        if (
+            hasattr(self.parent(), "desktopPlaces")
+            and isinstance(self.parent().desktopPlaces, dutils.PlacesMap)
+            ):
+            places = dict(
+                            filter(
+                                    lambda x: (
+                                                x[0].startswith("file")
+                                                and x[1].name not in ignored
+                                                and not x[1].hidden
+                                              ),
+                                    self.parent().desktopPlaces.items()
+                                  )
+                )
+        else:
+            places = dict(
+                            filter(
+                                    lambda x: x[1].name not in ignored,
+                                    dutils.get_desktop_places("file").items()
+                                  )
+                         )
+
+        # NOTE: 2026-05-01 09:28:54
+        # includes icon name as well, so this becomes place.name ↦ (place.url, place.icon)
         actionsDataMap = dict()
 
         for placeLoc, place in places.items():
             text = place.name
             if placeLoc.startswith("separator"):
-                actionsDataMap[text] = "separator"
+                actionsDataMap[text] = ("separator", "")
             else:
-                actionsDataMap[text] = place.url
+                actionsDataMap[text] = (place.url, place.icon)
 
         navigator = self.parent()
-        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        assert qtutils.isQObjectAlive(navigator), "Parent object was deleted"
 
         # updates the button looks
         self.setDisplayHintEnabled(DisplayHint.PopupActiveHint, True)
@@ -1967,19 +2018,27 @@ class PlacesButton(UrlNavigatorButtonBase):
 
     def initMenu(self, menu:QtWidgets.QMenu, actionsMap:dict, startIndex:int, nItems:int):
         navigator = self.parent()
-        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        assert qtutils.isQObjectAlive(navigator), "Parent object was deleted"
         menu.mouseButtonClicked.connect(self.slot_menuActionClicked) # mouse activation of menu entry
-        menu.triggered.connect(self.slot_menuActionTriggered) # keybard activation of menu entry
+        menu.triggered.connect(self.slot_menuActionTriggered) # keyboard activation of menu entry
         menu.setLayoutDirection(QtCore.Qt.LeftToRight)
 
         maxIndex = startIndex + nItems # (max 10 places shown in the menu)
         nAvailableItems = len(actionsMap)
-        lastIndex = min(nAvailableItems, maxIndex)
+        # lastIndex = min(nAvailableItems, maxIndex)
 
         for k, (key, val) in enumerate(actionsMap.items()):
+            if k >= maxIndex or k < startIndex:
+                continue
             action = QAction(key, menu)
-            if isinstance(val, QtCore.QUrl):
-                action.setData(val.toString())
+            if isinstance(val[0], QtCore.QUrl):
+                action.setData(val[0].toString())
+                if isinstance(val[1], str) and len(val[1].strip()):
+                    try:
+                        action.setIcon(QtGui.QIcon.fromTheme(val[1]))
+                    except: # noqa
+                        pass
+
                 if val == navigator.locationUrl():
                     font = QtGui.QFont(action.font())
                     font.setBold(True)
@@ -1988,25 +2047,6 @@ class PlacesButton(UrlNavigatorButtonBase):
                 action.setSeparator(True)
 
             menu.addAction(action)
-#             if k == 0:# and sys.platform.startswith("linux"):
-#                 action0 = QAction("Places", menu)
-#                 action0.setSeparator(True)
-#                 menu.addAction(action0)
-#             if k in range(startIndex, lastIndex):
-#                 if key.lower().startswith("separator"):
-#                     menu.addSeparator()
-#                 else:
-#                     action = QAction(key, menu)
-#                     if isinstance(val, QtCore.QUrl):
-#                         action.setData(val.toString())
-#                         if val == navigator.locationUrl():
-#                             font = QtGui.QFont(action.font())
-#                             font.setBold(True)
-#                             action.setFont(font)
-#                     else:
-#                         action.setSeparator(True)
-#
-#                     menu.addAction(action)
 
         if nAvailableItems > maxIndex:
             menu.addSeparator()
@@ -2017,14 +2057,14 @@ class PlacesButton(UrlNavigatorButtonBase):
     @Slot(QAction, QtCore.Qt.MouseButton)
     def slot_menuActionClicked(self, action:QAction, button:QtCore.Qt.MouseButton):
         navigator = self.parent()
-        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        assert qtutils.isQObjectAlive(navigator), "Parent object was deleted"
         url = QtCore.QUrl(action.data())
         navigator.setLocationUrl(url)
 
     @Slot(QAction)
     def slot_menuActionTriggered(self, action:QAction):
         navigator = self.parent()
-        assert qtutils.isQObjectAlive(navigator), f"Parent object was deleted"
+        assert qtutils.isQObjectAlive(navigator), "Parent object was deleted"
         url = QtCore.QUrl(action.data())
         navigator.setLocationUrl(url)
 
@@ -2038,7 +2078,7 @@ class UrlNavigatorDropDownButton(UrlNavigatorButtonBase):
         size.setWidth(int(size.height() / 2))
         return size
 
-    def keyPressEvent(evt:QtGui.QKeyEvent):
+    def keyPressEvent(self, evt:QtGui.QKeyEvent):
         if evt.key() == QtCore.Qt.Key_Down:
             self.clicked.emit()
 
@@ -2110,14 +2150,21 @@ class CoreUrlNavigator(QtCore.QObject):
         if newUrl == self.locationUrl():
             return
 
-        if os.environ["QT_API"] == "pyside6":
+        if __has_PySide6__:
             url = QtCore.QUrl(newUrl.adjusted(QtCore.QUrl.FullyDecoded))
+            # print(f"{self.__class__.__name__}.setCurrentLocationUrl({newUrl}) -> url = {url}")
+
         else:
             url = QtCore.QUrl(newUrl.adjusted(QtCore.QUrl.NormalizePathSegments))
 
+        # print(f"\n\t-> url = {url}")
+
         firstUrlChild = firstChildUrl(self.locationUrl(), url)
 
+        # print(f"\n\t-> firstUrlChild = {firstUrlChild}")
+
         scheme = url.scheme()
+        # print(f"\n\t-> scheme = {scheme}")
         # NOTE: 2023-05-04 15:15:30
         # Scipyen's file manager does NOT use special protocols (which include
         # compressed archives)
@@ -2137,9 +2184,10 @@ class CoreUrlNavigator(QtCore.QObject):
                     while parentUrl != prevUrl:
                         if self.isCompressedPath(parentUrl, archiveMimeTypes):
                             insideCompressedPath = True
-                            break;
+                            break
                         prevUrl = parentUrl
                         parentUrl = upUrl(parentUrl)
+
                 if not insideCompressedPath:
                     url.setScheme("file")
                     firstUrlChild.setScheme("file")
@@ -2161,11 +2209,15 @@ class CoreUrlNavigator(QtCore.QObject):
             self._history_[0:self._historyIndex_] = []
             self._historyIndex_ = 0
 
+
+
         assert self._historyIndex_ == 0
         if os.environ["QT_API"] == "pyside6":
-            self._history_.insert(0, LocationData(url.adjusted(QtCore.QUrl.FullyDecoded), None)) # CAUTION: is it OK for state to be None ?!?
+            adjustedUrl = url.adjusted(QtCore.QUrl.FullyDecoded)
+            self._history_.insert(0, LocationData(adjustedUrl, None)) # CAUTION: is it OK for state to be None ?!?
         else:
-            self._history_.insert(0, LocationData(url.adjusted(QtCore.QUrl.StripTrailingSlash), None)) # CAUTION: is it OK for state to be None ?!?
+            adjustedUrl = url.adjusted(QtCore.QUrl.StripTrailingSlash)
+            self._history_.insert(0, LocationData(adjustedUrl, None)) # CAUTION: is it OK for state to be None ?!?
 
         historyMax = 100 # TODO make configurable -> link with mainWindow !!!
 
@@ -2246,14 +2298,21 @@ class CoreUrlNavigator(QtCore.QObject):
 
     def goUp(self):
         currentUrl = self.locationUrl()
+        # print(f"{self.__class__.__name__}.goUp -> currenUrl = {currentUrl}")
         if not currentUrl.isValid() or currentUrl.isRelative():
             return QtCore.QUrl()
 
         upUrl_ = upUrl(currentUrl)
+        # print(f"{self.__class__.__name__}.goUp() upUrl_ -> {upUrl_}")
 
-        if not currentUrl.matches(upUrl_, QtCore.QUrl.StripTrailingSlash):
-            self.setCurrentLocationUrl(upUrl_)
-            return True
+        if __has_PySide6__:
+            if not currentUrl.matches(upUrl_, QtCore.QUrl.ComponentFormattingOption.PrettyDecoded):
+                self.setCurrentLocationUrl(upUrl_)
+                return True
+        else:
+            if not currentUrl.matches(upUrl_, QtCore.QUrl.StripTrailingSlash):
+                self.setCurrentLocationUrl(upUrl_)
+                return True
 
         return False
 
@@ -2290,9 +2349,10 @@ class _UrlNavigator_(QtCore.QObject):
         self._editable_:bool = False
         self._active_:bool = True
         self._showFullPath_:bool = False
+        self._desktopPlacesMap_ = dutils.get_desktop_places()
 
         # NOTE: 2025-01-24 21:21:11 CMT
-        self._closestPlace_:typing.Optional[DEPlace] = None
+        self._closestPlace_:typing.Optional[dutils.DEPlace] = None
         # self._placePathStr_:str = str()
 
         # self._sig_switchToBreadCrumbMode.connect(self.switchToBreadcrumbMode)
@@ -2303,7 +2363,7 @@ class _UrlNavigator_(QtCore.QObject):
 
         # ### BEGIN UI Components of self._nav_:UrlNavigator
 
-        self._nav_:UrlNavigator = qq
+        self._nav_: UrlNavigator = qq
         self._nav_.setAutoFillBackground(False)
 
         self._layout_:QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout(self._nav_)
@@ -2311,7 +2371,7 @@ class _UrlNavigator_(QtCore.QObject):
         self._layout_.setContentsMargins(0,0,0,0)
 
         # print(f"\tconstructing self._coreUrlNavigator_ on {url}")
-        self._coreUrlNavigator_:CoreUrlNavigator = CoreUrlNavigator(url, self._nav_) # m_coreUrlNavigator
+        self._coreUrlNavigator_: CoreUrlNavigator = CoreUrlNavigator(url, self._nav_) # m_coreUrlNavigator
         self._coreUrlNavigator_.currentLocationUrlChanged.connect(self._nav_.slot_coreUrlNavigatorUrlChanged)
         self._coreUrlNavigator_.currentUrlAboutToChange[QtCore.QUrl].connect(self._nav_.slot_coreUrlNavigatorUrlAboutToBeChanged)
         self._coreUrlNavigator_.historySizeChanged.connect(self._nav_._slot_historyChanged)
@@ -2322,7 +2382,7 @@ class _UrlNavigator_(QtCore.QObject):
         # NOTE: 2025-03-02 09:28:53
         # ### BEGIN stand-in for places selector
         #
-        self._placesButton_:PlacesButton = PlacesButton(self._nav_)
+        self._placesButton_: PlacesButton = PlacesButton(self._nav_)
         self._placesButton_.setForegroundRole(QtGui.QPalette.WindowText)
         self._placesButton_.installEventFilter(self._nav_)
         #
@@ -2339,7 +2399,7 @@ class _UrlNavigator_(QtCore.QObject):
         # ### END   _schemes_: UrlNavigatorSchemeCombo
 
         # ### BEGIN _navButtons_
-        self._navButtons_:list = list() # list of "breadcrumb buttons" - instances of UrlNavigatorButton
+        self._navButtons_: list = list() # list of "breadcrumb buttons" - instances of UrlNavigatorButton
         # ### END   _navButtons_
 
 
@@ -2420,6 +2480,11 @@ class _UrlNavigator_(QtCore.QObject):
 
 
     # ### BEGIN KUrlNavigatorPrivate API
+
+    @property
+    def desktopPlaces(self) -> dutils.PlacesMap | None:
+        # part of new effort to cache calls to dutils.get_desktop_places
+        return self._desktopPlacesMap_ if isinstance(self._desktopPlacesMap_, dutils.PlacesMap) else None
 
     @Slot(QtCore.QUrl)
     def slotApplyUrl(self, url:QtCore.QUrl):
@@ -2565,9 +2630,9 @@ class _UrlNavigator_(QtCore.QObject):
 
         firstVisibleUrl = self._navButtons_[0].url()
 
-        spacer = ""
+        # spacer = ""
 
-        dirName = ""
+        # dirName = ""
 
         drive = ""
 
@@ -2806,9 +2871,9 @@ class _UrlNavigator_(QtCore.QObject):
             # editing tool buttons for example, to remove current text from
             # navigation history - in this case we DO NOT want to restore
             # current url, but the next available one in the history.
-            signalBlocker = QtCore.QSignalBlocker(self._pathBox_)
-            url = QtCore.QUrl(pathlib.Path.cwd().as_uri())
-            self._nav_.setLocationUrl(url)
+            with qtutils.SignalBlocker(self._pathBox_):
+                url = QtCore.QUrl(pathlib.Path.cwd().as_uri())
+                self._nav_.setLocationUrl(url)
             return
 
     def appendWidget(self, widget:QtWidgets.QWidget, stretch:int=0):
@@ -2878,12 +2943,22 @@ class _UrlNavigator_(QtCore.QObject):
 
         self._navButtons_.clear()
 
+    def updateDesktopPlaces(self):
+        # print(f"{self.__class__.__name__}.updateDesktopPlaces()")
+        self._desktopPlacesMap_ = dutils.get_desktop_places()
+
     def updateContent(self):
+        # print(f"{self.__class__.__name__}.updateContent()")
         # KUrlNavigatorPrivate
         currentUrl = self._nav_.locationUrl()
+        # print(f"\n\t currentUrl -> {currentUrl}")
+
+        if urlToPath(currentUrl) is None:
+            return
 
         # NOTE: 2025-01-24 21:22:27 CMT
-        self._closestPlace_ = dutils.closestPlace(currentUrl)
+        self._closestPlace_ = dutils.closestPlace(currentUrl,
+                                                  self._desktopPlacesMap_)
         # print(f"\tself._placesSelector_ {self._placesSelector_}")
         # WARNING: 2025-01-20 22:32:18 temporary -- FIXME
         # TODO: Implement places selector
@@ -2950,7 +3025,8 @@ class _UrlNavigator_(QtCore.QObject):
             if not placeUrl.isValid():
                 placeUrl = self.retrievePlaceUrl()
 
-            placePath = dutils.urlToPath(placeUrl)
+            placePath = urlToPath(placeUrl)
+
             placePathStr = trailingSlashRemoved(placePath.as_posix())
 
             if sys.platform.startswith("win32"):
@@ -2962,8 +3038,6 @@ class _UrlNavigator_(QtCore.QObject):
 
             startIndex = placePathStr.count('/')
 
-            # NOTE: 2025-02-05 15:06:38
-            # RE BUG 2025-02-05 14:50:50 FIXME:
             # the following forces redraw of all buttons when full path must be
             # shown
             if self._showFullPath_ or not isinstance(self._closestPlace_, dutils.DEPlace):
@@ -2978,7 +3052,7 @@ class _UrlNavigator_(QtCore.QObject):
         if not currentUrl.isValid():
             return
 
-        path = dutils.urlToPath(currentUrl)
+        path = urlToPath(currentUrl)
 
         pathStr = trailingSlashRemoved(path.as_posix())
 
@@ -3073,9 +3147,9 @@ class _UrlNavigator_(QtCore.QObject):
             self._nav_.setTabOrder(self._navButtons_[-1], self._toggleEditableMode_)
 
         if os.environ["QT_API"] == "pyside6":
-            ptxt = currentUrl.toDisplayString().replace("///", "/");
+            ptxt = currentUrl.toDisplayString().replace("///", "/")
         else:
-            ptxt = currentUrl.toDisplayString(QtCore.QUrl.RemoveScheme | QtCore.QUrl.NormalizePathSegments | QtCore.QUrl.RemoveAuthority).replace("///", "/");
+            ptxt = currentUrl.toDisplayString(QtCore.QUrl.RemoveScheme | QtCore.QUrl.NormalizePathSegments | QtCore.QUrl.RemoveAuthority).replace("///", "/")
 
         self._dropDownButton_.setToolTip(f"Go to any location on the path {ptxt}")
         self.updateButtonVisibility()
@@ -3173,7 +3247,7 @@ class _UrlNavigator_(QtCore.QObject):
         if len(text) == 0:
             if currentUrl.isLocalFile():
                 if sys.platform.startswith("win32"):
-                    urlPath = dutils.urlToPath(currentUrl)
+                    urlPath = urlToPath(currentUrl)
                     drive = urlPath.drive
                     text = drive if len(drive) else QtCore.QDir.rootPath()
                     # text = currentUrl.path()[:2] if len(currentUrl.path()) > 1 else QtCore.QDir.rootPath()
@@ -3230,14 +3304,6 @@ class UrlNavigator(QtWidgets.QWidget):
     # ### BEGIN __init__ UrlNavigator c'tor
     def __init__(self, url:typing.Optional[QtCore.QUrl]=None,
                  parent:typing.Optional[QtWidgets.QWidget] = None):
-    # def __init__(self, placesModel:typing.Optional[PlacesModel]=None,
-    #              url:typing.Optional[QtCore.QUrl]=None,
-    #              parent:typing.Optional[QtWidgets.QWidget] = None):
-        # if isinstance(placesModel, QtCore.QUrl):
-        #     if isinstance(url, QtWidgets.QWidget):
-        #         parent = url
-        #     url = placesModel
-        #     placesModel = None
 
         super().__init__(parent=parent)
         self._newLook_ = False
@@ -3303,6 +3369,15 @@ class UrlNavigator(QtWidgets.QWidget):
     def locationUrl(self, historyIndex:int = -1) -> QtCore.QUrl:
         return self._nav_p_._coreUrlNavigator_.locationUrl(historyIndex)
 
+    def updateDesktopPlaces(self):
+        # print(f"{self.__class__.__name__}.updateDesktopPlaces()")
+        self._nav_p_.updateDesktopPlaces()
+
+    @property
+    def desktopPlaces(self) -> dutils.PlacesMap | None:
+        # part of new effort to cache calls to dutils.get_desktop_places
+        return self._nav_p_.desktopPlaces
+
     @safewrapper
     def saveLocationState(self, state:QtCore.QByteArray):
         # print(f"{self.__class__.__name__}.saveLocationState({state})")
@@ -3347,6 +3422,7 @@ class UrlNavigator(QtWidgets.QWidget):
         return self._nav_p_._editable_
 
     def setShowFullPath(self, show:bool):
+        # print(f"{self.__class__.__name__}.setShowFullPath({show})")
         if self._nav_p_._showFullPath_ != show:
             self._nav_p_._showFullPath_ = show
             self._nav_p_.updateContent()
@@ -3502,7 +3578,7 @@ class UrlNavigator(QtWidgets.QWidget):
         return self._nav_p_._subfolderOptions_.sortHiddenLast
 
     def setSortHiddenFoldersLast(self, sortHiddenFoldersLast:bool):
-        self._nav_p_._subfolderOptions_.sortHiddenLast = showHidden
+        self._nav_p_._subfolderOptions_.sortHiddenLast = sortHiddenFoldersLast
 
     def sortHiddenFoldersLast(self) -> bool:
         return self._nav_p_._subfolderOptions_.sortHiddenLast
@@ -3597,7 +3673,8 @@ class UrlNavigator(QtWidgets.QWidget):
 
     @Slot()
     def slot_coreUrlNavigatorUrlChanged(self):
-        self._nav_p_.updateContent() # !
+        # print(f"{self.__class__.__name__}.slot_coreUrlNavigatorUrlChanged")
+        self._nav_p_.updateContent()
         self.urlChanged.emit(self._nav_p_._coreUrlNavigator_.currentLocationUrl())
         # self.urlChanged.emit(self._nav_p_._coreUrlNavigator_.currentLocationUrl(), True)
 
@@ -3644,7 +3721,7 @@ class UrlNavigator(QtWidgets.QWidget):
         try:
             locations = list(filter(lambda x: x not in self._nav_p_._coreUrlNavigator_._oldSessionsHistory_, map(lambda x: pathToLocation(x), loc)))
             self._nav_p_._coreUrlNavigator_._oldSessionsHistory_.extend(locations)
-        except:
+        except: #noqa
             traceback.print_exc()
 
     # ### END   New methods by CMT

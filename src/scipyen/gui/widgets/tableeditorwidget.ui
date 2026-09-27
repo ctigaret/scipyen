@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>Form</class>
- <widget class="QWidget" name="Form">
+ <class>TableEditorWidget</class>
+ <widget class="QWidget" name="TableEditorWidget">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>433</width>
-    <height>341</height>
+    <width>429</width>
+    <height>174</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -126,6 +126,9 @@
         <iconset theme="object-locked"/>
        </property>
        <property name="checkable">
+        <bool>true</bool>
+       </property>
+       <property name="autoRaise">
         <bool>true</bool>
        </property>
       </widget>

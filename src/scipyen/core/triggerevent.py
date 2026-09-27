@@ -26,7 +26,7 @@ from neo.core.dataobject import (DataObject, ArrayDict,)
 from core.typeenum import TypeEnum
 from core.constants import (RELATIVE_TOLERANCE, ABSOLUTE_TOLERANCE, EQUAL_NAN,)
 from core.prog import scipywarn
-from core.scipyen_quantities import (checkTimeUnits, unitsConvertible)
+from core.scipyen_quantities import (checkTimeUnits, unitsConvertible, unitFamilyName)
 #from core.utilities import unique
 
 def _new_DataMark(cls, places = None, labels=None, units=None, name=None,
@@ -216,10 +216,11 @@ class DataMark(neo.Event):
         return event_type.name
 
     @classmethod
-    def prep_labels(cls, labels, mark_type, n, shape):
+    def prep_labels(cls, labels, mark_type, n, shape) -> np.ndarray:
         from core import strutils
         from core import datatypes as dt
         # print(f"{cls.__name__}.prep_labels(labels = {labels} ({type(labels).__name__}), mark_type={mark_type}, n = {n}, shape = {shape})\n")
+
         if labels is None:
             try:
                 def_label = cls.defaultLabel(mark_type)
@@ -240,6 +241,7 @@ class DataMark(neo.Event):
                 sfx = 0
 
             labels = np.array(list(map(lambda k: f"{pfx}{k}", range(sfx, n))))
+            # print(f"\tlabels str -> {labels}")
 
         elif isinstance(labels, typing.Sequence):
             if all(isinstance(l, str) for l in labels):
@@ -267,6 +269,7 @@ class DataMark(neo.Event):
 
                 if def_label is None:
                     def_label = "event" if cls.__name__ in ("TriggerEvent", "Event") else "mark"
+
                 labels = np.array(list(map(lambda k: f"{def_label}{k}", range(n))))
 
         elif isinstance(labels, np.ndarray):
@@ -275,12 +278,13 @@ class DataMark(neo.Event):
                     def_label = cls.defaultLabel(mark_type)
                 except:
                     def_label = "event"
+
                 if def_label is None:
                     def_label = "event" if cls.__name__ in ("TriggerEvent", "Event") else "mark"
                 # print(f"def_label -> {def_label}")
                 labels = np.array(list(map(lambda k: f"{def_label}{k}", range(n))))
 
-            if not dt.is_string(labels):
+            elif not dt.is_string(labels):
                 raise TypeError(f"Expecting an array-like of strings; instead, got {labels} ({type(labels).__name__})")
 
             if labels.flatten().size != n:
@@ -306,6 +310,8 @@ class DataMark(neo.Event):
             raise TypeError("Expecting a string or an array-like of strings")
 
         labels = labels.reshape(shape)
+
+        # print(f"\tto return: {labels} ({type(labels).__name__})")
 
         return labels
 
@@ -501,7 +507,6 @@ class DataMark(neo.Event):
                 if isinstance(event_type, (int, TriggerEventType, MarkType)):
                     mark_type = event_type
 
-            labels = cls.prep_labels(labels, mark_type, times.size, times.shape)
 
             if units is None:
                 # No keyword units, so get from `times`
@@ -523,13 +528,17 @@ class DataMark(neo.Event):
                 if not checkTimeUnits(units):
                     raise TypeError(f"Expecting time unitsl got {units} instead")
 
+        # labels = cls.prep_labels(labels, mark_type, times.size, times.shape)
         obj = pq.Quantity(places.magnitude, units=units).view(cls)
-        obj._labels = labels
+        # print(f"{cls.__name__}[DataMark].__new__ before prep_labels: labels = {labels} ({type(labels).__name__})")
+        obj._labels = cls.prep_labels(labels, mark_type, times.size, times.shape)
+        # obj._labels = obj.prep_labels(labels, mark_type, times.size, times.shape)
+        # print(f"{cls.__name__}[DataMark].__new__ after prep_labels: obj._labels = {obj._labels} ({type(obj._labels).__name__})")
         obj._relative = relative
         obj.segment = None
         # obj.name = name
 
-        # print(f"{cls.__name__}.__new__(labels = {obj._labels})")
+        # print(f"{cls.__name__}.__new__(labels = {obj._labels}) ({type(obj._labels).__name__})")
         return obj
 
 
@@ -546,7 +555,8 @@ class DataMark(neo.Event):
         DataObject.__init__(self, name=name, file_origin=file_origin, description=description,
                             array_annotations=array_annotations, **annotations)
 
-        # print(f"{self.__class__.__name__}.__init__(labels = {labels})")
+        # print(f"{self.__class__.__name__}[DataMark].__init__(labels = {labels}: {type(labels).__name__})")
+        self.__domain_name__ = unitFamilyName(self.places)
 
         if not isinstance(annotations, dict):
             annotations = dict()
@@ -599,8 +609,6 @@ class DataMark(neo.Event):
                 warnings.warn("'mark_type' parameter expected to be a MarkType enum value, a MarkType name, or None; got %s instead" % type(mark_type).__name__)
                 self.__mark_type__ = MarkType.unspecified
 
-        # self.set_labels(labels)
-
         if isinstance(name, str) and len(name.strip()):
             self._name_ = name
 
@@ -609,6 +617,9 @@ class DataMark(neo.Event):
                 self._name_ = self.mark_type.name
             else:
                 self._name_ = "DataMark"
+
+        self._labels = self.__class__.prep_labels(labels, self.__mark_type__, self.times.size, self.times.shape)
+        # print(f"{self.__class__.__name__}[DataMark].__init__ after prep_labels: self._labels = {self._labels}: {type(self._labels).__name__})")
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -647,6 +658,7 @@ class DataMark(neo.Event):
         # This ensures the attribute exists
         if not hasattr(self, 'array_annotations'):
             self.array_annotations = ArrayDict(self._get_arr_ann_length())
+        self.__domain_name__ = unitFamilyName(self.units)
 
     def __repr__(self):
         result = str(self)
@@ -657,10 +669,12 @@ class DataMark(neo.Event):
 
         if self.times.size > 1:
             if self.labels is not None:
-                if self.labels.size > 0:
+                if ((isinstance(self.labels, typing.Sequence) and len(self.labels) > 0)
+                    or
+                    (isinstance(self.labels, np.ndarray) and self.labels.size > 0)):
                     objs = ['%s@%s' % (label, time) for label, time in itertools.zip_longest(self.labels, self.times, fillvalue="")]
 
-                elif self.labels.size == 0:
+                else:
                     objs = ["%s" % time for time in self.times]
 
             else:
@@ -678,11 +692,6 @@ class DataMark(neo.Event):
                 objs = ["%s" % self.times]
 
         tail = "'%s' (%s): %s" % (self.name, self.type.name, ", ".join(objs))
-
-        # if self.__class__.__name__ == "TriggerEvent":
-        #     tail = f"({self.type.name}): {self.name}, {', '.join(objs)}"
-        # else:
-        #     tail = f": {self.name}, {', '.join(objs)}"
 
         result = f"{self.__class__.__name__} {tail}"
 
@@ -702,6 +711,20 @@ class DataMark(neo.Event):
                                self.units, self.name, self.description,
                                self.file_origin, self.__mark_type__,
                                self.segment, self.array_annotations, annots)
+
+    @property
+    def domain_name(self):
+        r"""A brief description of the domain name
+        """
+        if self.__domain_name__ is None:
+            self.__domain_name__ = unitFamilyName(self.domain)
+
+        return self.__domain_name__
+
+    @domain_name.setter
+    def domain_name(self, value):
+        if isinstance(value, str) and len(value.strip()):
+            self.__domain_name__ = value
 
     @property
     def labels(self):
@@ -733,62 +756,7 @@ class DataMark(neo.Event):
         from core.datatypes import is_string
 
         # print(f"{self.__class__.__name__}.set_labels(labels = {labels})")
-        self.__class__.prep_labels(labels, self.mark_type, self.times.size, self.times.shape)
-
-        # if labels is None:
-        #     if isinstance(self, TriggerEvent):
-        #         def_label = TriggerEvent.defaultLabel(self.__mark_type__)
-        #     else:
-        #         def_label = "DataMark"
-        #
-        #     labels = np.full_like(self.times.magnitude, def_label, dtype=np.dtype(str))
-        #
-        # else:
-        #     if isinstance(labels, str):
-        #         labels = np.array(list(map(lambda k: f"{labels}{k}", range(self.size))))
-        #         labels = labels.reshape(self.times.shape)
-        #
-        #     elif isinstance(labels, typing.Sequence):
-        #         if all(isinstance(l, str) for l in labels):
-        #             if len(labels) < self.flatten().size:
-        #                 pfx, sfx = strutils.get_int_sfx(labels[-1], sep="", use_re=True)
-        #                 if strutils.is_numeric(sfx):
-        #                     sfx = int(sfx)+1
-        #                 else:
-        #                     sfx = len(labels)+1
-        #                 new_labels = list(map(lambda k: f"{pfx}{k}", range(sfx, self.flatten().size)))
-        #                 labels = labels.extend(new_labels)
-        #
-        #             elif len(labels) > self.size:
-        #                 labels = labels[:self.size]
-        #
-        #             labels = np.array(labels)
-        #         else:
-        #             labels = None
-        #
-        #     elif isinstance(labels, np.ndarray):
-        #         if not is_string(labels):
-        #             raise TypeError("Expecting an array-like of strings")
-        #
-        #         if labels.flatten().size != self.flatten().size:
-        #             if labels.flatten().size < self.flatten().size:
-        #                 ll = str(labels[-1])
-        #                 pfx, sfx = strutils.get_int_sfx(ll, sep="", use_re=True)
-        #                 if strutils.is_numeric(sfx):
-        #                     sfx = int(sfx)+1
-        #                 else:
-        #                     sfx = labels.flatten().size+1
-        #                 new_labels = np.array(list(map(lambda k: f"{pfx}{k}", range(sfx, self.size))))
-        #                 labels = np.concat([labels.flatten(), new_labels], axis=0)
-        #
-        #                 labels = labels.reshape(self.shape)
-        #
-        #             elif labels.flatten().size > self.flatten().size:
-        #                 labels = labels.flatten()[:self.size]
-        #                 labels = labels.reshape(self.shape)
-        #
-        #     else:
-        #         raise TypeError("Expecting a string or an array-like of strings")
+        labels = self.__class__.prep_labels(labels, self.mark_type, self.times.size, self.times.shape)
 
         self._labels = labels
 
@@ -910,6 +878,7 @@ class DataMark(neo.Event):
         Value must be a pq.Quantity with the same units as the times attribute,
         or a scalar
         """
+        from core.datatypes import Real
         if copy:
             ret = self.copy()
 
@@ -1448,8 +1417,7 @@ class TriggerEvent(DataMark):
                 file_origin=None, event_type=None, relative=None,
                 array_annotations=None, **annotations):
         from core.datatypes import is_string
-        # BUG: 2023-10-03 17:57:30 FIXME
-        # when labels are passed as a string the counter is not taken into account
+
         if isinstance(times, (neo.Event, TriggerEvent)):
             # for copy c'tor
             evt = times
@@ -1464,6 +1432,7 @@ class TriggerEvent(DataMark):
 
             if isinstance(evt, TriggerEvent):
                 event_type = evt.event_type
+
         else:
             if times is None:
                 times = np.array([])
@@ -1478,7 +1447,7 @@ class TriggerEvent(DataMark):
                         times_.append(times[0])
                         for v in times[1:]:
                             if not unitsConvertible(v, times[0]):
-                                raise TypeError(f"'times' parametre has inconsistent units")
+                                raise TypeError(f"'times' parameter has inconsistent units")
                             times_.append(v.rescale(times[0]))
 
                         times = times_
@@ -1503,14 +1472,16 @@ class TriggerEvent(DataMark):
             if not isinstance(relative, bool):
                 relative = False
 
-            labels = cls.prep_labels(labels, event_type, times.size, times.shape)
+        # labels = cls.prep_labels(labels, event_type, times.size, times.shape)
 
         obj = pq.Quantity(times.magnitude, units=units).view(cls)
-        obj._labels = labels
+        # print(f"{cls.__name__}.__new__ before prep_labels: {labels}")
+        obj._labels = cls.prep_labels(labels, event_type, times.size, times.shape)
+        # obj._labels = obj.prep_labels(labels, event_type, times.size, times.shape)
         obj._relative = relative
         obj.segment = None
 
-        # print(f"{cls.__name__}.__new__: labels -> {obj._labels}")
+        # print(f"{cls.__name__}.__new__ after prep_labels: labels -> {obj._labels} ({type(obj._labels).__name__})")
 
         return obj
 
@@ -1539,6 +1510,8 @@ class TriggerEvent(DataMark):
                          mark_type=event_type, relative=relative,
                          array_annotations=array_annotations,
                          **annotations)
+
+        # print(f"{self.__class__.__name__}.__init__: after DataMark.__init__: self._labels = {self._labels} ({type(self._labels).__name__})")
 
     def __array_finalize__(self, obj):
         super(TriggerEvent, self).__array_finalize__(obj)

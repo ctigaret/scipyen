@@ -1,33 +1,34 @@
-# -*- coding: utf-8 -*-
-# $Id: tableeditorwidget.py $
+# $Id: tabulardatamodel.py $
 # SPDX-FileCopyrightText: 2023 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-r"""Table Editor widget and custom table model, for tabular-like data
+r"""Table model, for tabular-like data
 """
 
 
 #### BEGIN core python modules
-from __future__ import print_function
+# from __future__ import print_function
 
-import os, inspect, warnings, traceback, datetime, typing, numbers
-from functools import singledispatch
+import os, inspect, warnings, traceback, datetime, typing, types, numbers, enum # noqa
+from functools import (singledispatch, singledispatchmethod) # noqa
+from collections import deque
+import dataclasses
 #### END core python modules
 
 #### BEGIN 3rd party modules
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+# import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
-__has_sip__ = False
+# __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    # import PySide6
+    # from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -35,12 +36,13 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    # from qtpy import sip
+    # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
-    __has_sip__ = True
+    QVariant = QtCore.QVariant
+    # __has_sip__ = True
 
 
 import pandas as pd
@@ -48,57 +50,89 @@ import quantities as pq
 #import xarray as xa
 import numpy as np
 import neo
+from neo.core.objectlist import ObjectList as NeoObjectList
 from core.vigra_patches import vigra
+from imaging import vigrautils
 
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import matplotlib.pylab as plb
-import matplotlib.mlab as mlb
+import matplotlib as mpl # noqa
+import matplotlib.pyplot as plt # noqa
+import matplotlib.pylab as plb # noqa
+import matplotlib.mlab as mlb # noqa
 #### END 3rd party modules
 
 #### BEGIN pict.core modules
 #from core.patchneo import *
-import core.datatypes
-
-import core.utilities as utilities
-import core.strutils as strutils
-from core.strutils import str2float
-
-from core.prog import (safewrapper, scipywarn)
-
-from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType)
-from core.marktrain import MarkTrain
+from core import datatypes
+import core.datatypes as dt # noqa
+from core import utilities # noqa
+from core.utilities import repr_val
+import core.strutils as strutils # noqa
+from core.strutils import str2float # noqa
+from core.prog import (safewrapper, scipywarn, unwind_type)
+from core.triggerevent import (DataMark, MarkType, TriggerEvent, TriggerEventType) # noqa
+from core.marktrain import MarkTrain # noqa
 from core.triggerprotocols import (TriggerProtocol, TriggerProtocolList)
 from core.datazone import DataZone
-
-import core.datasignal
+import core.datasignal # noqa
 from core.datasignal import (DataSignal, IrregularlySampledDataSignal,)
-import core.datatypes as dt
-from core.datatypes import array_slice
-from core.sysutils import adapt_ui_path
+from core.datatypes import array_slice # noqa
+from core.sysutils import adapt_ui_path # noqa
 from core import scipyen_quantities as scq
-from core import neoutils
+from core import scipyendataclasses as sdc
+from core import neoutils # noqa
+from core.qtutils import (qVariant, QVariantType)
+
+from ephys import (ephys, ephys_pathways, ephys_protocol) # noqa
 
 #### END pict.core modules
 
 #### BEGIN pict.gui modules
-from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
-from gui import quickdialog
-from gui.delegates import PythonItemDelegate
-from gui.widgets.tabledataview import TableDataView
+# from gui.delegates import PythonItemDelegate
+from gui import guiutils
+
 from gui.itemmodels.roles import *
-# from gui import resources_rc
-# from gui import icons_rc
 #### END pict.gui modules
 
 #### BEGIN pict.iolib modules
-import iolib.pictio as pio
+# import iolib.pictio as pio
 #### END pict.iolib modules
 
-__module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__, "tableeditorwidget.ui")
-
 __module_name__ = os.path.splitext(os.path.basename(__file__))[0]
+
+TabularType = typing.Union[pd.DataFrame,
+                           pd.Series,
+                           neo.core.baseneo.BaseNeo,
+                           neo.AnalogSignal,
+                           neo.IrregularlySampledSignal,
+                           neo.Epoch,
+                           neo.Event,
+                           neo.SpikeTrain,
+                           DataSignal,
+                           IrregularlySampledDataSignal,
+                           TriggerEvent,
+                           TriggerProtocolList,
+                           np.ndarray,
+                           vigra.VigraArray,
+                           vigra.filters.Kernel1D,
+                           vigra.filters.Kernel2D,
+                           NeoObjectList,
+                           ephys_pathways.AuxiliaryInputList,
+                           ephys_pathways.AuxiliaryOutputList,
+                           ephys_pathways.RecordingSchedule,
+                           ephys_pathways.RecordingSourceList,
+                           ephys_pathways.SynapticPathwayList,
+                           ephys_pathways.SynapticStimulusChannelList,
+                           sdc.Schedule,
+                           list, tuple, deque]
+
+TabularTypes = tuple(unwind_type(TabularType))
+
+# def _extEditableBodyFn_(ns, obj):
+#     ns["obj"] = obj
+#
+#
+# ExternallyEditableType = types.new_class("ExternallyEditableType",
+#                                          exec_body = _extEditableBodyFn_)
 
 class TabularDataModel(QtCore.QAbstractTableModel):
     r"""Table item model for tabular data in Scipyen.
@@ -145,38 +179,43 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     # NOTE: 2025-11-23 14:03:48 sig_rowsPopulated(startRow, count, total)
     sig_rowsPopulated = Signal(int, int, int, name="sig_rowsPopulated")
     sig_columnsPopulated = Signal(int, int, int, name="sig_columnsPopulated")
+    sig_modelPopulated = Signal(name="sig_modelPopulated")
+    sig_indexChanged = Signal(QtCore.QModelIndex, name="sig_indexChanged")
+    sig_indexRowColChanged = Signal(int, int, name="sig_indexRowColChanged")
 
     def __init__(self, data=None, parent=None):
-        super(TabularDataModel, self).__init__(parent=parent)
+        super(TabularDataModel, self).__init__(parent=parent) # noqa
 
-        #if not isinstance(data, (pd.Series, pd.DataFrame, np.ndarray, type(None))):
-            #raise TypeError("%s data is not yet supported" % type(data).name)
+        self._decimals_ = None
 
-        #if isinstance(data, np.ndarray) and data.ndim > 2:
-            #raise TypeError("cannot support numpy array data with more than two dimensions")
         self._is_vigra_filter_kernel_:bool = False
         self._original_data_:typing.Any = None
         self._modelData_:typing.Any= None
         self._modelDataRows_:int = 0
+        self._modelDataRowIndexName_: str | None = None
+        # self._modelDataRowIndexName_: str = "Index"
         self._modelDataColumns_:int = 0
-        self._modelDataHeaderSections_: typing.Optional[
-            typing.Union[typingMapping, typing.Sequence]
+        self._modelDataColumnHeaders_: typing.Optional[
+            typing.Union[typing.Mapping, typing.Sequence]
             ] = None
         self._immutability_:dict = {"columns": list(), "rows": list(), "joint":False}
         self._rowBatchSize_:int = 10
         self._columnBatchSize_:int = 10
         self._canAddRemoveRows_:bool = False
         self._canAddRemoveColumns_:bool = False
+        self._rowValueToInsert_: typing.Any = None
 
-        # self._immutableColumns_:typing.Sequence[int] = list()  # of column indexes
-        # self._immutableRows_:typing.Sequence[int] = list()     # of row indexes
+        # NOTE: 2026-06-07 10:58:03
+        # flag showing if editing an object externally is allowed
+        #
+        self._useExternalDataEditor_: bool = False
 
         # NOTE: 2018-11-10 10:58:09
         # how many columns & rows are actually displayed
         self._displayedColumns_:int = 0
         self._displayedRows_:int = 0
 
-        self.setModelData(data)
+        self.populateModel(data)
 
     #### BEGIN lazy (paged) display
     #
@@ -185,7 +224,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     def fetchMore(self, parentIndex:QtCore.QModelIndex):
         if parentIndex.isValid():
-            # print(f"{self.__class__.__name__}.fetchMore: parent is valid, nothing to fetch")
             return
 
         startRow:int = self._displayedRows_
@@ -196,18 +234,26 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         rowsToFetch = min(self._rowBatchSize_, remainingRows)
         columnsToFetch = min(self._columnBatchSize_, remainingColumns)
-        # print(f"{self.__class__.__name__}.fetchMore: {rowsToFetch} rows and {columnsToFetch} columns to fetch")
 
         if rowsToFetch <= 0 and columnsToFetch <= 0:
             return
 
         if rowsToFetch > 0:
-            self.beginInsertRows(QtCore.QModelIndex(), startRow, startRow + rowsToFetch -1)
+            endRow = startRow + rowsToFetch - 1
+            if endRow < 0:
+                endRow = startRow
+            # print(f"{self.__class__.__name__}.fetchMore(startRow={startRow}, endRow={endRow})")
+            # self.beginInsertRows(QtCore.QModelIndex(), startRow, startRow + rowsToFetch -1)
+            self.beginInsertRows(QtCore.QModelIndex(), startRow, endRow)
             self._displayedRows_ += rowsToFetch
             self.endInsertRows()
 
         if columnsToFetch > 0:
-            self.beginInsertColumns(QtCore.QModelIndex(), startColumn, startColumn + columnsToFetch -1)
+            endColumn = startColumn + columnsToFetch -1
+            if endColumn < 0:
+                endColumn = startColumn
+            # self.beginInsertColumns(QtCore.QModelIndex(), startColumn, startColumn + columnsToFetch -1)
+            self.beginInsertColumns(QtCore.QModelIndex(), startColumn, endColumn)
             self._displayedColumns_ += columnsToFetch
             self.endInsertColumns()
 
@@ -220,66 +266,71 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     #### BEGIN item data handling
     #
     def data(self, modelIndex:QtCore.QModelIndex,
-             role:QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole) -> QtCore.QVariant:
+             role:QtCore.Qt.ItemDataRole = QtCore.Qt.DisplayRole) -> QVariantType:
         try:
             if self._modelData_ is None:
-                return QtCore.QVariant()
+                return qVariant()
 
             if not modelIndex.isValid():
-                return QtCore.QVariant()
+                return qVariant()
 
             row = modelIndex.row()
             col = modelIndex.column()
 
             if row >= self._modelDataRows_ or row < 0:
-                return QtCore.QVariant()
+                return qVariant()
 
             if col >= self._modelDataColumns_ or row < 0:
-                return QtCore.QVariant()
+                return qVariant()
 
             return self._getModelData_(row, col, role)
 
-        except Exception as e:
+        except Exception as e: # noqa
             traceback.print_exc()
 
     def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
         if self._modelData_ is None:
-            return QtCore.QVariant()
+            return qVariant()
 
         return self._getHeaderData_(section, orientation, role)
 
-    def rowCount(self, parentIndex:QtCore.QModelIndex = QtCore.QModelIndex()):
+    def rowCount(self, parentIndex: QtCore.QModelIndex | None = None):
         r"""Number of rows the model currently handles.
         This may be less than the notional "rows" in the data
         """
-        return 0 if parentIndex.isValid() else self._displayedRows_
+        if not isinstance(parentIndex, QtCore.QModelIndex):
+            parentIndex = QtCore.QModelIndex()
+        nRows = min(self._displayedRows_, self._modelDataRows_)
+        return nRows
 
-    def columnCount(self, parentIndex:QtCore.QModelIndex = QtCore.QModelIndex()):
-        return 0 if parentIndex.isValid() else self._displayedColumns_
+    def columnCount(self, parentIndex: QtCore.QModelIndex | None = None):
+        if not isinstance(parentIndex, QtCore.QModelIndex):
+            parentIndex = QtCore.QModelIndex()
+        nCols = (self._displayedColumns_ if self._displayedColumns_ <= self._modelDataRows_
+                 else self._modelDataColumns_)
+        return 0 if parentIndex.isValid() else nCols
 
     #### BEGIN editable items
     #
-    def flags(self, modelIndex:QtCore.QModelIndex):
+    def flags(self, modelIndex: QtCore.QModelIndex):
         if not modelIndex.isValid():
             return QtCore.Qt.ItemIsEnabled
 
-        # if self._readOnly_:
-        #     return QtCore.Qt.ItemIsSelectable
-
         return QtCore.Qt.ItemIsEditable | super().flags(modelIndex)
-
-        #return QtCore.Qt.ItemIsEditable | QtCore.Qt.ItemIsSelectable
 
     def setData(self: typing.Self, modelIndex: QtCore.QModelIndex,
                 value: object, role=QtCore.Qt.EditRole) -> bool:
-        r"""Set a new data with the specified role, at the specified model index in this model"""
+        r"""Set a new data with the specified role, at the specified model index in this model.
+    Overrides QtCore.QAbstractTableModel.setData
+    """
+        # print(f"{self.__class__.__name__}.setData(..., value={value}, role={role})")
         if self._modelData_ is None:
             return False
 
         row = modelIndex.row()
         col = modelIndex.column()
 
-        if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole):
+        if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, ObjectDataRole):
             return False
 
         if self._setDataValue_(value, row, col):
@@ -301,6 +352,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             # 'atomic' data changes in arrays, etc)
             # CAUTION/WARNING this only works for my own custom item models!
             self.sig_modelDataChanged.emit()
+            self.sig_indexChanged.emit(modelIndex)
             return True
 
         return False
@@ -309,312 +361,328 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
     #### BEGIN resizable model
     #
-    #
+
+    def insertRow(self, row: int, index: QtCore.QModelIndex | None = None) -> bool:
+        r"""Overrrides QAbstractItemModel.insertRow"""
+        if not isinstance(index, QtCore.QModelIndex):
+            index = QtCore.QModelIndex()
+        last = row+1
+        first = row
+
+        self.beginInsertRows(index, first, last)
+        ret = False
+        try:
+            ret = self._insertDataRow_(self._modelData_, row, self._rowValueToInsert_)
+        except: # noqa
+            traceback.print_exc()
+
+        finally:
+            self.endInsertRows()
+
+        return ret
+
+
+    def insertModelRow(self, row: int, row_value: object, parent: QtCore.QModelIndex | None = None) -> bool:
+        # print(f"{self.__class__.__name__}.insertModelRow: row {row}, value {row_value}, parent {parent}")
+        if not isinstance(parent, QtCore.QModelIndex):
+            parent = QtCore.QModelIndex()
+
+        if not datatypes.is_iterable(self._modelData_):
+            return False
+
+        if row < 0 or row > len(self._modelData_):
+            return False
+
+        ret = False
+
+        self._rowValueToInsert_ = row_value
+        ret = self.insertRow(row, parent)
+
+        if ret and self._displayedRows_ < self._modelDataRows_:
+            self.fetchMore(parent)
+
+        return ret
+
+    def appendRow(self, data: typing.Optional[object] = None) -> bool:
+        if self._modelData_ is None:
+            return
+
+        return self.insertModelRow(self.rowCount(), data, QtCore.QModelIndex())
+
+    def removeRow(self, row: int, parent: QtCore.QModelIndex) -> bool:
+        # BUG 2026-06-12 23:32:29 FIXME
+        # when removing intermediate rows the vertical header does NOT update its sections
+        # to reflect the reduced number of rows
+        if not datatypes.is_iterable(self._modelData_):
+            return False
+
+        if row < 0 or row > len(self._modelData_):
+            return False
+
+        if row < self._modelDataRows_: # -1:
+            row1 = row
+        else:
+            row1 = row+1
+
+        # print(f"{self.__class__.__name__}.removeRow({row}) -> row1 = {row1}")
+        self.beginRemoveRows(parent, row, row1)
+
+        if isinstance(self._modelData_, pd.DataFrame):
+            self._modelData_ = self._modelData_.drop(self._modelData_.index[row])
+            self._modelDataRows_ = self._modelData_.shape[0]
+        else:
+            del(self._modelData_[row])
+            self._modelDataRows_ = len(self._modelData_)
+
+        self.endRemoveRows()
+        return True
+
+    @singledispatchmethod
+    def _insertDataRow_(self, mdata, row: int, obj: object = None) -> bool:
+        scipywarn(f"Cannnot add rows to {type(mdata).__name__}")
+        return False
+
+    @_insertDataRow_.register(pd.DataFrame)
+    def __insertDataRow__(self, mdata: pd.DataFrame,
+                       row: int,
+                       obj: typing.Optional[pd.DataFrame] = None) -> bool: # noqa
+
+        if row == self.rowCount():
+            if issubclass(mdata.index.dtype.type, (float, int, complex, np.floating, np.complexfloating, np.integer)):
+                δndx = mdata.index[-1] - mdata.index[-2]
+                newIndex = pd.Index([mdata.index[-1] + δndx], name = mdata.index.name)
+            else:
+                newIndex = pd.Index([f"row {mdata.index.size+1}"], name = mdata.index.name)
+
+            try:
+                if obj is None:
+                    obj = pd.DataFrame(dict(zip(mdata.columns, tuple((pd.NA, )) * mdata.shape[1])), index = newIndex)
+
+                elif isinstance(obj, typing.Sequence):
+                    obj = pd.DataFrame(dict(zip(mdata.columns, obj)), index = newIndex)
+                else:
+                    return False
+
+                self._modelData_ = pd.concat((mdata, obj))
+
+            except: # noqa
+                traceback.print_exc()
+                return False
+
+        else:
+            if issubclass(mdata.index.dtype.type, (float, int, complex, np.floating, np.complexfloating, np.integer)):
+                δndx = mdata.index[row] - mdata.index[row-1]
+                newIndex = pd.Index([mdata.index[row] + δndx], name = mdata.index.name)
+            else:
+                newIndex = pd.Index([f"row {row+1}"], name = mdata.index.name)
+            try:
+                if obj is None:
+                    obj = pd.DataFrame(dict(zip(mdata.columns, tuple((pd.NA, )) * mdata.shape[1])), index = newIndex).T
+
+                elif isinstance(obj, typing.Sequence):
+                    obj = pd.DataFrame(dict(zip(mdata.columns, obj)), index = newIndex).T
+
+                else:
+                    return False
+
+                temp = mdata.T
+                temp.insert(row, obj.columns[0], obj, allow_duplicates = True)
+                self._modelData_ = temp.T
+
+            except: # noqa
+                traceback.print_exc()
+                return False
+
+        self._modelDataRows_ = self._modelData_.shape[0]
+        self._original_data_ = self._modelData_
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        return True
+
+    @_insertDataRow_.register(ephys_pathways.SynapticPathwayList)
+    @_insertDataRow_.register(ephys_pathways.AuxiliaryInputList)
+    @_insertDataRow_.register(ephys_pathways.AuxiliaryOutputList)
+    @_insertDataRow_.register(ephys_pathways.RecordingSchedule)
+    @_insertDataRow_.register(ephys_pathways.SynapticStimulusChannelList)
+    @_insertDataRow_.register(TriggerProtocolList)
+    def __insertDataRow__(self, mdata: typing.Union[ # noqa
+        ephys_pathways.SynapticPathwayList,
+        ephys_pathways.AuxiliaryInputList,
+        ephys_pathways.AuxiliaryOutputList,
+        ephys_pathways.SynapticStimulusChannelList,
+        ephys_pathways.RecordingSchedule,
+        TriggerProtocolList
+        ],
+        row: int,
+        obj: typing.Optional[ephys_pathways.SynapticPathway] = None) -> bool:
+
+        if obj is None:
+            if isinstance(mdata, ephys_pathways.SynapticPathwayList):
+                obj = ephys_pathways.SynapticPathway()
+
+            elif isinstance(mdata, ephys_pathways.AuxiliaryInputList):
+                obj = ephys_pathways.AuxiliaryInput()
+
+            elif isinstance(mdata, ephys_pathways.AuxiliaryOutputList):
+                obj = ephys_pathways.AuxiliaryOutput()
+
+            elif isinstance(mdata, ephys_pathways.SynapticStimulusChannelList):
+                obj = ephys_pathways.SynapticStimulusChannel()
+
+            elif isinstance(mdata, ephys_pathways.RecordingSchedule):
+                obj = ephys_pathways.RecordingEpisode()
+
+            elif isinstance(mdata, TriggerProtocolList):
+                obj = TriggerProtocol()
+
+        if len(self._modelData_) and all(hasattr(o, "name") for o in self._modelData_) and hasattr(obj, "name"):
+            names = list(map(lambda o: o.name, self._modelData_))
+
+            seps = list(map(lambda s: strutils.guess_sfx_sep(s), names))
+            seplen = list(map(lambda s: len(s), seps))
+            longest_sep_ndx = seplen.index(max(seplen))
+            sep = seps[longest_sep_ndx]
+
+            objNameAttr = strutils.counter_suffix(obj.name, names, sep = sep,
+                                                  returns_counter=False)
+
+            obj.name = objNameAttr
+
+        if not isinstance(obj, (ephys_pathways.SynapticPathway,
+                                ephys_pathways.AuxiliaryInput,
+                                ephys_pathways.AuxiliaryOutput,
+                                ephys_pathways.SynapticStimulusChannel,
+                                ephys_pathways.RecordingEpisode,
+                                TriggerProtocol
+                                )
+                        ):
+            return False
+
+        # print(f"{self.__class__.__name__}._insertDataRow_(row={row})")
+
+        if row == len(self._modelData_):
+            self._modelData_.append(obj)
+        else:
+            self._modelData_.insert(row, obj)
+
+        self._modelDataRows_ = len(self._modelData_)
+        self._original_data_ = self._modelData_
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        return True
+
+    @_insertDataRow_.register(list)
+    @_insertDataRow_.register(deque)
+    def __insertDataRow__(self, mdata: (list, deque), # noqa
+                       row: int,
+                       obj: typing.Optional[object] = None) -> bool:
+        if len(mdata):
+            if all(isinstance(o, ephys_pathways.RecordingSource) for o in mdata):
+                if obj is None:
+                    obj = ephys_pathways.RecordingSource()
+
+                if not isinstance(obj, ephys_pathways.RecordingSource):
+                    scipywarn(f"A RecordingSource object was expected; instead, got a {type(obj).__name__}")
+                    return False
+
+            elif all(isinstance(o, typing.Sequence) for o in mdata):
+                if isinstance(obj, typing.Sequence):
+                    if len(obj) != len(mdata[-1]):
+                        scipywarn(f"Expecting a sequence of {len(mdata[-1])} objects")
+                        return False
+
+                else:
+                    scipywarn(f"Expecting a sequence of {len(mdata[-1])} objects")
+                    return False
+
+            else:
+                if (all(
+                    isinstance(d,
+                                    (int, float, str, bool,
+                                    np.integer, np.floating, np.complexfloating,
+                                    np.character, np.bool,
+                                    pq.Quantity)
+                                )
+                    for d in mdata
+                    )
+                    and not isinstance(obj, ((int, float, str, bool,
+                                    np.integer, np.floating, np.complexfloating,
+                                    np.character, np.bool,
+                                    pq.Quantity, types.NoneType)))):
+                    return False
+
+        else:
+            return False
+
+        if row == self.rowCount():
+            self._modelData_.append(obj)
+        else:
+            self._modelData_.insert(row, obj)
+
+        self._modelDataRows_ = len(self._modelData_)
+        self._original_data_ = self._modelData_
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        return True
+
     #### END resizable model
 
     #### END item data handling
 
     @Slot(object)
-    def setModelData(self, data):
-        #print("TabularDataModel setModelData")
-        from imaging import vigrautils
+    def populateModel(self, data):
+        # from core import datatypes
+        # from imaging import vigrautils
 
+        # print(f"{self.__class__.__name__}.populateModel({type(data).__name__})")
         # ### BEGIN Define timer to debug
         # #
         # timer = QtCore.QElapsedTimer()
         # timer.start()
         #
         # ### END   Define timer debug
+
+        self.beginResetModel()
+
         try:
-
-            if not isinstance(data, (pd.Series, pd.DataFrame, pd.Index,
-                                     np.ndarray, vigra.filters.Kernel1D,
-                                     vigra.filters.Kernel2D,
-                                     TriggerProtocolList,
-                                     type(None))):
-                raise TypeError("%s data is not yet supported" % type(data).__name__)
-
-            self.beginResetModel()
-
-            # timer1 = QtCore.QElapsedTimer()
-            # timer1.start()
-
             self._is_vigra_filter_kernel_ = False
             self._original_data_ = data
 
-            if isinstance(data, pd.DataFrame):
-                self._modelData_ = data
-                self._modelDataRows_ = data.shape[0]
-                self._modelDataColumns_ = data.shape[1]
-
-                if isinstance(self._modelData_.columns, (pd.MultiIndex, pd.Index)):
-                    self._modelDataHeaderSections_ = dict(
-                        tuple(
-                            map(
-                                lambda x: (x[0], f"{x[1]}"),
-                                enumerate(data.columns)
-                                )
-                            )
-                        )
-
-                # self._modelDataHeaderSections_ = dict(enumerate(data.columns))
-                self._canAddRemoveColumns_ = True
-                self._canAddRemoveRows_ = True
-
-            elif isinstance(data, pd.Series):
-                self._modelData_ = data
-                self._modelDataRows_ = data.shape[0]
-                self._modelDataColumns_ = 1
-                self._modelDataHeaderSections_ = {0: data.name}
-                self._canAddRemoveRows_ = True
-                self._canAddRemoveColumns_ = False
-
-            elif isinstance(data, pd.Index):
-                self._modelData_ = data
-                self._modelDataRows_ = data.shape[0]
-                self._modelDataColumns_ = 1
-                self._modelDataHeaderSections_ = {0: "Index or Column"}
-                self._canAddRemoveRows_ = True
-                self._canAddRemoveColumns_ = False
-
-            elif isinstance(data, (vigra.filters.Kernel1D, vigra.filters.Kernel2D)):
-                self._modelData_ = vigrautils.kernel2array(data)
-                self._modelDataRows_ = data.shape[0]
-                self._modelDataColumns_ = 1 if isinstance(data, vigra.filters.Kernel1D) else 2
-                self._modelDataHeaderSections_ = {0: "Sample"} if isinstance(data, vigra.filters.Kernel1D) else {0: "X", 1: "Y"}
-                self._is_vigra_filter_kernel_  = True
-                self._original_data_ = data
-                self._canAddRemoveRows_ = False
-                self._canAddRemoveColumns_ = False
-
-            elif isinstance(data, TriggerProtocolList):
-                self._modelData_ = data
-                self._original_data_ = data
-                self._modelDataRows_ = len(data)
-                self._is_vigra_filter_kernel_ = 1
-                self._canAddRemoveRows_ = True
-                self._canAddRemoveColumns_ = True
-
-                self._modelDataHeaderSections_ = dict(
-                    tuple(
-                        map(
-                            lambda x: (x[0], f"{x[1]}"),
-                            enumerate(("name", "presynaptic", "postsynaptic", "photostimulation",
-                             "acquisition", "imagingDelay" ,"segments")
-                            ))
-                        )
-                    )
-                self._modelDataColumns_ = len(self._modelDataHeaderSections_)
-
-            elif isinstance(data, np.ndarray):
-                # trying to streamline this
-                # NOTE: 2025-11-23 09:45:45 FIXME/TODO - TOO SLOW!
-                # lazy display alleviates this to some degree (see self.fetchMore(…))
-                self._canAddRemoveRows_ = True
-                self._canAddRemoveColumns_ = True
-
-                if isinstance(data, neo.core.dataobject.DataObject):
-                    # NOTE: 2025-09-27 10:38:00
-                    # for regularly sampled signals (neo.AnalogSignal, DataSignal)
-                    # signal domain (e.g. time) is a dynamic property, calculated
-                    # from the t_start and sampling_period attributes of the signal
-                    # object; hence, individual data points in the domain cannot
-                    # be edited; however, the entire domain IS mutable (by changing
-                    # the two attributes mentioned above)
-                    #
-                    if data.ndim:
-                        self._modelDataRows_ = data.shape[0]
-
-                        domain = getattr(data, "times", None)
-                        domain_name = getattr(data, "domain_name", scq.getUnitFamily(domain))
-                        if len(domain_name) == 0:
-                            domain_name = f"{domain.dimensionality}"
-                        else:
-                            domain_name += f" ({domain.dimensionality})"
-
-                        if data.ndim > 1:
-                            # include domain as the first column
-                            self._modelDataColumns_ = data.shape[1] + 1
-                            # domain = getattr(data, "times", None)
-                            # domain_name = getattr(data, "domain_name", scq.getUnitFamily(domain))
-                            # if len(domain_name) == 0:
-                            #     domain_name = f"{domain.dimensionality}"
-                            # else:
-                            #     domain_name += f" ({domain.dimensionality})"
-
-                            channel_names = None
-                            if len(data.array_annotations):
-                                if "channel_names" in data.array_annotations:
-                                    channel_names = list(
-                                        map(
-                                            lambda n: f"{n}",
-                                            data.array_annotations["channel_names"]
-                                            )
-                                        )
-                                elif "channel_ids" in data.array_annotations:
-                                    channel_names = list(
-                                        map(
-                                            lambda i: f"{i}",
-                                            data.array_annotations["channel_ids"]
-                                            )
-                                        )
-
-                            if channel_names is None:
-                                channel_names = list(map(lambda i: f"Channel {i}", range(data.shape[1])))
-
-                            channel_names = list(map(lambda kc: f"{channel_names[kc]} ({data[:,kc].dimensionality})",
-                                                     range(len(channel_names))))
-                            headers = [domain_name, ] + channel_names
-
-                            self._modelDataHeaderSections_ = dict(
-                                    (
-                                        tuple(map(lambda x: (x[0]+1, x),
-                                                  enumerate(headers))
-                                            )
-                                    )
-                                )
-
-                            # self._modelDataRows_ = data.shape[0]
-
-                            if isinstance(data, (neo.AnalogSignal, DataSignal)):
-                                # NOTE: 2025-09-27 11:05:05 see NOTE: 2025-09-27 10:38:00
-                                # although the signal domain is shown as a regular column
-                                # (column 0),  editing data points in this column is
-                                # prevented, EXCEPT for the first data point - which is
-                                # the t_start
-                                #
-                                # This may sound contrived, but the native Qt option would
-                                # be to call setItemDelegateForColumn and setItemDelegateForRow
-                                # with a custom delegate returning a null widget (i.e. None)
-                                # but that is already baked in PythonItemDelegate class
-                                self._immutableColumns_ = [0]
-                                # below, allow editing t_start
-                                self._immutableRows_ = range(1,self._modelDataRows_)
-
-                        else: # e.g. case of spiketrains:
-                            self._modelDataColumns_ = 1 if isinstance(data, neo.SpikeTrain) else 2
-                            if isinstance(data, neo.SpikeTrain):
-                                headers = [domain_name ]
-                            else:
-                                channel_names = None
-                                if len(data.array_annotations):
-                                    if "channel_names" in data.array_annotations:
-                                        channel_names = list(
-                                            map(
-                                                lambda n: f"{n}",
-                                                data.array_annotations["channel_names"]
-                                                )
-                                            )
-                                    elif "channel_ids" in data.array_annotations:
-                                        channel_names = list(
-                                            map(
-                                                lambda i: f"{i}",
-                                                data.array_annotations["channel_ids"]
-                                                )
-                                            )
-
-                                if channel_names is None:
-                                    channel_names = [f"Channel 0 ({data.dimensionality})"]
-
-                                headers = [domain_name, ] + channel_names
-
-                            self._modelDataHeaderSections_ = dict(
-                                    (
-                                        tuple(map(lambda x: (x[0]+1, x),
-                                                  enumerate(headers))
-                                            )
-                                    )
-                                )
-
-
-                    else:
-                        self._modelDataRows_ = 1
-                        self._modelDataColumns_ = 1
-                        self._modelDataHeaderSections_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
-                        # self._canAddRemoveColumns_ = True
-
-                    self._modelData_ = data
-
-                else: # "plain" numpy arrays and "generic" Quantity arrays
-                    if data.ndim > 2:
-                        if all (v == 1 for v in data.shape[2:]):
-                            self._modelData_ = np.squeeze(data).reshape((data.shape[0], np.prod(data.shape[1:])))
-                        else:
-                            raise ValueError("Arrays with more than two dimensions and with non-singleton dimensions higher than 2 are not supported")
-                    else:
-                        self._modelData_ = data
-
-                    if self._modelData_.ndim:
-                        self._modelDataRows_ = self._modelData_.shape[0]
-                        if self._modelData_.ndim > 1:
-                            self._modelDataColumns_ = self._modelData_.shape[1]
-                            if isinstance(self._modelData_, pq.Quantity):
-                                self._modelDataHeaderSections_ = dict(
-                                        tuple(
-                                            map(
-                                                lambda x: (x, f"{scq.getUnitFamily(data)} ({self._modelData_.units.dimensionality})"),
-                                                range(self._modelData_.shape[1])
-                                                )
-                                            )
-                                    )
-                            # else:
-                            #     self._modelDataHeaderSections_ = dict(
-                            #         tuple(
-                            #             map(
-                            #                 lambda x: (x, f"Channel {x}"),
-                            #                 range(self._modelData_.shape[1])
-                            #                 )
-                            #             )
-                            #         )
-                        else:
-                            self._modelDataColumns_ = 1
-                            if isinstance(self._modelData_, pq.Quantity):
-                                self._modelDataHeaderSections_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
-                            # else:
-                            #     self._modelDataHeaderSections_ = {0: "Samples"}
-                    else:
-                        self._modelDataRows_ = 1
-                        self._modelDataColumns_ = 1
-                        if isinstance(self._modelData_, pq.Quantity):
-                            self._modelDataHeaderSections_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
-                        # else:
-                        #     self._modelDataHeaderSections_ = {0: "Samples"}
-
-            elif data is None:
-                self._modelData_ = data
-                self._modelDataRows_ = 0
-                self._modelDataColumns_ = 0
-                self._canAddRemoveRows_ = False
-                self._canAddRemoveColumns_ = False
-
+            self._makeModelData_(data)
             self._displayedRows_ = 0
-
-            # print(f"{self.__class__.__name__}.setModelData({type(data).__name__}) execution during model reset took {timer1.elapsed()} milliseconds")
-
-            self.endResetModel()
+            self._displayedColumns_ = 0
 
             if self._modelData_ is None:
                 self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, 0)
+                self.headerDataChanged.emit(QtCore.Qt.Horizontal, 0, 0)
 
             else:
+                self.headerDataChanged.emit(QtCore.Qt.Horizontal, 0, self._modelDataColumns_)
                 self.headerDataChanged.emit(QtCore.Qt.Vertical, 0, self._modelDataRows_)
 
-        except Exception as e:
+        except Exception as e: # noqa
             traceback.print_exc()
+
+        self.endResetModel()
+
+        if "Edit" in self._modelDataColumnHeaders_.values():
+            self._useExternalDataEditor_ = True
+
+        self.sig_modelPopulated.emit()
+
 
         # ### BEGIN report timing
         #
-        # print(f"{self.__class__.__name__}.setModelData({type(data).__name__}) took {timer.elapsed()} milliseconds")
+        # print(f"{self.__class__.__name__}.populateModel({type(data).__name__}) took {timer.elapsed()} milliseconds")
         #
         # ### END   report timing
 
-    # def rowOps(self, row:object):
-    #     if not self._canAddRemoveRows_:
-    #         return
-
-        # if isinstance()
-
-    # def colOps()
+    @Slot()
+    def _slot_dataEditedExternally(self):
+        pass
 
     @safewrapper
     def _getHeaderData_(self, section, orientation, role = QtCore.Qt.DisplayRole):
@@ -627,7 +695,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
             if role not in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole,
                             QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole,
                             QtCore.Qt.AccessibleDescriptionRole):
-                return QtCore.QVariant()
+                if __has_PySide6__:
+                    return
+                else:
+                    return QtCore.QVariant()
 
             if isinstance(self._modelData_, pd.DataFrame):
                 if orientation == QtCore.Qt.Horizontal: # column header
@@ -638,10 +709,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
                             # NOTE: 2018-11-27 21:32:16
                             # TODO: chech pandas API for other possibilities
-                            if isinstance(self._modelDataHeaderSections_, dict) and len(self._modelDataHeaderSections_):
-                                return QtCore.QVariant(self._modelDataHeaderSections_[section])
+                            if isinstance(self._modelDataColumnHeaders_, dict) and len(self._modelDataColumnHeaders_):
+                                return qVariant(self._modelDataColumnHeaders_[section])
                             else:
-                                return QtCore.QVariant(str(self._modelData_.columns[section]))
+                                return qVariant(str(self._modelData_.columns[section]))
 
                         elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                             #if isinstance(self._modelData_.iloc[:,section], pd.core.arrays.categorical.CategoricalDtype):
@@ -662,18 +733,22 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             else:
                                 ret = "\n".join(["%s" % v for v in self._modelData_.columns.names] + ["(%s)" % self._modelData_.iloc[:,section].dtype])
 
-                            return QtCore.QVariant(ret)
+                            return qVariant(ret)
 
                         else:
-                            return QtCore.QVariant()
+                            return qVariant()
 
                     elif isinstance(self._modelData_.columns, pd.Index):
                         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            if isinstance(self._modelDataHeaderSections_, dict) and len(self._modelDataHeaderSections_):
-                                return QtCore.QVariant(self._modelDataHeaderSections_[section])
+                            if (
+                                isinstance(self._modelDataColumnHeaders_, dict)
+                                # and len(self._modelDataColumnHeaders_)
+                                and section < len(self._modelDataColumnHeaders_)
+                                ):
+                                return qVariant(self._modelDataColumnHeaders_[section])
                             else:
-                                return QtCore.QVariant(str(self._modelData_.columns[section]))
-                            # return QtCore.QVariant(str(self._modelData_.columns[section]))
+                                return qVariant(str(self._modelData_.columns[section]))
+                            # return qVariant(str(self._modelData_.columns[section]))
 
                         elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                             #if isinstance(self._modelData_.iloc[:,section], pd.core.arrays.categorical.CategoricalDtype):
@@ -689,22 +764,22 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                                     ["%s" % v for v in self._modelData_.iloc[:,section].cat.categories])
                                 #print(ret)
 
-                                return QtCore.QVariant(ret)
+                                return qVariant(ret)
 
                             else:
-                                return QtCore.QVariant("%s" % self._modelData_.iloc[:, section].dtype)
+                                return qVariant("%s" % self._modelData_.iloc[:, section].dtype)
 
                         else:
-                            return QtCore.QVariant()
+                            return qVariant()
 
 
                     else: # NOTE: 2018-11-22 23:16:45 could columns be anything else than Index?
-                        return QtCore.QVariant()
+                        return qVariant()
 
                 else: # vertical (rows) header
                     if isinstance(self._modelData_.index, pd.MultiIndex):# MultiIndex is subclass of Index so catch it first
                         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            return QtCore.QVariant(str(self._modelData_.index[section]))
+                            return qVariant(str(self._modelData_.index[section]))
 
                         elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                             # ret = " ".join(["%s" % v for v in self._modelData_.index.names] + ["(%s)" % self._modelData_.iloc[section,:].dtype])
@@ -725,18 +800,17 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             else:
                                 ret = " ".join(["%s" % v for v in self._modelData_.index.names] + ["(%s)" % self._modelData_.iloc[section,:].dtype])
 
-                            return QtCore.QVariant(ret)
+                            return qVariant(ret)
 
                         else:
-                            return QtCore.QVariant()
+                            return qVariant()
 
                     elif isinstance(self._modelData_.index, pd.Index):
                         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            # if isinstance(self._modelDataHeaderSections_, dict) and len(self._modelDataHeaderSections_):
-                            #     return QtCore.QVariant(self._modelDataHeaderSections_[section])
-                            # else:
-                            #     return QtCore.QVariant(str(self._modelData_.columns[section]))
-                           return QtCore.QVariant(str(self._modelData_.index[section]))
+                            if section < self._modelData_.index.size:
+                                return qVariant(str(self._modelData_.index[section]))
+                            else:
+                                return qVariant()
 
                         elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                             #if isinstance(self._modelData_.iloc[:,section], pd.core.arrays.categorical.CategoricalDtype):
@@ -754,22 +828,25 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                             else:
                                 ret = "%s" % self._modelData_.iloc[section,:].dtype # the type of the data row, not of its index !
 
-                            return QtCore.QVariant(ret)
+                            if section < self._modelData_.index.size:
+                                return qVariant(ret)
+                            else:
+                                return qVariant()
 
                         else:
-                            return QtCore.QVariant()
+                            return qVariant()
 
                     else:
-                        return QtCore.QVariant()
+                        return qVariant()
 
-            elif isinstance(self._modelData_, pd.Series): # TODO pd.Index
+            elif isinstance(self._modelData_, pd.Series):
                 if orientation == QtCore.Qt.Horizontal: # horizontal (column) headers
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                        if isinstance(self._modelDataHeaderSections_, dict) and len(self._modelDataHeaderSections_):
-                            return QtCore.QVariant(self._modelDataHeaderSections_[section])
+                        if isinstance(self._modelDataColumnHeaders_, dict) and len(self._modelDataColumnHeaders_):
+                            return qVariant(self._modelDataColumnHeaders_[section])
                         else:
-                            return QtCore.QVariant(str(self._modelData_.columns[section]))
-                        # return QtCore.QVariant(str(self._modelData_.name))
+                            return qVariant(str(self._modelData_.columns[section]))
+                        # return qVariant(str(self._modelData_.name))
 
                     elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                         #if isinstance(self._modelData_.dtype, pd.core.arrays.categorical.CategoricalDtype):
@@ -784,100 +861,105 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                 ret = "\n".join(["categories:"] + \
                                                 ["%s" % v for v in self._modelData_.cat.categories])
 
-                            return QtCore.QVariant(ret)
+                            return qVariant(ret)
 
                         else:
-                            return QtCore.QVariant("%s" % self._modelData_.dtype)
+                            return qVariant("%s" % self._modelData_.dtype)
 
                     else:
-                        return QtCore.QVariant()
+                        return qVariant()
 
                 else: # vertical (row) headers
                     if isinstance(self._modelData_.index, pd.MultiIndex): # MultiIndex is subclass of Index so catch it first
                         if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            # if isinstance(self._modelDataHeaderSections_, dict) and len(self._modelDataHeaderSections_):
-                            #     return QtCore.QVariant(self._modelDataHeaderSections_[section])
-                            # else:
-                            #     return QtCore.QVariant(str(self._modelData_.columns[section]))
-                            return QtCore.QVariant(str(self._modelData_.index[section]))
+                            if section < self._modelData_.index.size:
+                                return qVariant(str(self._modelData_.index[section]))
+                            else:
+                                return qVariant()
 
                         elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                            #if isinstance(self._modelData_.iloc[section], pd.core.arrays.categorical.CategoricalDtype):
-                            if "%s" % self._modelData_.iloc[section].dtype == "category":
-                                if len(self._modelData_.iloc[section].cat.categories) > 6:
-                                    ret = " ".join(["%s" % v for v in self._modelData_.index.names] +\
-                                                   ["%d categories:" % len(self._modelData_.iloc[section].cat.categories)] + \
-                                                   ["%s" % v for v in self._modelData_.iloc[section].cat.categories[0:3]] + \
-                                                   ["..."] + \
-                                                   ["%s" % v for v in self._modelData_.iloc[section].cat.categories[-3:]])
+                            try:
+                                if "%s" % self._modelData_.iloc[section].dtype == "category":
+                                    if len(self._modelData_.iloc[section].cat.categories) > 6:
+                                        ret = " ".join(["%s" % v for v in self._modelData_.index.names] +\
+                                                    ["%d categories:" % len(self._modelData_.iloc[section].cat.categories)] + \
+                                                    ["%s" % v for v in self._modelData_.iloc[section].cat.categories[0:3]] + \
+                                                    ["..."] + \
+                                                    ["%s" % v for v in self._modelData_.iloc[section].cat.categories[-3:]])
 
-                                else:
-                                    ret = " ".join(["categories:"] +\
-                                                ["%s" % v for v in self._modelData_.iloc[section].cat.categories])
+                                    else:
+                                        ret = " ".join(["categories:"] +\
+                                                    ["%s" % v for v in self._modelData_.iloc[section].cat.categories])
+                                return qVariant(ret)
 
-                                return QtCore.QVariant(ret)
+                            except: # noqa
+                                return qVariant()
+
+                            # if section < self._modelData_.index.size:
+                            #     return qVariant(ret)
+                            # else:
+                            #     return qVariant()
 
                         else:
-                            return QtCore.QVariant()
+                            return qVariant()
 
                     elif isinstance(self._modelData_.index, pd.Index):
-                        if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                            # if isinstance(self._modelDataHeaderSections_, dict) and len(self._modelDataHeaderSections_):
-                            #     return QtCore.QVariant(self._modelDataHeaderSections_[section])
-                            # else:
-                            #     return QtCore.QVariant(str(self._modelData_.columns[section]))
-                            return QtCore.QVariant(str(self._modelData_.index[section]))
+                        if section < self._modelData_.index.size:
+                            if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
+                                return qVariant(str(self._modelData_.index[section]))
 
-                        elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                            #if isinstance(self._modelData_.index[section], pd.core.arrays.categorical.CategoricalDtype):
-                            if "%s" % self._modelData_.iloc[section].dtype == "category":
-                                if len(self._modelData_.iloc[section].cat.categories) > 6:
-                                    ret = " ".join(["%d categories:" % len(self._modelData_[section].cat.categories)] + \
-                                                   ["%s" % v for v in self._modelData_[section].cat.categories[0:3]] + \
-                                                   ["..."] + \
-                                                   ["%s" % v for v in self._modelData_[section].cat.categories[-3:]])
+                            elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
+                                #if isinstance(self._modelData_.index[section], pd.core.arrays.categorical.CategoricalDtype):
+                                if "%s" % self._modelData_.iloc[section].dtype == "category":
+                                    if len(self._modelData_.iloc[section].cat.categories) > 6:
+                                        ret = " ".join(["%d categories:" % len(self._modelData_[section].cat.categories)] + \
+                                                    ["%s" % v for v in self._modelData_[section].cat.categories[0:3]] + \
+                                                    ["..."] + \
+                                                    ["%s" % v for v in self._modelData_[section].cat.categories[-3:]])
+
+                                    else:
+                                        ret = " ".join(["categories:"] + \
+                                                    ["%s" % v for v in self._modelData_[section].cat.categories])
+
+                                    return qVariant(ret)
 
                                 else:
-                                    ret = " ".join(["categories:"] + \
-                                                ["%s" % v for v in self._modelData_[section].cat.categories])
-
-                                return QtCore.QVariant(ret)
+                                    return qVariant("%s" % self._modelData_[section].dtype) # the type of data at [section]
 
                             else:
-                                return QtCore.QVariant("%s" % self._modelData_[section].dtype) # the type of data at [section]
+                                return qVariant()
 
                         else:
-                            return QtCore.QVariant()
+                            return qVariant()
 
                     else:
-                        return QtCore.QVariant()
+                        return qVariant()
 
             elif isinstance(self._modelData_, TriggerProtocolList):
                 if orientation == QtCore.Qt.Horizontal: # horizontal (columns) header
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                        if (isinstance(self._modelDataHeaderSections_, dict)
-                            and len(self._modelDataHeaderSections_)
+                        if (isinstance(self._modelDataColumnHeaders_, dict)
+                            and len(self._modelDataColumnHeaders_)
                             and section in range(self._modelDataColumns_)):
-                            return QtCore.QVariant(self._modelDataHeaderSections_[section])
+                            return qVariant(self._modelDataColumnHeaders_[section])
                         else:
-                            return QtCore.QVariant()
+                            return qVariant()
                     else:
-                        return QtCore.QVariant()
+                        return qVariant()
                 else:
-                    return QtCore.QVariant(f"{section}")
+                    if section < len(self._modelData_):
+                        return qVariant(f"{section}")
+                    else:
+                        return qVariant()
 
-            elif isinstance(self._modelData_, neo.core.dataobject.DataObject):
+            elif isinstance(self._modelData_, NeoObjectList):
                 if orientation == QtCore.Qt.Horizontal: # horizontal (columns) header
                     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.AccessibleTextRole):
-                        # return QtCore.QVariant("%s (channel %d, %s)" % (self._modelData_.name, section, self._modelData_.dimensionality))
                         # for horizontal header, section number is the column number
-                        if (isinstance(self._modelDataHeaderSections_, dict)
-                            and len(self._modelDataHeaderSections_)):
-                            # print(f"{self.__class__.__name__}._getHeaderData_({section} ({type(section).__name__})...)")
-                            # print(f"\theader sections: {self._modelDataHeaderSections_}")
-                            key = list(self._modelDataHeaderSections_.keys())[section]
-                            colhead = self._modelDataHeaderSections_[key][1]
-                            return QtCore.QVariant(colhead)
+                        if (isinstance(self._modelDataColumnHeaders_, dict)
+                            and len(self._modelDataColumnHeaders_)):
+                            colhead = self._modelDataColumnHeaders_[section]
+                            return qVariant(colhead)
                         else:
                             if section == 0:
                                 domain = getattr(self._modelData_, "times", None)
@@ -886,310 +968,991 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                     if isinstance(domain, pq.Quantity):
                                         domain_name = scq.getUnitFamily(domain)
                                         dname = f"{domain_name} ({domain.dimensionality})" if len(domain_name.strip()) else "Sample index"
-                                        return QtCore.QVariant(dname)
+                                        return qVariant(dname)
                                     else:
-                                        return QtCore.QVariant("Sample")
+                                        return qVariant("Sample")
                                 else:
-                                    return QtCore.QVariant("Sample")
+                                    return qVariant("Sample")
 
                             else:
-                                return QtCore.QVariant("%s (channel %d, %s)" % (self._modelData_.name, section-1, self._modelData_.dimensionality))
+                                return qVariant("%s (channel %d, %s)" % (self._modelData_.name, section-1, self._modelData_.dimensionality))
 
                     elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                        return QtCore.QVariant("%s" % self._modelData_[:,section].dtype)
+                        try:
+                            if len(self._modelData_):
+                                if self._modelDataColumnHeaders_[section].lower() == "edit":
+                                    tip = "Double-click in the desired row to edit the object represented in the row"
+                                else:
+                                    tip = type(getattr(self._modelData_[0], self._modelDataColumnHeaders_[section])).__name__
+                                return qVariant(f"{tip}")
+                            else:
+                                return qVariant()
+                        except:
+                            traceback.print_exc()
+                            return qVariant()
 
                     else:
-                        return QtCore.QVariant()
+                        return qVariant()
 
                 else: # vertical (rows) headers
-                    return QtCore.QVariant(f"{section}")
-                    # if isinstance(self._modelData_, (neo.AnalogSignal, DataSignal)):
-                    #     return QtCore.QVariant(f"{section}")
-                    #     # return QtCore.QVariant(self._modelData_.times[section])
-                    # else:
-                    #     if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
-                    #         return QtCore.QVariant("%s" % section)
-                    #
-                    #     elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                    #         return QtCore.QVariant("%s" % self._modelData_[section,:].dtype)
-                    #
-                    #     else:
-                    #         return QtCore.QVariant()
+                    if section < len(self._modelData_):
+                        return qVariant(f"{section}")
+                    else:
+                        return qVariant()
+                    # return qVariant(f"{section}")
 
             elif isinstance(self._modelData_, np.ndarray):
                 if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
                     lbl = f"{section}"
                     if orientation == QtCore.Qt.Horizontal:
-                        if (isinstance(self._modelDataHeaderSections_, dict)
-                            and len(self._modelDataHeaderSections_)):
-                            return QtCore.QVariant(self._modelDataHeaderSections_[section])
+                        # print(f"{self.__class__.__name__}._getHeaderData horizontal:")
+                        # print(f"\t section = {lbl}")
+                        if (isinstance(self._modelDataColumnHeaders_, dict)
+                            and len(self._modelDataColumnHeaders_)
+                            and section in self._modelDataColumnHeaders_
+                            ):
+                            return qVariant(self._modelDataColumnHeaders_[section])
                         else:
                             if isinstance(self._modelData_, pq.Quantity):
                                 lbl = f"{scq.getUnitFamily(self._modelData_.units)} ({self._modelData_.units.dimensionality})"
-                    return QtCore.QVariant(lbl)
+
+                    else:
+                        if section < self._modelData_.shape[0]:
+                            return qVariant(lbl)
+                        else:
+                            return qVariant()
 
                 elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
                     if orientation == QtCore.Qt.Horizontal:
                         lbl = "%s" % self._modelData_[:,section].dtype
                         if isinstance(self._modelData_, pq.Quantity):
                             lbl += f" ({self._modelData_.units.dimensionality})"
-                        return QtCore.QVariant(lbl)
+                        return qVariant(lbl)
 
                     else:
-                        return QtCore.QVariant("%s" % self._modelData_[section,:].dtype)
+                        if section < self._modelData_.shape[0]:
+                            return qVariant("%s" % self._modelData_[section,:].dtype)
+                        else:
+                            return qVariant()
 
                 else:
-                    return QtCore.QVariant()
+                    return qVariant()
+
+            elif isinstance(self._modelData_,
+                                (
+                                    typing.Sequence,
+                                    ephys_pathways.SynapticPathwayList,
+                                    ephys_pathways.AuxiliaryInputList,
+                                    ephys_pathways.AuxiliaryOutputList,
+                                    ephys_pathways.RecordingSchedule,
+                                    ephys_pathways.SynapticStimulusChannelList,
+                                )
+                            ):
+                if role in (QtCore.Qt.DisplayRole, QtCore.Qt.AccessibleTextRole):
+                    # lbl = f"{section}"
+                    if orientation == QtCore.Qt.Horizontal:
+                        if (isinstance(self._modelDataColumnHeaders_, dict)
+                            and len(self._modelDataColumnHeaders_)):
+                            if section in self._modelDataColumnHeaders_:
+                                return qVariant(f"{self._modelDataColumnHeaders_[section]}")
+                            else:
+                                return  qVariant(f"{section}")
+                        else:
+                            return  qVariant(f"{section}")
+                    else:
+                        if section < len(self._modelData_):
+                            return qVariant(f"{section}")
+                        else:
+                            return qVariant()
+
+                elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
+                    return qVariant(f"{section}")
+
+                else:
+                    return qVariant()
 
             else:
-                return QtCore.QVariant()
+                return qVariant()
 
-            # NOTE: 2018-11-10 11:12:39 TODO nested lists !!!
+        except IndexError:
+            return qVariant()
 
-        except (IndexError, ):
-            return QtCore.QVariant()
+    @singledispatchmethod
+    def _modelDataGetter_(self, mdata, row: int, col: int) -> object:
+        raise NotImplementedError(f"{type(mdata).__name__} object are not yet supported")
 
-        # print(f"{self.__class__.__name__}._getHeaderData_ took {timer.elapsed()} milliseconds")
+    @_modelDataGetter_.register(pd.DataFrame)
+    @_modelDataGetter_.register(pd.Series)
+    def __modelDataGetter__(self, mdata: pd.DataFrame | pd.Series, row: int, col: int) -> object:
+        return mdata.iloc[row,col]
 
-    def _getModelData_(self, row, col, role = QtCore.Qt.DisplayRole) -> QtCore.QVariant:
+    @_modelDataGetter_.register(pd.RangeIndex)
+    def __modelDataGetter__(self, mdata: pd.RangeIndex, row: int, col: int) -> object: # noqa
+        return mdata[row]
+
+    @_modelDataGetter_.register(pd.Index)
+    def __modelDataGetter__(self, mdata: pd.Index, row: int, col: int) -> object: # noqa
+        if isinstance(mdata, pd.RangeIndex):
+            val = mdata[row]
+
+        else:
+            val = mdata.iloc[row, col]
+
+        return val
+
+    @_modelDataGetter_.register(TriggerProtocolList)
+    def __modelDataGetter__(self, mdata: TriggerProtocolList, row: int, col: int) -> object: # noqa
+        obj = mdata[row]
+        return getattr(obj, self._modelDataColumnHeaders_[col])
+
+    @_modelDataGetter_.register(ephys_pathways.SynapticPathwayList)
+    @_modelDataGetter_.register(ephys_pathways.AuxiliaryInputList)
+    @_modelDataGetter_.register(ephys_pathways.AuxiliaryOutputList)
+    @_modelDataGetter_.register(ephys_pathways.SynapticStimulusChannelList)
+    @_modelDataGetter_.register(ephys_pathways.RecordingSchedule)
+    @_modelDataGetter_.register(ephys_pathways.RecordingSourceList)
+    def __modelDataGetter__(self, mdata: (ephys_pathways.SynapticPathwayList, # noqa
+                                          ephys_pathways.AuxiliaryInputList,
+                                          ephys_pathways.AuxiliaryOutputList,
+                                          ephys_pathways.SynapticStimulusChannelList,
+                                          ephys_pathways.RecordingSchedule,
+                                          ephys_pathways.RecordingSourceList),
+                            row: int, col: int) -> object:
+        obj = self._modelData_[row]
+        attributeName = self._modelDataColumnHeaders_[col]
+
+        if attributeName.lower() != "edit":
+            return getattr(obj, attributeName)
+
+        else:
+            return dataclasses.MISSING
+
+    @_modelDataGetter_.register(sdc.Schedule)
+    def __modelDataGetter__(self, mdata: sdc.Schedule, row: int, col: int) -> object: # noqa
+        obj = self._modelData_[row] # an Episode
+        attributeName = self._modelDataColumnHeaders_[col]
+        if attributeName.lower() == "edit":
+            # return ExternallyEditableType(obj = obj)
+            return dataclasses.MISSING
+        else:
+            return getattr(obj, attributeName)
+
+    @_modelDataGetter_.register(list)
+    @_modelDataGetter_.register(tuple)
+    @_modelDataGetter_.register(deque)
+    def __modelDataGetter__(self, mdata: (list, tuple, deque), row: int, col: int) -> object: # noqa
+        rowObj = self._modelData_[row]
+        if isinstance(rowObj, typing.Sequence):
+            val = rowObj[col]
+        else:
+            val = rowObj
+
+        return val
+
+    @_modelDataGetter_.register(neo.core.dataobject.DataObject)
+    def __modelDataGetter__(self, mdata: neo.core.dataobject.DataObject, row: int, col: int): # noqa
+        if col == 0:
+            val = mdata.times[row]
+        else:
+            if mdata.ndim > 1:
+                val = mdata[row, col-1]
+            else:
+                val = mdata[row]
+
+        return val
+
+    @_modelDataGetter_.register(np.ndarray)
+    def __modelDataGetter__(self, mdata: np.ndarray, row: int, col: int): # noqa
+        if mdata.ndim  == 0: # e.g. pq object
+            val = np.atleast_1d(mdata)[row]
+
+        elif mdata.ndim > 1:
+            val = mdata[row, col]
+
+        else:
+            val = mdata[row]
+
+        return val
+
+    def _getVariantForData_(self, obj, role: QtCore.Qt.ItemDataRole) -> QVariantType:
+        obj_type_name = qVariant(type(obj).__name__)
+
+        if isinstance(obj, (ephys_protocol.ElectrophysiologyProtocol,
+                            sdc.Procedure,
+                            ephys_pathways.PathwaysStimulationLayout)):
+        # if isinstance(obj, (ephys_protocol.ElectrophysiologyProtocol,
+        #                     sdc.Procedure,
+        #                     )
+        #             ):
+            ret = qVariant(obj)
+            obj_disp = qVariant(getattr(obj, "name", obj_type_name))
+            # obj_disp = qVariant(getattr(obj, "name", guiutils.getIcon("view-list-tree")))
+
+        elif obj is dataclasses.MISSING:
+            ret = qVariant()
+            obj_type_name = qVariant()
+            obj_disp = qVariant()
+
+        elif isinstance(obj, (numbers.Number, np.number)):
+            ret = qVariant(obj)
+            obj_disp = qVariant(repr_val(obj, self.decimals))
+
+        else:
+            ret = qVariant(obj)
+            obj_disp = qVariant(f"{obj}")
+
+        return ret if role in (QtCore.Qt.EditRole, ObjectDataRole) else obj_type_name if role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole) else obj_disp
+
+    def _getModelData_(self, row, col, role = QtCore.Qt.DisplayRole) -> QVariantType:
         r"""Retrieves tabular data associated with row & column, given the item role.
 
     """
-        # TODO: 2026-03-17 13:20:49
-        # if data is None but the owner of accest attibuting values to the data
-        # _AND_ it advertises what types of data are acceptale, then allow creating
-        # a new instance of the acceptable class, via a GUI, before setting a new
-        # value to it
-        #
-        # Must work in concert with PythonItemDelegate and with the various model
-        # data types supported by this item model.
-        #
-        # for now, new data has to be entered by hand...
         try:
-            if role not in (ObjectDataRole, QtCore.Qt.DisplayRole, QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleTextRole):
-                return QtCore.QVariant()
+            if role not in (ObjectDataRole, QtCore.Qt.DisplayRole,
+                            QtCore.Qt.EditRole, QtCore.Qt.ToolTipRole,
+                            QtCore.Qt.AccessibleTextRole):
+                return qVariant(None)
 
-            if isinstance(self._modelData_, pd.DataFrame):
-                val = self._modelData_.iloc[row,col]
-                ret_type = type(val).__name__
-                if isinstance(val, datetime.datetime):
-                    ret = val if role == QtCore.Qt.EditRole else val.isoformat(" ")
-                else:
-                    ret = val if role == QtCore.Qt.EditRole else f"{val}"
+            ret = self._modelDataGetter_(self._modelData_, row, col)
 
-            elif isinstance(self._modelData_, pd.Series):
-                val = self._modelData_.iloc[row,col]
-                ret_type = type(val).__name__
-                if isinstance(val, datetime.datetime):
-                    ret = val if role == QtCore.Qt.EditRole else val.isoformat(" ")
-                else:
-                    ret = val if role == QtCore.Qt.EditRole else f"{val}"
+            return self._getVariantForData_(ret, role)
 
-            elif isinstance(self._modelData_, pd.Index):
-                if isinstance(self._modelData_, pd.RangeIndex):
-                    val = self._modelData_[row]
-                else:
-                    # CAUTION 2025-05-25 09:09:00
-                    # when _modelData_ is the column index of a DataFrame, ``row``
-                    # needs to be a column index!
-                    val = self._modelData_.iloc[row,col]
-
-                ret_type = type(val).__name__
-
-                if isinstance(val, datetime.datetime):
-                    ret = val if role == QtCore.Qt.EditRole else val.isoformat(" ")
-                else:
-                    ret = val if role == QtCore.Qt.EditRole else f"{val}"
-
-            elif isinstance(self._modelData_, TriggerProtocolList):
-                protocol = self._modelData_[row]
-                val = getattr(protocol, self._modelDataHeaderSections_[col])
-                # print(f"{self.__class__.__name__}._getModelData_: val at row {row}, col {col} is {type(val).__name__}; role is {role}")
-                # if isinstance(val, neo.Event):
-                #     val = val.times
-
-                ret = val if role in (ObjectDataRole, QtCore.Qt.EditRole) else f"{val.times}" if isinstance(val, neo.Event) else f"{val}" # noqa
-
-            elif isinstance(self._modelData_, neo.core.dataobject.DataObject):
-                if col == 0:
-                    val = self._modelData_.times[row]
-                else:
-                    if self._modelData_.ndim > 1:
-                        val = self._modelData_[row, col-1]
-                    else:
-                        val = self._modelData_[row]
-
-                if isinstance(val, datetime.datetime):
-                    ret = val if role == QtCore.Qt.EditRole else ret.isoformat(" ")
-                else:
-                    ret = val if role == QtCore.Qt.EditRole else f"{val.magnitude}"
-
-            elif isinstance(self._modelData_, np.ndarray):
-                if self._modelData_.ndim  == 0: # e.g. pq object
-                    val = np.atleast_1d(self._modelData_)[row]
-
-                elif self._modelData_.ndim > 1:
-                    val = self._modelData_[row, col]
-
-                else:
-                    val = self._modelData_[row]
-
-
-                if isinstance(val, datetime.datetime):
-                    ret = val if role == QtCore.Qt.EditRole else ret.isoformat(" ")
-                else:
-                    ret = val if role == QtCore.Qt.EditRole else f"{val}" #" f"{val.magnitude}" if isinstance(self._modelData_, pq.Quantity) else f"{val}"
-
-            else:
-                return QtCore.QVariant()
-
-            ret_type = type(val).__name__
-
-            if role == QtCore.Qt.EditRole:
-                return QtCore.QVariant(val)
-
-            elif role == QtCore.Qt.DisplayRole:
-                return QtCore.QVariant("%s" % ret)
-
-            elif role in (QtCore.Qt.ToolTipRole, QtCore.Qt.AccessibleDescriptionRole):
-                return QtCore.QVariant(ret_type)
-
-            elif role in (QtCore.Qt.UserRole, ):
-                return QtCore.QVariant(val)
-                # return val
-
-            else:
-                return QtCore.QVariant()
-
-        except (IndexError,):
-            return QtCore.QVariant()
+        except IndexError:
+            return qVariant(None)
 
     def _setDataValue_(self, value, row, col):
         r"""Sets the EditRole data for the row & column in the tabular model"""
+        # print(f"{self.__class__.__name__}._setDataValue_({value}, row={row}, col={col})")
         if self._modelData_ is None:
             return False
 
         try:
-            if isinstance(value, QtCore.QVariant) or hasattr(value, "value"):
-                pyvalue = value.value()
-
+            if __has_PySide6__:
+                pyvalue=value
             else:
-                pyvalue = value
+                if isinstance(value, QVariant) or hasattr(value, "value"):
+                    try:
+                        pyvalue = value.value()
 
-            if isinstance(self._modelData_, pd.DataFrame):
-                if row >= self._modelData_.shape[0]:
-                    return False
-                self._modelData_.iloc[row, col] = pyvalue
-                # self._modelData_.at[row, col] = pyvalue
-                return True
-
-            elif isinstance(self._modelData_, pd.Series):
-                if row >= self._modelData_.shape[0]:
-                    return False
-                self._modelData_.iloc[row] = pyvalue
-                return True
-
-            elif isinstance(self._modelData_, neo.dataobject.DataObject):
-                if row >= self._modelData_.shape[0]:
-                    return False
-
-                if isinstance(self._modelData_, neo.SpikeTrain) and col > 0:
-                    return False
-
-                if col >= self._modelData_.shape[1] + 1:
-                    # because the signal's domain is on column 0, what is shown
-                    # here has one extra column
-                    return False
-                if col == 0:
-                    if isinstance(self._modelData_, (neo.AnalogSignal, DataSignal)) :
-                        # for analog signals only t_start can be edited
-                        if row == 0:
-                            # allow setting t_start
-                            if isinstance(pyvalue, pq.Quantity):
-                                if pyvalue.units != self._modelData_.times.units:
-                                    raise ValueError(f"Expecting value units of {self._modelData_.times.units}; got ({pyvalue.units}) instead")
-
-                                self._modelData_.t_start = pyvalue
-                                return True
-
-                            elif isinstance(pyvalue, (float, int, complex)):
-                                self._modelData_.t_start = pyvalue * self._modelData_.units
-                                return True
-                            else:
-                                scipywarn(f"Expecting a float or a Quantity in {self._modelData_.times.units}; got {type(pyvalue).__name__} instead")
-                                return False
-                        else:
-                            return False
-
-                    else:
-                        if isinstance(pyvalue, pq.Quantity):
-                            if pyvalue.units != self._modelData_.times.units:
-                                scipywarn(f"Expecting value units of {self._modelData_.times.units}; got ({pyvalue.units}) instead")
-                                return False
-
-                            self._modelData_.times[row] = pyvalue
-                            return True
-
-                        elif isinstance(pyvalue, (float, int, complex)):
-                            self._modelData_.times[row] = pyvalue * self._modelData_.units
-                            return True
-                        else:
-                            scipywarn(f"Expecting a float or a Quantity in {self._modelData_.times.units}; got {type(pyvalue).__name__} instead")
-                            return False
+                    except: # noqa
+                        # traceback.print_exc()
+                        pyvalue = value.value # for PODS this "comes out" directly !?
 
                 else:
-                    if isinstance(pyvalue, pq.Quantity):
-                        if pyvalue.units != self._modelData_.units:
-                            scipywarn(f"Expecting value units of {self._modelData_.units}; got ({pyvalue.units}) instead")
-                            return False
+                    pyvalue = value
 
-                        self._modelData_[row, col-1] = pyvalue
-                        return True
+            return self._setValueInModelData_(self._modelData_, pyvalue, row, col)
 
-                    elif isinstance(pyvalue, (float, int, complex)):
-                        self._modelData_[row, col-1] = pyvalue * self._modelData_.units
-                        return True
-                    else:
-                        scipywarn(f"Expecting a float or a Quantity in {self._modelData_.units}; got {type(pyvalue).__name__} instead")
-                        return False
-
-            elif isinstance(self._modelData_, np.ndarray):
-                if row >= self._modelData_.shape[0]:
-                    return False
-                if self._modelData_.ndim == 1:
-                    self._modelData_[row] = pyvalue
-                elif self._modelData_.ndim == 2:
-                    self._modelData_[row, col] = pyvalue
-                if self._is_vigra_filter_kernel_:
-                    self._original_data_ = vigrautils.kernelfromarray(self._modelData_)
-
-                return True
-
-            elif isinstance(self._modelData_, TriggerProtocolList):
-                if row >= len(self._modelData_):
-                    return False
-                protocol = self._modelData_[row]
-
-                attr = self._modelDataHeaderSections_[col]
-
-                setattr(protocol, attr, value)
-
-                return True
-
-            else:
-                return False
-
-            return True
-
-        except Exception as e:
+        except Exception as e: # noqa
             traceback.print_exc()
             return False
 
-        # NOTE: 2018-11-22 11:11:43
-        # don't delete this; contemplate using it at module/app level
-        #sip.enableautoconversion(QtCore.QVariant, old_qvariant_autoconv)
+    @singledispatchmethod
+    def _makeModelData_(self, data):
+        scipywarn(f"{type(data).__name__} data are not supported yet")
+        self._modelData_ = data
+        self._original_data_ = data
+        self._modelDataRows_ = 0
+        self._modelDataColumns_ = 0
+        self._canAddRemoveRows_ = False
+        self._canAddRemoveColumns_ = False
+        self._modelDataColumnHeaders_ = dict()
+        # self._modelDataRowIndexName_ = "Index"
 
+    @_makeModelData_.register(types.NoneType)
+    def __makeModelData__(self, data: types.NoneType):
+        self._modelData_ = data
+        self._original_data_ = data
+        self._modelDataRows_ = 0
+        self._modelDataColumns_ = 0
+        self._canAddRemoveRows_ = False
+        self._canAddRemoveColumns_ = False
+        self._modelDataColumnHeaders_ = dict()
+
+    @_makeModelData_.register(pd.DataFrame)
+    def __makeModelData__(self, data: pd.DataFrame): # noqa
+        self._modelData_ = data
+        self._modelDataRows_ = data.shape[0]
+        self._modelDataColumns_ = data.shape[1]
+
+        if isinstance(self._modelData_.columns, (pd.MultiIndex, pd.Index)):
+            self._modelDataColumnHeaders_ = dict(
+                tuple(
+                    map(
+                        lambda x: (x[0], f"{x[1]}"),
+                        enumerate(data.columns)
+                        )
+                    )
+                )
+
+        # self._modelDataColumnHeaders_ = dict(enumerate(data.columns))
+        self._canAddRemoveColumns_ = True
+        self._canAddRemoveRows_ = True
+        self._modelDataRowIndexName_ = self._modelData_.index.name or "Index"
+
+    @_makeModelData_.register(pd.Series)
+    def __makeModelData__(self, data: pd.Series): # noqa
+        self._modelData_ = data
+        self._modelDataRows_ = data.shape[0]
+        self._modelDataColumns_ = 1
+        self._modelDataColumnHeaders_ = {0: data.name}
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+        self._modelDataRowIndexName_ = "Index"
+
+    @_makeModelData_.register(pd.Index)
+    def __makeModelData__(self, data: pd.Index): # noqa
+        self._modelData_ = data
+        self._modelDataRows_ = data.shape[0]
+        self._modelDataColumns_ = 1
+        self._modelDataColumnHeaders_ = {0: "Index or Column"}
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+        self._modelDataRowIndexName_ = "Index"
+
+    @_makeModelData_.register(vigra.filters.Kernel1D)
+    @_makeModelData_.register(vigra.filters.Kernel2D)
+    def __makeModelData__(self, data: vigra.filters.Kernel1D | vigra.filters.Kernel2D): # noqa
+        self._modelData_ = vigrautils.kernel2array(data)
+        self._modelDataRows_ = data.shape[0]
+        self._modelDataColumns_ = 1 if isinstance(data, vigra.filters.Kernel1D) else 2
+        self._modelDataColumnHeaders_ = {0: "Sample"} if isinstance(data, vigra.filters.Kernel1D) else {0: "X", 1: "Y"}
+        self._is_vigra_filter_kernel_  = True
+        self._original_data_ = data
+        self._canAddRemoveRows_ = False
+        self._canAddRemoveColumns_ = False
+        self._modelDataRowIndexName_ = "Index"
+
+    @_makeModelData_.register(ephys_pathways.RecordingSchedule)
+    def __makeModelData__(self, data: ephys_pathways.RecordingSchedule): # noqa
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+        self._modelData_ = data
+        self._modelDataRows_ = len(data)
+        self._modelDataColumnHeaders_ = dict(
+            tuple(
+                map( # noqa
+                    lambda x: (x[0], f"{x[1]}"),
+                    enumerate(("name", "begin", "end", "beginFrame", "nFrames",
+                               "procedure", "protocol", "episodeType", "stimLayout",
+                               "Edit"))
+                    )
+                )
+            )
+        self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+        self._modelDataRowIndexName_ = "Index"
+
+    @_makeModelData_.register(TriggerProtocolList)
+    def __makeModelData__(self, data: TriggerProtocolList): # noqa
+        self._modelData_ = data
+        self._original_data_ = data
+        self._modelDataRows_ = len(data)
+        # self._is_vigra_filter_kernel_ = 0
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        self._modelDataColumnHeaders_ = dict(
+            tuple(
+                map(
+                    lambda x: (x[0], f"{x[1]}"),
+                    enumerate(("name", "presynaptic", "postsynaptic", "photostimulation",
+                        "acquisition", "imagingDelay" ,"segments")
+                    ))
+                )
+            )
+        self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+        self._modelDataRowIndexName_ = "Index"
+
+    @_makeModelData_.register(ephys_pathways.SynapticPathwayList)
+    def __makeModelData__(self, data: ephys_pathways.SynapticPathwayList): # noqa
+        self._modelData_ = data
+        self._original_data_ = data
+        self._modelDataRows_ = len(data)
+        # self._is_vigra_filter_kernel_ = 0
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        #names = list(map(lambda f: f.name, dataclasses.fields(ephys_pathways.SynapticPathway))) + ["Edit"]
+
+        # NOTE: 2026-06-07 21:38:40 see NOTE: 2026-06-07 21:36:23
+        self._modelDataColumnHeaders_ = dict(
+            tuple(
+                map(
+                    lambda x: (x[0], f"{x[1]}"),
+                    enumerate(("name", "adc", "dac",
+                                "electrodeMode", "pathwayType", "Edit")
+                    ))
+                )
+            )
+        self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+        self._modelDataRowIndexName_ = "Index"
+
+    @_makeModelData_.register(ephys_pathways.AuxiliaryInputList)
+    def __makeModelData__(self, data: ephys_pathways.AuxiliaryInputList): # noqa
+        self._modelData_ = data
+        self._original_data_ = data
+        self._modelDataRows_ = len(data)
+        # self._is_vigra_filter_kernel_ = 0
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        # NOTE: 2026-06-07 21:36:23
+        # Only display (and allow editing) the relevant fields:
+        # name & adc; give option to edit the entire object via an "Edit"
+        # column
+        self._modelDataColumnHeaders_ = dict(
+            tuple(
+                map( # noqa
+                    lambda x: (x[0], f"{x[1]}"),
+                    enumerate(("name", "adc", "Edit"))
+                    )
+                )
+            )
+        self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+        self._modelDataRowIndexName_ = "Index"
+
+    @_makeModelData_.register(ephys_pathways.AuxiliaryOutputList)
+    def __makeModelData__(self, data: ephys_pathways.AuxiliaryOutputList): # noqa
+        self._modelData_ = data
+        self._original_data_ = data
+        self._modelDataRows_ = len(data)
+        # self._is_vigra_filter_kernel_ = 0
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        # NOTE: 2026-06-07 21:37:08 see NOTE: 2026-06-07 21:36:23
+        self._modelDataColumnHeaders_ = dict(
+            tuple(
+                map( # noqa
+                    lambda x: (x[0], f"{x[1]}"),
+                    enumerate(("name", "channel", "Edit"))
+                    )
+                )
+            )
+        self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+        self._modelDataRowIndexName_ = "Index"
+
+    @_makeModelData_.register(ephys_pathways.SynapticStimulusChannelList)
+    def __makeModelData__(self, data: ephys_pathways.SynapticStimulusChannelList): # noqa
+        self._modelData_ = data
+        self._original_data_ = data
+        self._modelDataRows_ = len(data)
+        # self._is_vigra_filter_kernel_ = 0
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = False
+
+        # NOTE: 2026-06-07 21:38:07 see NOTE: 2026-06-07 21:36:23
+        self._modelDataColumnHeaders_ = dict(
+            tuple(
+                map( # noqa
+                    lambda x: (x[0], f"{x[1]}"),
+                    enumerate(("name", "channel", "dig"))
+                    )
+                )
+            )
+        self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+        self._modelDataRowIndexName_ = "Index"
+
+    @_makeModelData_.register(np.ndarray)
+    def __makeModelData__(self, data: np.ndarray): # noqa
+        # trying to streamline this
+        # NOTE: 2025-11-23 09:45:45 FIXME/TODO - TOO SLOW!
+        # lazy display alleviates this to some degree (see self.fetchMore(…))
+        self._canAddRemoveRows_ = True
+        self._canAddRemoveColumns_ = True
+
+        if isinstance(data, neo.core.dataobject.DataObject):
+            # NOTE: 2025-09-27 10:38:00
+            # for regularly sampled signals (neo.AnalogSignal, DataSignal)
+            # signal domain (e.g. time) is a dynamic property, calculated
+            # from the t_start and sampling_period attributes of the signal
+            # object; hence, individual data points in the domain cannot
+            # be edited; however, the entire domain IS mutable (by changing
+            # the two attributes mentioned above)
+            #
+            if data.ndim:
+                self._modelDataRows_ = data.shape[0]
+
+                domain = getattr(data, "times", None)
+                domain_name = getattr(data, "domain_name", scq.getUnitFamily(domain))
+                domain_units_symbol = "" if domain.units == pq.Dimensionless else f"{scq.unitSymbol(domain)}"
+                if len(domain_name) == 0:
+                    domain_name = "Dimensionless" if len(domain_units_symbol) == 0 else domain_units_symbol
+                else:
+                    if len(domain_units_symbol):
+                        domain_name += f" ({domain_units_symbol})"
+
+                if data.ndim > 1:
+                    # include domain as the first column
+                    self._modelDataColumns_ = data.shape[1] + 1 # to include domain as column 0
+
+                    channel_names = None
+                    if len(data.array_annotations):
+                        if "channel_names" in data.array_annotations:
+                            channel_names = list( # noqa
+                                map(
+                                    lambda n: f"{n}",
+                                    data.array_annotations["channel_names"]
+                                    )
+                                )
+                        elif "channel_ids" in data.array_annotations:
+                            channel_names = list( # noqa
+                                map(
+                                    lambda i: f"{i}",
+                                    data.array_annotations["channel_ids"]
+                                    )
+                                )
+
+                    if channel_names is None:
+                        channel_names = list(map(lambda i: f"Channel {i}", range(data.shape[1])))
+
+                    # print(f"{self.__class__.__name__}._makeModelData_({type(data).__name__})")
+                    channel_names = list(
+                        map(
+                            lambda kc: f"{channel_names[kc]} ({data[:,kc].dimensionality})",
+                            range(len(channel_names))
+                            )
+                        )
+                    # print(f"\t channel_names = {channel_names}")
+                    headers = [domain_name, ] + channel_names
+                    # print(f"\t headers = {headers}\n")
+
+                    self._modelDataColumnHeaders_ = dict(
+                                tuple(enumerate(headers))
+                            )
+                    # self._modelDataColumnHeaders_ = dict(
+                    #         (
+                    #             tuple(
+                    #                     map(
+                    #                         lambda x: (x[0], x),
+                    #                         enumerate(headers)
+                    #                        )
+                    #                  )
+                    #         )
+                    #     )
+
+                    # if isinstance(data, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
+                    #     self._modelDataRowIndexName_ = "Index"
+                    # else:
+                    #     self._modelDataRowIndexName_ = domain_name
+                    self._modelDataRowIndexName_ = "Index"
+                    # print(f"\t _modelDataRowIndexName_ = {self._modelDataRowIndexName_}")
+                    # print(f"\t _modelDataColumnHeaders_ = {self._modelDataColumnHeaders_}\n")
+
+                    if isinstance(data, (neo.AnalogSignal, DataSignal)):
+                        # NOTE: 2025-09-27 11:05:05 see NOTE: 2025-09-27 10:38:00
+                        # although the signal domain is shown as a regular column
+                        # (column 0),  editing data points in this column is
+                        # prevented, EXCEPT for the first data point - which is
+                        # the t_start
+                        #
+                        # This may sound contrived, but the native Qt option would
+                        # be to call setItemDelegateForColumn and setItemDelegateForRow
+                        # with a custom delegate returning a null widget (i.e. None)
+                        # but that is already baked in PythonItemDelegate class
+                        # see NOTE: 2025-09-27 11:06:52 in gui/delegates.py
+                        self.immutableColumns = [0]
+                        # below, allow editing t_start
+                        self.immutableRows = range(1,self._modelDataRows_)
+                        self.jointImmutability = True
+                        # self._modelDataRowIndexName_ = f"{scq.unitFamilyName(data.times)} ({scq.unitSymbol(data.times)})"
+
+                else: # e.g. case of spiketrains:
+                    self._modelDataColumns_ = 1 if isinstance(data, neo.SpikeTrain) else 2
+                    if isinstance(data, neo.SpikeTrain):
+                        headers = [domain_name ]
+                    else:
+                        channel_names = None
+                        if len(data.array_annotations):
+                            if "channel_names" in data.array_annotations:
+                                channel_names = list(
+                                    map(
+                                        lambda n: f"{n}",
+                                        data.array_annotations["channel_names"]
+                                        )
+                                    )
+                            elif "channel_ids" in data.array_annotations:
+                                channel_names = list(
+                                    map(
+                                        lambda i: f"{i}",
+                                        data.array_annotations["channel_ids"]
+                                        )
+                                    )
+
+                        if channel_names is None:
+                            channel_names = [f"Channel 0 ({data.dimensionality})"]
+
+                        headers = [domain_name, ] + channel_names
+
+                    self._modelDataColumnHeaders_ = dict(
+                            tuple(map(lambda x: (x[0]+1, x),
+                                        enumerate(headers))
+                                )
+                        )
+
+                    self._modelDataRowIndexName_ = domain_name
+
+            else:
+                self._modelDataRows_ = 1
+                self._modelDataColumns_ = 1
+                self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
+                self._modelDataRowIndexName_ = "Index"
+
+                # self._canAddRemoveColumns_ = True
+
+            self._modelData_ = data
+
+        else: # "plain" numpy arrays and "generic" Quantity arrays
+            if data.ndim > 2:
+                if all (v == 1 for v in data.shape[2:]):
+                    self._modelData_ = np.squeeze(data).reshape((data.shape[0], np.prod(data.shape[1:])))
+                else:
+                    raise ValueError("Arrays with more than two dimensions and with non-singleton dimensions higher than 2 are not supported")
+            else:
+                self._modelData_ = data
+
+            self._modelDataRowIndexName_ = "Index"
+
+            if self._modelData_.ndim:
+                self._modelDataRows_ = self._modelData_.shape[0]
+                if self._modelData_.ndim > 1:
+                    self._modelDataColumns_ = self._modelData_.shape[1]
+                    if isinstance(self._modelData_, pq.Quantity):
+                        self._modelDataColumnHeaders_ = dict(
+                                tuple(
+                                    map(
+                                        lambda x: (x, f"{scq.getUnitFamily(data)} ({self._modelData_.units.dimensionality})"),
+                                        range(self._modelData_.shape[1])
+                                        )
+                                    )
+                            )
+
+                else:
+                    self._modelDataColumns_ = 1
+                    if isinstance(self._modelData_, pq.Quantity):
+                        self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
+            else:
+                self._modelDataRows_ = 1
+                self._modelDataColumns_ = 1
+                if isinstance(self._modelData_, pq.Quantity):
+                    self._modelDataColumnHeaders_ = {0: f"{scq.getUnitFamily(data)} ({data.units.dimensionality})"}
+
+
+    @_makeModelData_.register(list)
+    @_makeModelData_.register(tuple)
+    @_makeModelData_.register(deque)
+    def __makeModelData__(self, data: typing.Sequence): # noqa
+        if len(data):
+            if all(isinstance(d, ephys_pathways.RecordingSource) for d in data):
+                self._modelData_ = data
+                self._original_data_ = data
+                self._modelDataRows_ = len(data)
+                self._canAddRemoveRows_ = True
+                self._canAddRemoveColumns_ = False
+                # self._is_vigra_filter_kernel_ = 0
+                # NOTE: 2026-06-07 21:38:07 see NOTE: 2026-06-07 21:36:23
+                self._modelDataColumnHeaders_ = dict(
+                    tuple(
+                        map(
+                            lambda x: (x[0], f"{x[1]}"),
+                            enumerate(("name", "adc", "dac", "electrodeMode", "Edit"))
+                            )
+                        )
+                    )
+                self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
+
+            elif all(isinstance(d, typing.Sequence) for d in data):
+                # NOTE: 2026-06-07 21:59:50 Row-major !!!
+                # i.e., access is data[row][column] ≡ data[y][x]
+                assert all(len(d) == len(data[0]) for d in data[1:]), "Sequences with non-rectangular shape are not supported"
+
+                assert datatypes.is_homogeneous_sequence(data), "Only sequences homogeneous in their element types are supported"
+
+                # if any(any(isinstance(d_, typing.Sequence) for d_ in d) for d in data):
+                #     raise ValueError("Only 2D nested sequences are supported")
+
+                self._modelData_ = data
+                self._original_data_ = data
+                self._modelDataColumns_ = len(data[0])
+                self._modelDataRows_ = len(data)
+
+                self._modelDataColumnHeaders_ = dict(
+                    tuple(
+                        map(
+                            lambda x: (x, f"{x}"),
+                            range(self._modelDataColumns_)
+                            )
+                        )
+                    )
+                self._canAddRemoveRows_ = True
+                self._canAddRemoveColumns_ = True
+
+                if isinstance(data, tuple):
+                    self.immutableRows = range(self._modelDataRows_)
+                    self.immutableColumns = range(self._modelDataColumns_)
+                    self._canAddRemoveColumns_ = False
+
+                else:
+                    self.immutableRows = list(
+                        map(
+                            lambda x: x[0],
+                            filter(
+                                lambda x: isinstance(x[1], tuple),
+                                enumerate(data)
+                                )
+                            )
+                        )
+                    self._canAddRemoveColumns_ = False
+
+            else:
+                if all(
+                    isinstance(d,
+                                    (int, float, str, bool,
+                                    np.integer, np.floating, np.complexfloating,
+                                    np.character, np.bool,
+                                    pq.Quantity)
+                                    )
+                    for d in data
+                    ):
+
+                    self._modelData_ = data
+                    self._original_data_ = data
+                    self._modelDataColumns_ = 1
+                    self._modelDataRows_ = len(data)
+
+                    self._modelDataColumnHeaders_ = dict(
+                        tuple(
+                            map(
+                                lambda x: (x, f"{x}"),
+                                range(self._modelDataColumns_)
+                                )
+                            )
+                        )
+                    self._canAddRemoveRows_ = True
+                    self._canAddRemoveRows_ = True
+
+                else:
+                    scipywarn(f"{self.__class__.__name__} <with parent widget: {self.parent().objectName() if isinstance(self.parent(), QtWidgets.QWidget) else None}>: Unsupported sequence element types")
+                    self._modelDataColumns_ = 0
+                    self._modelDataRows_ = 0
+                    self._modelDataColumnHeaders_ = dict()
+                    self._modelData_ = None
+                    self._original_data_ = None
+
+        else:
+            self._modelDataColumns_ = 0
+            self._modelDataRows_ = 0
+            self._modelDataColumnHeaders_ = dict()
+            self._modelData_ = data
+            self._original_data_ = data
+            self._canAddRemoveRows_ = True
+            self._canAddRemoveRows_ = True
+
+        self._modelDataRowIndexName_ = "Index"
+
+    @singledispatchmethod
+    def _setValueInModelData_(self, mdata, pyvalue, row, col) -> bool:
+        scipywarn(f"Unsupported model data {type(mdata).__name__}")
         return False
+
+    @_setValueInModelData_.register(pd.DataFrame)
+    def __setValueInModelData__(self, mdata: pd.DataFrame, pyvalue, row, col) -> bool:
+        if row >= mdata.shape[0]:
+            return False
+
+        mdata.iloc[row, col] = pyvalue
+        return True
+
+    @_setValueInModelData_.register(pd.Series)
+    def __setValueInModelData__(self, mdata: pd.Series, pyvalue, row, col) -> bool: # noqa
+        if row >= mdata.shape[0]:
+            return False
+
+        mdata.iloc[row] = pyvalue
+        return True
+
+    @_setValueInModelData_.register(neo.dataobject.DataObject)
+    def __setValueInModelData__(self, mdata: neo.dataobject.DataObject, pyvalue, row, col) -> bool: # noqa
+        if row >= mdata.shape[0]:
+            return False
+
+        if isinstance(mdata, neo.SpikeTrain) and col > 0:
+            return False
+
+        if col >= mdata.shape[1] + 1:
+            # because the signal's domain is on column 0, what is shown
+            # here has one extra column
+            return False
+
+        if col == 0:
+            if isinstance(mdata, (neo.AnalogSignal, DataSignal)) :
+                # for analog signals only t_start can be edited
+                if row == 0:
+                    # allow setting t_start
+                    if isinstance(pyvalue, pq.Quantity):
+                        if pyvalue.units != mdata.times.units:
+                            raise ValueError(f"Expecting value units of {mdata.times.units}; got ({pyvalue.units}) instead")
+
+                        mdata.t_start = pyvalue
+                        return True
+
+                    elif isinstance(pyvalue, (float, int, complex)):
+                        mdata.t_start = pyvalue * mdata.units
+                        return True
+                    else:
+                        scipywarn(f"Expecting a float or a Quantity in {mdata.times.units}; got {type(pyvalue).__name__} instead")
+                        return False
+                else:
+                    return False
+
+            else:
+                if isinstance(pyvalue, pq.Quantity):
+                    if pyvalue.units != mdata.times.units:
+                        scipywarn(f"Expecting value units of {mdata.times.units}; got ({pyvalue.units}) instead")
+                        return False
+
+                    mdata.times[row] = pyvalue
+                    return True
+
+                elif isinstance(pyvalue, (float, int, complex)):
+                    mdata.times[row] = pyvalue * mdata.units
+                    return True
+                else:
+                    scipywarn(f"Expecting a float or a Quantity in {mdata.times.units}; got {type(pyvalue).__name__} instead")
+                    return False
+
+        else:
+            if isinstance(pyvalue, pq.Quantity):
+                if pyvalue.units != mdata.units:
+                    scipywarn(f"Expecting value units of {mdata.units}; got ({pyvalue.units}) instead")
+                    return False
+
+                mdata[row, col-1] = pyvalue
+                return True
+
+            elif isinstance(pyvalue, (float, int, complex)):
+                mdata[row, col-1] = pyvalue * mdata.units
+                return True
+            else:
+                scipywarn(f"Expecting a float or a Quantity in {mdata.units}; got {type(pyvalue).__name__} instead")
+                return False
+
+
+    @_setValueInModelData_.register(np.ndarray)
+    def __setValueInModelData__(self, mdata: np.ndarray, pyvalue, row, col) -> bool: # noqa
+        if row >= mdata.shape[0]:
+            return False
+        if mdata.ndim == 1:
+            mdata[row] = pyvalue
+        elif mdata.ndim == 2:
+            mdata[row, col] = pyvalue
+
+        if self._is_vigra_filter_kernel_:
+            self._original_data_ = vigrautils.kernelfromarray(mdata)
+
+        return True
+
+    @_setValueInModelData_.register(TriggerProtocolList)
+    def __setValueInModelData__(self, mdata: TriggerProtocolList, pyvalue, row, col) -> bool: # noqa
+        if row >= len(mdata):
+            return False
+        protocol = mdata[row]
+
+        attr = self._modelDataColumnHeaders_[col]
+
+        setattr(protocol, attr, pyvalue)
+
+        return True
+
+    @_setValueInModelData_.register(ephys_pathways.SynapticPathwayList)
+    @_setValueInModelData_.register(ephys_pathways.AuxiliaryInputList)
+    @_setValueInModelData_.register(ephys_pathways.AuxiliaryOutputList)
+    @_setValueInModelData_.register(ephys_pathways.RecordingSchedule)
+    @_setValueInModelData_.register(ephys_pathways.SynapticStimulusChannelList)
+    @_setValueInModelData_.register(sdc.Schedule)
+    def __setValueInModelData__(self, mdata: typing.Union[ # noqa
+                                                ephys_pathways.SynapticPathwayList,
+                                                ephys_pathways.AuxiliaryInputList,
+                                                ephys_pathways.AuxiliaryOutputList,
+                                                ephys_pathways.RecordingSchedule,
+                                                ephys_pathways.SynapticStimulusChannelList,
+                                                sdc.Schedule,
+                                                ], pyvalue, row, col) -> bool:
+        if row >= len(mdata):
+            return False
+
+        obj = mdata[row]
+
+        attr = self._modelDataColumnHeaders_[col]
+
+        if attr.lower() != "edit": # noqa
+            old_val = getattr(obj, attr)
+            if isinstance(old_val, enum.Enum):
+                if isinstance(pyvalue, int):
+                    new_val = type(old_val)(pyvalue)
+
+                elif isinstance(pyvalue, str):
+                    new_val = type(old_val)[pyvalue]
+
+            else:
+                new_val = pyvalue
+
+            setattr(obj, attr, new_val)
+
+        elif hasattr(obj, attr):
+            old_val = getattr(obj, attr)
+            if isinstance(old_val, enum.Enum):
+                if isinstance(pyvalue, int):
+                    new_val = type(old_val)(pyvalue)
+
+                elif isinstance(pyvalue, str):
+                    new_val = type(old_val)[pyvalue]
+
+            else:
+                new_val = pyvalue
+
+            setattr(obj, attr, new_val)
+
+        mdata[row] = obj
+
+        if (
+            isinstance(mdata, (ephys_pathways.RecordingSchedule, sdc.Schedule))
+            and attr in ("beginFrame", "nFrames")
+            ):
+            mdata.update()
+
+        return True
+
+    @_setValueInModelData_.register(list)
+    @_setValueInModelData_.register(deque)
+    def __setValueInModelData__(self, mdata: list | deque, pyvalue, row, col) -> bool: # noqa
+        if all(isinstance(o, ephys_pathways.RecordingSource) for o in mdata):
+            old_obj = mdata[row]
+            attr = self._modelDataColumnHeaders_[col]
+            params = {
+                "name":old_obj.name, "adc":old_obj.adc,
+                "dac":old_obj.dac, "electrodeMode":old_obj.electrodeMode
+                }
+            if attr.lower() != "edit":
+                old_val = getattr(old_obj, attr)
+                # print(f"'{attr}' -> {old_val} ({type(old_val)})")
+                if isinstance(old_val, enum.Enum):
+                    if isinstance(pyvalue, int):
+                        params[attr] = type(old_val)(pyvalue)
+                    elif isinstance(pyvalue, str):
+                        params[attr] = type(old_val)[pyvalue]
+                else:
+                    params[attr] = pyvalue
+            new_obj = type(old_obj)(**params)
+            mdata[row] = new_obj
+            return True
+        else:
+            try:
+                mdata[row][col] = pyvalue
+            except:
+                traceback.print_exc()
+                return False
+        return True
 
     @property
     def sourceData(self):
@@ -1198,6 +1961,26 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         if self._is_vigra_filter_kernel_:
             return self._original_data_
         return self._modelData_
+
+    @property
+    def decimals(self) -> int | None:
+        r"""Number of decimals used for displaying/editing floating point data.
+
+    This value includes the decimals separator, and is used only when the
+    item delegate is a PythonItemDelegate object.
+
+    A value of None indicates that the Qt default is being used (3).
+
+    """
+        return self._decimals_
+
+    @decimals.setter
+    def decimals(self, val: int | None):
+        if not isinstance(val, int) or val < 0:
+            self._decimals_ = None
+
+        else:
+            self._decimals_ = val
 
     @property
     def immutability(self) -> dict:
@@ -1274,328 +2057,329 @@ class TabularDataModel(QtCore.QAbstractTableModel):
     def canAlterColumns(self, val: bool):
         self._canAddRemoveColumns_ = val is True
 
-@singledispatch
-def _addRow_(self,
-             obj: object, row: object, in_place: bool = False) -> object:
-    r"""Appends a row of data to the object"""
-    raise NotImplementedError(f"Object of type {type (obj).__name__} are not supported")
 
-@_addRow_.register(pd.DataFrame)
-def _(obj: pd.DataFrame,
-      row: typing.Union[typing.Sequence, pd.Series],
-      in_place: bool = False) -> pd.DataFrame:
-    if isinstance(row, (pd.Series, np.ndarray)):
-        assert(row.size == len(obj.columns)), f"Mismatch between the number of row elements ({row.size}) and target columns ({len(obj.columns)})"
-        assert row.ndim==1, f"Wrong row dimensionality ({row.ndim}); should be 1"
-        row = tuple(row)
-
-    if isinstance(row, typing.Sequence):
-        assert len(row) == len(obj.columns), f"Mismatch between the number of row elements ({len(row)}) and target columns ({len(obj.columns)})"
-
-        for k, col in enumerate(obj.columns):
-            dtype = obj[col].dtype
-            rtype = type(row[k])
-            if np.dtype(rtype) is not dtype:
-                raise TypeError(f"Row element {k} expected to resolve to {dtype}; got {rtype.__name__} instead")
-
-    else:
-        raise TypeError(f"Row expected a pd.Series or a sequence of objects; got {type(row).__name__} instead")
-
-    ret = obj if in_place else obj.copy()
-    ret.loc[len(obj)] = row
-
-    return ret
-
-@_addRow_.register(pd.Series)
-@_addRow_.register(pd.Index)
-def _(obj: typing.Union[pd.Series, pd.Index],
-      row: typing.Union[dt.Number, str, pq.Quantity],
-      in_place: bool = False) -> pd.Series | pd.Index:
-    if isinstance(row, np.ndarray):
-        if row.size > 1:
-            raise ValueError("Can only add a scalar object")
-        row = tuple(row)
-
-    elif isinstance(row, typing.Sequence):
-        if len(row) > 1:
-            raise ValueError("Can only add a scalar object")
-
-    else:
-        row = (row,)
-
-    dtype = obj.dtype
-    rtype = type(row[0])
-    # print(f"{rtype} -> {np.dtype(rtype)}")
-    if np.dtype(rtype) is not dtype:
-        raise TypeError(f"Row data expected to resolve to {dtype}; got {rtype.__name__} instead")
-
-    ret = obj if in_place else obj.copy()
-    ret.loc[len(obj)] = row[0]
-
-    return ret
-
-@_addRow_.register(np.ndarray)
-@_addRow_.register(pq.Quantity)
-def _(obj: typing.Union[pq.Quantity, np.ndarray],
-      row: typing.Union[typing.Sequence[pq.Quantity], pq.Quantity],
-      in_place: bool = False) -> typing.Union[pq.Quantity, np.ndarray]:
-
-    if isinstance(obj, pd.Quantity):
-        units = obj.units
-        obj = obj.magnitude
-
-        if isinstance(row, pq.Quantity):
-            if row.units != units:
-                if scq.unitsConvertible(row, units):
-                    row = row.rescale(units)
-                else:
-                    raise TypeError(f"Row units ({row.units}) are incompatible with target's units ({units})")
-
-        row = row.magnitude
-
-    assert row.ndim == obj.ndim, f"Mismatch between dimensions: for row ({row.ndim}) vs target ({obj.ndim})"
-
-    try:
-        if obj.ndim == 0:
-            # NOTE: 2026-03-08 10:24:58
-            # in_place does not make sense here , as concatenation of dimensionless
-            # arrays is non-sensical; hence both obj and row MUST be converted
-            # to 1D arrays
-            ret = np.concat((np.atleast_1d(obj.magnitude), np.atleast_1d(row.magnitude)))
-
-        else:
-            ret = np.concat((obj.magnitude, row.magnitude), axis=0)
-
-        if isinstance(obj, pq.Quantity):
-            return ret * obj.units
-
-        return ret
-    except:
-        # traceback.print_exc()
-        raise
-
-@_addRow_.register(neo.IrregularlySampledSignal)
-@_addRow_.register(IrregularlySampledDataSignal)
-def _(obj: typing.Union[neo.IrregularlySampledSignal,
-                        IrregularlySampledDataSignal],
-      row: typing.Union[neo.IrregularlySampledSignal,
-                        IrregularlySampledDataSignal],
-      in_place: bool = False) -> typing.Union[neo.IrregularlySampledSignal,
-                                              IrregularlySampledDataSignal]:
-    r"""Concnatenates irregular signals on their domain axis"""
-    if type(row) is not type(obj):
-        raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
-
-    assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
-
-    domainUnits = obj.times.units
-    rowDomainUnits = row.times.units
-
-    if rowDomainUnits != domainUnits:
-        if not scq.unitsConvertible(rowDomainUnits, domainUnits):
-            raise TypeError(f"Incompatible domain units between row ({rowDomainUnits}) and target ({domainUnits})")
-        row.times = row.times.rescale(domainUnits)
-
-    ret = obj.concatenate(row, allow_overlap=True)
-    ret.file_origin = ""
-
-    return ret
-
-@_addRow_.register(neo.Epoch)
-@_addRow_.register(DataZone)
-def _(obj: typing.Union[neo.Epoch, DataZone],
-      row: typing.Union[neo.Epoch, DataZone],
-      in_place:bool=False) -> typing.Union[neo.Epoch, DataZone]:
-    if type(row) is not type(obj):
-        raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
-
-    assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
-
-    objTimes = obj.times
-    rowTimes = row.times
-
-    objDurations = obj.durations
-    rowDurations = row.durations
-
-    domainUnits = objTimes.units
-    rowDomainUnits = rowTimes.units
-
-    if rowDomainUnits != domainUnits:
-        if not scq.unitsConvertible(rowDomainUnits, domainUnits):
-            raise TypeError(f"Incompatible domain units between row ({rowDomainUnits}) and target ({domainUnits})")
-        rowTimes = rowTimes.rescale(domainUnits)
-
-    if rowDurations.units != objDurations.units:
-        if not scq.unitsConvertible(rowDuration.units, objDurations.units):
-            raise TypeError(f"Incompatible domain units between row ({rowDurations.units}) and target ({objDurations.units})")
-
-        rowDurations = rowDurations.rescale(objDurations.units)
-
-    times = np.concatenate((objTimes, rowTimes), axis=0) * objTimes.units
-
-    durations = np.concatenate((objDurations, rowDurations), axis=0) * objDurations.units
-
-    labels = np.concatenate((obj.labels, row.labels), axis=0)
-
-    return type(obj)(times = times, durations = durations, labels = labels,
-                     name = obj.name, description = obj.description,
-                     file_origin = "",
-                     array_annotations = obj.array_annotations,
-                     **obj.annotations)
-
-@_addRow_.register(neo.Event)
-@_addRow_.register(DataMark)
-@_addRow_.register(TriggerEvent)
-def _(obj: typing.Union[neo.Event, DataMark, TriggerEvent],
-      row: typing.Union[neo.Event, DataMark, TriggerEvent],
-      in_place:bool=False) -> typing.Union[neo.Event, DataMark, TriggerEvent]:
-    if type(row) is not type(obj):
-        raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
-
-    assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
-
-    # NOTE: 2026-03-08 22:19:12
-    # using neo.Event.merge is enticing, but the code below ensures the row is
-    # appended
-    # return obj.merge(row)
-
-    objTimes = obj.times
-    rowTimes = row.times
-
-    if isinstance(obj, (TriggerEvent, DataMark)):
-        assert (row.type == obj.type), "Incompatible trigger event type"
-
-    domainUnits = objTimes.units
-    rowDomainUnits = rowTimes.units
-
-    if rowDomainUnits != domainUnits:
-        if not scq.unitsConvertible(rowDomainUnits, domainUnits):
-            raise TypeError(f"Incompatible domain units between row ({rowDomainUnits}) and target ({domainUnits})")
-        rowTimes = rowTimes.rescale(domainUnits)
-
-    times = np.concatenate((objTimes, rowTimes), axis=0) * objTimes.units
-
-    labels = np.concatenate((obj.labels, row.labels), axis=0)
-
-    ret = type(obj)(times = times, labels = labels,
-                     name = obj.name, description = obj.description,
-                     file_origin = "",
-                     array_annotations = obj.array_annotations,
-                     **obj.annotations)
-
-    if isinstance(obj, (DataMark, TriggerEvent)):
-        ret.type = obj.type
-
-    return ret
-
-@_addRow_.register(neo.AnalogSignal)
-@_addRow_.register(DataSignal)
-def _(obj: typing.Union[neo.AnalogSignal, DataSignal],
-      row: typing.Union[np.ndarray, pq.Quantity],
-      in_place=False) -> neo.AnalogSignal | DataSignal:
-    if not isinstance(row, [pq.Quantity, np.ndarray]):
-        raise TypeError(f"Row expected to be a Quantity or a numpy array; got {type(row).__name__} instead")
-
-    if row.ndim == 0:
-        if obj.shape[1] > 1:
-            raise ValueError(f"Not enough data points; expected {obj.shape[1]}")
-
-    elif row.ndim == 1:
-        if row.size != obj.shape[1]:
-            raise ValueError(f"Mismatch in data points; expected {obj.shape[1]}, got {row.size} instead")
-
-    elif row.ndim > 2:
-        raise ValueError(f"Unexpected row shape ({row.shape})")
-
-    if isinstance(row, pq.Quantity) and row.units != obj.units:
-        if not scq.unitsConvertible(row, obj):
-            raise TypeError(f"Incompatible units: expecting {obj.units}; got {row.units} instead")
-
-        row = row.rescale(obj.units)
-
-    sampling_rate = obj.sampling_rate
-
-    objData = obj.magnitude
-    rowData = row.magnitude if isinstance(row, pq.Quantity) else row
-
-    if rowData.ndim < 2:
-        rowData = np.atleast_2d(rowData)
-
-    newData = np.concatenate((objData, rowData), axis=0) * obj.units
-
-    ret = type(obj)(newData, units = newData.units, t_start = obj.t_start,
-                    sampling_rate = obj.sampling_rate,
-                    name = obj.name, description = obj.description,
-                    file_origin = "",
-                    array_annotations = obj.array_annotations,
-                    **obj.annotations)
-
-    return ret
-
-@_addRow_.register(neo.SpikeTrain)
-@_addRow_.register(MarkTrain)
-def _(obj: typing.Union[neo.SpikeTrain, MarkTrain],
-      row: typing.Union[neo.SpikeTrain, MarkTrain], in_place = False) -> typing.Union[neo.SpikeTrain, MarkTrain]:
-    if not isinstance(row, type(obj)):
-        raise TypeError(f"Row expected to be a {type(obj).__name__}; instead got a {type(row).__name__}")
-
-    assert(row.size == 1), "Expecting exactly one timestamp"
-    assert(row.left_sweep == obj.left_sweep), "Both argument must have the same 'left_sweep'"
-
-    # NOTE: 2026-03-08 22:21:00 see NOTE: 2026-03-08 22:19:12
-    # return obj.merge(row)
-
-    times = obj.times
-    waveforms = obj.waveforms
-
-    time = row.times
-    waves = row.waveforms
-
-    if time.units != times.units:
-        if not scq.unitsConvertible(time, times):
-            raise TypeError(f"Incompatible domain units: row ({time.units}) vs target ({times.units})")
-
-        time = time.rescale(times.units)
-
-    newTimes = np.concatenate(
-        (np.atleast_1d(times.magnitude),
-         np.atleast_1d(time.magnitude)), axis=0) * times.units
-
-    if waveforms is None:
-        if isinstance(wave, np.ndarray):
-            shape = (obj.size, ) + wave.shape[0:2]
-            full_waveforms = np.concatenate((np.full(shape, np.nan), wave), axis=0)
-        else:
-            full_waveforms = None
-
-    else:
-        full_waveforms = np.concatenate((waveforms, wave), axis=0)
-
-    t_stop = np.max(obj.t_stop, row.t_stop)
-    t_start = np.min(obj.t_start, row.t_start)
-
-    return neo.SpikeTrain(newTimes, t_stop, units = newTimes.units,
-                          sampling_rate = obj.sampling_rate,
-                          t_start = t_start,
-                          waveforms = full_waveforms,
-                          left_sweep = obj.left_sweep,
-                          file_origin = "",
-                          array_annotations = obj.array_annotations,
-                          **obj.annotations)
-
-@_addRow_.register(TriggerProtocolList)
-def _(obj: TriggerProtocolList, row: TriggerProtocol, in_place: bool = False):
-    if not isinstance(row, TriggerProtocol):
-        raise TypeError(f"Cannot add {type(row).__name__}")
-
-    if in_place:
-        obj += row
-        return obj
-
-    else:
-        ret = TriggerProtocolList(obj._items)
-        ret += row
-        return ret
+# @singledispatch
+# def _appendRow_(self,
+#              obj: object, row: object, in_place: bool = False) -> object:
+#     r"""Appends a row of data to the object"""
+#     raise NotImplementedError(f"Object of type {type (obj).__name__} are not supported")
+#
+# @_appendRow_.register(pd.DataFrame)
+# def __appendRow__(obj: pd.DataFrame,
+#       row: typing.Union[typing.Sequence, pd.Series],
+#       in_place: bool = False) -> pd.DataFrame:
+#     if isinstance(row, (pd.Series, np.ndarray)):
+#         assert(row.size == len(obj.columns)), f"Mismatch between the number of row elements ({row.size}) and target columns ({len(obj.columns)})"
+#         assert row.ndim==1, f"Wrong row dimensionality ({row.ndim}); should be 1"
+#         row = tuple(row)
+#
+#     if isinstance(row, typing.Sequence):
+#         assert len(row) == len(obj.columns), f"Mismatch between the number of row elements ({len(row)}) and target columns ({len(obj.columns)})"
+#
+#         for k, col in enumerate(obj.columns):
+#             dtype = obj[col].dtype
+#             rtype = type(row[k])
+#             if np.dtype(rtype) is not dtype:
+#                 raise TypeError(f"Row element {k} expected to resolve to {dtype}; got {rtype.__name__} instead")
+#
+#     else:
+#         raise TypeError(f"Row expected a pd.Series or a sequence of objects; got {type(row).__name__} instead")
+#
+#     ret = obj if in_place else obj.copy()
+#     ret.loc[len(obj)] = row
+#
+#     return ret
+#
+# @_appendRow_.register(pd.Series)
+# @_appendRow_.register(pd.Index)
+# def __appendRow__(obj: typing.Union[pd.Series, pd.Index],
+#       row: typing.Union[dt.Number, str, pq.Quantity],
+#       in_place: bool = False) -> pd.Series | pd.Index:
+#     if isinstance(row, np.ndarray):
+#         if row.size > 1:
+#             raise ValueError("Can only add a scalar object")
+#         row = tuple(row)
+#
+#     elif isinstance(row, typing.Sequence):
+#         if len(row) > 1:
+#             raise ValueError("Can only add a scalar object")
+#
+#     else:
+#         row = (row,)
+#
+#     dtype = obj.dtype
+#     rtype = type(row[0])
+#     # print(f"{rtype} -> {np.dtype(rtype)}")
+#     if np.dtype(rtype) is not dtype:
+#         raise TypeError(f"Row data expected to resolve to {dtype}; got {rtype.__name__} instead")
+#
+#     ret = obj if in_place else obj.copy()
+#     ret.loc[len(obj)] = row[0]
+#
+#     return ret
+#
+# @_appendRow_.register(np.ndarray)
+# @_appendRow_.register(pq.Quantity)
+# def __appendRow__(obj: typing.Union[pq.Quantity, np.ndarray],
+#       row: typing.Union[typing.Sequence[pq.Quantity], pq.Quantity],
+#       in_place: bool = False) -> typing.Union[pq.Quantity, np.ndarray]:
+#
+#     if isinstance(obj, pd.Quantity):
+#         units = obj.units
+#         obj = obj.magnitude
+#
+#         if isinstance(row, pq.Quantity):
+#             if row.units != units:
+#                 if scq.unitsConvertible(row, units):
+#                     row = row.rescale(units)
+#                 else:
+#                     raise TypeError(f"Row units ({row.units}) are incompatible with target's units ({units})")
+#
+#         row = row.magnitude
+#
+#     assert row.ndim == obj.ndim, f"Mismatch between dimensions: for row ({row.ndim}) vs target ({obj.ndim})"
+#
+#     try:
+#         if obj.ndim == 0:
+#             # NOTE: 2026-03-08 10:24:58
+#             # in_place does not make sense here , as concatenation of dimensionless
+#             # arrays is non-sensical; hence both obj and row MUST be converted
+#             # to 1D arrays
+#             ret = np.concat((np.atleast_1d(obj.magnitude), np.atleast_1d(row.magnitude)))
+#
+#         else:
+#             ret = np.concat((obj.magnitude, row.magnitude), axis=0)
+#
+#         if isinstance(obj, pq.Quantity):
+#             return ret * obj.units
+#
+#         return ret
+#     except:
+#         # traceback.print_exc()
+#         raise
+#
+# @_appendRow_.register(neo.IrregularlySampledSignal)
+# @_appendRow_.register(IrregularlySampledDataSignal)
+# def __appendRow__(obj: typing.Union[neo.IrregularlySampledSignal,
+#                         IrregularlySampledDataSignal],
+#       row: typing.Union[neo.IrregularlySampledSignal,
+#                         IrregularlySampledDataSignal],
+#       in_place: bool = False) -> typing.Union[neo.IrregularlySampledSignal,
+#                                               IrregularlySampledDataSignal]:
+#     r"""Concnatenates irregular signals on their domain axis"""
+#     if type(row) is not type(obj):
+#         raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
+#
+#     assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
+#
+#     domainUnits = obj.times.units
+#     rowDomainUnits = row.times.units
+#
+#     if rowDomainUnits != domainUnits:
+#         if not scq.unitsConvertible(rowDomainUnits, domainUnits):
+#             raise TypeError(f"Incompatible domain units between row ({rowDomainUnits}) and target ({domainUnits})")
+#         row.times = row.times.rescale(domainUnits)
+#
+#     ret = obj.concatenate(row, allow_overlap=True)
+#     ret.file_origin = ""
+#
+#     return ret
+#
+# @_appendRow_.register(neo.Epoch)
+# @_appendRow_.register(DataZone)
+# def __appendRow__(obj: typing.Union[neo.Epoch, DataZone],
+#       row: typing.Union[neo.Epoch, DataZone],
+#       in_place:bool=False) -> typing.Union[neo.Epoch, DataZone]:
+#     if type(row) is not type(obj):
+#         raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
+#
+#     assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
+#
+#     objTimes = obj.times
+#     rowTimes = row.times
+#
+#     objDurations = obj.durations
+#     rowDurations = row.durations
+#
+#     domainUnits = objTimes.units
+#     rowDomainUnits = rowTimes.units
+#
+#     if rowDomainUnits != domainUnits:
+#         if not scq.unitsConvertible(rowDomainUnits, domainUnits):
+#             raise TypeError(f"Incompatible domain units between row ({rowDomainUnits}) and target ({domainUnits})")
+#         rowTimes = rowTimes.rescale(domainUnits)
+#
+#     if rowDurations.units != objDurations.units:
+#         if not scq.unitsConvertible(rowDuration.units, objDurations.units):
+#             raise TypeError(f"Incompatible domain units between row ({rowDurations.units}) and target ({objDurations.units})")
+#
+#         rowDurations = rowDurations.rescale(objDurations.units)
+#
+#     times = np.concatenate((objTimes, rowTimes), axis=0) * objTimes.units
+#
+#     durations = np.concatenate((objDurations, rowDurations), axis=0) * objDurations.units
+#
+#     labels = np.concatenate((obj.labels, row.labels), axis=0)
+#
+#     return type(obj)(times = times, durations = durations, labels = labels,
+#                      name = obj.name, description = obj.description,
+#                      file_origin = "",
+#                      array_annotations = obj.array_annotations,
+#                      **obj.annotations)
+#
+# @_appendRow_.register(neo.Event)
+# @_appendRow_.register(DataMark)
+# @_appendRow_.register(TriggerEvent)
+# def __appendRow__(obj: typing.Union[neo.Event, DataMark, TriggerEvent],
+#       row: typing.Union[neo.Event, DataMark, TriggerEvent],
+#       in_place:bool=False) -> typing.Union[neo.Event, DataMark, TriggerEvent]:
+#     if type(row) is not type(obj):
+#         raise TypeError(f"Row expected to be {type(obj).__name__}; got {type(row).__name__} instead")
+#
+#     assert row.size == 1, f"Row must contain a single data point; instead, got {row.size}"
+#
+#     # NOTE: 2026-03-08 22:19:12
+#     # using neo.Event.merge is enticing, but the code below ensures the row is
+#     # appended
+#     # return obj.merge(row)
+#
+#     objTimes = obj.times
+#     rowTimes = row.times
+#
+#     if isinstance(obj, (TriggerEvent, DataMark)):
+#         assert (row.type == obj.type), "Incompatible trigger event type"
+#
+#     domainUnits = objTimes.units
+#     rowDomainUnits = rowTimes.units
+#
+#     if rowDomainUnits != domainUnits:
+#         if not scq.unitsConvertible(rowDomainUnits, domainUnits):
+#             raise TypeError(f"Incompatible domain units between row ({rowDomainUnits}) and target ({domainUnits})")
+#         rowTimes = rowTimes.rescale(domainUnits)
+#
+#     times = np.concatenate((objTimes, rowTimes), axis=0) * objTimes.units
+#
+#     labels = np.concatenate((obj.labels, row.labels), axis=0)
+#
+#     ret = type(obj)(times = times, labels = labels,
+#                      name = obj.name, description = obj.description,
+#                      file_origin = "",
+#                      array_annotations = obj.array_annotations,
+#                      **obj.annotations)
+#
+#     if isinstance(obj, (DataMark, TriggerEvent)):
+#         ret.type = obj.type
+#
+#     return ret
+#
+# @_appendRow_.register(neo.AnalogSignal)
+# @_appendRow_.register(DataSignal)
+# def __appendRow__(obj: typing.Union[neo.AnalogSignal, DataSignal],
+#       row: typing.Union[np.ndarray, pq.Quantity],
+#       in_place=False) -> neo.AnalogSignal | DataSignal:
+#     if not isinstance(row, [pq.Quantity, np.ndarray]):
+#         raise TypeError(f"Row expected to be a Quantity or a numpy array; got {type(row).__name__} instead")
+#
+#     if row.ndim == 0:
+#         if obj.shape[1] > 1:
+#             raise ValueError(f"Not enough data points; expected {obj.shape[1]}")
+#
+#     elif row.ndim == 1:
+#         if row.size != obj.shape[1]:
+#             raise ValueError(f"Mismatch in data points; expected {obj.shape[1]}, got {row.size} instead")
+#
+#     elif row.ndim > 2:
+#         raise ValueError(f"Unexpected row shape ({row.shape})")
+#
+#     if isinstance(row, pq.Quantity) and row.units != obj.units:
+#         if not scq.unitsConvertible(row, obj):
+#             raise TypeError(f"Incompatible units: expecting {obj.units}; got {row.units} instead")
+#
+#         row = row.rescale(obj.units)
+#
+#     sampling_rate = obj.sampling_rate
+#
+#     objData = obj.magnitude
+#     rowData = row.magnitude if isinstance(row, pq.Quantity) else row
+#
+#     if rowData.ndim < 2:
+#         rowData = np.atleast_2d(rowData)
+#
+#     newData = np.concatenate((objData, rowData), axis=0) * obj.units
+#
+#     ret = type(obj)(newData, units = newData.units, t_start = obj.t_start,
+#                     sampling_rate = obj.sampling_rate,
+#                     name = obj.name, description = obj.description,
+#                     file_origin = "",
+#                     array_annotations = obj.array_annotations,
+#                     **obj.annotations)
+#
+#     return ret
+#
+# @_appendRow_.register(neo.SpikeTrain)
+# @_appendRow_.register(MarkTrain)
+# def __appendRow__(obj: typing.Union[neo.SpikeTrain, MarkTrain],
+#       row: typing.Union[neo.SpikeTrain, MarkTrain], in_place = False) -> typing.Union[neo.SpikeTrain, MarkTrain]:
+#     if not isinstance(row, type(obj)):
+#         raise TypeError(f"Row expected to be a {type(obj).__name__}; instead got a {type(row).__name__}")
+#
+#     assert(row.size == 1), "Expecting exactly one timestamp"
+#     assert(row.left_sweep == obj.left_sweep), "Both argument must have the same 'left_sweep'"
+#
+#     # NOTE: 2026-03-08 22:21:00 see NOTE: 2026-03-08 22:19:12
+#     # return obj.merge(row)
+#
+#     times = obj.times
+#     waveforms = obj.waveforms
+#
+#     time = row.times
+#     waves = row.waveforms
+#
+#     if time.units != times.units:
+#         if not scq.unitsConvertible(time, times):
+#             raise TypeError(f"Incompatible domain units: row ({time.units}) vs target ({times.units})")
+#
+#         time = time.rescale(times.units)
+#
+#     newTimes = np.concatenate(
+#         (np.atleast_1d(times.magnitude),
+#          np.atleast_1d(time.magnitude)), axis=0) * times.units
+#
+#     if waveforms is None:
+#         if isinstance(wave, np.ndarray):
+#             shape = (obj.size, ) + wave.shape[0:2]
+#             full_waveforms = np.concatenate((np.full(shape, np.nan), wave), axis=0)
+#         else:
+#             full_waveforms = None
+#
+#     else:
+#         full_waveforms = np.concatenate((waveforms, wave), axis=0)
+#
+#     t_stop = np.max(obj.t_stop, row.t_stop)
+#     t_start = np.min(obj.t_start, row.t_start)
+#
+#     return neo.SpikeTrain(newTimes, t_stop, units = newTimes.units,
+#                           sampling_rate = obj.sampling_rate,
+#                           t_start = t_start,
+#                           waveforms = full_waveforms,
+#                           left_sweep = obj.left_sweep,
+#                           file_origin = "",
+#                           array_annotations = obj.array_annotations,
+#                           **obj.annotations)
+#
+# @_appendRow_.register(TriggerProtocolList)
+# def __appendRow__(obj: TriggerProtocolList, row: TriggerProtocol, in_place: bool = False):
+#     if not isinstance(row, TriggerProtocol):
+#         raise TypeError(f"Cannot add {type(row).__name__}")
+#
+#     if in_place:
+#         obj += row
+#         return obj
+#
+#     else:
+#         ret = TriggerProtocolList(obj._items)
+#         ret += row
+#         return ret
 
 
 

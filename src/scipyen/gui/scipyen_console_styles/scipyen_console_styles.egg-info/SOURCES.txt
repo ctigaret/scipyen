@@ -1,5 +1,5 @@
 README.md
-keplerdark.py
+keplerstyles.py
 pyproject.toml
 scipyen_console_styles.egg-info/PKG-INFO
 scipyen_console_styles.egg-info/SOURCES.txt

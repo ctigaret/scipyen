@@ -37,9 +37,13 @@ from core.sysutils import adapt_ui_path
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 __ui_path__ = adapt_ui_path(__module_path__, "spinboxslider.ui")
 
-Ui_SpinBoxSlider, QWidget = loadUiType(__ui_path__)
+try:
+    from gui.widgets.spinboxslider_ui import Ui_SpinBoxSlider
 
-class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
+except:
+    Ui_SpinBoxSlider, _ = loadUiType(__ui_path__)
+
+class SpinBoxSlider(QtWidgets.QWidget, Ui_SpinBoxSlider):
     r"""Compound widget with a QSpinBox and QSlider.
     The widge is backed by a Python `range` object, meaning that its attributes
     are as follows:
@@ -68,6 +72,7 @@ class SpinBoxSlider(QWidget, Ui_SpinBoxSlider):
     valueChanged = Signal(int, name="valueChanged")
     
     def __init__(self, parent=None, **kwargs):
+        super(Ui_SpinBoxSlider, self).__init__()
         self._singleStep_ = kwargs.pop("singleStep", 1)
         self._pageStep_ = kwargs.pop("pageStep", 10)
         minimum = kwargs.pop("minimum", 0)

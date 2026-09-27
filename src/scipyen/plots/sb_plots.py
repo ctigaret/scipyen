@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-import numpy as np
+import numpy as np # noqa
 import pandas as pd # for DataFrame, Series etc
 import seaborn as sb
 from six import string_types
+from matplotlib import pyplot as plt
 # from seaborn.external.six import string_types
 
 class SB_CategoricalPlotter(sb.categorical._CategoricalPlotter):

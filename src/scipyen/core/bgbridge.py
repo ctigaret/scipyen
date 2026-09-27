@@ -38,6 +38,7 @@ Wrapper around BrainGlobe API, with shims
 
 import traceback, os, sys, pathlib, shutil, inspect
 import collections, typing, dataclasses, functools, itertools
+import subprocess
 # import json
 import re
 from dataclasses import MISSING
@@ -56,7 +57,7 @@ if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -65,7 +66,7 @@ else:
         __has_PyQt6__ = True
 
     from qtpy import sip
-    from qtpy.uic import loadUiType
+    # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -143,6 +144,11 @@ try:
                                                   get_local_atlas_version,
                                                   show_atlases)
     from brainglobe_atlasapi.structure_class import Structure, StructuresDict
+    from brainglobe_atlasapi import descriptors as bg_descriptors
+
+    remote_url_base = bg_descriptors.remote_url_base
+    remote_url_s3 = bg_descriptors.remote_url_s3
+    remote_url_s3_http = bg_descriptors.remote_url_s3_http
     # BGStructure = Structure
 
     hasBrainGlobe=True
@@ -154,6 +160,10 @@ except:
     get_atlases_lastversions = lambda : dict()
     get_downloaded_atlases = lambda : list()
     get_local_atlas_version = lambda x: str()
+    bg_descriptors = None
+    remote_url_base = None
+    remote_url_s3 = None
+    remote_url_s3_http = None
     def show_atlases(show_local_path:bool=False, table_width:int=88): None
 
 class BGStructureDescriptor:
@@ -223,7 +233,7 @@ class BrainAtlasManager(QtCore.QObject):
 
     default_config_file = brainglobe_atlasapi.config.CONFIG_PATH if hasBrainGlobeAtlasAPI else None
 
-    remoteUrlBase = brainglobe_atlasapi.bg_atlas.BrainGlobeAtlas._remote_url_base if hasBrainGlobeAtlasAPI else None
+    remoteUrlBase = remote_url_base #if hasBrainGlobeAtlasAPI else None
 
     default_free_space_fraction_allowed = 0.01
 
@@ -259,7 +269,7 @@ class BrainAtlasManager(QtCore.QObject):
 
         """
         super().__init__(parent=parent)
-        self._atlas_ = None
+        # self._atlas_ = None
         self._current_atlas_ = None
         self._atlas_name_to_initialize_ = None
         self._atlas_in_progress_ = None
@@ -668,7 +678,7 @@ class BrainAtlasManager(QtCore.QObject):
     def testAtlasDownload(self):
         r"""Tests downloading and extracting an atlas archive.
         See iolib.network.example_sequential_download_handler for explanations
-        TODO - refactor this into self.downloadAtlas/self._updateAtlas
+        TODO - refactor this into self.uiDownloadAtlas/self._updateAtlas
         """
         if not self.hasBrainGlobeAtlasAPI():
             return
@@ -749,7 +759,8 @@ class BrainAtlasManager(QtCore.QObject):
         # print(f"{self.__class__.__name__}._slot_extractAtlasArchiveAndInit: target = {target}")
         ret = self._extractAtlasArchive(target)
         if ret and self._atlas_name_to_initialize_ is not None:
-            self._atlas_ = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
+            # self._atlas_ = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
+            self._current_atlas_ = BrainGlobeAtlas(self._atlas_name_to_initialize_, check_latest=False)
             print(f"{print_styled(f'{self._atlas_name_to_initialize_}', 'green')} was initialized")
             self._atlas_name_to_initialize_ = None
 
@@ -805,32 +816,32 @@ class BrainAtlasManager(QtCore.QObject):
                         )
                     )
                 ):
-
                 name = self.selectAtlasName(localAtlasesOnly = localAtlasesOnly)
 
                 if name is None:
                     return
                     # name = self.default_atlas_name
 
-            if name not in self.localAtlasNames:
+            atlasNames = self.localAtlasNames if localAtlasesOnly else self.atlasNames
+            if name not in atlasNames:
                 if interactive:
                     GuiMessages.informationMessage_static(
                         title = f"Atlas {name}:",
                         text  = "\n".join(
-        [
-            f"Atlas {name} must be installed manually.",
-            "Open a terminal, run 'scipyact' to activate Scipyen's environment,"
-            f"then run 'brainglobe install -a {name}' to install the atlas"
-        ]
+                                [
+                                    f"Atlas {name} must be installed manually.",
+                                    "Open a terminal, run 'scipyact' to activate Scipyen's environment,"
+                                    f"then run 'brainglobe install -a {name}' to install the atlas"
+                                ]
                             )
                         )
-                return
-                # if download:
-                #     scipywarn(f"The atlas {name} will be available as the 'atlas' attribute once donwloaded and initialized")
-                #     self.downloadAtlas(name, True)
-                # else:
-                #     scipywarn(f"The atlas {name} must be downloaded manually")
-                #     return
+                else:
+                    if download:
+                        scipywarn(f"The atlas {name} will be available as the 'atlas' attribute once donwloaded and initialized")
+                        self.downloadAtlas(name, True)
+                    else:
+                        scipywarn(f"The atlas {name} must be downloaded manually")
+                        return
             else:
                 # TODO 2024-11-24 21:23:14
                 # make 'check_latest' below a Scipyen configurable variable
@@ -898,7 +909,7 @@ class BrainAtlasManager(QtCore.QObject):
         except:
             traceback.print_exc()
 
-    def downloadAtlas(self, name:typing.Optional[str], initAtlas:bool=False) -> None:
+    def uiDownloadAtlas(self, name:typing.Optional[str], initAtlas:bool=False) -> None:
         r"""Downloads an atlas data from the BrainGlobe GIN repository
 
         https://gin.g-node.org/brainglobe/atlases/raw/master/
@@ -952,6 +963,22 @@ class BrainAtlasManager(QtCore.QObject):
                                    url = url)
 
         self._netMan_.getUrl(url1, destination=None, replyHandler=handle)
+
+    def downloadAtlas(self, name:str, init:bool=True):
+
+        command = ["brainglobe", "install", "-a", name]
+
+        proc = subprocess.run(command)
+
+        if proc.returncode == 0:
+            if init:
+                self._current_atlas_ = BrainGlobeAtlas(name, check_latest=False)
+                self._atlas_name_to_initialize_ = None
+            else:
+                scipywarn(f"The atlas {name} was downloaded but it must be manually initialized")
+
+        else:
+            scipywarn(f"Download process exited with code {proc.returncode}")
 
 
     @Slot()
@@ -1773,11 +1800,11 @@ def get_atlas_structure(name:str, atlas:BrainGlobeAtlas,
         scipywarn("The 'brainglobe_atlasapi' package is not installed")
         return
 
-    if not isinstance(name, str):
-        raise TypeError(f"Expecting a str; got {type(name).__name__} instead")
+    if not isinstance(name, str) or len(name.strip()) == 0:
+        raise TypeError(f"Expecting a non-empty string; got {name} instead")
 
-    if len(name.strip()) == 0:
-        raise ValueError("Expecting a non-empty string")
+    # if len(name.strip()) == 0:
+    #     raise ValueError("Expecting a non-empty string")
 
     # structures, snames, sacronyms, sids = zip(*[(s, s["name"], s["acronym"], s["id"]) for s in atlas.structures_list])
     structures, snames, sacronyms = zip(*[(s, s["name"], s["acronym"]) for s in atlas.structures_list])
@@ -1905,6 +1932,13 @@ a valid atlas ``metadata.json`` file.
     pattern = r'"species":\s*"(.*?)"'
     with open(atlas_metadata_json_file_name, "rt", encoding="utf-8") as json_file:
         return re.findall(pattern, json_file.read())
+
+
+
+def get_hash(s: typing.Union[Structure, StructuresDict]) -> int:
+    items = tuple(map(lambda i: (i[0], tuple(i[1]) if isinstance(i[1], list) else get_hash(i[1]) if isinstance(i[1], Structure) else i[1])))
+    return hash(items)
+
 # ### END ---- module-level functions
 
 # manager = BrainAtlasManager()

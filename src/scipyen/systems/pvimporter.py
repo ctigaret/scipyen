@@ -54,7 +54,7 @@ from systems.PrairieView import *
 from systems.PrairieView import loadPrairieViewXML
 from gui import quickdialog as qd
 from gui.triggerdetectgui import TriggerDetectDialog, TriggerDetectWidget
-from gui.protocoleditordialog import ProtocolEditorDialog
+from gui.triggerprotocolseditordialog import TriggerProtocolsEditorDialog
 from gui import pictgui as pgui
 from gui.workspacegui import WorkspaceGuiMixin
 import gui.signalviewer as sv
@@ -73,14 +73,20 @@ from imaging.axiscalibration import (AxesCalibration,
 
 import ephys.ephys as ephys
 
-__ui_path__ = adapt_ui_path(__module_path__, "PrairieImporter.ui")
+try:
+    from systems.PrairieImporter_ui import Ui_PrairieImporterDialog
 
-if os.environ["QT_API"] in ("pyqt5", "pyside2"):
-    __UI_PrairieImporter, __QDialog__ = loadUiType(__ui_path__, from_imports=True, import_from="gui")
-else:
-    __UI_PrairieImporter, __QDialog__ = loadUiType(__ui_path__)
+except:
+    __ui_path__ = adapt_ui_path(__module_path__, "PrairieImporter.ui")
 
-class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiMixin):
+    if os.environ["QT_API"] in ("pyqt5", "pyside2"):
+        Ui_PrairieImporterDialog, _ = loadUiType(__ui_path__, from_imports=True, import_from="gui")
+    else:
+        Ui_PrairieImporterDialog, _ = loadUiType(__ui_path__)
+
+
+
+class PrairieViewImporter(QtWidgets.QDialog, Ui_PrairieImporterDialog, WorkspaceGuiMixin):
     sig_protocolRemoved = Signal(int, name="sig_protocolRemoved")
 
     def __init__(self, parent=None,
@@ -136,6 +142,7 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
         #
         # see also scipyen gui.mainwindow.ScipyenWindow.slot_importPrairieView()
         super().__init__(parent)
+        super(Ui_PrairieImporterDialog, self).__init__()
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
         #super(WorkspaceGuiMixin, self).__init__(parent, **kwargs)
 
@@ -287,9 +294,9 @@ class PrairieViewImporter(QtWidgets.QDialog, __UI_PrairieImporter, WorkspaceGuiM
         # created in _slot_startTriggerEventDetectionGui()
         self.eventDetectionDialog = None # when a TriggerDetectDialog, this caches the detection options & events
 
-        self.protocolEditorDialog = ProtocolEditorDialog(title = "Edit Trigger Protocols")
+        self.protocolEditorDialog = TriggerProtocolsEditorDialog(title = "Edit Trigger Protocols")
 
-        # the ProtocolEditorDialog works on a reference to the list of
+        # the TriggerProtocolsEditorDialog works on a reference to the list of
         # TriggerProtocols stored in here.
         self.protocolEditorDialog.triggerProtocols = self.triggerProtocols
         self.protocolEditorDialog.sig_detectTriggers.connect(self._slot_startTriggerEventDetectionGui)

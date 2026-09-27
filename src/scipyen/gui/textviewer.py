@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# __scipyen_plugin__
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -11,32 +11,27 @@ import os
 #### END core python modules
 
 #### BEGIN 3rd party modules
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
-__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
-    __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
-    # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
+    __has_PySide6__ = True
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+
+    # from qtpy import sip # noqa
+    # from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
-    
+
 
 #### END 3rd party modules
 
@@ -47,16 +42,13 @@ import core.strutils as strutils
 
 #### BEGIN pict.gui modules
 from gui.scipyenviewer import ScipyenViewer #, ScipyenFrameViewer
-from gui import quickdialog
+# from gui import quickdialog
 # from . import resources_rc
 # from . import icons_rc
 #### END pict.gui modules
 
 import iolib.pictio as pio
 
-# NOTE: 2022-12-25 23:08:51
-# needed for the new plugins framework
-__scipyen_plugin__ = None
 
 
 # TODO: 2019-11-10 13:12:40
@@ -69,13 +61,11 @@ class TextViewer(ScipyenViewer):
     • only save as
     • no drag'n drop
     """
-    sig_activated = Signal(int)
-    # closeMe  = Signal(int)
-    # signal_window_will_close = Signal()
+    sig_activated = Signal()
+    # sig_activated = Signal(int)
     sig_textChanged = Signal(name = "sig_textChanged")
     
     viewer_for_types = {str: 99, QtGui.QTextDocument: 99, strutils.is_html:99}
-    # view_action_name = "Text"
     
     # FIXME/TODO: 2019-11-10 13:16:56
     # highlighter_types = ("plain", "xml", "html")
@@ -85,16 +75,14 @@ class TextViewer(ScipyenViewer):
                  ID:(int, type(None)) = None,
                  win_title: (str, type(None)) = None, 
                  doc_title: (str, type(None)) = None, 
-                 edit:bool=False,
+                 edit: bool = False,
                  markdown:bool=False, *args, **kwargs):
-        self._readOnly = edit!=True
-        self._markdown = markdown==True
+        self._readOnly = edit is not True
+        self._markdown = markdown is True
         self._wrapMode_ = kwargs.pop("wrap", None)
         if not isinstance(self._wrapMode_, QtWidgets.QTextEdit.LineWrapMode):
             self._wrapMode_ = QtWidgets.QTextEdit.NoWrap
         super().__init__(data=data, parent=parent, ID = ID, win_title=win_title, doc_title=doc_title, *args, **kwargs)
-        # super(QMainWindow, self).__init__(parent)
-        # self._wm_id_ = int(self.winId())
             
     def _configureUI_(self):
         self.fileMenu = self.menuBar().addMenu("&File")
@@ -123,11 +111,13 @@ class TextViewer(ScipyenViewer):
         
         self.setCentralWidget(self._docViewer_)
         
-        #self._defaultCursor = QtGui.QCursor(QtCore.Qt.ArrowCursor)
-        
         self._docViewer_.setDocument(QtGui.QTextDocument())
         
     def _set_data_(self, data, *args, **kwargs):
+
+        if data is None:
+            data = ""
+
         if isinstance(data, QtGui.QTextDocument):
             self._docViewer_.setDocument(data)
             
@@ -145,7 +135,7 @@ class TextViewer(ScipyenViewer):
                 
                 parser.close()
                 
-                if parser.get_starttag_text() is None:
+                if parser.get_starttag_text() is None or not any(s in data for s in ("html", "xml")):
                     self._docViewer_.document().setPlainText(data)
                     
                 else:
@@ -153,9 +143,10 @@ class TextViewer(ScipyenViewer):
                 
                 if data.find("<?xml version=") >= 0:
                     self._highlighter_ = xmlutils.XmlSyntaxHighlighter(self._docViewer_.document())
+
                 else:
                     self._highlighter_ = None
-                
+
         else:
             raise TypeError("Expecting a QTextDdocument or a str; got %s instead" % type(data).__name__)
         
@@ -174,8 +165,8 @@ class TextViewer(ScipyenViewer):
         
             return self._docViewer_.document().toHtml()
         
-    def setText(self, data):
-        super().setData(data) # inherited
+    def setText(self, data, **kwargs):
+        super().setData(data, **kwargs) # inherited
     
     @property
     def isMarkdown(self):
@@ -183,7 +174,7 @@ class TextViewer(ScipyenViewer):
     
     @isMarkdown.setter
     def isMarkdown(self, value:bool):
-        self._markdown = value == True
+        self._markdown = value is True
         if self._markdown:
             data = self._docViewer_.document().toPlainText()
             self._docViewer_.document().clear()

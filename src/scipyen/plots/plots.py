@@ -61,7 +61,10 @@ mpl_plot_functions = dict()
 mpl_plot_functions["plot"]                  = Axes.plot
 mpl_plot_functions["errorbar"]              = Axes.errorbar
 mpl_plot_functions["scatter"]               = Axes.scatter
-mpl_plot_functions["plot_date"]             = Axes.plot_date
+try:
+    mpl_plot_functions["plot_date"]             = Axes.plot_date
+except:
+    pass
 mpl_plot_functions["step"]                  = Axes.step
 mpl_plot_functions["loglog"]                = Axes.loglog
 mpl_plot_functions["semilogx"]              = Axes.semilogx
@@ -1195,9 +1198,11 @@ def plot_wavelet(w:typing.Union[str, pywt.Wavelet, pywt.ContinuousWavelet], /,le
                 length:typing.Optional[int] = None, what:str="functions", 
                 separate:bool=False, newfig:bool=False) -> tuple:
     r"""Plots a wavelet.
+    DEPRECATED: Plase use the PyWavelets Viewer plugin (pywtgui plugin module)
+
     For discrete wavelets, the funtion plots either the scaling (ϕ) and wavelet 
-(ψ) functions, or tthe wavelet decoomposition and reconstruction filters.
-    For continuous wavelets, the function plot the wavelet function
+    (ψ) functions, or tthe wavelet decomposition and reconstruction filters.
+    For continuous wavelets, the function plots  the wavelet function
     
     Parameters:
     ===========

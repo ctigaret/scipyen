@@ -25,7 +25,7 @@ Classes defined in other Scipyen modules and imported in this module:
  'CalibrationData',
  'ChannelCalibrationData',
  'DataBag',
- 'ProtocolEditorDialog',
+ 'TriggerProtocolsEditorDialog',
  'ScanData',
  'ScanDataOptions',
  'TriggerDetectDialog',
@@ -92,7 +92,7 @@ import iolib.pictio as pio
 # from gui import icons_rc # as icons_rc
 # from gui import quickdialog as qd
 # from gui.triggerdetectgui import TriggerDetectDialog, TriggerDetectWidget
-# from gui.protocoleditordialog import ProtocolEditorDialog
+# from gui.triggerprotocolseditordialog import TriggerProtocolsEditorDialog
 # from gui import pictgui as pgui
 # from gui.workspacegui import WorkspaceGuiMixin
 # import gui.signalviewer as sv
@@ -116,12 +116,8 @@ import ephys.ephys as ephys
 #### END scipyen modules
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-# __ui_path__ = adapt_ui_path(__module_path__, "PrairieImporter.ui")
-#
-# if os.environ["QT_API"] in ("pyqt5", "pyside2"):
-#     __UI_PrairieImporter, __QDialog__ = loadUiType(__ui_path__, from_imports=True, import_from="gui")
-# else:
-#     __UI_PrairieImporter, __QDialog__ = loadUiType(__ui_path__)
+
+
 
 
 r""" NOTE: 2017-09-22 09:28:23

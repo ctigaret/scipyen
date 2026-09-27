@@ -23,32 +23,32 @@ import numpy as np
 import quantities as pq
 import neo
 from core.vigra_patches import vigra
-import qtpy
+# import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
-__has_sip__ = False
+# __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    # import PySide6
+    # from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+
+    # from qtpy import sip
+    # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
-    __has_sip__ = True
-    
+    # __has_sip__ = True
+
 
 #### END 3rd party modules
 
@@ -58,7 +58,7 @@ from core.traitcontainers import DataBag
 from core.triggerevent import (TriggerEvent, TriggerEventType, )
 from core.triggerprotocols import (TriggerProtocol,
                                    auto_detect_trigger_protocols,
-                                   embed_trigger_protocol, 
+                                   embed_trigger_protocol,
                                    embed_trigger_event,
                                    parse_trigger_protocols,
                                    remove_trigger_protocol,
@@ -68,7 +68,7 @@ from core.neoutils import (concatenate_blocks, concatenate_signals,)
 
 import core.xmlutils as xmlutils
 import core.strutils as strutils
-import core.datatypes  
+import core.datatypes
 
 import iolib.pictio as pio
 
@@ -76,7 +76,7 @@ import iolib.pictio as pio
 # from gui import icons_rc
 from gui import quickdialog as qd
 from gui.triggerdetectgui import TriggerDetectDialog, TriggerDetectWidget
-from gui.protocoleditordialog import ProtocolEditorDialog
+from gui.triggerprotocolseditordialog import TriggerProtocolsEditorDialog
 from gui import pictgui as pgui
 from gui.workspacegui import WorkspaceGuiMixin
 import gui.signalviewer as sv
@@ -86,12 +86,12 @@ from imaging.scandata import (ScanData, ScanDataOptions, scanDataOptions,)
 
 from imaging.vigrautils import (concatenateImages, insertAxis)
 
-from imaging.axisutils import (axisTypeFromString, axisTypeName, 
+from imaging.axisutils import (axisTypeFromString, axisTypeName,
                                axisTypeSymbol, axisTypeUnits,)
 
-from imaging.axiscalibration import (AxesCalibration, 
-                                     CalibrationData, 
-                                     ChannelCalibrationData, 
+from imaging.axiscalibration import (AxesCalibration,
+                                     CalibrationData,
+                                     ChannelCalibrationData,
                                      AxisCalibrationData)
 
 import ephys.ephys as ephys

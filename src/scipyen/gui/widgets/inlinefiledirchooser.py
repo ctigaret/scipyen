@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""
-New data viewer widget, based on datatreemodel
+New data viewer widget, based on objectmodel
 """
 from __future__ import print_function
 
@@ -61,22 +61,30 @@ from gui import workspacegui
 from core.prog import scipywarn
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_file__ = "inlinefiledirchooser.ui"
 
-if __has_PyQt6__ or __has_PySide6__:
-    __UI_widget__, __QWidget__ = loadUiType(
-        os.path.join(__module_path__, __ui_file__))
-else:
-    __UI_widget__, __QWidget__ = loadUiType(
-        os.path.join(__module_path__, __ui_file__),
-        from_imports = True, import_from = "gui.widgets")
+try:
+    from gui.widgets.inlinefiledirchooser_ui import Ui_InlineFileDirChooser
 
-class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
+except:
+    __ui_file__ = "inlinefiledirchooser.ui"
+
+    if __has_PyQt6__ or __has_PySide6__:
+        Ui_InlineFileDirChooser, _ = loadUiType(
+            os.path.join(__module_path__, __ui_file__))
+    else:
+        Ui_InlineFileDirChooser, _ = loadUiType(
+            os.path.join(__module_path__, __ui_file__),
+            from_imports = True, import_from = "gui.widgets")
+
+class InlineFileDirChooserWidget(Ui_InlineFileDirChooser, QtWidgets.QWidget):
     sig_pathChanged = Signal(pathlib.Path, name = "sig_pathChanged")
     sig_dataChanged = Signal(name = "sig_dataChanged")
     _sig_newPath_ = Signal(pathlib.Path, name = "_sig_newPath_")
-    sig_dispatchAction = Signal([partial], [types.FunctionType],
-                                name="sig_dispatchAction")
+    if __has_PySide6__:
+        sig_dispatchAction = Signal(object, name="sig_dispatchAction")
+    else:
+        sig_dispatchAction = Signal([partial], [types.FunctionType],
+                                    name="sig_dispatchAction")
 
     def __init__(self,
                  initial: typing.Optional[pathlib.Path] = None,
@@ -85,6 +93,7 @@ class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
                  asDelegate: bool = False,
                  parent: typing.Optional[QtWidgets.QWidget] = None):
         QtWidgets.QWidget.__init__(self, parent = parent)
+        super(Ui_InlineFileDirChooser, self).__init__()
         self._dirsOnly_ = dirsOnly is True
         self._readOnly_ = readOnly is True
         self._pendingChange_: bool = False
@@ -140,7 +149,10 @@ class InlineFileDirChooserWidget(__UI_widget__, QtWidgets.QWidget):
                          # fileName = suggestedName,
                          save=False, single=True, asPath=True)
 
-        self.sig_dispatchAction.emit(fn)
+        if __has_PySide6__:
+            self.sig_dispatchAction.emit(fn)
+        else:
+            self.sig_dispatchAction[partial].emit(fn)
 
     @Slot()
     def _slot_launchAction_(self):

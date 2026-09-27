@@ -1,28 +1,27 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2022-2026 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
-r"""
+r"""Small widgets
 """
 
-import typing, warnings, math, cmath, os, traceback, dataclasses, sys
+import typing, warnings, math, cmath, os, traceback, dataclasses, sys # noqa
 import numbers
 import numpy as np
 import quantities as pq
 import pandas as pd
 from tribool import Tribool
 
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+# import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
     from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
@@ -32,7 +31,7 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
+    from qtpy import sip # noqa
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
@@ -40,36 +39,63 @@ else:
     __has_sip__ = True
 
 
-from core.utilities import (get_least_pwr10, unique)
+from core.utilities import (get_least_pwr10, unique) # noqa
 from core.inputspec import InputSpec
-from gui.painting_shared import (FontStyleType, standardQtFontStyles,
+from gui.painting_shared import (FontStyleType, standardQtFontStyles, # noqa
                                  FontWeightType, standardQtFontWeights)
 
 from gui import quickdialog as qd
 from gui.guiutils import (DisplayHint,
-    InftyDoubleValidator, ComplexValidator, validatorString, NumericStringValidator,
+    InftyDoubleValidator, ComplexValidator, validatorString, NumericStringValidator, # noqa
     get_elided_text, get_text_width)
 
 from core import scipyen_quantities as scq
 from core import strutils as strutils
+from core import qtutils
 from core import prog
+from core.prog import scipywarn
 from core import datatypes as dt
+from core import utilities
 from iolib.navigation.navigator import UrlNavigatorButtonBase
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
+try:
+    from gui.widgets.quantitychooserwidget_ui import Ui_QuantityChooserWidget
+
+except:
+    Ui_QuantityChooserWidget, _ = loadUiType(
+        os.path.join(__module_path__,
+                    "quantitychooserwidget.ui")
+        )
+
+
 class ElidedPushButton(UrlNavigatorButtonBase):
-    def __init__(self, text: str = "", elideText: bool = True, parent = None):
-        super().__init__(parent=parent)
+    def __init__(self, parent = None, text: str = "", elideText: bool = True):
+        txt_ = None
+        if isinstance(parent, QtWidgets.QWidget):
+            parent_ = parent
+        else:
+            if isinstance(parent, str):
+                txt_ = parent
+            parent_ = None
+        super().__init__(parent=parent_)
+
+        if isinstance(parent_, QtWidgets.QWidget) and hasattr(parent_, "addWidget"):
+            parent_.addWidget(self)
+
         self.setMouseTracking(True)
         self._elideText_ = elideText is True
         self.setElideTextAction = QtGui.QAction("Elide text", self)
         self.setElideTextAction.setCheckable(True)
         self.setElideTextAction.setChecked(self._elideText_ is True)
         self.setElideTextAction.toggled.connect(self._slot_setElideText)
-        self._text_ = ""
+        # if self._text_ is None and isinstance(text, str) and len(text.strip()):
         if isinstance(text, str) and len(text.strip()):
-            self.setText(text)
+            txt_ = text
+        else:
+            txt_ = ""
+        self.setText(txt_)
 
     def paintEvent(self, evt: QtGui.QPaintEvent):
         painter = QtGui.QPainter(self)
@@ -221,8 +247,9 @@ class ElidedPushButton(UrlNavigatorButtonBase):
     @elideText.setter
     def elideText(self, val: bool):
         self._elideText_ = val is True
-        signalBlocker = QtCore.QSignalBlocker(self.setElideTextAction)
-        self.setElideTextAction.setChecked(self._elideText_ is True)
+        # signalBlocker = QtCore.QSignalBlocker()
+        with qtutils.SignalBlocker(self.setElideTextAction):
+            self.setElideTextAction.setChecked(self._elideText_ is True)
         self.update()
 
     @Slot(bool)
@@ -242,12 +269,7 @@ class ElidedPushButton(UrlNavigatorButtonBase):
         if oldMinWidth != minWidth:
             self.setMinimumWidth(minWidth)
 
-Ui_QuantityChooserWidget, QWidget = loadUiType(
-    os.path.join(__module_path__,
-                 "quantitychooserwidget.ui")
-    )
-
-class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
+class QuantityChooserWidget(QtWidgets.QWidget, Ui_QuantityChooserWidget):
     r"""Compound widget allowing the user to choose a physical dimensionality.
     Convenience UI elements to attach quantities to various numeric variables.
 
@@ -262,7 +284,8 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
 
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget]=None,
                  unit:typing.Optional[pq.Quantity]=None,
-                 unitsFamily:typing.Optional[str]=None):
+                 unitsFamily:typing.Optional[str]=None,
+                 **kwargs):
         r"""
         Named parameters:
         =================
@@ -273,7 +296,17 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
                     For a list of units families, type `scq.unitFamilies()` in
                     Scipyen's console
         """
-        QWidget.__init__(self, parent=parent)
+        if isinstance(parent, QtWidgets.QWidget):
+            parent_ = parent
+        else:
+            parent_ = None
+
+        super(Ui_QuantityChooserWidget, self).__init__()
+        super().__init__(parent_)
+
+
+        if isinstance(parent_, QtWidgets.QWidget) and hasattr(parent_, "addWidget"):
+            parent_.addWidget(self)
 
         _irreds = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])]
         _derived = [k for k in scq.UNITS_DICT if len(scq.UNITS_DICT[k]["irreducible"])==0]
@@ -281,9 +314,9 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
 
         myunits = unit.units if isinstance(unit, pq.Quantity) else self._default_units_
 
-        self._getUnitFamilyAndUnitFamilyUnits(myunits)
+        self._restrictedToFamily_ = kwargs.pop("restrictedToFamily", None)
 
-        self._restrictedToFamily_ = None
+        self._getUnitFamilyAndUnitFamilyUnits(myunits)
 
         self._units_ = myunits
 
@@ -306,69 +339,73 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
         self._units_ = self._currentUnitFamilyUnits[self._unitIndexInFamily]
 
     def _getUnitFamilyAndUnitFamilyUnits(self, unit:pq.Quantity):
-        # print(f"{self.__class__.__name__}._getUnitFamilyAndUnitFamilyUnits (unit = {unit})")
         family_name, directly_found = scq.getUnitFamily(unit, show_components=False,
                                                    as_string=True,
                                                    indicate_if_directly_found=True)
 
-
-        self._currentUnitsFamilyName = family_name
-        self._currentUnitsFamily = scq.UNITS_DICT[self._currentUnitsFamilyName]
-        self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(family_name)), key = lambda x: x.name)
-
-        if not directly_found:
-            self._currentUnitFamilyUnits.insert(0, unit.units)
-
         self._familyIndex = list(scq.UNITS_DICT).index(family_name)
 
-        self._unitIndexInFamily = self._currentUnitFamilyUnits.index(unit.units)
+        self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(family_name)), key = lambda x: x.name)
 
-        # print(f"{self.__class__.__name__}._getUnitFamilyAndUnitFamilyUnits: unit = {unit}")
-        # print(f"\tfamily -> {family_name}")
-        # print(f"\tdirectly_found -> {directly_found}")
-        # print(f"\t_currentUnitsFamily -> {self._currentUnitsFamily}")
-        # print(f"\t_currentUnitsFamilyName -> {self._currentUnitsFamilyName}")
-        # print(f"\t_currentUnitFamilyUnits -> {self._currentUnitFamilyUnits}")
-        # print(f"\t_familyIndex -> {self._familyIndex}")
-        # print(f"\t_unitIndexInFamily -> {self._unitIndexInFamily}")
+        if isinstance(self._restrictedToFamily_, str) and len(self._restrictedToFamily_.strip()) and self._restrictedToFamily_ in self._family_names:
+            self._currentUnitsFamilyName = self._restrictedToFamily_
+            self._currentUnitsFamily = scq.UNITS_DICT[self._currentUnitsFamilyName]
+            self._currentUnitFamilyUnits.extend(sorted(list(scq.familyUnits(self._currentUnitsFamilyName)), key = lambda x: x.name))
+        else:
+            self._currentUnitsFamilyName = family_name
+            self._currentUnitsFamily = scq.UNITS_DICT[self._currentUnitsFamilyName]
+
+        self._unitIndexInFamily = self._currentUnitFamilyUnits.index(unit.units)
 
     def _setupFamilyCombo(self):
         r"""Called by _configureUI_ but also when manually setting the units family
         """
-        signalBlocker = QtCore.QSignalBlocker(self.unitFamilyComboBox)
-        # signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.unitFamilyComboBox, self.unitComboBox)]
-        self.unitFamilyComboBox.clear()
-        self.unitFamilyComboBox.addItems(self._family_names)
-        if self._currentUnitsFamilyName in self._family_names:
-            self.unitFamilyComboBox.setCurrentIndex(self._families.index(self._currentUnitsFamily))
-        else:
-            self.unitFamilyComboBox.setCurrentIndex(0)
-            self._currentUnitsFamily = self._families[self.unitFamilyComboBox.currentIndex()]
-            self._currentUnitsFamilyName = self._family_names[self.unitFamilyComboBox.currentIndex()]
-            self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(self._family_names[self.unitFamilyComboBox.currentIndex()])), key = lambda x: x.name)
+        with qtutils.SignalBlocker(self.unitFamilyComboBox):
+            self.unitFamilyComboBox.clear()
+
+            if isinstance(self._restrictedToFamily_, str) and self._restrictedToFamily_ in scq.UNITS_DICT:
+                self.unitFamilyComboBox.addItem(self._restrictedToFamily_)
+                self.unitFamilyComboBox.setCurrentIndex(0)
+
+            else:
+                self.unitFamilyComboBox.addItems(self._family_names)
+
+                if self._currentUnitsFamilyName in self._family_names:
+                    self.unitFamilyComboBox.setCurrentIndex(self._families.index(self._currentUnitsFamily))
+
+                else:
+                    self.unitFamilyComboBox.setCurrentIndex(0)
+                    self._currentUnitsFamily = self._families[self.unitFamilyComboBox.currentIndex()]
+                    self._currentUnitsFamilyName = self._family_names[self.unitFamilyComboBox.currentIndex()]
+                    self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(self._family_names[self.unitFamilyComboBox.currentIndex()])), key = lambda x: x.name)
+
 
     def _setupUnitCombo(self):
         r"""Called by _configureUI_ but also when manually setting up a unit
         """
-        # self._generateCurrentFamilyUnits()
-        signalBlocker = QtCore.QSignalBlocker(self.unitComboBox)
-        self.unitComboBox.clear()
-        u_names = list(map(lambda x: x.name, self._currentUnitFamilyUnits))
-        u_names_display = list(map(lambda x: f"{x.name} ({x.dimensionality.unicode})" if (x != pq.dimensionless and x.name != x.dimensionality.unicode) else x.name, self._currentUnitFamilyUnits))
-        self.unitComboBox.addItems(u_names_display)
-        u_name = scq.unitName(self._units_)
-        # print(f"{self.__class__.__name__}._setupUnitCombo: u_name -> {u_name}")
-        if u_name in u_names:
-            self.unitComboBox.setCurrentIndex(u_names.index(u_name))
-        else:
-            self.unitComboBox.setCurrentIndex(0)
+        with qtutils.SignalBlocker(self.unitComboBox):
+            self.unitComboBox.clear()
+
+            if self.units == pq.dimensionless:
+                u_names = list(map(lambda x: x.name, [pq.dimensionless] + self._currentUnitFamilyUnits))
+                u_names_display = list(map(lambda x: f"{x.name} ({x.dimensionality.unicode})" if (x != pq.dimensionless and x.name != x.dimensionality.unicode) else x.name, self._currentUnitFamilyUnits))
+            else:
+                u_names = list(map(lambda x: x.name, self._currentUnitFamilyUnits))
+                u_names_display = list(map(lambda x: f"{x.name} ({x.dimensionality.unicode})" if (x != pq.dimensionless and x.name != x.dimensionality.unicode) else x.name, self._currentUnitFamilyUnits))
+
+            self.unitComboBox.addItems(u_names_display)
+            u_name = scq.unitName(self._units_)
+
+            if u_name in u_names:
+                self.unitComboBox.setCurrentIndex(u_names.index(u_name))
+
+            else:
+                self.unitComboBox.setCurrentIndex(0)
 
     @Slot(int)
     def _slot_unitsFamilyChanged(self, value):
-        # print(f"{self.__class__.__name__}._slot_unitsFamilyChanged: value = {value}")
         self._currentUnitsFamilyName = self._family_names[self.unitFamilyComboBox.currentIndex()]
         self._currentUnitsFamily = scq.UNITS_DICT[self._currentUnitsFamilyName]
-        # print(f"\nself._currentUnitsFamily -> {self._currentUnitsFamily}")
         self._currentUnitFamilyUnits = sorted(list(scq.familyUnits(self._currentUnitsFamilyName)), key = lambda x: x.name)
         self._setupUnitCombo()
         self._units_ = self._currentUnitFamilyUnits[self.unitComboBox.currentIndex()]
@@ -398,25 +435,21 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
 
     @units.setter
     def units(self, value:typing.Optional[typing.Union[pq.UnitQuantity, pq.Quantity]]=None):
-        # print(f"{self.__class__.__name__}.units.setter: value = {value}")
         if value is None:
             value = pq.dimensionless
 
         self._getUnitFamilyAndUnitFamilyUnits(value)
         self._units_ = self._currentUnitFamilyUnits[self._unitIndexInFamily]
-        # print(f"\n{self.__class__.__name__}.units.setter:  _units_ -> {self._units_}")
 
-        signalBlockers = [QtCore.QSignalBlocker(w) for w in (self.unitFamilyComboBox, self.unitComboBox)]
-        currentUnitComboboxIndex = self.unitFamilyComboBox.currentIndex()
-        # print(f"\n{self.__class__.__name__}.units.setter: ")
-        # print(f"\t_familyIndex -> {self._familyIndex}")
-        # print(f"\tcurrentUnitComboboxIndex -> {currentUnitComboboxIndex}")
+        with qtutils.SignalBlocker((self.unitFamilyComboBox, self.unitComboBox)):
+            currentUnitComboboxIndex = self.unitFamilyComboBox.currentIndex()
 
-        if currentUnitComboboxIndex != self._familyIndex:
-            self.unitFamilyComboBox.setCurrentIndex(self._familyIndex)
-            self._setupUnitCombo()
-        else:
-            self.unitComboBox.setCurrentIndex(self._unitIndexInFamily)
+            if currentUnitComboboxIndex != self._familyIndex:
+                self.unitFamilyComboBox.setCurrentIndex(self._familyIndex)
+                self._setupUnitCombo()
+
+            else:
+                self.unitComboBox.setCurrentIndex(self._unitIndexInFamily)
 
     def value(self):
         r"""For compatibilty with qd.QuickDialog"""
@@ -445,22 +478,28 @@ class QuantityChooserWidget(Ui_QuantityChooserWidget, QWidget):
             if value not in self._family_names:
                 scipywarn(f"Family of units named {value} not found")
                 return
+
             self._restrictedToFamily_ = value
+            self._getUnitFamilyAndUnitFamilyUnits(self.units)
+            self._setupFamilyCombo()
+            self._setupUnitCombo()
             self.unitFamily = value
             self.unitFamilyComboBox.setEnabled(False)
+
         else:
             self.unitFamilyComboBox.setEnabled(True)
 
+        # print(f"{self.__class__.__name__}.familyRestriction.setter() -> {self._restrictedToFamily_}")
+
 class LazyLineEdit(QtWidgets.QLineEdit):
-    sig_enterPressed = Signal(str, name="sig_enterPressed")
+    sig_textChanged = Signal(str, name="sig_textChanged")
 
     def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None):
         super().__init__(parent=parent)
 
     def keyPressEvent(self, event):
         if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
-            # print(f"{self.__class__.__name__}.keyPressEvent: text = '{self.text()}'")
-            self.sig_enterPressed.emit(self.text())
+            self.sig_textChanged.emit(self.text())
         else:
             super().keyPressEvent(event)
 
@@ -468,15 +507,35 @@ class LineEdit(QtWidgets.QLineEdit):
     r"""Line editor widget with custom context menu and, optional lazy notifications of text changes.
 
     To constrain for numeric values/arrays, including Quantity arrays, use it with guiutils.NumericStringValidator.
+
+    The inherited Qt signal "textChanged" is still available!
 """
-    sig_enterPressed = Signal(str, name="sig_enterPressed")
+    sig_textChanged = Signal(str, name="sig_textChanged")
     sig_lazy = Signal(bool, name="sig_lazy")
-    def __init__(self, contents: typing.Optional[str] = None,
-                 parent: typing.Optional[QtWidgets.QWidget] = None,
+
+    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
+                 contents: typing.Optional[str] = None,
                  lazy: bool = False,
                  validator: typing.Optional[QtGui.QValidator] = None):
+        contents_ = None
+        if isinstance(parent, QtWidgets.QWidget):
+            parent_ = parent
+            contents_ = contents
+        else:
+            if isinstance(parent, str):
+                contents_ = parent
+                parent_ = None
+
         super().__init__(parent=parent)
-        self._variable_ = contents
+
+        if isinstance(parent_, QtWidgets.QWidget) and hasattr(parent_, "addWidget"):
+            parent_.addWidget(self)
+
+        self._variable_ = contents_
+        # if not isinstance(contents_, str):
+        #     self._variable_ = contents
+        # else:
+
         self._lazy_: bool = lazy is True
         self._custom_menu_: typing.Optional[QtWidgets.QMenu] = None
         self._validator_: typing.Optional[QtGui.QValidator] = None
@@ -487,6 +546,10 @@ class LineEdit(QtWidgets.QLineEdit):
 
         if isinstance(self._variable_, str):
             self.setText(self._variable_)
+
+        self._old_text_: str = ""
+
+        # self.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Fixed)
 
     def value(self) -> str:
         self._variable_ = super().text()
@@ -505,28 +568,54 @@ class LineEdit(QtWidgets.QLineEdit):
     def setText(self, val:str):
         self.setValue(val)
 
+    def focusInEvent(self, event):
+        self._old_text_ = self.text()
+        super().focusInEvent(event)
+        event.accept()
+
+    def focusOutEvent(self, event):
+        newText = self.text()
+        if newText != self._old_text_:
+            self._old_text_ = newText
+            self.sig_textChanged.emit(newText)
+
+        super().focusOutEvent(event)
+
+        event.accept()
+
     def keyPressEvent(self, event):
         if not self._lazy_:
             super().keyPressEvent(event)
         else:
             if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
-                # print(f"{self.__class__.__name__}.keyPressEvent: text = '{self.text()}'")
-                # self.textChanged.emit(self.text())
-                self.sig_enterPressed.emit(self.text())
+                text = self.text()
+
+                if text != self._old_text_:
+                    self._old_text_ = text
+
+                self.sig_textChanged.emit(text)
+
             else:
                 # needed in order to update the widget
                 super().keyPressEvent(event)
+
+        event.accept()
 
     def contextMenuEvent(self, evt: QtGui.QContextMenuEvent):
         stdMenu = self.createStandardContextMenu()
         if isinstance(self._custom_menu_, QtWidgets.QMenu):
             menu = QtWidgets.QMenu(self)
+
             for action in self._custom_menu_.actions():
                 menu.addAction(action)
+
             menu.addSeparator()
+
             for action in stdMenu.actions():
                 menu.addAction(action)
+
             menu.exec(evt.globalPos())
+
         else:
             stdMenu.exec(evt.globalPos())
 
@@ -536,19 +625,16 @@ class LineEdit(QtWidgets.QLineEdit):
             return True
 
         else:
-            # print(f"{self.__class__.__name__}.validate({args})")
             if len(args):
                 if isinstance(args[0], str):
                     ret = self._validator_.validate(args[0], len(args[0]))
-                    # print(f"{self.__class__.__name__}.validate({args}) -> {ret}")
                     return ret[0] == QtGui.QValidator.Acceptable
+
                 else:
                     return False
+
             else:
                 return True
-
-    def setValidator(self, val):
-        self.validator = val
 
     @property
     def validator(self) -> typing.Optional[QtGui.QValidator]:
@@ -578,6 +664,7 @@ class LineEdit(QtWidgets.QLineEdit):
                                   tt])
             else:
                 tip = tt
+
             self.setToolTip(tip)
 
     def setValidator(self, val: QtGui.QValidator):
@@ -594,9 +681,9 @@ class LineEdit(QtWidgets.QLineEdit):
 
     @property
     def lazy(self) -> bool:
-        r"""When True, the widget emits sig_enterPressed after pressing the Enter (Return) key.
+        r"""When True, the widget emits sig_textChanged after pressing the Enter (Return) key.
     The textChanged signal should NOT be connected to any slot in your UI.
-    Instead, connect the sig_enterPressed signal of this widget to your UI slot(s).
+    Instead, connect the sig_textChanged signal of this widget to your UI slot(s).
 
     When, False, then you should connect the textChanged signal to your UI slot(s)
     as per usual.
@@ -604,7 +691,7 @@ class LineEdit(QtWidgets.QLineEdit):
     To be notified by changes in the "lazy" status, connect to the sig_lazy signal
 
     .. warning::
-        If sig_enterPressed is also connected you may obtain undesired, duplicate
+        If textChanged is also connected you may obtain undesired, duplicate
         notifications.
     """
         return self._lazy_
@@ -619,21 +706,32 @@ class ArrayEditorWidget(QtWidgets.QFrame):
     r"""Widget for editing (small) numeric arrays"""
     sig_valueChanged = Signal(object, name = "sig_valueChanged")
 
-    def __init__(self, value: typing.Optional[
-                        typing.Union[np.ndarray, typing.Sequence, typing.Set]
+    def __init__(self, parent = None,
+                 value: typing.Optional[ # noqa
+                        typing.Union[np.ndarray, typing.Sequence, typing.Set] # noqa
                         ] = None,
-                 parent = None):
-        super().__init__(parent = parent)
+                 ):
+        value_ = None
+
         if isinstance(parent, QtWidgets.QWidget):
-            parent.addWidget(self)
+            parent_ = parent
+
+        else:
+            if (isinstance(parent, np.ndarray) and issubclass(parent.dtype.type, np.number)
+                or (isinstance(parent, (typing.Sequence, typing.Set)) and all(isinstance(v, numbers.Number) for v in parent))):
+                value_ = parent
+            parent_ = None
+
+        super().__init__(parent = parent_)
+
+        if isinstance(parent_, QtWidgets.QWidget) and hasattr(parent_, "addWidget"):
+            parent_.addWidget(self)
 
         self._inputWidget_ = None
 
-        if (isinstance(value, np.ndarray) and issubclass(value.dtype.type, np.number)
-            or (isinstance(value, (typing.Sequence, typing.Set)) and all(isinstance(v, numbers.Number) for v in value))):
-            self._value_ = value
-        else:
-            self._value_ = None
+        if value_ is None and (isinstance(value, np.ndarray) and issubclass(value.dtype.type, np.number)
+                or (isinstance(value, (typing.Sequence, typing.Set)) and all(isinstance(v, numbers.Number) for v in value))):
+                value_ = value
 
         self._configureUI_()
 
@@ -641,7 +739,6 @@ class ArrayEditorWidget(QtWidgets.QFrame):
         self._layout_ = QtWidgets.QHBoxLayout(self)
         self._layout_.setSpacing(0)
         self._layout_.setContentsMargins(0,0,0,0)
-        # self.setLayout(self._layout_) # already added in layout c'tor with parent=self
         self._setup_widgets_()
 
     def _setup_widgets_(self):
@@ -651,19 +748,21 @@ class ArrayEditorWidget(QtWidgets.QFrame):
             w.undoAvailable = True
             w.setClearButtonEnabled(True)
             w.setValidator(NumericStringValidator(self))
+
             if self._value_ is not None:
                 w.setText(f"{self._value_}")
+
             w.textChanged.connect(self._slot_valuesEdited)
             w.sig_lazy.connect(self._slot_lazyTextChanges)
 
         elif isinstance(self._value_, np.ndarray):
             if not dt.is_vector(self._value_) or self._value_.size > 5: # seems like a good compromise?
                 if self._value_.ndim < 3:
-                    # w = QtWidgets.QPushButton(QtGui.QIcon.fromTheme("table"), f"Edit {type(self._value_).__name__} with size {self._value_.size} and shape {self._value_.shape}", self)
                     w = ElidedPushButton(self)
                     w.setText(f"Edit {type(self._value_).__name__} with size {self._value_.size} and shape {self._value_.shape}")
                     w.setIcon(QtGui.QIcon.fromTheme("table"))
                     w.clicked.connect(self._slot_editExternally)
+
                 else:
                     w = QtWidgets.QLabel(parent=self)
                     w.setText(f"{type(self._value_).__name__} with size {self._value_.size} and shape {self._value_.shape}")
@@ -685,10 +784,10 @@ class ArrayEditorWidget(QtWidgets.QFrame):
         self._layout_.setStretchFactor(self._inputWidget_,1)
 
     def _update_(self):
-        signalBlockers = QtCore.QSignalBlocker(self._inputWidget_)
-        self._layout_.removeWidget(self._inputWidget_)
-        self._inputWidget_.deleteLater()
-        self._setup_widgets_()
+        with qtutils.SignalBlocker(self._inputWidget_):
+            self._layout_.removeWidget(self._inputWidget_)
+            self._inputWidget_.deleteLater()
+            self._setup_widgets_()
 
 
     @Slot()
@@ -710,10 +809,13 @@ class ArrayEditorWidget(QtWidgets.QFrame):
         if val is True:
             if self._inputWidget_.receivers(self._inputWidget_.textChanged) > 0:
                 self._inputWidget_.textChanged.disconnect(self._slot_timesChanged)
-            self._inputWidget_.sig_enterPressed.connect(self._slot_timesChanged)
+
+            self._inputWidget_.sig_textChanged.connect(self._slot_timesChanged)
+
         else:
-            if self.timesLineEdit.receivers(self.timesLineEdit.sig_enterPressed) > 0:
-                self.timesLineEdit.sig_enterPressed.disconnect(self._slot_timesChanged)
+            if self.timesLineEdit.receivers(self.timesLineEdit.sig_textChanged) > 0:
+                self.timesLineEdit.sig_textChanged.disconnect(self._slot_timesChanged)
+
             self.timesLineEdit.textChanged.connect(self._slot_timesChanged)
 
     @Slot(str)
@@ -724,11 +826,11 @@ class ArrayEditorWidget(QtWidgets.QFrame):
            try:
                v = eval(value) # will eval numeric sequences; will fail for arrays
                self._value_ = v
-           except:
+           except: # noqa
                 try:
                     v = scq.str2quantity_2(value)
                     self._value_ = v
-                except:
+                except: # noqa
                     return
 
     def value(self):
@@ -740,6 +842,7 @@ class ArrayEditorWidget(QtWidgets.QFrame):
         if (isinstance(value, np.ndarray) and issubclass(value.dtype.type, np.number)
             or (isinstance(value, (typing.Sequence, typing.Set)) and all(isinstance(v, numbers.Number) for v in value))):
             self._value_ = value
+
         else:
             self._value_ = None
 
@@ -767,25 +870,22 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     sig_valueChanged:Signal = Signal(object, name="sig_valueChanged")
 
     _default_units_:pq.Quantity         =  pq.dimensionless
-    # _default_internal_minimum_:float    = -math.inf
-    # _default_internal_maximum_:float    =  math.inf
-    _default_internal_minimum_:float    = sys.float_info.min
-    _default_internal_maximum_:float    = sys.float_info.max
+    _default_internal_maximum_:float    =  sys.float_info.max
+    _default_internal_minimum_:float    = -sys.float_info.max
 
     _default_singleStep_:int = 1
-    _default_stepType_:QtWidgets.QAbstractSpinBox.StepType = QtWidgets.QAbstractSpinBox.DefaultStepType
-    _default_decimals_:int = np.get_printoptions()["precision"]
+    _default_stepType_: QtWidgets.QAbstractSpinBox.StepType = QtWidgets.QAbstractSpinBox.DefaultStepType
+    _default_decimals_: int = np.get_printoptions()["precision"]
 
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget]=None,
                  units: typing.Optional[typing.Union[pq.Quantity,
                                                      float, int, complex,
                                                      np.integer, np.floating,
                                                      np.complexfloating]] = None,
+                 # /,
                  singleStep: typing.Optional[float] = None,
                  stepType: typing.Optional[QtWidgets.QAbstractSpinBox.StepType] = None,
                  decimals: typing.Optional[int] = None,
-                 # minimum: typing.Optional[typing.Union[pq.Quantity, float]] = sys.float_info.min,
-                 # maximum: typing.Optional[typing.Union[pq.Quantity, float]] = sys.float_info.max,
                  minimum: typing.Optional[typing.Union[pq.Quantity, float]] = None,
                  maximum: typing.Optional[typing.Union[pq.Quantity, float]] = None,
                  unitsFamily: typing.Optional[str] = None,
@@ -805,25 +905,27 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         """
         # minimum, maximum: min & max values of the spin box - to be set manually
 
-        QtWidgets.QDoubleSpinBox.__init__(self, parent=parent)
+        # QtWidgets.QDoubleSpinBox.__init__(self, parent=parent)
+        super().__init__(parent=parent)
 
         # FIXME/TODO: 2022-11-07 13:32:41
         # This setting is not right; NA should be somewhat mapped to NA, NOT
         # to minimum - what do we do if minimum is set to 0 which is a valid value?
         # super().setSpecialValueText("NA") # shown when value is at minimum
 
-        # self._default_units_ = pq.dimensionless
-
-        # self._lineEdit_ = LazyLineEdit(self)
         self._lineEdit_ = LineEdit(self)
+        self._lineEdit_.lazy = True
+        self._lineEdit_.sig_textChanged.connect(self._slot_valueTextChanged)
 
-        self.setLineEdit(self._lineEdit_)
+        super().setLineEdit(self._lineEdit_)
 
         self._keepDimensionless_: bool = keepDimensionless
         self._disableUnitChange_: bool = disableUnitChange
         self._enforceImmutableUnits_: bool = enforceImmutableUnits
+
         if self._enforceImmutableUnits_:
             self._disableUnitChange_ = True
+
         self._restrictedToFamily_: typing.Optional[str] = None
         self._rescaleOnUnitChange_: bool = False
         self._forceDimensionless_: bool = False
@@ -835,6 +937,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self._prefix_ = ""
         self._suffix_ = ""
         self._specialValueText_: str = ""
+        self._fixSingleStep_: bool = False
 
         if isinstance(units, pq.Quantity):
             self._units_ = units.units
@@ -865,12 +968,15 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         if self._units_.dimensionality == pq.dimensionless.dimensionality:
             self._suffix_ = ""
             self._prefix_ = ""
+
         else:
             if not (self._keepDimensionless_ or self._forceDimensionless_):
                 symbol = self._units_.dimensionality.unicode
+
                 if self._unitFamily_ == "Currency":
                     self._suffix_ = ""
                     self._prefix_ = f"{symbol} "
+
                 else:
                     self._suffix_ = f" {symbol}"
                     self._prefix_ = ""
@@ -881,38 +987,30 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         elif singleStep is None:
             self._singleStep_ = self._default_singleStep_
+
         else:
             raise TypeError(f"singleStep expected to be a float or None; instead, got {singleStep}")
-
 
         if isinstance(decimals, int) and decimals >= 0:
             self._decimals_ = decimals
 
         elif decimals is None:
-            self._decimals_ = np.get_printoptions()["precision"]
-            # self._decimals_ = -int(math.log10(abs(self._singleStep_))) if (self._singleStep_ < 1 and self._singleStep_ > -1) else self._default_decimals_
-            # self._decimals_ = self._default_decimals_
+            self._decimals_ = self._default_decimals_
 
         else:
             raise TypeError(f"decimals expected to be an int >= 0 or None; instead, got {decimals}")
-
-        # print(f"{self.objectName()}: {self.__class__.__name__}.__init__:  decimals -> {self.decimals}")
 
         self._internal_minimum = self._default_internal_minimum_
         self._internal_maximum = self._default_internal_maximum_
 
         self.setContextMenuPolicy(QtCore.Qt.DefaultContextMenu)
-        # print(f"{self.objectName()}: {self.__class__.__name__}.__init__ DONE")
-
-        # super().setSuffix(self._suffix_)
-        # super().setPrefix(self._prefix_)
 
         self.setSingleStep(self._singleStep_)
-        self.setDecimals(self._decimals_)
-        # super().setValue(self._magnitude_) # will also set prefix suffix and specialValueText
+        self.setDecimals(self._decimals_) # also calls super().setDecimals(…)
 
         if isinstance(stepType, QtWidgets.QAbstractSpinBox.StepType):
             self._stepType_ = stepType
+
         else:
             self._stepType_ = self._default_stepType_
 
@@ -920,16 +1018,51 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         super().setRange(self._internal_minimum, self._internal_maximum)
 
-        # if isinstance(units, pq.Quantity) and not isinstance(units, pq.UnitQuantity):
-        #     self.setValue(units)
-
         self.setValue(self._magnitude_ * self._units_)
 
-        # super().valueChanged.connect(self._slot_valueChanged)
-        # self.lineEdit().setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
-        self._lineEdit_.sig_enterPressed.connect(self._slot_valueTextChanged)
+        # super().lineEdit().sig_textChanged.connect(self._slot_valueTextChanged)
 
-        # self.lineEdit().installEventFilter(self)
+        # self.setFocusPolicy(QtCore.Qt.StrongFocus)
+
+        self.setSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Fixed)
+
+    # def sizeHint(self):
+    #     return QtCore.QSize()
+
+    @property
+    def fixSingleStep(self) -> bool:
+        return self._fixSingleStep_
+
+    @fixSingleStep.setter
+    def fixSingleStep(self, val:bool):
+        self._fixSingleStep_ = val is True
+
+    @property
+    def magnitude(self):
+        return self._magnitude_
+
+    def getMagnitude(self):
+        return self.magnitude
+
+    @magnitude.setter
+    def magnitude(self, val):
+        if isinstance(val, (float, np.floating, int, np.integer)):
+            self._magnitude_ = val
+
+        elif isinstance(val, np.ndarray):
+            if val.ndim > 0:
+                raise ValueError("Only 0-dimensional arrays are supported")
+
+            if isinstance(val, pq.Quantity):
+                val = val.magnitude
+
+            self._magnitude_ = float(val)
+
+        else:
+            raise TypeError(f"Unsupported value type: {type(val).__name__}")
+
+    def setMagnitude(self, val):
+        self.magnitude = val
 
     @property
     def units(self) -> pq.Quantity:
@@ -940,11 +1073,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         return self.units
 
     @units.setter
-    def units(self, value:typing.Optional[pq.Quantity] = None):
+    def units(self, value: pq.Quantity | None = None):
         self.setUnits(value)
 
-    def setUnits(self, value:typing.Optional[pq.Quantity] = None):
-        # print(f"{self.__class__.__name__}.setUnits: value = {value}")
+    def setUnits(self, value: pq.Quantity | None = None):
         if self._keepDimensionless_ or self._forceDimensionless_:
             return
 
@@ -958,7 +1090,6 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             self._singleStep_ *= ratio
             self._magnitude_ = float(newval.magnitude)
             self._units_ = newval.units
-            # self.setValue(self._magnitude_)
             self.setSingleStep(self._singleStep_)
         else:
             self._units_ = value.units
@@ -981,19 +1112,21 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             self._suffix_ = ""
             self._prefix_ = ""
 
-        if np.isnan(self._magnitude_):
+        if self._magnitude_ is pd.NA:
+            text = "<NA>"
+            self._specialValueText_ = text
+
+        elif np.isnan(self._magnitude_):
             text = "NaN"
             self._specialValueText_ = text
-            # super().setSpecialValueText(text)
 
         elif np.isinf(self._magnitude_):
             text = "-Inf" if self._magnitude_ in (-np.inf, -math.inf) else "Inf"
             self._specialValueText_ = text
-            # super().setSpecialValueText(text)
+
         else:
             text = f"{self._magnitude_:.{self.decimals}}"
             self._specialValueText_ = ""
-            # super().setSpecialValueText("")
 
         super().setSuffix(self._suffix_)
         super().setPrefix(self._prefix_)
@@ -1007,29 +1140,25 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         if len(self._suffix_):
             text = f"{text}{self._suffix_}"
 
-        super().setSpecialValueText(self._specialValueText_)
-        super().setValue(self._magnitude_)
-
-        # print(f"{self.objectName()}: {self.__class__.__name__}.units.setter({value}): text -> {text}")
-        signalBlock = QtCore.QSignalBlocker(self.lineEdit())
-        self.lineEdit().setText(text)
+        with qtutils.SignalBlocker(self.lineEdit()):
+            self.lineEdit().setText(text)
 
         self.sig_valueChanged.emit(self.value())
 
     @Slot(str)
     def _slot_valueTextChanged(self, s:str):
-        # print(f"{self.__class__.__name__}._slot_valueTextChanged")
-
+        # print(f"{self.__class__.__name__}._slot_valueTextChanged({s!r}) -> valid: {self._validText_}")
         if self._validText_ == QtGui.QValidator.Acceptable:
             try:
                 val = self.valueFromText(s)
-                # if objectName.endswith("startSpinBox"):
-                #     print(f"{oname}{self.__class__.__name__}._slot_valueTextChanged(s = '{s}') -> val = {val}")
-                if isinstance(val, (pq.Quantity, float)):
+                # print(f"\n -> val {val}")
+                if isinstance(val, (pq.Quantity, float, np.floating)):
                     self._magnitude_ = float(val)
-                    # self.setValue(self._magnitude_ * self._units)
                     self.sig_valueChanged.emit(self.value())
-            except:
+
+                # print(f"\n -> magnitude {self._magnitude_} -> value: {self.value()}")
+
+            except: # noqa
                 traceback.print_exc()
 
     @Slot(bool)
@@ -1037,11 +1166,12 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         self.keepDimensionless = val
 
     def contextMenuEvent(self, evt):
-        # print(f"{self.objectName()}: {self.__class__.__name__}.contextMenuEvent: _enforceImmutableUnits_ = {self._enforceImmutableUnits_}")
         cm = QtWidgets.QMenu("Options", self)
+
         if not (self._keepDimensionless_ or self._forceDimensionless_ or self._disableUnitChange_ or self._enforceImmutableUnits_):
             setUnitsAction = cm.addAction("Set units")
             setUnitsAction.triggered.connect(self._slot_setUnitsGUI)
+
         setDecimalsAction = cm.addAction("Set decimals")
         setDecimalsAction.triggered.connect(self._slot_setDecimalsGUI)
         setSingleStepAction = cm.addAction("Set single step")
@@ -1052,6 +1182,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         adaptiveStepAction.toggled.connect(self._slot_setAdaptiveStep)
         setRangeAction = cm.addAction("Set range (min, max)")
         setRangeAction.triggered.connect(self._slot_setRangeGUI)
+
         if not (self._keepDimensionless_ or self._forceDimensionless_ or self._disableUnitChange_):
             cm.addSeparator()
             rescaleValueAction = cm.addAction("Rescale on unit change")
@@ -1096,7 +1227,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         elif isinstance(value, pq.Quantity):
             if value.size > 1:
-                raise TypeError(f"Expecting a scalar quantity, not an array")
+                raise TypeError("Expecting a scalar quantity, not an array")
+
             val = float(value.magnitude)
             units = value.units
             super().setMinimum(val)
@@ -1120,7 +1252,8 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         elif isinstance(value, pq.Quantity):
             if value.size > 1:
-                raise TypeError(f"Expecting a scalar quantity, not an array")
+                raise TypeError("Expecting a scalar quantity, not an array")
+
             val = float(value.magnitude)
             units = value.units
             super().setMaximum(val)
@@ -1169,11 +1302,13 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             if isinstance(minimum, pq.Quantity):
                 if minimum.size > 1:
                     raise TypeError("Expecting a scalar quantity for 'minimum")
+
                 maximum = maximum * minimum.units
 
             elif isinstance(maximum, pq.Quantity):
                 if maximum.size>1:
                     raise TypeError("Expecting a scalar quantity for maximum")
+
                 minimum = minimum * maximum.units
 
             elif not all(isinstance(v, (float, type(None))) for v in (minimum, maximum)):
@@ -1184,7 +1319,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         minVal = float(minimum.magnitude) if isinstance(minimum, pq.Quantity) else minimum
         minUnits = minimum.units if isinstance(minimum, pq.Quantity) else None
         maxVal = float(maximum.magnitude) if isinstance(maximum, pq.Quantity) else maximum
-        maxUnits = maximum.units if isinstance(maximum, pq.Quantity) else None
+        # maxUnits = maximum.units if isinstance(maximum, pq.Quantity) else None
 
         # NOTE: 2022-11-07 10:00:21
         # both minUnits and maxUnits should have been checked and now be identical
@@ -1196,14 +1331,18 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
     def minimum(self):
         ret = super().minimum()
+
         if self._keepDimensionless_ or self._forceDimensionless_:
             return ret
+
         return ret  * self.units
 
     def maximum(self):
         ret = super().maximum()
+
         if self._keepDimensionless_ or self._forceDimensionless_:
             return ret
+
         return ret * self.units
 
     def value(self) -> typing.Union[pq.Quantity, float, type(pd.NA)]:
@@ -1228,6 +1367,10 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         return self._decimals_
 
     @property
+    def defaultSingleStep(self) -> float:
+        return self._default_singleStep_
+
+    @property
     def decimals(self) -> int:
         return self._decimals_
 
@@ -1240,6 +1383,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             val = 0
         self._decimals_ = val
         super().setDecimals(self._decimals_)
+        self._update_()
 
     def validate(self, text:str, pos:int):
         validator = InftyDoubleValidator(parent=self)
@@ -1271,7 +1415,18 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         return valid
 
-    def valueFromText(self, text:str):
+    def keyPressEvent(self, event):
+        if event.key() in (QtCore.Qt.Key_Return, QtCore.Qt.Key_Enter):
+            self.sig_valueChanged.emit(self.value())
+
+        else:
+            # needed in order to update the widget
+            super().keyPressEvent(event)
+
+        event.accept()
+
+    def valueFromText(self, text:str) -> float | pq.Quantity:
+        # print(f"{self.__class__.__name__}.valueFromText({text})")
         suffix = self._suffix_
         prefix = self._prefix_
         s = text
@@ -1289,31 +1444,35 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
 
         if s == "NA":
             ret = pd.NA
+
         elif s.lower() == "nan":
             ret = math.nan * self.units
+
         else:
             if len(s.strip()) == 0:
                 ret = math.nan
+
             else:
                 if s.startswith("e"):
                     s = "1"+s
+
                 elif s.startswith("+e"):
                     s = s.replace("+e", "+1e")
+
                 elif s.startswith("-e"):
                     s = s.replace("-e", "-1e")
 
                 ret = float(s)
-                # try:
-                # except ValueError:
-                #     pass
+
             units = self.units
             ret = ret * units.units if isinstance(units, pq.Quantity) else ret
 
         return ret
 
-
     def textFromValue(self, value:typing.Union[float, pq.Quantity, np.ndarray]):
-        # print(f"{self.objectName()}: {self.__class__.__name__}.textFromValue({value})")
+        # print(f"{self.__class__.__name__}.textFromValue({value})")
+        # print(f"\n my value is {self.value()} with magnitude {self._magnitude_} and units {self._units_}")
+
         if isinstance(value, (pq.Quantity, np.ndarray)):
             if value.size > 1:
                 return "NA"
@@ -1323,194 +1482,192 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
             prefix = ""
             suffix = ""
             family = scq.getUnitFamily(units)
+
             if family == "Currency":
                 prefix = f"{units.dimensionality.unicode}"
+
             else:
                 suffix = f"{units.dimensionality.unicode}"
 
             fval = float(value.magnitude)
 
-            if np.isnan(fval):
-                ret = "NaN"
-            elif np.isinf(fval):
-                ret = "-Inf" if fval in (-np.inf, -math.inf) else "Inf"
-            else:
-                ret = f"{fval:.{self.decimals}}"
-                # ret = super().textFromValue(float(value.magnitude))
+            # print(f"\n fval = {fval}")
+
+            ret = utilities.repr_val(fval, self.decimals)
 
             if len(prefix):
                 ret = f"{prefix} {ret}"
+
             if len(suffix):
                 ret = f"{ret} {suffix}"
 
-            # print(f"\t ret -> {ret}")
+            # print(f"\n ret -> {ret}")
 
             return ret
 
-        elif isinstance(value, float):
-            if np.isnan(value):
-                ret = "NaN"
-            elif np.isinf(value):
-                ret = "-Inf" if value == -np.inf else "Inf"
-            else:
-                ret = f"{value:.{self.decimals}}"
-                # ret = super().textFromValue(value)
+        elif isinstance(value, (float, np.floating)):
+            ret = utilities.repr_val(value, self.decimals)
 
-            # print(f"\t ret -> {ret}")
+            # print(f"\n ret -> {ret}")
             return ret
 
         else:
             return "NA"
 
-    def setValue(self, value:typing.Union[pq.Quantity, float, int, type(pd.NA)]):
+    def setValue(self, value: (pq.Quantity, float, int, type(pd.NA))):
         r"""Also allows changing the units if not convertible to current ones.
         Otherwise the value will be rescaled to current units.
     WARNING: This is different from the case when new units are chosen while
     self.rescaleOnUnitChange is True.
     """
-        from core.regexps import SCIENTIFIC_NUMBER_FORMAT_MATCH
-        # traceback.print_stack()
-
-        # print(f"{self.__class__.__name__}.setValue({value})")
-
         if isinstance(value, pq.Quantity):
             if value.size > 1:
                 # return # Only scalar quantities are allowed
-                raise TypeError("Only scalar quantities are allowed")
+                raise TypeError("Only scalar and 0-dimensional Quantity arrays are supported")
 
-            fval = float(value.magnitude)
+            fval = float(value.magnitude.flatten()[0])
 
-            if not (self._keepDimensionless_ or self._forceDimensionless_):
-                if value.units != self.units:
-                    if scq.unitsConvertible(self.units, value.units):
-                        if fval > -math.inf and fval < math.inf:
-                            fval = float(value.rescale(self.units).magnitude)
-                    else:
-                        self.units = value.units
+            if not (self._keepDimensionless_ or self._forceDimensionless_) and value.units != self.units:
+                # when NOT in a dimensionless world, if the new value has
+                # different units:
+                #   if the new units are convertible to the current units =>
+                #       RESCALE the new value so that units are preserved
+                #   else =>
+                #       just adopt the new units, AND the new value as supplied
+                if scq.unitsConvertible(self.units, value.units):
+                    if fval > -math.inf and fval < math.inf:
+                        fval = float(value.rescale(self.units).magnitude)
+                else:
+                    self.units = value.units
 
             self._magnitude_ = fval
 
-        elif value is pd.NA or value in(math.nan, np.nan):
+        elif (
+                value is pd.NA
+                or isinstance(value, (int, float, np.integer, np.floating))
+                # or np.isnan(value) # NOTE: np.nan, math.nan are floats!
+                ):
             self._magnitude_ = value
             self.units = None
 
-        elif isinstance(value, float):
-            self._magnitude_ = value
-            self.units = None
+        elif isinstance(value, np.ndarray):
+            if not issubclass(value.dtype.type, (np.integer, np.floating)):
+                raise TypeError(f"Unsupported dtype {value.dtype.type}")
 
-        elif isinstance(value, int):
-            self._magnitude_ = float(value)
-            self.units = None
+            if value.size > 1:
+                raise TypeError("Only 0-dimensional arrays are supported")
 
-        elif isinstance(value, (np.float64, np.int64)):
-            self._magnitude_ = float(value)
-            self.units = None
+            self._magnitude_ = value.flatten()[0]
 
         else:
             raise ValueError(f"Incompatible value: {value} ({type(value).__name__})")
+
+        # print(f"{self.__class__.__name__}.setValue({value}) =>\n self._magnitude_ -> {self._magnitude_}\n self._units_ -> {self._units_}")
 
         self._update_()
 
     def _update_(self,
                  forceSgStep: typing.Optional[typing.Union[int, float]] = None,
                  forceDecimals: typing.Optional[int] = None):
-        signalBlockers = list(map(QtCore.QSignalBlocker, (self, self.lineEdit())))
-        if self._magnitude_ is pd.NA:
-            self.setMinimum(-math.inf)
-            specialText = r"NA"
-            self._specialValueText_ = specialText
+        # signalBlockers = list(map(QtCore.QSignalBlocker, (self, self.lineEdit())))
+        with qtutils.SignalBlocker((self, self.lineEdit())):
+            if self._magnitude_ is pd.NA:
+                # self.setMinimum(-math.inf)
+                specialText = r"NA"
+                text = specialText
 
-            if len(self._prefix_):
-                text = f"{self._prefix_} {self._specialValueText_}"
+                self._specialValueText_ = specialText
 
-            if len(self._suffix_):
-                text = f"{text} {self._suffix_}"
+                if len(self._prefix_):
+                    text = f"{self._prefix_} {self._specialValueText_}"
 
-            super().setSpecialValueText(self._specialValueText_)
-            super().setValue(self._magnitude_)
+                if len(self._suffix_):
+                    text = f"{text} {self._suffix_}"
 
-            self.lineEdit().setText(text)
+            elif np.isnan(self._magnitude_): # in (math.nan, np.nan):
+                # self.setMinimum(-math.inf)
+                specialText = r"NaN"
+                text = specialText
+                self._specialValueText_ = specialText
 
-        elif self._magnitude_ in (math.nan, np.nan):
-            self.setMinimum(-math.inf)
-            specialText = r"NaN"
-            self._specialValueText_ = specialText
+                if len(self._prefix_):
+                    text = f"{self._prefix_} {self._specialValueText_}"
 
-            if len(self._prefix_):
-                text = f"{self._prefix_} {self._specialValueText_}"
+                if len(self._suffix_):
+                    text = f"{text} {self._suffix_}"
 
-            if len(self._suffix_):
-                text = f"{text} {self._suffix_}"
+            elif isinstance(self._magnitude_, (float, int)):
+                if self._magnitude_ in (-math.inf, -np.inf):
+                    specialText = r"-Inf"
+                    text = specialText
 
-            super().setSpecialValueText(self._specialValueText_)
-            super().setValue(self._magnitude_)
+                elif self._magnitude_ in (math.inf, np.inf):
+                    specialText = r"Inf"
+                    text = specialText
 
-            self.lineEdit().setText(text)
-
-        elif isinstance(self._magnitude_, (float, int)):
-            if self._magnitude_ in (-math.inf, -np.inf):
-                specialText = r"-Inf"
-
-            elif self._magnitude_ in (math.inf, np.inf):
-                specialText = r"Inf"
-
-            else:
-                # NOTE: 2026-03-29 12:14:37
-                # the next line formats self._magnitude_ according to the number of decimals
-                # HOWEVER, this does NOT work when the generated text is in scientific format
-                # e.g., '1e-8'
-                text = f"{self._magnitude_:.{self.decimals+1}}"
-                mantissa, exponent, decimals = strutils.parse_sci_string(text)
-                if exponent != 0:
-                    sign = "+" if exponent > 0 else "" # '-' wil be automatically inserted by Python library
-                    text = f"{mantissa:.{self.decimals}}e{sign}{exponent}"
                 else:
-                    text = f"{mantissa:.{self.decimals}}"
+                    # NOTE: 2026-03-29 12:14:37
+                    # the next line formats self._magnitude_ according to the number of decimals
+                    # HOWEVER, this does NOT work when the generated text is in scientific format
+                    # e.g., '1e-8'
+                    text = utilities.repr_val(self._magnitude_, self.decimals)
+                    # text = f"{self._magnitude_:.{self.decimals+1}}"
 
-                if not isinstance(forceSgStep, (int, float)):
-                    if self._magnitude_ < self._singleStep_:
-                        if exponent < 0 and abs(exponent) > self.decimals:
-                            step = 10**exponent
-                        else:
-                            step = 10**(-self.decimals + exponent)
-                        # print(f"\tnew step proposed: {step}")
-                        self.setSingleStep(step) # good fallback?
+                    mantissa, exponent, decimals = strutils.parse_sci_string(text)
 
-                    elif self._magnitude_ > self._singleStep_:
-                        if exponent > self.decimals:
-                            step = 10**(exponent - self.decimals)
+                    # print(f"{self.__class__.__name__}._update_ -> mantissa {mantissa}, exponent {exponent}, decimals {decimals}")
+
+                    if exponent != 0:
+                        sign = "+" if exponent > 0 else "" # '-' wil be automatically inserted by Python library
+                        text = f"{mantissa:.{self.decimals}}e{sign}{exponent}"
+
+                    if not isinstance(forceSgStep, (int, float)) and not self.fixSingleStep:
+                        if self._magnitude_ < self._singleStep_:
+                            if exponent < 0 and abs(exponent) > self.decimals:
+                                step = 10**exponent
+                            else:
+                                step = 10**(-self.decimals + exponent)
                             # print(f"\tnew step proposed: {step}")
                             self.setSingleStep(step) # good fallback?
+                            self.fixSingleStep = False
 
-                specialText = ""
+                        elif self._magnitude_ > self._singleStep_:
+                            if exponent > self.decimals:
+                                step = 10**(exponent - self.decimals)
+                                self.setSingleStep(step) # good fallback?
+                                self.fixSingleStep = False
 
-            self._specialValueText_ = specialText
+                    specialText = ""
 
+                self._specialValueText_ = specialText
 
-            if len(self._specialValueText_):
-                # super().setSpecialValueText(specialText)
-                text = self._specialValueText_
+                if len(self._specialValueText_):
+                    text = self._specialValueText_
 
-            if len(self._prefix_):
-                text = f"{self._prefix_} {text} "
+                if len(self._prefix_):
+                    text = f"{self._prefix_} {text} "
 
-            if len(self._suffix_):
-                text = f"{text} {self._suffix_}"
+                if len(self._suffix_):
+                    text = f"{text} {self._suffix_}"
 
-            super().setSpecialValueText(self._specialValueText_)
+            else:
+                raise TypeError(f"_magnitude_ expected to be a scalar quantity, a float or pd.NA; instead, got {type(self._magnitude_).__name__}")
+
+            # ### BEGIN ATTENTION super() object and held value
+            #
+            # CAUTION: 2026-08-23 16:57:25
+            # The super() QDoubleSpinBox calls textFromValue internally, which
+            # will OVERWRITE the value
+            # Hence I need to set the value of the super() object BEFORE
+            # anything else !!!
+            #
             super().setValue(self._magnitude_)
+            #
+            # ### END   ATTENTION super() object and held value
 
-            # print(f"{self.objectName()}: {self.__class__.__name__}.setValue({value}) -> text = {text}")
-
-            # signalBlock = QtCore.QSignalBlocker(self.lineEdit())
-            # print(f"\tsetting text to {text}")
+            super().setDecimals(self._decimals_)
+            super().setSpecialValueText(self._specialValueText_)
             self.lineEdit().setText(text)
-
-            # print(f"\tvalue after update: {self.value()}")
-
-        else:
-            raise TypeError(f"_magnitude_ expected to be a scalar quantity, a float or pd.NA; instead, got {type(value).__name__}")
-
 
     @property
     def disableUnitChange(self) -> bool:
@@ -1560,16 +1717,20 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     def _slot_setUnitsGUI(self):
         if self._keepDimensionless_ or self._forceDimensionless_:
             return
+
         dlg = qd.QuickDialog(parent = self, title="Set units")
-        quantityWidget = QuantityChooserWidget(parent = dlg)
+        quantityWidget = QuantityChooserWidget(parent = dlg)#, restrictedToFamily=self.familyRestriction)
         quantityWidget.units = self._units_
+
         if isinstance(self._restrictedToFamily_, str) and self._restrictedToFamily_ in scq.UNITS_DICT:
             quantityWidget.familyRestriction = self._restrictedToFamily_
+
         else:
             quantityWidget.familyRestriction = None
 
         dlg.addWidget(quantityWidget)
         dlg.adjustSize()
+
         if dlg.exec():
             self.units = quantityWidget.units
 
@@ -1577,22 +1738,27 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     def _slot_setSingleStepGUI(self):
         if self._keepDimensionless_ or self._forceDimensionless_:
             return
+
         dlg = qd.QuickDialog(parent=self, title="Set single step")
-        # stepInput = qd.HSpinBox(dlg, "Step (float)", widget_type="d")
+
         stepInput = qd.HSpinBox(dlg, "Step (float|Scalar quantity):", widget_type="q")
         stepInput.familyRestriction = scq.getUnitFamily(self.units)
         stepInput.rescaleOnUnitChange = True
         stepInput.units = self.units
         stepInput.setDecimals(3)
         stepInput.setValue(self.singleStep())
+
         adaptiveCheckBox = qd.CheckBox(dlg, "Adaptive")
         adaptiveCheckBox.setChecked(self.stepType() == QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+
         dlg.addWidget(stepInput)
         dlg.addWidget(adaptiveCheckBox)
         dlg.adjustSize()
+
         if dlg.exec():
             value = stepInput.value()
             stepType = QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType if adaptiveCheckBox.isChecked() else QtWidgets.QAbstractSpinBox.DefaultStepType
+
             if value != self.singleStep():
                 self.setSingleStep(value)
 
@@ -1611,6 +1777,7 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         if value:
             family = scq.getUnitFamily(self.units)
             self._restrictedToFamily_ = family
+
         else:
             self._restrictedToFamily_ = None
 
@@ -1625,35 +1792,46 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     def _slot_rescaleValueChanged(self, value:bool):
         if self._keepDimensionless_ or self._forceDimensionless_:
             return
+
         self._rescaleOnUnitChange_ = value
 
     @Slot()
     def _slot_setDecimalsGUI(self):
         dlg = qd.QuickDialog(parent=self, title="Set decimals")
+
         decimalsInput = qd.HSpinBox(dlg, "Decimals (int) >= 0:")
         decimalsInput.setValue(self._decimals_)
         decimalsInput.setMinimum(0)
+
         dlg.addWidget(decimalsInput)
         dlg.adjustSize()
+
         if dlg.exec():
             value = decimalsInput.value()
+
             if value < 0:
                 value  = 0
+
             self.setDecimals(value)
 
     @Slot()
     def _slot_setRangeGUI(self):
         dlg = qd.QuickDialog(parent=self, title="Set range (min, max)")
         group = qd.DialogGroup(dlg)
-        unitsLabel = ""
-        if not (self._keepDimensionless_ or self._forceDimensionless_):
-            unitsLabel = self._prefix_ if len(self._prefix_) else self._suffix_ if len(self._suffix_) else ""
-        minimumInput = qd.HSpinBox(group, f"Minimum:", widget_type="q", decimals=3)
+        # unitsLabel = ""
+        #
+        # if not (self._keepDimensionless_ or self._forceDimensionless_):
+        #     unitsLabel = self._prefix_ if len(self._prefix_) else self._suffix_ if len(self._suffix_) else ""
+
+        minimumInput = qd.HSpinBox(group, "Minimum:", widget_type="q", decimals=3)
         minimumInput.setValue(self._default_internal_minimum_ * self.units)
-        maximumInput = qd.HSpinBox(group, f"Maximum:", widget_type="q", decimals=3)
+
+        maximumInput = qd.HSpinBox(group, "Maximum:", widget_type="q", decimals=3)
         maximumInput.setValue(self._default_internal_maximum_ * self.units)
+
         group.addWidget(minimumInput)
         group.addWidget(maximumInput)
+
         dlg.addWidget(group)
         dlg.adjustSize()
 
@@ -1692,53 +1870,54 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
         shift = math.pow(10, 1 - math.floor(math.log(10, absVal)))
         absRound = round(absVal * shift, decimals) / shift
         logVal = math.floor(math.log(10, absRound)) - 1
+
         return max(minStep, math.pow(10, logVal))
 
     def stepBy(self, steps:int):
-        signalBlocker = QtCore.QSignalBlocker(self._lineEdit_)
-        step = self._singleStep_ * steps
-        # print(f"{self.__class__.__name__}.stepBy({steps})")
-        # print(f"\tsingle step = {self._singleStep_}; step  = {step}")
-        # print(f"\tcurrent magnitude: {self._magnitude_}")
-        if isinstance(self._singleStep_, pq.Quantity):
-            if self._singleStep_.size != 1:
-                raise ValueError(f"Single step must be a scalar; instead got {self._singleStep_}")
-            stepUnits = self._singleStep_.units
-            if isinstance(self._units_, pq.Quantity):
-                if all(self._units_ != pq.dimensionless) and all(stepUnits != self._units_):
-                    if not scq.unitsConvertible(stepUnits, self._units_):
-                        raise ValueError(f"Step units ({stepUnits}) are incompatible with value's units ({self._units_})")
+        with qtutils.SignalBlocker(self.lineEdit()):
+            # signalBlocker = QtCore.QSignalBlocker(self._lineEdit_)
+            # step = self._singleStep_ * steps
 
-                    sgStep = self._singleStep_.rescale(self._units_).magnitude
+            if isinstance(self._singleStep_, pq.Quantity):
+                if self._singleStep_.size != 1:
+                    raise ValueError(f"Single step must be a scalar; instead got {self._singleStep_}")
+
+                stepUnits = self._singleStep_.units
+
+                if isinstance(self._units_, pq.Quantity):
+
+                    if all(self._units_ != pq.dimensionless) and all(stepUnits != self._units_):
+                        if not scq.unitsConvertible(stepUnits, self._units_):
+                            raise ValueError(f"Step units ({stepUnits}) are incompatible with value's units ({self._units_})")
+
+                        sgStep = self._singleStep_.rescale(self._units_).magnitude
+
+                    else:
+                        sgStep = self._singleStep_.magnitude
+                else:
+                    sgStep = self._singleStep_.magnitude
+
+            elif isinstance(self._singleStep_, (int, float)):
+
+                sgStep = self._singleStep_
+
             else:
-                sgStep = self._singleStep_.magnitude
+                raise TypeError(f"singleStep has wrong object type: {type(self._singleStep_).__name__}")
 
-        elif isinstance(self._singleStep_, (int, float)):
-            sgStep = self._singleStep_
-        else:
-            raise TypeError(f"singleStep has wrong object type: {type(self._singleStep_).__name__}")
-
-        self._magnitude_ = self._magnitude_ + sgStep * steps
-        # print(f"\tnew magnitude: {self._magnitude_}")
-        decimals = self._decimals_
-        self._lineEdit_.lazy = True
-        self._update_(forceSgStep = sgStep)
-        self._lineEdit_.lazy = False
-        # restore single step & decimals
-        # self._singleStep_ = sgStep
-        # self._decimals_ = decimals
-        # value = self._magnitude_ + steps * self._singleStep_
-        # super().stepBy(steps)
-        # txt = self.lineEdit().displayText()
-        # val = self.valueFromText(txt)
-        # self._magnitude_ = float(val)
-        # print(f"\tnew magnitude again: {self._magnitude_}")
-        self.sig_valueChanged.emit(self.value())
+            δVal = sgStep * steps
+            oldMagnitude = self._magnitude_
+            newMagnitude = oldMagnitude + δVal
+            self._magnitude_ = newMagnitude
+            # decimals = self._decimals_
+            self._update_(forceSgStep = sgStep)
+            self.sig_valueChanged.emit(self.value())
 
     def singleStep(self) -> typing.Union[pq.Quantity, float, int]:
         ret = self._singleStep_
+
         if self._keepDimensionless_ or self._forceDimensionless_:
             return ret
+
         else:
             return ret * self.units
 
@@ -1748,21 +1927,25 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
                 raise TypeError("Scalar quantity expected")
 
             if value.units != self.units:
-                if not scq.unitsConvertible(value, self.units):
-                    raise ValueError(f"Cannot set single step with units ({value.units}) that are not scalable to the current units ({self.units})")
-                v = float(value.rescale(self.units).magnitude)
+                if isinstance(self.units, pq.Quantity):
+                    if not scq.unitsConvertible(value, self.units):
+                        raise ValueError(f"Cannot set single step with units ({value.units}) that are not scalable to the current units ({self.units})")
+                    v = float(value.rescale(self.units).magnitude)
+
+                else:
+                    v = float(value.units)
 
             else:
                 v = float(value.units)
 
         elif isinstance(value, (float, int)):
             v = float(value)
+
         else:
             raise TypeError(f"Expecting a scalar quantity or float; instead, got a {type(value).__name__}")
 
         self._singleStep_ = v
-
-        # super().setSingleStep(self._singleStep_)
+        self.fixSingleStep = True
 
     @property
     def keepDimensionless(self) -> bool:
@@ -1771,9 +1954,11 @@ class QuantitySpinBox(QtWidgets.QDoubleSpinBox):
     @keepDimensionless.setter
     def keepDimensionless(self, val:bool):
         self._keepDimensionless_ = val
+
         if self._keepDimensionless_ or self._forceDimensionless_:
             super().setSuffix("")
             super().setPrefix("")
+
         else:
             super().setSuffix(self._suffix_)
             super().setPrefix(self._prefix_)
@@ -1815,31 +2000,45 @@ class ComplexSpinBox(QtWidgets.QFrame):
                  rescaleWithUnitsChange:bool=False,
                  keepDimensionless:bool=False,
                  ):
-        QtWidgets.QFrame.__init__(self, parent)
+
+        units_ = None
+
         if isinstance(parent, QtWidgets.QWidget):
-            parent.addWidget(self)
+            parent_ = parent
+        else:
+            parent_ = None
+            if isinstance(parent, (pq.Quantity, float, complex, int)):
+                units_ = parent
+
+        QtWidgets.QFrame.__init__(self, parent_)
+
+        if isinstance(parent_, QtWidgets.QWidget) and hasattr(parent_, "addWidget"):
+            parent_.addWidget(self)
+
         self._layout_ = QtWidgets.QHBoxLayout(self)
         self._layout_.setSpacing(0)
         self.prefixLabel = QtWidgets.QLabel(self)
         self.prefixLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignHCenter)
         self.prefixLabel.setTextInteractionFlags(QtCore.Qt.NoTextInteraction)
 
-        # self.realSpinBox = QtWidgets.QSpinBox(self)
         self.realSpinBox = QuantitySpinBox(self, decimals=3)#, keepDimensionless = True)
         self.realSpinBox.forceDimensionless = True
         self.realSpinBox.sig_valueChanged.connect(self._slot_valueChanged)
-        # self.imagSpinBox = QtWidgets.QDoubleSpinBox(self)
+
         self.imagSpinBox = QuantitySpinBox(self, decimals=3)#, keepDimensionless = True)
         self.imagSpinBox.forceDimensionless = True
         self.imagSpinBox.sig_valueChanged.connect(self._slot_valueChanged)
+
         self.plusLabel = QtWidgets.QLabel(self)
         self.plusLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignHCenter)
         self.plusLabel.setText(" + ")
         self.plusLabel.setTextInteractionFlags(QtCore.Qt.NoTextInteraction)
+
         self.jLabel = QtWidgets.QLabel(self)
         self.jLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignHCenter)
         self.jLabel.setText(" × j")
         self.jLabel.setTextInteractionFlags(QtCore.Qt.NoTextInteraction)
+
         self.suffixLabel = QtWidgets.QLabel(self)
         self.suffixLabel.setAlignment(QtCore.Qt.AlignVCenter | QtCore.Qt.AlignHCenter)
         self.suffixLabel.setTextInteractionFlags(QtCore.Qt.NoTextInteraction)
@@ -1851,7 +2050,6 @@ class ComplexSpinBox(QtWidgets.QFrame):
         self._layout_.addWidget(self.jLabel)
         self._layout_.addWidget(self.suffixLabel)
         self._layout_.addStretch(5)
-        # self.setLayout(self._layout_)
 
         self._restrictedToFamily_:typing.Optional[str] = None
         self._rescaleOnUnitChange_:bool = False
@@ -1863,19 +2061,25 @@ class ComplexSpinBox(QtWidgets.QFrame):
         self._prefix_ = ""
         self._suffix_ = ""
 
-        if isinstance(units, pq.Quantity):
-            self._units_ = units.units
-            if not isinstance(units, pq.UnitQuantity):
-                if units.size != 1:
-                    raise TypeError(f"Expecting a scalar quantity; instead, got a Quantity array with {units.size} elements")
-                self._magnitude_ = complex(units.magnitude)
+        if units_ is None:
+            units_ = units
+
+        if isinstance(units_, pq.Quantity):
+            self._units_ = units_.units
+            if not isinstance(units_, pq.UnitQuantity):
+                if units_.size != 1:
+                    raise TypeError(f"Expecting a scalar quantity; instead, got a Quantity array with {units_.size} elements")
+                self._magnitude_ = complex(units_.magnitude)
+
         else:
-            if isinstance(units, (float, int)):
-                self._magnitude_ = complex(units)
-            elif isinstance(units, complex):
-                self._magnitude_ = units
-            elif units is not None:
-                raise TypeError(f"Invalid 'units' argument: {units}")
+            if isinstance(units_, (float, int)):
+                self._magnitude_ = complex(units_)
+
+            elif isinstance(units_, complex):
+                self._magnitude_ = units_
+
+            elif units_ is not None:
+                raise TypeError(f"Invalid 'units' argument: {units_}")
 
             self._units_ = self._default_units_
 
@@ -2003,6 +2207,7 @@ class ComplexSpinBox(QtWidgets.QFrame):
 
             if value.dtype == np.dtype("complex"):
                 cval = complex(value.magnitude)
+
             else:
                 cval = complex(float(value.magnitude), 0.0)
 
@@ -2172,10 +2377,6 @@ class ComplexSpinBox(QtWidgets.QFrame):
         resetAction.triggered.connect(self._slot_reset)
         cm.popup(self.mapToGlobal(evt.pos()))
 
-    # @Slot(float)
-    # def _slot_valueChanged(self, val):
-    #     self.sig_valueChanged.emit(self.value())
-
     @Slot(bool)
     def _slot_keepDimensionless(self, val:bool):
         self.keepDimensionless = val
@@ -2208,29 +2409,35 @@ class ComplexSpinBox(QtWidgets.QFrame):
     def _slot_setSingleStepGUI(self):
         realVal = self._singleStepReal_
         imagVal = self._singleStepImag_
+
         dlg  = qd.QuickDialog(parent=self, title="Set single step")
+
         realGrp = qd.DialogGroup(dlg)
+
         realInput = qd.HSpinBox(realGrp, "Real part:", widget_type="f")
         realInput.setValue(realVal)
+
         adaptiveRealCheckBox = qd.CheckBox(realGrp, "Adaptive")
         adaptiveRealCheckBox.setChecked(self.stepType()[0] == QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+
         realGrp.addWidget(realInput, QtCore.Qt.AlignVCenter)
         realGrp.addWidget(adaptiveRealCheckBox, QtCore.Qt.AlignVCenter)
-        # realInput.setMinimum(0)
+
         imagGrp = qd.DialogGroup(dlg)
         imagInput = qd.HSpinBox(imagGrp, "Imaginary part:", widget_type="f")
         imagInput.setValue(imagVal)
+
         adaptiveImagCheckBox = qd.CheckBox(imagGrp, "Adaptive")
         adaptiveImagCheckBox.setChecked(self.stepType()[1] == QtWidgets.QAbstractSpinBox.AdaptiveDecimalStepType)
+
         imagGrp.addWidget(imagInput, QtCore.Qt.AlignVCenter)
         imagGrp.addWidget(adaptiveImagCheckBox, QtCore.Qt.AlignVCenter)
-        # imagInput.setMinimum(0)
 
-        # dlg.addWidget(realInput)
-        # dlg.addWidget(imagInput)
         dlg.addWidget(realGrp)
         dlg.addWidget(imagGrp)
+
         dlg.adjustSize()
+
         if dlg.exec():
             realVal = realInput.value()
             imagVal = imagInput.value()
@@ -2261,8 +2468,6 @@ class ComplexSpinBox(QtWidgets.QFrame):
         if self._keepDimensionless_ or self._forceDimensionless_:
             return
         self._rescaleOnUnitChange_ = value
-        # self.realSpinBox.rescaleOnUnitChange = value
-        # self.imagSpinBox.rescaleOnUnitChange = value
 
     @Slot(bool)
     def _slot_familyRestrictionChanged(self, value:bool):
@@ -2292,7 +2497,6 @@ class ComplexSpinBox(QtWidgets.QFrame):
 
     @units.setter
     def units(self, value:typing.Optional[pq.Quantity] = None):
-        # print(f"{self.__class__.__name__}.units.setter: value = {value}")
         if self._keepDimensionless_ or self._forceDimensionless_:
             return
 
@@ -2314,7 +2518,7 @@ class ComplexSpinBox(QtWidgets.QFrame):
             ratio = newval/self._magnitude_
             realStep = self.realSpinBox.singleStep() * ratio
             imagStep = self.imagSpinBox.singleStep() * ratio
-            self._magnitude_ = complex(scaled.magnitude) if scaledval.dtype == np.dtype("complex") else float(scaledval.magnitude)
+            self._magnitude_ = complex(scaledval.magnitude) if scaledval.dtype == np.dtype("complex") else float(scaledval.magnitude)
             self._units_ = newval.units
             self.realSpinBox.setValue(self._magnitude_.real)
             self.realSpinBox.setSingleStep(realStep)
@@ -2388,27 +2592,38 @@ class GenericInputWidget(QtWidgets.QFrame):
     # TODO: 2026-04-09 01:14:54
     # implement instantiation of objects with default (0-argument) c'tor -- maybe in a separate widget
 
-    def __init__(self, varType: typing.Union[
-                            typing.Set[type], typing.Sequence[type],
-                            typing.Sequence[numbers.Number],
-                            pq.UnitQuantity, pq.Quantity,
-                            InputSpec, dataclasses.Field,
-                            type(None),
-                            type(dataclasses.MISSING)
-                            ] = dataclasses.MISSING,
-                 default = dataclasses.MISSING,
+    def __init__(self, parent = None, varType: typing.Union[
+                typing.Set[type], typing.Sequence[type],
+                typing.Sequence[numbers.Number],
+                pq.UnitQuantity, pq.Quantity,
+                InputSpec, dataclasses.Field,
+                type(None),
+                type(dataclasses.MISSING)
+                ] = dataclasses.MISSING,
+                default = dataclasses.MISSING,
                  value = dataclasses.MISSING,
                  valueChoices: typing.Optional[
                      typing.Union[typing.Set, typing.Sequence]
                      ] = None,
-                 parent = None):
-        super().__init__(parent = parent)
+
+                 ):
         if isinstance(parent, QtWidgets.QWidget):
-            parent.addWidget(self)
+            parent_ = parent
+        else:
+            parent_ = None
+
+        super().__init__(parent = parent_)
+
+        if isinstance(parent_, QtWidgets.QWidget) and hasattr(parent_, "addWidget"):
+            parent_.addWidget(self)
 
         self._inputWidget_ = None
         self._typeCombo_ = None
         self._value_ = dataclasses.MISSING
+
+        if not isinstance(varType, type):
+            self._value_ = varType
+            self._vartype_ = type(self._value_)
 
         if varType == dataclasses.MISSING:
             # NOTE: 2026-04-06 22:13:01
@@ -2435,7 +2650,7 @@ class GenericInputWidget(QtWidgets.QFrame):
                     value = value_
 
             elif isinstance(varType, typing._Final):
-                t = prog.unwind_type(x)
+                t = prog.unwind_type(varType)
                 if len(t) == 0:
                     if default not in (dataclasses.MISSING, None): # get it from default's type
                         t = {type(default)}
@@ -2444,7 +2659,7 @@ class GenericInputWidget(QtWidgets.QFrame):
 
                 varType = t
 
-            print(f"{self.__class__.__name__}.__init__ -> varType is a {type(varType).__name__}: {varType}")
+            # print(f"{self.__class__.__name__}.__init__ -> varType is a {type(varType).__name__}: {varType}")
 
             if isinstance(varType, type) and varType in self.SUPPORTED_TYPES:
                 self._vartype_ = varType
@@ -2585,11 +2800,11 @@ class GenericInputWidget(QtWidgets.QFrame):
             self._current_vartype_ = self._vartype_[ndx]
 
         if isinstance(val, QtCore.Qt.CheckState):
-            if self._current_vartype_  == Tribool:
+            if self._current_vartype_  is Tribool:
                 v_ = None if val == QtCore.Qt.PartiallyChecked else True if val == QtCore.Qt.Checked else False
                 self._cached_value_[self._current_vartype_] = Tribool(v_)
 
-            elif self._current_vartype_ == bool:
+            elif self._current_vartype_ is bool:
                 v_ = val == QtCore.Qt.Checked
                 self._cached_value_[self._current_vartype_] = v_
 
@@ -2628,15 +2843,18 @@ class GenericInputWidget(QtWidgets.QFrame):
                 cachedVal = self._cached_value_[self._current_vartype_]
             else:
                 cachedVal = dataclasses.MISSING
+
             self._inputWidget_ = self._createInputWidget_(self._current_vartype_)
+
             if isinstance(self._inputWidget_, QtWidgets.QComboBox):
                 if self._current_vartype_ in self._value_choices_:
                     choices = self._value_choices_[self._current_vartype_]
                     if isinstance(cachedVal, self._current_vartype_):
                         if cachedVal != dataclasses.MISSING and isinstance(cachedVal, self._current_vartype_):
                             if cachedVal in choices:
-                                sigBlock = QtCore.QSignalBlocker(self._inputWidget_)
-                                self._inputWidget_.setCurrentIndex(choices.index(cachedVal))
+                                with qtutils.SignalBlocker(self._inputWidget_):
+                                    # sigBlock = QtCore.QSignalBlocker(self._inputWidget_)
+                                    self._inputWidget_.setCurrentIndex(choices.index(cachedVal))
 
                     ndx = self._inputWidget_.currentIndex()
 
@@ -2645,19 +2863,19 @@ class GenericInputWidget(QtWidgets.QFrame):
 
             elif isinstance(self._inputWidget_, QtWidgets.QCheckBox):
                 if isinstance(cachedVal, Tribool):
-                    checkState = QtCore.Qt.Checked if cachedVal.value == True else QtCore.Qt.Checked if cachedVal.value == False else QtCore.Qt.PartiallyChecked
+                    checkState = QtCore.Qt.Checked if cachedVal.value is True else QtCore.Qt.Checked if cachedVal.value is False else QtCore.Qt.PartiallyChecked
                     self._inputWidget_.setCheckState(checkState)
 
                 elif isinstance(cachedVal, bool):
-                    self._inputWidget_.setChecked(cachedVal == True)
+                    self._inputWidget_.setChecked(cachedVal is True)
 
                 state = self._inputWidget_.checkState()
 
-                if self._current_vartype_  == Tribool:
+                if self._current_vartype_ is Tribool:
                     v_ = None if state == QtCore.Qt.PartiallyChecked else True if state == QtCore.Qt.Checked else False
                     self._cached_value_[self._current_vartype_] = Tribool(v_)
 
-                elif self._current_vartype_ == bool:
+                elif self._current_vartype_ is bool:
                     v_ = state == QtCore.Qt.Checked
                     self._cached_value_[self._current_vartype_] = v_
 
@@ -2695,7 +2913,7 @@ class GenericInputWidget(QtWidgets.QFrame):
             self._vartype_names_ = self._vartype_.__name__
             self._current_vartype_ = self._vartype_
 
-            if type(default) == self._vartype_:
+            if type(default) is self._vartype_:
                 self._default_ = default
 
             else:
@@ -2721,7 +2939,6 @@ class GenericInputWidget(QtWidgets.QFrame):
 
         # NOTE: 2026-04-06 15:52:20
         #  self._value_choices_ is the mapping value_type -> sequence of values of type 'value_type'
-        # print(f"{self.__class__.__name__}.__init__: _vartype_ = {self._vartype_}")
         if isinstance(valueChoices, typing.Sequence) and len(valueChoices):
             if all(isinstance(c, self._vartype_) for c in valueChoices):
                 if isinstance(self._vartype_, type):
@@ -2729,6 +2946,7 @@ class GenericInputWidget(QtWidgets.QFrame):
 
                 else:
                      self._value_choices_ = dict(map(lambda t: (t, unique(list(filter(lambda c: isinstance(c, t), valueChoices)))), self._vartype_))
+
         else:
             self._value_choices_ = dict()
 
@@ -2740,66 +2958,66 @@ class GenericInputWidget(QtWidgets.QFrame):
 
         self._cached_value_.clear()
 
-        # print(f"{self.__class__.__name__}.setValue -> self._default_ = {self._default_}, self._current_vartype_ = {self._current_vartype_}")
-
         self._setup_widgets_()
 
-        sigBlock = QtCore.QSignalBlocker(self._inputWidget_)
+        # sigBlock = QtCore.QSignalBlocker(self._inputWidget_)
+        with qtutils.SignalBlocker(self._inputWidget_):
+            if not isinstance(self._inputWidget_, QtWidgets.QLabel):
+                if self._typeCombo_:
+                    self._current_vartype_ = self._vartype_[self._typeCombo_.currentIndex()]
 
-        if not isinstance(self._inputWidget_, QtWidgets.QLabel):
-            if self._typeCombo_:
-                self._current_vartype_ = self._vartype_[self._typeCombo_.currentIndex()]
+                if self._current_vartype_ in self._cached_value_:
+                    cachedVal = self._cached_value_[self._current_vartype_]
+                else:
+                    cachedVal = dataclasses.MISSING
 
-            if self._current_vartype_ in self._cached_value_:
-                cachedVal = self._cached_value_[self._current_vartype_]
-            else:
-                cachedVal = dataclasses.MISSING
+                if isinstance(self._inputWidget_, QtWidgets.QComboBox):
+                    if self._current_vartype_ in self._value_choices_:
+                        choices = self._value_choices_[self._current_vartype_]
+                        if isinstance(cachedVal, self._current_vartype_):
+                            if cachedVal != dataclasses.MISSING and isinstance(cachedVal, self._current_vartype_):
+                                if cachedVal in choices:
+                                    self._inputWidget_.setCurrentIndex(choices.index(cachedVal))
 
-            if isinstance(self._inputWidget_, QtWidgets.QComboBox):
-                if self._current_vartype_ in self._value_choices_:
-                    choices = self._value_choices_[self._current_vartype_]
-                    if isinstance(cachedVal, self._current_vartype_):
-                        if cachedVal != dataclasses.MISSING and isinstance(cachedVal, self._current_vartype_):
-                            if cachedVal in choices:
-                                self._inputWidget_.setCurrentIndex(choices.index(cachedVal))
+                        ndx = self._inputWidget_.currentIndex()
 
-                    ndx = self._inputWidget_.currentIndex()
+                        if ndx >=0 and ndx < len(choices):
+                            self._cached_value_[self._current_vartype_] = choices[ndx]
 
-                    if ndx >=0 and ndx < len(choices):
-                        self._cached_value_[self._current_vartype_] = choices[ndx]
+                elif isinstance(self._inputWidget_, QtWidgets.QCheckBox):
+                    if isinstance(cachedVal, Tribool):
+                        checkState = QtCore.Qt.Checked if cachedVal.value is True else QtCore.Qt.Checked if cachedVal.value is False else QtCore.Qt.PartiallyChecked
+                        self._inputWidget_.setCheckState(checkState)
 
-            elif isinstance(self._inputWidget_, QtWidgets.QCheckBox):
-                if isinstance(cachedVal, Tribool):
-                    checkState = QtCore.Qt.Checked if cachedVal.value == True else QtCore.Qt.Checked if cachedVal.value == False else QtCore.Qt.PartiallyChecked
-                    self._inputWidget_.setCheckState(checkState)
-                elif isinstance(cachedVal, bool):
-                    self._inputWidget_.setChecked(cachedVal == True)
+                    elif isinstance(cachedVal, bool):
+                        self._inputWidget_.setChecked(cachedVal is True)
 
-                state = self._inputWidget_.checkState()
+                    state = self._inputWidget_.checkState()
 
-                if self._current_vartype_  == Tribool:
-                    v_ = None if state == QtCore.Qt.PartiallyChecked else True if state == QtCore.Qt.Checked else False
-                    self._cached_value_[self._current_vartype_] = Tribool(v_)
+                    if self._current_vartype_  is Tribool:
+                        v_ = None if state == QtCore.Qt.PartiallyChecked else True if state == QtCore.Qt.Checked else False
+                        self._cached_value_[self._current_vartype_] = Tribool(v_)
 
-                elif self._current_vartype_ == bool:
-                    v_ = state == QtCore.Qt.Checked
-                    self._cached_value_[self._current_vartype_] = v_
+                    elif self._current_vartype_ is bool:
+                        v_ = state == QtCore.Qt.Checked
+                        self._cached_value_[self._current_vartype_] = v_
 
-            else:
-                if cachedVal != dataclasses.MISSING:
-                    self._inputWidget_.setValue(cachedVal)
+                else:
+                    if cachedVal != dataclasses.MISSING:
+                        self._inputWidget_.setValue(cachedVal)
 
-                self._cached_value_[self._current_vartype_] = self._inputWidget_.value()
+                    self._cached_value_[self._current_vartype_] = self._inputWidget_.value()
 
     def _createInputWidget_(self, t: typing.Union[type, type(dataclasses.MISSING)],
                             c: typing.Optional[typing.Sequence] = None
                             ) -> QtWidgets.QWidget:
-        # print(f"{self.__class__.__name__}._createInputWidget_({t})")
         value = self._default_ if self._value_ is dataclasses.MISSING else self._value_
+
         if t in self._value_choices_ and len(self._value_choices_[t]):
             w = QtWidgets.QComboBox(parent = self)
             w.setEditable(False)
             w.insertItems(0, list(map(lambda v: f"{v}",  self._value_choices_[t])))
+
             if isinstance(value, t) and value in  self._value_choices_[t]:
                 ndx =  self._value_choices_[t].index(self._default_)
                 w.setCurrentIndex(ndx)
@@ -2809,19 +3027,23 @@ class GenericInputWidget(QtWidgets.QFrame):
             w.currentIndexChanged.connect(self._slot_valueChoiceIndexChanged)
 
         else:
-            if t == bool:
+            if t is bool:
                 w = QtWidgets.QCheckBox(parent = self)
                 w.setTristate(False)
+
                 if isinstance(value, bool):
                     w.setChecked(value is True)
+
                 w.toggled.connect(self._slot_inputValueChanged)
 
-            elif t == Tribool:
+            elif t is Tribool:
                 w = QtWidgets.QCheckBox(parent = self)
                 w.setTristate(True)
+
                 if isinstance(value, Tribool):
                     checkState = QtCore.Qt.Checked if value.value is True else QtCore.Qt.Unckecked if value.value is False else QtCore.Qt.PartiallyChecked
                     w.setCheckState(checkState)
+
                 w.toggled.connect(self._slot_inputValueChanged)
 
             elif t in (int, np.integer):
@@ -2831,6 +3053,7 @@ class GenericInputWidget(QtWidgets.QFrame):
 
                 if isinstance(value, t):
                     w.setValue(value)
+
                 w.valueChanged.connect(self._slot_inputValueChanged)
 
             elif t in (float, np.floating):
@@ -2846,31 +3069,33 @@ class GenericInputWidget(QtWidgets.QFrame):
                 w = ComplexSpinBox(parent = self)
                 w.setMinimum(sys.float_info.min)
                 w.setMaximum(sys.float_info.max)
+
                 if isinstance(value, t):
                     w.setValue(value)
+
                 w.sig_valueChanged.connect(self._slot_inputValueChanged)
 
-            elif t == str:
-                # print(f"LineEdit -> {self._default_}")
+            elif t is str:
                 w = LineEdit(parent=self)
                 w.undoAvailable=True
                 w.redoAvailable=True
                 w.setClearButtonEnabled(True)
+
                 if isinstance(value, str):
                     w.setText(value)
+
                 w.textChanged.connect(self._slot_inputValueChanged)
 
-            elif t == pq.UnitQuantity:
+            elif t is pq.UnitQuantity:
                 w = QuantityChooserWidget(parent=self)
+
                 if value is None:
                     value = pq.dimensionless
+
                 elif isinstance(value, pq.Quantity) and not isinstance(value, pq.UnitQuantity):
                     if len(value.units.dimensionality) == 1:
                         if value == self._default_:
                             self._default_ = self._default_.units.dimensionality[0][0]
-                            # self._value_ = self._value_.units.dimensionality[0][0]
-                        # else:
-                        #     self._value_ = self._value_.units.dimensionality[0][0]
 
                 if isinstance(value, pq.UnitQuantity):
                     w.setValue(value)
@@ -2881,9 +3106,12 @@ class GenericInputWidget(QtWidgets.QFrame):
                 if isinstance(value, t):
                     if value.size == 1:
                         w = QuantitySpinBox(parent=self)
+
                     else:
                         w = ArrayEditorWidget(parent=self)
+
                     w.setValue(value)
+
                 else:
                     w = QuantitySpinBox(parent=self)
 
@@ -2902,11 +3130,12 @@ class GenericInputWidget(QtWidgets.QFrame):
                 w = QtWidgets.QLabel(parent=self)
                 w.setText(f"{value}")
 
-            elif t == dataclasses.MISSING:
+            elif t is dataclasses.MISSING:
                 # FIXME: 2026-04-06 22:10:42
                 # what to do with unsupported types?
                 # currently uses a QLabel with no text, as a placeholder
                 w = QtWidgets.QLabel(parent=self)
+
             else:
                 raise TypeError(f"Unsupported data type {t.__name__}")
 
@@ -2921,13 +3150,14 @@ class GenericInputWidget(QtWidgets.QFrame):
             elif isinstance(w, QtWidgets.QCheckBox):
                 state = w.checkState()
 
-                if self._current_vartype_  == Tribool:
+                if self._current_vartype_  is Tribool:
                     v_ = None if state == QtCore.Qt.PartiallyChecked else True if state == QtCore.Qt.Checked else False
                     self._value_ = Tribool(v_)
 
-                elif self._current_vartype_ == bool:
+                elif self._current_vartype_ is bool:
                     v_ = state == QtCore.Qt.Checked
                     self._value_ = v_
+
             else:
                 self._value_ = w.value()
 

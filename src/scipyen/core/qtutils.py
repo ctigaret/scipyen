@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2025 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -7,91 +6,152 @@ r"""
 See https://pyqt.riverbankcomputing.narkive.com/4Atl8IgU/how-to-detect-if-an-object-has-been-deleted
 solution by Giovanni Bajo
 """
-import sys, os, typing
+import sys, os, typing # noqa
 import datetime
-
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+# import contextlib
+import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
+    QVariantType = object
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+
+    from qtpy import sip  # noqa: I001
+    # from qtpy.uic import loadUiType
+    from QtCore import QVariant
+    QVariantType = QVariant
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
-# import qtpy
-# qtpy.API = os.environ["QT_API"]
-# if os.environ["QT_API"] == "pyside6":
-#     import PySide6
-#     from PySide6 import QtCore, QtGui, QtWidgets, QtSvg
-#     from PySide6.QtCore import Signal, Slot, Property
-# else:
-#     from qtpy import QtCore, QtGui, QtWidgets, QtSvg
-#     from qtpy.QtCore import Signal, Slot, Property
-
-from core.prog import safewrapper
-from core.sysutils import adapt_ui_path
-
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
 
+# NOTE: 2026-07-31 15:10:43
+# QVariant does NOT exist in PySide6
+# In PyQt* QVariant is a bona fide QtCore class i.e. a type (QVariant)
+# with a constructor (``QVariant(...)``)
+
+# I am introducing these "placeholders"  to avoid messing about with
+# the entire Scipyen codebase forever
+
+def qVariants(*args) -> list:
+    r"""In PyQt*, Creates and returns a list of QVariant objects wrapping each element in args.
+    In PySide6 just returns the list of objects in *args"""
+
+    if __has_PySide6__:
+        return list(args)
+    else:
+        return [o if isinstance(o, QVariantType) else QVariantType(o) for o in args]
+        # return list(map(lambda o: o if isinstance(o, QVariantType) else QVariantType(o), args))
+
+def qVariant(obj=None):
+    if __has_PySide6__:
+        return obj
+
+    else:
+        return obj if isinstance(obj, QVariantType) else QVariantType(obj)
+
+def fromQVariant(obj):
+    if __has_PySide6__:
+        return obj
+    else:
+        return obj.value() if isinstance(obj, QVariantType) else obj
+
+def getAssociatedObjects(action: QAction, oType: type = QtWidgets.QWidget) -> list:
+    if __has_PyQt6__ or __has_PySide6__:
+        aao = action.associatedObjects()
+    else:
+        aao = action.associatedWidgets()
+
+    return [o for o in aao if isinstance(o, oType)]
+
 # from qt import *
-import weakref
+# import weakref
 
-class QtRef(weakref.ref):
-    __slots__ = "_callback",
+# class QtRef(weakref.ref):
+#     __slots__ = "_callback",
+#
+#     def __new__(typ, obj, callback=None):
+#         if not isinstance(obj, QtCore.QObject):
+#             wr = weakref.ref.__new__(weakref.ref, obj, callback)
+#             wr.__init__(obj, callback)
+#             return wr
+#         wr = weakref.ref.__new__(typ, obj)
+#         if callback is not None:
+#             wr._callback = lambda: callback(wr)
+#             QtCore.QObject.connect(o, SIGNAL("destroyed()"), wr._callback)
+#             return wr
+#
+#     def __call__(self, *args, **kwargs):
+#         obj = super(qtref, self).__call__(*args, **kwargs)
+#         if obj is None:
+#             return None
+#         try:
+#             obj.parent()
+#         except RuntimeError:
+#             return None
+#         return obj
+#
+#     def __repr__(self):
+#         obj = self()
+#         if obj is not None:
+#             return "<qtweakref at %08X; to '%.50s' at %08X>" % (id(self),
+#         type(obj).__name__, id(obj))
+#         return "<qtweakref at %08X; is dead>" % id(self)
 
-    def __new__(typ, o, callback=None):
-        if not isinstance(o, QObject):
-            wr = weakref.ref.__new__(weakref.ref, o, callback)
-            wr.__init__(o, callback)
-            return wr
-        wr = weakref.ref.__new__(typ, o)
-        if callback is not None:
-            wr._callback = lambda: callback(wr)
-            QObject.connect(o, SIGNAL("destroyed()"), wr._callback)
-            return wr
+class SignalBlocker:
+    r"""Context manager for temporarily blocking Qt signals from Qt objects"""
+    def __init__(self, widgets: QtWidgets.QWidget | typing.Sequence[QtWidgets.QWidget]):
+        self._blockers_ = ()
+        if isinstance(widgets, QtCore.QObject):
+            self._widgets_ = (widgets, )
 
-    def __call__(self, *args, **kwargs):
-        o = super(qtref, self).__call__(*args, **kwargs)
-        if o is None:
-            return None
-        try:
-            o.parent()
-        except RuntimeError:
-            return None
-        return o
+        else:
+            self._widgets_ = tuple(
+                filter(
+                    lambda w: isinstance(w, QtWidgets.QWidget),
+                    widgets
+                    )
+                )
 
-    def __repr__(self):
-        o = self()
-        if o is not None:
-            return "<qtweakref at %08X; to '%.50s' at %08X>" % (id(self),
-        type(o).__name__, id(o))
-        return "<qtweakref at %08X; dead>" % id(self)
-    
+    def __enter__(self):
+        self._blockers_ = tuple(
+            map(  # noqa: C417
+                lambda w: QtCore.QSignalBlocker(w),
+                tuple(
+                    filter(
+                        lambda w: isQObjectAlive(w),
+                        self._widgets_
+                        )
+                    )
+                )
+            )
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._blockers_ = ()
+
 def isQObjectDeleted(obj:QtCore.QObject):
-    import sip
-    
+    if not __has_sip__:
+        return False # fallback
+
     if not isinstance(obj, QtCore.QObject):
         return True
-    
+
     try:
         sip.unwrapinstance(obj)
     except RuntimeError:
@@ -101,22 +161,21 @@ def isQObjectDeleted(obj:QtCore.QObject):
 def isQObjectAlive(obj:QtCore.QObject):
     if not isinstance(obj, QtCore.QObject):
         return False
-    
+
     try:
-        # obj.name()
         obj.parent()
-    except RuntimeError:
+    except (RuntimeError, TypeError):
         return False
-    
+
     return True
 
 def datetime2Qt(d:datetime.datetime)->QtCore.QDateTime:
     from core import utilities
-    
-    timeStamp = utilities.posixUTC(d)
+
+    timeStamp = int(utilities.posixUTC(d))
     return QtCore.QDateTime.fromSecsSinceEpoch(timeStamp) # converts to local time,
 
 def datetimeFromQt(d:QtCore.QDateTime)->datetime.datetime:
     timeStamp = d.toSecsSinceEpoch()
-    return datetime.datetime.fromtimestamp(timeStamp) # converts to local time,
-    
+    return datetime.datetime.fromtimestamp(timeStamp) # converts to local time,  # noqa: DTZ006
+

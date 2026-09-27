@@ -156,7 +156,8 @@ def makeScaledUnitQuantity(quantity:pq.Quantity,
             if power not in prefixes.keys():
                 raise ValueError(f"Power {power} is invalid")
 
-            name = "%s%s" % (power, quantity.units.dimensionality)
+            name = f"{power, quantity.units.dimensionality}" #"%s%s" % (power, quantity.units.dimensionality)
+            # name = "%s%s" % (power, quantity.units.dimensionality)
             if not isinstance(symbol, str) or len(symbol.strip())==0:
                 symbol = "%s%s" % (prefixes[power]["symbol"], quantity.units.dimensionality)
             power = prefixes[power]["exponent"]
@@ -608,7 +609,7 @@ def getBaseUnitQuantities(x:pq.Quantity | pq.UnitQuantity):
                 ret.append(bbase)
     return ret
 
-def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity], /,
+def getUnitFamily(unit: pq.Quantity | pq.UnitQuantity, /,
                   show_components:bool=False,
                   as_string:bool=True,
                   indicate_if_directly_found:bool=False) -> typing.Union[str, list[str]]:
@@ -811,7 +812,7 @@ def getUnitFamily(unit:typing.Union[pq.Quantity, pq.UnitQuantity], /,
 #     return families
 
 
-def familyUnits(family:str, kind:typing.Optional[str]=None) -> set:
+def familyUnits(family: str, kind: str | None = None) -> set:
     """Returns the set of units belonging to a Units Family.
     Parameters:
     ==========
@@ -869,7 +870,6 @@ def quantity2scalar(x:typing.Union[int, float, complex, np.ndarray, pq.Quantity]
             v = x.magnitude
         else:
             v = x[0]
-
 
         if v.dtype.name.startswith("complex"):
             return complex(v)
@@ -1199,7 +1199,7 @@ def quantity2str(x:typing.Union[
                     typing.Sequence[pq.Quantity]
                     ],
                  precision: typing.Optional[typing.Union[int, str]] = "numpy",
-                 format:str="f"):
+                 scientific: bool = False):
     r"""Returns a str representation of a Dimensionality, Quantity, or Quantity sequence.
 
 .. |nbsp| unicode:: 0xA0
@@ -1231,7 +1231,7 @@ Parameters:
     (see ``numpy.get_printoptions``). This precision can also be set during the current session |nbsp|
     by calling ``numpy.set_printoptions``.
 
-:format: format string — single character ("f", "g"); optional; default is "f"
+:scientific: (default False) - onlu used for scalar Quantity objects
 
 .. note::
 
@@ -1265,8 +1265,7 @@ Example 2: Converting a dimensionality:
 """
     from core.datatypes import is_vector
     if isinstance(x, typing.Sequence) and all(isinstance(q, pq.Quantity) for q in x):
-        return ", ".join(list(map(lambda q: quantity2str(q), x)))
-
+        return ", ".join(list(map(lambda q: quantity2str(q, precision), x)))
 
     if not isinstance(x, (pq.Quantity, pq.UnitQuantity, pq.dimensionality.Dimensionality)):
         raise TypeError("Expecting a python Quantity or UnitQuantity; got %s instead" % type(x).__name__)
@@ -1274,23 +1273,59 @@ Example 2: Converting a dimensionality:
     if isinstance(x, pq.dimensionality.Dimensionality):
         return x.string
 
-    return " ".join([np.array2string(x.magnitude), x.units.dimensionality.string])
+    if x.ndim == 0: # scalar i.e., 0-dimensional array
+        if scientific:
+            format_fn = np.format_float_scientific
+        else:
+            format_fn = np.format_float_positional
+
+        if precision is None:
+            return " ".join([
+                format_fn(x.magnitude, unique=True),
+                x.units.dimensionality.string
+                ])
+
+        elif precision == "numpy":
+            return " ".join([
+                format_fn(x.magnitude, unique=False, precision = np.get_printoptions()["precision"]),
+                x.units.dimensionality.string
+                ])
+
+        elif isinstance(precision, int):
+            return " ".join([
+                format_fn(x.magnitude, precision = precision),
+                x.units.dimensionality.string
+                ])
+
+        else:
+            raise TypeError(f"Invalid precision: expecting an int, the string 'numpy' or None; instead, got {type(precision).__name__}")
+
+    else:
+        if precision is None:
+            with np.printoptions(floatmode="unique"):
+                return " ".join([np.array2string(x.magnitude), x.units.dimensionality.string])
+
+        elif precision == "numpy":
+            with np.printoptions(floatmode="fixed"):
+                return " ".join([np.array2string(x.magnitude), x.units.dimensionality.string])
+
+        elif isinstance(precision, int):
+            if precision < 0:
+                raise ValueError("'precision' must be >= 0")
+
+            with np.printoptions(floatmode="fixed", precision=precision):
+                return " ".join([np.array2string(x.magnitude), x.units.dimensionality.string])
+
+        else:
+            raise TypeError(f"Invalid precision: expecting an int, the string 'numpy' or None; instead, got {type(precision).__name__}")
+
+
+
 
     # if x.magnitude.flatten().size != 1:
     #     if not is_vector(x):
     #         raise TypeError(f"Expecting a scalar quantity or a quantity vector; instead, got a quantity of size {x.magnitude.flatten().size} with {x.ndim} dimensions")
 
-    # if precision is None:
-    #     p10 = np.log10(x.magnitude.flatten()).min()
-    #     if p10 < 0:
-    #         precision = abs(int(np.floor(p10)) - 1)
-    #
-    # if not isinstance(precision, int) or precision != "numpy":
-    #     raise TypeError("precision expected to be an int or the string 'numpy'; got %s instead" % type(precision).__name__)
-    #
-    # if isinstance(precision, int):
-    #     if precision <= 0:
-    #         raise ValueError("precision must be strictly positive; got %d instead" % precision)
     #
     #     mag_format = "%d" % precision
     #
@@ -1495,13 +1530,13 @@ def unitFamilyName(u, as_key:bool=False):
         else:
             return f"Compound Quantity {u.dimensionality.string}" if not as_key else "?"
 
-def checkQuantity(x:typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence[numbers.Number]],
-                  name:str,
-                  units:pq.Quantity,
-                  shape:typing.Optional[tuple[int]] = None,
-                  size:typing.Optional[int] = None,
-                  ndim:typing.Optional[int] = None,
-                  dtype:typing.Union[np.dtype, dataclasses.MISSING]=dataclasses.MISSING) -> pq.Quantity:
+def checkQuantity(x: typing.Union[numbers.Number, pq.Quantity, np.ndarray, typing.Sequence[numbers.Number]],
+                  name: str,
+                  units: pq.Quantity,
+                  shape: tuple[int] | None = None,
+                  size: int | None = None,
+                  ndim: int | None = None,
+                  dtype: typing.Union[np.dtype, dataclasses.MISSING]=dataclasses.MISSING) -> pq.Quantity:
     r"""Check validity of an object as a Quantity, or convertibility to a Quantity
 
     Parameters:
@@ -1747,13 +1782,6 @@ def checkDosageUnits(value):
     families = getUnitFamily(value)
 
     return any(f in families for f in acceptable_families)
-
-
-
-    # test if this is a Mass, Volume¹, Concentration, Compound, or Substance unit
-    #
-    # ¹ a dosing based exclusively on volume is theoretically possible, although
-    # impractical
 
 
 def checkTimeUnits(value):

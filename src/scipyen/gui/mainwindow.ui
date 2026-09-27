@@ -29,6 +29,9 @@
   <property name="tabShape">
    <enum>QTabWidget::TabShape::Rounded</enum>
   </property>
+  <property name="unifiedTitleAndToolBarOnMac">
+   <bool>true</bool>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <property name="sizePolicy">
     <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
@@ -148,10 +151,32 @@
      <property name="icon">
       <iconset theme="file-catalog-symbolic"/>
      </property>
+     <widget class="QMenu" name="menuSynchronize_working_directory">
+      <property name="title">
+       <string>Synchronize working directory</string>
+      </property>
+      <property name="icon">
+       <iconset theme="folder-sync"/>
+      </property>
+      <addaction name="separator"/>
+      <addaction name="actionOpeningARecentFileNavigatesToItsDirectory"/>
+      <addaction name="actionSynchronize_working_directory_when_opening_a_dropped_file"/>
+     </widget>
+     <widget class="QMenu" name="menuFileSystemView">
+      <property name="title">
+       <string>File System View</string>
+      </property>
+      <addaction name="actionTreeView"/>
+      <addaction name="actionListView"/>
+      <addaction name="actionIconView"/>
+      <addaction name="actionColumnView"/>
+     </widget>
      <addaction name="actionUse_Native_Menu_Bar"/>
      <addaction name="actionUse_New_Navigator_Look"/>
+     <addaction name="actionTimeDisplayFormat"/>
      <addaction name="actionHide_Filtered_out_File_Names"/>
-     <addaction name="actionOpeningARecentFileNavigatesToItsDirectory"/>
+     <addaction name="menuSynchronize_working_directory"/>
+     <addaction name="menuFileSystemView"/>
     </widget>
     <widget class="QMenu" name="menuAppearance">
      <property name="title">
@@ -488,7 +513,7 @@ Right button click opens context menu with more actions.
 NOTE: you can click anywhere in the row to select</string>
        </property>
        <property name="showDropIndicator" stdset="0">
-        <bool>false</bool>
+        <bool>true</bool>
        </property>
        <property name="dragEnabled">
         <bool>true</bool>
@@ -807,13 +832,13 @@ NOTE: you can click anywhere in the row to select</string>
     <iconset theme="folder"/>
    </property>
    <property name="toolTip">
-    <string>Scipyen's (limited) file system manager</string>
+    <string>Scipyen's file system navigator</string>
    </property>
    <property name="statusTip">
-    <string>Scipyen's (limited) file system manager</string>
+    <string>Scipyen's file system navigator</string>
    </property>
    <property name="whatsThis">
-    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Scipyen's (limited) file system manager. &lt;/p&gt;&lt;p&gt;For access to archive files, including archiving/extracting etc, please use the desktop's own file manager.&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+    <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Scipyen's file system navigator. &lt;/p&gt;&lt;p&gt;For access to archive files, including archiving/extracting etc, please use the desktop's own file manager.&lt;br/&gt;&lt;/p&gt;&lt;p&gt;&lt;br/&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
    </property>
    <property name="features">
     <set>QDockWidget::DockWidgetFeature::DockWidgetFloatable|QDockWidget::DockWidgetFeature::DockWidgetMovable</set>
@@ -825,22 +850,7 @@ NOTE: you can click anywhere in the row to select</string>
     <number>8</number>
    </attribute>
    <widget class="QWidget" name="dockWidgetFileSystemContents">
-    <layout class="QGridLayout" name="gridLayout">
-     <property name="leftMargin">
-      <number>6</number>
-     </property>
-     <property name="topMargin">
-      <number>6</number>
-     </property>
-     <property name="rightMargin">
-      <number>6</number>
-     </property>
-     <property name="bottomMargin">
-      <number>6</number>
-     </property>
-     <property name="spacing">
-      <number>6</number>
-     </property>
+    <layout class="QGridLayout" name="gridLayout_5">
      <item row="0" column="0">
       <layout class="QHBoxLayout" name="horizontalLayout">
        <property name="spacing">
@@ -925,16 +935,16 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QToolButton" name="selDirBtn">
          <property name="toolTip">
-          <string>Select working directory</string>
+          <string>Select working directory or click on down arrow for recent directories</string>
          </property>
          <property name="statusTip">
-          <string>Select working directory</string>
+          <string>Select working directory or click on down arrow for recent directories</string>
          </property>
          <property name="whatsThis">
           <string>Select working directory</string>
          </property>
          <property name="text">
-          <string>&amp;Select working directory</string>
+          <string>&amp;Select Working directory</string>
          </property>
          <property name="icon">
           <iconset theme="document-open-folder"/>
@@ -947,10 +957,10 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QToolButton" name="systemOpenFolderBtn">
          <property name="toolTip">
-          <string>Open current folder in system file manager</string>
+          <string>Open current folder in the system file manager</string>
          </property>
          <property name="statusTip">
-          <string>Open current folder in system file manager</string>
+          <string>Open current folder in the system file manager</string>
          </property>
          <property name="whatsThis">
           <string>Open current folder in system file manager</string>
@@ -969,10 +979,10 @@ NOTE: you can click anywhere in the row to select</string>
        <item>
         <widget class="QToolButton" name="systemOpenParentFolderBtn">
          <property name="toolTip">
-          <string>Opens parent directory of working directory in system file manager</string>
+          <string>Opens parent of working directory in the system file manager</string>
          </property>
          <property name="statusTip">
-          <string>Opens parent directory of working directory in system file manager</string>
+          <string>Opens parent directory of working directory in the system file manager</string>
          </property>
          <property name="whatsThis">
           <string>Opens parent directory of working directory in system file manager</string>
@@ -1027,6 +1037,34 @@ NOTE: you can click anywhere in the row to select</string>
         </spacer>
        </item>
        <item>
+        <widget class="QToolButton" name="fileSystemViewToolButton">
+         <property name="toolTip">
+          <string>Change File System View</string>
+         </property>
+         <property name="statusTip">
+          <string>Change File System View</string>
+         </property>
+         <property name="whatsThis">
+          <string>Change File System View</string>
+         </property>
+         <property name="text">
+          <string>...</string>
+         </property>
+         <property name="icon">
+          <iconset theme="view-multiple-objects"/>
+         </property>
+         <property name="popupMode">
+          <enum>QToolButton::ToolButtonPopupMode::MenuButtonPopup</enum>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+         <property name="arrowType">
+          <enum>Qt::ArrowType::NoArrow</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QToolButton" name="toggleFilesFilterToolBtn">
          <property name="toolTip">
           <string>Toggle filter bar</string>
@@ -1061,95 +1099,134 @@ NOTE: you can click anywhere in the row to select</string>
      </item>
      <item row="2" column="0">
       <layout class="QVBoxLayout" name="verticalLayout">
-       <property name="spacing">
-        <number>3</number>
-       </property>
-       <property name="leftMargin">
-        <number>3</number>
-       </property>
-       <property name="topMargin">
-        <number>3</number>
-       </property>
-       <property name="rightMargin">
-        <number>3</number>
-       </property>
-       <property name="bottomMargin">
-        <number>3</number>
-       </property>
        <item>
-        <widget class="QTreeView" name="fileSystemTreeView">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
-           <horstretch>0</horstretch>
-           <verstretch>1</verstretch>
-          </sizepolicy>
+        <widget class="QStackedWidget" name="fileSystemViewStackedWidget">
+         <property name="currentIndex">
+          <number>0</number>
          </property>
-         <property name="contextMenuPolicy">
-          <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
-         </property>
-         <property name="acceptDrops">
-          <bool>false</bool>
-         </property>
-         <property name="frameShape">
-          <enum>QFrame::Shape::StyledPanel</enum>
-         </property>
-         <property name="frameShadow">
-          <enum>QFrame::Shadow::Sunken</enum>
-         </property>
-         <property name="lineWidth">
-          <number>1</number>
-         </property>
-         <property name="sizeAdjustPolicy">
-          <enum>QAbstractScrollArea::SizeAdjustPolicy::AdjustToContentsOnFirstShow</enum>
-         </property>
-         <property name="editTriggers">
-          <set>QAbstractItemView::EditTrigger::DoubleClicked</set>
-         </property>
-         <property name="tabKeyNavigation">
-          <bool>true</bool>
-         </property>
-         <property name="showDropIndicator" stdset="0">
-          <bool>false</bool>
-         </property>
-         <property name="dragEnabled">
-          <bool>true</bool>
-         </property>
-         <property name="dragDropMode">
-          <enum>QAbstractItemView::DragDropMode::DragOnly</enum>
-         </property>
-         <property name="alternatingRowColors">
-          <bool>true</bool>
-         </property>
-         <property name="selectionMode">
-          <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
-         </property>
-         <property name="selectionBehavior">
-          <enum>QAbstractItemView::SelectionBehavior::SelectItems</enum>
-         </property>
-         <property name="iconSize">
-          <size>
-           <width>16</width>
-           <height>16</height>
-          </size>
-         </property>
-         <property name="uniformRowHeights">
-          <bool>true</bool>
-         </property>
-         <property name="sortingEnabled">
-          <bool>true</bool>
-         </property>
-         <attribute name="headerCascadingSectionResizes">
-          <bool>true</bool>
-         </attribute>
-         <attribute name="headerHighlightSections">
-          <bool>true</bool>
-         </attribute>
-         <attribute name="headerShowSortIndicator" stdset="0">
-          <bool>true</bool>
-         </attribute>
-         <attribute name="headerStretchLastSection">
-          <bool>true</bool>
-         </attribute>
+         <widget class="QWidget" name="fileSystemTreeViewPage">
+          <layout class="QGridLayout" name="gridLayout_4">
+           <item row="0" column="0">
+            <widget class="QTreeView" name="fileSystemTreeView">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+               <horstretch>0</horstretch>
+               <verstretch>1</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="contextMenuPolicy">
+              <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
+             </property>
+             <property name="acceptDrops">
+              <bool>false</bool>
+             </property>
+             <property name="frameShape">
+              <enum>QFrame::Shape::StyledPanel</enum>
+             </property>
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Sunken</enum>
+             </property>
+             <property name="lineWidth">
+              <number>1</number>
+             </property>
+             <property name="sizeAdjustPolicy">
+              <enum>QAbstractScrollArea::SizeAdjustPolicy::AdjustToContentsOnFirstShow</enum>
+             </property>
+             <property name="editTriggers">
+              <set>QAbstractItemView::EditTrigger::NoEditTriggers</set>
+             </property>
+             <property name="tabKeyNavigation">
+              <bool>true</bool>
+             </property>
+             <property name="showDropIndicator" stdset="0">
+              <bool>false</bool>
+             </property>
+             <property name="dragEnabled">
+              <bool>true</bool>
+             </property>
+             <property name="dragDropMode">
+              <enum>QAbstractItemView::DragDropMode::DragOnly</enum>
+             </property>
+             <property name="alternatingRowColors">
+              <bool>true</bool>
+             </property>
+             <property name="selectionMode">
+              <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
+             </property>
+             <property name="selectionBehavior">
+              <enum>QAbstractItemView::SelectionBehavior::SelectItems</enum>
+             </property>
+             <property name="iconSize">
+              <size>
+               <width>16</width>
+               <height>16</height>
+              </size>
+             </property>
+             <property name="uniformRowHeights">
+              <bool>true</bool>
+             </property>
+             <property name="sortingEnabled">
+              <bool>true</bool>
+             </property>
+             <attribute name="headerCascadingSectionResizes">
+              <bool>true</bool>
+             </attribute>
+             <attribute name="headerHighlightSections">
+              <bool>true</bool>
+             </attribute>
+             <attribute name="headerShowSortIndicator" stdset="0">
+              <bool>true</bool>
+             </attribute>
+             <attribute name="headerStretchLastSection">
+              <bool>true</bool>
+             </attribute>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="fileSystemListViewPage">
+          <layout class="QGridLayout" name="gridLayout_3">
+           <item row="0" column="0">
+            <widget class="QListView" name="fileSystemListView">
+             <property name="contextMenuPolicy">
+              <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
+             </property>
+             <property name="editTriggers">
+              <set>QAbstractItemView::EditTrigger::EditKeyPressed</set>
+             </property>
+             <property name="dragDropMode">
+              <enum>QAbstractItemView::DragDropMode::DragOnly</enum>
+             </property>
+             <property name="selectionMode">
+              <enum>QAbstractItemView::SelectionMode::ExtendedSelection</enum>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="fileSystemColumnViewPage">
+          <layout class="QGridLayout" name="gridLayout">
+           <item row="0" column="0">
+            <widget class="QColumnView" name="fileSystemColumnView">
+             <property name="contextMenuPolicy">
+              <enum>Qt::ContextMenuPolicy::CustomContextMenu</enum>
+             </property>
+             <property name="editTriggers">
+              <set>QAbstractItemView::EditTrigger::EditKeyPressed</set>
+             </property>
+             <property name="dragEnabled">
+              <bool>true</bool>
+             </property>
+             <property name="dragDropMode">
+              <enum>QAbstractItemView::DragDropMode::DragOnly</enum>
+             </property>
+             <property name="selectionBehavior">
+              <enum>QAbstractItemView::SelectionBehavior::SelectItems</enum>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
         </widget>
        </item>
        <item>
@@ -1906,7 +1983,7 @@ NOTE: you can click anywhere in the row to select</string>
     <iconset theme="dirsync"/>
    </property>
    <property name="text">
-    <string>Synchronize working directory when opening a recent file</string>
+    <string>When opening a recent file</string>
    </property>
    <property name="toolTip">
     <string>Check this to enable navigating to the directory of a recent file uppon opening it successfully</string>
@@ -1924,6 +2001,92 @@ NOTE: you can click anywhere in the row to select</string>
    </property>
    <property name="text">
     <string>Show Last Command Search at Startup</string>
+   </property>
+  </action>
+  <action name="actionSynchronize_working_directory_when_opening_a_dropped_file">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="folder-sync"/>
+   </property>
+   <property name="text">
+    <string>When opening a dropped file</string>
+   </property>
+  </action>
+  <action name="actionStandard">
+   <property name="checkable">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Standard</string>
+   </property>
+  </action>
+  <action name="actionNarrow">
+   <property name="text">
+    <string>Narrow</string>
+   </property>
+  </action>
+  <action name="actionShort">
+   <property name="text">
+    <string>Short</string>
+   </property>
+  </action>
+  <action name="actionLong">
+   <property name="text">
+    <string>Long</string>
+   </property>
+  </action>
+  <action name="actionTimeDisplayFormat">
+   <property name="icon">
+    <iconset theme="accept_time_event"/>
+   </property>
+   <property name="text">
+    <string>Time Display Format</string>
+   </property>
+  </action>
+  <action name="actionTreeView">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="view-list-tree"/>
+   </property>
+   <property name="text">
+    <string>Tree View</string>
+   </property>
+  </action>
+  <action name="actionListView">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="view-list-details"/>
+   </property>
+   <property name="text">
+    <string>List View</string>
+   </property>
+  </action>
+  <action name="actionIconView">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="view-list-icons"/>
+   </property>
+   <property name="text">
+    <string>Icon View</string>
+   </property>
+  </action>
+  <action name="actionColumnView">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="icon">
+    <iconset theme="object-columns"/>
+   </property>
+   <property name="text">
+    <string>Column View</string>
    </property>
   </action>
  </widget>

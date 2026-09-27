@@ -1,4 +1,5 @@
-# -*- coding: utf-8 -*-
+# __scipyen_plugin__
+# $Id: signalviewer.py $
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -78,7 +79,7 @@ quantities (for python 3)
 mpldatacursor (for python 3)
 
 '''
-
+#### BEGIN
 # TODO: 2025-05-02 14:20:33
 # • when viewing a neo object:
 #   ∘ hide the frame navigation ui when viewing:
@@ -110,6 +111,7 @@ mpldatacursor (for python 3)
 # should assume a notional signal domain "start" at 0 (i.e., treat the landmarks
 # as if "relative" was False, in such cases).
 #
+#### END
 
 
 #### BEGIN core python modules
@@ -117,7 +119,6 @@ mpldatacursor (for python 3)
 
 # NOTE: 2022-12-25 23:08:51
 # needed for the new plugins framework
-__scipyen_plugin__ = None
 
 # from pprint import pprint
 
@@ -138,7 +139,7 @@ from tribool import Tribool
 #### END core python modules
 
 #### BEGIN 3rd party modules
-import qtpy
+# import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
@@ -170,7 +171,7 @@ else:
 import numpy as np
 import pandas as pd
 from pandas import NA
-# import pyqtgraph as pg
+# import pyqtgraph as pg # see core.pyqtgraph_patch
 import quantities as pq
 import matplotlib as mpl
 from matplotlib import pyplot as plt
@@ -201,7 +202,7 @@ from iolib import pictio as pio
 #### BEGIN pict.core modules
 import core.signalprocessing as sgp
 from core import (xmlutils, strutils, svgutils)
-import core.neoutils as neoutils
+from core import neoutils
 import core.scipyen_quantities as scq
 from core.neoutils import (get_domain_name,
                            get_non_empty_spike_trains,
@@ -216,7 +217,8 @@ from core.neoutils import (get_domain_name,
 # NOTE: when needed, call neoutils.normalized_index
 # from core.neoutils import normalized_index as normalized_index_neo
 
-from core.prog import (safewrapper, show_caller_stack, with_doc, scipywarn, timefunc)
+from core.prog import (safewrapper, show_caller_stack, with_doc, scipywarn,
+                       timefunc, timemethod)
 from core.datatypes import (array_slice, is_column_vector, is_vector, )
 
 from core.utilities import (normalized_index, normalized_axis_index,
@@ -239,7 +241,7 @@ from core.sysutils import adapt_ui_path
 from imaging.vigrautils import kernel2array
 from core import scipyen_quantities as scq
 
-from ephys import ephys as ephys
+from ephys import ephys
 # from ephys.ephys import cursors2epoch
 
 #from core.patchneo import *
@@ -247,15 +249,16 @@ from ephys import ephys as ephys
 #### BEGIN gui modules
 #from . import imageviewer as iv
 from core.pyqtgraph_patch import pyqtgraph as pg
-from gui import guiutils as guiutils
+from core import qtutils
+from gui import guiutils
 from gui import pictgui as pgui
 from gui import quickdialog as qd
 from gui import scipyen_colormaps as colormaps
 
 from gui.scipyenviewer import (ScipyenFrameViewer,Bunch)
 # from gui.dataviewer import (InteractiveTreeWidget, DataViewer,)
-from gui.datatreeviewer import DataTreeViewer
-from gui.widgets.datatreeview import DataTreeView
+from gui.objectinspector import ObjectInspector
+from gui import cursors as guicursors
 from gui.cursors import (DataCursor, SignalCursor, SignalCursorTypes, cursors2epoch)
 from gui.widgets.colorwidgets import ColorSelectionWidget, quickColorDialog
 from gui.pictgui import (GuiWorker, WorkerThread)
@@ -293,10 +296,13 @@ DEPRECATED here, but keep for reference
 """
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-__ui_path__ = adapt_ui_path(__module_path__,'signalviewer.ui')
 
-# Ui_SignalViewerWindow, QMainWindow = loadUiType(os.path.join(__module_path__,'signalviewer.ui'))
-Ui_SignalViewerWindow, QMainWindow = loadUiType(__ui_path__)
+try:
+    from gui.signalviewer_ui import Ui_SignalViewerWindow
+
+except:
+    __ui_path__ = adapt_ui_path(__module_path__,'signalviewer.ui')
+    Ui_SignalViewerWindow, QMainWindow = loadUiType(__ui_path__)
 
 class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     r""" A plotter for multi-sweep signals ("frames" or "segments"), with cursors.
@@ -423,19 +429,6 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
        ChannelIndex, Unit -- see the documentation of neo package
 
 
-    CHANGELOG
-    =========
-    NOTE: 2025-07-14 21:52:45 to developers
-    Since the plotItems are pg.PlotItem objects thatinherit from Qt QGraphicsItem,
-    we can store user-specific data to these as a mapping key:int ↦ object
-    In sSignalViewer I use this mechanism to store python quantities associated
-    with the plotted data (e.g., time units and signal.units for analog signals, etc)
-    as follows:
-    key 0 ↦ domain (e.g. time) units of the plotted data or None
-    key 1 ↦ data units or None
-    NOTE: 2019-02-11 13:52:30
-    heavily based on pyqtgraph package
-
     TODO: ability to use the modifiable LinearRegionItem objects to edit epochs
     in neo.Segment data (if / when plotted)
 
@@ -444,47 +437,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     TODO: write the documentation
 
     """
-    # NOTE: 2023-01-01 15:29:48
-    # Radical API change:
-    #
-    # • Current approach using dynamically created PlotItems (and deleting them
-    #   wich each data frame) does not quite cut it, because of issues with
-    #   delected C++ pointer (PlotItem instance) and with managing cursors linked
-    #   to that PlotItem instance.
-    #
-    # • Instead, we need need to pre-determine the maximum number of PlotItems
-    #   based on the data type  - delegate to _parse_data_
-    #   Axis selection form the GUI should then only set which PlotItem is visible
-    #
-    #
-    # • The number of axes should be set as follows:
-    #
-    #   ∘ for neo.Block: the maximum number of signals in all sweeps (analog AND
-    #       irregular) + 2 (one axis for events, one for spike trains)
-    #
-    #   ∘ for a neo.Segment: the number of signals (analog + irregular)
-    #       PLUS one axis for spike trains + 2 (see above)
-    #
-    #   ∘ for a sequence of Segments  - treat as for Block
-    #
-    #   ∘ for a sequence of signals (analog or irregular): the number of axes is
-    #       the number of signals in the sequence, or 1 (one) is signals are to
-    #       be shown as separate frames
-    #
-    #   ∘ for numpy arrays: number of axes is determined by the signalChannelAxis
-    #       and frameAxis
-    #
-    #   ∘ for a sequence of numpy arrays: determined according to the signalChannelAxis
-    #
-    #   ∘ for a sequence of DataZone, DataMarker, events, epochs, spiketrains:
-    #       one axis for eech of this type, per frame
-
-
-
-
     #dockedWidgetsNames = ["cursorsDockWidget"]
 
-    sig_activated = Signal(int, name="sig_activated")
+    # sig_activated = Signal(name="sig_activated")
+    # sig_activated = Signal(int, name="sig_activated")
     sig_plot = Signal(dict, name="sig_plot")
     sig_newEpochInData = Signal(name="sig_newEpochInData")
     sig_axisActivated = Signal(int, name="sig_axisActivated")
@@ -496,33 +452,31 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     # TODO: 2019-11-01 22:43:50
     # implement viewing for all these
-    viewer_for_types = {neo.Block: 99,
-                        neo.Segment: 99,
-                        neo.AnalogSignal: 99,
-                        DataSignal: 99,
-                        neo.IrregularlySampledSignal: 99,
-                        IrregularlySampledDataSignal: 99,
-                        neo.SpikeTrain: 99,
-                        neo.Event: 99,
-                        neo.Epoch: 99,
-                        neo.core.spiketrainlist.SpikeTrainList:99,
+    viewer_for_types = {neo.Block: 100,
+                        neo.Segment: 100,
+                        neo.AnalogSignal: 100,
+                        DataSignal: 100,
+                        neo.IrregularlySampledSignal: 100,
+                        IrregularlySampledDataSignal: 100,
+                        neo.SpikeTrain: 100,
+                        neo.Event: 100,
+                        neo.Epoch: 100,
+                        neo.core.spiketrainlist.SpikeTrainList:100,
                         # neo.core.baseneo.BaseNeo: 99,
                         TriggerEvent: 99,
                         TriggerProtocol: 99,
                         vigra.filters.Kernel1D: 99,
                         pq.Quantity: 99,
-                        np.ndarray: 99,
+                        np.ndarray: 90,
                         tuple: 99,
                         list: 99}
-
-    # view_action_name = "Signal"
 
     defaultCursorWindowSizeX = 0.001
     defaultCursorWindowSizeY = 0.001
 
     defaultCursorLabelPrecision = SignalCursor.default_precision
-
     defaultCursorsShowValue = False
+
     defaultXAxesLinked = False
     defaultXGrid = False
     defaultYGrid = False
@@ -530,10 +484,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     mpl_prop_cycle = plt.rcParams['axes.prop_cycle']
 
-    defaultLineColorsList = ["#000000"] + ["blue", "red", "green", "cyan", "magenta", "yellow"]  + mpl_prop_cycle.by_key()['color']
-    #defaultLineColorsList = ["#000000"] + list((QtGui.QColor(c).name(QtGui.QColor.HexArgb) for c in ("blue", "red", "green", "cyan", "magenta", "yellow")))  + mpl_prop_cycle.by_key()['color']
+    defaultLineColorsList = ["#000000"] + [
+        "blue", "red", "green",
+        "cyan", "magenta", "yellow"] + mpl_prop_cycle.by_key()['color']
 
-    defaultOverlaidLineColorList = (mpl.colors.rgb2hex(mpl.colors.to_rgba(c, alpha=0.5)) for c in defaultLineColorsList)
+    defaultOverlaidLineColors = (mpl.colors.rgb2hex(mpl.colors.to_rgba(c, alpha=0.5)) for c in defaultLineColorsList)
 
     defaultSpikeColor    = mpl.colors.rgb2hex(mpl.colors.to_rgba("xkcd:navy"))
     defaultEventColor    = mpl.colors.rgb2hex(mpl.colors.to_rgba("xkcd:crimson"))
@@ -552,15 +507,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     default_antialias = True
 
-    defaultCursorLineStyle = QtCore.Qt.DashLine
-    defaultSelectedCursorLineStyle = QtCore.Qt.SolidLine
-
-    defaultCursorColors = Bunch({"crosshair":"#C173B088", "horizontal":"#B1D28F88", "vertical":"#ff007f88"})
-    defaultLinkedCursorColors = Bunch({"crosshair":QtGui.QColor(defaultCursorColors["crosshair"]).darker().name(QtGui.QColor.HexArgb),
-                                       "horizontal":QtGui.QColor(defaultCursorColors["horizontal"]).darker().name(QtGui.QColor.HexArgb),
-                                       "vertical":QtGui.QColor(defaultCursorColors["vertical"]).darker().name(QtGui.QColor.HexArgb)})
-
-    defaultCursorHoverColor = "red"
+    defaultCursorLineStyle = guicursors.DefaultCursorLineStyle
+    defaultSelectedCursorLineStyle = guicursors.DefaultSelectedCursorLineStyle
+    defaultCursorColors = guicursors.DefaultCursorColors
+    defaultLinkedCursorColors = guicursors.DefaultLinkedCursorColors
+    defaultCursorHoverColor = guicursors.DefaultCursorHoverColor
 
     defaultLeftAxisLabelSpace = 40
 
@@ -589,7 +540,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         """
         # print(f"{self.__class__.__name__}.__init__: parent is {type(parent)}")
         # super(QtWidgets.QMainWindow, self).__init__(parent=parent)
-
+        super(Ui_SignalViewerWindow, self).__init__()
         self.threadpool = QtCore.QThreadPool()
 
         self._axesColumn_ = 0
@@ -656,6 +607,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._selectedCursorLineStyle_ = self.defaultSelectedCursorLineStyle
 
         self._data_cursors_ = collections.ChainMap(self._crosshairSignalCursors_, self._horizontalSignalCursors_, self._verticalSignalCursors_)
+
+        # ### BEGIN About cached cursors
         # maps signal name with list of cursors
         # NOTE: 2019-03-08 13:20:50
         # map plot item index (int) with list of cursors
@@ -733,7 +686,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #   after a cycle of changes in the plot items layout as above...
         #
         #
-
+        # ### END   About cached cursors
         self._cached_cursors_ = dict()
 
         # NOTE: 2023-01-01 22:56:20 see NOTE: 2023-01-01 22:48:10 point (1) above
@@ -749,6 +702,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         self._events_axis_ = None
         self._default_events_axis_name_ = "Events"
+
+        self._curve_overlays_ = dict()
 
         self._target_overlays_ = dict()
 
@@ -842,12 +797,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # also, there is no mention of "hoverBrush" or "hoverPen" anywhere in the
         # source code for LinearRegionItem or its superclass UIGraphicsItem
         # in fact, hovering just modifes the brush by doubling its alpha value
-        self.epoch_plot_options["epoch_pen"] = None
-        self.epoch_plot_options["epoch_brush"] = None
+        #
+        self.epoch_plot_options["epoch_pen"] = None   # use the pg default
+        self.epoch_plot_options["epoch_brush"] = None # use the pg default
 
         # for future use, maybe (see NOTE: 2019-04-28 18:03:20)
-        self.epoch_plot_options["epoch_hoverPen"] = None
-        self.epoch_plot_options["epoch_hoverBrush"] = None
+        self.epoch_plot_options["epoch_hoverPen"] = None # use the pg default
+        self.epoch_plot_options["epoch_hoverBrush"] = None # use the pg default
 
         self.epoch_plot_options["epochs_color_set"] = [(255, 0, 0, 50),
                                                        (0, 255, 0, 50),
@@ -890,6 +846,11 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self._hovered_plot_item_ = None
         self._selected_plot_item_ = None
         self._selected_plot_item_index_ = -1
+
+        # NOTE: 2026-08-21 15:58:09
+        # see NOTE: 2025-07-14 21:49:57
+        # allow me to do something with it (e.g. change its symbol, etc)
+        self._selected_plot_data_item_ = None
         #### END plot items management
 
         self._mouse_coordinates_text_ = ""
@@ -1065,6 +1026,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionCrosshair_Cursor.triggered.connect(self.slot_TBAddCrosshairCursor)
         self.actionHorizontal_Cursor.triggered.connect(self.slot_TBAddHorizontalCursor)
         self.actionRemove_Cursor.triggered.connect(self.slot_TBRemoveCursor)
+        self.actionRemove_All_Cursors.triggered.connect(self.slot_TBRemoveAllCursors)
 
         # NOTE: 2024-09-18 10:43:04
         # useful for LTP analysis, etc
@@ -1236,7 +1198,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.annotationsViewer.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.annotationsViewer.setDragDropMode(QtWidgets.QAbstractItemView.DragOnly)
         self.annotationsViewer.setDragEnabled(True)
-        # self.annotationsViewer.setSupportedDataTypes(tuple(DataTreeViewer.viewer_for_types))
+        # self.annotationsViewer.setSupportedDataTypes(tuple(ObjectInspector.viewer_for_types))
         #### END set up annotations dock widget
 
         #### BEGIN set up coordinates dock widget - defined in the UI file
@@ -1265,8 +1227,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         self.actionDetect_Triggers.setEnabled(False)
         self.actionRemoveTriggers.triggered.connect(self.slot_removeTriggers)
         self.actionRemoveTriggers.setEnabled(False)
-        # self.actionRemoveAllEvents.triggered.connect(self.slot_removeAllEvents)
-        # self.actionRemoveAllEvents.setEnabled(False)
+        self.actionRemoveAllEvents.triggered.connect(self.slot_removeAllEvents)
+        self.actionRemoveAllEvents.setEnabled(False)
 
         self.actionRefresh.triggered.connect(self.slot_refreshDataDisplay)
 
@@ -1521,8 +1483,8 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
     @enableAutoRangeAllAxesByDefault.setter
     def enableAutoRangeAllAxesByDefault(self, value: bool):
         enabled = value is True
-        signalBlocker = QtCore.QSignalBlocker(self.actionEnable_Auto_Range)
-        self.actionEnable_Auto_Range.setChecked(enabled)
+        with qtutils.SignalBlocker(self.actionEnable_Auto_Range):
+            self.actionEnable_Auto_Range.setChecked(enabled)
 
         self._enableAutoRangeAllAxesByDefault_ = enabled
 
@@ -1695,7 +1657,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     @cursorColors.setter
     def cursorColors(self, val:dict):
-        if isinstance(val, dict) and all((s in val for s in ("crosshair", "horizontal", "vertical"))):
+        if isinstance(val, dict) and all(s in val for s in ("crosshair", "horizontal", "vertical")):
             self.crosshairCursorColor = QtGui.QColor(val["crosshair"]).name(QtGui.QColor.HexArgb)
             self.horizontalCursorColor = QtGui.QColor(val["horizontal"]).name(QtGui.QColor.HexArgb)
             self.verticalCursorColor = QtGui.QColor(val["vertical"]).name(QtGui.QColor.HexArgb)
@@ -1733,7 +1695,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
     @linkedCursorColors.setter
     def linkedCursorColors(self, val:dict):
-        if isinstance(val, dict) and all((s in val for s in ("crosshair", "horizontal", "vertical"))):
+        if isinstance(val, dict) and all(s in val for s in ("crosshair", "horizontal", "vertical")):
             self.linkedCrosshairCursorColor = QtGui.QColor(val["crosshair"]).name(QtGui.QColor.HexArgb)
             self.linkedHorizontalCursorColor = QtGui.QColor(val["horizontal"]).name(QtGui.QColor.HexArgb)
             self.linkedVerticalCursorColor = QtGui.QColor(val["vertical"]).name(QtGui.QColor.HexArgb)
@@ -2222,7 +2184,13 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         return ret
 
-    def _make_targetItem(self, data:typing.Union[tuple, list, QtCore.QPointF, QtCore.QPoint, pg.Point], **kwargs):
+    def _make_targetItem(self, data: typing.Union[
+                                                    tuple, list,
+                                                    QtCore.QPointF,
+                                                    QtCore.QPoint,
+                                                    pg.Point
+                                                 ],
+                        **kwargs):
         r"""Generates a pg.TargetItem
         Parameters:
         ==========
@@ -2247,6 +2215,30 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         return pg.TargetItem(data, **kwargs)
 
+    def _make_overlay_plotitem(self, data: typing.Union[
+                                                    neo.AnalogSignal,
+                                                    neo.IrregularlySampledSignal,
+                                                    DataSignal,
+                                                    IrregularlySampledDataSignal,
+                                                    np.ndarray
+                                                    ],
+                                **kwargs):
+        if isinstance(data, (neo.AnalogSignal,
+                             neo.IrregularlySampledSignal,
+                             DataSignal,
+                             IrregularlySampledDataSignal)
+                    ):
+            x = np.atleast_1d(data.times.magnitude).flatten()
+            # xUnits = data.times.units
+            y = np.atleast_1d(data.magnitude).flatten()
+            # yUnits = data.units
+
+        elif isinstance(data, np.ndarray):
+            x = np.arange(np.atleast_1d(data).shape[0])
+            y = np.atleast_1d(data)[:,0]
+
+        return pg.PlotDataItem(x,y, **kwargs)
+
     def _clear_lris_(self):
         for k, ax in enumerate(self.axes):
             lris = [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
@@ -2257,11 +2249,15 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
 
     @safewrapper
-    def _plot_discrete_entities_(self, /, entities: typing.Union[dict, list, neo.core.spiketrainlist.SpikeTrainList],
-                                 axis:pg.PlotItem, clear:bool=True,
-                                 adapt_X_range:bool=True,
-                                 minX:typing.Optional[float]=None,
-                                 maxX:typing.Optional[float]=None,
+    def _plot_discrete_entities_(self, /, entities: typing.Union[
+                                        dict, list,
+                                        neo.core.spiketrainlist.SpikeTrainList
+                                        ],
+                                 axis: pg.PlotItem,
+                                 clear: bool = True,
+                                 adapt_X_range: bool = True,
+                                 minX: typing.Optional[float] = None,
+                                 maxX: typing.Optional[float] = None,
                                  **kwargs):
         r"""For plotting events and spike trains on their own (separate) axis
         Epochs & DataZones are represented as regions between vertical lines
@@ -2415,6 +2411,42 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         except:
             traceback.print_exc()
 
+    def _plot_curve_overlays_(self, entities, axis, clear:bool = False):
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+
+        if axis not in self.signalAxes:
+            return
+
+        if len(entities) == 0:
+            return
+
+        if isinstance(entities, dict):
+            entities_list  = list(entities.values())
+
+        else:
+            entities_list = entities
+
+        if not all(isinstance(entity, pg.PlotDataItem) for entity in entities_list):
+            return
+
+        if clear:
+            self._clear_curves_overlay_(axis, self.frameIndex[self.currentFrame], False)
+
+        dataPlotItems = list(filter(lambda i: (isinstance(i, pg.PlotDataItem)
+                                               and i not in entities_list),
+                                    axis.items)
+                            )
+
+        entityColors = self.defaultLineColorsList[len(dataPlotItems):]
+
+        for k, entity in enumerate(entities_list):
+            if entity not in axis.items:
+                entity.setPen(pg.mkPen(entityColors[k], cosmetic=True, width=2))
+                axis.addItem(entity)
+
+            return
+
+    # @timemethod
     def _clear_targets_overlay_(self, axis):
         r"""Removes the targets overlay from this axis
             Cached targets are left in place
@@ -2426,11 +2458,40 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         #     print(f"\tcaller\t {s.function}")
         # traceback.print_stack(limit=8)
         #### END debug
-        axis, axNdx = self._check_axis_spec_ndx_(axis)
+        # axis, axNdx = self._check_axis_spec_ndx_(axis)
         items = [i for i in axis.items if isinstance(i, pg.TargetItem)]
-        # print(f"{self.windowTitle()} _clear_targets_overlay_ {len(items)} targets")
         for i in items:
             axis.removeItem(i)
+
+    # @timemethod
+    def _clear_curves_overlay_(self, axis, frameNdx: int | None = None,
+                               removeOverlaysFromCache: bool = False):
+        r"""Remove overlaid curves from a specific axis and frame.
+    Optionally also removes the curve overlays from the internal cache.
+    """
+
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+
+        if not isinstance(frameNdx, int) or (frameNdx < 0 or frameNdx >= self.nFrames):
+            cFrame = self.frameIndex[self.currentFrame]
+
+        else:
+            cFrame = frameNdx
+
+        if cFrame not in self._curve_overlays_ or axNdx not in self._curve_overlays_[cFrame]:
+            return
+
+        items = list(filter(lambda i: (isinstance(i, pg.PlotDataItem) and
+                                       i in self._curve_overlays_[cFrame][axNdx]),
+                            axis.items))
+
+        for i in items:
+            axis.removeItem(i)
+
+        if removeOverlaysFromCache:
+            if len(self._curve_overlays_[cFrame][axNdx]):
+                self._curve_overlays_[cFrame][axNdx].clear()
+                self._curve_overlays_[cFrame].pop(axNdx, None)
 
     def _clear_labels_overlay_(self, axis):
         axis, axNdx = self._check_axis_spec_ndx_(axis)
@@ -2466,6 +2527,7 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
 
         return axis, axNdx
 
+    # @timemethod
     def _update_annotations_(self, data=None):
         self.dataAnnotations.clear()
 
@@ -2627,7 +2689,100 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         super().showEvent(evt)
         evt.accept()
 
-    def overlayTargets(self, *args, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None, clear:bool=False, **kwargs):
+    def addCurvesOverlay(self, frameNdx: int,  curves: tuple,
+                        axis:typing.Optional[
+                                                typing.Union[int, pg.PlotItem]
+                                            ]=None,
+                        clear:bool=False, **kwargs):
+        r"""Adds curve overlay without plotting"""
+        if frameNdx < 0 or frameNdx >= self.nFrames:
+            scipywarn(f"{self.__class__.__name__}.addCurvesOverlay: Invalid frame index {frameNdx}")
+            return
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+
+        curveItems = list()
+
+        if isinstance(curves, (neo.AnalogSignal, neo.IrregularlySampledSignal,
+                                   DataSignal, IrregularlySampledDataSignal)):
+            for ch in range(curves.shape[1]):
+                curveItems.append(self._make_overlay_plotitem(curves[:,ch], **kwargs))
+
+        elif isinstance(curves, pg.PlotDataItem):
+            curveItems.append(curves)
+
+        elif isinstance(curve, typing.Sequence):
+            if len(curves) == 0:
+                scipywarn(f"{self.__class__.__name__}.addCurvesOverlay: no curves to overlay!")
+                return
+
+            for kc, item in enumerate(curves):
+                # print(f"overlayTargets target {kc} is a {type(coords)}")
+                if isinstance(item, pg.PlotDataItem):
+                    curveItems.append(item)
+
+                elif isinstance(item, (neo.AnalogSignal, neo.IrregularlySampledSignal,
+                                        DataSignal, IrregularlySampledDataSignal)
+                                ):
+                    for ch in range(item.shape[1]):
+                        curveItems.append(self._make_overlay_plotitem(item[:,ch], **kwargs))
+
+        else:
+            scipywarn(f"{self.__class__.__name__}.addCurvesOverlay: no curves to overlay!")
+            return
+
+        # print(f"{self.__class__.__name__}.addCurvesOverlay: curveItems = {curveItems}")
+
+        if frameNdx not in self._curve_overlays_:
+            self._curve_overlays_[frameNdx] = dict()
+        elif clear:
+            self._clear_curves_overlay_(axNdx, frameNdx, True)
+
+        if axNdx in self._curve_overlays_[frameNdx] and isinstance(self._curve_overlays_[frameNdx][axNdx], list):
+            self._curve_overlays_[frameNdx][axNdx].extend(curveItems)
+        else:
+            self._curve_overlays_[frameNdx][axNdx] = curveItems
+
+    def overlayCurves(self, curves: tuple, axis:typing.Optional[
+                                        typing.Union[int, pg.PlotItem]
+                                        ]=None,
+                     clear:bool=False, **kwargs):
+        r"""Plots curve overlays to the currently displayed frame"""
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+
+        # curveItems = list()
+        #
+        # for kc, item in enumerate(args):
+        #     # print(f"overlayTargets target {kc} is a {type(coords)}")
+        #     if isinstance(item, pg.PlotDataItem):
+        #         curveItems.append(item)
+        #
+        #     elif isinstance(item, (neo.AnalogSignal, neo.IrregularlySampledSignal,
+        #                            DataSignal, IrregularlySampledDataSignal)
+        #                     ):
+        #         for ch in range(item.shape[1]):
+        #             curveItems.append(self._make_overlay_plotitem(item[:,ch], **kwargs))
+
+        # targetItems = [self._make_targetItem(coords, **kwargs) for coords in args]
+
+        cFrame = self.frameIndex[self.currentFrame]
+
+        self.addCurvesOverlay(cFrame, curves, axis=axis, clear=clear)
+
+        # if cFrame not in self._curve_overlays_:
+        #     self._curve_overlays_[cFrame] = dict()
+        #
+        # if axNdx in self._curve_overlays_[cFrame] and isinstance(self._curve_overlays_[cFrame][axNdx], list):
+        #     self._curve_overlays_[cFrame][axNdx].extend(curveItems)
+        # else:
+        #     self._curve_overlays_[cFrame][axNdx] = curveItems
+
+        # print(f"_curve_overlays_ for axis {axNdx} in frame {cFrame}: {len(self._curve_overlays_[cFrame][axNdx])}")
+        self._plot_curve_overlays_(self._curve_overlays_[cFrame][axNdx], axis, clear=clear)
+
+    def overlayTargets(self, *args, axis:typing.Optional[
+                                        typing.Union[int, pg.PlotItem]
+                                        ]=None,
+                       clear:bool=False, **kwargs):
         r"""Overlays "target" glyphs on the given axis, for the current frame.
         Targets are also added to an internal cache.
 
@@ -2690,6 +2845,33 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
         # print(f"_target_overlays_ for axis {axNdx} in frame {cFrame}: {len(self._target_overlays_[cFrame][axNdx])}")
         self._plot_discrete_entities_(self._target_overlays_[cFrame][axNdx], axis, clear=clear)
 
+    def removeCurveOverlays(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None):
+        cFrame = self.frameIndex[self.currentFrame]
+        if axis is None:
+            for axNdx, axis in enumerate(self.axes):
+                if cFrame in self._curve_overlays_:
+                    if isinstance(self._curve_overlays_[cFrame], dict):
+                        if isinstance(self._curve_overlays_[cFrame].get(axNdx, None), (tuple, list)):
+                            self._curve_overlays_[cFrame][axNdx].clear()
+                        else:
+                            self._curve_overlays_[cFrame][axNdx] = list()
+
+                self._clear_curves_overlay_(axis)
+
+
+        else:
+            axis, axNdx = self._check_axis_spec_ndx_(axis)
+
+            if cFrame in self._curve_overlays_:
+                if isinstance(self._curve_overlays_[cFrame], dict):
+                    if isinstance(self._curve_overlays_[cFrame].get(axNdx, None), (tuple, list)):
+                        self._curve_overlays_[cFrame][axNdx].clear()
+                    else:
+                        self._curve_overlays_[cFrame][axNdx] = list()
+
+            # call this just in case we have overlays that escaped the cache mechanism
+            self._clear_curves_overlay_(axis)
+
     def removeTargetsOverlay(self, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None):
         r"""Remove targets overlaid in this axis.
         Target objects are also removed from the internal cache
@@ -2717,13 +2899,9 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                     if isinstance(self._target_overlays_[cFrame].get(axNdx, None), (tuple, list)):
                         self._target_overlays_[cFrame][axNdx].clear()
                     else:
-                        # self._target_overlays_[cFrame].pop(axNdx, None)
                         self._target_overlays_[cFrame][axNdx] = list()
 
-                    # if len(self._target_overlays_[cFrame]) == 0:
-                    #     self._target_overlays_.pop(cFrame)
-
-            # cal this just in case we have overlays that escaped the cache mechanism
+            # call this just in case we have overlays that escaped the cache mechanism
             self._clear_targets_overlay_(axis)
 
     def addLabel(self, text:str, axis:typing.Optional[typing.Union[int, pg.PlotItem]]=None,
@@ -2788,6 +2966,10 @@ class SignalViewer(ScipyenFrameViewer, Ui_SignalViewerWindow):
                 self.removeLegend(axis)
 
         self.refresh()
+
+    def addPage(self, obj):
+        r"""Adds a new data page, or frame, to the displayed data."""
+        self.addDataFrame(obj)
 
     @singledispatchmethod
     def addDataFrame(self, obj):
@@ -2894,7 +3076,7 @@ anything else       anything else       ❌
 
         bk = len(newData)-1
 
-        mIndex = np.array(list(((bk,sk) for sk in range(len(obj.segments)))))
+        mIndex = np.array(list((bk,sk) for sk in range(len(obj.segments))))
 
         new_frame_meta_index = np.recarray((len(obj.segments), 1),
                                             dtype = [('block', int), ('segment', int)])
@@ -3075,7 +3257,7 @@ anything else       anything else       ❌
         # TODO/FIXME 2022-11-16 21:37:13
         # pgmembers = inspect.getmembers(self, lambda x: isinstance(x, (pg.GraphicsItem, pg.GraphicsView, QtWidgets.QWidget)))
 
-        if getattr(self, "_delete_on_close_", False) or getattr(self.appWindow, "autoRemoveViewers", False):
+        if getattr(self, "_delete_on_close_", False) or getattr(self.scipyenWindow, "autoRemoveViewers", False):
             if len(self._signal_axes_):
                 self._signal_axes_.clear()
 
@@ -3086,73 +3268,100 @@ anything else       anything else       ❌
             self._label_overlays_.clear()
             self._spiketrains_axis_ = None
             self._events_axis_ = None
+            self._selected_plot_item_ = None
+            self._selected_plot_data_item_ = None
 
             self._plot_names_.clear()
+            for plotItem in self.axes:
+                # print(f"{self.__class__.__name__}.closEvent calling del {plotItem.vb.name}")
+                try:
+                    try:
+                        plotItem.vb.sigStateChanged.disconnect()
+                    except:
+                        pass
+
+                    try:
+                        plotItem.vb.sigResized.disconnect()
+                    except:
+                        pass
+
+                    plotItem.vb.close()
+                    plotItem.close()
+                    del plotItem
+
+                except:
+                    continue
 
             # self.signalsLayout.clear()
 
         super().closeEvent(evt) # NOTE: 2026-04-12 00:18:02 This is crucial!
         evt.accept()
 
-    def addCursors(self, /, *args, **kwargs):
+    def addCursors(self, /, *args, **kwargs) -> tuple:
         r"""Manually adds a set of cursors to the selected axes in the SignalViewer window.
 
-        Requires at least one Axis object, therefore some data must be plotted first.
+.. |nbsp| unicode:: 0xA0
+   :trim:
 
-        Var-positional parameters (args):
-        =================================
-        Comma-separated coordinates, or numpy array of cursor coordinates:
+Requires at least one ``Axis`` object, therefore some data must be plotted first.
 
-        • for crosshair cursors the coordinates of ONE cursor must be
-            given as (x,y) pair: comma-separated sequence of two-element tuples,
-            of a float 2D numpy array with shape = (N,2) where N is the number
-            of cursors.
+Var-positional parameters (args):
+=================================
+Comma-separated coordinates, or numpy array of cursor coordinates:
 
-        • for vertical and horizontal cursors the coordinates must be
-            given as a comma-separated sequence of floats, or a float numpy array
-            with shape (N,) or (N,1) where N is the number of cursors.
+* for **crosshair** cursors, the coordinates of *each* cursor must be |nbsp|
+    given as ``(x,y)`` pair: comma-separated sequence of two-element tuples, |nbsp|
+    or a 2D numpy array (``float` dtype) with shape ``(N,2)``, where N is the number |nbsp|
+    of cursors.
 
-        • alternatively, each "cursor" above can be specified by DataCursor objects.
+* for **vertical** and **horizontal** cursors the coordinates must be |nbsp|
+    given as a comma-separated sequence of floats, or a 1D numpy array (``float`` dtype) |nbsp|
+    with shape ``(N,)`` or ``(N,1)``,  where N is the number of cursors.
 
-        Var-keyword arguments ("name=value" pairs):
-        ===========================================
-        cursorType: str or SignalCursorsTypes enum value
-                    When a str it should be one of "c", "v", "h", respectively,
-                    for crosshair, vertical, horizontal cursors.
+* alternatively, each "cursor" above can be specified by DataCursor objects.
 
-                    All cursors created with this method will have the same type
+Var-keyword arguments ("name=value" pairs):
+===========================================
+:cursorType: ``str`` or ``SignalCursorTypes`` enum value
+            When a ``str`` it should be one of "c", "v", "h", respectively, |nbsp|
+            for crosshair, vertical, horizontal cursors.
 
-                    Optional, default is "c".
+            All cursors created with this method will have the same type.
 
-        xwindow = 1D sequence of floats with the horizontal extent of the cursor window
-            (for crosshair and vertical cursors); must have as many elements as
-            coordinates supplied in the *where argument
+            Optional, default is "v".
 
-        ywindow   = as above, for crosshair and horizontal cursors
+:xwindow: 1D sequence of ``float`` scalars with the horizontal extent of the cursor window |nbsp|
+    (for crosshair and vertical cursors); must have as many elements as |nbsp|
+    coordinates supplied in the ``*where`` parameter.
 
-        labels    = 1D sequence of str for cursor IDs; must have as many
-            elements as supplied through the *where argument
-            NOTE: the display of cursor values is controlled by
-            self.setCursorsShowValue property (and its checkbox in the settings
-            menu).`
+:ywindow: As above, for crosshair and horizontal cursors
 
-        axis: int, or str, pyqtgraph.PlotItem, or None (default)
-            ∘   When an int this is a valid axis index in the current instance
-                of ScipyenViewer (from top to bottom, 0 -> number of axes - 1)
+:labels: 1D sequence of ``str`` for cursor IDs; must have as many elements as supplied |nbsp|
+    in the ``*where`` parameter.
 
-            ∘   When a str, this can only be "all" or "a", meaning that the new
-                cursors will span all axes (multi-axis cursors)
+    .. note::
+        The display of cursor values is controlled by the ``setCursorsShowValue`` |nbsp|
+        property (and its checkbox in the settings menu).
 
-            ∘   When None (default) the cursors will be created in the axis that
-                is currently selected, or axis 0 is no axis is selected.
+:axis: ``int``, or ``str``, ``pyqtgraph.PlotItem``, or ``None`` (default)
+    ∘   When an ``int`` this is a valid axis index in the current instance
+        of ScipyenViewer (from top to bottom, 0 -> number of axes - 1)
 
-        """
+    ∘   When a ``str``, this can only be "all" or "a", meaning that the new
+        cursors will span all axes (**multi-axis** cursors)
+
+    ∘   When ``None`` (default) the cursors will be created in the axis that
+        is currently selected, or axis 0 is no axis is selected.
+
+"""
         xwindow = kwargs.pop("xwindow", self.defaultCursorWindowSizeX)
         ywindow = kwargs.pop("ywindow", self.defaultCursorWindowSizeY)
         labels  = kwargs.pop("labels",  None)
         axis    = kwargs.pop("axis",    None)
 
         showEditor = kwargs.pop("editFirst", False)
+
+        ret = list()
 
         if len(self.plotItems) == 0:
             axis = self.signalsLayout.scene()
@@ -3206,7 +3415,7 @@ anything else       anything else       ❌
         cursorType = kwargs.pop("cursorType", None)
 
         if cursorType is None:
-            cursorType = kwargs.pop("type", "c")
+            cursorType = kwargs.pop("type", "v")
 
         if isinstance(cursorType, str):
             if cursorType.lower() in ("h", "horiz", "horizontal"):
@@ -3222,39 +3431,61 @@ anything else       anything else       ❌
         elif not isinstance(cursorType, SignalCursorTypes):
             raise TypeError(f"Expecting cursorType a str or a gui.cursors.SignalCursorTypes object; instead, got {type(cursorType).__name__}")
 
-
         if len(args) == 0: # no coordinates given
             x = y = None
 
         elif len(args) == 1: # a single object passed - figure it out
             if isinstance(args[0], np.ndarray):
-                self._use_coords_sequence_(args[0], xwindow, ywindow, labels, axis, cursorType)
-                return
+                return self._use_coords_sequence_(args[0], xwindow, ywindow, labels, axis, cursorType)
 
             elif isinstance(args[0], (tuple, list)):
                 x, y = self._addCursors_parse_coords_(args[0], cursorType)
 
             elif isinstance(args[0], DataCursor):
-                self.addCursor(cursorType, args[0])
+                return (self.addCursor(cursorType, args[0]), )
 
         elif isinstance(args, (tuple, list)):
             if all(isinstance(a, numbers.Number) for a in args):
-                self._use_coords_sequence_(args, xwindow, ywindow, labels, axis, cursorType)
-                return
+                return self._use_coords_sequence_(args, xwindow, ywindow, labels, axis, cursorType)
 
             elif all(isinstance(a, DataCursor) for a in args):
                 if len(args) > 2:
                     raise SyntaxError(f"Too many DataCursor objects passed: expecting at most two, got {len(args)}")
 
-
-
-        self.addCursor(cursorType=cursorType, x=x, y=y,
+        ret = (self.addCursor(cursorType=cursorType, x=x, y=y,
                        xwindow=xwindow, ywindow=ywindow,
                        label=labels,
                        show_value = self.setCursorsShowValue.isChecked(),
                        axis = axis,
-                       editFirst = showEditor)
+                       editFirst = showEditor), )
 
+        return ret
+
+    def addVerticalSignalCursorFromDataCursor(self, c: DataCursor,
+                                label: typing.Optional[
+                                    typing.Union[int, str, pg.PlotItem]
+                                    ] = None,
+                                name: typing.Optional[
+                                    typing.Union[int, str, pg.PlotItem]
+                                    ] = None,
+                                follows_mouse: bool = False,
+                                axis: typing.Optional[int] = None,
+                                editFirst: bool=False,
+                                **kwargs) -> str:
+
+        assert(isinstance(c, DataCursor)), f"Expecting a DataCursor; instead, got a {type(c).__name__}"
+
+        if label is None:
+            if isinstance(c.name, str) and len(c.name.strip()) > 0:
+                label = c.name
+
+        if name is None:
+            if isinstance(c.name, str) and len(c.name.strip()) > 0:
+                name = c.name
+
+        return self.addCursor(cursorType = SignalCursorTypes.vertical,
+                       x = c.coord, xwindow = c.span,
+                       name = name, relative=True)
 
     def addCursor(self, cursorType: typing.Optional[typing.Union[str, SignalCursorTypes]] = None,
                   x: typing.Optional[typing.Union[numbers.Number, DataCursor]] = None,
@@ -3268,87 +3499,94 @@ anything else       anything else       ❌
                   follows_mouse: bool = False,
                   axis: typing.Optional[int] = None,
                   editFirst: bool=False,
-                  **kwargs):
+                  **kwargs) -> str:
         r""" Add a cursor to the selected axes in the signal viewer window.
 
-        When no data has been plotted, the cursor is created in the scene.
+When no data has been plotted, the cursor is created in the scene.
 
-        Parameters:
-        ------------
-        cursorType: str, one of "c", "v" or "h" respectively, for
-                    crosshair, vertical or horizontal cursors; default is "c"
+Parameters:
+------------
+cursorType: str, one of "c", "v" or "h" respectively, for
+            crosshair, vertical or horizontal cursors; default is "c"
 
-        x: None, float (cursor's horizontal coordinate in axis units) or a DataCursor.
-                When None, the cursor will be placed in the middle of the X range
-                of the selected axis.
+x: None, float (cursor's horizontal coordinate in axis units) or a DataCursor.
+        When None, the cursor will be placed in the middle of the X range
+        of the selected axis.
 
-        y: None, float (cursor's vertical coordinate in axis unitss), or a DataCursor.
-                When None, the cursor will be placed in the middle of the Y range
-                of the selected axis
+x can also be a DataCursor -> vertical or horizontal cursor
 
-        xwindow: None or float with the horizontal size of the cursor window;
-                    this is ignored for horizontal cursors
+y: None, float (cursor's vertical coordinate in axis unitss), or a DataCursor.
+        When None, the cursor will be placed in the middle of the Y range
+        of the selected axis
 
-        ywindow: as xwindow; ignored for vertical cursors
+xwindow: None or float with the horizontal size of the cursor window;
+            this is ignored for horizontal cursors
 
-        xBounds, yBounds: limits for the cursor's position, respectively in the
-            X and Y ranges of the selected axis.
+ywindow: as xwindow; ignored for vertical cursors
 
-        label: None, or a str; is None, the cursor will be assigned an ID
-                    composed of "c", "v", or "h", followed by the current cursor
-                    number of the same type.
+xBounds, yBounds: limits for the cursor's position, respectively in the
+    X and Y ranges of the selected axis.
 
-        name: same as label (for backward compatibility in old API)
+label: None, or a str; is None, the cursor will be assigned an ID
+            composed of "c", "v", or "h", followed by the current cursor
+            number of the same type.
 
-        follows_mouse: bool default False. When True, the cursor will follow
-            the mouse position in the axis
+name: same as label (for backward compatibility in old API)
 
-        axis: None (default), int, the str "all" or "a" (case-insensitive), or
-            a pyqtgraph.PlotItem object.
+follows_mouse: bool default False. When True, the cursor will follow
+    the mouse position in the axis
 
-            Indicates the axis (or PlotItem) where the cursor will be created.
+axis: None (default), int, the str "all" or "a" (case-insensitive), or
+    a pyqtgraph.PlotItem object.
 
-            When there are no axes yet the cursor will be created by default in
-            the scene, and wil behave like a multi-axis cursor.
-            WARNING the coordinates won't make much sense unless in this case,
-            unless they are given in the scene coordinates.
+    Indicates the axis (or PlotItem) where the cursor will be created.
 
-            None (the default) indicates that the cursor will be created in
-            the selected axis (which by default is the top axis at index 0).
+    When there are no axes yet the cursor will be created by default in
+    the scene, and wil behave like a multi-axis cursor.
+    WARNING the coordinates won't make much sense unless in this case,
+    unless they are given in the scene coordinates.
 
-            Axis "a" or "all" indicates a cursor that spans all axes
-            (multi-axis cursor).
+    None (the default) indicates that the cursor will be created in
+    the selected axis (which by default is the top axis at index 0).
 
-            When "axis" is a pyqtgraph.PlotItem, it must be one of the axes
-            that belong to this instance of SignalViewer.
+    Axis "a" or "all" indicates a cursor that spans all axes
+    (multi-axis cursor).
 
-        editFirst:bool, default False; When True, the user will be prompted with
-            the CursorEditor dialog to edit the cursor's parameter (e.g., name,
-            coordinates)
+    When "axis" is a pyqtgraph.PlotItem, it must be one of the axes
+    that belong to this instance of SignalViewer.
 
-        Var-keyword parameters (**kwargs):
-        ----------------------------------
+editFirst:bool, default False; When True, the user will be prompted with
+    the CursorEditor dialog to edit the cursor's parameter (e.g., name,
+    coordinates)
 
-        show_value: bool. When True, the cursor's coordinate(s) will be shown
-            next to its label; by default, this is set in SignalViewer's "Cursors"
-            menu
+Var-keyword parameters (**kwargs):
+----------------------------------
 
-        precison: int; the precision of the displayed coordinate (i.e. number of
-            digits after the decimal point); by default, this is set in SignalViewer's "Cursors"
-            menu
+show_value: bool. When True, the cursor's coordinate(s) will be shown
+    next to its label; by default, this is set in SignalViewer's "Cursors"
+    menu
 
-        relative: bool, default is True.
-            When True, the cursor's horizontal coordinate will be adjusted
-            relative to the minimum of the axis X range (ths is necessary for a
-            given cursor to 'stay' in axis across, e.g., successive segments of
-            a neo.Block).
+precison: int; the precision of the displayed coordinate (i.e. number of
+    digits after the decimal point); by default, this is set in SignalViewer's "Cursors"
+    menu
 
-            When False, whenever the axis X domain changes, the cursor may become
-            invisible, or plotted at one of the axis X domain end (dependng on its
-            xBounds).
+relative: bool, default is True.
+    When True, the cursor's horizontal coordinate will be adjusted
+    relative to the minimum of the axis X range (ths is necessary for a
+    given cursor to 'stay' in axis across, e.g., successive segments of
+    a neo.Block).
 
-        label_position: float, default is 0.5; the initial position of the cursor's
-            label, as a fraction of the cursor's line extent
+    When False, whenever the axis X domain changes, the cursor may become
+    invisible, or plotted at one of the axis X domain end (dependng on its
+    xBounds).
+
+label_position: float, default is 0.5; the initial position of the cursor's
+    label, as a fraction of the cursor's line extent
+
+Returns:
+--------
+The ID of the newly created SignalCursor
+
 
         """
         # NOTE: 2020-02-26 14:23:40
@@ -3370,6 +3608,8 @@ anything else       anything else       ❌
 
         self.slot_selectCursor(crsID)
 
+        return crsID
+
     @safewrapper
     def keyPressEvent(self, keyevt):
         if keyevt.key() in (QtCore.Qt.Key_Escape, QtCore.Qt.Key_Delete, QtCore.Qt.Key_Backspace):
@@ -3386,29 +3626,48 @@ anything else       anything else       ❌
             super().keyPressEvent(keyevt)
 
     @safewrapper
-    def setupCursors(self, cursorType="c", *where, **kwargs):
+    def setupCursors(self, cursorType: typing.Union[str , SignalCursorTypes] ="v",
+                     *where, **kwargs):
         r"""Removes whatever cursors are already there then add new ones from the arguments.
-        cursorType "c" (default), "h" or "v"
-        *where = a sequence of X coordinates
-        Requires at least one Axis object, therefore some data must be plotted first.
 
-        Arguments:
-        cursorType : string, one of "c" for crosshair, "v" for vertical, "h" for horizontal cursors
-                    -- optional (default is "c")
+.. |nbsp| unicode:: 0xA0
+   :trim:
 
-        where      : comma-separated list or a sequence of cursor coordinates:
-                        * for crosshair cursors, the coordinates are given as two-element tuples;
-                        * for vertical and horizontal cursors, the coordinates are floats
+Requires at least one Axis object, therefore some data must be plotted first.
 
-        keyword arguments ("name=value" pairs):
-                    xwindow = 1D sequence of floats with the horizontal extent of the cursor window
-                        (for crosshair and vertical cursors); must have as many elements as
-                        coordinates supplied in the *where argument
-                    ywindow   = as above, for crosshair and horizontal cursors
-                    labels         = 1D sequence of str for cursor IDs; must have as many
-                        elements as supplied through the *where argument
-                    axis = index of the axis where the cursors are to be shown (default is 0)
-        """
+Removes all cursors then calls self.addCursors(*where, cursorType, **kwargs).
+
+Parameters:
+-----------
+
+:cursorType: One of "c", "v", "h", respectively, for crosshair, vertical, horizontal cursors |nbsp|
+        or a SignalCursorTypes enum value.
+
+        Optional; default is "v".
+
+
+:*where: Comma-separated list or a sequence of cursor coordinates or numpy arrays |nbsp|
+    (``float`` dtype).
+
+    * for crosshair cursors, the coordinates are given as two-element tuples;
+    * for vertical and horizontal cursors, the coordinates are floats
+
+Var-keyword parameters ("name=value" pairs):
+--------------------------------------------
+:xwindow: 1D sequence of floats with the extent of the cursor's *horizontal* window |nbsp|
+    (for crosshair and vertical cursors). Must have as many elements as |nbsp|
+    coordinates supplied in the ``*where`` argument.
+
+:ywindow: As above, for *crosshair* and *horizontal* cursors
+
+:labels:  1D sequence of str for cursor IDs; must have as many
+    elements as supplied in the ``*where`` argument
+
+:axis: Index of the axis where the cursors are to be shown. Optional, the |nbsp|
+    default is the currently selected axis, or 0 (first axis) if no axis is |nbsp|
+    selected.
+
+"""
         xwindow = self.defaultCursorWindowSizeX
         ywindow = self.defaultCursorWindowSizeY
         labels  = None
@@ -3441,6 +3700,7 @@ anything else       anything else       ❌
 
     @safewrapper
     def resizeEvent(self, evt:QtGui.QResizeEvent):
+        self._update_multi_axis_cursors_h_bounds()
         super().resizeEvent(evt)
 
         # NOTE: 2024-10-23 11:36:50 FIXME
@@ -3469,10 +3729,11 @@ anything else       anything else       ❌
                     cursor_pos_text = list()
 
                     if cursor.cursorTypeName in ("crosshair", "vertical"):
-                        cursor_pos_text.append("X: %f (window: %f)" % (x, cursor.xwindow))
+                        cursor_pos_text.append(f"X: {x} (window: {cursor.xwindow})")# % (x, cursor.xwindow))
 
                     if cursor.cursorTypeName in ("crosshair", "horizontal"):
-                        cursor_pos_text.append("Y: %f (window: %f)" % (y, cursor.ywindow))
+                        cursor_pos_text.append(f"Y: {y} (window: {cursor.ywindow})")# % (y, cursor.ywindow))
+                        # cursor_pos_text.append("Y: %f (window: %f)" % (y, cursor.ywindow))
 
                     text.append("\n".join(cursor_pos_text))
 
@@ -3516,10 +3777,12 @@ anything else       anything else       ❌
                         y = cursor.getY(plotitem)
 
                         if cursor.cursorTypeName in ("crosshair", "vertical"):
-                            plot_item_cursor_pos_text.append("X: %f (window: %f)" % (x, cursor.xwindow))
+                            plot_item_cursor_pos_text.append(f"X: {x} (window: {cursor.xwindow})")# % (x, cursor.xwindow))
+                            # plot_item_cursor_pos_text.append("X: %f (window: %f)" % (x, cursor.xwindow))
 
                         if cursor.cursorTypeName in ("crosshair", "horizontal"):
-                            plot_item_cursor_pos_text.append("Y: %f (window: %f)" % (y, cursor.ywindow))
+                            plot_item_cursor_pos_text.append(f"Y: {x} (window: {cursor.ywindow})")# % (y, cursor.ywindow))
+                            # plot_item_cursor_pos_text.append("Y: %f (window: %f)" % (y, cursor.ywindow))
 
                         plot_item_text.append("\n".join(plot_item_cursor_pos_text))
 
@@ -3664,6 +3927,34 @@ anything else       anything else       ❌
             tdlg.show()
 
     @Slot()
+    def slot_removeAllEvents(self):
+        if not isinstance(self.yData, neo.Block) or len(self.yData.segments) == 0:
+            return
+        fn = lambda s: neoutils.remove_events(s) # remove all neo.Events
+        dlg = qd.QuickDialog(self, "Remove Events & Triggers")
+        # evtCombo = qd.QuickDialogComboBox(dlg, "Select Event Type")
+        # comboItems = ["All Trigger Events"]
+        # comboItems.extend(trigTypeNames)
+        # comboItems.append("Select TriggerEvent Type(s)...")
+        # comboItems.append("All Events")
+        # evtCombo.setItems(comboItems)
+        allSegments = qd.CheckBox(dlg, "In All Segments")
+        allSegments.setChecked=False
+        dlg.adjustSize()
+
+        if dlg.exec():
+            if allSegments.isChecked():
+                segments = self.yData.segments
+            else:
+                segments = [self.yData.segments[self.currentFrame]]
+
+            for s in segments:
+                fn(s)
+
+            self.displayFrame()
+
+
+    @Slot()
     def slot_removeTriggers(self):
         if not isinstance(self.yData, neo.Block) or len(self.yData.segments) == 0:
             return
@@ -3697,13 +3988,14 @@ anything else       anything else       ❌
                 fn = lambda s: neoutils.remove_events(s, TriggerEventType[comboItems[value]])
             else:
                 sdlg = ItemsListDialog(parent=self, itemsList = trigTypeNames,
-                                       title = "Select Trigger Event Types",#
+                                       title = "Select Trigger Event Types",
                                        modal = True,
                                        selectmode = QtWidgets.QAbstractItemView.ExtendedSelection)
                 sdlg.adjustSize()
 
                 if sdlg.exec():
-                    sel_types = list(map(lambda t: TriggerEventType[t], sdlg.selectedItemsText))
+                    sel_types = [TriggerEventType[t] for t in sdlg.selectedItemsText]
+                    # sel_types = list(map(lambda t: TriggerEventType[t], sdlg.selectedItemsText))
                     fn = lambda s: neoutils.remove_events(s, sel_types)
                 else:
                     return
@@ -3711,7 +4003,6 @@ anything else       anything else       ❌
             for s in segments:
                 fn(s)
 
-            # self.refresh()
             self.displayFrame()
 
     @Slot(str)
@@ -4031,8 +4322,8 @@ anything else       anything else       ❌
             self.configurable_traits[traitname] = name
 
     def _addCursor_(self, cursor_type: typing.Union[str, SignalCursorTypes],
-                    x: typing.Optional[typing.Union[numbers.Number, pq.Quantity, DataCursor]] = None,
-                    y: typing.Optional[typing.Union[numbers.Number, pq.Quantity, DataCursor]] = None,
+                    x: typing.Optional[typing.Union[numbers.Number, pq.Quantity, DataCursor, Interval, neo.Epoch, DataZone]] = None,
+                    y: typing.Optional[typing.Union[numbers.Number, pq.Quantity, DataCursor, Interval, neo.Epoch, DataZone]] = None,
                     xwindow: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
                     ywindow: typing.Optional[typing.Union[numbers.Number, pq.Quantity]] = None,
                     xBounds: typing.Optional[tuple] = None,
@@ -4079,61 +4370,160 @@ anything else       anything else       ❌
             axis = self.signalsLayout.scene()
 
         elif not isinstance(axis, (pg.PlotItem, pg.GraphicsScene)):
-            raise TypeError("axes expected to be an int, a str ('all' or 'a'), a pyqtgraph.PlotItem, a pyqtgraph.GraphicsScene, or None; got %s instead" % type(axes).__name__)
+            raise TypeError("axis expected to be an int, a str ('all' or 'a'), a pyqtgraph.PlotItem, a pyqtgraph.GraphicsScene, or None; got %s instead" % type(axis).__name__)
 
         #### END Figure out cursors destination: axis or scene
 
-        #### BEGIN sort out cursor windows (and units, 1st pass) -- TODO 2025-07-14 22:40:39 streamline this
-        if xwindow is None:
-            if isinstance(x, DataCursor):
-                xwindow = x.span
-                if isinstance(xwindow, pq.Quantity):
-                    xUnits = xwindow.units
-                    xwindow = float(xwindow.magnitude.flatten()[0])
+        if isinstance(axis, pg.PlotItem): # single-axis cursor - a.k.a cursor in axis
+            if axis not in self.signalsLayout.items:
+                return
 
-            elif isinstance(x, Interval):
-                xwindow = x.durations[0]
-                xUnits = xwindow.units
-                xwindow = float(xwindow.magnitude.flatten()[0])
+            # NOTE: 2025-07-14 22:29:19
+            # use embedded user data in the QGraphicsItem (Qt API), see also:
+            # NOTE: 2025-07-14 21:49:57 and NOTE: 2025-07-14 21:52:45
+            ax_xUnits = axis.data(0)
+            ax_yUnits = axis.data(1)
+
+            # data_range = guiutils.getPlotItemDataBoundaries(axis)
+            # view_range = axis.viewRange()
+
+        else:
+            ax_xUnits = None
+            ax_yUnits = None
+
+        # ### BEGIN sort out cursor windows (and units, 1st pass) -- TODO 2025-07-14 22:40:39 streamline this
+        #
+
+        # ### BEGIN x window
+        #
+        if xwindow is None:
+            xwindow = x.span if isinstance(x, DataCursor) else x.durations[0] if isinstance(x, (Interval, neo.Epoch, DataZone)) else self.defaultCursorWindowSizeX
+
+            if isinstance(xwindow, pq.Quantity):
+                if isinstance(ax_xUnits, pq.Quantity):
+                    xwindow = xwindow.rescale(ax_xUnits)
+                    xUnits = xwindow.units
+                else:
+                    xwindow = float(xwindow.magnitude.flatten()[0])
+                    xUnits = ax_xUnits
+
             else:
-                xwindow = self.defaultCursorWindowSizeX
+                if not isinstance(ax_xUnits, pq.Quantity):
+                    xwindow = float(xwindow.flatten()[0]) if isinstance(xwindow, np.ndarray) else float(xwindow)
+                    xUnits = pq.dimensionless
+                else:
+                    xwindow = xwindow * ax_xUnits
+                    xUnits = xwindow.units
+
+            # if isinstance(x, DataCursor):
+            #     xwindow = x.span
+            #
+            # elif isinstance(x, Interval):
+            #     xwindow = x.durations[0]
+            #     xUnits = xwindow.units
+            #     xwindow = float(xwindow.magnitude.flatten()[0])
+            # else:
+            #     xwindow = self.defaultCursorWindowSizeX
 
         elif isinstance(xwindow, pq.Quantity):
-            xwindow = float(xwindow.magnitude.flatten()[0])
             xUnits = xwindow.units
+            if not isinstance(ax_xUnits, pq.Quantity):
+                xwindow = float(xwindow.magnitude.flatten()[0])
+            else:
+                xwindow = xwindow.rescale(ax_xUnits)
 
         elif not isinstance(xwindow, numbers.Number):
             raise TypeError("Unexpected type for xwindow: %s" % type(xwindow).__name__)
 
-        if ywindow is None:
-            if isinstance(y, DataCursor):
-                ywindow = y.span
-                if isinstance(ywindow, pq.Quantity):
-                    yUnits = ywindow.units
-                    ywindow = float(ywindow.magnitude.flatten()[0])
-
-            elif isinstance(y, Interval):
-                ywindow = y.durations[0]
-                yUnits = ywindow.units
-                ywindow = float(ywindow.magnitude.flatten()[0])
+        else:
+            if isinstance(ax_xUnits, pq.Quantity):
+                xwindow  = xwindow * ax_xUnits
+                xUnits = xwindow.units
             else:
-                ywindow = self.defaultCursorWindowSizeY
+                xUnits = pq.dimensionless
+        #
+        # ### END   x window
+
+        # ### BEGIN y window
+        #
+
+        if ywindow is None:
+            ywindow = y.span if isinstance(y, DataCursor) else y.durations[0] if isinstance(y, (Interval, neo.Epoch, DataZone)) else self.defaultCursorWindowSizeY
+
+            if isinstance(ywindow, pq.Quantity):
+                if isinstance(ax_yUnits, pq.Quantity):
+                    ywindow = ywindow.rescale(ax_yUnits)
+                    yUnits = xwindow.units
+                else:
+                    ywindow = float(ywindow.magnitude.flatten()[0])
+                    yUnits = ax_yUnits
+
+            else:
+                if not isinstance(ax_yUnits, pq.Quantity):
+                    ywindow = float(ywindow.flatten()[0]) if isinstance(ywindow, np.ndarray) else float(ywindow)
+                    yUnits = ax_yUnits
+                else:
+                    ywindow = ywindow * ax_yUnits
+                    yUnits = ywindow.units
+
+            # if isinstance(y, DataCursor):
+            #     if isinstance(ywindow, pq.Quantity):
+            #         yUnits = ywindow.units
+            #         ywindow = float(ywindow.magnitude.flatten()[0])
+            #     else:
+            #         ywindow = float(y.span[0]) if isinstance(y.span, np.ndarray) else float(y.span)
+            #
+            # elif isinstance(y, Interval):
+            #     ywindow = y.durations[0]
+            #     yUnits = ywindow.units
+            #     ywindow = float(ywindow.magnitude.flatten()[0])
+            # else:
+            #     ywindow = self.defaultCursorWindowSizeY
 
         elif isinstance(ywindow, pq.Quantity):
-            ywindow = float(ywindow.magnitude.flatten()[0])
             yUnits = ywindow.units
+            if not isinstance(ax_yUnits, pq.Quantity):
+                ywindow = float(ywindow.magnitude.flatten()[0])
+            else:
+                ywindow = ywindow.rescale(ax_yUnits)
 
         elif not isinstance(ywindow, numbers.Number):
             raise TypeError("Unexpected type for ywindow: %s" % type(ywindow).__name__)
 
-        #### END sort out cursor windows (and units, 1st pass) -- TODO 2025-07-14 22:40:39 streamline this
+        else:
+            if isinstance(ax_yUnits, pq.Quantity):
+                ywindow = ywindow * ax_yUnits
+                yUnits = ywindow.units
+            else:
+                yUnits = ax_yUnits
 
-        #### BEGIN figure out cursor type ⇒
+        #
+        # ### END   y window
+        #
+        # ### END sort out cursor windows (and units, 1st pass) -- TODO 2025-07-14 22:40:39 streamline this
+
+        # ### BEGIN figure out cursor type ⇒
         # • identify` cursor_dict
         # • adjust cursor windows as needed (set 0 for unused cursor lines)
         #
-        if any(isinstance(v, (DataCursor, Interval)) for v in (x,y)):
-            cursor_type = SignalCursorTypes.getType((isinstance(y, (DataCursor, Interval)), isinstance(x, (DataCursor,Interval))))
+        if any(isinstance(v, (DataCursor, Interval, neo.Epoch, DataZone)) for v in (x,y)):
+            cursor_type = SignalCursorTypes.getType((isinstance(y, (DataCursor, Interval, neo.Epoch, DataZone)), isinstance(x, (DataCursor,Interval, neo.Epoch, DataZone))))
+            if label is None or (isinstance(label, str) and len(label.strip()) == 0):
+                if isinstance(x, (DataCursor, Interval, neo.Epoch, DataZone)):
+                    label = getattr(x, "name", None)
+
+                if isinstance(y, (DataCursor, Interval, neo.Epoch, DataZone)):
+                    y_label = getattr(y, "name", None)
+                else:
+                    y_label = ""
+
+                if isinstance(label, str) and len(label.strip()):
+                    if isinstance(y_label, str) and len(y_label.strip()):
+                        label = f"{label}_{y_label}"
+
+                elif isinstance(y_label, str) and len(y_label.strip()):
+                    label = y_label
+
             # print(f"{self.__class__.__name__}._addCursor_ (DataCursor): cursor_type = {cursor_type}")
         else:
             if isinstance(cursor_type, SignalCursorTypes):
@@ -4143,9 +4533,10 @@ anything else       anything else       ❌
             cursorDict = self._verticalSignalCursors_
             crsPrefix = "dv" if follows_mouse else "v"
 
-            ywindow = 0.0 * yUnits if isinstance(yUnits, pq.Quantity) else 0.0
+            # NOTE: 2026-05-22 11:35:05
+            # dealt with this earlier
+            # ywindow = 0.0 * yUnits if isinstance(yUnits, pq.Quantity) else 0.0
 
-            # pen = QtGui.QPen(QtGui.QColor(self.cursorColors["vertical"]), 1, QtCore.Qt.SolidLine)
             pen = QtGui.QPen(QtGui.QColor(self.cursorColors["vertical"]), 1., self._cursorLineStyle_)
             linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["vertical"]), 1., self._cursorLineStyle_)
             hoverPen = QtGui.QPen(QtGui.QColor(self._cursorHoverColor_), 1., self._cursorLineStyle_)
@@ -4157,10 +4548,15 @@ anything else       anything else       ❌
         elif cursor_type in ("horizontal", "h", SignalCursorTypes.horizontal):
             cursorDict = self._horizontalSignalCursors_
             crsPrefix = "dh" if follows_mouse else "h"
-            xwindow = 0.0 * xUnits if isinstance(xUnits, pq.Quantity) else 0.0
+
+            # NOTE: 2026-05-22 11:35:05
+            # dealt with this earlier
+            # xwindow = 0.0 * xUnits if isinstance(xUnits, pq.Quantity) else 0.0
+
             pen = QtGui.QPen(QtGui.QColor(self.cursorColors["horizontal"]), 1, self._cursorLineStyle_)
             linkedPen = QtGui.QPen(QtGui.QColor(self.linkedCursorColors["horizontal"]), 1, self._cursorLineStyle_)
             hoverPen = QtGui.QPen(QtGui.QColor(self._cursorHoverColor_), 1, self._cursorLineStyle_)
+
             pen.setCosmetic(True)
             linkedPen.setCosmetic(True)
             hoverPen.setCosmetic(True)
@@ -4177,13 +4573,17 @@ anything else       anything else       ❌
 
         else:
             raise ValueError("unsupported cursor type %s" % cursor_type)
-        #### END figure out cursor type; adjust cursor windows as needed (set 0 for unused cursor lines)
+        # ### END figure out cursor type; adjust cursor windows as needed (set 0 for unused cursor lines)
 
 
-        #### BEGIN check cursors coordinates (and units) - see also TODO 2025-07-14 22:40:39 streamline this
+        # ### BEGIN check cursors coordinates (and units) - see also TODO 2025-07-14 22:40:39 streamline this
+        #
+
         if isinstance(axis, pg.PlotItem): # single-axis cursor - a.k.a cursor in axis
             if axis not in self.signalsLayout.items:
                 return
+
+            # print(f"{self.__class__.__name__}._addCursor_ single-axis received x = {x}")
 
             # NOTE: 2025-07-14 22:29:19
             # use embedded user data in the QGraphicsItem (Qt API), see also:
@@ -4197,6 +4597,8 @@ anything else       anything else       ❌
             if x is None:
                 x = view_range[0][0] + (view_range[0][1] - view_range[0][0])/2
                 xUnits = ax_xUnits
+                if isinstance(ax_xUnits, pq.Quantity):
+                    x *= ax_xUnits
 
             elif isinstance(x, pq.Quantity):
                 if x.units != ax_xUnits:
@@ -4204,28 +4606,35 @@ anything else       anything else       ❌
                     x.rescale(ax_xUnits)
                     xUnits = x.units
 
-                x = float(x.magnitude.flatten()[0])
+                # x = float(x.magnitude.flatten()[0])
+
+            # elif isinstance(x, numbers.Number):
 
             elif not isinstance(x, (numbers.Number, DataCursor)):
                 raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
+
             else:
                 xUnits = ax_xUnits
 
             if xBounds is None:
                 xBounds = data_range[0]
+                if isinstance(ax_xUnits, pq.Quantity):
+                    xBounds = tuple(map(lambda v: v * ax_xUnits, xBounds))
                 # xBounds = view_range[0]
 
             if y is None:
                 y = view_range[1][0] + (view_range[1][1] - view_range[1][0])/2
                 yUnits = ax_yUnits
+                if isinstance(ax_yUnits, pq.Quantity):
+                    y *= ax_yUnits
 
             elif isinstance(y, pq.Quantity):
                 if yUnits != ax_yUnits:
                     assert scq.unitsConvertible(y.units, ax_yUnits), f"y.units {y.units} and axis Y units {ax_yUnits} are incompatible"
-                    y = rescale(ax_yUnits)
+                    y = y.rescale(ax_yUnits)
                     yUnits = y.units
 
-                y = float(y.magnitude.flatten()[0])
+                # y = float(y.magnitude.flatten()[0])
 
             elif not isinstance(y, (numbers.Number, DataCursor)):
                 raise TypeError("Unexpected type for y coordinate: %s" % type(y).__name__ )
@@ -4235,6 +4644,8 @@ anything else       anything else       ❌
 
             if yBounds is None:
                 yBounds = data_range[1]
+                if isinstance(ax_yUnits, pq.Quantity):
+                    yBounds = tuple(map(lambda v: v* ax_yUnits, yBounds))
                 # yBounds = view_range[1]
 
             # print(f"{self.__class__.__name__}._addCursor_ single-axis x = {x}")
@@ -4283,7 +4694,7 @@ anything else       anything else       ❌
             elif isinstance(x, pq.Quantity):
                 x = float(x.magnitude.flatten()[0])
 
-            elif not isinstance(x, (numbers.Number, DataCursor)):
+            elif not isinstance(x, (numbers.Number, DataCursor, Interval, neo.Epoch, DataZone)):
                 raise TypeError("Unexpected type for x coordinate: %s" % type(x).__name__)
 
             if y is None:
@@ -4298,6 +4709,12 @@ anything else       anything else       ❌
 
             elif not isinstance(y, (numbers.Number, DataCursor)):
                 raise TypeError("Unexpected type for y coordinate: %s" % type(y).__name__)
+
+            if isinstance(xwindow, pq.Quantity):
+                xwindow = xwindow.magnitude
+
+            if isinstance(ywindow, pq.Quantity):
+                ywindow = ywindow.magnitude
 
             # print(f"{self.__class__.__name__}._addCursor_ multi-axis x = {x}")
 
@@ -4325,16 +4742,21 @@ anything else       anything else       ❌
                 if len(labels):
                     label = "_".join(labels)
 
-            if label is None:
-                crsId = "%s%s" % (crsPrefix, str(nCursors))
+            if label is None or (isinstance(label, str) and len(label.strip()) == 0):
+                # crsId = "%s%s" % (crsPrefix, str(nCursors))
+                crsId = f"{crsPrefix}{nCursors}"
 
             else:
-                crsId = label
+                currentCursorLabels = list(cursorDict.keys() )
+                crsId = counter_suffix(label, currentCursorLabels, returns_counter=False)
+                # crsId = label
 
         else:
             currentCursorLabels = list(cursorDict.keys() )
 
-            crsId = counter_suffix(label, currentCursorLabels)
+            crsId = counter_suffix(label, currentCursorLabels, returns_counter=False)
+
+        # print(f"{self.__class__.__name__}._addCursor_: crsId -> {crsId}")
 
         if precision is None:
             if isinstance(axis, pg.PlotItem):
@@ -4344,6 +4766,7 @@ anything else       anything else       ❌
                 if len(self.plotItems):
                     pi_precisions = [self.getAxis_xDataPrecision(ax) for ax in self.plotItems]
                     precision = min(pi_precisions)
+
         # print(f"{self.__class__.__name__}._addCursor_ x = {x}, xwindow = {xwindow}, y = {y}, ywindow = {ywindow}")
         # print(f"{self.__class__.__name__}._addCursor_ kwargs = {kwargs}")
 
@@ -4585,7 +5008,7 @@ anything else       anything else       ❌
         return SignalCursor.default_precision
 
 
-    @Slot((QtCore.QPoint))
+    @Slot(QtCore.QPoint)
     @safewrapper
     def slot_annotationsContextMenuRequested(self, point):
         if self._scipyenWindow_ is None:
@@ -4810,6 +5233,10 @@ anything else       anything else       ❌
             self.removeActiveCursor()
 
     @Slot()
+    def slot_TBRemoveAllCursors(self):
+        self.slot_removeCursors()
+
+    @Slot()
     @safewrapper
     def slot_addHorizontalCursor(self, label=None, follows_mouse=False):
         return self._addCursor_("horizontal", axis=self._selected_plot_item_,
@@ -4959,7 +5386,7 @@ anything else       anything else       ❌
                                         editFirst = False):
         # print(f"{self.__class__.__name__}._construct_multi_axis_vertical_ label = {label}, dynamic = {dynamic}")
         # NOTE: 2020-02-26 14:37:50
-        # code being migrated to _addCursor_()
+        # code being migrated to _addCursor_() # TODO !!!
         # with allowing for cursors to be added to an empty scene (i.e. with no
         # axes) on the condition that their coordinates must be reset once
         # something has been plotted
@@ -4969,7 +5396,7 @@ anything else       anything else       ❌
 
             # NOTE: 2023-01-14 23:23:06
             # always expect at least one PlotItem present
-            if len(pIs) == 0: #
+            if len(pIs) == 0:
                 scene_rect = self.signalsLayout.scene().sceneRect()
                 xbounds = (scene_rect.x(), scene_rect.x() + scene_rect.width())
                 precision=None
@@ -5867,7 +6294,7 @@ anything else       anything else       ❌
     @Slot()
     @safewrapper
     def _slot_update_cursor_to_epoch_dlg(self, cid:typing.Optional[str]=None, d:typing.Optional[qd.QuickDialog]=None):
-        print(f"{self.__class__.__name__}._slot_update_cursor_to_epoch_dlg(cid={cid}, d={d})")
+        # print(f"{self.__class__.__name__}._slot_update_cursor_to_epoch_dlg(cid={cid}, d={d})")
         if (not isinstance(cid, str) or len(cid.strip()) == 0) and isinstance(d, qd.QuickDialog):
             if hasattr(d, "cursorComboBox"):
                 if d.cursorComboBox.variable.count() == 0:
@@ -6158,14 +6585,15 @@ anything else       anything else       ❌
 
                 current_seg_start = segment_start(segments[self.currentFrame])
 
-                rel_starts = [c.x * current_seg_start.units - current_seg_start for c in cursors]
+                # rel_starts = [c.x * current_seg_start.units - current_seg_start for c in cursors]
+                rel_starts = [c.x - current_seg_start for c in cursors]
 
                 # print(f"SignalViewer.cursorsToEpoch: rel_starts: {rel_starts}")
                 for k, seg in enumerate(segments):
                     # NOTE: 2024-09-17 15:31:30
                     # see datazone cursors2epochs for logic
-                    tdls = [(seg_starts[k] + rel_starts[i] - 0.5 * cursors[i].xwindow * seg_starts[k].units,
-                             cursors[i].xwindow * seg_starts[k].units,
+                    tdls = [(seg_starts[k] + rel_starts[i] - 0.5 * cursors[i].xwindow,# * seg_starts[k].units,
+                             cursors[i].xwindow,# * seg_starts[k].units,
                              seg_starts[k].units,
                              cursors[i].name,
                              False) for i in range(len(cursors))]
@@ -6554,7 +6982,7 @@ anything else       anything else       ❌
         self.signalChannelAxis = 1
         self.dataAxis = 0 # data as column vectors
 
-        self.singleFrame = False
+        self.singleFrame = singleFrame
 
         self._cached_title = ""
 
@@ -7233,7 +7661,7 @@ anything else       anything else       ❌
                 self._meta_index = np.recarray((self._number_of_frames_,1), dtype=[('frame', int)])
                 self._meta_index.frame[:,0] = self.frameIndex
 
-            elif all([isinstance(i, neo.Segment) for i in y]):
+            elif all(isinstance(i, neo.Segment) for i in y):
                 # NOTE: 2019-11-30 09:35:42
                 # treat this as the segments attribute of a neo.Block
                 # a segment is ALWAYS plotted in a single frame
@@ -7265,7 +7693,7 @@ anything else       anything else       ❌
 
                 self._meta_index.frame[:,0] = self.frameIndex
 
-            elif all([isinstance(i, neo.Block) for i in y]):
+            elif all(isinstance(i, neo.Block) for i in y):
                 # NOTE 2021-01-02 11:31:05
                 # treat this as a sequence of segments, but do NOT concatenate
                 x = None
@@ -7276,7 +7704,7 @@ anything else       anything else       ❌
                 self.irregularSignalChannelAxis = None
                 self.irregularSignalChannelIndex = None
                 self.separateSignalChannels = False
-                self._data_frames_ = tuple(accumulate((len(b.segments) for b in y)))[-1]
+                self._data_frames_ = tuple(accumulate(len(b.segments) for b in y))[-1]
                 self.frameIndex = range(self._data_frames_)
                 self._number_of_frames_ = len(self.frameIndex)
                 self.signalIndex                    = signalIndex
@@ -7293,7 +7721,7 @@ anything else       anything else       ❌
                 self._meta_index.block[:,0] = mIndex[:,0]
                 self._meta_index.segment[:,0] = mIndex[:,1]
 
-            elif all([isinstance(i, SIGNAL_OBJECT_TYPES) for i in y]):
+            elif all(isinstance(i, SIGNAL_OBJECT_TYPES) for i in y):
                 # NOTE: 2019-11-30 09:42:27
                 # Treat this as a segment, EXCEPT that each signal is plotted
                 # in its own frame. This is because in a generic container
@@ -7310,19 +7738,26 @@ anything else       anything else       ❌
                 # CAUTION: the risk is of too many signals (and PlotItems) in one frame
 
                 # NOTE: 2023-01-18 08:33:13
-                # for very large lists of signals, passing frameAxis None will
+                # for lists of > 10 signals, passing frameAxis None will
                 # result in too many plotItems being created
                 #
-                # To avoid this, we set an arbitrary limit of 10 signals in the
+                # To avoid this, I set an arbitrary limit of 10 signals in the
                 # collection, beyond which we automatically revert to one signal
                 # per frame by setting frameAxis to 1
                 #
                 # The user may still overrride this - at their own risk - by
                 # passing a frameAxis int value different than 1 (one)
 
-                if len(y) > 10:
+                # Another condition for NOT plotting all signals in a single frame is
+                # when their domains have no overlap
+
+                if (len(y) > 10
+                    or all(y[k].t_stop < y[k+1].t_start for k in range(len(y)-1))
+                    or not singleFrame
+                    ):
                     if frameAxis is None:
                         frameAxis = 1
+
                     elif frameAxis != 1:
                         # for the sake of flexibility
                         frameAxis is None
@@ -7465,19 +7900,20 @@ anything else       anything else       ❌
 
     @with_doc(_parse_data_, use_header=True)
     @safewrapper
-    def _set_data_(self, x,  y = None, doc_title:(str, type(None)) = None,
-                   frameAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                   signalChannelAxis:(int, str, vigra.AxisInfo, type(None)) = None,
-                   frameIndex:(int, tuple, list, range, slice, type(None)) = None,
-                   signalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
-                   signalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
-                   irregularSignalIndex:(str, int, tuple, list, range, slice, type(None)) = None,
-                   irregularSignalChannelAxis:(int, type(None)) = None,
-                   irregularSignalChannelIndex:(int, tuple, list, range, slice, type(None)) = None,
-                   separateSignalChannels:bool = False, separateChannelsIn:str="axes",
-                   singleFrame:bool=False,
-                   interval:(tuple, list, neo.Epoch, type(None)) = None,
-                   plotStyle:str = "plot", showFrame:int = None,
+    def _set_data_(self, x,  y = None, doc_title: str | None = None,
+                   frameAxis: (int, str, vigra.AxisInfo, type(None)) = None,
+                   signalChannelAxis: (int, str, vigra.AxisInfo, type(None)) = None,
+                   frameIndex: (int, tuple, list, range, slice, type(None)) = None,
+                   signalIndex: (str, int, tuple, list, range, slice, type(None)) = None,
+                   signalChannelIndex: (int, tuple, list, range, slice, type(None)) = None,
+                   irregularSignalIndex: (str, int, tuple, list, range, slice, type(None)) = None,
+                   irregularSignalChannelAxis: (int, type(None)) = None,
+                   irregularSignalChannelIndex: (int, tuple, list, range, slice, type(None)) = None,
+                   separateSignalChannels: bool = False,
+                   separateChannelsIn: str="axes",
+                   singleFrame: bool=False,
+                   interval: (tuple, list, neo.Epoch, type(None)) = None,
+                   plotStyle: str = "plot", showFrame: int | None = None,
                    *args, **kwargs):
         r"""Sets up internal variables and triggers plotting.
         Does the behind the scene work of self.setData(...)
@@ -7520,15 +7956,11 @@ anything else       anything else       ❌
 
             # print(f"self._set_data_ dataOK = {dataOK}")
 
+            # self._n_signal_axes_ = len(self.signalAxes)
+
             if dataOK:
-                self._clear_lris_() # remove gremlins (i.e. any epochs LinearRegionItem)
-
-                # NOTE: 2023-06-02 13:09:25
-                # to avoid flicker, set up axes ONLY if data demands a different
-                # number of axes
-                if n_axes != self._n_signal_axes_:
-                    self._setup_axes_(n_axes) # also assigns n_axes to self._n_signal_axes_
-
+                # NOTE: 2026-08-15 16:05:45
+                # set this up early as is needed by methods called below
                 if isinstance(showFrame, int):
                     if showFrame < 0:
                         showFrame = 0
@@ -7541,6 +7973,21 @@ anything else       anything else       ❌
                 else:
                     if self._current_frame_index_ not in self.frameIndex:
                         self._current_frame_index_ = self.frameIndex[-1]
+
+                # NOTE: 2026-08-15 16:06:07
+                # remove gremlins (i.e. any epochs LinearRegionItem)
+                if len(self.axes):
+                    for ax in self.axes:
+                        if self._axis_has_lris(ax):
+                            self._clear_axis_lris_(ax)
+                # self._clear_lris_()
+
+
+                # NOTE: 2023-06-02 13:09:25
+                # to avoid flicker, set up axes ONLY if data demands a different
+                # number of axes
+                if n_axes != self._n_signal_axes_:
+                    self._setup_axes_(n_axes) # also assigns n_axes to self._n_signal_axes_
 
                 if isinstance(plotStyle, str):
                     self.plotStyle = plotStyle
@@ -7902,6 +8349,12 @@ anything else       anything else       ❌
                         plotStyle = plotStyle,
                         showFrame = showFrame,
                         **kwargs)
+
+        # NOTE: 2026-08-15 16:11:38
+        # self._slot_set_data_finished is inherited from ScipyenViewer; does nothing
+        # to the data plots or axes, just does some housekeeping common to all
+        # ScipyenViewer objects
+        # TODO: use it in other viewers, too!
         worker.signals.signal_Finished.connect(self._slot_set_data_finished)
         worker.run()
 
@@ -7946,13 +8399,18 @@ anything else       anything else       ❌
         doc_title_prompt.variable.setClearButtonEnabled(True)
         doc_title_prompt.variable.redoAvailable = True
         doc_title_prompt.variable.undoAvailable = True
+        if isinstance(doc_title, str) and len(doc_title.strip()):
+            doc_title_prompt.setText(doc_title)
+        else:
+            doc_title_prompt.setText("")
+
         d.promptWidgets.append(doc_title_prompt)
 
-        doc_title_prompt.setText(doc_title)
         frameAxis_prompt = qd.StringInput(d, "Frame axis")
         frameAxis_prompt.variable.setClearButtonEnabled(True)
         frameAxis_prompt.variable.redoAvailable = True
         frameAxis_prompt.variable.undoAvailable = True
+        frameAxis_prompt.setText(f"{frameAxis}")
         d.promptWidgets.append(frameAxis_prompt)
 
         d.adjustSize()
@@ -7963,9 +8421,12 @@ anything else       anything else       ❌
         return self._current_frame_index_
 
     @currentFrame.setter
+    # @timemethod
     def currentFrame(self, val:typing.Union[int, type(MISSING), type(NA), type(None), float]):
         r""" Programmatically sets up the index of the displayed frame.
-        CAUTION: emits self.frameChanged signal
+
+        Overrides ScipyenFrameViewer.currentFrame() setter.
+
         """
         missing = (isinstance(self._missing_frame_value_, (int, float)) and val == self._missing_frame_value_) or \
             self._missing_frame_value_ in (MISSING, NA) and val is self._missing_frame_value_
@@ -8049,6 +8510,11 @@ anything else       anything else       ❌
         Alias to self.plotItems property
         """
         return self.plotItems
+
+    @property
+    def visibleAxes(self) -> tuple:
+        r"""Tuple of visible pg.PlotItem objects"""
+        return tuple(filter(lambda ax: ax.isVisible(), self.axes))
 
     @safewrapper
     def plotItem(self, index: int):
@@ -8212,6 +8678,12 @@ anything else       anything else       ❌
         return self.currentAxis
 
     @property
+    def selectedCurve(self) -> pg.PlotDataItem | None:
+        # NOTE: 2026-08-21 15:55:57
+        # see NOTE: 2025-07-14 21:49:57
+        return self._selected_plot_data_item_
+
+    @property
     def plotNames(self):
         r"""A dict of int keys mapped to axes names (str).
         The keys are the indices of the axes (with 0 being the first axis from
@@ -8316,9 +8788,10 @@ anything else       anything else       ❌
             hostitem = self.signalsLayout.scene()
 
         elif isinstance(index, int):
+            nAxesWLayout = len(self.axesWithLayoutPositions)
             if index >=0:
-                if index >= len(self.axesWithLayoutPositions):
-                    raise ValueError("index must be between -1 and %d; got %d instead" % (len(self.axesWithLayoutPositions), index))
+                if index >= nAxesWLayout:
+                    raise ValueError(f"Index must be between -1 and {nAxesWLayout}; got {index} instead")
 
                 hostitem = self.axis(index)
 
@@ -8329,12 +8802,10 @@ anything else       anything else       ❌
             hostitem = index
 
         if hostitem is not None: # may be None if there is no scene, i.e. no plot item
-            ret =  [c for c in self._data_cursors_.values() if c.hostItem is hostitem]
+            return  [c for c in self._data_cursors_.values() if c.hostItem is hostitem]
 
         else:
-            ret = list()
-
-        return ret
+            return []
 
     def getSignalCursors(self, cursorType:typing.Optional[typing.Union[str, SignalCursorTypes]]=None):
         r"""Returns the dictionary of SignalCursor objects with the specified type.
@@ -8363,7 +8834,8 @@ anything else       anything else       ❌
     def getCursors(self, cursorType:typing.Optional[typing.Union[str, SignalCursorTypes]]):
         return self.getSignalCursors(cursorType)
 
-    def registerCursor(self, cursor, cursorDict:typing.Optional[dict]=None, **kwargs):
+    def registerCursor(self, cursor, cursorDict:typing.Optional[dict]=None,
+                       **kwargs):
         r"""Register externally-created cursors.
         """
         # TODO: 2023-06-12 23:11:50
@@ -8374,7 +8846,10 @@ anything else       anything else       ❌
         crsId = cursor.ID
         if crsId in cursorDict:
             warnings.warn(f"{self.__class__.__name__} <{self.windowTitle()}>: A {cursor.cursorType.name} cursor named {crsId} already exists")
-            return
+            newId = strutils.counter_suffix(crsId, list(cursorDict.keys()), returns_counter=False)
+            print(f"{self.__class__.__name__}.registerCursor -> newId: {newId}")
+            cursor.ID = newId
+            # return
 
         if cursor in cursorDict.values():
             ndx = list(cursorDict.values()).index(cursor)
@@ -8407,12 +8882,19 @@ anything else       anything else       ❌
             if isinstance(precision, int) and precision > 0:
                 cursor.precision = precision
 
-        cursorDict[crsId] = cursor
-        cursorDict[crsId].sig_cursorSelected[str].connect(self.slot_selectCursor)
-        cursorDict[crsId].sig_reportPosition[str].connect(self.slot_reportCursorPosition)
-        cursorDict[crsId].sig_doubleClicked[str].connect(self.slot_editCursor)
-        cursorDict[crsId].sig_lineContextMenuRequested[str].connect(self.slot_cursorMenu)
-        cursorDict[crsId].sig_editMe[str].connect(self.slot_editCursor)
+        cursorDict[cursor.ID] = cursor
+        cursorDict[cursor.ID].sig_cursorSelected[str].connect(self.slot_selectCursor)
+        cursorDict[cursor.ID].sig_reportPosition[str].connect(self.slot_reportCursorPosition)
+        cursorDict[cursor.ID].sig_doubleClicked[str].connect(self.slot_editCursor)
+        cursorDict[cursor.ID].sig_lineContextMenuRequested[str].connect(self.slot_cursorMenu)
+        cursorDict[cursor.ID].sig_editMe[str].connect(self.slot_editCursor)
+
+        # cursorDict[crsId] = cursor
+        # cursorDict[crsId].sig_cursorSelected[str].connect(self.slot_selectCursor)
+        # cursorDict[crsId].sig_reportPosition[str].connect(self.slot_reportCursorPosition)
+        # cursorDict[crsId].sig_doubleClicked[str].connect(self.slot_editCursor)
+        # cursorDict[crsId].sig_lineContextMenuRequested[str].connect(self.slot_cursorMenu)
+        # cursorDict[crsId].sig_editMe[str].connect(self.slot_editCursor)
 
 
 
@@ -8511,6 +8993,7 @@ anything else       anything else       ❌
             axis.update(axis.boundingRect())
         # self.displayFrame()
 
+    # @timemethod
     @safewrapper
     def displayFrame(self):
         r""" Plots individual frame (data "sweep" or "segment")
@@ -8528,34 +9011,37 @@ anything else       anything else       ❌
             to pass new-data=False to avoid unnecessary function calls related
             to plotting the same data again
 
-
-        Delegates plotting as follows:
-        ------------------------------
-        neo.Segment                     ↦ _plotSegment_ # needed to pick up which signal from segment
-        neo.AnalogSignal                ↦ _plot_signal_
-        neo.IrregularlySampledSignal    ↦ _plot_signal_
-        neo.Epoch                       ↦ _plot_signal_
-        neo.SpikeTrain                  ↦ _plot_signal_
-        neo.Event                       ↦ _plot_signal_
-        datasignal.DataSignal           ↦ _plot_signal_
-        vigra.Kernel1D, vigra.Kernel2D  ↦ _plotNumpyArray_
-            NOTE: These are converted to numpy.ndarray
-        numpy.ndarray                   ↦ _plotNumpyArray_
-            NOTE: This includes vigra.VigraArray and quantities.Quantity arrays
-            The meta-information in VigarArray objects is ignored here.
-
-
-        sequence (iterable)             ↦ _plotSequence_
-            NOTE: The sequence can contain these types:
-                neo.AnalogSignal,
-                neo.IrregularlySampledSignal,
-                datasignal.DataSignal,
-                np.ndarray
-                vigra.filters.Kernel1D  (NOTE  this is converted to two numpy arrays)
-
-        Anything else                   ↦ ignored
-
         """
+
+        # ### BEGIN Description
+        # Delegates plotting as follows:
+        # ------------------------------
+        # neo.Segment                     ↦ _plotSegment_ # needed to pick up which signal from segment
+        # neo.AnalogSignal                ↦ _plot_signal_
+        # neo.IrregularlySampledSignal    ↦ _plot_signal_
+        # neo.Epoch                       ↦ _plot_signal_
+        # neo.SpikeTrain                  ↦ _plot_signal_
+        # neo.Event                       ↦ _plot_signal_
+        # datasignal.DataSignal           ↦ _plot_signal_
+        # vigra.Kernel1D, vigra.Kernel2D  ↦ _plotNumpyArray_
+        #     NOTE: These are converted to numpy.ndarray
+        # numpy.ndarray                   ↦ _plotNumpyArray_
+        #     NOTE: This includes vigra.VigraArray and quantities.Quantity arrays
+        #     The meta-information in VigarArray objects is ignored here.
+        #
+        #
+        # sequence (iterable)             ↦ _plotSequence_
+        #     NOTE: The sequence can contain these types:
+        #         neo.AnalogSignal,
+        #         neo.IrregularlySampledSignal,
+        #         datasignal.DataSignal,
+        #         np.ndarray
+        #         vigra.filters.Kernel1D  (NOTE  this is converted to two numpy arrays)
+        #
+        # Anything else                   ↦ ignored
+        # ### END   Description
+
+
         # print("###")
         # traceback.print_stack()
         # print("###")
@@ -8571,11 +9057,7 @@ anything else       anything else       ❌
         # a different X domain
         self._axesXOffsetsCache_ = self.getViewXOffsets()
 
-        # print(f"{self.__class__.__name__}.displayFrame for {self.currentFrame} with _new_frame_ = {self._new_frame_}: {len(self._axesStatesCache_)} axes states\n\n###\n\n")
-
         self.currentFrameAnnotations = None
-
-        # print(f"SignalViewer({self._winTitle_}).displayFrame {self.currentFrame}")
 
         self._plot_data_(self._yData_, *self.plot_args, **self.plot_kwargs)
 
@@ -8610,86 +9092,145 @@ anything else       anything else       ❌
 
         self._update_annotations_() # is this one crashing the thread? -- No!
 
-        # Check if cursors want to stay in axis or stay with the domain
-        # and act accordingly
-        mfun = lambda x: -np.inf if x is None else x
-        pfun = lambda x: np.inf if x is None else x
+        # kAx = 0
+
+        visibleSignalAxes = [] # needed below, at NOTE: 2026-08-15 15:20:53
+        visibleAxes = []
 
         for k, ax in enumerate(self.axes):
-            # NOTE: 2025-07-13 22:21:02 potentia BUG / FIXME
-            # what is axes have different item data boundaries?
-            [[dataxmin, dataxmax], [dataymin, dataymax]] = guiutils.getPlotItemDataBoundaries(ax)
+            if not ax.isVisible():
+                continue
 
-            for c in self.cursorsInAxis(k):
-                if not c.staysInAxes:
-                    continue
+            if ax in self._signal_axes_:
+                visibleSignalAxes.append(ax) # needed below at NOTE: 2026-08-15 15:32:38
 
-                if not c.isHorizontal:
-                    relX = c.x - c.xBounds()[0]
-                    c.setBounds()
-                    c.x = dataxmin + relX
+            if self._axis_has_cursors_(ax):
+                self._update_axis_cursor_h_bounds_(ax)
 
-                if not c.isVertical:
-                    # print(f"{self.__class__.__name__}.displayFrame for cursor in axis {k}: cursor type {c.cursorType}, coordinates: {c.y}; bounds: {c.yBounds()}")
-                    yBounds = c.yBounds()
-                    relY = c.y - c.yBounds()[0]
-                    c.setBounds()
-                    c.y = dataymin+relY
+            if self._has_multi_axis_cursors_():
+                self._update_multi_axis_cursors_h_bounds()
 
-        # NOTE: 2022-11-22 11:49:47
-        # Finally, check for target overlays
+            if self._axis_has_curve_overlays(ax, k, self.currentFrame):
+                self._update_axis_curve_overlays_(ax, k, self.currentFrame)
 
-        try:
-            cFrame = self.frameIndex[self.currentFrame]
-        except:
-            cFrame = self.frameIndex[0]
+            if self._axis_has_target_overlays(ax):
+                self._clear_axis_target_overlays_(ax)
 
-        for k, ax in enumerate(self.axes):
-            if ax.isVisible():
-                self._clear_targets_overlay_(ax)
-                if cFrame in self._target_overlays_:
-                    targetItems = self._target_overlays_[cFrame].get(k, list())
-                    if len(targetItems):
-                        for tgt in targetItems:
-                            ax.addItem(tgt)
+            # NOTE: 2026-08-15 15:32:38
+            # update axes spines, so that they "share" their "X" axis, when it
+            # is feasible
+            # WARNING: MUST be done NOW, before meddling with X links and ranges
+            # below
+            if len(visibleAxes):
+                upperNeighbourAxis = visibleAxes[-1]
+                myXaxis = ax.getAxis("bottom")
+                myYaxis = ax.getAxis("left")
+                prevXaxis = upperNeighbourAxis.getAxis("bottom")
+                sameLabel = myXaxis.labelText == prevXaxis.labelText
+                prevXaxis.showLabel(not sameLabel)
+                prevXaxis.setStyle(showValues=False)
+                myYaxis.setWidth(self.leftLabelSpace)
+
+            # NOTE: 2026-08-15 15:20:53
+            if self.xAxesLinked:
+                currentXLinkedView = ax.vb.linkedView(0)
+                if len(visibleSignalAxes):
+                    if currentXLinkedView:
+                        if ax is visibleSignalAxes[0]:
+                            ax.vb.setXLink(None)
+
+                        elif (currentXLinkedView.parentItem != visibleSignalAxes[0]):
+                            ax.vb.setXLink(visibleSignalAxes[0])
+                    else:
+                        ax.vb.setXLink(visibleSignalAxes[0])
+
+            # TODO: 2026-08-15 15:26:51 refactor this, merge with the above
+            # This is responsible to maintain the relative X offsets of axes
+            # across different framesm, when axes have been "zoomed" (i.e.,
+            # not showing the full range)
+            #
+            # Necessary especially when plotting a neo.Block, where signals in
+            # each segment have different time domains; also applies to other
+            # simlar cases e.g., plotting signals with different time domains in
+            # separate frames, etc
+            #
+            if len(self._axesXOffsetsCache_):
+                cachedXOffset = self._axesXOffsetsCache_[k]
+                currentBounds = guiutils.getPlotItemDataBoundaries(ax)
+                cachedXLinkedView = cachedXOffset["xLinkedView"]
+                currentXLinkedView = ax.vb.linkedView(0)
+
+                if cachedXOffset["autoRangeX"]:
+                    # skip plot items that auto-range on X axis
+                    # but ensure it STAYS auto-ranged
+                    ax.vb.enableAutoRange(0)
+                    # continue
+
+                elif (isinstance(cachedXLinkedView, pg.ViewBox)
+                      and currentXLinkedView == cachedXLinkedView
+                      and not cachedXLinkedView.parentItem().isVisible()
+                      and cachedXLinkedView.parentItem().vb.state["autoRange"][0]
+                      ):
+                    ax.vb.enableAutoRange(0)
+                            # continue
+
+                # if currentXLinkedView and currentXLinkedView.state["autoRange"][0]:
+                #     continue
+
+                if (
+                    (not currentXLinkedView or not currentXLinkedView.state["autoRange"][0])
+                    and currentBounds[0][0] != cachedXOffset["bounds"][0][0]
+                    and currentBounds[0][1] != cachedXOffset["bounds"][0][1]
+                    ):
+
+                    newViewRangeX = (currentBounds[0][0] + cachedXOffset["xOffset"][0],
+                                     currentBounds[0][1] + cachedXOffset["xOffset"][1])
+
+                    if ax in self._signal_axes_:
+                        if currentXLinkedView:
+                            currentXLinkedView.blockLink(True)
+
+                        ax.setXRange(*newViewRangeX, padding = 0)
+
+                        if currentXLinkedView:
+                            currentXLinkedView.blockLink(False)
+
+                    else:
+                        if len(visibleSignalAxes) == 0:
+                            ax.setXRange(*newViewRangeX, padding = 0)
+
+            # NOTE: 2026-08-15 15:45:22
+            # append NOW, and NOT EARLIER
+            visibleAxes.append(ax) # needed above at NOTE: 2026-08-15 15:32:38
+
+        if len(visibleAxes):
+            visibleAxes[-1].getAxis("bottom").showLabel(True)
+            visibleAxes[-1].getAxis("bottom").setStyle(showValues = True)
+
 
         # NOTE: 2024-10-23 11:36:50 FIXME
         # hold off this for now
         # self._adjust_left_label_space_()
+
         # NOTE: 2026-04-02 09:19:39
         # connected to _slot_post_frameDisplay
-        self.sig_frameDisplayReady.emit()
+        # self.sig_frameDisplayReady.emit()
         self._new_data_ = False
 
-    def _get_axisXDataBounds(self, axis: typing.Union[int, pg.PlotItem]) -> tuple:
+    def _get_axisXDataBounds(self, axis: int | pg.PlotItem) -> tuple:
         # generator!
         # NOTE: 2026-04-07 22:42:49
         # possibly redundant with guiutils.getPlotItemDataBoundaries
         yield from guiutils.plotItemXDataBounds(axis)
-        # if isinstance(axis, int):
-        #     axis = self.axes[axis]
-        #
-        # x0 = np.array(list(map(lambda pdi: pdi.xData[0],
-        #                        filter(lambda i: (isinstance(i, pg.PlotDataItem)
-        #                                          and isinstance(i.xData, np.ndarray)
-        #                                          and i.xData.size > 0),
-        #                               axis.listDataItems()))))
-        # x1 = np.array(list(map(lambda pdi: pdi.xData[-1],
-        #                        filter(lambda i: (isinstance(i, pg.PlotDataItem)
-        #                                          and isinstance(i.xData, np.ndarray)
-        #                                          and i.xData.size > 0),
-        #                               axis.listDataItems()))))
-        # if len(x0) and len(x1):
-        #     yield np.nanmin(x0), np.nanmax(x1)
 
     @Slot()
     def _slot_post_frameDisplay(self):
-        self._process_X_ranges_()
+        # self._process_X_ranges_() # FIXME 2026-08-15 15:07:08 TOO SLOW !!!
         self._update_axes_spines_()
 
     # NOTE: 2026-04-04 14:03:37
     # OK, so _process_X_ranges_ works but it's slow ...
-    # @timefunc
+    # @timemethod
     def _process_X_ranges_(self, padding:typing.Optional[float] = None):
         r""" Maintains an X view range for frames with different X data bounds.
     Necessary to recreate a view range to an axis relative to the axis' X data.
@@ -8720,7 +9261,7 @@ anything else       anything else       ❌
         if len(tuple(filter(lambda ax: ax.isVisible(), self.axes))) == 0:
             return
 
-        getLinkedView = lambda l: pg.ViewBox.NamedViews.get(l, l)
+        # getLinkedView = lambda l: pg.ViewBox.NamedViews.get(l, l)
 
         visibleAxes = tuple(filter(lambda ax: ax.isVisible(), self.axes))
         visibleSignalAxes = tuple(filter(lambda ax: ax.isVisible(), self.signalAxes))
@@ -8791,11 +9332,9 @@ anything else       anything else       ❌
                     if len(visibleSignalAxes) == 0:
                         ax.setXRange(*newViewRangeX, padding = 0)
 
+    # @timemethod
     def _update_axes_spines_(self):
         visibleAxes = [ax for ax in self.axes if ax.isVisible()]
-
-        # if len(visibleAxes) == 0:
-        #     return
 
         for k, ax in enumerate(self.axes):
             if k > 0:
@@ -8817,7 +9356,6 @@ anything else       anything else       ❌
                 prev_ax.getAxis("bottom").showLabel(not sameLabel)
                 prev_ax.getAxis("bottom").setStyle(showValues=False)
 
-                # ax.getAxis("left").setWidth(60)
                 ax.getAxis("left").setWidth(self.leftLabelSpace)
 
                 # if ax in axes_with_X_overlap: # also hide axis values if same boundaries
@@ -8834,7 +9372,7 @@ anything else       anything else       ❌
         r"""Common landing zone for SpikeTrainList or collection of SpikeTrain.
         Actual plotting delegated to _plot_discrete_entities_.
         """
-        standaloneTrains = self._yData_ is trains
+        # standaloneTrains = self._yData_ is trains
         # plot all spike trains stacked in a single axis
         if self._plot_spiketrains_:
             if isinstance(trains, neo.SpikeTrain):
@@ -8899,25 +9437,23 @@ anything else       anything else       ❌
         else:
             self._events_axis_.setVisible(False)
 
-        # events_dict = self._prep_entity_dict_(events, (neo.Event, DataMark))
-
-
     def _plot_epoch_data_(self, epoch:typing.Union[neo.Epoch, DataZone], **kwargs):
         r""" Plots the time intervals defined in a single neo.Epoch or DataZone """
-        brush = kwargs.pop("brush", self.epoch_plot_options["epoch_brush"])
-
-        # relative = getattr(epoch, "relative", False)
-
-        epoch_units = epoch.units
+        # print(f"{self.__class__.__name__}._plot_epoch_data_({epoch})")
+        epoch_pen = kwargs.pop("epoch_pen", self.epoch_plot_options["epoch_pen"])
+        epoch_brush = kwargs.pop("epoch_brush", self.epoch_plot_options["epoch_brush"])
+        epoch_hoverPen = kwargs.pop("epoch_hoverPen", self.epoch_plot_options["epoch_hoverPen"])
+        epoch_hoverBrush = kwargs.pop("epoch_hoverBrush", self.epoch_plot_options["epoch_hoverBrush"])
+        epochAxis = kwargs.pop("axis", None)
 
         x0 = epoch.times.flatten().magnitude
         x1 = x0 + epoch.durations.flatten().magnitude
 
-        # brush = next(brushes)
-
+        labels = epoch.labels
 
         for k in range(len(self.axes)):
-            self.axes[k].update() # to update its viewRange()
+            plotItem = self.axes[k]
+            plotItem.update() # to update its viewRange()
 
             # NOTE: 2024-07-27 23:00:23
             # see TODO: 2024-07-27 22:46:05
@@ -8929,21 +9465,50 @@ anything else       anything else       ❌
 #                 x0_ = x0
 #                 x1_ = x1
 
-            # regions = [v for v in zip(x0_, x1_)]
-
             regions = [v for v in zip(x0, x1)]
 
             lris = [pg.LinearRegionItem(values=value,
-                                        brush=brush,
+                                        brush=epoch_brush,
+                                        hoverBrush=epoch_hoverBrush,
+                                        pen=epoch_pen,
+                                        hoverPen=epoch_hoverPen,
                                         orientation=pg.LinearRegionItem.Vertical,
                                         movable=False, **kwargs) for value in regions]
 
+            labelsAxis = self.selectedAxis if isinstance(self.selectedAxis, pg.PlotItem) and self.selectedAxis.isVisible() else self.visibleAxes[0] if len(self.visibleAxes) else None
+
+            # NOTE: 2026-05-01 10:15:39
+            # allow plotting the epoch on a specific axis
+            isAxisSpecific = isinstance(epochAxis, str) and len(epochAxis.strip())
+            if isAxisSpecific:
+                if plotItem.vb.name == epochAxis:
+                    labelsAxis = plotItem
+                else:
+                    continue
+
+            elif isinstance(epochAxis, int):
+                if epochAxis == k:
+                    labelsAxis = plotItem
+                else:
+                    continue
+
             for kl, lri in enumerate(lris):
-                self.axes[k].addItem(lri)
+                plotItem.addItem(lri)
+                # self.axes[k].addItem(lri)
                 lri.setZValue(10)
                 lri.setVisible(True)
                 lri.setRegion(regions[kl])
+                if kl < len(labels) and (labelsAxis == plotItem or isAxisSpecific):
+                    labelText = str(labels[kl])
+                    labelTextHeight = guiutils.get_text_height(labelText)
+                    lriBoundingRect = lri.boundingRect()
+                    # yPos = (lriBoundingRect.height() - 2 * labelTextHeight) / lriBoundingRect.height()
 
+                    lri.lines[0].label = pg.InfLineLabel(lri.lines[0], text=str(labels[kl]),
+                                                         position = 0.8,
+                                                         color = lri.currentBrush.color().darker().name(),
+                                                         # color = lri.lines[0].pen.color(),
+                                                         )
 
     def _plot_epochs_sequence_(self, *args, **kwargs):
         r"""Plots data from a sequence of neo.Epochs.
@@ -8958,10 +9523,12 @@ anything else       anything else       ❌
         if len(args) == 0:
             return
 
-        epoch_pen = kwargs.pop("epoch_pen", self.epoch_plot_options["epoch_pen"])
         epoch_brush = kwargs.pop("epoch_brush", self.epoch_plot_options["epoch_brush"])
-        epoch_hoverPen = kwargs.pop("epoch_hoverPen", self.epoch_plot_options["epoch_hoverPen"])
-        epoch_hoverBrush = kwargs.pop("epoch_hoverBrush", self.epoch_plot_options["epoch_hoverBrush"])
+
+        # NOTE: do not remove yet
+        # epoch_pen = kwargs.pop("epoch_pen", self.epoch_plot_options["epoch_pen"])
+        # epoch_hoverPen = kwargs.pop("epoch_hoverPen", self.epoch_plot_options["epoch_hoverPen"])
+        # epoch_hoverBrush = kwargs.pop("epoch_hoverBrush", self.epoch_plot_options["epoch_hoverBrush"])
 
         # plot LRIs in a different colour for each epoch;
         # all LRIs that belong to the same epoch have the same colour.
@@ -8996,7 +9563,17 @@ anything else       anything else       ❌
 
         for epoch in args:
             brush = next(brushes)
-            self._plot_epoch_data_(epoch, brush)
+            hoverBrush = QtGui.QBrush(QtGui.QColor(brush.color().lighter()))
+            self._plot_epoch_data_(epoch, epoch_brush = brush, epoch_hoverBrush = hoverBrush)
+
+#     def plotOverlay(self, obj, axis, *args, **kwargs):
+#         axis = self.getAxis(axis)
+#
+#         axNsx = self.axes.index(axis)
+#         self._current_array_data_overlay_[axNdx] = obj
+#
+#
+#         self.displayFrame()
 
     @singledispatchmethod
     def _plot_data_(self, obj, *args, **kwargs):
@@ -9005,7 +9582,9 @@ anything else       anything else       ❌
     @_plot_data_.register(neo.Block)
     def __plot_data_(self, obj: neo.Block, *args, **kwargs):
         # NOTE: 2019-11-24 22:31:26
-        # select a segment then delegate to _plotSegment_()
+        # select a segment then dispatches to _plot_data_[segment]
+        # to delegate to _plotSegment_()
+        #
         # Segment selection is based on self.frameIndex, or on self.channelIndex
         # NOTE 2021-10-03 12:59:10 ChannelIndex is no more
 
@@ -9031,9 +9610,10 @@ anything else       anything else       ❌
         self.currentFrameAnnotations = {type(segment).__name__ : segment.annotations}
 
     @_plot_data_.register(neo.Segment)
-    def __plot_data_(self, obj: neo.Segment, *args, **kwargs):
+    # @timemethod
+    def __plot_data_(self, obj: neo.Segment, *args, **kwargs): # noqa
         r"""Plots a neo.Segment.
-        Plots the signals (optionally the selected ones) present in a segment,
+        Plots the signals (optionally, only the selected ones) present in a segment,
         and the associated epochs, events, and spike trains.
         """
         analog = obj.analogsignals
@@ -9139,9 +9719,11 @@ anything else       anything else       ❌
         epoch_hoverPen = kwargs.pop("epoch_hoverPen", self.epoch_plot_options["epoch_hoverPen"])
         epoch_hoverBrush = kwargs.pop("epoch_hoverBrush", self.epoch_plot_options["epoch_hoverBrush"])
 
+        epochAxis = epoch.annotations.get("axis", None)
         self._plot_epoch_data_(epoch, brush=epoch_brush, pen=epoch_pen,
                                hoverBrush=epoch_hoverBrush,
-                               hoverPen = epoch_hoverPen)
+                               hoverPen = epoch_hoverPen,
+                               axis=epochAxis)
 
         self.currentFrameAnnotations = {type(obj).__name__: obj.annotations}
 
@@ -9311,7 +9893,10 @@ anything else       anything else       ❌
 
             for epoch in obj:
                 brush = next(brushes)
-                self._plot_epoch_data_(epoch, brush=brush,**kwargs)
+                hoverBrush = brush.color().lighter()
+                self._plot_epoch_data_(epoch, epoch_brush=brush,
+                                       epoch_hoverBrush=hoverBrush,
+                                       **kwargs)
 
             self.currentFrameAnnotations = {type(obj).__name__: [getattr(y_, "annotations", dict()) for y_ in obj]}
 
@@ -9552,6 +10137,13 @@ anything else       anything else       ❌
         if len(analog) + len(irregs) == 0:
             return None, None
 
+        # BUG 2026-08-13 12:02:19 FIXME
+        # does not play well when the analogsignals collection in a segment has
+        # changed its length; I think the bug is upstream of this call, though...#
+        #
+        # the BUG manifests when the number of signals in a segment's analogsignals
+        # collection was changed manually, e.g. at the console - check the workspacemodel
+        # and how it signals the current viewer to refresh (if any)
         assert len(self.signalAxes) >= len(analog) + len(irregs), f"Mismatch between number of signal axes ({len(self.signalAxes)}) and available signals (analog {len(analog)} + irregs {len(irregs)} = {len(analog) + len(irregs)})"
 
         # NOTE: 2023-01-12 16:45:48
@@ -9911,7 +10503,7 @@ anything else       anything else       ❌
 
     @safewrapper
     @Slot(dict)
-    def _slot_plot_numeric_data_(self, data:dict):
+    def _slot_plot_numeric_data_(self, data: dict):
         r"""For dict's keys and values see parameters of self._plot_numeric_data_
         For threading...
         """
@@ -9938,14 +10530,16 @@ anything else       anything else       ❌
         self.setCursor(QtCore.Qt.ArrowCursor)
         self.statusBar().clearMessage()
 
-    def _plot_events_or_marks_(self, entities_list, entities_axis, xLabel, yLabel, minX, maxX, adapt_X_range, height_interval, symbolStyle, **labelStyle):
+    def _plot_events_or_marks_(self, entities_list, entities_axis,
+                               xLabel, yLabel, minX, maxX, adapt_X_range,
+                               height_interval, symbolStyle, **labelStyle):
         r""" Helper method for self._plot_discrete_entities_(events or data marks)"""
         symbolColor = symbolStyle["color"]
         symbolPen = symbolStyle["pen"]
         symbolBrush = symbolStyle.get("brush", None)
         # symbol = symbolStyle["symbol"]
         # print(f"symbol = {symbol}")
-        max_len =  max((len(event.times) for event in entities_list))
+        max_len =  max(len(event.times) for event in entities_list)
         xx = [np.full((1,max_len), np.nan) for event in entities_list]
 
         yy = list()
@@ -9994,7 +10588,8 @@ anything else       anything else       ❌
                                                         xUnits = xUnits,
                                                         symbolColor = symbolColor,
                                                         symbolBrush = symbolBrush,
-                                                        symbolPen   = symbolPen)
+                                                        symbolPen   = symbolPen,)
+                                                        # itemType    = pg.ScatterPlotItem) # don't delete - see TODO 2026-04-18 23:18:00
                                 )
         else:
             self._plot_numeric_data_(entities_axis, xx_, yy_,
@@ -10003,7 +10598,8 @@ anything else       anything else       ❌
                                     xUnits = xUnits,
                                     symbolColor = symbolColor,
                                     symbolBrush = symbolBrush,
-                                    symbolPen   = symbolPen)
+                                    symbolPen   = symbolPen,)
+                                    # itemType    = pg.ScatterPlotItem) # don't delete - see TODO 2026-04-18 23:18:00
 
         # entities_axis.setLabel(bottom = xLabel, left = yLabel)
         entities_axis.axes["left"]["item"].setPen(None)
@@ -10226,6 +10822,12 @@ anything else       anything else       ❌
         a pyqtgraph.PlotItem where the data was plotted
 
         """
+        # NOTE: 2026-08-21 15:53:12
+        # get the new plot data items to signal when they've been clicked (selected)
+
+        # TODO 2026-04-18 23:18:00
+        # think about using pg.ScatterPlotItem for events
+
         # print(f"{self.__class__.__name__}._plot_numeric_data_ xUnits: {xUnits}, yUnits: {yUnits}")
 
         # ATTENTION: y is a numpy arrays here; x is either None, or a numpy array
@@ -10235,6 +10837,8 @@ anything else       anything else       ❌
         # for s in stack:
         #     print(f"\tcaller\t {s.function} at line {s.lineno}")
         # ### END debug
+
+        axNdx = self.axes.index(plotItem)
 
         y = np.atleast_1d(y)
 
@@ -10265,6 +10869,7 @@ anything else       anything else       ❌
         symbolColor = kwargs.get("symbolColor", None)
         color = kwargs.get("color", None)
         name = kwargs.get("name", None)
+        plotDataItemClass = kwargs.pop("itemType", pg.PlotDataItem)
 
         pen = kwargs.get("pen", QtGui.QPen(QtGui.QColor("black"),1))
         if isinstance(pen, QtGui.QPen): # because the caller may have passed 'pen=None'
@@ -10289,7 +10894,17 @@ anything else       anything else       ❌
         # rewriting into a pg.PlotDataItem needs vector (array with shape (N,))
         # OR array with shape (N,2);
         # "vectors" with shape (N,1) won't do
-        plotDataItems = [i for i in plotItem.listDataItems() if isinstance(i, pg.PlotDataItem)]
+        # plotDataItems = [i for i in plotItem.listDataItems() if isinstance(i, plotDataItemClass)]
+
+        cFrame = self.currentFrame
+
+        axOverlayItems = self._curve_overlays_.get(cFrame, dict()).get(axNdx, list())
+
+        plotDataItems = list(filter(lambda i: (isinstance(i, plotDataItemClass) and
+                                               i not in axOverlayItems),
+                                    plotItem.listDataItems()
+                                    )
+                             )
 
         if y.ndim == 1:
             y_nan_ndx = np.atleast_1d(np.isnan(y))
@@ -10315,16 +10930,22 @@ anything else       anything else       ❌
                             plotItem.removeItem(item)
 
                     plotDataItems[0].clear()
+
                     if xx is not None:
                         plotDataItems[0].setData(x=xx, y=yy, **kwargs)
                     else:
                         plotDataItems[0].setData(y=yy, **kwargs)
 
                 else:
+                    # isntantiates new PlotDataItem objects
                     if xx is not None:
-                        plotItem.plot(x=xx, y=yy, **kwargs)
+                        pdi = plotItem.plot(x=xx, y=yy, **kwargs)
+
                     else:
-                        plotItem.plot(y=yy, **kwargs)
+                        pdi = plotItem.plot(y=yy, **kwargs)
+
+                    pdi.setCurveClickable(True)
+                    pdi.sigClicked[object, object].connect(self._slot_plotDataItemClicked)
 
             else:
                 if xx is not None:
@@ -10418,22 +11039,25 @@ anything else       anything else       ❌
                     else:
                         if xx is not None:
                             # print(f"kwargs = {kwargs}")
-                            plotItem.plot(x = xx, y = yy, **kwargs)
+                            pdi = plotItem.plot(x = xx, y = yy, **kwargs)
+
                         else:
-                            plotItem.plot(y = yy, **kwargs)
+                            pdi = plotItem.plot(y = yy, **kwargs)
+
+                        pdi.setCurveClickable(True)
+                        pdi.sigClicked[object, object].connect(self._slot_plotDataItemClicked)
 
                 else:
                     if xx is not None:
-                        plotItem.plot(x = xx, y = yy, **kwargs)
-                    else:
-                        plotItem.plot(y = yy, **kwargs)
+                        pdi = plotItem.plot(x = xx, y = yy, **kwargs)
 
+                    else:
+                        pdi = plotItem.plot(y = yy, **kwargs)
+
+                    pdi.setCurveClickable(True)
+                    pdi.sigClicked[object, object].connect(self._slot_plotDataItemClicked)
 
         plotItem.setLabels(bottom = [xlabel], left=[ylabel])
-        # textOption = plotItem.axes["left"]["item"].label.document().defaultTextOption()
-        # textOption.setWrapMode(QtGui.QTextOption.WordWrap)
-        # plotItem.axes["left"]["item"].label.document().setDefaultTextOption(textOption)
-        # plotItem.axes["left"]["item"].label.setTextWidth(2*plotItem.height()/3)
 
         if isinstance(title, str) and len(title.strip()):
             plotItem.setTitle(title)
@@ -10449,6 +11073,7 @@ anything else       anything else       ❌
                 lbl = lbl[3 : lbl.find("</B>")]
                 plotItem.setLabel("left", lbl)
 
+
         # NOTE: 2025-07-14 21:49:57
         # as plotItem inherits from QGraphicsItem, we can use the user's data
         # available from Qt API to store X units under key 0, and yUnits under key 1
@@ -10457,11 +11082,14 @@ anything else       anything else       ❌
 
         plotItem.replot() # must be called NOW, and NOT earlier !
 
+
+
         return plotItem
 
-    def _remove_axes_(self, plotItem:pg.PlotItem):
+    def _remove_axis_(self, plotItem:pg.PlotItem):
         cursors = self.cursorsInAxis(plotItem)
         k = self.axes.index(plotItem)
+        # del self.signalsLayout[k]  # remove plotItem from self.axes
         if len(cursors):
             for cursor in cursors:
                 cursor.detach() # option (b)
@@ -10474,10 +11102,30 @@ anything else       anything else       ❌
         if plotItem in self._signal_axes_:
             self._signal_axes_.remove(plotItem)
 
-        plotItem.close()
+        entry = plotItem.getViewBox().name
+        self._unregister_plot_item_name_(plotItem, entry)
+
         self.signalsLayout.removeItem(plotItem)
+
         if self.currentAxis == plotItem:
             self.currentAxis = self.axes[0] if len(self.axes) else None
+
+        self._selected_plot_data_item_ = None
+
+        # if qtutils.isQObjectAlive(plotItem.vb):
+        #     vb = plotItem.vb
+        #     vb.deleteLater()
+        #     vb = None
+        #     del vb
+
+        # plotItem.close()
+        # print(f"{self.__class__.__name__}._remove_axis_ {entry}")
+        if qtutils.isQObjectAlive(plotItem):
+            plotItem.vb.close()
+            plotItem.deleteLater()
+            plotItem = None
+            del plotItem
+
 
     def _showXGrid(self, value:bool):
         for ax in self.axes:
@@ -10649,7 +11297,7 @@ anything else       anything else       ❌
 
             # remove the rest of them
             for plotItem in self.signalAxes[_n_signal_axes_:]:
-                self._remove_axes_(plotItem)
+                self._remove_axis_(plotItem)
 
             self._signal_axes_ = self._signal_axes_[:_n_signal_axes_]
 
@@ -10703,8 +11351,12 @@ anything else       anything else       ❌
             self.signalsLayout.scene().sigMouseClicked.connect(self._slot_mouseClickSelectPlotItem)
 
         for plotItem in self.axes:
-            self._clear_targets_overlay_(plotItem)
-            self._clear_labels_overlay_(plotItem)
+            if self._axis_has_target_overlays(plotItem):
+                self._clear_axis_target_overlays_(plotItem)
+            # self._clear_targets_overlay_(plotItem)
+            if self._axis_has_label_overlays(plotItem):
+                self._clear_axis_label_overlays_(plotItem)
+            # self._clear_labels_overlay_(plotItem)
 
             # NOTE: 2024-11-13 20:20:22 BUG/FiXME
             # hold thif off until we figure out a better way to manage the horizontal
@@ -10786,7 +11438,7 @@ anything else       anything else       ❌
         else:
             self._update_coordinates_viewer_()
 
-    def _addCursors_parse_coords_(self, coords, cursorType):
+    def _addCursors_parse_coords_(self, coords, cursorType) -> tuple:
         # print(f"{self.__class__.__name__}._addCursors_parse_coords_ coords {coords}")
         if isinstance(coords, (tuple, list)) and all([isinstance(v, numbers.Number) for v in coords]):
             if len(coords) == 1:
@@ -10807,7 +11459,6 @@ anything else       anything else       ❌
 
             else:
                 raise ValueError(f"Invalid coordinates specified - expecting at most two; instead, got  {coords}")
-
 
         elif isinstance(coords, (pq.Quantity, np.ndarray)):
             if coords.size == 1:
@@ -10859,10 +11510,12 @@ anything else       anything else       ❌
 
         return x,y
 
-    def _use_coords_sequence_(self, seq, xw, yw, lbls, ax, cursorType):
+    def _use_coords_sequence_(self, seq, xw, yw, lbls, ax, cursorType) -> tuple:
         r"""Adds cursors based on a sequence of cursor coordinates
         """
         # print(f"_use_coords_sequence_ seq = {seq}, xw = {xw}, yw = {yw}, lbls = {lbls}, ax = {ax}")
+        ret = list()
+
         for (k, coords) in enumerate(seq):
             x, y = self._addCursors_parse_coords_(coords, cursorType)
 
@@ -10901,25 +11554,87 @@ anything else       anything else       ❌
                 lbl = f"{cursorType.name[0]}{len(n_existing_cursors)}"
 
             if isinstance(ax, (int, pg.PlotItem, str)):
-                self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
+                cID = self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
                             label=lbl, show_value = self.setCursorsShowValue.isChecked(),
                             axis=ax)
+                ret.append(cID)
 
             elif isinstance(ax, (tuple, list)) and all(isinstance(a, (int, pg.PlotItem)) for a in ax):
                 if len(ax) != len(seq):
                     raise ValueError(f"number of axes ({len(ax)}) should be the same as the number of cursors ({len(seq)})")
 
-                self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
+                cID = self.addCursor(cursorType=cursorType, x=x, y=y, xwindow=wx, ywindow=wy,
                             label=lbl, show_value = self.setCursorsShowValue.isChecked(),
                             axis=ax[k])
+                ret.append(cID)
+
+        return tuple(ret)
 
     @safewrapper
     def _reportMouseCoordinatesInAxis_(self, pos, plotitem):
-        if isinstance(plotitem, pg.PlotItem):
+        if isinstance(plotitem, pg.PlotItem) and qtutils.isQObjectAlive(plotitem):
             if plotitem.sceneBoundingRect().contains(pos):
-                plot_name = plotitem.vb.name
+                if isinstance(plotitem.vb, pg.ViewBox):
+                    plot_name = plotitem.vb.name
+                else:
+                    if plotitem in self.signalAxes:
+                        ndx = self.signalAxes.index(plotitem)
+                        plot_name = f"Axis {ndx}"
+
+                    elif plotitem == self.eventsAxis:
+                        plot_name = "Events axis"
+
+                    elif plotitem == self.spikeTrainsAxis:
+                        plot_name = "Spike Trains Axis"
+
+                entity_text = None
 
                 mousePoint = plotitem.vb.mapSceneToView(pos)
+
+                if plotitem == self.eventsAxis:
+                    entities = list(filter(lambda i: isinstance(i, pg.PlotDataItem), plotitem.items))
+                    xax = plotitem.axes["bottom"]["item"]
+                    viewXrange = plotitem.vb.viewRange()[0]
+                    xax_length = xax.boundingRect().width()
+
+                    tickSpacing = xax.tickSpacing(viewXrange[0], viewXrange[1], xax_length)[-1][0]
+                    # NOTE: 2026-04-18 23:42:36
+                    # don't delete next line - consider ScatterPlotItem for events, see TODO 2026-04-18 23:18:00
+                    # entities = list(filter(lambda i: isinstance(i, pg.ScatterPlotItem), plotitem.items))
+                    if len(entities):
+                        if isinstance(self.yData, neo.Block):
+                            events = self.yData.segments[self.currentFrame].events
+                        elif isinstance(self.yData, typing.Sequence) and all(isinstance(y_, neo.Segment) for y_ in self.yData):
+                            events = self.yData[self.currentFrame].events
+                        elif isinstance(self.yData, neo.Segment):
+                            events = self.yData.events
+                        elif isinstance(self.yData, neo.Event):
+                            events = [self.yData]
+
+                        if len(events) == len(entities):
+                            height_interval = 1/len(entities)
+                            entityNdx = int((mousePoint.y() - height_interval/2) / height_interval)
+                            if entityNdx >=0 and entityNdx < len(entities):
+                                event = events[entityNdx]
+                                mp = mousePoint.x()
+                                if not np.isnan(mp):
+                                    entityPointNdx = np.where((event.times.magnitude > mp - tickSpacing) & (event.times.magnitude < mp + tickSpacing))[0]
+                                    if entityPointNdx.size > 0:
+                                        entityPointNdx = int(entityPointNdx[-1])
+                                        if entityPointNdx>=0 and entityPointNdx < event.labels.size:
+                                            entity_text = str(event.labels[entityPointNdx])
+                                        else:
+                                            entity_text = None
+                                    else:
+                                        entity_text = None
+                                else:
+                                    entity_text = None
+                            else:
+                                entity_text = None
+                        else:
+                            entity_text = None
+                    else:
+                        entity_text = None
 
                 x_text = "%f" % mousePoint.x()
                 y_text = "%f" % mousePoint.y()
@@ -10928,7 +11643,10 @@ anything else       anything else       ❌
 
                 self._mouse_coordinates_text_ = "%s:\n%s" % (plot_name, display_text)
 
-                self.statusBar().showMessage(self._mouse_coordinates_text_)
+                if isinstance(entity_text, str) and len(entity_text.strip()):
+                    self.statusBar().showMessage(self._mouse_coordinates_text_ + " " + entity_text)
+                else:
+                    self.statusBar().showMessage(self._mouse_coordinates_text_)
 
             else:
                 self.statusBar().clearMessage()
@@ -10938,6 +11656,21 @@ anything else       anything else       ❌
     def _update_coordinates_viewer_(self):
         self.coordinatesViewer.setPlainText(self._cursor_coordinates_text_)
 
+    @Slot(object, object)
+    def _slot_plotDataItemClicked(self, *args):
+        # NOTE 2026-08-21 15:55:02
+        # see NOTE: 2025-07-14 21:49:57
+        # FIXME: 2026-08-21 17:06:37
+        # not quite right!
+        # print(f"{self.__class__.__name__}._slot_plotDataItemClicked({args})")
+        pci, evt = args
+        # print(f"{self.__class__.__name__}._slot_plotDataItemClicked -> pci = {pci} -> view={pci.getViewWidget()}")
+        # self.exportDataToWorkspace(pci, "pci", dialog=False)
+
+        selectedpdi = pci.parentItem()
+        # print(f"\n\tselectedpdi -> {selectedpdi}")
+        self._selected_plot_data_item_ = selectedpdi
+
     @Slot(object)
     @safewrapper
     def _slot_mouseClickSelectPlotItem(self, evt):
@@ -10946,7 +11679,7 @@ anything else       anything else       ❌
         if len(self.axes) == 0:
             return
 
-        if isinstance(focusItem, pg.ViewBox):
+        if isinstance(focusItem, pg.ViewBox) and qtutils.isQObjectAlive(focusItem):
             plotitems, rc = zip(*self.axesWithLayoutPositions)
 
             focusedPlotItems = [i for i in plotitems if i.vb is focusItem]
@@ -10976,6 +11709,12 @@ anything else       anything else       ❌
             for ax in self.axes:
                 self._setAxisIsActive(ax, False)
 
+        if isinstance(self._selected_plot_data_item_, pg.PlotDataItem):
+            if self._selected_plot_data_item_ not in self._selected_plot_item_.items:
+                self._selected_plot_data_item_ = None
+
+        # self._selected_plot_data_item_ = None
+
     @safewrapper
     def clearEpochs(self):
         self._plotEpochs_()
@@ -10991,6 +11730,7 @@ anything else       anything else       ❌
         # print(f"{self.__class__.__name__}.clear()")
         self._selected_plot_item_ = None
         self._selected_plot_item_index_ = -1
+        self._selected_plot_data_item_ = None
         self._hovered_plot_item_ = None
 
         for axis in self.axes:
@@ -11024,15 +11764,6 @@ anything else       anything else       ❌
         self.linkedCrosshairCursors = []
         self.linkedHorizontalCursors = []
         self.linkedVerticalCursors = []
-#         if not keepCursors:
-#             self._crosshairSignalCursors_.clear() # a dict of SignalCursors mapping str name to cursor object
-#             self._verticalSignalCursors_.clear()
-#             self._horizontalSignalCursors_.clear()
-#             self._cached_cursors_.clear()
-#
-#             self.linkedCrosshairCursors = []
-#             self.linkedHorizontalCursors = []
-#             self.linkedVerticalCursors = []
 
         self.signalNo = 0
         self.frameIndex = [0]
@@ -11070,17 +11801,23 @@ anything else       anything else       ❌
         self.docTitle = None # to completely remove the data name from window title
 
         for p in self.plotItems:
-            self._remove_axes_(p)
+            self._remove_axis_(p)
 
         # remove all PlotItems references
         self._signal_axes_.clear()
+
+        self._n_signal_axes_ = len(self.signalAxes)
         self._events_axis_ = None
         self._spiketrains_axis_ = None
 
     def clearAxes(self):
         self._clear_lris_()
+        self._selected_plot_item_ = None
+        self._selected_plot_item_index_ = -1
+        self._selected_plot_data_item_ = None
         for ax in self.axes:
             self.removeTargetsOverlay(ax)
+            self.removeCurveOverlays(ax)
             ax.clear()
             ax.setVisible(False)
 
@@ -11267,7 +12004,7 @@ anything else       anything else       ❌
     def getPlotItemXOffsets(self, o: pg.PlotItem) -> dict | None:
         if not isinstance(o, pg.PlotItem):
             return
-        getLinkedView = lambda l: pg.ViewBox.NamedViews.get(l, l)
+        getLinkedView = lambda l: pg.ViewBox.NamedViews.get(l, l) # noqa
 
         bounds = guiutils.getPlotItemDataBoundaries(o)
         state = o.vb.getState()
@@ -11325,10 +12062,11 @@ anything else       anything else       ❌
     @property
     def dataCursors(self):
         r"""Alias to cursors and signalCursors properties"""
+        return self.cursors
 
-    @property
-    def selectedAxis(self):
-        return self._selected_plot_item_
+    # @property
+    # def selectedAxis(self):
+    #     return self._selected_plot_item_
 
     # aliases to setData
     plot = setData
@@ -11362,7 +12100,182 @@ anything else       anything else       ❌
     @Slot(object, object)
     def _slot_plotItemYRangeChanged(self, obj1: object, obj2: object):
         sender=self.sender()
-        print(f"{self.__class__.__name__}._slot_plotItemYRangeChanged({obj1},{obj2})")
-        print(f"\tfrom sender {sender}")
+        # print(f"{self.__class__.__name__}._slot_plotItemYRangeChanged({obj1},{obj2})")
+        # print(f"\tfrom sender {sender}")
 
 
+    # --- ancillay stuff
+
+    # @timemethod
+    def _clear_axis_target_overlays_(self, ax):
+        # if not ax.isVisible():
+        #     return
+
+        for item in self._get_axis_target_overlays(ax):
+            ax.removeItem(item)
+
+    # @timemethod
+    def _clear_axis_label_overlays_(self, ax):
+        # if not ax.isVisible():
+        #     return
+
+        for item in self._get_axis_label_overlays(ax):
+            ax.removeItem(item)
+
+    # @timemethod
+    def _clear_axis_lris_(self, ax):
+        for item in self._get_axis_lris(ax):
+            ax.removeItem(item)
+
+    # @timemethod
+    def _update_axis_cursor_h_bounds_(self, ax):
+        if not ax.isVisible():
+            return
+        cursors = self._get_axis_data_cursors(ax)
+        if len(cursors):
+            [dataxmin, dataxmax], _= guiutils.getPlotItemDataBoundaries(ax)
+            # [dataxmin, dataxmax], [dataymin, dataymax]= guiutils.getPlotItemDataBoundaries(ax)
+            ax_xUnits = ax.data(0)
+            ax_yUnits = ax.data(1)
+
+            if isinstance(ax_xUnits, pq.Quantity):
+                dataxmin, dataxmax = tuple(
+                    map(
+                            lambda v: v * ax_xUnits,
+                            (dataxmin, dataxmax)
+                        )
+                    )
+
+            for c in cursors:
+                if not c.staysInAxes:
+                    continue
+
+                if not c.isHorizontal:
+                    newX = ephys.adapt_coordinate_to_lower_boundary(c.x, c.xBounds()[0], dataxmin)
+                    c.setBounds()
+                    c.x = newX
+
+                if not c.isVertical:
+                    c.setBounds()
+
+    def _update_multi_axis_cursors_h_bounds(self):
+        cursors = self._get_multi_axis_cursors()
+        if len(cursors):
+            for c in cursors:
+                c.setBounds()
+
+    def _axis_has_cursors_(self, ax):
+        return any(c.hostItem is ax for c in self._data_cursors_.values())
+
+    def _has_multi_axis_cursors_(self):
+        return any(c.hostItem is self.signalsLayout.scene() for c in self._data_cursors_.values())
+
+    # @timemethod
+    def _update_horizontal_bounds_for_cursors_(self):
+        for k, ax in enumerate(self.axes):
+            # NOTE: 2025-07-13 22:21:02 potential BUG / FIXME
+            # what axes have different item data boundaries?
+
+            if len(self.cursorsInAxis(k)) == 0:
+                continue
+
+            [[dataxmin, dataxmax], [dataymin, dataymax]] = guiutils.getPlotItemDataBoundaries(ax)
+
+            ax_xUnits = ax.data(0)
+            ax_yUnits = ax.data(1)
+
+            if isinstance(ax_xUnits, pq.Quantity):
+                dataxmin, dataxmax = tuple(map(lambda v: v * ax_xUnits, (dataxmin, dataxmax)))
+
+            # if isinstance(ax_yUnits, pq.Quantity):
+            #     dataymin, dataymax = tuple(map(lambda v: v * ax_yUnits, (dataymin, dataymax)))
+
+            for c in self.cursorsInAxis(k):
+                if not c.staysInAxes:
+                    continue
+
+                if not c.isHorizontal:
+                    newX = ephys.adapt_coordinate_to_lower_boundary(c.x, c.xBounds()[0], dataxmin)
+                    c.setBounds()
+                    c.x = newX
+
+                if not c.isVertical:
+                    c.setBounds()
+
+    # @timemethod
+    def _update_axis_curve_overlays_(self, ax, axNdx, frame):
+        if not ax.isvisible():
+            return
+        items = self._get_axis_curve_overlays_(ax, axNdx, frame)
+        if len(items):
+            for i in items:
+                ax.removeItem(i)
+
+        if frame in self._curve_overlays_:
+            curveItems = self._curve_overlays_[frame].get(axNdx, list())
+            if len(curveItems):
+                self._plot_curve_overlays_(curveItems, ax)
+
+
+    def _axis_has_target_overlays(self, ax):
+        return any(isinstance(i, pg.TargetItem) for i in ax.items)
+
+    def _axis_has_label_overlays(self, ax):
+        return any(isinstance(i, pg.TextItem) for i in ax.items)
+
+    def _axis_has_curve_overlays(self, ax, axNdx, frame):
+        if len(self._curve_overlays_) == 0:
+            return False
+
+        if frame in self._curve_overlays_:
+            if len(self._curve_overlays_[frame]) == 0:
+                return False
+
+            if axNdx not in self._curve_overlays_[frame]:
+                return False
+
+            return any(isinstance(i, pg.PlotDataItem) and i in self._curve_overlays_[frame][axNdx] for i in ax.items)
+
+        return False
+
+    def _axis_has_lris(self, ax):
+        return any(isinstance(i, pg.LinearRegionItem) for i in ax.items)
+
+    def _get_axis_curve_overlays_(self, ax, axNdx, frame) -> list:
+        return [i for i in ax.items if isinstance(i, pg.PlotDataItem) and i in self._curve_overlays_[axNdx][frame]]
+
+    def _get_axis_target_overlays(self, ax) -> list:
+        return [i for i in ax.items if isinstance(i, pg.TargetItem)]
+
+    def _get_axis_label_overlays(self, ax) -> list:
+        return [i for i in ax.items if isinstance(i, pg.TextItem)]
+
+    def _get_axis_data_cursors(self, ax) -> list:
+        return [c for c in self._data_cursors_.values() if c.hostItem is ax]
+
+    def _get_axis_lris(self, ax) -> list:
+        return [i for i in ax.items if isinstance(i, pg.LinearRegionItem)]
+
+    def _get_multi_axis_cursors(self) -> list:
+        return [c for c in self._data_cursors_.values() if c.hostItem is self.signalsLayout.scene()]
+
+    def _get_axis_data_curves_(self, ax, axNdx, frame) -> list:
+        items = [i for i in ax.items if isinstance(i, pg.PlotDataItem)]
+        if (axNdx in self._curve_overlays_
+            and isinstance(self._curve_overlays_[axNdx], dict)
+            and frame in self._curve_overlays_[axNdx]):
+            items = list(
+                            filter(
+                                    lambda i: i not in self._curve_overlays_[axNdx][frame],
+                                    items
+                                  )
+                        )
+
+        return items
+
+    def getAxisDataCurves(self, axis) -> list:
+        axis, axNdx = self._check_axis_spec_ndx_(axis)
+        return self._get_axis_data_curves_(axis, axNdx, self.currentFrame)
+
+    def getDataCurvesInSelectedAxis(self) -> list:
+        return self.getAxisDataCurves(self.selectedAxis)

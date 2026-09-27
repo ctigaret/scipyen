@@ -1,29 +1,27 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
 
 r"""Various helpers for GUI
 """
-import sys, os, typing, warnings, math, io, pathlib, traceback, numbers
+import sys, os, typing, warnings, math, io, pathlib, traceback, numbers # noqa
 from enum import IntEnum
 import numpy as np
 from ipykernel.inprocess.ipkernel import InProcessInteractiveShell
 from tribool import Tribool
-from core.utilities import get_least_pwr10
 
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
-from qtpy.QtCore import (Signal, Slot, Property,)
+import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
 __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
     import PySide6
-    from PySide6 import Shiboken
+    from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -31,30 +29,21 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    # from qtpy import sip
+    # from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
 
 
-# import qtpy
-# qtpy.API = os.environ["QT_API"]
-# if os.environ["QT_API"] == "pyside6":
-#     import PySide6
-#     from PySide6 import (QtCore, QtWidgets, QtGui)
-#     QAction = QtGui.QAction
-# else:
-#     from qtpy import (QtCore, QtWidgets, QtGui)
-#     QAction = QtWidgets.QAction
-
 from gui.painting_shared import (FontStyleType, standardQtFontStyles,
                                  FontWeightType, standardQtFontWeights)
 
 import quantities as pq
+from core.utilities import get_least_pwr10
 from core.pyqtgraph_patch import pyqtgraph as pg
-
+from core.prog import timefunc
 from core import strutils, xmlutils
 
 class DisplayHint(IntEnum):
@@ -98,7 +87,7 @@ class NumericStringValidator(QtGui.QValidator):
 
 """
         from core.strutils import isnumber, is_sequence, parse_sequence, detect_nested_sequences
-        import core.scipyen_quantities as scq
+        # import core.scipyen_quantities as scq
         # from core.datatypes import is_numeric_string
 
         if not isinstance(s, str):
@@ -146,7 +135,7 @@ class NumericStringValidator(QtGui.QValidator):
                 self._validation_substring_ = None
                 return QtGui.QValidator.Acceptable, s, pos
 
-        except Exception as e:
+        except Exception as e: # noqa
             # print(f"{self.__class__.__name__}.validate: -> {e} => Invalid")
             traceback.print_exc()
             self._validation_substring_ = None
@@ -248,29 +237,35 @@ class ComplexValidator(InftyDoubleValidator):
             else:
                 return (QtGui.QValidator.Invalid, s, pos)
 
+
 def getDesktopScreen():
     if os.environ["QT_API"] == "pyside6":
         return QtWidgets.QApplication.primaryScreen()
+
     else:
         desktop = QtWidgets.QApplication.desktop()
-        # geometry = desktop.screenGeometry(desktop.primaryScreen())
         return  QtWidgets.QApplication.screens()[desktop.primaryScreen()]
 
 
 def getDesktopHeight():
     return getDesktopGeometry().height()
 
+
 def getDesktopGeometry():
     # if os.environ["QT_API"] == "pyside6":
     if __has_PyQt6__ or __has_PySide6__:
         pos = QtGui.QCursor.pos()
         screen = QtWidgets.QApplication.screenAt(pos)
+
         if(screen):
             return screen.geometry()
+
         else:
             raise RuntimeError("No screens found!")
+
     else:
         return QtWidgets.QApplication.desktop().geometry()
+
 
 def getScipyenMainWindow() -> QtWidgets.QMainWindow | None:
     # NOTE: 2026-01-04 22:33:13
@@ -282,6 +277,7 @@ def getScipyenMainWindow() -> QtWidgets.QMainWindow | None:
     mainWindow = windows[0]
     return mainWindow
 
+
 def getScipyenConsoleShell() -> InProcessInteractiveShell:
     # windows = list(filter(lambda w: "ScipyenWindow" in type(w).__name__, QtWidgets.QApplication.topLevelWidgets()))
     # assert len(windows)==1, "Not a Scipyen session"
@@ -291,6 +287,7 @@ def getScipyenConsoleShell() -> InProcessInteractiveShell:
     assert isinstance(shell, InProcessInteractiveShell), "Not using an in-process interactive shell"
     return shell
 
+
 def validatorString(val:typing.Union[QtGui.QValidator.State, int]):
     r"""String representation of a QValidator.State value
     """
@@ -299,32 +296,37 @@ def validatorString(val:typing.Union[QtGui.QValidator.State, int]):
 
     return "Acceptable" if val == QtGui.QValidator.Acceptable else "Intermediate" if val == QtGui.QValidator.Intermediate else "Invalid"
 
+# @timefunc
 def getPlotItemDataBoundaries(item:pg.PlotItem):
     r"""Calculates data bounds (data domain, `X`, and data range, `Y`)
     Falls back on item's ViewBox view range
     """
-    [[vxmin, vxmax], [vymin, vymax]] = item.viewRange()
     plotDataItems = [i for i in item.listDataItems() if isinstance(i, pg.PlotDataItem) and all(v is not None for v in (i.xData, i.yData))]
+    [[vxmin, vxmax], [vymin, vymax]] = item.viewRange()
     if len(plotDataItems):
-        mfun = lambda x: -np.inf if x is None else x
-        pfun = lambda x: np.inf if x is None else x
+        mxfun = lambda x: vxmin if (x is None or np.isnan(x)) else x # noqa
+        pxfun = lambda x: vxmax if (x is None or np.isnan(x)) else x # noqa
+        myfun = lambda x: vymin if (x is None or np.isnan(x)) else x # noqa
+        pyfun = lambda x: vymax if (x is None or np.isnan(x)) else x # noqa
+        # mfun = lambda x: -np.inf if (x is None or np.isnan(x)) else x # noqa
+        # pfun = lambda x:  np.inf if (x is None or np.isnan(x)) else x # noqa
 
-        xmin = min(map(mfun, [min(p.xData) for p in plotDataItems]))
-        xmax = max(map(pfun, [max(p.xData) for p in plotDataItems]))
-        ymin = min(map(mfun, [min(p.yData) for p in plotDataItems]))
-        ymax = max(map(pfun, [max(p.yData) for p in plotDataItems]))
+        xmin = min(map(mxfun, [min(p.xData) for p in plotDataItems]))
+        xmax = max(map(pxfun, [max(p.xData) for p in plotDataItems]))
+        ymin = min(map(myfun, [min(p.yData) for p in plotDataItems]))
+        ymax = max(map(pyfun, [max(p.yData) for p in plotDataItems]))
 
-        if np.isinf(xmin) or np.isnan(xmin):
-            xmin = vxmin
-
-        if np.isinf(xmax) or np.isnan(xmax):
-            xmax = vxmax
-
-        if np.isinf(ymin) or np.isnan(ymin):
-            ymin = vymin
-
-        if np.isinf(ymax) or np.isnan(ymax):
-            ymax = vymax
+        # if np.isinf(xmin) or np.isnan(xmin):
+        #     xmin = vxmin
+        #
+        # if np.isinf(xmax) or np.isnan(xmax):
+        #     xmax = vxmax
+        #
+        # if np.isinf(ymin) or np.isnan(ymin):
+        #     ymin = vymin
+        #
+        # if np.isinf(ymax) or np.isnan(ymax):
+        #     ymax = vymax
 
     else: # no data plotted
         xmin = vxmin
@@ -333,6 +335,7 @@ def getPlotItemDataBoundaries(item:pg.PlotItem):
         ymax = vymax
 
     return [[xmin, xmax], [ymin, ymax]]
+
 
 def plotItemXDataBounds(axis: pg.PlotItem):
     # generator!
@@ -353,6 +356,7 @@ def plotItemXDataBounds(axis: pg.PlotItem):
 def getMenuActionsTree(w: typing.Optional[QtWidgets.QWidget] = None):
     return dict(map(lambda a: (a.text().replace("&", ""), (a, getMenuActionsTree(a.menu()))), w.actions())) if w else None
 
+
 def get_QDoubleSpinBox_params(x:typing.Sequence):
     r"""Return stepSize and decimals for a QDoubleSpinBox given x.
 
@@ -363,6 +367,7 @@ def get_QDoubleSpinBox_params(x:typing.Sequence):
         return (abs(dd), 10**dd)
     return (0, 1)
 
+
 def csqueeze(s:str, w:int):
     r"""Returns text elided to the right
     """
@@ -370,6 +375,7 @@ def csqueeze(s:str, w:int):
         part = (w-3)//2
         return s[0:part] + "..."
     return s
+
 
 def rsqueeze(s:str, w:int):
     r"""Returns text elided to the right
@@ -379,6 +385,7 @@ def rsqueeze(s:str, w:int):
         return s[0:part] + "..."
     return s
 
+
 def lsqueeze(s:str, w:int):
     r"""Returns text elided to the left
     """
@@ -386,6 +393,7 @@ def lsqueeze(s:str, w:int):
         part = w - 3
         return "..." + s[part:]
     return s
+
 
 def get_current_font_metrics():
     if os.environ["QT_API"] in ("pyqt5", "pyside2"):
@@ -395,10 +403,12 @@ def get_current_font_metrics():
 
     return fm
 
+
 def get_elided_text(s:str, w:int, elideMode = QtCore.Qt.ElideRight):
     fm = get_current_font_metrics()
     # fm = QtWidgets.QApplication.fontMetrics()
     return fm.elidedText(s, elideMode, w)
+
 
 def get_text_width(s:str, fm:typing.Optional[QtGui.QFontMetrics]=None, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
     if not isinstance(fm, QtGui.QFontMetrics):
@@ -409,17 +419,20 @@ def get_text_width(s:str, fm:typing.Optional[QtGui.QFontMetrics]=None, flags=QtC
         sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
     return sz.width()
 
+
 def get_text_height(s:str, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
     fm = get_current_font_metrics()
     # fm = QtWidgets.QApplication.fontMetrics()
     sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
     return sz.height()
 
+
 def get_text_width_and_height(s:str, flags=QtCore.Qt.TextSingleLine, tabStops = 0, tabArray=None):
     # fm = QtWidgets.QApplication.fontMetrics()
     fm = get_current_font_metrics()
     sz = fm.size(flags, s, tabStops=tabStops, tabArray=tabArray)
     return sz.width(), sz.height()
+
 
 def get_font_style(val:typing.Union[str, FontStyleType]) -> typing.Union[int, QtGui.QFont.Style]:
     r"""Returns an int or a QtGui.QFont.Style enum value
@@ -490,6 +503,30 @@ def get_font_weight(val:typing.Union[str, FontWeightType]) -> typing.Union[int, 
     else:
         return QtGui.QFont.Normal
 
+
+def getEnclosingQMainWindow(obj: QtWidgets.QWidget) -> QtWidgets.QMainWindow | None:
+    r"""Retrieves the highest level QMainWindow that contains this object.
+    This may be:
+    * the object itself, if the object is a QMainWindow, or a QWidget without
+    parent (in which case the system's window manager automatically encloses
+    the widget in a window instance)
+    * the object's immediate parent, if the parent is a QMainWindow
+    * the window enclosing all the parent hierarchy of this object
+    """
+    if not isinstance(obj, QtWidgets.QWidget):
+        return
+
+    parent = obj.parent()
+    if parent is None or isinstance(obj, QtWidgets.QMainWindow):
+        topW = obj
+
+    while isinstance(parent, QtWidgets.QWidget):
+        topW = parent
+        parent = parent.parent()
+
+    if isinstance(topW, QtWidgets.QMainWindow):
+        return topW
+
 def treeWidgetItems(tree: QtWidgets.QTreeWidget):
     r"""Generator that iterates the QTreeWidgetItems in a QTreeWidget 'tree'
     """
@@ -498,10 +535,12 @@ def treeWidgetItems(tree: QtWidgets.QTreeWidget):
         yield it.value()
         it += 1
 
+
 def isDarkGui() -> bool:
     windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
     _,_,v,_ = windowColor.getHsv()
     return v <= 128
+
 
 def svgFileForIcon(icon:QtGui.QIcon) -> typing.Sequence[pathlib.Path]:
     name = icon.name()
@@ -528,6 +567,7 @@ def svgFileForIcon(icon:QtGui.QIcon) -> typing.Sequence[pathlib.Path]:
         return list(set(found))
 
     return list()
+
 
 def svg2pixmap(s:str, scale:float=1.0) -> QtGui.QPixmap:
     if not strutils.is_svg(s) and not isinstance(s, xmlutils.xml.dom.minidom.Document):
@@ -563,17 +603,141 @@ def svg2pixmap(s:str, scale:float=1.0) -> QtGui.QPixmap:
     return pix
 
 
+def formatRelativeDate(date: QtCore.QDate, fmt: QtCore.QLocale.FormatType) -> str:
+    if not date.isValid():
+        return ("Invalid date")
+
+    daysTo = QtCore.QDate.currentDate().daysTo(date)
+
+    if daysTo > 2 or daysTo < -2:
+        return QtCore.QLocale.system().toString(date, fmt)
+
+    if daysTo == 2:
+        return "In two days"
+    elif daysTo == 1:
+        return "Tomorrow"
+    elif daysTo == 0:
+        return "Today"
+    elif daysTo == -1:
+        return "Yesterday"
+    elif daysTo == -2:
+        return "Two days ago"
 
 
-# def testme():
-#     import pywt
-#     old_stdout = sys.stdout
-#     sys.stdout = buffer = io.StringIO()
+def formatRelativeDateTime(dateTime: QtCore.QDateTime,
+                           fmt: QtCore.QLocale.FormatType,
+                           fancy: bool = False) -> str:
+    now = QtCore.QDateTime.currentDateTime()
+
+    secsToNow = dateTime.secsTo(now)
+    secsInAnHour = 60 * 60
+    if secsToNow >= 0 and secsToNow < secsInAnHour:
+        minutesToNow = secsToNow / 60
+        rMinutesToNow = int(np.round(minutesToNow))
+        intMinutesToNow = secsToNow // 60
+
+        if fancy:
+            pfx = f"Nearly {rMinutesToNow}" if intMinutesToNow < rMinutesToNow else f"Over {intMinutesToNow}"
+        else:
+            pfx = f"{rMinutesToNow}"
+
+        if minutesToNow <= 1:
+            return "Just now"
+
+        elif fmt == QtCore.QLocale.NarrowFormat:
+            return f"{pfx} {strutils.pluralize('min', minutesToNow)} ago"
+
+        return f"{pfx} {strutils.pluralize('minute', minutesToNow)} ago"
+
+    if secsToNow <= 0 and -secsToNow < secsInAnHour:
+        minutesFromNow = -secsToNow / 60
+        rMinutesToNow = int(np.round(minutesToNow))
+        intMinutesToNow = secsToNow // 60
+        pfx = f"Nearly {rMinutesToNow}" if intMinutesToNow < rMinutesToNow else f"Over {intMinutesToNow}"
+        if minutesFromNow < 1:
+            return "Now"
+
+        elif fmt == QtCore.QLocale.NarrowFormat:
+            return f"{pfx} {strutils.pluralize('min', minutesToNow)} ago"
+
+        # elif fmt == QtCore.QLocale.ShortFormat:
+
+        return f"{pfx} {strutils.pluralize('minute', minutesToNow)} ago"
+
+    timeFormatType = QtCore.QLocale.FormatType.ShortFormat if fmt == QtCore.QLocale.FormatType.LongFormat else fmt
+    # timeFormatType = fmt
+
+    daysToNow = dateTime.daysTo(now)
+
+    if daysToNow < 2 and daysToNow > -2:
+        dateString = formatRelativeDate(dateTime.date(), fmt)
+    else:
+        dateString = QtCore.QLocale.system().toString(dateTime.date(), fmt)
+
+    formattedDate = f"{dateString} at {QtCore.QLocale.system().toString(dateTime.time(), timeFormatType)}"
+
+    return formattedDate.replace(formattedDate[0], formattedDate[0].upper())
+
+
+def autoChooseThemeName() -> str:
+    windowColor = QtWidgets.QApplication.palette().color(QtGui.QPalette.Window)
+    _,_,v,_ = windowColor.getHsv()
+    themeName="breeze" if v > 128 else "breeze-dark"
+    return themeName
+
+
+def getIcon(name: str, rc_fallback: str | None = None, **kwargs) ->  QtGui.QIcon:
+    icon = QtGui.QIcon.fromTheme(name)
+    group = kwargs.pop("group", "actions")
+    if icon.isNull():
+        themeName = autoChooseThemeName()
+        icon = QtGui.QIcon(f":/icons/{themeName}/{group}/{name}")
+        if icon.isNull() and isinstance(rc_fallback, str) and len(rc_fallback.strip()):
+            # print(f"guiutils.getIcon: themeName = '{themeName}', group='{group}', rc_fallback = '{rc_fallback}'")
+            icon = QtGui.QIcon(f":/icons/{themeName}/{group}/{rc_fallback}")
+            if icon.isNull():
+                ret = getRCIconGroup(themeName, rc_fallback)
+                # print(len(ret))
+                if len(ret):
+                    for key, val in ret.items():
+                        # print (f"{themeName}/{key} ↦ {val}")
+                        if any(rc_fallback in s.split(".")[0] for s in val):
+                            return QtGui.QIcon(f":/icons/{themeName}/{key}/{rc_fallback}")
+    return icon
+
+
+def getRCIconNames(themeName: str = "breeze-dark") -> dict:
+    if not isinstance(themeName, str) or len(themeName.strip()) == 0:
+        themeName = autoChooseThemeName()
+    return dict(map(lambda g: (g, QtCore.QDir(f":/icons/{themeName}/{g}").entryList()), QtCore.QDir(f":/icons/{themeName}/").entryList()))
+
+
+def getRCIconGroup(themeName: str, test:str) -> dict:
+    if not isinstance(themeName, str) or len(themeName.strip()) == 0:
+        themeName = autoChooseThemeName()
+    iconNames = getRCIconNames(themeName)
+
+    ret = dict(
+        filter(
+            lambda i: len(i[1])>0,
+            map(
+                lambda i: (i[0], list(filter(lambda s: test in s, i[1]))),
+                iconNames.items()
+                )
+            )
+        )
+    return ret
+
+
+def checkIconInResources(name: str, group: str = "actions") -> bool:
+    themeName = autoChooseThemeName()
+    icon = QtGui.QIcon(f":/icons/{themeName}/{group}/{name}")
+    return not icon.isNull()
+
+
+# def process_qrc_icon_theme(theme_name): # TODO
+#     theme_resource_index = QtCore.QFile(f":/icons/{theme_name}/index.theme")
+#     if not theme_resource_index.exists():
+#         return
 #
-#     help(pywt.wavelist)
-#
-#     sys.stdout = old_stdout
-#
-#     txt = buffer.getvalue()
-#
-#     return txt
+#     theme_spec_contents = dict()

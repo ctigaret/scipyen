@@ -26,7 +26,7 @@ from PIL.Image import Image as PILImage
 import drawsvg as dw
 from tribool import Tribool
 
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from IPython.core.latex_symbols import (latex_symbols, reverse_latex_symbol)
 from IPython.display import Image as IPImage
 from IPython.core.interactiveshell import is_integer_string
@@ -47,7 +47,7 @@ if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -56,7 +56,7 @@ else:
         __has_PyQt6__ = True
 
     from qtpy import sip
-    from qtpy.uic import loadUiType
+    # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -861,9 +861,26 @@ def is_path(s: str) -> bool:
     import pydoc
     if not isinstance(s, str) or len(s.strip()) == 0:
         return False
-    return pydoc.ispath(s)
+    return pydoc.ispath(s) or is_windows_path(s) or is_absolute_windows_path(s)
     # return isinstance(x, str) and x.find(os.sep) >= 0
 
+def is_windows_path(s: str) -> bool:
+    from pathlib import PureWindowsPath
+    if not isinstance(s, str) or not s:
+        return False
+
+    path = PureWindowsPath(s)
+
+    # Windows-specific path syntax:
+    return (
+        path.drive != ""             # C:\file.txt or \\server\share
+        or "\\" in s                 # relative path such as folder\file.txt
+    )
+
+def is_absolute_windows_path(s: str) -> bool:
+    from pathlib import PureWindowsPath
+    path = PureWindowsPath(s)
+    return path.is_absolute()
 
 def str2range(s: str) -> range:
     r"""Parses the string representation of a range into a range object"""
@@ -960,6 +977,31 @@ def is_pathname_valid(pathname: str) -> bool:
     #
     # Did we mention this should be shipped with Python already?
 
+def guess_sfx_sep(s, suppress_warnings:bool=False) -> str:
+    from core.prog import scipywarn
+    nosepPattern = _re.compile(r"(.*?)??(\d*)$")
+    try_match = nosepPattern.match(s)
+    # print(f"try_match -> {try_match}")
+    if try_match is not None and len(try_match.groups()) > 1:
+        try:
+            base, sfx = try_match.group(1,2)
+            if base.endswith("_"):
+                sep = "_"
+            elif base.endswith(" "):
+                sep = " "
+            else:
+                sep = ""
+        except: # noqa
+            if not suppress_warnings:
+                scipywarn("Cannot guess whether separator is '_', ' ', or ''; assuming ''.")
+            sep = ""
+
+    else:
+        if not suppress_warnings:
+            scipywarn("Cannot guess whether separator is '_', ' ', or ''; assuming ''.")
+        sep = ""
+
+    return sep
 
 def get_int_sfx(s: str, sep: str = "_",
                 use_re: bool = False, bracketed:bool=False) -> typing.Tuple[str, int]:
@@ -1001,6 +1043,12 @@ Examples:
 
     get_int_sfx("some_name_1", sep="_") -> ("some_name", 1)
 
+    # also:
+
+    get_int_sfx("name0", sep="") -> ("name", 0)
+
+    get_int_sfx("name(0)", sep="", bracketed=True) -> ("name", 0)
+
 """
     if not isinstance(s, str) or len(s.strip()) == 0:
         return ("", None)
@@ -1019,12 +1067,14 @@ Examples:
             return (ss, val)
 
     elif not isinstance(sep, str) or len(sep) == 0 or use_re:
+        # print("using regexp")
         # pattern = _re.compile(r"(.*?)??(\(\d+\))$")
         pattern = _re.compile(r"(.*?)??(\d*)$")
         re_match = pattern.match(s)
         if re_match is not None and len(re_match.groups()) > 1:
             try:
                 base, sfx = re_match.group(1, 2)
+                sfx = int(sfx)
             except:
                 # base, sfx = s, 0
                 base, sfx = s, None
@@ -1035,8 +1085,8 @@ Examples:
 
     else:
         parts = s.split(sep)
+        # print(f"parts -> {parts}")
 
-        # if len(parts) <= 1:
         if len(parts) < 2:
             # return s, 0
             sfx = None
@@ -1060,12 +1110,6 @@ Examples:
                 sfx = None
                 base = sep.join(parts)
 
-    # try:
-    #     sfx = int(sfx)
-    # except:
-    #     sfx = None
-    #     # sfx = 0
-
     return base, sfx
 
 def counter_suffix(x:str, strings:typing.List[str], sep:str="_",
@@ -1081,7 +1125,9 @@ Parameters:
 
 :strings: sequence of str to check for existence of x
 
-:sep: default is "_"; suffix separator
+:sep: default is "_"; suffix separator; valid values are "_", " " (single space),
+    "" (the empty string), or "guess". When sep is "guess", the function will try
+    to determine which separator is used in "x", i.e., either "_", " ", or "".
 
 :use_re: When True, use regular expressions to detect integral suffixes in ``strings``
 
@@ -1117,9 +1163,12 @@ Parameters:
     if start < 0:
         raise ValueError(f"'start' expected to be a positive int (>= 0); instead, got {start}")
 
-    if len(strings):
 
-        make_suffix = lambda c: f" ({c})" if bracketed else sep + f"{c}" if isinstance(sep, str) and len(sep) else f"{c}"
+    if isinstance(sep, str) and sep.lower() == "guess":
+        sep = guess_sfx_sep(x)
+
+    if len(strings):
+        make_suffix = lambda c: f" ({c})" if bracketed else sep + f"{c}" if (isinstance(sep, str) and len(sep)) else f"{c}" # noqa
 
         base, cc = get_int_sfx(x, sep=sep, use_re=use_re, bracketed=bracketed)
 
@@ -1130,9 +1179,9 @@ Parameters:
         # print(f"counter_suffix: clashes = {clashes}")
 
         if len(clashes) == 0:
-            return None if returns_counter==True else x if returns_counter==False else (x, None)
+            return None if returns_counter is True else x if returns_counter is False else (x, None)
 
-        candidate_counters = list(filter(lambda t: isinstance(t, int), map(lambda s: get_int_sfx(s, sep=sep, bracketed=bracketed)[1], clashes)))
+        candidate_counters = list(filter(lambda t: isinstance(t, int), map(lambda s: get_int_sfx(s, sep=sep, use_re=use_re, bracketed=bracketed)[1], clashes)))
 
         # print(f"counter_suffix: candidate_counters = {candidate_counters}")
 
@@ -1140,7 +1189,7 @@ Parameters:
             if cc is None:
                 cc = start
             new_x = base + make_suffix(cc)
-            return (new_x, cc) if returns_counter is None else cc if returns_counter == True else new_x
+            return (new_x, cc) if returns_counter is None else cc if returns_counter is True else new_x
 
         min_counter, max_counter = min(candidate_counters), max(candidate_counters)
         # print(f"counter_suffix: min_counter = {min_counter}, max_counter = {max_counter}")
@@ -1151,11 +1200,11 @@ Parameters:
 
         new_x = base + make_suffix(new_counter)
 
-        return (new_x, new_counter) if returns_counter is None else new_counter if returns_counter else new_x
+        return (new_x, new_counter) if returns_counter is None else new_counter if returns_counter is True else new_x
 
 
     else:
-        return (x, None) if returns_counter is None else None if returns_counter else x
+        return (x, None) if returns_counter is None else None if returns_counter is True else x
 
 def similar_strings(a:str, b:str) -> bool:
     r"""Similarity between two strings using difflib.SequenceMatcher./
@@ -1417,7 +1466,7 @@ def isnumber(s: str) -> bool:
     try:
         v = eval(s)
         return isinstance(v, numbers.Number)
-    except:
+    except: # noqa
         return False
 
 def is_svg(s:str) -> bool:
@@ -1430,7 +1479,7 @@ def is_svg(s:str) -> bool:
         root = etree.fromstring(s)
         if root.tag == '{http://www.w3.org/2000/svg}svg':
             ret = True
-    except:
+    except: # noqa
         ret = False
     if not ret:
         pattern = r'<svg[^>]*>(.*?)<\/svg>'
@@ -1439,23 +1488,44 @@ def is_svg(s:str) -> bool:
 
     return ret
 
+# def qdbusmessage_str_to_dict(s: str) -> dict:
+#     # Captures tokens like: "service='com.foo'" or 'path=/bar' or "member=SomeMethod"
+#     # Handles values with quotes or without quotes, non-space chars.
+#     pattern = _re.compile(r"(?P<key>[A-Za-z_][A-Za-z0-9_]*)=(?P<val>'[^']*'|\"[^\"]*\"|\S+)")
+#     out = {}
+#     for m in pattern.finditer(s):
+#         key = m.group("key")
+#         val = m.group("val")
+#         print(f"key {key} -> val = {val}")
+#
+#         # Strip surrounding quotes if present
+#         if (len(val) >= 2) and ((val[0] == val[-1]) and val[0] in ("'", '"')):
+#             val = val[1:-1]
+#         out[key] = val
+#
+#     return out
+
+def un_html(s: str) -> str:
+    pattern = re.compile('<.*?>|&([a-z0-9]+|#[0-9]{1,6}|#x[0-9a-f]{1,6});')
+    return re.sub(pattern, '', s)
+
 def is_html(s:str) -> bool:
     from lxml import html
     if not isinstance(s, str) or len(s.strip()) == 0:
         return False
     try:
-        test = html.fromstring(s)
+        test = html.fromstring(s) # noqa
         return True
-    except:
+    except: # noqa
         return False
     # return all(v in s for v in ("<html>", "</html>"))
 
 def is_xml(s:str) -> bool:
     from lxml import etree
     try:
-        test = etree.fromstring(s)
+        test = etree.fromstring(s) # noqa
         return True
-    except:
+    except: # noqa
         return False
     if not isinstance(s, str) or len(s.strip()) == 0:
         return False

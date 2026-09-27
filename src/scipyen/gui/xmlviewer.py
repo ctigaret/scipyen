@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# __scipyen_plugin__
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -25,37 +25,37 @@ import xml.dom.minidom
 #### END core python modules
 
 #### BEGIN 3rd party modules
-# 2016-09-25 21:28:37 
+# 2016-09-25 21:28:37
 # add XMl text viewer, schema viewer and xquery editor
 
 # 2016-08-16 09:30:07
 # NOTE FIXME QtXml is not actively maintained anymore in Qt >= 5.5 ?!
-import qtpy
+# import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
-__has_sip__ = False
+# __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    # import PySide6
+    # from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+
+    # from qtpy import sip
+    # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
-    __has_sip__ = True
-    
+    # __has_sip__ = True
+
 
 
 #### END 3rd party modules
@@ -71,9 +71,6 @@ from gui import quickdialog
 #### END pict.gui modules
 
 
-# NOTE: 2022-12-25 23:08:51
-# needed for the new plugins framework
-__scipyen_plugin__ = None
 
 # 2016-08-16 23:55:53
 class DomItem(object):
@@ -418,7 +415,8 @@ class XMLViewer(ScipyenViewer):
      problems with converting utf-8 characters => when saving document to file
      results in invalid XML 
     '''
-    sig_activated = Signal(int)
+    sig_activated = Signal()
+    # sig_activated = Signal(int)
     closeMe  = Signal(int)
     viewer_for_types = {xmlutils.xml.dom.minidom.Document: 99, 
                         xmlutils.xml.etree.ElementTree.Element: 99, 

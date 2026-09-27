@@ -1,0 +1,220 @@
+# -*- coding: utf-8 -*-
+# $Id: nervoussystemwidgets.py $
+# SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@proton.me>
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+r"""
+"""
+
+import sys, os, typing, types, warnings, math, cmath # noqa
+import traceback
+# import numbers
+# import numpy as np
+# import quantities as pq
+import pandas as pd
+# import neo
+# from tribool import Tribool
+
+# import qtpy
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
+from copy import deepcopy
+__has_PySide6__ = False
+__has_PyQt6__ = False
+__has_sip__ = False
+__has_qtdbus__ = False
+
+if os.environ["QT_API"] == "pyside6":
+    __has_PySide6__ = True
+    import PySide6 # noqa
+    from PySide6 import Shiboken # noqa
+    # from PySide6.QtCore import (Signal, Slot, Property,)
+    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    QAction = QtGui.QAction
+    QActionGroup = QtGui.QActionGroup
+    QShortcut = QtGui.QShortcut
+else:
+    if os.environ["QT_API"] == "pyqt6":
+        __has_PyQt6__ = True
+
+    from qtpy import sip # noqa
+    from qtpy.uic import loadUiType # noqa
+    QAction = QtWidgets.QAction
+    QActionGroup = QtWidgets.QActionGroup
+    QShortcut = QtWidgets.QShortcut
+    __has_sip__ = True
+
+try:
+    from qtpy import QtDBus # noqa
+    __has_qtdbus__ = True
+except:
+    __has_qtdbus__ = False
+
+# from core.prog import scipywarn
+from core import scipyendataclasses as sdc
+# from core import scipyen_quantities as scq
+# from core import taxonbridge
+from core import bgbridge
+# from gui import ObjectInspector
+# from gui.widgets import small_widgets as smw
+from gui.widgets.dataclasswidgets.dataclasswidget import DataClassWidget
+# from gui.workspacegui import WorkspaceGuiMixin
+# from gui.widgets.datawidgetmixin import DataWidgetMixin
+
+__module_path__ = os.path.abspath(os.path.dirname(__file__))
+__module_file_name__ = os.path.splitext(os.path.basename(__file__))[0]
+
+try:
+    from gui.widgets.dataclasswidgets.nervoussystemwidget_ui import Ui_NervousSystemWidget
+
+except:
+    Ui_NervousSystemWidget, _ = loadUiType(
+        os.path.join(__module_path__, "nervoussystemwidget.ui")
+        )
+
+class NervousSystemWidget(Ui_NervousSystemWidget, DataClassWidget, QtWidgets.QWidget):
+    r"""NOTE: This relates to ALL organs in a BrainGlobeAtlas, not just the brain!"""
+    _objectTypes_ = (sdc.NervousSystem, )
+    def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
+                 obj: typing.Optional[sdc.BiologicalSource] = None,
+                 **kwargs):
+        if isinstance(parent, self._objectTypes_):
+            obj_ = parent
+            if isinstance(obj, QtWidgets.QWidget):
+                parent = obj
+            else:
+                parent = None
+
+            obj = obj_
+
+        if not isinstance(obj, self._objectTypes_):
+            self._data_ = self._objectTypes_[0]()
+        else:
+            self._data_ = obj
+
+        QtWidgets.QWidget.__init__(self, parent)
+        DataClassWidget.__init__(self, parent=parent, **kwargs)
+        Ui_NervousSystemWidget.__init__(self)
+
+        self._bman_ = bgbridge.BrainAtlasManager(self)
+
+        self._atlas_ = None
+        self._availableStructures_ = None
+
+        # self._localAtlasNames_ = ["Undefined"]
+        self._atlasNames_ = ["Undefined"]
+
+        self._bgAvailable_ = False
+        # self._atlasStructureNamesAcronyms_ = {"Undefined": "Undefined"}
+
+        # print(f"{self.__class__.__name__}.__init__: _data_.atlasName = {self._data_.atlasName}")
+
+        if bgbridge.hasBrainGlobe and bgbridge.hasBrainGlobeAtlasAPI:
+            try:
+                # for atlasName, atlasVersion in self._bman_.localAtlases.items():
+                for atlasName, atlasVersion in self._bman_.getAtlasesConfiguration().items():
+                    # self._localAtlasNames_.append(f"{atlasName} ({atlasVersion})")
+                    self._atlasNames_.append(f"{atlasName} ({atlasVersion})")
+
+                # if isinstance(self._data_.atlasName, str) and self._data_.atlasName in self._bman_.localAtlases:
+                if isinstance(self._data_.atlasName, str) and self._data_.atlasName in self._bman_.atlases:
+                    self._atlas_ = self._bman_.initAtlas(self._data_.atlasName, interactive=False)
+                    self._availableStructures_ = self._atlas_.lookup_df
+
+                self._bgAvailable_ = True
+
+            except:
+                traceback.print_exc()
+                self.warningMessage("Nervous System Editor", "No local BrainGlobe atlases are available; some functionality will be limited")
+
+        else:
+            self.warningMessage("Nervous System Editor", "No local BrainGlobe atlases are available; some functionality will be limited")
+
+        self._configureUI_()
+
+    def _configureUI_(self):
+        self.setupUi(self)
+        super()._configureUI_()
+
+        self.bgStructureWidget.containerWidget = self
+
+        if self._bgAvailable_:
+
+            # for t in self._localAtlasNames_:
+            for t in self._atlasNames_:
+                self.brainAtlasComboBox.addItem(t)
+
+            if isinstance(self._data_.atlasName, str) and self._data_.atlasName in self._bman_.localAtlases.keys():
+                ndx = list(self._bman_.localAtlases.keys()).index(self._data_.atlasName) + 1 # to account for "Undefined"
+                self.brainAtlasComboBox.setCurrentIndex(ndx)
+
+            else:
+                self.brainAtlasComboBox.setCurrentIndex(0) # use "Undefined"
+
+            self.brainAtlasComboBox.currentIndexChanged.connect(self._slot_atlasChanged)
+
+            if (bgbridge.hasBrainGlobe
+                and bgbridge.hasBrainGlobeAtlasAPI
+                and isinstance(self._atlas_, bgbridge.BrainGlobeAtlas)
+                and "brainglobe_atlasapi" in type(self._atlas_).__module__
+                ):
+
+                self.bgStructureWidget.atlas = self._atlas_
+
+                if (isinstance(self._data_.structure, bgbridge.Structure)
+                    and "brainglobe_atlasapi" in type(self._data_.structure).__module__):
+                    self.bgStructureWidget.setValue(self._data_.structure)
+
+            self.bgStructureWidget.sig_valueChanged.connect(self._slot_structureChanged)
+
+        else:
+            self.bgStructureWidget.setEnabled(False)
+
+
+        self.sig_uiConfigured.emit()
+
+
+    @Slot(object)
+    def _slot_structureChanged(self, val: object):
+        self._data_.structure = val
+
+        self.sig_valueChanged.emit(self._data_)
+
+    @Slot(int)
+    def _slot_atlasChanged(self, val: int):
+        # if not isinstance(val, int) or val <= 0 or val >=len(self._bman_.localAtlases):
+        old_atlas_name = deepcopy(self._data_.atlasName)
+
+        if not isinstance(val, int) or val <= 0 or val >=len(self._bman_.atlases):
+            self._data_.atlasName = pd.NA
+            self.bgStructureWidget.clear()
+            return
+
+        # else:
+            # self._data_.atlasName = list(self._bman_.localAtlases.keys())[val-1]
+        newName = list(self._bman_.atlases.keys())[val-1]
+
+        if newName is pd.NA:
+            self._data_.atlasName = newName
+            self.bgStructureWidget.clear()
+            return
+
+        if self._data_.atlasName is not pd.NA and newName != self._data_.atlasName:
+            self.bgStructureWidget.clear()
+
+        # if self._data_.atlasName in self._bman_.localAtlases:
+        if newName in self._bman_.atlases:
+            self._atlas_ = self._bman_.initAtlas(newName, localAtlasesOnly=False,
+                                                 interactive=False)
+            self.bgStructureWidget.atlas = self._atlas_
+            self._data_.atlasName = newName
+            if (self._data_.structure is None or
+                self._data_.structure["id"] not in self._atlas_.structures):
+                self._data_.structure = None
+                self.bgStructureWidget.setValue(None)
+
+        self.sig_valueChanged.emit(self._data_)
+
+
+

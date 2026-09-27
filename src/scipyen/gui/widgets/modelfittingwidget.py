@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # $Id: modelfittingwidget.py $
 # SPDX-FileCopyrightText: 2026 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -6,7 +5,8 @@
 
 r"""Widget for model parameter inputs
 """
-import math, numbers, typing, os, types, sys, traceback, warnings, itertools
+import math, numbers, typing, os, types, sys, traceback, warnings, itertools, io # noqa
+
 import numpy as np
 import quantities as pq
 import pandas as pd
@@ -31,14 +31,14 @@ if os.environ["QT_API"] == "pyside6":
 else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
-        
+
     from qtpy import sip
     from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
     __has_sip__ = True
-    
+
 import matplotlib as mpl
 
 from matplotlib import pyplot as plt
@@ -57,15 +57,20 @@ import gui.quickdialog as qd
 from gui.widgets.small_widgets import QuantitySpinBox
 
 __module_path__ = os.path.abspath(os.path.dirname(__file__))
-Ui_ModelFittingWidget, QWidget = loadUiType(os.path.join(__module_path__, "ModelFittingWidget.ui"))
+try:
+    # from gui.widgets.modelfittingwidget_ui import Ui_ModelFittingWidget
+    from gui.widgets.ModelFittingWidget_ui import Ui_ModelFittingWidget
+
+except:
+    Ui_ModelFittingWidget, _ = loadUiType(os.path.join(__module_path__, "ModelFittingWidget.ui"))
 
 class _ModelFunctionExpressionSVGGenerator_(QtCore.QThread):
     ready = Signal(str, name="ready")
-    
+
     def __init__(self, modelFunc:typing.Union[types.FunctionType, str], parent:QtCore.QObject):
         QtCore.QThread.__init__(self, parent)
         self._modelFunc_ = modelFunc
-        
+
     def run(self):
         # from core import strutils
         # svg_out = models.renderModelExpression(self._modelFunc_, out="svg")
@@ -74,9 +79,9 @@ class _ModelFunctionExpressionSVGGenerator_(QtCore.QThread):
             self.ready.emit(svg)
         else:
             self.ready.emit("")
-    
 
-class ModelFittingWidget(Ui_ModelFittingWidget, QWidget, workspacegui.GuiMessages):
+
+class ModelFittingWidget(Ui_ModelFittingWidget, QtWidgets.QWidget, workspacegui.GuiMessages):
     # NOTE: 2026-01-21 10:44:11 TODO URGENT
     # Currently inserting rows for starred coefficients is implemented by means
     # of redefining the coefficients data frame
@@ -94,7 +99,8 @@ class ModelFittingWidget(Ui_ModelFittingWidget, QWidget, workspacegui.GuiMessage
                  waveViewer:typing.Optional[typing.Union[mpl.figure.Figure, QtWidgets.QMainWindow]] = None,
                  # initial = None,
                  # lbubkf = None,
-                 parent=None):
+                 parent=None,
+                 **kwargs):
         r"""
 Parameters:
 ===========
@@ -125,10 +131,11 @@ Named Parameters:
     .. attention::
         When given, it can be used to override the coefficients table extracted from the ``model`` parameter, provided it has a compatible structure (i.e. same number and names of coefficients)
 
-            
+
 """
-        QWidget.__init__(self, parent=parent)
-        
+        QtWidgets.QWidget.__init__(self, parent=parent)
+        # super(Ui_ModelFittingWidget, self).__init__()
+
         self._nStarredCoeffs_:int = 0
         self._nStarredGroups_:int = 0
         self._destarredCoeffs_:typing.Sequence = list()
@@ -136,25 +143,31 @@ Named Parameters:
         self._data_:typing.Optional[neo.AnalogSignal | DataSignal] = None
         self._dataChannel_:int = 0
 
-        self._fittedCurve_:typing.Optional[np.ndarray] = None
-        self._fitResult_:typing.Optional[types.SimpleNamespace] = None
-        self._use_fitted_:bool = False
+        self._fittedCurve_: np.ndarray | None = None
+        self._modelWaveform_: np.ndarray | None = None
+        self._fitResult_: types.SimpleNamespace | None = None
+        # self._use_fitted_: bool = False
 
-        self._plot_data_overlaid_:bool = False
+        self._plot_data_overlaid_: bool = False
 
-        self._model_:typing.Optional[types.FunctionType] = None
+        self._model_: types.FunctionType | None = None
 
-        self._model_fit_coefficients_:typing.Optional[pd.DataFrame] = None
+        self._model_fit_coefficients_: pd.DataFrame | None = None
 
-        self._model_name_:typing.Optional[str] = None
-        self._model_expression_svg_:typing.Optional[QtGui.QPixmap] = None
-        self._waveformStart_:typing.Optional[pq.Quantity] = None
+        self._model_name_: str | None = None
+        self._model_expression_svg_: QtGui.QPixmap | None = None
+        self._waveformStart_: typing.Optional[pq.Quantity] = None
         self._waveformDuration_:typing.Optional[pq.Quantity] = None
         self._waveformSamplingRate_:typing.Optional[pq.Quantity] = None
         self._waveformUnits_:typing.Optional[pq.Quantity] = None
         self._model_expression_window_:typing.Optional[QtWidgets.QMainWindow] = None
         self._expressionWindow_:typing.Optional[QtWidgets.QMainWindow] = None
-        
+
+        self._decimals_ = kwargs.pop("decimals", None)
+
+        if not isinstance(self._decimals_, int) or self._decimals_ < 0:
+            self._decimals_ = None
+
         self._configureUI_()
 
         self._waveViewer_ = waveViewer if (isinstance(waveViewer, mpl.figure.Figure) or (isinstance(waveViewer, QtWidgets.QMainWindow) and type(waveViewer).__name__ == "SignalViewer")) else None
@@ -164,17 +177,19 @@ Named Parameters:
         #
         # if lbubkf is None:
         #     lbubkf = dict()
-        
+
         if isinstance(model, types.FunctionType):
             self._setModelData_(model, data, start, duration, samplingRate, waveformUnits, coefficients)# , *initial, **lbubkf)
-        
+
             if isinstance(self._model_fit_coefficients_, pd.DataFrame):
                 self._populateCoefficientsTable_(self._model_fit_coefficients_)
 
     def _configureUI_(self):
         from gui.guiutils import svg2pixmap
         self.setupUi(self)
-        dsvg = str2svg("1:1", 16, 16, x=8, y=15, font_size=16, text_anchor="middle", dominant_baseline="hanging").as_svg()
+        dsvg = str2svg("1:1", 16, 16, x=8, y=15, font_size=16,
+                       text_anchor="middle",
+                       dominant_baseline="hanging").as_svg()
         pix = svg2pixmap(dsvg)
         if not pix.isNull():
             self.makeUnitAmplitudePushButton.setIcon(QtGui.QIcon(pix))
@@ -183,7 +198,9 @@ Named Parameters:
             self.makeUnitAmplitudePushButton.setText("Unit Amplitude")
         self.makeUnitAmplitudePushButton.setFlat(True)
 
-        dsvg = str2svg("SI", 16, 16, x=8, y=15, font_size=16, text_anchor="middle", dominant_baseline="hanging").as_svg()
+        dsvg = str2svg("SI", 16, 16, x=8, y=15, font_size=16,
+                       text_anchor="middle",
+                       dominant_baseline="hanging").as_svg()
         pix = svg2pixmap(dsvg)
         if not pix.isNull():
             self.waveformUnitsPushButton.setIcon(QtGui.QIcon(pix))
@@ -207,6 +224,7 @@ Named Parameters:
         self.removeStarredRowsPushButton.clicked.connect(self._slot_removeRowsForStarredCoeffs)
         self.fitDataPushButton.clicked.connect(self._slot_fitData)
         self.channelSpinBox.valueChanged.connect(self._slot_dataChannelChanged_)
+
         self.pythonHelpPushButton.setEnabled(False)
         self.generateWaveformPushButton.setEnabled(False)
         self.waveformExpressionPushButton.setEnabled(False)
@@ -218,11 +236,16 @@ Named Parameters:
         self.addStarredRowsPushButton.setEnabled(False)
         self.removeStarredRowsPushButton.setEnabled(False)
         self.channelSpinBox.setVisible(False)
+
         self.overlayDataCheckbox.setChecked(self._plot_data_overlaid_)
         self.overlayDataCheckbox.setEnabled(False)
+
         self.overlayDataCheckbox.toggled.connect(self._slot_setDataOverlay_)
-        self.modelCoefficientsTable.enforceFloat = True
+        self.modelCoefficientsTable.enforceFloat = False
         self.modelCoefficientsTable.readOnly = False
+
+        self.setAsX0ToolButton.clicked.connect(self._slot_setWaveStartAsX0)
+        self.setAsX0ToolButton.setEnabled(False)
 
         if self._waveformUnits_ is None:
             self.unitsLabel.setText("")
@@ -231,7 +254,7 @@ Named Parameters:
             symbol = scq.shortSymbol(self._waveformUnits_)
             self.unitsLabel.setText(symbol)
             self.unitsLabel.setToolTip(symbol)
-            
+
         # NOTE: 2026-01-19 15:35:18
         # have the expression widget (svgWidget) collapsed in the splitter, by default
         sizes = self.labelsSplitter.sizes()
@@ -245,7 +268,18 @@ Named Parameters:
         csizes[0] = (self.size().width() - self.modelCoefficientsTable.size().width()) // 2
         # print(f"{self.__class__.__name__}._configureUI_: csizes adjusted = {csizes}")
         self.controlsSplitter.setSizes(csizes)
-            
+
+        # self.exportModelWaveformToolButton.setEnabled(False)
+        self.exportModelWaveformToolButton.clicked.connect(self._slot_exportModelWaveform)
+
+        self.exportFitResultPushButton.setEnabled(False)
+        self.exportFitResultPushButton.clicked.connect(self._slot_exportFitResult)
+
+        self.exportFitCurveToolButton.setEnabled(False)
+        self.exportFitCurveToolButton.clicked.connect(self._slot_exportFittedCurve)
+
+        self.exportModelFittingTablePushButton.clicked.connect(self._slot_exportFitTable)
+
     def _setModelData_(self, model:types.FunctionType,
                        data:typing.Optional[neo.AnalogSignal | DataSignal] = None,
                        start:pq.Quantity=0*pq.dimensionless,
@@ -258,20 +292,27 @@ Named Parameters:
         assert isinstance(duration, pq.Quantity) and duration.size==1, f"'duration' must be a scalar quantity; instead, got {duration}"
         assert isinstance(samplingRate, pq.Quantity) and samplingRate.size==1 and samplingRate.units == 1/duration.units, f"'samplingRate' must be a scalar quantity in units of, or convertible to, {1/duration.units}; instead, got {samplingRate}"
         assert (isinstance(waveformUnits, pq.Quantity) and waveformUnits.size==1) or waveformUnits is None, f"'waveformUnits' , must be a scalar quantity or None; instead, gor {waveformUnits}"
-        
+
         assert models.isModelFunction(model), f"Expecting a model function — which is NOT a regular Python function; instead, got {model}"
-        
+
         if isinstance(data, (neo.AnalogSignal, DataSignal)):
             self.setData(data)
+            self._fitResult_ = None
+            self.exportFitResultPushButton.setEnabled(False)
 
-        else:
+        elif not isinstance(self._data_, (neo.AnalogSignal, DataSignal)):
+            # NOTE: 2026-05-06 11:37:56
+            # upon changing the model when curve data is already set, leave the
+            # wave controls unchanged
             if isinstance(start, (float, int)):
                 start = start*pq.s
+
             elif not isinstance(start, pq.Quantity):
                 start = 0*pq.s
 
             if isinstance(duration, (float, int)):
                 duration = duration*pq.s
+
             elif not isinstance(start, pq.Quantity):
                 start = 0*pq.s
 
@@ -297,6 +338,8 @@ Named Parameters:
                 waveformUnits = pq.dimensionless
 
             self._data_ = None
+            self._fitResult_ = None
+            self.exportFitResultPushButton.setEnabled(False)
             self.fitDataPushButton.setEnabled(False)
 
             self._waveformStart_ = start
@@ -312,21 +355,35 @@ Named Parameters:
         domainUnitsFamily = scq.getUnitFamily(self._waveformDuration_)
         if domainUnitsFamily == "Time":
             self._waveformSamplingRate_.rescale(pq.Hz)
+
         elif domainUnitsFamily in ("Length", "Space"):
             self._waveformSamplingRate_.rescale(pq.space_frequency_unit)
+
         elif domainUnitsFamily == "Angle" or self._waveformDuration_.units == pq.rad:
             self._waveformSamplingRate_.rescale(pq.angle_frequency_unit)
+
         else:
             self._waveformSamplingRate_.rescale(1/self._waveformDuration_.units)
 
-        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), [self.startSpinBox, self.durationSpinBox, self.samplingRateSpinBox]))#, self.waveformUnitsChooser]))
+        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), [self.startSpinBox, self.durationSpinBox, self.samplingRateSpinBox]))#, self.waveformUnitsChooser])) # noqa
+        # print(f"{self.__class__.__name__}._populate_WaveControls_:")
+        # print(f"\t\tself._waveformStart_ -> {self._waveformStart_}")
+        # print(f"\t\tself._waveformDuration_ -> {self._waveformDuration_}")
+        # print(f"\t\tself._waveformSamplingRate_ -> {self._waveformSamplingRate_}")
+        # print(f"\t\tself._waveformUnits_ -> {self._waveformUnits_}")
+        decimals = len(f"{float(self._waveformStart_)}".split(".")[-1]) + 2
+        self._decimals_ = decimals
+        self.startSpinBox.setDecimals(decimals)
         self.startSpinBox.setValue(self._waveformStart_)
+        self.durationSpinBox.setDecimals(decimals)
         self.durationSpinBox.setValue(self._waveformDuration_)
+        self.samplingRateSpinBox.setDecimals(decimals)
         self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
         self.waveformUnits = self._waveformUnits_ # will also set up the unitsLabel
+        self.modelCoefficientsTable.decimals = self._decimals_
 
-        
-    def _setModelFunction_(self, model:types.FunctionType, coefficients=None): #, *initial, **lbubkf):
+
+    def _setModelFunction_(self, model:types.FunctionType, coefficients=None):
         # from core.strutils import is_svg
         assert models.isModelFunction(model), f"Expecting a model function — which is NOT a regular Python function; instead, got {model}"
         self._model_ = model
@@ -349,17 +406,11 @@ Named Parameters:
         fitting_df = self._parseModelCoefficients_(model, coefficients) #, *initial, **lbupkf)
 
         # print(f"{self.__class__.__name__}._setModelFunction_: fitting_df = {fitting_df}")
-        
+
         if isinstance(fitting_df, pd.DataFrame):
             self._model_fit_coefficients_ = fitting_df
             self._populateCoefficientsTable_(self._model_fit_coefficients_)
-            
-
-        # if not(isinstance(self._model_fit_coefficients_, pd.DataFrame) and self._model_fit_coefficients_.shape == fitting_df.shape and np.all(self._model_fit_coefficients_.index == fitting_df.index)) or new_fit_params:
-        #     self._model_fit_coefficients_ = fitting_df
-        # 
-        # if not isinstance(self.modelCoefficientsTable._data_, pd.DataFrame):# or self.modelCoefficientsTable._data_.size==0:
-        #     self._populateCoefficientsTable_(self._model_fit_coefficients_)
+            self.setAsX0ToolButton.setEnabled("x0" in self._model_fit_coefficients_.index)
 
         self._generateModelExpressionSVG()
 
@@ -368,11 +419,8 @@ Named Parameters:
         self.addStarredRowsPushButton.setEnabled(self._nStarredCoeffs_ > 0)
         self.removeStarredRowsPushButton.setEnabled(self._nStarredCoeffs_ > 0 and self._nStarredGroups_ > 1)
 
-        # if isinstance(fitting_df, pd.DataFrame):
-        #     self.fittingCoefficients = fitting_df
-        # else:
-        #     if isinstance(self._model_fit_coefficients_, pd.DataFrame):
-        #         self._populateCoefficientsTable_(self._model_fit_coefficients_)
+        self._fitResult_ = None
+        self.exportFitResultPushButton.setEnabled(False)
 
 
     def _parseModelCoefficients_(self, model:types.FunctionType,
@@ -410,7 +458,14 @@ Named Parameters:
 
             elif len(model.coefficients):
                 starred = model.starred_coefficients
-                ret, destarred, starredGroups, all_names = model.generateFitTable(*initial, **lbubkf)
+                if models.isFittingCoefficientsDict(model.fitting):
+                    initial = model.fitting["initial"]
+                    lbubkw = {"lower": model.fitting["lower"], "upper": model.fitting["upper"]}
+                else:
+                    initial = tuple()
+                    lbubkw = dict()
+
+                ret, destarred, starredGroups, all_names = model.generateFitTable(*initial, **lbubkw)
 
                 self._nStarredCoeffs_ = len(model.starred_coefficients)
                 self._destarredCoeffs_= destarred
@@ -432,13 +487,10 @@ Named Parameters:
         worker.ready.connect(self._slot_modelExpressionGenerated)
         worker.run()
         worker.deleteLater()
-        
+
     @Slot(str)
-    def _slot_modelExpressionGenerated(self, svg:str|None):
-        # if isinstance(d, dict) and "svg" in d:
-            # print(f"{self.__class__.__name__}._setModelFunction_: {svg_out['svg']} \n is svg: {is_svg(svg_out['svg'])}")
+    def _slot_modelExpressionGenerated(self, svg: str|None):
         self._model_expression_svg_ = svg
-        # print(f"{self.__class__.__name__}._setModelFunction_: self._model_expression_svg_ is svg@ {is_svg(self._model_expression_svg_)}")
         self.svgWidget.setSvg(self._model_expression_svg_)
         if is_svg(self._model_expression_svg_):
             svgSize = self.svgWidget.svgSize()
@@ -451,21 +503,30 @@ Named Parameters:
     @property
     def domain(self) -> np.ndarray|None:
         return self._generateWaveformDomain_()
-            
+
+    @property
+    def modelWaveform(self):
+        return self.generateModelWaveform()
+
     @property
     def model(self) -> types.FunctionType:
         return self._model_
 
-    def setData(self, val:typing.Optional[neo.AnalogSignal | DataSignal] = None):
-        print(f"\n{self.__class__.__name__}.setData({type(val).__name__})\n")
+    def setData(self, val:typing.Optional[typing.Union[
+                                            neo.AnalogSignal,
+                                            DataSignal,
+                                            np.ndarray
+                                            ]
+                                         ] = None) -> None:
+        # print(f"\n{self.__class__.__name__}.setData({type(val).__name__})\n")
         sigBlock = QtCore.QSignalBlocker(self.channelSpinBox)
-        if not isinstance(val, (neo.AnalogSignal, DataSignal)):
+        if not isinstance(val, (neo.AnalogSignal, DataSignal, np.ndarray)):
             self._data_ = None
             self._dataChannel_ = 0
             self.channelSpinBox.setMinimum(0)
             self.channelSpinBox.setMaximum(0)
             self.channelSpinBox.setValue(self._dataChannel_)
-            
+
             self.channelSpinBox.setEnabled(False)
             self.channelSpinBox.setVisible(False)
             self.fitDataPushButton.setEnabled(False)
@@ -477,10 +538,19 @@ Named Parameters:
         if val.size == 0:
             raise ValueError("Received an empty signal!")
 
-        start = val.t_start
-        duration = val.duration
-        samplingRate = val.sampling_rate
-        waveformUnits = val.units
+        if isinstance(val, (neo.AnalogSignal, DataSignal)):
+            start = val.t_start
+            duration = val.duration
+            if scq.checkTimeUnits(start):
+                duration = duration.rescale(start.units)
+            samplingRate = val.sampling_rate
+            waveformUnits = val.units
+
+        else:
+            start = 0.0 * pq.dimensionless
+            duration = val.shape[0] * pq.dimensionless
+            sampling_rate = val.shape[0]/duration
+            waveformUnits = pq.dimensionless
 
         if val.ndim == 1 or (val.ndim==2 and val.shape[1] > 0):
             self._dataChannel_ = 0
@@ -492,9 +562,9 @@ Named Parameters:
             self.fitDataPushButton.setEnabled(True)
 
         elif val.ndim == 2:
-
             if self._dataChannel_ < -val.shape[1]:
                 self._dataChannel_ = -val.shape[-1]
+
             elif self._dataChannel_ >= val.shape[-1]:
                 self._dataChannel_ = val.shape[-1]-1
 
@@ -520,11 +590,23 @@ Named Parameters:
         self.overlayDataCheckbox.setEnabled(True)
         self.overlayDataCheckbox.setChecked(False)
 
-    def setModel(self, model:types.FunctionType, coefficients:pd.DataFrame):
+        self._fitResult_ = None
+        self.exportFitResultPushButton.setEnabled(False)
+
+    def setModel(self, model:types.FunctionType, coefficients: typing.Optional[pd.DataFrame] = None):
         if models.isModelFunction(model):
-            if not isinstance(coefficients, pd.Dataframe):
-                raise TypeError(f"Expecting a DataFrame for 'coefficients'; got {type(coefficients).__name__} instead")
+            if not isinstance(coefficients, pd.DataFrame):
+                if models.isFittingCoefficientsDict(model.fitting):
+                    d = {"Initial Value": model.fitting["initial"],
+                        "Lower Bound": model.fitting["lower"],
+                        "Upper Bound": model.fitting["upper"],
+                        "Keep Feasible": model.fitting["feasible"]}
+                    coefficients = pd.DataFrame(d, index = model.fitting["names"])
+                else:
+                    coefficients, variadics, groups, coefnames = model.generateFitTable()
+
             if all(v in coefficients.columns for v in ("Initial Value", "Lower Bound", "Upper Bound", "Keep Feasible")):
+                # print(f"{self.__class__.__name__}.setModel {model.__name__  } -> coefficients =\n{coefficients}\n({type(coefficients).__name__})")
                 self._setModelData_(model, coefficients=coefficients)
                 self._model_fit_coefficients_ = coefficients
                 self._populateCoefficientsTable_(self._model_fit_coefficients_)
@@ -545,12 +627,12 @@ Named Parameters:
                 msg = f"Expecting a model function\n(Python function decorated with the '@modelfunction' decorator);\ninstead, got a {type(model).__name__}."
                 self.detailedMessage("Error", msg)
             self.clear()
-        
+
     @property
     def waveformStart(self) -> pq.Quantity:
         self._waveformStart_ = self.startSpinBox.value()
         return self._waveformStart_
-    
+
     @waveformStart.setter
     def waveformStart(self, val:pq.Quantity):
         assert isinstance(val, pq.Quantity) and val.size==1, f"'duration' must be a scalar quantity; instead, got {val}"
@@ -563,11 +645,11 @@ Named Parameters:
                     newUnits = True
         else:
             newUnits = True
-                
+
         # print(f"{self.__class__.__name__} start setter: newUnits: {newUnits}")
-                
+
         self._waveformStart_ = val
-    
+
         if newUnits:
             self._waveformDuration_ = self._waveformDuration_.magnitude * self._waveformStart_.units
 
@@ -589,23 +671,23 @@ Named Parameters:
         self.startSpinBox.setValue(self._waveformStart_)
         self.durationSpinBox.setValue(self._waveformDuration_)
         self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
-        
-        
+
+
     @property
     def waveformDuration(self) -> pq.Quantity:
         self._waveformDuration_ = self.durationSpinBox.value()
         return self._waveformDuration_
-    
+
     @waveformDuration.setter
     def waveformDuration(self, val:pq.Quantity):
         # NOTE: 2026-01-16 15:35:43
         # setting a new duration with different units:
-        # if new units are not scalable to the current duration units, this will 
+        # if new units are not scalable to the current duration units, this will
         #   also change the sampling rate units but leave their magnitude untouched
         # is new units ARE scalable/convertible to the current duration units, then
         #   the new duration will be rescaled to the current duration units
         assert isinstance(val, pq.Quantity) and val.size==1, f"'duration' must be a scalar quantity; instead, got {val}"
-        
+
         if isinstance(self._waveformDuration_, pq.Quantity):
             newUnits = False
             if self._waveformDuration_.units != val.units:
@@ -615,7 +697,7 @@ Named Parameters:
                     newUnits = True
         else:
             newUnits = True
-            
+
         # print(f"{self.__class__.__name__} duration setter: newUnits: {newUnits}")
 
         self._waveformDuration_ = val
@@ -635,24 +717,24 @@ Named Parameters:
                 self._waveformSamplingRate_ = self._waveformSamplingRate_.magnitude /  1/self._waveformDuration_.units
 
         blockedWidgets = [self.startSpinBox, self.durationSpinBox, self.samplingRateSpinBox]
-        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), blockedWidgets))#, self.waveformUnitsChooser]))
+        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), blockedWidgets))#, self.waveformUnitsChooser])) # noqa
         self.startSpinBox.setValue(self._waveformStart_)
         self.durationSpinBox.setValue(self._waveformDuration_)
         self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
-    
+
     @property
     def waveformSamplingRate(self)->pq.Quantity:
         self._waveformSamplingRate_ = self.samplingRateSpinBox.value()
         return self._waveformSamplingRate_
-    
+
     @waveformSamplingRate.setter
     def waveformSamplingRate(self, val:pq.Quantity):
         assert isinstance(val, pq.Quantity) and val.size==1 and scq.unitsConvertible(val.units, 1/self._waveformDuration_.units), f"'sampling rate' must be a scalar quantity in units of, or convertible to, {1/self._waveformDuration_.units}; instead, got {val}"
         self._waveformSamplingRate_ = val
-        
-        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), [self.samplingRateSpinBox]))#, self.waveformUnitsChooser]))
+
+        signalBlockers = list(map(lambda w: QtCore.QSignalBlocker(w), [self.samplingRateSpinBox]))#, self.waveformUnitsChooser])) # noqa
         self.samplingRateSpinBox.setValue(self._waveformSamplingRate_)
-        
+
     @property
     def waveViewer(self) -> typing.Optional[mpl.figure.Figure | QtWidgets.QMainWindow]:
         return self._waveViewer_
@@ -665,26 +747,26 @@ Named Parameters:
     @property
     def coefficientValues(self) -> typing.Sequence:
         return list(self._model_fit_coefficients_["Initial Value"])
-        
+
     @property
     def fittingCoefficients(self) -> pd.DataFrame | None:
         return self._model_fit_coefficients_
-    
+
     @fittingCoefficients.setter
     def fittingCoefficients(self, coefficients: pd.DataFrame):
         if not models.isModelFunction(self._model_):
             return
-        
+
         if isinstance(coefficients, pd.DataFrame):
             OK, unstarred, var, groups = models.parseCoefficientsFitTable(self._model_, coefficients)
-            
+
             if OK:
                 self._model_fit_coefficients_ = coefficients
                 self._populateCoefficientsTable_(self._model_fit_coefficients_) # just replace it all, for now
-                
+
             else:
                 self.criticalMessage("Table is not compatible with this model")
-                
+
 #                 # NOTE: 2026-01-13 23:26:42
 #                 # override coefficients given by model only if the indexes are the same
 #                 if isinstance(self._model_fit_coefficients_, pd.DataFrame) and models.parseCoefficientsFitTable(self._model_,self._model_fit_coefficients_)[0]:
@@ -696,24 +778,24 @@ Named Parameters:
 #                             self._model_fit_coefficients_.loc[c,:] = coefficients.loc[c,:]
 #                         else:
 #                             self._model_fit_coefficients_ = pd.concat([self._model_fit_coefficients_, pd.DataFrame(coefficients.loc[c,:])].T)
-#                             
+#
 #                     for g in groups:
 #                         for c in g:
 #                             if c in self._model_fit_coefficients_.index:
 #                                 self._model_fit_coefficients_.loc[c,:] = coefficients.loc[c,:]
 #                             else:
 #                                 self._model_fit_coefficients_ = pd.concat([self._model_fit_coefficients_, pd.DataFrame(coefficients.loc[c,:])].T)
-                            
-                    
-                    
-            
-        
+
+
+
+
+
             # # NOTE: 2026-01-13 23:26:42
             # # override coefficients given by model only if the indexes are the same
             # if isinstance(self._model_fit_coefficients_, pd.DataFrame):
             #     assert coefficients.size == self._model_fit_coefficients_.size, "Incompatible coefficients data were supplied"
             #     assert all(c in coefficients.index for c in self._model_.coefficients) and all(c in self._model_.coefficients for c in coefficients), "Incompatible coefficients data were supplied"
-            # 
+            #
             # self._model_fit_coefficients_ = coefficients
             # self._populateCoefficientsTable_(self._model_fit_coefficients_)
 
@@ -735,11 +817,11 @@ Named Parameters:
     @property
     def modelName(self) -> str:
         return self._model_name_
-    
+
     @modelName.setter
     def modelname(self, val:str):
         self._model_name_ = val
-        
+
     def clear(self):
         from gui.widgets import svgwidgets
         self.modelNameLabel.setText("")
@@ -765,6 +847,7 @@ Named Parameters:
         self.svgWidget.setSvg(self._model_expression_svg_)
 
     def _populateCoefficientsTable_(self, data:typing.Optional[pd.DataFrame]=None):
+        self.modelCoefficientsTable.decimals = self._decimals_
         if isinstance(data, pd.DataFrame) and data.size > 0:
             assert all(v in data.columns for v in ('Initial Value', 'Lower Bound', 'Upper Bound', 'Keep Feasible')), "Not a model parameters data frame"
             # if isinstance(self._model_fit_coefficients_, pd.DataFrame) and not np.all(data.index == self._model_fit_coefficients_.index):
@@ -776,21 +859,21 @@ Named Parameters:
         else:
             self._model_fit_coefficients_ = None
             self.modelCoefficientsTable.clear()
-            
+
 
     def _calculateWaveformSamples(self) -> int:
         self._waveformDuration_ = self.durationSpinBox.value()
         self._waveformSamplingRate_ = self.samplingRateSpinBox.value()
         assert(scq.unitsConvertible(1/self._waveformSamplingRate_.units, self._waveformDuration_.units)), f"Waveform duration ({self._waveformDuration_}) and sampling rate ({self._waveformSamplingRate_}) have incompatible units"
         return int(self._waveformDuration_ * self._waveformSamplingRate_.magnitude)
-    
+
     def _generateWaveformDomain_(self) -> np.ndarray:
         # t_start = 0* self._waveformDuration_.units
         self._waveformStart_ = self.startSpinBox.value()
         self._waveformDuration_ = self.durationSpinBox.value()
         self._waveformSamplingRate_ = self.samplingRateSpinBox.value()
         return np.linspace(self._waveformStart_.magnitude, self._waveformStart_.magnitude + self._waveformDuration_.magnitude, self._calculateWaveformSamples())
-        
+
     def generateModelWaveform(self, *coeffs) -> neo.basesignal.BaseSignal | None:
         if not isinstance(self._model_, types.FunctionType) or not models.isModelFunction(self._model_):
             return
@@ -819,12 +902,13 @@ Named Parameters:
 
             if scq.checkTimeUnits(self._waveformDuration_):
                 sig = neo.AnalogSignal(y, t_start = self._waveformStart_, units = sigUnits, sampling_rate=self._waveformSamplingRate_, name=name, codomain_name=sigName)
+
             else:
                 sig = datasignal.DataSignal(y, t_start = self._waveformStart_, units = sigUnits, domain_units = self._waveformDuration_.units,
                                         sampling_rate=self._waveformSamplingRate_, name=name, codomain_name=sigName)
 
 
-            sig.array_annotate(channel_names = [f"Realization or {self._model_.title}"])
+            sig.array_annotate(channel_names = [f"Realization of {self._model_.title}"])
 
             if wrn:
                 warningMessages = self.unpackWarnings(wrn)
@@ -845,8 +929,10 @@ Named Parameters:
 
         return sig
 
-    def generateWaveform(self) -> neo.basesignal.BaseSignal | None:
-        from gui.guiutils import getScipyenMainWindow
+    def generateWaveform(self, fitted:bool = False) -> neo.basesignal.BaseSignal | None:
+        r"""Generates curve for the model using intial or the fitted coefficients.
+    """
+        # from gui.guiutils import getScipyenMainWindow
 
         if not isinstance(self._model_, types.FunctionType) or not models.isModelFunction(self._model_):
             return
@@ -859,7 +945,8 @@ Named Parameters:
                 if "channel_names" not in yData.array_annotations:
                     yData.array_annotate(channel_names = list(map(lambda k: f"Channel {k}", range(yData.shape[1]))))
 
-            if self._use_fitted_:
+            # if self._use_fitted_:
+            if fitted is True:
                 if isinstance(yData, (neo.AnalogSignal, DataSignal)) and isinstance(self._fittedCurve_, np.ndarray) and self._fittedCurve_.shape[0] == yData.shape[0]:
                     name = yData.name
                     if not isinstance(name, str) or len(name.strip()):
@@ -880,15 +967,15 @@ Named Parameters:
                     y_.array_annotate(channel_names = ["Fitted data channel"])
             else:
                 y_ = self.generateModelWaveform()
-                # if self._plot_data_overlaid_:
-                #     y-
 
             # print(f"{self.__class__.__name__}.generateWaveform: yData: {type(yData).__name__}, y_: {type(y_).__name__}")
 
             if isinstance(yData, (neo.AnalogSignal, DataSignal)) and self._plot_data_overlaid_ :
                 sig = neoutils.concatenate_signals(yData, y_, axis=1)
-                if self._use_fitted_:
+                # if self._use_fitted_:
+                if fitted is True:
                     placeHolder = f"{self._model_.title} fit"
+
                 else:
                     placeHolder = f"{self._model_.title} model"
 
@@ -903,7 +990,7 @@ Named Parameters:
             else:
                 sig = y_
 
-        except:
+        except: # noqa
             traceback.print_exc()
             exc = sys.exception()
             msg = "".join(traceback.format_exception_only(exc))
@@ -913,19 +1000,26 @@ Named Parameters:
         if isinstance(sig, neo.basesignal.BaseSignal):
             self.sig_waveformReady.emit(sig)
 
-            if self.receivers(self.sig_waveformReady) == 0 and self._waveViewer_ is None:
-                varname = f"{self._model_name_}_waveform" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "model_waveform"
-                getScipyenMainWindow().assignToWorkspace(varname, sig)
+            if __has_PySide6__:
+                receivers = self.receivers("sig_waveformReady")
+            else:
+                receivers(self.sig_waveformReady)
 
-            if isinstance(self._waveViewer_, mpl.figure.Figure):
-                plt.figure(self._waveViewer_)
-                plt.plot(sig)
+            if receivers == 0:
+                if isinstance(self._waveViewer_, mpl.figure.Figure):
+                    plt.figure(self._waveViewer_)
+                    plt.plot(sig)
 
-            elif isinstance(self._waveViewer_, QtWidgets.QMainWindow):
-                self._waveViewer_.view(sig)
+                elif isinstance(self._waveViewer_, QtWidgets.QMainWindow):
+                    self._waveViewer_.view(sig)
+
+                else:
+                # if self._waveViewer_ is None:
+                    varname = f"{self._model_name_}_waveform" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "model_waveform"
+                    # getScipyenMainWindow().assignToWorkspace(varname, sig)
 
             return sig
-        
+
     @Slot()
     def _slot_showModelExpression(self):
         # from core.strutils import is_svg
@@ -933,11 +1027,11 @@ Named Parameters:
             # print("invalid expression")
             return
         self._setupExpressionWindow()
-            
+
         if not self._expressionWindow_.isVisible():
             self._expressionWindow_.resize(self._expressionWindow_.centralWidget().svgSize())
             self._expressionWindow_.show()
-            
+
     def _setupExpressionWindow(self):
         # from core.strutils import is_svg
         from gui.widgets import svgwidgets
@@ -945,17 +1039,17 @@ Named Parameters:
             self._expressionWindow_ = QtWidgets.QMainWindow()
             sWidget = svgwidgets.SimpleSVGWidget(parent=self._expressionWindow_)
             self._expressionWindow_.setCentralWidget(sWidget)
-            
+
         if is_svg(self._model_expression_svg_):
             self._expressionWindow_.centralWidget().setSvg(self._model_expression_svg_)
         else:
             self._expressionWindow_.centralWidget().setSvg(None)
-                
+
         if isinstance(self._model_name_, str):
             self._expressionWindow_.setWindowTitle(f"{QtWidgets.QApplication.instance().applicationName()} - {self._model_name_} model")
         else:
             self._expressionWindow_.setWindowTitle(f"{QtWidgets.QApplication.instance().applicationName()} - no model")
-    
+
     @Slot()
     def _slot_addRowsForStarredCoeffs(self): # TODO 2026-01-21 12:43:22
         import itertools
@@ -973,20 +1067,21 @@ Named Parameters:
             groups = list(map(lambda s: get_int_sfx(s, sep="")[1], dfdestarred))
             grset = set(groups)
             assert(len(grset) > 0), "There must be at least one group of concrete values for starred coefficients"
-            lastGroup = sorted(list(grset))[-1]
+            groupsList = sorted(list(grset))
+            lastGroup = groupsList[-1]
 
-            nextGroup = lastGroup +1
+            nextGroupNdx = len(groupsList)# lastGroup +1
             self._nStarredGroups_ += 1
 
             self.removeStarredRowsPushButton.setEnabled(self._nStarredCoeffs_ > 0 and self._nStarredGroups_ > 1)
 
-            # print(f"{self.__class__.__name__}._slot_addRowsForStarredCoeffs: groups = {groups}, lastGroup = {lastGroup},  nextGroup = {nextGroup}")
+            print(f"{self.__class__.__name__}._slot_addRowsForStarredCoeffs: groups = {groups}, lastGroup = {lastGroup},  nextGroupNdx = {nextGroupNdx}")
 
             extra = {"Names": list()}
             extra.update(dict(map(lambda k: (k, list()), df.columns)))
 
             for ds in self._destarredCoeffs_:
-                extra["Names"].append(f"{ds}{nextGroup}")
+                extra["Names"].append(f"{ds}{nextGroupNdx}")
                 extra["Initial Value"].append(0.0)
                 extra["Lower Bound"].append(-np.inf)
                 extra["Upper Bound"].append(np.inf)
@@ -1021,12 +1116,21 @@ Named Parameters:
 
     @Slot(bool)
     def _slot_setDataOverlay_(self, val:bool):
-        self._plot_data_overlaid_ = val == True
+        self._plot_data_overlaid_ = val is True
 
     @Slot()
     def _slot_generateWaveform(self):
-        self._use_fitted_ = False
+        # self._use_fitted_ = False
         self.generateWaveform()
+
+    @Slot()
+    def _slot_setWaveStartAsX0(self):
+        x0 = self.startSpinBox.value()
+        if isinstance(x0, pq.Quantity):
+            x0 = float(x0.flatten()[0].magnitude)
+        self._model_fit_coefficients_.loc["x0", "Initial Value"] = x0
+        self.modelCoefficientsTable.tableView.reset()
+
 
     @Slot(int)
     def _slot_dataChannelChanged_(self, val:int):
@@ -1044,24 +1148,25 @@ Named Parameters:
         print(f"{self.__class__.__name__}.dataChannel.setter({val})")
         if not isinstance(val, int):
             raise TypeError(f"Expecting an int; got {type(val).__name__} instead")
-        
+
         if self._data_:
             if self._data_.ndim ==1 or self._data_.ndim==2 and self._data_.shape[1] == 1:
                 if val != 0:
                     raise ValueError(f"Wrong channel index {val} for 1D data or a singleton second dimension")
-                
+
             elif val < -self._data_.shape[1] or val >= self._data_.shape[1]:
                 raise ValueError(f"Wrong channel index {val}. New channel index must be between {-self._data_.shape[1]} and {self._data_.shape[1]-1}")
         else:
             if val != 0:
                 raise ValueError(f"In the absence of data the channel can only be 0")
-            
+
         self._dataChannel_ = val
         signalBlock = QtCore.QSignalBlocker(self.channelSpinBox)
         self.channelSpinBox.setValue(self._dataChannel_)
 
     @Slot()
     def _slot_fitData(self):
+        self._fitResult_ = None
         if not isinstance(self._data_, (neo.AnalogSignal, DataSignal)) or self._data_.size == 0:
             return
 
@@ -1069,6 +1174,7 @@ Named Parameters:
             return
 
         fitParams = self._model_fit_coefficients_
+
         if not isinstance(fitParams, pd.DataFrame) or \
             not all(v in fitParams.columns for v in ("Initial Value", "Lower Bound", "Upper Bound", "Keep Feasible")) or \
                 fitParams.size == 0:
@@ -1092,7 +1198,19 @@ Named Parameters:
 
         bounds = optimize.Bounds(lb=lb, ub=ub, keep_feasible = kf)
 
-        self._fittedCurve_, self._fitResult_ = crvf.fit_model(data, self._model_, p0, x = x, bounds=bounds)
+        try:
+            self._fittedCurve_, self._fitResult_ = crvf.fit_model(data, self._model_, p0, x = x, bounds=bounds)
+
+            # print(f"self._fitResult_.ModelFunction -> {self._fitResult_.ModelFunction}")
+
+        except Exception as e: # noqa
+            print(e)
+            with io.StringIO() as bf:
+                traceback.print_exc(file=bf)
+                msg = bf.getvalue()
+                eType = type(e).__name__
+                eMsg = str(e)
+                self.detailedMessage(f"Curve Fitting {eType}", eMsg, detail = msg)
 
         if self._fitResult_:
             self._model_fit_coefficients_["Fitted"] = self._fitResult_.Coefficients.Fitted
@@ -1106,29 +1224,91 @@ Named Parameters:
             fitInfo += list(map(lambda i: f"{i[0]}:\t{i[1]}", self._fitResult_.Coefficients.GoF.__dict__.items()))
 
             self.fitResultsTextEdit.setPlainText ("\n".join(fitInfo))
+            # self._use_fitted_ = True
+            self.generateWaveform(True)
+            self.exportFitResultPushButton.setEnabled(True)
+            self.exportFitCurveToolButton.setEnabled(True)
 
         else:
             self.fitResultsTextEdit.setPlainText("")
+            self.exportFitResultPushButton.setEnabled(False)
+            self.exportFitCurveToolButton.setEnabled(False)
 
-        self._use_fitted_ = True
+    @Slot()
+    def _slot_exportModelWaveform(self):
+        from gui.guiutils import getScipyenMainWindow, getEnclosingQMainWindow
+        from gui.workspacegui import WorkspaceGuiMixin
 
-        self.generateWaveform()
+        wave = self.generateModelWaveform()
+        if isinstance(wave, np.ndarray):
+            varname = f"{self._model_name_}_modelCurve" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "modelCurve"
+
+            ancestorWindow = getEnclosingQMainWindow(self)
+            if isinstance(ancestorWindow, WorkspaceGuiMixin):
+                ancestorWindow.exportDataToWorkspace(wave, varname,
+                                                        title="Export Model Curve")
+            else:
+                getScipyenMainWindow().assignToWorkspace(varname, wave)
+
+    @Slot()
+    def _slot_exportFittedCurve(self):
+        from gui.guiutils import getScipyenMainWindow, getEnclosingQMainWindow
+        from gui.workspacegui import WorkspaceGuiMixin
+
+        wave = self.generateWaveform(True)
+        if isinstance(wave, np.ndarray):
+            varname = f"{self._model_name_}_fittedCurve" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "fittedCurve"
+
+            ancestorWindow = getEnclosingQMainWindow(self)
+            if isinstance(ancestorWindow, WorkspaceGuiMixin):
+                ancestorWindow.exportDataToWorkspace(wave, varname,
+                                                     title="Export Fitted Curve")
+            else:
+                getScipyenMainWindow().assignToWorkspace(varname, wave)
+
+    @Slot()
+    def _slot_exportFitTable(self):
+        from gui.guiutils import getScipyenMainWindow, getEnclosingQMainWindow
+        from gui.workspacegui import WorkspaceGuiMixin
+
+        varname = f"{self._model_name_}_fitCoefficientsTable" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "fitCoefficientsTable"
+        ancestorWindow = getEnclosingQMainWindow(self)
+        if isinstance(ancestorWindow, WorkspaceGuiMixin):
+            ancestorWindow.exportDataToWorkspace(self._model_fit_coefficients_, varname,
+                                                    title="Export Fit Coefficients Table")
+        else:
+            getScipyenMainWindow().assignToWorkspace(varname, self._model_fit_coefficients_)
+
+    @Slot()
+    def _slot_exportFitResult(self):
+        from gui.guiutils import getScipyenMainWindow, getEnclosingQMainWindow
+        from gui.workspacegui import WorkspaceGuiMixin
+        if isinstance(self._fitResult_, types.SimpleNamespace):
+            varname = f"{self._model_name_}_fitResult" if isinstance(self._model_name_, str) and len(self._model_name_.strip()) else "fitResult"
+
+            ancestorWindow = getEnclosingQMainWindow(self)
+            if isinstance(ancestorWindow, WorkspaceGuiMixin):
+                ancestorWindow.exportDataToWorkspace(self._fitResult_, varname,
+                                                     title="Export Fit Result")
+            else:
+                getScipyenMainWindow().assignToWorkspace(varname, self._fitResult_)
 
     @Slot()
     def _slot_makeUnitAmplitudeModel(self):
+        # TODO 2026-05-06 11:49:36 FIXME
+        # finalize this!!!
         if not isinstance(self._model_, types.FunctionType) or not models.isModelFunction(self._model_):
             return
-        pass
-    
+
     @Slot()
     def _slot_pythonHelpForModel(self):
         from gui import guiutils
         if not isinstance(self._model_, types.FunctionType) or not models.isModelFunction(self._model_):
             return
-        
+
         mainWindow = guiutils.getScipyenMainWindow()
-        mainWindow.runPythonHelpGUI(f"{self._model_.__module__}.{self._model_.__name__}")
-    
+        mainWindow.runPythonHelpGUI(f"{self._model_.__module__}.{self._model_.__name__}") # BUG 2026-05-05 23:25:59 in pythonhelpviewer FIXME
+
     @Slot()
     def _slot_changeWaveformUnits(self):
         from gui.quickdialog import QuickDialog
@@ -1140,7 +1320,7 @@ Named Parameters:
         dlg.addWidget(qc)
         if dlg.exec():
             self.waveformUnits = qc.units
-            
+
     @Slot(object)
     def _slot_waveformStartChanged(self, val:typing.Union[pq.Quantity, float, int, np.float64, np.int64]):
         # print(f"{self.__class__.__name__}._slot_waveformStartChanged({val})")
@@ -1178,22 +1358,27 @@ Named Parameters:
     def _slot_waveformSamplingRateChanged(self, val:typing.Union[pq.Quantity, float, int, np.float64, np.int64]):
         # print(f"{self.__class__.__name__}._slot_waveformStartChanged({val})")
         rate = self._waveformSamplingRate_
-        
+
         if isinstance(val, pq.Quantity):
             assert(val.size == 1), "Expecting a scalar Quantity"
             rate = val
-            
+
         elif isinstance(val, (float, np.float64, int, np.int64)):
             rate = val * self._waveformSamplingRate_.units
-            
+
         else:
             raise TypeError(f"Wrong value type ({type(val).__name__})")
-        
+
         self.waveformSamplingRate = rate
 
     @property
     def fitResult(self) -> types.SimpleNamespace | None:
+        r"""The result of the curve fitting; read-only"""
         return self._fitResult_
+
+    @property
+    def fittedCurve(self) -> np.ndarray | None:
+        return self._fittedCurve_
 
     @property
     def overlayData(self) -> bool:
@@ -1201,10 +1386,10 @@ Named Parameters:
 
     @overlayData.setter
     def overlayData(self, val:bool):
-        self._plot_data_overlaid_ = val == True
+        self._plot_data_overlaid_ = val is True
         sigBlock = QtCore.QSignalBlocker(self.overlayDataCheckbox)
         self.overlayDataCheckbox.setChecked(self._plot_data_overlaid_)
-        
+
     @property
     def waveformUnits(self) -> pq.Quantity | None:
         return self._waveformUnits_
@@ -1215,7 +1400,7 @@ Named Parameters:
             self._waveformUnits_ = None
         else:
             self._waveformUnits_ = val.units
-            
+
         if self._waveformUnits_ is None or (isinstance(self._waveformUnits_, pq.Quantity) and self._waveformUnits_.units == pq.dimensionless):
             self.unitsLabel.setText("")
             self.unitsLabel.setToolTip("Dimensionless")
@@ -1223,4 +1408,14 @@ Named Parameters:
             symbol = scq.shortSymbol(self._waveformUnits_)
             self.unitsLabel.setText(symbol)
             self.unitsLabel.setToolTip(symbol)
-            
+
+    @property
+    def decimals(self) -> int | None:
+        return self._decimals_
+
+    @decimals.setter
+    def decimals(self, val: int | None = None):
+        if isinstance(val, int) and val >= 0:
+            self._decimals_ = val
+        else:
+            self._decimals_ = None

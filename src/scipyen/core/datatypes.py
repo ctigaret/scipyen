@@ -58,7 +58,7 @@ if os.environ["QT_API"] == "pyside6":
     import PySide6
     from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -67,7 +67,7 @@ else:
         __has_PyQt6__ = True
 
     from qtpy import sip
-    from qtpy.uic import loadUiType
+    # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
@@ -184,9 +184,9 @@ ndarray_type = ndarray.__name__
 NUMPY_NUMERIC_KINDS = set("buifc")
 NUMPY_STRING_KINDS = set("SU")
 
-Real: typing.TypeAlias = typing.Union[int, float, np.integer, np.floating]
-Complex: typing.TypeAlias = typing.Union[complex, np.complexfloating]
-Number: typing.TypeAlias = typing.Union[Real, Complex]
+Real: typing.TypeAlias = typing.Union[int, float, np.integer, np.floating]      # noqa: UP007
+Complex: typing.TypeAlias = typing.Union[complex, np.complexfloating]           # noqa: UP007
+Number: typing.TypeAlias = typing.Union[Real, Complex]                          # noqa: UP007
 
 PODS = (
     bool,
@@ -197,9 +197,14 @@ PODS = (
     bytes,
     bytearray,
     str,
+    np.bool,
+    np.complexfloating,
     np.integer,
     np.floating,
-    np.complexfloating,
+    np.ufunc,
+    type(pd.NA),
+    type(None),
+    type(dataclasses.MISSING),
     Real,
     Complex,
     Number
@@ -348,6 +353,15 @@ def is_callable(x):
 
     return ret
 
+def asTribool(x: typing.Optional[typing.Union[bool, Tribool]] = None) -> Tribool:
+    if isinstance(x, bool):
+        return Tribool(x)
+    elif isinstance(x, Tribool):
+        return x
+    else:
+        return Tribool()
+
+
 def is_vector(x):
     r"""Returns True if x is a numpy array encapsulating a vector.
 
@@ -374,13 +388,18 @@ with more than one dimensions and all but one axes are singleton axes.
     else:
         return False
 
+def is_iterable(x):
+    return hasattr(x, "__iter__")
+
 def is_scalar(x):
     r"""Checks if ``x`` is a numeric scalar or a numpy array with one element"""
     import numpy as np
     if isinstance(x, (bool, int, float, complex, numbers.Rational, fractions.Fraction)):
-        return False
+        return True
+
     elif isinstance(x, np.ndarray):
         return x.ndim == 0 or x.size == 1
+
     else:
         return False
 
@@ -393,7 +412,7 @@ def is_homogeneous_sequence(x: typing.Sequence):
 
     etype = type(x[0])
 
-    return all(isinstance(e, etype), x[1:])
+    return all(isinstance(e, etype) for e in x[1:])
 
 
 def is_column_vector(x):
@@ -531,7 +550,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
 
     elif isinstance(t, (tuple, list, set)) and all(isinstance(t_, type) for t_ in t):
         # sequence of types
-        t_set = set(itertools.chain_from_iterable([inspect.getmro(t_) for t_ in t])) if use_mro else {t}
+        t_set = set(itertools.chain_from_iterable([inspect.getmro(t_) for t_ in t])) if use_mro else set(t)
 
     elif type(t).__module__ == "typing":
         t_origin = typing.get_origin(t)
@@ -556,7 +575,7 @@ def check_type(t:typing.Union[type, typing.Sequence[type], typing.Set[type]],
                     t_keys = {t_keys}
                     t_vals = {t_vals}
 
-                elif issubclass(t_origin, ((list, tuple, set, frozenset, collections.deque, collections.abc.Sequence))):
+                elif issubclass(t_origin, (list, tuple, set, frozenset, collections.deque, collections.abc.Sequence)):
                     if len(t_args) > 1:
                         raise RuntimeError(f"Cannot resolve {t} with type arguments {t_args}")
 
@@ -1119,7 +1138,7 @@ def categorize_data_frame_columns(data:pd.DataFrame, *column_names, inplace:bool
         return ret
 
 
-def inspect_members(obj:typing.Any, predicate:typing.Optional[typing.Callable] = None) -> dict:
+def inspect_members(obj:typing.Any, predicate: typing.Callable | None = None, symbols_only: bool = False) -> dict | tuple:
     skips = ("__class__", "__module__", "__name__", "__qualname__", "__func__",
              "__self__", "__code__", "__defaults__", "__kwdefaults__",
              "__globals__", "__builtins__", "__annotations__", "__doc__",
@@ -1131,12 +1150,20 @@ def inspect_members(obj:typing.Any, predicate:typing.Optional[typing.Callable] =
 
     mbi = tuple((k, n, inspect.getattr_static(obj, n, None)) for k,n in enumerate(names))
 
-    mb = list()
+    mb = []
 
     for k, mbi_name, mbi_obj in mbi:
         try:
+            # NOTE: for treelib Tree adapt to new API:
+            if mbi_name == "bpointer":
+                mbi_name = "predecessor"
+
+            if mbi_name == "fpointer":
+                mbi_name = "successors"
+
             v = getattr(obj, mbi_name)
-        except:
+
+        except:  # noqa: E722
             # print(f"Cannot parse member {k}: {mbi_name} which is a {type(mbi_obj)}")
             # traceback.print_exc()
             v = mbi_obj
@@ -1145,6 +1172,9 @@ def inspect_members(obj:typing.Any, predicate:typing.Optional[typing.Callable] =
 
     if inspect.isfunction(predicate):
         mb = tuple(filter(lambda x: predicate(x[1]), mb))
+
+    if symbols_only:
+        return tuple(x[0] for x in mb)
 
     return dict(mb)
 

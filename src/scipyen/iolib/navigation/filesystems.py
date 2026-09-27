@@ -10,18 +10,18 @@ import dataclasses
 import psutil
 from functools import (singledispatch, singledispatchmethod) # noqa
 from enum import Enum, IntEnum # noqa
-import qtpy
+# import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa
 from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
-__has_sip__ = False
+# __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    # import PySide6
+    # from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -29,14 +29,14 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    # from qtpy import sip
+    # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
-    __has_sip__ = True
+    # __has_sip__ = True
 
-
+# from gui.itemmodels.filesystemmodel import FileSystemModel
 # from . import networkmounts
 # from iolib.navigation.networkmounts import (NetworkMounts, NetworkMountsType)
 
@@ -109,36 +109,6 @@ fsMap = [
         FsInfo(FsType.Fat, "msdos"),
         FsInfo(FsType.Fuse, "fuseblk"),
     ]
-
-class FileSystemModel(QtGui.QFileSystemModel):
-    CutItemRole = QtCore.Qt.UserRole=1
-    def __init__(self, parent:typing.Optional[QtCore.QObject] = None):
-        super().__init__(parent=parent)
-        self._cutIndexes_:typing.Sequence[QtCore.QModelIndex] = list()
-
-    def data(self, index:QtCore.QModelIndex, role:QtCore.Qt.ItemDataRole=QtCore.Qt.DisplayRole) -> QtCore.QVariant:
-        # NOTE: 2026-01-25 21:20:01
-        # not sure this does anything meaningful...
-        # simply because the stock QTreeView does not seem to ever query the ForegroundRole
-        # and because this model does define a custom setData(…) to set a ForegroundRole for the items.
-        #
-        # besides, I don;t think this approach works; rather, I use a custom QStyledItemDelegate defined in gui.delegates
-        if index in self._cutIndexes_:
-            if role == QtCore.Qt.ForegroundRole:
-                return QtWidgets.QApplication.palette().brush(QtGui.QPalette.Inactive, QtGui.QPalette.Text)
-
-        return super().data(index, role)
-
-    @property
-    def cutIndexes(self) -> list:
-        return self._cutIndexes_
-
-    @cutIndexes.setter
-    def cutIndexes(self, value:typing.Sequence[QtCore.QModelIndex]):
-        if len(value) and not all(isinstance(v, QtCore.QModelIndex) for v in value):
-            return
-
-        self._cutIndexes_ = value
 
 class FileOperationJob(QtCore.QObject):
     sig_finished = Signal(name="sig_finished") # noqa
@@ -379,13 +349,14 @@ def determineFileSystemType(path:str) -> FsType:
     pass
 
 def fileSystemType(path:str) -> FsType:
-    netMounts = NetworkMounts.instance()
-    if netMounts.isSlowPath(path, NetworkMountsType.SmbPaths):
-        return FsType.Smb
-    elif netMounts.isSlowPath(path, NetworkMountsType.NfsPaths):
-        return FsType.Nfs
-    else:
-        return determineFileSystemType(path)
+    # netMounts = NetworkMounts.instance()
+    # if netMounts.isSlowPath(path, NetworkMountsType.SmbPaths):
+    #     return FsType.Smb
+    # elif netMounts.isSlowPath(path, NetworkMountsType.NfsPaths):
+    #     return FsType.Nfs
+    # else:
+    #     return determineFileSystemType(path)
+    return determineFileSystemType(path)
 
 def fileSystemName(ftype:FsType) -> str:
     # TODO 2025-01-07 19:03:57
@@ -442,18 +413,26 @@ def _(x:QtCore.QUrl) -> int:
     return len(x.path())
 
 @singledispatch
-def urlToPath(x:typing.Any) -> pathlib.Path:
+def urlToPath(x:typing.Any) -> pathlib.Path | None:
     raise NotImplementedError(f"Method is not implemented for objects of type {type(x).__name__}")
 
 @urlToPath.register(str)
-def _(x:str) -> pathlib.Path:
+def _(x:str) -> pathlib.Path | None:
     if "://" in x:
         s = x[x.index("://")+3:] # remove schema
     return pathlib.Path(x).absolute()
 
 @urlToPath.register(QtCore.QUrl)
-def _(x:QtCore.QUrl) -> pathlib.Path:
+def _(x:QtCore.QUrl) -> pathlib.Path | None:
+    # print(f"filesystems.urlToPath({x})\n\t scheme: {x.scheme()},\n\t path: {x.path()}")
+    if x.scheme() != "file":
+        return
+
     pathStr = x.path()
+
+    if len(pathStr.strip()) == 0:
+        return
+
     if sys.platform.startswith("win32"):
         if pathStr.startswith("/"):
             pathStr = pathStr[1:]

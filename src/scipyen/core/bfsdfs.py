@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -11,8 +10,8 @@ from core.utilities import safe_identity_test, NestedFinder
 
 import numpy as np
 
-import nested_lookup as nlu
-import dpath
+# import nested_lookup as nlu
+# import dpath
 
 found = deque()
 visited = deque()
@@ -36,7 +35,6 @@ def gen_elem(src, ndx):
         
     else:
         yield src
-            
             
 def gen_nested_value(src, path=None):
     #print("\n\ngen_nested_value src", src, "\npath", path)
@@ -92,9 +90,6 @@ def gen_nested_value(src, path=None):
     #elif 
     #elif isinstance(src, (tuple, list, deque))
             
-    
-    
-
 def gen_extract(var, key, index=False):
     if isinstance(var, dict):
         for k, v in var.items():

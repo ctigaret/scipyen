@@ -6,24 +6,23 @@
 
 r"""Superclass for Scipyen viewer windows
 """
-import typing, warnings, inspect, sys, platform, os
+import typing, warnings, inspect, sys, platform, os # noqa
 from dataclasses import MISSING
-from abc import (ABC, ABCMeta, abstractmethod,)
+from abc import (ABC, ABCMeta, abstractmethod,) # noqa
 from traitlets import Bunch
-import functools
 #from abc import (abstractmethod,)
-import qtpy
-from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, QtDBus)
-from qtpy.QtCore import (Signal, Slot, Property,)
+# import qtpy # noqa
+from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork) #, QtDBus) # noqa
+from qtpy.QtCore import (Signal, Slot, Property,) # noqa
 __has_PySide6__ = False
 __has_PyQt6__ = False
-__has_sip__ = False
+# __has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
+    # import PySide6 # noqa
+    # from PySide6 import Shiboken # noqa
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -31,31 +30,33 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    # from qtpy import sip # noqa
+    # from qtpy.uic import loadUiType # noqa
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
-    __has_sip__ = True
+    # __has_sip__ = True
 
 __has_qtdbus__ = False
-try:
-    from qtpy import QtDBus
-    __has_qtdbus__ = True
-except:
-    __has_qtdbus__ = False
+if sys.platform == "linux":
+    try:
+        from qtpy import QtDBus
+        __has_qtdbus__ = True
+    except: # noqa
+        __has_qtdbus__ = False
 
 
 from core.utilities import safewrapper
+from core import desktoputils
+from core.qtutils import qVariant #, QVariantType, fromQVariant)
 # from core import workspacefunctions as wfunc
 # from .workspacegui import (WorkspaceGuiMixin, _X11WMBridge_,
 #                            saveWindowSettings, loadWindowSettings)
-from gui.workspacegui import (WorkspaceGuiMixin, saveWindowSettings, loadWindowSettings)
+from gui.workspacegui import WorkspaceGuiMixin #, saveWindowSettings, loadWindowSettings)
 from gui.widgets.spinboxslider import SpinBoxSlider
-from gui.workspacemodel import WorkspaceModel
+# from gui.itemmodels.workspacemodel import WorkspaceModel
 from gui.pictgui import WorkerThread
-from core import sysutils, desktoputils
-from iolib import pictio as pio
+# from iolib import pictio as pio
 from pandas import NA
 
 
@@ -70,7 +71,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
     Derived classes:
     -----------------
-    DataTreeViewer, MatrixViewer, ScipyenFrameViewer, TableEditor, TextViewer, XMLViewer
+    ObjectInspector, MatrixViewer, ScipyenFrameViewer, TableEditor, TextViewer, XMLViewer
 
     Developer information:
     -----------------------
@@ -156,14 +157,14 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
     attribute of the viewer classes; the names of these menu items are set by
     the value of the "view_action_name" attribute.
 
-    DataTreeViewer has a special place. It has been designed to display tree-like
+    ObjectInspector has a special place. It has been designed to display tree-like
     data structures (e.g. dict and derived types) but can also display any python
     object that has a "__dict__" attribute. Therefore, the dict and derived types
-    shuld be the first elements in DataTreeViewer.viewer_for_types. In this way, other
+    shuld be the first elements in ObjectInspector.viewer_for_types. In this way, other
     data types for which there exists a specialized viewer will be displayed,
-    by default, in that specialized viewer, instead of DataTreeViewer.
+    by default, in that specialized viewer, instead of ObjectInspector.
     """
-    sig_activated           = Signal(int, name="sig_activated")
+    sig_activated           = Signal(name="sig_activated")
     sig_closeMe             = Signal()
     _sig_setNewDataBegin    = Signal(object, tuple, dict, name="_sig_setNewDataBegin")
 
@@ -241,11 +242,14 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
         self._ready_:bool = False
         self._grab_focus_:bool = False
+        self._alwaysShow_: bool = True
+
+        # print(f"{self.__class__.__name__}.__init__(parent={parent})")
 
         super().__init__(parent)
         WorkspaceGuiMixin.__init__(self, parent=parent, **kwargs)
 
-        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, False);
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground, False)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose, on=False)
         self._docTitle_ = doc_title
         self._winTitle_ = win_title # force auto-set in update_title()
@@ -320,7 +324,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         else:
             self._ID_  = int(self.winId()) # this is the wm ID of the window
 
-        self.update()
         # NOTE: 2021-09-16 12:26:09
         # This SHOULD be implemented in the derived class
         self._configureUI_()
@@ -329,19 +332,11 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
         self.loadSettings() # inherited from ScipyenConfigurable (via WorkspaceGuiMixin)
 
-        self._sig_setNewDataBegin.connect(self._slot_beginSetData)
-
         # NOTE: 2021-08-17 12:59:02
         # setData ALMOST SURELY needs the ui elements to be initialized - hence
         # it is called here, AFTER self._configureUI_()
         if data is not None:
-            # NOTE: 2022-01-17 12:39:49 this will call _set_data_
-            # subclasses can override this by implementing their own setData()
-            # see e.g., SignalViewer
-            # fn = functools.partialmethod(self.setData, data = data, doc_title = doc_title)
-            # QtCore.QTimer.singleShot(500, fn)
-            self._sig_setNewDataBegin(data, tuple(), {"doc_title": doc_title})
-            # self.setData(data = data, doc_title = doc_title)
+            self.setData(data = data, doc_title = doc_title)
 
         else:
             self.update_title(win_title = win_title, doc_title = doc_title)
@@ -414,6 +409,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         r"""workaround wayland"""
         if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
             return
+
         super().requestActivate()
 
 
@@ -421,21 +417,25 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         if sys.platform== "win32":
             self.windowHandle().raise_()
         else:
-            if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
-                return
+            # if os.getenv("XDG_SESSION_TYPE").lower() == "wayland":
+            #     return
             super().activateWindow()
+
+            self.sig_activated.emit()
+            # self.sig_activated.emit(self.winId())
 
     def getAppMenu(self):
         if self._global_menu_service_ == "com.canonical.AppMenu.Registrar":
-            service_name = self._global_menu_service_
-            service_path = "/com/canonical/AppMenu/Registrar"
-            interface = "com.canonical.AppMenu.Registrar"
+            # service_name = self._global_menu_service_
+            # service_path = "/com/canonical/AppMenu/Registrar"
+            # interface = "com.canonical.AppMenu.Registrar"
             dbusinterface = QtDBus.QDBusInterface(self._global_menu_service_, "/"+self._global_menu_service_.replace(".", "/"),
                                                   self._global_menu_service_)
             dbusinterface.setTimeout(100)
             if __has_PyQt6__ or __has_PySide6__:
                 v = int(self.winId())
                 result = dbusinterface.call("GetMenuForWindow", v).arguments()
+
             else:
                 v = QtCore.QVariant(int(self.winId()))
 
@@ -456,13 +456,13 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                     #
                     result = dbusinterface.call("GetMenuForWindow", v).arguments()
 
-                    if len(result) == 1: # oops!
-                        # warnings.warn(result[0])
-                        return
+            if len(result) == 1: # oops!
+                # warnings.warn(result[0])
+                return
 
-                        # address, objpath = result
+                # address, objpath = result
 
-                    return result
+            return result
 
     def update_title(self, doc_title: typing.Optional[str] = None,
                      win_title: typing.Optional[str] = None,
@@ -520,12 +520,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         elif len(self._winTitle_.strip()) == 0:
             self._winTitle_ = self.scipyenWindow.applicationName
 
-#         if isinstance(self._docTitle_, str) and len(self._docTitle_.strip()):
-#             self.setWindowTitle("%s - %s" % (self._docTitle_, self._winTitle_))
-#
-#         else:
-#             self.setWindowTitle(self._winTitle_)
-
     @abstractmethod
     def setDataDisplayEnabled(self, value):
         r"""Enable/disable the central data display widget.
@@ -578,20 +572,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         else:
             return __check_val_type_is_supported__(value)
 
-    @Slot(object, tuple, dict)
-    def _slot_beginSetData(self, obj: object, args = tuple(), kwargs = dict()):
-        if obj is None:
-            return
-
-        if not isinstance(args, tuple):
-            args = (args, )
-
-        if not isinstance(kwargs, dict):
-            kwargs = dict()
-
-        self.setData(obj, *args, **kwargs)
-
-
     def setData(self, *args, **kwargs):
         r"""Generic function to set the data to be displayed by this viewer.
 
@@ -624,7 +604,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         uiParamsPrompt:bool, default False;l when True, a dialog asking for
             further parameters is shown (if the viewer supports it)
         """
-
+        # print(f"ScipyenViewer[{self.__class__.__name__}].setData(...)")
         # NOTE: 2020-09-25 10:35:34
         #
         # This function does the following:
@@ -645,6 +625,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         #
 
         uiParamsPrompt = kwargs.pop("uiParamsPrompt", False)
+        self._alwaysShow_ = kwargs.get("autoRaise", True)
 
         if uiParamsPrompt:
             # TODO 2023-01-18 08:48:13
@@ -652,7 +633,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # print(f"{self.__class__.__name__}.setData uiParamsPrompt")
 
         if len(args):
-            if "DataTreeViewer" not in self.__class__.__name__:
+            if "ObjectInspector" not in self.__class__.__name__:
                 if len(self.viewer_for_types) and not any([self._check_supports_parameter_type_(a) for a in args]):
                     raise TypeError("Expecting one of the supported types: %s" % " ".join([s.__name__ for s in self.viewer_for_types]))
 
@@ -675,25 +656,17 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         worker = WorkerThread(self, self._set_data_, *args, **kwargs)
         worker.signals.signal_Finished.connect(self._slot_set_data_finished)
         worker.run()
-        # self._set_data_(*args, **kwargs)
-
-        #print(f"In ScipyenViewer<{self.__class__.__name__}>.setData(): is visible: {self.isVisible()}")
-
-#         if not self.isVisible():
-#             self.setVisible(True)
-#
-#         if get_focus:
-#             self.activateWindow()
 
     @Slot()
     def _slot_set_data_finished(self):
         self._slot_update_title()
         self._ready_ = True
-        if not self.isVisible():
-            self.setVisible(True)
+        if self._alwaysShow_:
+            if not self.isVisible():
+                self.setVisible(True)
 
-        if self._grab_focus_:
-            self.activateWindow()
+            if self._grab_focus_:
+                self.activateWindow()
 
     @Slot()
     def _slot_update_title(self):
@@ -702,7 +675,6 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
 
         else:
             self.setWindowTitle(self._winTitle_)
-
 
     def paintEvent(self, event:QtGui.QPaintEvent):
         super().paintEvent(event)
@@ -730,6 +702,24 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         r"""Should implement/override in the subclass if self._data_ has specific structure
         """
         return self._data_
+
+    @property
+    def autoRaise(self) -> bool:
+        r"""When True, the window will be made visible every time data is set.
+        By default this property is always True.
+    """
+        return self._alwaysShow_
+
+    @autoRaise.setter
+    def autoRaise(self, val:bool):
+        self._alwaysShow_ = val is True
+
+        if self._alwaysShow_:
+            if not self.isVisible():
+                self.setVisible(True)
+
+            if self._grab_focus_:
+                self.activateWindow()
 
     @property
     def ID(self):
@@ -800,7 +790,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         return self._docTitle_
 
     @docTitle.setter
-    def docTitle(self, value: (str, type(None)) = None):
+    def docTitle(self, value: str | None = None):
         r"""Sets the display name of the data.
 
         This is the "document" part of the pattern "document - window" used in the window title.
@@ -815,7 +805,7 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             Calls self.update_title()
         """
         if not isinstance(value, (str, type(None))):
-            raise TypeError("Expecting a str, or None; got %s instead" % type(value.__name__))
+            raise TypeError("Expecting a str, or None; got %s instead" % type(value).__name__)
 
         self.update_title(doc_title=value)
 
@@ -855,16 +845,16 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
             # if/when it does exist
             self._deregister_menuBar_()
 
-            self.sig_closeMe.emit()
 
             if self.isTopLevel:
-                if self._delete_on_close_ or getattr(self.appWindow, "autoRemoveViewers", False):
-                    if any([v is self for v in self.appWindow.workspace.values()]):
-                        self.appWindow.deRegisterWindow(self)
-                        self.appWindow.removeFromWorkspace(self, by_name=False)
+                if self._delete_on_close_ or getattr(self.scipyenWindow, "autoRemoveViewers", False):
+                    if any([v is self for v in self.scipyenWindow.workspace.values()]):
+                        self.scipyenWindow.deRegisterWindow(self)
 
             super().closeEvent(evt)
             evt.accept()
+
+            self.sig_closeMe.emit()
 
     def event(self, evt:QtCore.QEvent):
         r"""Generic event handler
@@ -872,8 +862,10 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
         """
         evt.accept()
 
+        # if not __has_PySide6__ and evt.type() in (QtCore.QEvent.FocusIn, QtCore.QEvent.WindowActivate):
         if evt.type() in (QtCore.QEvent.FocusIn, QtCore.QEvent.WindowActivate):
-            self.sig_activated.emit(self.ID)
+            self.sig_activated.emit()
+            # self.sig_activated.emit(self.ID)
             return True
 
         return super().event(evt)
@@ -893,10 +885,14 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                                                 interface)
             dbusinterface.setTimeout(100)
 
-            old_v = QtCore.QVariant(self._wm_id_)
+            old_v = qVariant(self._wm_id_)
 
-            if old_v.convert(QtCore.QVariant.UInt):
-                reply = dbusinterface.call("UnregisterWindow", old_v)
+            if __has_PySide6__:
+                reply = dbusinterface.call("UnregisterWindow", old_v) # noqa
+
+            else:
+                if old_v.convert(QtCore.QVariant.UInt):
+                    reply = dbusinterface.call("UnregisterWindow", old_v) # noqa
 
     def _restore_menuBar_(self):
         r"""Hack to restore the window's menubar in the desktop's global menu.
@@ -920,14 +916,19 @@ class ScipyenViewer(QtWidgets.QMainWindow, WorkspaceGuiMixin):
                                                     interface)
                 dbusinterface.setTimeout(100)
 
-                old_v = QtCore.QVariant(self._wm_id_)
-                new_v = QtCore.QVariant(int(self.winId()))
+                old_v = qVariant(self._wm_id_)
+                new_v = qVariant(int(self.winId()))
 
-                if old_v.convert(QtCore.QVariant.UInt) and new_v.convert(QtCore.QVariant.UInt):
-                    # deregister old WM window ID, then register the new one
-                    # to the same DBus object path (i.e. dbusmenu instance)
-                    dereg_reply = dbusinterface.call("UnregisterWindow", old_v)
-                    newreg_reply = dbusinterface.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self._app_menu_[1]))
+                if __has_PySide6__:
+                    dereg_reply = dbusinterface.call("UnregisterWindow", old_v) # noqa
+                    newreg_reply = dbusinterface.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self._app_menu_[1])) # noqa
+
+                else:
+                    if old_v.convert(QtCore.QVariant.UInt) and new_v.convert(QtCore.QVariant.UInt):
+                        # deregister old WM window ID, then register the new one
+                        # to the same DBus object path (i.e. dbusmenu instance)
+                        dereg_reply = dbusinterface.call("UnregisterWindow", old_v) # noqa
+                        newreg_reply = dbusinterface.call("RegisterWindow", new_v, QtDBus.QDBusObjectPath(self._app_menu_[1])) # noqa
 
     @Slot()
     @safewrapper
@@ -1302,7 +1303,6 @@ class ScipyenFrameViewer(ScipyenViewer):
         currentFrame is an index into THAT subset, and not an index into all of
         the data frames.
 
-        Should NOT emit frameChanged signal (exceptions are allowed with CAUTION).
 
         Developer information:
         ---------------------
@@ -1333,7 +1333,7 @@ class ScipyenFrameViewer(ScipyenViewer):
             blocked_signal_emitters.append(self._frames_spinBoxSlider_)
 
         if len(blocked_signal_emitters):
-            signalBlockers = [QtCore.QSignalBlocker(w) for w in blocked_signal_emitters]
+            signalBlockers = [QtCore.QSignalBlocker(w) for w in blocked_signal_emitters] # noqa
 
             if isinstance(self._frames_slider_, QtWidgets.QSlider):
                 self._frames_slider_.setValue(value)

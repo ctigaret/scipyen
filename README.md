@@ -101,7 +101,7 @@ Scipyen session with:
 1. The main window, with workspace viewer ("User variables"), file system viewer and command history.
 2. The console
 3. The script manager
-4. DataTreeViewer
+4. ObjectInspector
 5. Electrophysiology data viewer (SignalViewer)
 
 

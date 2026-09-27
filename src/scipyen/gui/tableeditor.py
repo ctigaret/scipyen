@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# __scipyen_plugin__
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -17,6 +17,7 @@ from __future__ import print_function
 
 import os, inspect, warnings, traceback, datetime, typing, sys
 from functools import (singledispatch, singledispatchmethod)
+from collections import deque
 
 #### END core python modules
 
@@ -27,18 +28,14 @@ import quantities as pq
 import numpy as np
 import neo
 from core.vigra_patches import vigra
-import qtpy
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, )
 from qtpy.QtCore import (Signal, Slot, Property,)
 __has_PySide6__ = False
 __has_PyQt6__ = False
-__has_sip__ = False
 if os.environ["QT_API"] == "pyside6":
     __has_PySide6__ = True
-    import PySide6
-    from PySide6 import Shiboken
     # from PySide6.QtCore import (Signal, Slot, Property,)
-    from PySide6.QtUiTools import loadUiType # -- A-HA!
+    # from PySide6.QtUiTools import loadUiType # -- A-HA!
     QAction = QtGui.QAction
     QActionGroup = QtGui.QActionGroup
     QShortcut = QtGui.QShortcut
@@ -46,12 +43,10 @@ else:
     if os.environ["QT_API"] == "pyqt6":
         __has_PyQt6__ = True
 
-    from qtpy import sip
-    from qtpy.uic import loadUiType
+    # from qtpy.uic import loadUiType
     QAction = QtWidgets.QAction
     QActionGroup = QtWidgets.QActionGroup
     QShortcut = QtWidgets.QShortcut
-    __has_sip__ = True
 
 
 import matplotlib as mpl
@@ -94,10 +89,10 @@ from gui import quickdialog
 import iolib.pictio as pio
 #### END pict.iolib modules
 
+from ephys import (ephys, ephys_pathways)
 
 # NOTE: 2022-12-25 23:08:51
 # needed for the new plugins framework
-__scipyen_plugin__ = None
 
 class TableEditor(ScipyenViewer):
     r"""Viewer/Editor for tabular data
@@ -110,7 +105,8 @@ class TableEditor(ScipyenViewer):
     #   varname: binding symbol of model data in the named namespace -
     #   namespace_name: the namespace name as registered with Scipyen's workspace model
     sig_dataChanged = Signal(str, str, name="sig_dataChanged")
-    sig_activated               = Signal(int)
+    # sig_activated               = Signal(int)
+    sig_activated               = Signal()
     closeMe                     = Signal(int)
     signal_window_will_close    = Signal()
 
@@ -134,7 +130,15 @@ class TableEditor(ScipyenViewer):
                         # pq.Quantity: 0,
                         vigra.VigraArray: 0,
                         vigra.filters.Kernel1D: 0,
-                        vigra.filters.Kernel2D: 0}
+                        vigra.filters.Kernel2D: 0,
+                        ephys_pathways.SynapticPathwayList: 0,
+                        ephys_pathways.AuxiliaryInputList: 0,
+                        ephys_pathways.AuxiliaryOutputList: 0,
+                        ephys_pathways.SynapticStimulusChannelList: 0,
+                        ephys_pathways.RecordingSchedule: 0,
+                        list:0,
+                        tuple:0,
+                        deque:0}
 
     # view_action_name = "Table"
 
@@ -144,6 +148,8 @@ class TableEditor(ScipyenViewer):
                  win_title: (str, type(None)) = None, doc_title: (str, type(None)) = None,
                  *args, **kwargs) -> None:
         super().__init__(data=data, parent=parent, win_title=win_title, doc_title = doc_title, ID=ID, *args, **kwargs) # calls _configureUI_ and loadSettings
+
+        self._decimals_ = kwargs.pop("decimals", None)
 
         self.selectedColumnIndex      = None
         self.selectedRowIndex         = None
@@ -254,6 +260,7 @@ class TableEditor(ScipyenViewer):
 
     def _configureUI_(self):
         r"""Initializes and configures the GUI elements.
+    NOTE: There is NO UI file for this.
         """
         # NOTE: 2019-01-12 12:21:34
         # CAUTION: setting section resize mode policies to ResizeToContents has
@@ -332,7 +339,10 @@ class TableEditor(ScipyenViewer):
                        neo.Epoch, neo.Event, neo.SpikeTrain,
                        DataSignal, IrregularlySampledDataSignal,
                        TriggerEvent, TriggerProtocol,
-                       np.ndarray, vigra.VigraArray, vigra.filters.Kernel1D, vigra.filters.Kernel2D), *args, **kwargs):
+                       np.ndarray, vigra.VigraArray,
+                       vigra.filters.Kernel1D,
+                       vigra.filters.Kernel2D,
+                       list, tuple, deque), *args, **kwargs):
 
         if (type(data) not in self.viewer_for_types
             and not any(t in inspect.getmro(type(data)) for t in self.viewer_for_types)):
@@ -342,7 +352,7 @@ class TableEditor(ScipyenViewer):
 
         self._viewData_()
 
-        if kwargs.get("show", True): # ??? won't work in wayland anyway
+        if kwargs.get("show", True) and os.getenv("XDG_SESSION_TYPE").lower() != "wayland":
             self.activateWindow()
 
     def _viewData_(self):
@@ -723,3 +733,15 @@ class TableEditor(ScipyenViewer):
 
         self._use_matplotlib_ = value
 
+    @property
+    def decimals(self) -> int | None:
+        return self._decimals_
+
+    @decimals.setter
+    def decimals(self, val: int | None = None):
+        if isinstance(val, int) and val >= 0:
+            self._decimals_ = val
+        else:
+            self._decimals_ = None
+
+        self.tableWidget.decimals = self._decimals_

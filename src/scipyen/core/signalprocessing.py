@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # SPDX-FileCopyrightText: 2024 Cezar M. Tigaret <cezar.tigaret@gmail.com>
 # SPDX-License-Identifier: GPL-3.0-or-later
 # SPDX-License-Identifier: LGPL-2.1-or-later
@@ -9,6 +8,7 @@ please use the "ephys" module.
 """
 
 import typing, numbers, functools, warnings, traceback
+from functools import singledispatch
 
 #### BEGIN 3rd party modules
 import numpy as np
@@ -21,20 +21,20 @@ from enum import (IntEnum, auto)
 #### END 3rd party modules
 
 #### BEGIN scipyen core modules
-from . import curvefitting as crvf
-from . import scipyen_quantities as scq
-from . import datasignal as sds
-from .datasignal import DataSignal, IrregularlySampledDataSignal
-from . import prog as prog
-from .prog import safewrapper, with_doc
+from core import curvefitting as crvf
+from core import scipyen_quantities as scq
+# from . import datasignal as sds
+from core.datasignal import DataSignal, IrregularlySampledDataSignal
+# from . import prog as prog
+from core.prog import safewrapper, with_doc
+from core import datatypes
 
-from plots.plots import plot_wavelet
+# from plots.plots import plot_wavelet
 #### END scipyen core modules
 
 class BoxcarDetectionMethod(IntEnum):
     state_levels = auto()
     kmeans = auto()
-
 
 def simplify_2d_shape(xy: np.ndarray, max_points: int = 5, k: int = 3):
     r"""Creates an simplified version of a 2D shape defined by x,y coordinate array
@@ -214,7 +214,6 @@ def simplify_2d_shape(xy: np.ndarray, max_points: int = 5, k: int = 3):
 
     return ret, splines
 
-
 def zero_crossings(x: np.ndarray):
     r"""Returns the zero crossings of x waveform, with grid accuracy.
 
@@ -240,7 +239,6 @@ def zero_crossings(x: np.ndarray):
 
     return np.where(x[:-1] * x[1:] < 0)[0]  # because where() returns a tuple which
     # for 1D data has only one element
-
 
 def value_crossings(x: np.ndarray, value: float):
     r"""Returns the sample indices, in a waveform, that cross an arbitrary value.
@@ -435,7 +433,7 @@ def normalise_waveform(
     FIXME: 2022-12-13 16:57:47 This is NOT nan-friendly!
 
     """
-    from core import datatypes
+    # from core import datatypes
 
     if x.ndim != 1:
         if x.ndim == 2:
@@ -954,6 +952,67 @@ def state_levels(x: np.ndarray, **kwargs):
 
     return sLevels, counts, edges, ranges
 
+def remove_stim_artifacts(x: np.ndarray, wp: float, ws: float, gp: float, gs: float,
+                          fs: typing.Optional[float | pq.Quantity] = None):
+    r"""Removes stimulus artifacts usin a Butterworth filter"""
+    if isinstance(x, (neo.AnalogSignal, DataSignal)):
+        if not isinstance(fs, pq.Quantity):
+            fs = float(x.sampling_rate)
+
+    elif isinstance(x, np.ndarray):
+        if not isinstance(fs, float):
+            raise TypeError("'f' must be supplied for ordinary numy arrays")
+
+    bord, wn = scipy.signal.buttord(wp, ws, gp, gs, fs=fs)
+    btr = scipy.signal.butter(bord, wn, "low", fs = fs)
+    # btrsos = scipy.signal.tf2sos(*btr)
+    btrsos = scipy.signal.butter(bord, wn, "low", output="sos", fs = fs)
+
+    if isinstance(x, (neo.AnalogSignal, DataSignal)):
+        ret = sosfilter(x, btrsos)
+        klass = x.__class__
+        ret = klass(ret, units = x.units, t_start = x.t_start,
+                            sampling_rate = x.sampling_rate,
+                            name=x.name,
+                            description = x.description)
+        ann = x.array_annotations
+        for key in ann:
+            ret.array_annotations[key] = ann[key]
+    else:
+        ret = scipy.signal.sosfiltfilt(btrsos, x, axis=0)
+
+    return ret
+
+def remove_hum(x: np.ndarray, notch_freq: typing.Union[float, int, pq.Quantity] = 50 * pq.Hz,
+               quality: float | int = 30,
+               fs: typing.Optional[typing.Union[float, int, pq.Quantity]] = None,) -> np.ndarray:
+    r"""Removes 'hum' (power grid noise)"""
+    if isinstance(x, (neo.AnalogSignal, DataSignal)):
+        if not isinstance(fs, pq.Quantity):
+            fs = float(x.sampling_rate)
+
+    elif isinstance(x, np.ndarray):
+        if not isinstance(fs, float):
+            raise TypeError("'f' must be supplied for ordinary numpy arrays")
+
+    notch = scipy.signal.iirnotch(notch_freq, quality, fs=fs)
+    notchsos = scipy.signal.tf2sos(*notch)
+    if isinstance(x, (neo.AnalogSignal, DataSignal)):
+        ret = sosfilter(x, notchsos)
+        klass = x.__class__
+        ret = klass(ret, units = x.units, t_start = x.t_start,
+                            sampling_rate = x.sampling_rate,
+                            name=x.name,
+                            description = x.description)
+        ann = x.array_annotations
+        for key in ann:
+            ret.array_annotations[key] = ann[key]
+    else:
+        ret = scipy.signal.sosfiltfilt(notchsos, x, axis=0)
+
+    return ret
+
+
 
 def remove_dc(
     x,
@@ -1283,7 +1342,7 @@ def argmaxmin(x: np.ndarray, **kwargs):
 
     """
     axis = kwargs.pop("axis", None)
-    max_first = kwargs.op("max_first", True)
+    max_first = kwargs.pop("max_first", True)
 
     amx, amn = np.argmax(x, axis=axis), np.argmin(x, axis=axis)
     return (amx, amn) if max_first else (amn, amx)
@@ -1303,6 +1362,15 @@ def argminmax(x: np.ndarray, **kwargs):
     axis = kwargs.pop("axis", None)
     return argmaxmin(x, axis=axis, max_first=False)
 
+def max_argmax(x: np.ndarray, **kwargs):
+    r"""Returns the tuple (max value, index of max value)"""
+    axis = kwargs.pop("axis", None)
+    return np.max(x, axis=axis), np.argmax(x, axis=axis)
+
+def min_argmin(x: np.ndarray, **kwargs):
+    r"""Returns the tuple (min value, index of min value)"""
+    axis = kwargs.pop("axis", None)
+    return np.min(x, axis=axis), np.argmin(x, axis=axis)
 
 def sem(x: np.ndarray, **kwargs):
     r"""Standard error of the mean (SEM) for array x
@@ -1361,36 +1429,6 @@ def nansem(x: np.ndarray, **kwargs):
 
     return np.nanstd(x, ddof=ddof, axis=axis, keepdims=keepdims) / np.sqrt(sz - ddof)
 
-
-def rms(x: np.ndarray, **kwargs):
-    r"""Root-mean-square of x
-
-    Parameters:
-    ===========
-    x: 1D numpy array
-
-    """
-    from core import datatypes
-
-    if not isinstance(x, np.ndarray):
-        raise TypeError(f"Expecting a numpy array; got {type(x).__name__} instead")
-    if not datatypes.is_vector(x):
-        raise ValueError(f"Expecting a vector; instead, got data with shape: {x.shape}")
-
-    return np.sqrt(np.linalg.norm(x) / x.size)
-
-
-#     if isinstance(x, pq.Quantity):
-#         xdot = np.dot(np.abs(x.magnitude).T, np.abs(x.magnitude))
-#     else:
-#         xdot = np.dot(x.T, x)
-#
-#     return np.sqrt(xdot/x.size)
-
-#     if isinstance(xsq, pq.Quantity):
-#         return np.sqrt(xsq.magnitude/x.size)
-#
-#     return np.sqrt(xsq/x.size)
 
 
 def detrend(x: typing.Union[neo.AnalogSignal, DataSignal], **kwargs):
@@ -1507,23 +1545,48 @@ def detrend(x: typing.Union[neo.AnalogSignal, DataSignal], **kwargs):
     return ret
 
 
-def sosfilter(sig: typing.Union[pq.Quantity, np.ndarray], kernel: np.ndarray):
+def sosfilter(sig: typing.Union[pq.Quantity, np.ndarray], kernel: np.ndarray,
+              name: typing.Optional[str] = None):
+    r"""Filters the signal using a cascading Second Order Sections (SOS) filter.
+
+Uses scipy.signal.sosfilter with ``axis`` set to 0 (zero) and no initil conditions.
+
+See scipy documentation for details.
+
+Parameters:
+-----------
+
+:sig:  signal-like
+
+:kernel: Array of second-order filter coefficients
+
+:name: optional, a memorable name for the implemented filter, for information only
+    (e.g. "de-hum", etc).
+"""
     if isinstance(sig, (neo.AnalogSignal, DataSignal)):
         ret = scipy.signal.sosfiltfilt(kernel, sig.magnitude, axis=0)
 
         klass = sig.__class__
-        name = sig.name
+        sig_name = sig.name
+
         if isinstance(name, str) and len(name.strip()):
-            name = f"{name}_filtered"
+            sfx = name
         else:
-            name = "filtered"
+            sfx = "filtered"
+
+        # if isinstance(sig_name, str) and len(sig_name.strip()):
+        #     sig_name = f"{sig_name}_{sfx}"
+        # else:
+        #     sig_name = sfx
+
         ret = klass(
             ret,
             units=sig.units,
             t_start=sig.t_start,
             sampling_rate=sig.sampling_rate,
-            name=name,
+            name=sig_name,
             description=f"{sig.description} filtered",
+            filtered = {"name": sfx if sfx != "filtered" else "unknown", "sos": kernel}
         )
 
     else:
@@ -2395,62 +2458,96 @@ def forward_difference(
     return ret
 
 
-def root_mean_square(x, axis=None):
-    r"""Computes the RMS of a signal.
 
-    Positional parameters
-    =====================
-    x = neo.AnalogSignal, neo.IrregularlySampledSignal, or datasignal.DataSignal
+@singledispatch
+def mad(x) -> float | list[float]:
+    r"""Mean absolute deviation for vector x.
 
-    Named parameters
-    ================
+This is defined as median(abs(x-mean(x)))
 
-    axis: None (defult), or a scalar int, or a sequence of int: index of the axis,
-            in the interval [0, x.ndim), or None (default)
+"""
+    raise NotImplementedError(f"{type(x).__name__} objects are not supported")
 
-            When a sequence of int, the RMS will be calculated across all the
-            specified axes
+@mad.register(np.ndarray)
+def __mad__(x: np.ndarray) -> float | list[float]:
+    if not datatypes.is_vector(x):
+        raise ValueError(f"Expecting a vector; instead, got data with shape: {x.shape}")
 
-        When None (default) the RMS is calculated for the flattened signal array.
+    return np.median(np.abs(x-np.mean(x, axis=0)))
 
-        This argument is passed on to numpy.mean
+@mad.register(neo.AnalogSignal)
+@mad.register(DataSignal)
+@mad.register(neo.IrregularlySampledSignal)
+@mad.register(IrregularlySampledDataSignal)
+def __mad__(x: (neo.AnalogSignal, neo.IrregularlySampledSignal,
+                DataSignal, IrregularlySampledDataSignal)) -> float | list[float]:
+    if x.ndims == 1:
+        return mad(x.flatten().magnitude) * x.units
 
-    Returns: a scalar float
-    RMS = sqrt(mean(x^2))
+    result = [mad(x[:,channel].flatten().magnitude) * x[:,channel].units for channel in range(x.shape[1])]
+
+    if x.shape[1] == 1:
+        return result[0]
+
+    return result
+
+@singledispatch
+def rms(x) -> float | list[float]:
+    r"""Root-mean-square of x
+
+    Parameters:
+    ===========
+    x: 1D numpy array or signal-like object
+
+    Returns:
+    ========
+    RMS = np.linalg.norm(x,2)/√(x.size)
+
+    For multi-channel signals, returns a list with the RMS of each channel
+
+    .. note::
+        This is mathematically identical to
+
+        sqrt(mean(x^2))
+
+        for x a vector (1D array)
+
+    ..
+        np.isclose(rms(x) , np.sqrt(np.mean(x**2)))
+
+        np.True_
 
     """
-    from . import datatypes
+    raise NotImplementedError(f"{type(x).__name__} objects are not supported")
 
-    if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
-        raise TypeError(
-            "Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datasignal.DataSignal; got %s instead"
-            % type(x).__name__
-        )
+@rms.register(np.ndarray)
+def __rms__(x: np.ndarray) -> float | list[float]:
+    # from core import datatypes
 
-    if not isinstance(axis, (int, tuple, list, type(None))):
-        raise TypeError(
-            "axis expected to be an int or None; got %s instead" % type(axis).__name__
-        )
+    if not datatypes.is_vector(x):
+        raise ValueError(f"Expecting a vector; instead, got data with shape: {x.shape}")
 
-    if isinstance(axis, (tuple, list)):
-        if not all([isinstance(a, int) for a in axis]):
-            raise TypeError("Axis nindices must all be integers")
+    return np.linalg.norm(x, axis=0) / np.sqrt(x.size)
+    # return np.sqrt(np.linalg.norm(x, axis=0) / x.size)
 
-        if any([a < 0 or a > x.ndim for a in axis]):
-            raise ValueError("Axis indices must be inthe interval [0, %d)" % x.ndim)
+@rms.register(neo.AnalogSignal)
+@rms.register(DataSignal)
+@rms.register(neo.IrregularlySampledSignal)
+@rms.register(IrregularlySampledDataSignal)
+def __rms__(x: (neo.AnalogSignal, neo.IrregularlySampledSignal,
+                DataSignal, IrregularlySampledDataSignal)) -> float | list[float]:#, **kwargs): # noqa
+    if x.ndim==1:
+        return rms(x.flatten().magnitude) * x.units
 
-    if isinstance(axis, int):
-        if axis < 0 or axis >= x.ndim:
-            raise ValueError(
-                "Invalid axis index; expecting value between 0 and %d ; got %d instead"
-                % (x.ndim, axis)
-            )
+    result = [rms(x[:,channel].flatten().magnitude) * x[:,channel].units for channel in range(x.shape[1])]
 
-    return np.sqrt(np.mean(np.abs(x), axis=axis))
+    if len(result) == 1:
+        return result[0]
 
+    return result
 
-def signal_to_noise(x, axis=None, ddof=None, db=True):
-    r"""Calculates SNR for the given signal.
+def snr(x, axis=None, ddof=None, db=True):
+    r"""Calculates signal-to-noise ration (SNR) for the given signal.
 
     Positional parameters:
     =====================
@@ -2471,7 +2568,7 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
 
     ddof: None (default) or a scalar int: delta degrees of freedom
 
-        When None, it sill be calculated from the size of x along the specified axes
+        When None, it will be calculated from the size of x along the specified axes
 
         ddof is passed onto numpy.std (see numpy.std for details)
 
@@ -2481,9 +2578,9 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
     """
     from . import datatypes
 
-    if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal)):
+    if not isinstance(x, (neo.AnalogSignal, neo.IrregularlySampledSignal, DataSignal, np.ndarray)):
         raise TypeError(
-            "Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, or a datasignal.DataSignal; got %s instead"
+            "Expecting a neo.AnalogSignal, neo.IrregularlySampledSignal, a datasignal.DataSignal or a numpy array; got %s instead"
             % type(x).__name__
         )
 
@@ -2525,14 +2622,18 @@ def signal_to_noise(x, axis=None, ddof=None, db=True):
         if ddof < 0:
             raise ValueError("ddof must be >= 0; got %s instead" % ddof)
 
-    rms = root_mean_square(x, axis=axis)
+    # rms = root_mean_square(x, axis=axis)
+    sig_rms = rms(x, axis=axis)
 
-    std = np.std(x, axis=axis, ddof=ddof)
+    sig_std = np.std(x, axis=axis, ddof=ddof)
 
-    ret = rms / std
+    ret = sig_rms / sig_std
 
     if db:
-        return np.log10(ret.magnitude.flatten()) * 20
+        if isinstance(ret, pq.Quantity):
+            return np.log10(ret.magnitude.flatten()) * 20
+        else:
+            return np.log10(ret.flatten()) * 20
 
     return ret
 
@@ -3150,7 +3251,7 @@ def detect_boxcar(
 
     if not isinstance(method, BoxcarDetectionMethod):
         raise TypeError(
-            f"'methd' expected to be a BoxcarDetectionMethod; instead, got {type(method).__name__}"
+            f"'method' expected to be a BoxcarDetectionMethod; instead, got {type(method).__name__}"
         )
 
     # NOTE: 2023-06-19 08:59:37
@@ -3344,3 +3445,96 @@ def detect_boxcar(
 
     # emulates parse_step_waveform_signal
     return times_hi_lo, times_lo_hi, amplitude, cbook, code, upward
+
+def suggest_rise_fraction_indexes(sig: np.ndarray,
+                      refval: np.ndarray | pq.Quantity,
+                      targetval: np.ndarray | pq.Quantity,
+                      minpc: float, maxpc: float, asArray:bool = False) -> tuple | None:
+
+    if not isinstance(refval, np.ndarray) or refval.size!=1:
+        raise ValueError(f"revfal expected a scalar; instead, got {refval}")
+
+    if not isinstance(targetval, np.ndarray) or targetval.size!=1:
+        raise ValueError(f"targetval expected a scalar; instead, got {targetval}")
+
+    if not all (isinstance(v, float) for v in (minpc, maxpc)):
+        raise TypeError(f"Both minpc and maxpc must be floats; instead, got minpc: {type(minpc).__name__} and maxpc: {type(maxpc).__name__}")
+
+    if not (minpc >=0 and minpc <=1 and maxpc >= 0 and maxpc <=1 and minpc != maxpc):
+        raise ValueError(f"Both minpc and maxpc must be in the interval [0,1] and distinct; instead, got minpc: {minpc} and maxpc: {maxpc}")
+
+    target = targetval.magnitude if (isinstance(targetval, pq.Quantity) and not isinstance(sig, pq.Quantity)) else targetval
+
+    ref = refval.magnitude if (isinstance(refval, pq.Quantity) and not isinstance(sig, pq.Quantity)) else refval
+
+    if np.isclose(float(target), float(ref)):
+        scipywarn(f"Traget ({targetval}) and reference ({revfal}) are too close")
+        return
+
+
+    inward = target < ref
+
+    # δval = target-ref
+    δval = targetval-refval
+
+    if inward:
+        bottom = refval + δval * maxpc
+        top = refval + δval * minpc
+        below = np.where(sig < bottom)[0]
+        if below.size == 0:
+            return
+
+        endNdx = below[0]
+
+        above = np.where(sig > top)[0]
+        if above.size == 0:
+            return
+
+        startNdx = above[-1]
+
+        if asArray:
+            return np.ndarray([startNdx, endNdx])
+
+        return startNdx, endNdx
+
+    else:
+        bottom = refval + δval * minpc
+        top = refval + δval * maxpc
+
+        above = np.where(sig > top)[0]
+
+        if above.size == 0:
+            return
+
+        endNdx = above[0]
+
+        below = np.where(sig < bottom)[0]
+
+        if below.size == 0:
+            return
+
+        startNdx = below[-1]
+
+        if asArray:
+            return np.ndarray([startNdx, endNdx])
+
+        return startNdx, endNdx
+
+def rising_phase_fraction_times(sig: typing.Union[neo.AnalogSignal, DataSignal],
+                      refval: np.ndarray | pq.Quantity,
+                      targetval: np.ndarray | pq.Quantity,
+                      minpc: float, maxpc: float, asArray:bool = False) -> tuple | None:
+    if not isinstance(sig, (neo.AnalogSignal, DataSignal)):
+        raise TypeError(f"Expecting a neo.AnalogSignal or DataSignal object; instead, got a {type(sig).__name__}")
+
+    ndx = suggest_rise_fraction_indexes(sig, refval, targetval, minpc, maxpc, False)
+
+    if ndx is None:
+        return
+
+    ret = tuple(map(lambda x: sig.times[x], ndx))
+
+    if asArray:
+        return np.array(ret)
+
+    return ret

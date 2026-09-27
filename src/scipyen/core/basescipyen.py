@@ -22,31 +22,21 @@ from core import scipyen_quantities as cq
 from core.scipyen_quantities import unitsConvertible
 
 # from core.datatypes import * # clashes with datetime class imported from datetime module !!!
-from core.typeenum import TypeEnum
-from core.scipyendataclasses import (Episode, Schedule, ProcedureType, AdministrationRoute,
-                            Procedure, BioSourceType, TaxonDescriptor, Taxon,
+from core.typeenum import TypeEnum # noqa
+from core.scipyendataclasses import (Episode, Schedule, ProcedureType, AdministrationRoute, # noqa
+                            Procedure, PPL, PIL, PPLProtocol, PPLProtocolStep, PPLProcedure,
+                            BioSourceType, # noqa
                             BiologicalSource, CellCompartment, CellCompartmentType,
                             Organism, Biometrics, ScipyenDataclass,
                             FileOriginDescriptor
                             )
+# from core.taxonbridge import Taxon, TaxonDescriptor
 
 from iolib.navigation.filesystems import getFileCreationDateTime
 
 @dataclass
 class BaseScipyenData(ScipyenDataclass):
     r"""Encapsulates 'metadata' associated with recorded data or analysis results"""
-    # NOTE: 2024-11-16 10:07:21
-    # The fields below, from 'name' to 'rec_datetime' are meant to align this
-    # data model to the one used in NeuralEnsemble's neo library.
-    # In addition, I introduce an "analysis_datetime" field to ease up tracking
-    # analysis times, and a "triggers" field (which may not be generally useful,
-    # see NOTE below)
-    # name:str = ""
-    # description:str = ""
-    # file_origin: typing.Union[
-    #     str, pathlib.Path
-    #     ] = dataclasses.field(default="")
-
 
     # NOTE: 2026-03-05 23:34:21
     # file_origin refers to the file(s) origin of the object that associates
@@ -100,6 +90,8 @@ class BaseScipyenData(ScipyenDataclass):
     # as these are specific to ephys/imaging protocols.
     procedure: Procedure = dataclasses.field(default_factory=Procedure)
 
+    # pplProcedure: PPLProcedure = dataclasses.field(default_factory = PPLProcedure)
+
     def __repr__(self):
         indent = lambda x: x.replace("\n", "\n\t")
         repr_attr = lambda x: f": {type(x).__name__} → '{x}'" if isinstance(x, str) else f": {type(x).__name__} → {indent(x.__repr__())}" if dataclasses.is_dataclass(type(x)) else f": {type(x).__name__} → {x}" # noqa
@@ -115,7 +107,7 @@ class BaseScipyenData(ScipyenDataclass):
                 self._file_datetime = getFileCreationDateTime(self.file_origin)
 
 
-class BaseResult(types.SimpleNamespace):
+class BaseResult(types.SimpleNamespace): # TODO 2026-05-31 21:14:33
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
