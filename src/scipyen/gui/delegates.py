@@ -1307,8 +1307,14 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
     def _inspectIndex_(self, index: QtCore.QModelIndex,
                             # role: QtCore.Qt.ItemDataRole = ObjectDataRole
                             ) -> tuple:
+        r"""Returns the tuple (model, data, disp, choices), where:
+    :model: the item model associated with the index
+    :data:  index payload
+    :disp:  string representation of the payload
+    :choices: dictionary of name -> values that the payload may take; can be empty
+    """
         if not index.isValid():
-            return (None, None)
+            return (None, None, None, None)
 
         model = index.model() # this should never be a proxy model (in case the view uses one)
 
@@ -1350,6 +1356,8 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             if src.column() != 0:
                 src = model.getMasterItem(src)
 
+        # NOTE: 2026-09-27 09:07:23
+        # this is/should be common to all item models in Scipyen
         disp = f"{src.data(QtCore.Qt.DisplayRole)}"
 
         data = src.data(ObjectDataRole)
@@ -1361,6 +1369,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
                 dataChoices = data.objectInfo.choices
                 data = data.data
                 self._dataInObjectNode_ = True
+
             else:
                 self._dataInObjectNode_ = False
                 self._currentObjectNode_ = None
@@ -1371,8 +1380,11 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             self._useObjectDataRole_ = False
 
         # print(f"\t -> {data}\n\t -> {type(data).__name__}")
+        # print(f"\t -> disp = {disp}")
+        # print(f"\t -> choicess = {dataChoices}")
 
-        return model, data, dataChoices, disp
+
+        return model, data, disp, dataChoices
 
     def setEditorData(self, editor: QtWidgets.QWidget,
                       index: QtCore.QModelIndex):
