@@ -202,7 +202,6 @@ class ObjectInspector(ScipyenViewer):
         *args, **kwargs ⇒ passed on to ScipyenViewer superclass.
 
         """
-        self._useObjectView_: bool = kwargs.pop("useObjectView", True)
         self._showPrivateMembers_:bool = kwargs.get("showPrivate", False)
         self._showIntrospection_: bool = kwargs.get("introspect", False)
         self._showCallables_: bool = kwargs.get("showCallables", False)
@@ -271,16 +270,10 @@ class ObjectInspector(ScipyenViewer):
         self.autoResizeColumnsAction.triggered.connect(self._slot_setAutoResizeColumns)
         self.settingsMenu.addAction(self.autoResizeColumnsAction)
 
-        if self._useObjectView_:
-            self.treeView = ObjectView(parent = self,
-                                     # supported_data_types = tuple(self.viewer_for_types),
-                                     # initialExpandDepth = self._initialExpandDepth_,
-                                     autoResizeColumns = self._autoResizeColumns_)
-        else:
-            self.treeView = DataTreeView(parent = self,
-                                        supported_data_types = tuple(self.viewer_for_types),
-                                        initialExpandDepth = self._initialExpandDepth_,
-                                        autoResizeColumns = self._autoResizeColumns_)
+        self.treeView = ObjectView(parent = self,
+                                    # supported_data_types = tuple(self.viewer_for_types),
+                                    # initialExpandDepth = self._initialExpandDepth_,
+                                    autoResizeColumns = self._autoResizeColumns_)
 
         self.model = self.treeView.sourceModel
         self.model.sig_modelDataChanged.connect(self.sig_modelDataChanged)
@@ -365,18 +358,30 @@ class ObjectInspector(ScipyenViewer):
         # self._toolBarStretcher_.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         self._toolBarStretcher_.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
         self.toolBar.addWidget(self._toolBarStretcher_)
-        self.setReadOnlyAction = self.toolBar.addAction(
-            QtGui.QIcon.fromTheme("lock"), "Set read-only"
-            )
-        self.setReadOnlyAction.setCheckable(True)
-        self.setReadOnlyAction.setChecked(self._readOnly_)
-        self.setReadOnlyAction.toggled.connect(self.slot_setReadOnly)
+        self.setEditableAction = self.toolBar.addAction(
+            QtGui.QIcon(), "Set read-only")
+        self.setEditableAction.setCheckable(True)
+        self.setEditableAction.setChecked(not self._readOnly_)
+
+        if self._readOnly_:
+            self.setEditableAction.setIcon(QtGui.QIcon.fromTheme("object-locked"))
+            self.setEditableAction.setToolTip("Editing disabled; toggle to enable")
+
+        else:
+            self.setEditableAction.setIcon(QtGui.QIcon.fromTheme("object-unlocked"))
+            self.setEditableAction.setToolTip("Editing enabled; toggle to disable")
+
+        self.setEditableAction.toggled.connect(self.slot_setEditable)
 
         self.addToolBar(QtCore.Qt.TopToolBarArea, self.toolBar)
 
     @Slot(bool)
     def slot_setReadOnly(self, value: bool):
         self.readOnly = value is True
+
+    @Slot(bool)
+    def slot_setEditable(self, value: bool):
+        self.readOnly = value is False
 
     @Slot(bool)
     @safewrapper
@@ -751,6 +756,15 @@ class ObjectInspector(ScipyenViewer):
     @readOnly.setter
     def readOnly(self: typing.Self, val: bool):
         self._readOnly_ = val is True
+        with qtutils.SignalBlocker(self.setEditableAction):
+            if self._readOnly_:
+                self.setEditableAction.setIcon(QtGui.QIcon.fromTheme("object-locked"))
+                self.setEditableAction.setToolTip("Editing disabled; toggle to enable")
+
+            else:
+                self.setEditableAction.setIcon(QtGui.QIcon.fromTheme("object-unlocked"))
+                self.setEditableAction.setToolTip("Editing enabled; toggle to disable")
+
         self.treeView.readOnly = self._readOnly_
 
     @property

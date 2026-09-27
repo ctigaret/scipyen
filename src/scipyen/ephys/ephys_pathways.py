@@ -5,7 +5,7 @@
 
 
 #### BEGIN core python modules
-import os
+import os  # noqa: I001
 # import sys
 import collections
 # import traceback
@@ -872,20 +872,38 @@ class AuxiliaryInputList(NeoObjectList):
         else:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
-    def __getitem__(self, i: int) -> AuxiliaryInput | None:
+    def __getitem__(self, i: int | slice | str) -> AuxiliaryInput | None:
         """x.__getitem__(y) <==> x[y]"""
         if len(self._items) == 0:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
-        if i < len(self._items) and i >= -len(self._items):
+        if isinstance(i, int):
+            if i < len(self._items) and i >= -len(self._items):
+                return self._items[i]
+
+            else:
+                raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+        elif isinstance(i, slice):
             return self._items[i]
 
-        else:
-            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+        elif isinstance(i, str):
+            found = [x for x in filter(lambda x: x.name == i, self._items)]
+
+            if len(found) == 0:
+                raise IndexError("A pathway named '{i}' does not exist")
+
+            if len(found) == 1:
+                return found[0]
+
+            return found
 
     def __setitem__(self, i: int, value: AuxiliaryInput):
         if not isinstance(value, self.allowed_contents):
             raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(value).__name__}")
+
+        if not isinstance(i, int):
+            raise TypeError("Elements can only be assigned through integer indexing")
 
         if len(self._items) == 0:
             raise ValueError(f"Index {i} out of range for {len(self._items)} items")
@@ -1167,20 +1185,38 @@ class AuxiliaryOutputList(NeoObjectList):
         else:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
-    def __getitem__(self, i: int) -> AuxiliaryOutput | None:
+    def __getitem__(self, i: int | slice | str) -> AuxiliaryOutput | None:
         """x.__getitem__(y) <==> x[y]"""
         if len(self._items) == 0:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
-        if i < len(self._items) and i >= -len(self._items):
+        if isinstance(i, int):
+            if i < len(self._items) and i >= -len(self._items):
+                return self._items[i]
+
+            else:
+                raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+        elif isinstance(i, slice):
             return self._items[i]
 
-        else:
-            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+        elif isinstance(i, str):
+            found = [x for x in filter(lambda x: x.name == i, self._items)]
+
+            if len(found) == 0:
+                raise IndexError("A pathway named '{i}' does not exist")
+
+            if len(found) == 1:
+                return found[0]
+
+            return found
 
     def __setitem__(self, i: int, value: AuxiliaryOutput):
         if not isinstance(value, self.allowed_contents):
             raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(value).__name__}")
+
+        if not isinstance(i, int):
+            raise TypeError("Elements can only be assigned through integer indexing")
 
         if len(self._items) == 0:
             raise ValueError(f"Index {i} out of range for {len(self._items)} items")
@@ -1336,8 +1372,8 @@ class PathwaysCrossTalk(ScipyenDataclass):
     r"""Encapsulates an ordered pair of synaptic pathways tested for crosstalk.
 
 """
-    path0: typing.Union[SynapticPathway, str, int] = dataclasses.field(default_factory=SynapticPathway)
-    path1: typing.Union[SynapticPathway, str, int] = dataclasses.field(default_factory=SynapticPathway)
+    path0: SynapticPathway | str | int = dataclasses.field(default_factory=SynapticPathway)
+    path1: SynapticPathway | str | int = dataclasses.field(default_factory=SynapticPathway)
 
     def __hash__(self) -> int:
         return hash((self.path0, self.path1))
@@ -2327,7 +2363,7 @@ class SynapticPathwayList(NeoObjectList): # noqa
         return self._parent
 
     @parent.setter
-    def parent(self, obj:typing.Optional[ScipyenDataclass] = None):
+    def parent(self, obj: ScipyenDataclass | None = None):
         if isinstance(obj, ScipyenDataclass):
             self._parent = obj
         else:
@@ -2348,7 +2384,23 @@ class SynapticPathwayList(NeoObjectList): # noqa
         else:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
-    def __getitem__(self, i: int | slice) -> SynapticPathway | None:
+    def __setitem__(self, i: int, value: SynapticPathway):
+        if not isinstance(value, self.allowed_contents):
+            raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(value).__name__}")
+
+        if not isinstance(i, int):
+            raise TypeError("Elements can only be assigned through integer indexing")
+
+        if len(self._items) == 0:
+            raise ValueError(f"Index {i} out of range for {len(self._items)} items")
+
+        if i < len(self._items) and i >= -len(self._items):
+            self._items[i] = value
+
+        else:
+            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
+    def __getitem__(self, i: int | slice | str) -> SynapticPathway | None:
         """x.__getitem__(y) <==> x[y]"""
         if len(self._items) == 0:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
@@ -2359,21 +2411,34 @@ class SynapticPathwayList(NeoObjectList): # noqa
 
             else:
                 raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
         elif isinstance(i, slice):
             return self._items[i]
 
-    def __setitem__(self, i: int, value: SynapticPathway):
-        if not isinstance(value, self.allowed_contents):
-            raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(value).__name__}")
+        elif isinstance(i, str):
+            found = [x for x in filter(lambda x: x.name == i, self._items)]
 
-        if len(self._items) == 0:
-            raise ValueError(f"Index {i} out of range for {len(self._items)} items")
+            if len(found) == 0:
+                raise IndexError("A pathway named '{i}' does not exist")
 
-        if i < len(self._items) and i >= -len(self._items):
-            self._items[i] = value
+            if len(found) == 1:
+                return found[0]
 
-        else:
-            raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+            return found
+
+
+    # def __setitem__(self, i: int, value: SynapticPathway):
+    #     if not isinstance(value, self.allowed_contents):
+    #         raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(value).__name__}")
+    #
+    #     if len(self._items) == 0:
+    #         raise ValueError(f"Index {i} out of range for {len(self._items)} items")
+    #
+    #     if i < len(self._items) and i >= -len(self._items):
+    #         self._items[i] = value
+    #
+    #     else:
+    #         raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
     def __str__(self):
         """Return str(self)"""
@@ -3100,7 +3165,7 @@ class RecordingSourceList(NeoObjectList):
         else:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
 
-    def __getitem__(self, i: int | slice) -> RecordingSource | None:
+    def __getitem__(self, i: int | slice| str) -> RecordingSource | None:
         """x.__getitem__(y) <==> x[y]"""
         if len(self._items) == 0:
             raise IndexError(f"Index {i} out of range for {len(self._items)} items")
@@ -3111,12 +3176,27 @@ class RecordingSourceList(NeoObjectList):
 
             else:
                 raise IndexError(f"Index {i} out of range for {len(self._items)} items")
+
         elif isinstance(i, slice):
             return self._items[i]
+
+        elif isinstance(i, str):
+            found = [x for x in filter(lambda x: x.name == i, self._items)]
+
+            if len(found) == 0:
+                raise IndexError("A pathway named '{i}' does not exist")
+
+            if len(found) == 1:
+                return found[0]
+
+            return found
 
     def __setitem__(self, i: int, value: RecordingSource):
         if not isinstance(value, self.allowed_contents):
             raise TypeError(f"Can only contain {self.allowed_contents[0].__name__} objects, not {type(value).__name__}")
+
+        if not isinstance(i, int):
+            raise TypeError("Elements can only be assigned through integer indexing")
 
         if len(self._items) == 0:
             raise ValueError(f"Index {i} out of range for {len(self._items)} items")

@@ -1199,7 +1199,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         # print(f"{self.__class__.__name__}.createEditor")
 
-        model, data, dataChoices, _ = self._inspectIndex_(index)
+        model, data, _, dataChoices = self._inspectIndex_(index)
         if any (o is None for o in (model, data)):
             return
 

@@ -61,7 +61,7 @@ For code painting the NW corner label see
 // Retrieved 2026-06-12, License - CC BY-SA 3.0
 
 """
-    def __init__(self, parent:typing.Optional[QtWidgets.QWidget] = None, **kwargs):
+    def __init__(self, parent: QtWidgets.QWidget | None = None, **kwargs):
         super().__init__(parent)
 
         self._decimals_ = kwargs.pop("decimals", None)
