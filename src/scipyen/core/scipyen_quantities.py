@@ -1811,18 +1811,29 @@ def checkElectricalPotentialUnits(value):
 def checkTemperatureUnits(val):
     return isinstance(val, pq.Quantity) and list(val.dimensionality.keys())[0] in familyUnits("Temperature")
 
-def C2K(value: pq.Quantity) -> pq.Quantity:
-    assert checkTemperatureUnits(value), "Expecting a temperature quantity"
+def C2K(value: pq.Quantity | float | np.ndarray) -> pq.Quantity:
+    from scipy import constants
+    if isinstance(value, pq.Quantity):
+        assert checkTemperatureUnits(value), "Expecting a temperature quantity"
 
-    assert list(value.dimensionality.keys())[0] == pq.degC, "Expecting a value in degrees Celsius"
+        assert list(value.dimensionality.keys())[0] == pq.degC, "Expecting a value in degrees Celsius"
 
-    return value.rescale(pq.degK) + 273.15*pq.degK
+        return constants.convert_temperature(value.magnitude, "Celsius", "Kelvin") * pq.degK
+
+    else:
+        return constants.convert_temperature(value, "Celsius", "Kelvin") * pq.degK
+
 
 def K2C(value: pq.Quantity) -> pq.Quantity:
-    assert checkTemperatureUnits(value), "Expecting a temperature quantity"
-    assert list(value.dimensionality.keys())[0] == pq.degK, "Expecting a value in degrees Celsius"
+    from scipy import constants
+    if isinstance(value, pq.Quantity):
+        assert checkTemperatureUnits(value), "Expecting a temperature quantity"
+        assert list(value.dimensionality.keys())[0] == pq.degK, "Expecting a value in degrees Celsius"
 
-    return value.rescale(pq.degK) - 275.15*pq.degK
+        return constants.convert_temperature(value.magnitude, "Kelvin", "Celsius") * pq.degC
+
+    else:
+        return constants.convert_temperature(value, "Kelvin", "Celsius") * pq.degC
 
 def conversion_factor(x:pq.Quantity, y:pq.Quantity):
     r"""Calculates the conversion factor from y units to x units.

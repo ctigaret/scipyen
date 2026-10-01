@@ -1155,18 +1155,45 @@ def epoch_Rs_Rin(signal: typing.Union[neo.AnalogSignal, DataSignal],
     return measure_Rs_Rin(signal, vstep, intervals, channel=channel, returnIdc=returnIdc)
 
 @safewrapper
-def v_Nernst(x_out, x_in, z, temp):
+def Nernst(x_out, x_in, z, temp, useScipyConstants:bool=False):
     r"""Calculates Nernst potential for an ionic species X.
 
-    Calculates Nernst potential for an ionic species X, given its concentrations
-    x_out and x_in (in M / L), valence, and temperature (in degress centigrade).
+    Parameters:
+    ===========
+
+    :x_out, x_in: extracellular and intracellular concentrations of ion X (in M/L)
+
+    :z: valence (dimensionless), e.g. 1 for Na⁺, K⁺, 2 for Ca²⁺, -1 for Cl⁻, etc.
+
+    :temp: temperature (in degrees Celsius)
+
+    Returns:
+    ========
+    Value of the equilibrium potential (mV) for ion X at the given concentrations
+    and temperature.
+
     """
     from scipy import constants
 
-    T = constants.convert_temperature(temp, "Celsius", "Kelvin")
-    F = constants.physical_constants["Faraday constant"][0]
 
-    return constants.R * T * np.log(x_out/x_in) / (z * F)
+    T = scq.C2K(temp)
+
+    if useScipyConstants:
+
+        F = constants.physical_constants["Faraday constant"][0] * pq.C/pq.mol
+        R = constants.R * pq.J/(pq.mol * pq.degK)
+
+    else:
+        F = scq.F
+        R = scq.R
+
+    if isinstance(x_out, float):
+        x_out *= pq.M
+
+    if isinstance(x_in, float):
+        x_in *= pq.M
+
+    return (R * T * np.log(x_out/x_in) / (z * F)).rescale(pq.mV)
 
 
 # def __wave_interp_root_near_val__(w, value):

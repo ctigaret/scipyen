@@ -274,7 +274,7 @@ from core.utilities import (summarize_object_properties, # noqa
 import core.curvefitting as crvf # noqa
 import core.data_analysis as anl # noqa
 import core.desktoputils as desktoputils # noqa
-import core.scipyen_quantities as cq # noqa
+import core.scipyen_quantities as scq # noqa
 import core.strutils as strutils # noqa
 from core.strutils import counter_suffix # noqa
 import core.signalprocessing as sigp # noqa
