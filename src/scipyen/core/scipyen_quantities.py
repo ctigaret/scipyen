@@ -1808,6 +1808,22 @@ def checkElectricalPotentialUnits(value):
 
     return value._reference.dimensionality == ref._reference.dimensionality
 
+def checkTemperatureUnits(val):
+    return isinstance(val, pq.Quantity) and list(val.dimensionality.keys())[0] in familyUnits("Temperature")
+
+def C2K(value: pq.Quantity) -> pq.Quantity:
+    assert checkTemperatureUnits(value), "Expecting a temperature quantity"
+
+    assert list(value.dimensionality.keys())[0] == pq.degC, "Expecting a value in degrees Celsius"
+
+    return value.rescale(pq.degK) + 273.15*pq.degK
+
+def K2C(value: pq.Quantity) -> pq.Quantity:
+    assert checkTemperatureUnits(value), "Expecting a temperature quantity"
+    assert list(value.dimensionality.keys())[0] == pq.degK, "Expecting a value in degrees Celsius"
+
+    return value.rescale(pq.degK) - 275.15*pq.degK
+
 def conversion_factor(x:pq.Quantity, y:pq.Quantity):
     r"""Calculates the conversion factor from y units to x units.
     Alternative to pq.quantity.get_conversion_factor()
