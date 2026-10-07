@@ -9,7 +9,7 @@
 r"""
 """
 import sys, os, typing # noqa
-import pathlib # noqa
+import pathlib
 from functools import singledispatchmethod # noqa
 import qtpy # noqa
 from qtpy import (QtCore, QtGui, QtWidgets, QtXml, QtSvg, QtNetwork, ) # noqa

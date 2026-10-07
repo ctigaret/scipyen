@@ -1,0 +1,21 @@
+{
+    "KPlugin": {
+        "Name": "Scipyen KWin Wayland",
+        "Description": "Scipyen Windows Management under KWin & Wayland",
+        "Icon": "preferences-system-windows",
+
+        "Authors": [
+            {
+                "Email": "cezar.tigaret@gmail.com",
+                "Name": "Cezar Tigaret"
+            }
+        ],
+        "Id": "scipyen_kwin_wayland",
+        "Version": "1.0",
+        "License": "GPLv3",
+        "Website": "https://github.com/username/myscript"
+    },
+    "X-Plasma-API": "declarativescript",
+    "X-Plasma-MainScript": "code/main.qml",
+    "KPackageStructure": "KWin/Script"
+}

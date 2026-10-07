@@ -153,7 +153,10 @@ class AnchoringCollapsibleWidget(WorkspaceGuiMixin):
         """
         if self.anchoringWidget:
             if desktoputils.is_wayland():
-                self.setWindowFlags(self.windowFlags() | QtCore.Qt.Tool)#  | QtCore.Qt.CustomizeWindowHint | QtCore.Qt.BypassWindowManagerHint)
+                self.setWindowFlags(QtCore.Qt.Dialog)#  | QtCore.Qt.CustomizeWindowHint | QtCore.Qt.BypassWindowManagerHint)
+                # self.setWindowFlags(self.windowFlags() | QtCore.Qt.Dialog)#  | QtCore.Qt.CustomizeWindowHint | QtCore.Qt.BypassWindowManagerHint)
+                self.setWindowModality(QtCore.Qt.WindowModal) # no effect when using Popup !
+                # self.setWindowFlags(self.windowFlags() | QtCore.Qt.Tool)#  | QtCore.Qt.CustomizeWindowHint | QtCore.Qt.BypassWindowManagerHint)
                 # self.setWindowFlags(self.windowFlags() | QtCore.Qt.Popup)#  | QtCore.Qt.CustomizeWindowHint | QtCore.Qt.BypassWindowManagerHint)
 
 
@@ -169,7 +172,6 @@ class AnchoringCollapsibleWidget(WorkspaceGuiMixin):
                 # self.setWindowFlag(QtCore.Qt.WindowTitleHint, True)
                 # self.setWindowFlag(QtCore.Qt.WindowCloseButtonHint, True)
 
-                # self.setWindowModality(QtCore.Qt.WindowModal) # no effect when using Popup !
             else:
                 if isinstance(self._windowFlags_, QtCore.Qt.WindowType):
                     self.setWindowFlags(self._windowFlags_)

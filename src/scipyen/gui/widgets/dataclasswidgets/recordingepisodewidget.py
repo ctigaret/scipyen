@@ -312,14 +312,14 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
             return
 
         doc_title = self._protocol_.name
-        if not isinstance(self.protocolViewer, ObjectInspector.ObjectInspector):
+        if not isinstance(self.protocolViewer, ObjectInspector):
             topWindow = self.getHighestAncestor()
             if topWindow is self:
                 appWindow = None
             else:
                 appWindow = topWindow
 
-            self.protocolViewer = ObjectInspector.ObjectInspector(
+            self.protocolViewer = ObjectInspector(
                 parent=self,
                 doc_title=doc_title,
                 appWindow = appWindow,
@@ -519,7 +519,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
             self._end_ = self._data_.end
             self._episodeType_ = self._data_.type
             if isinstance(self._data_.stimulusLayout, ephys_pathways.PathwaysStimulationLayout):
-                if (isinstance(self.stimulusLayoutViewer, ObjectInspector.ObjectInspector)
+                if (isinstance(self.stimulusLayoutViewer, ObjectInspector)
                     and self.stimulusLayoutViewer.isVisible()
                     and qtutils.isQObjectAlive(self.stimulusLayoutViewer)
                     ):
@@ -533,7 +533,7 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
             self._stimulusLayout_ = self._data_.stimulusLayout
 
             if isinstance(self._data_.protocol, ephys_protocol.ElectrophysiologyProtocol):
-                if (isinstance(self.protocolViewer, ObjectInspector.ObjectInspector)
+                if (isinstance(self.protocolViewer, ObjectInspector)
                     and self.protocolViewer.isvisible()
                     and qtutils.isQObjectAlive(self.protocolViewer)
                     ):
@@ -558,14 +558,14 @@ class RecordingEpisodeWidget(Ui_RecordingEpisodeWidget, DataClassWidget, QtWidge
             self._nFrames_ = 0
             self._protocol_ = None
             self._stimulusLayout_ = None
-            if (isinstance(self.stimulusLayoutViewer, ObjectInspector.ObjectInspector)
+            if (isinstance(self.stimulusLayoutViewer, ObjectInspector)
                 and qtutils.isQObjectAlive(self.stimulusLayoutViewer)
                 ):
                 self.stimulusLayoutViewer.close()
                 self.stimulusLayoutViewer.deleteLater()
                 self.stimulusLayoutViewer = None
 
-            if (isinstance(self.protocolViewer, ObjectInspector.ObjectInspector)
+            if (isinstance(self.protocolViewer, ObjectInspector)
                 and qtutils.isQObjectAlive(self.protocolViewer)
                 ):
                 self.protocolViewer.close()

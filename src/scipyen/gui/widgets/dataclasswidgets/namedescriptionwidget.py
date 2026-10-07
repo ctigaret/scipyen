@@ -206,7 +206,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
             self._dataName_ = val.name
             self.nameLineEdit.setText(self._dataName_)
 
-        if isinstance(self.detailsViewer, ObjectInspector.ObjectInspector):# and self.detailsViewer.isVisible():
+        if isinstance(self.detailsViewer, ObjectInspector):# and self.detailsViewer.isVisible():
             # print(f"\n\t-> call self.detailsViewer.view({val},\n{self.symbol})")
             self.detailsViewer.view(val, doc_title=self.symbol, autoRaise=False)
             self.detailsViewer.slot_refreshDataDisplay()
@@ -258,13 +258,13 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
         doc_title =  varName if len(varName.strip()) else getattr(obj, 'name', type(obj).__name__)
         # win_title = f"Details of {varName}"
         # win_title = "Details"
-        if not isinstance(self.detailsViewer, ObjectInspector.ObjectInspector):
+        if not isinstance(self.detailsViewer, ObjectInspector):
             topWindow = self.getHighestAncestor()
             if topWindow is self:
                 appWindow = None
             else:
                 appWindow = topWindow
-            self.detailsViewer = ObjectInspector.ObjectInspector(
+            self.detailsViewer = ObjectInspector(
                 parent=self,
                 doc_title=doc_title,
                 appWindow = appWindow,
@@ -355,7 +355,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
         if isinstance(val, str) and len(val.strip()):
             self._objSymbol_ = val
             if (
-                isinstance(self.detailsViewer, ObjectInspector.ObjectInspector)
+                isinstance(self.detailsViewer, ObjectInspector)
                 and qtutils.isQObjectAlive(self.detailsViewer)
                 ):
                 self.detailsViewer.setRootName(self._objSymbol_)
@@ -419,7 +419,7 @@ class NameDescriptionWidget(Ui_NameDescriptionWidget, AnchoringCollapsibleWidget
             self.descriptionEditor.deleteLater()
             self.descriptionEditor = None
 
-        if isinstance(self.detailsViewer, ObjectInspector.ObjectInspector):
+        if isinstance(self.detailsViewer, ObjectInspector):
             self.detailsViewer.close()
             self.detailsViewer.deleteLater()
             self.detailsViewer = None

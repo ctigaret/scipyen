@@ -78,6 +78,9 @@ class BiologicalSourceWidget(Ui_BiologicalSourceWidget, DataClassWidget, QtWidge
     def __init__(self, parent: typing.Optional[QtWidgets.QWidget] = None,
                  obj: typing.Optional[sdc.BiologicalSource] = None,
                  **kwargs):
+
+        # print(f"{self.__class__.__name__}.__init__(parent = {parent})")
+
         if isinstance(parent, self._objectTypes_):
             obj_ = parent
             if isinstance(obj, QtWidgets.QWidget):

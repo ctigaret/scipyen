@@ -6832,7 +6832,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
 
         self.sig_windowRemoved.connect(self.slot_windowRemoved)
 
-        self.setWindowTitle("Scipyen")
+        self.setWindowTitle("Scipyen Main Window")
         #
         # ### END   miscellaneous
 
@@ -8363,7 +8363,7 @@ class ScipyenWindow(QtWidgets.QMainWindow, Ui_MainWindow, WorkspaceGuiMixin):
             self._updateFileSystemView_(targetDir, True)
             self.currentDirectory = targetDir
             mpl.rcParams["savefig.directory"] = targetDir
-            self.setWindowTitle("Scipyen %s" % targetDir)
+            self.setWindowTitle("Scipyen Main Window %s" % targetDir)
 
             self.sig_changedDirectory.emit(targetDir)
 

@@ -232,9 +232,9 @@ class BGAtlasStructureLookupWidget(Ui_BGAtlasStructureLookupWidget, QtWidgets.QW
         if not isinstance(self._containerWidget_, DataClassWidget):
             return
 
-        if not isinstance(self.detailsViewer, ObjectInspector.ObjectInspector):
+        if not isinstance(self.detailsViewer, ObjectInspector):
             scipyenWindow = getattr(self.containerWidget, "scipyenWindow", None)
-            self.detailsViewer = ObjectInspector.ObjectInspector(
+            self.detailsViewer = ObjectInspector(
                 scipyenWindow = scipyenWindow,
                 readOnly=True
                 )

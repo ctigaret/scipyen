@@ -425,6 +425,7 @@ class DataClassWidget(AnchoringCollapsibleWidget):
                           dataSymbol: str,
                           ) -> QtWidgets.QWidget:
         anchoringWidget = self.provideAnchoringWidget()
+        # print(f"{self.__class__.__name__}._makeEditorWidget(data = {data})")
         obj = self._setupCollapsibleChild_(
             widgetType,
             widgetName,
@@ -433,7 +434,7 @@ class DataClassWidget(AnchoringCollapsibleWidget):
             anchoringWidget,
             not desktoputils.is_wayland(),
             data,
-            dataSymbol="organism"
+            dataSymbol="organism",
             )
 
         return obj

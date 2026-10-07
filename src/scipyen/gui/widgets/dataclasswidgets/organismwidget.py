@@ -305,8 +305,8 @@ class OrganismWidget(Ui_OrganismWidget, DataClassWidget, QtWidgets.QWidget):
         # win_title = f"Taxon Details of {getattr(self._data_, 'name', type(self._data_).__name__)}"
         doc_title =  "taxon"
         if taxonbridge.hasTaxoniq and isinstance(self._data_.taxon, taxonbridge.Taxon):
-            if not isinstance(self.taxonDetailsViewer, ObjectInspector.ObjectInspector):
-                self.taxonDetailsViewer= ObjectInspector.ObjectInspector(
+            if not isinstance(self.taxonDetailsViewer, ObjectInspector):
+                self.taxonDetailsViewer= ObjectInspector(
                     parent=self,
                     doc_title=doc_title,
                     # title="Detailed view"
