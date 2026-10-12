@@ -582,6 +582,30 @@ class DirectoryObserver(QtCore.QObject):
 
 
 class FileIOGui:
+    # FIXME 2026-10-12 11:50:27
+    # File I/O in Scipyen is problematic because all different data types end up
+    # as one of few mime types (most commonly pickle, some generic HDF5 attempts,
+    # JSON, and plain text or comma-separate value where possible and appropriate)
+    #
+    # This has the inherent problem of NOT KNOWING what sort of data is serialized
+    # to the file on disk UNTIL AFTER THE FILE WAS LOADED (especially for Pickle
+    # and JSON). While in most situations this generally works well, this raises
+    # a problem for large files (i.e. containing large data structures) where the
+    # actual TYPE of the data object is resolved AFTER deserializing the file's contents
+    #
+    # This effectively means having to wait for some time before the code can figure
+    # out if the file provides the data type that is fit for its purpose
+    #
+    # I REALLY need a better way - and less generic than pickle, but
+    # nevertheless FAST - to save-load data streams on disk, and to include
+    # a bit sequence at the very beginning to tell me what type of data is
+    # this.
+    #
+    # NOTE: Until I find an efficient way to do this, ths functionality is
+    # HIDDEN from all Scipyen apps. Saving/loading of data should be done
+    # via Scipyen's main window (context menu in the workspace, for saving,
+    # contect menu for loading, in the file system browseer)
+
     @safewrapper
     def chooseFile(self, caption: str | None = None, fileFilter: str | None = None,
                    single: bool = True,
