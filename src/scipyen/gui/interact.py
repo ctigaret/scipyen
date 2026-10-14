@@ -133,9 +133,8 @@ def selectWSData(*args, title="", single=True, asDict=False,
 
     name_vars = lsvars(*args, glob=glob, ws=user_ns_visible, **kwargs)
 
-    if len(name_vars) == 0:
-        if retrieve_all is True:
-            name_vars = lsvars(glob=glob, ws = user_ns_visible, **kwargs)
+    if len(name_vars) == 0 and retrieve_all is True:
+        name_vars = lsvars(glob=glob, ws = user_ns_visible, **kwargs)
 
     if len(name_vars) == 0:
         return tuple()

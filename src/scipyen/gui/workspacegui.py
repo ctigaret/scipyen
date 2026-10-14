@@ -1386,7 +1386,7 @@ class WorkspaceGuiMixin(GuiMessages, FileIOGui, ScipyenConfigurable):
                             with_varName: bool = False,
                             predicate = None,
                             retrieve_all: bool = True,
-                            ) -> list | dict | None:
+                            ) -> tuple:
         r"""Version of importWorkspaceData using interact module"""
         # TODO: 2026-06-21 15:46:19 harmonize with self.importWorkspaceData
         from gui import interact

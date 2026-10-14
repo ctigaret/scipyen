@@ -178,6 +178,7 @@ class MetaDataWidget(Ui_MetaDataWidget, DataClassWidget, QtWidgets.QWidget):
         return self._data_
 
     def setValue(self, data: bsc.BaseScipyenData, **kwargs):
+        # print(f"{self.__class__.__name__}.setValue({type(data).__name__} object)")
         if not isinstance(data, bsc.BaseScipyenData):
             self._data_ = bsc.BaseScipyenData()
         else:
