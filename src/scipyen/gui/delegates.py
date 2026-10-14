@@ -99,6 +99,8 @@ NOTE: To be used with Scipyen's custom itemmodels only
 """
         QtWidgets.QMainWindow.__init__(self, parent=parent)
 
+        self._dataName_ = kwargs.get("dataName", None)
+
         self._pendingChange_: bool = False
         self._lazy_ = lazy is True
 
@@ -245,8 +247,8 @@ NOTE: To be used with Scipyen's custom itemmodels only
     @_makeWidget_.register(ephys_protocol.ElectrophysiologyProtocol)
     @_makeWidget_.register(ephys_pathways.PathwaysStimulationLayout)
     def __makeWidget__(self, obj: ephys_protocol.ElectrophysiologyProtocol | ephys_pathways.PathwaysStimulationLayout, name: str) -> QtWidgets.QWidget | None: # noqa
-        from gui.widgets import datatreeview
-        widget = datatreeview.DataTreeView(parent=self)
+        from gui.widgets.objectview import ObjectView
+        widget = ObjectView(parent=self, name=self._dataName_)
         widget.setData(obj)
         widget.setObjectName(f"{name}_Widget")
         return widget
@@ -1067,8 +1069,15 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
             # CAUTION 2026-06-09 19:08:50
             # this is supposed to edit the python object represented by the
             # entire model data row!!!
+            # WARNING 2026-10-14 22:04:21 for tabular data model only!
             if isinstance(modelData, typing.Iterable):
-                self._externalDataEditor_ = ExternalEditorDelegate(modelData[self._currentModelIndex_.row()])
+                row = self._currentModelIndex_.row()
+                dataObject = modelData[row]
+                dataName = getattr(dataObject, "name", "")
+                if not isinstance(dataName, str) or len(dataName.strip()) == 0:
+                    dataName = f"{type(dataObject).__name__}_"
+
+                self._externalDataEditor_ = ExternalEditorDelegate(dataObject)
                 self._externalDataEditor_.sig_valueChanged.connect(self._slot_dataEditedExternally)
                 self._externalDataEditor_.sig_closing.connect(self._slot_externalEditorClosing)
 
@@ -1199,7 +1208,7 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
         # print(f"{self.__class__.__name__}.createEditor")
 
-        model, data, _, dataChoices = self._inspectIndex_(index)
+        model, data, _, dataChoices = self._inspectIndex_(index) # BUG 2026-10-14 22:18:25 FIXME returns None for Edit columns!
         if any (o is None for o in (model, data)):
             return
 
@@ -1264,9 +1273,12 @@ class PythonItemDelegate(QtWidgets.QStyledItemDelegate):
 
                 return widget
 
-            elif isinstance(data, (ephys_protocol.ElectrophysiologyProtocol,
-                                    sdc.Procedure,
-                                    ephys_pathways.PathwaysStimulationLayout)):
+            elif isinstance(data, (
+                ephys_protocol.ElectrophysiologyProtocol,
+                ephys_pathways.PathwaysStimulationLayout
+                sdc.Procedure,
+                )
+            ):
                 # for these types call the external editor!
                 widget = QtWidgets.QPushButton(guiutils.getIcon("document-edit"), "", parent)
                 if hasattr(widget, "setFrame"):

@@ -45,7 +45,7 @@ else:
     # __has_sip__ = True
 
 
-import pandas as pd
+import pandas as pd  # noqa: I001
 import quantities as pq
 #import xarray as xa
 import numpy as np
@@ -1192,10 +1192,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         if isinstance(obj, (ephys_protocol.ElectrophysiologyProtocol,
                             sdc.Procedure,
                             ephys_pathways.PathwaysStimulationLayout)):
-        # if isinstance(obj, (ephys_protocol.ElectrophysiologyProtocol,
-        #                     sdc.Procedure,
-        #                     )
-        #             ):
             ret = qVariant(obj)
             obj_disp = qVariant(getattr(obj, "name", obj_type_name))
             # obj_disp = qVariant(getattr(obj, "name", guiutils.getIcon("view-list-tree")))
@@ -1269,6 +1265,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                             )
                                         )
                                     )
+
         elif obj is ephys_pathways.AuxiliaryOutput:
             self._modelDataColumnHeaders_ = dict(
                 tuple(
@@ -1326,7 +1323,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         elif obj is TriggerProtocol:
             self._modelDataColumnHeaders_ = dict(
                 tuple(
-                    map(
+                    map(  # noqa: C417
                         lambda x: (x[0], f"{x[1]}"),
                         enumerate(("name", "presynaptic", "postsynaptic", "photostimulation",
                             "acquisition", "imagingDelay" ,"segments")
@@ -1347,7 +1344,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._canAddRemoveRows_ = False
         self._canAddRemoveColumns_ = False
         self._modelDataColumnHeaders_ = dict()
-        # self._modelDataRowIndexName_ = "Index"
 
     @_makeModelData_.register(types.NoneType)
     def __makeModelData__(self, data: types.NoneType):
@@ -1368,7 +1364,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         if isinstance(self._modelData_.columns, (pd.MultiIndex, pd.Index)):
             self._modelDataColumnHeaders_ = dict(
                 tuple(
-                    map(
+                    map(  # noqa: C417
                         lambda x: (x[0], f"{x[1]}"),
                         enumerate(data.columns)
                         )
@@ -1420,16 +1416,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelData_ = data
         self._modelDataRows_ = len(data)
         self._makeColumnHeadersForTabularElement_(ephys_pathways.RecordingEpisode)
-        # self._modelDataColumnHeaders_ = dict(
-        #     tuple(
-        #         map( # noqa
-        #             lambda x: (x[0], f"{x[1]}"),
-        #             enumerate(("name", "begin", "end", "beginFrame", "nFrames",
-        #                        "procedure", "protocol", "episodeType", "stimLayout",
-        #                        "Edit"))
-        #             )
-        #         )
-        #     )
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
         self._modelDataRowIndexName_ = "Index"
 
@@ -1440,16 +1426,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._modelData_ = data
         self._modelDataRows_ = len(data)
         self._makeColumnHeadersForTabularElement_(sdc.Episode)
-        # self._modelDataColumnHeaders_ = dict(
-        #     tuple(
-        #         map( # noqa
-        #             lambda x: (x[0], f"{x[1]}"),
-        #             enumerate(("name", "begin", "end", "beginFrame", "nFrames",
-        #                        "procedure", "protocol", "episodeType", "stimLayout",
-        #                        "Edit"))
-        #             )
-        #         )
-        #     )
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
         self._modelDataRowIndexName_ = "Index"
 
@@ -1463,15 +1439,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         self._canAddRemoveColumns_ = False
 
         self._makeColumnHeadersForTabularElement_(TriggerProtocol)
-        # self._modelDataColumnHeaders_ = dict(
-        #     tuple(
-        #         map(
-        #             lambda x: (x[0], f"{x[1]}"),
-        #             enumerate(("name", "presynaptic", "postsynaptic", "photostimulation",
-        #                 "acquisition", "imagingDelay" ,"segments")
-        #             ))
-        #         )
-        #     )
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
         self._modelDataRowIndexName_ = "Index"
 
@@ -1488,15 +1455,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         # NOTE: 2026-06-07 21:38:40 see NOTE: 2026-06-07 21:36:23
         self._makeColumnHeadersForTabularElement_(ephys_pathways.SynapticPathway)
-        # self._modelDataColumnHeaders_ = dict(
-        #     tuple(
-        #         map(
-        #             lambda x: (x[0], f"{x[1]}"),
-        #             enumerate(("name", "adc", "dac",
-        #                         "electrodeMode", "pathwayType", "Edit")
-        #             ))
-        #         )
-        #     )
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
         self._modelDataRowIndexName_ = "Index"
 
@@ -1514,14 +1472,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
         # name & adc; give option to edit the entire object via an "Edit"
         # column
         self._makeColumnHeadersForTabularElement_(ephys_pathways.AuxiliaryInput)
-        # self._modelDataColumnHeaders_ = dict(
-        #     tuple(
-        #         map( # noqa
-        #             lambda x: (x[0], f"{x[1]}"),
-        #             enumerate(("name", "adc", "Edit"))
-        #             )
-        #         )
-        #     )
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
         self._modelDataRowIndexName_ = "Index"
 
@@ -1536,14 +1486,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         # NOTE: 2026-06-07 21:37:08 see NOTE: 2026-06-07 21:36:23
         self._makeColumnHeadersForTabularElement_(ephys_pathways.AuxiliaryOutput)
-        # self._modelDataColumnHeaders_ = dict(
-        #     tuple(
-        #         map( # noqa
-        #             lambda x: (x[0], f"{x[1]}"),
-        #             enumerate(("name", "channel", "Edit"))
-        #             )
-        #         )
-        #     )
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
         self._modelDataRowIndexName_ = "Index"
 
@@ -1558,14 +1500,6 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
         # NOTE: 2026-06-07 21:38:07 see NOTE: 2026-06-07 21:36:23
         self._makeColumnHeadersForTabularElement_(ephys_pathways.SynapticStimulusChannel)
-        # self._modelDataColumnHeaders_ = dict(
-        #     tuple(
-        #         map( # noqa
-        #             lambda x: (x[0], f"{x[1]}"),
-        #             enumerate(("name", "channel", "dig"))
-        #             )
-        #         )
-        #     )
         self._modelDataColumns_ = len(self._modelDataColumnHeaders_)
         self._modelDataRowIndexName_ = "Index"
 
@@ -1620,10 +1554,10 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                                 )
 
                     if channel_names is None:
-                        channel_names = list(map(lambda i: f"Channel {i}", range(data.shape[1])))
+                        channel_names = list(map(lambda i: f"Channel {i}", range(data.shape[1]))) # noqa: C417
 
                     # print(f"{self.__class__.__name__}._makeModelData_({type(data).__name__})")
-                    channel_names = list(
+                    channel_names = list( # noqa: C417
                         map(
                             lambda kc: f"{channel_names[kc]} ({data[:,kc].dimensionality})",
                             range(len(channel_names))
@@ -1636,21 +1570,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     self._modelDataColumnHeaders_ = dict(
                                 tuple(enumerate(headers))
                             )
-                    # self._modelDataColumnHeaders_ = dict(
-                    #         (
-                    #             tuple(
-                    #                     map(
-                    #                         lambda x: (x[0], x),
-                    #                         enumerate(headers)
-                    #                        )
-                    #                  )
-                    #         )
-                    #     )
 
-                    # if isinstance(data, (neo.IrregularlySampledSignal, IrregularlySampledDataSignal)):
-                    #     self._modelDataRowIndexName_ = "Index"
-                    # else:
-                    #     self._modelDataRowIndexName_ = domain_name
                     self._modelDataRowIndexName_ = "Index"
                     # print(f"\t _modelDataRowIndexName_ = {self._modelDataRowIndexName_}")
                     # print(f"\t _modelDataColumnHeaders_ = {self._modelDataColumnHeaders_}\n")
@@ -1681,14 +1601,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         channel_names = None
                         if len(data.array_annotations):
                             if "channel_names" in data.array_annotations:
-                                channel_names = list(
+                                channel_names = list( # noqa: C417
                                     map(
                                         lambda n: f"{n}",
                                         data.array_annotations["channel_names"]
                                         )
                                     )
                             elif "channel_ids" in data.array_annotations:
-                                channel_names = list(
+                                channel_names = list( # noqa: C417
                                     map(
                                         lambda i: f"{i}",
                                         data.array_annotations["channel_ids"]
@@ -1701,7 +1621,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                         headers = [domain_name, ] + channel_names
 
                     self._modelDataColumnHeaders_ = dict(
-                            tuple(map(lambda x: (x[0]+1, x),
+                            tuple(map(lambda x: (x[0]+1, x), # noqa: C417
                                         enumerate(headers))
                                 )
                         )
@@ -1736,7 +1656,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     if isinstance(self._modelData_, pq.Quantity):
                         self._modelDataColumnHeaders_ = dict(
                                 tuple(
-                                    map(
+                                    map( # noqa: C417
                                         lambda x: (x, f"{scq.getUnitFamily(data)} ({self._modelData_.units.dimensionality})"),
                                         range(self._modelData_.shape[1])
                                         )
@@ -1769,7 +1689,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                 # NOTE: 2026-06-07 21:38:07 see NOTE: 2026-06-07 21:36:23
                 self._modelDataColumnHeaders_ = dict(
                     tuple(
-                        map(
+                        map( # noqa: C417
                             lambda x: (x[0], f"{x[1]}"),
                             enumerate(("name", "adc", "dac", "electrodeMode", "Edit"))
                             )
@@ -1794,7 +1714,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                 self._modelDataColumnHeaders_ = dict(
                     tuple(
-                        map(
+                        map( # noqa: C417
                             lambda x: (x, f"{x}"),
                             range(self._modelDataColumns_)
                             )
@@ -1809,7 +1729,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     self._canAddRemoveColumns_ = False
 
                 else:
-                    self.immutableRows = list(
+                    self.immutableRows = list( # noqa: C417
                         map(
                             lambda x: x[0],
                             filter(
@@ -1838,7 +1758,7 @@ class TabularDataModel(QtCore.QAbstractTableModel):
 
                     self._modelDataColumnHeaders_ = dict(
                         tuple(
-                            map(
+                            map(  # noqa: C417
                                 lambda x: (x, f"{x}"),
                                 range(self._modelDataColumns_)
                                 )
@@ -1860,14 +1780,14 @@ class TabularDataModel(QtCore.QAbstractTableModel):
                     scipywarn(f"{self.__class__.__name__} <with parent widget: {self.parent().objectName() if isinstance(self.parent(), QtWidgets.QWidget) else None}>: Unsupported sequence element types")
                     self._modelDataColumns_ = 0
                     self._modelDataRows_ = 0
-                    self._modelDataColumnHeaders_ = dict()
+                    self._modelDataColumnHeaders_ = {}
                     self._modelData_ = None
                     self._original_data_ = None
 
         else:
             self._modelDataColumns_ = 0
             self._modelDataRows_ = 0
-            self._modelDataColumnHeaders_ = dict()
+            self._modelDataColumnHeaders_ = {}
             self._modelData_ = data
             self._original_data_ = data
             self._canAddRemoveRows_ = True
